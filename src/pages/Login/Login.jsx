@@ -1,7 +1,18 @@
 import { useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { WordmarkWhite, MonoKnot } from '../../components/Logo/Logo';
+import { LOGIN_ICONS } from './loginAssets';
+import { WordmarkWhite, WordmarkDark, MonoKnot } from '../../components/Logo/Logo';
+import heroPeople from '../../assets/login/login-people.webp';
 import './Login.css';
+
+const FEATURES = [
+  { icon: LOGIN_ICONS.deals, title: 'CRM та угоди', sub: 'Клієнти, угоди та воронка продажів.' },
+  { icon: LOGIN_ICONS.reports, title: 'Тижневі звіти', sub: 'Усі дані про проєкти в одному місці.' },
+  { icon: LOGIN_ICONS.projects, title: 'Проєкти', sub: 'Контроль задач і прогресу команди.' },
+  { icon: LOGIN_ICONS.team, title: 'Команда', sub: 'Спільна робота та ресурси студії.' },
+  { icon: LOGIN_ICONS.ai, title: 'AI-асистенти', sub: 'Автоматизація рутинних процесів.' },
+  { icon: LOGIN_ICONS.compare, title: 'Аналітика', sub: 'Динаміка та прозорість результатів.' },
+];
 
 const ALLOWED_DOMAIN = '@monarchi.agency';
 // The account this CRM was originally set up under, kept working even
@@ -94,41 +105,67 @@ export default function Login() {
 
   return (
     <div className="login">
-      <div className="login-brand">
-        <MonoKnot className="mono" />
-        <div className="login-brand-top">
-          <WordmarkWhite className="login-wordmark" />
+      <div className="login-hero">
+        <div className="login-hero__bg" aria-hidden="true" />
+        <div className="login-hero__watermark-clip" aria-hidden="true">
+          <MonoKnot className="login-hero__watermark" />
         </div>
-        <div className="login-brand-mid">
-          <div className="login-brand-bottom">
-            <div className="kicker">Monarchi &middot; Operations</div>
-            <h2>Внутрішня CRM для звітності та інструментів команди.</h2>
+
+        <div className="login-hero__top">
+          <div className="login-hero__kicker-top">Monarchi &middot; Operations</div>
+        </div>
+
+        <div className="login-hero__body">
+          <h2>Єдина внутрішня платформа Mon&#39;Archi</h2>
+
+          <div className="login-hero__lower">
             <p>
-              Тижневі, місячні та річні звіти, порівняння періодів і робочі студії &mdash; в одному місці,
-              доступному лише команді.
+              Керуйте клієнтами та угодами в CRM, ведіть проєкти, працюйте зі звітністю, використовуйте
+              AI-асистентів, автоматизації та робочі інструменти - без перемикання між десятками сервісів.
             </p>
+
+            <div className="login-feature-list">
+              {FEATURES.map((f) => (
+                <div className="login-feature-card" key={f.title}>
+                  <span className="login-feature-card__icon" dangerouslySetInnerHTML={{ __html: f.icon }} />
+                  <div>
+                    <div className="login-feature-card__title">{f.title}</div>
+                    <div className="login-feature-card__sub">{f.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+
+        <img className="login-hero__people" src={heroPeople} alt="" aria-hidden="true" />
       </div>
 
-      <div className="login-panel">
+      <div className="login-right">
         <div className="login-card">
+          <div className="login-card__logo-row">
+            <WordmarkDark className="login-card__logo" />
+          </div>
+
           {method === 'password' ? (
             <div>
               <h1>Увійти паролем</h1>
               <p className="sub">Робоча пошта та пароль, які ви встановили в кабінеті.</p>
               <div className="field">
                 <label htmlFor="pwLoginEmail">Робоча пошта</label>
-                <input
-                  id="pwLoginEmail"
-                  type="email"
-                  placeholder="name@monarchi.agency"
-                  required
-                  autoComplete="email"
-                  value={pwEmail}
-                  onChange={(e) => setPwEmail(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); signInWithPassword(); } }}
-                />
+                <div className="field-input-wrap">
+                  <span className="field-input-icon" dangerouslySetInnerHTML={{ __html: LOGIN_ICONS.mail }} />
+                  <input
+                    id="pwLoginEmail"
+                    type="email"
+                    placeholder="name@monarchi.agency"
+                    required
+                    autoComplete="email"
+                    value={pwEmail}
+                    onChange={(e) => setPwEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); signInWithPassword(); } }}
+                  />
+                </div>
               </div>
               <div className="field">
                 <label htmlFor="pwLoginPassword">Пароль</label>
@@ -143,39 +180,44 @@ export default function Login() {
                 />
               </div>
               <button type="button" className="login-btn" disabled={pwSending} onClick={signInWithPassword}>
+                {pwSending ? <span className="login-btn__spinner" /> : null}
                 {pwSending ? 'Входимо...' : 'Увійти'}
               </button>
               {errPw && <p className="login-note err">{errPw}</p>}
               <p className="login-note">
                 <a href="#" onClick={(e) => { e.preventDefault(); setMethod('otp'); setErrPw(''); }}>Увійти кодом натомість</a>
               </p>
-              <p className="login-foot">MONARCHI CRM &middot; INTERNAL</p>
             </div>
           ) : step === 'email' ? (
             <div>
-              <h1>Увійти в Monarchi CRM</h1>
-              <p className="sub">Введіть робочу пошту команди. Ми надішлемо одноразовий код для входу.</p>
+              <h1 className="center">Вхід на платформу</h1>
+              <p className="sub center">Введіть робочу пошту команди. Ми надішлемо одноразовий код для входу.</p>
               <div className="field">
-                <label htmlFor="loginEmail">Робоча пошта</label>
-                <input
-                  id="loginEmail"
-                  type="email"
-                  placeholder="name@monarchi.agency"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendCode(); } }}
-                />
+                <div className="field-input-wrap">
+                  <span className="field-input-icon" dangerouslySetInnerHTML={{ __html: LOGIN_ICONS.mail }} />
+                  <input
+                    id="loginEmail"
+                    type="email"
+                    aria-label="Робоча пошта"
+                    placeholder="name@monarchi.agency"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendCode(); } }}
+                  />
+                </div>
               </div>
               <button type="button" className="login-btn" disabled={sending} onClick={sendCode}>
-                {sending ? 'Надсилаємо...' : 'Надіслати код'}
+                {sending && <span className="login-btn__spinner" />}
+                <span>{sending ? 'Надсилання...' : 'Надіслати код'}</span>
+                {!sending && <span className="login-btn__arrow" dangerouslySetInnerHTML={{ __html: LOGIN_ICONS.arrowRight }} />}
               </button>
               {errEmail && <p className="login-note err">{errEmail}</p>}
+              <div className="login-divider"><span>або</span></div>
               <p className="login-note">
                 <a href="#" onClick={(e) => { e.preventDefault(); setMethod('password'); setErrEmail(''); }}>Увійти паролем натомість</a>
               </p>
-              <p className="login-foot">MONARCHI CRM &middot; INTERNAL</p>
             </div>
           ) : (
             <div>
@@ -196,7 +238,8 @@ export default function Login() {
                 />
               </div>
               <button type="button" className="login-btn" disabled={verifying} onClick={verifyCode}>
-                {verifying ? 'Перевіряємо...' : 'Увійти'}
+                {verifying && <span className="login-btn__spinner" />}
+                {verifying ? 'Перевірка...' : 'Увійти'}
               </button>
               {errCode && <p className="login-note err">{errCode}</p>}
               <p className="login-note">
@@ -206,9 +249,13 @@ export default function Login() {
                   Змінити пошту
                 </a>
               </p>
-              <p className="login-foot">MONARCHI CRM &middot; INTERNAL</p>
             </div>
           )}
+        </div>
+
+        <div className="login-right__foot">
+          <div className="login-right__foot-title">Лише для внутрішньої команди</div>
+          <div className="login-right__foot-sub">MONARCHI CRM &middot; INTERNAL</div>
         </div>
       </div>
     </div>

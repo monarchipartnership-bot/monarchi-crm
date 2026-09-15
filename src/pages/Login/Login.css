@@ -1,93 +1,257 @@
-.login { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
-.login-brand {
+/* Design tokens for this page only — scoped under .login so they don't
+   collide with the app's own global --purple/--ink/etc. in index.css. */
+.login {
+  --ma-purple-950: #2a0f34;
+  --ma-purple-900: #35113f;
+  --ma-purple-800: #45134d;
+  --ma-purple-700: #5b1f68;
+  --ma-purple-600: #7131a9;
+  --ma-purple-500: #8d49d2;
+  --ma-purple-300: #cfaaf0;
+  --ma-purple-100: #f2e9fb;
+  --ma-text: #211727;
+  --ma-muted: #817589;
+  --ma-border: #e8e1ec;
+  --ma-page: #fbfafc;
+
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.27fr 1fr;
+  background: var(--ma-page);
+}
+
+/* ============================= LEFT — HERO ============================= */
+.login-hero {
   position: relative;
-  background: var(--purple-deep);
-  color: #fff;
-  overflow: hidden;
+  overflow: visible;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
-  padding: 44px clamp(28px, 4vw, 56px);
+  padding: 40px clamp(28px, 3.6vw, 64px);
+  color: #fff;
 }
-.login-brand .mono { position: absolute; right: -70px; bottom: -70px; width: 380px; height: 380px; opacity: .09; pointer-events: none; }
-.login-brand-top { position: relative; z-index: 1; }
-.login-wordmark { width: 180px; flex: none; }
-.login-wordmark svg { display: block; width: 100%; height: auto; }
-.login-brand-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; position: relative; z-index: 1; }
-.login-brand-bottom { max-width: 440px; }
-.login-brand-bottom .kicker {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: 12.5px;
-  letter-spacing: 2.8px;
-  opacity: .65;
-  margin-bottom: 18px;
-  text-transform: uppercase;
-}
-.login-brand-bottom h2 {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: clamp(32px, 3.6vw, 44px);
-  line-height: 1.22;
-  letter-spacing: -.6px;
-  margin-bottom: 18px;
-}
-.login-brand-bottom p { font-size: 16.5px; line-height: 1.65; opacity: .75; }
 
-.login-panel { display: flex; align-items: center; justify-content: center; padding: 32px 24px; background: #fff; }
-.login-card { width: 100%; max-width: 360px; opacity: 0; transform: translateY(10px); animation: cardIn .5s ease forwards .05s; }
-@keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
-.login-card h1 { font-family: var(--font-head); font-weight: 700; font-size: 23px; letter-spacing: -.3px; margin-bottom: 7px; }
-.login-card p.sub { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin-bottom: 26px; }
-.field { margin-bottom: 16px; }
-.field label {
-  display: block;
-  font-family: var(--font-head);
-  font-weight: 600;
-  font-size: 11px;
-  letter-spacing: .6px;
-  color: var(--ink-soft);
-  margin-bottom: 7px;
-  text-transform: uppercase;
+/* Separate, clipped layer for the panel colour so the diagonal edge doesn't
+   clip the people illustration (which must bleed past it — see .login-hero__people). */
+.login-hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  clip-path: polygon(0 0, 100% 0, 100% 20%, 90% 100%, 0 100%);
+  background:
+    radial-gradient(75% 65% at 87% 28%, rgba(190, 108, 255, .44), transparent 58%),
+    radial-gradient(55% 50% at 8% 82%, rgba(91, 31, 104, .55), transparent 64%),
+    linear-gradient(145deg, #26102f 0%, #43134c 48%, #6f2a78 100%);
 }
-.field input {
-  width: 100%;
-  padding: 11px 13px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  font-family: var(--font-body);
-  font-size: 14px;
-  color: var(--ink);
-  background: #fff;
+
+/* Clipped to the hero's own box: the mark inside is huge and rotated for
+   the bleed effect, and without this wrapper its rotated bounding box
+   (position:absolute doesn't stop at the hero's edges since .login-hero
+   is overflow:visible, needed so .login-hero__people can cross the
+   diagonal split) was taller than the viewport, growing the whole page's
+   scroll height. */
+.login-hero__watermark-clip {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1;
+}
+.login-hero__watermark {
+  position: absolute;
+  width: min(85vw, 1000px);
+  right: -20%;
+  top: -26%;
+  opacity: .16;
+  transform: rotate(-35deg);
+  user-select: none;
+  mask-image: linear-gradient(205deg, rgba(0, 0, 0, .95) 0%, rgba(0, 0, 0, .5) 38%, transparent 72%);
+  -webkit-mask-image: linear-gradient(205deg, rgba(0, 0, 0, .95) 0%, rgba(0, 0, 0, .5) 38%, transparent 72%);
+}
+
+.login-hero::after {
+  content: "";
+  position: absolute;
+  width: 55%;
+  aspect-ratio: 1;
+  right: -6%;
+  bottom: 6%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(199, 129, 255, .26), transparent 68%);
+  filter: blur(18px);
+  pointer-events: none;
+  z-index: -2;
+}
+
+.login-hero__top { position: relative; z-index: 2; display: flex; align-items: flex-start; }
+.login-hero__kicker-top {
+  font-family: var(--font-head); font-weight: 700; font-size: 12px; letter-spacing: 2.6px;
+  color: rgba(255, 255, 255, .7); text-transform: uppercase;
+}
+
+/* space-evenly (not a fixed px/vh offset) so the gap above the heading,
+   the gap between the heading and the lower group, and the gap below the
+   lower group all stay equal on any real screen — a hardcoded offset here
+   was tuned against emulated viewport sizes that didn't match the user's
+   actual browser (window chrome eats into the real usable height). */
+.login-hero__body {
+  flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; position: relative; z-index: 2;
+}
+.login-hero__body h2 {
+  font-family: var(--font-head); font-weight: 700; font-size: clamp(32px, 3.7vw, 47px);
+  line-height: 1.14; letter-spacing: -.5px; white-space: nowrap;
+}
+.login-hero__lower p { font-size: 17px; line-height: 1.55; opacity: .78; margin-bottom: 8px; max-width: 520px; }
+
+/* Feature cards — 2x3 grid. Kept narrower than the illustration's left
+   edge at every breakpoint (see the media queries below) so it never
+   overlaps the people. */
+.login-feature-list {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 14px;
+  width: 400px; margin-top: 30px;
+}
+.login-feature-card {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px;
+  background: rgba(255, 255, 255, .085); border: 1px solid rgba(255, 255, 255, .13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.login-feature-card__icon {
+  flex: none; width: 30px; height: 30px; border-radius: 9px; background: rgba(255, 255, 255, .12);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-feature-card__icon svg { width: 15px; height: 15px; stroke: #fff; fill: none; }
+.login-feature-card__title { font-family: var(--font-head); font-weight: 700; font-size: 13px; color: #fff; }
+.login-feature-card__sub { font-family: var(--font-body); font-size: 11.5px; color: rgba(255, 255, 255, .62); margin-top: 1px; line-height: 1.4; }
+
+.login-hero__people {
+  position: absolute; right: -16%; bottom: 0; width: clamp(430px, 48vw, 760px); height: auto;
+  object-fit: contain; object-position: right bottom; pointer-events: none; user-select: none; z-index: 1;
+  filter:
+    drop-shadow(0 0 55px rgba(225, 179, 255, .45))
+    drop-shadow(0 28px 48px rgba(18, 5, 25, .18));
+}
+
+/* ============================= RIGHT — FORM ============================= */
+.login-right { position: relative; display: flex; align-items: center; justify-content: center; padding: 32px 24px; }
+.login-card {
+  position: relative; width: 100%; max-width: 460px;
+  background: rgba(255, 255, 255, .96); border: 1px solid rgba(54, 17, 63, .075);
+  border-radius: 26px;
+  box-shadow: 0 30px 70px rgba(139, 73, 210, .22), 0 10px 28px rgba(91, 31, 104, .12);
+  padding: 40px 40px;
+  opacity: 0; transform: translateY(10px); animation: cardIn .5s ease forwards .05s;
+}
+@keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
+
+.login-card__logo-row { display: flex; justify-content: center; margin-bottom: 24px; }
+.login-card__logo { width: 150px; flex: none; }
+.login-card__logo svg { display: block; width: 100%; height: auto; }
+
+.login-card h1 { font-family: var(--font-head); font-weight: 700; font-size: 26px; letter-spacing: -.4px; color: var(--ma-text); margin-bottom: 8px; }
+.login-card h1.center { text-align: center; }
+.login-card p.sub { color: var(--ma-muted); font-size: 14px; line-height: 1.55; margin-bottom: 26px; }
+.login-card p.sub.center { text-align: center; }
+
+/* Scoped under .login-card (not bare .field/.field-input-wrap): those bare
+   class names also exist, with different rules (background/border/padding),
+   in other pages' global stylesheets (e.g. imageStudioPage.css) that load
+   app-wide — without scoping, that unrelated CSS was leaking a second,
+   unwanted bordered box around the label+input here. */
+.login-card .field {
+  margin-bottom: 16px; border: none; background: none; padding: 0; border-radius: 0;
+}
+.login-card .field label {
+  display: block; font-family: var(--font-head); font-weight: 600; font-size: 11px; letter-spacing: .8px;
+  color: var(--ma-muted); margin-bottom: 7px; text-transform: uppercase;
+}
+.login-card .field-input-wrap { position: relative; }
+.login-card .field-input-icon {
+  position: absolute; left: 15px; top: 50%; transform: translateY(-50%); display: flex; pointer-events: none; color: var(--ma-muted);
+}
+.login-card .field-input-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
+.login-card .field .field-input-wrap input { padding-left: 42px; }
+.login-card .field input {
+  width: 100%; height: 54px; padding: 0 15px; border: 1px solid var(--ma-border); border-radius: 12px;
+  font-family: var(--font-body); font-size: 14.5px; color: var(--ma-text); background: #fff;
   transition: border-color .15s, box-shadow .15s;
 }
-.field input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px var(--purple-tint); }
-.login-btn {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 9px;
-  background: var(--purple);
-  color: #fff;
-  font-family: var(--font-head);
-  font-weight: 600;
-  font-size: 13.5px;
-  letter-spacing: .3px;
-  cursor: pointer;
-  transition: background .15s, transform .1s;
-  margin-top: 4px;
-}
-.login-btn:hover { background: var(--purple-hover); }
-.login-btn:active { transform: scale(.98); }
-.login-btn:disabled { opacity: .7; cursor: default; }
-.login-note { margin-top: 18px; font-size: 11.5px; color: var(--muted); text-align: center; line-height: 1.5; }
-.login-note a { color: var(--purple); text-decoration: underline; text-underline-offset: 2px; }
-.login-note.err { color: var(--bad); }
-.login-foot { margin-top: 28px; font-size: 10.5px; letter-spacing: .5px; color: var(--muted); opacity: .8; }
+.login-card .field input:focus { outline: none; border-color: var(--ma-purple-500); box-shadow: 0 0 0 3px var(--ma-purple-100); }
+.login-card .field input:disabled { opacity: .6; cursor: default; }
 
-@media (max-width: 820px) {
-  .login { grid-template-columns: 1fr; }
-  .login-brand { display: none; }
+.login-btn {
+  width: 100%; height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: none; border-radius: 12px; color: #fff;
+  background: linear-gradient(90deg, #7430b3 0%, #68229e 100%);
+  box-shadow: 0 10px 24px rgba(105, 35, 159, .18);
+  font-family: var(--font-head); font-weight: 600; font-size: 14.5px; letter-spacing: .2px;
+  cursor: pointer; transition: filter .15s, transform .1s; margin-top: 4px;
 }
+.login-btn:hover:not(:disabled) { filter: brightness(.96); }
+.login-btn:active:not(:disabled) { transform: scale(.98); }
+.login-btn:disabled { opacity: .75; cursor: default; }
+.login-btn__arrow { display: flex; }
+.login-btn__arrow svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
+.login-btn__spinner {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .4);
+  border-top-color: #fff; animation: loginSpin .7s linear infinite; flex: none;
+}
+@keyframes loginSpin { to { transform: rotate(360deg); } }
+
+.login-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 6px; }
+.login-divider::before, .login-divider::after { content: ""; flex: 1; height: 1px; background: var(--ma-border); }
+.login-divider span { font-family: var(--font-body); font-size: 11.5px; color: var(--ma-muted); }
+
+.login-note { margin-top: 14px; font-size: 12px; color: var(--ma-muted); text-align: center; line-height: 1.5; }
+.login-note a { color: var(--ma-purple-600); text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+.login-note.err { color: #c0392b; }
+.login-foot { margin-top: 26px; font-size: 10.5px; letter-spacing: .5px; color: var(--ma-muted); opacity: .8; text-align: center; }
+
+.login-right__foot {
+  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 10px 20px; border-radius: 999px;
+  background: rgba(255, 255, 255, .8); border: 1px solid var(--ma-border);
+  box-shadow: 0 10px 26px rgba(91, 31, 104, .1);
+  white-space: nowrap;
+}
+.login-right__foot-title { font-family: var(--font-body); font-size: 11.5px; font-weight: 600; color: var(--ma-text); }
+.login-right__foot-sub { font-size: 9.5px; font-weight: 600; letter-spacing: .4px; color: var(--ma-muted); margin-top: 1px; }
+
+/* ============================= RESPONSIVE ============================= */
+@media (max-width: 1440px) {
+  .login-hero__people { right: -34%; width: clamp(380px, 42vw, 620px); }
+  /* Tighter text column at this breakpoint — the illustration sits closer
+     here, and the longer copy needs more clearance from it than the
+     default (wide-screen) sizing gives, or the feature cards collide with
+     the image. */
+  .login-hero__body { max-width: 440px; }
+  /* One-line heading only has room on wide screens (see the default rule
+     above) — here it would overflow into the form column, so let it wrap. */
+  .login-hero__body h2 { font-size: clamp(27px, 3vw, 36px); white-space: normal; }
+  .login-hero__lower p { font-size: 15px; }
+  /* Scales with viewport width rather than a fixed px: this tier spans
+     1024-1440px, and the illustration's left edge (and the hero's own
+     padding) both shift a lot across that range, so a single fixed width
+     is either too wide at the narrow end (overlaps the people) or
+     needlessly narrow at the wide end. */
+  .login-feature-list { width: calc(12px + 27vw); gap: 8px; margin-top: 16px; }
+  .login-feature-card { padding: 9px 11px; gap: 9px; }
+}
+
+@media (max-width: 1023px) {
+  .login { grid-template-columns: .82fr 1fr; }
+  .login-hero__body { max-width: none; }
+  .login-hero__body h2 { font-size: clamp(22px, 3.4vw, 28px); }
+  .login-hero__lower p { font-size: 14.5px; }
+  .login-hero__people { width: clamp(300px, 46vw, 480px); right: -8%; }
+  /* Not enough spare width here to safely bleed the grid over the
+     illustration without risking a page-wide horizontal scrollbar. */
+  .login-feature-list { width: 100%; max-width: 420px; }
+}
+
+@media (max-width: 767px) {
+  .login { grid-template-columns: 1fr; }
+  .login-hero { display: none; }
+}
+
 @media (max-width: 480px) {
-  .login-card { max-width: 100%; }
+  .login-right { padding: 20px; }
+  .login-card { max-width: 100%; padding: 30px 22px; }
 }
