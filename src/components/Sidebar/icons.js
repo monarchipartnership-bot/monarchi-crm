@@ -32,7 +32,14 @@ export const IC = {
   account: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#6366F1"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>',
   salesTasks: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#7C3AED"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h.01M8 12h.01M8 16h.01"/><path d="M11.5 8h5M11.5 12h5M11.5 16h5"/></svg>',
   myTasks: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#2F80ED"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/></svg>',
-  deals: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#B8860B"><circle cx="12" cy="12" r="9"/><path d="M12 7v1.5M12 15.5V17"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1c-1.4 0-2.5.7-2.5 1.6 0 2 5 1 5 3s-1.1 1.6-2.5 1.6a2.7 2.2 0 0 1-2.5-1"/></svg>',
+  deals: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#B8860B"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5L3 4z"/></svg>',
+  // Was a duplicate of `reports` (the same icon as Reports Manager) —
+  // projects get their own folder icon instead.
+  projects: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#7652C8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>',
+  // Was the generic Tools wrench icon, shared with the unrelated Tools
+  // department — accounts/credentials get an id-card icon instead.
+  teamAccounts: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#64748B"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M6 16a2.5 2.5 0 0 1 5 0"/><path d="M13.5 10h5M13.5 13h5"/></svg>',
+  teamMembers: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#0D9488"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><circle cx="17.5" cy="8" r="2.4"/><path d="M14.8 20a4.4 4.4 0 0 1 6.7-3.6"/></svg>',
 };
 
 export function iconOnly(svgStr) {

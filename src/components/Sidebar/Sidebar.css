@@ -1,7 +1,10 @@
 .sidebar {
   width: 224px;
   flex: none;
-  background: var(--purple-deep);
+  /* Lighter than --purple-deep (#421342, used app-wide elsewhere) —
+     matches the login page's hero panel tone, scoped to just the sidebar
+     rather than changing that shared variable. */
+  background: #5b1f68;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -75,8 +78,19 @@
 }
 .side-node:hover { background: rgba(255, 255, 255, .08); color: #fff; transform: translateX(2px); }
 .side-node:active { transform: translateX(2px) scale(.98); }
-.side-ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; flex: none; opacity: .85; transition: opacity .18s ease, transform .18s ease; }
-.side-node:hover .side-ic { opacity: 1; transform: scale(1.08); }
+
+/* Icon box — same treatment as the login page's feature-card icons
+   (rounded square, translucent white tile, solid white glyph), instead of
+   a bare stroke icon tinted per its own category color. */
+.side-ic-box {
+  flex: none; width: 28px; height: 28px; border-radius: 9px;
+  background: rgba(255, 255, 255, .14);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .18s ease, transform .18s ease;
+}
+.side-ic-box .side-ic { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 1.8; }
+.side-node:hover .side-ic-box { background: rgba(255, 255, 255, .22); transform: scale(1.06); }
+
 .side-node .chev {
   margin-left: auto;
   width: 12px;
@@ -89,9 +103,9 @@
   flex: none;
 }
 .side-node[aria-expanded="true"] .chev { transform: rotate(90deg); }
-.side-node.active { background: var(--purple); color: #fff; box-shadow: 0 4px 14px -6px rgba(0, 0, 0, .4); }
-.side-node.active:hover { background: var(--purple); transform: translateX(2px); }
-.side-node.active .side-ic { opacity: 1; }
+.side-node.active { background: rgba(255, 255, 255, .16); color: #fff; box-shadow: 0 4px 14px -6px rgba(0, 0, 0, .4); }
+.side-node.active:hover { background: rgba(255, 255, 255, .16); transform: translateX(2px); }
+.side-node.active .side-ic-box { background: rgba(255, 255, 255, .24); }
 
 .side-children { overflow: hidden; max-height: 0; transition: max-height .25s ease; }
 .side-children.open { max-height: 900px; }

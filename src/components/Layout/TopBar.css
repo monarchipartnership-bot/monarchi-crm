@@ -49,9 +49,8 @@
 
 /* Notification bell — a gentle ring-shake on hover, and a soft pulsing halo
    on the unread badge so it stays noticeable without being distracting. */
-.topbar-bell-wrap { position: relative; flex: none; }
 .topbar-bell-btn {
-  position: relative; width: 34px; height: 34px; border-radius: 50%; background: var(--surface);
+  position: relative; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--surface);
   border: none; color: var(--ink-soft); display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease;
 }
@@ -77,33 +76,106 @@
   70% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
   100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
-.topbar-bell-menu {
-  position: absolute; top: calc(100% + 10px); right: 0; width: 300px; max-height: 380px; overflow-y: auto;
-  background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 34px -14px rgba(0, 0, 0, .24);
-  padding: 6px; z-index: 30;
-  animation: topbarMenuIn .15s ease;
+/* Notifications — a right-side slide-out panel (full working-area height)
+   instead of a small dropdown, so there's room to actually list them and
+   click through, not just glance at the last couple. */
+.notif-backdrop {
+  position: fixed; inset: 0; background: rgba(33, 18, 40, .28); z-index: 40;
+  animation: notifFadeIn .24s cubic-bezier(.4, 0, .2, 1) both;
 }
-@keyframes topbarMenuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-.topbar-bell-menu-head { font-family: var(--font-body); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 6px 8px 8px; }
-.topbar-bell-item {
-  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 8px; border-radius: 8px;
-  border: none; background: transparent; cursor: pointer; margin-bottom: 2px; transition: background .15s ease;
+.notif-backdrop.closing { animation: notifFadeOut .24s cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes notifFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes notifFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+.notif-panel {
+  position: fixed; top: 67px; right: 0; bottom: 0; width: min(420px, 100vw);
+  background: #fff; border-left: 1px solid var(--border); box-shadow: -16px 0 40px -20px rgba(0, 0, 0, .3);
+  border-top-left-radius: 18px; overflow: hidden;
+  z-index: 41; display: flex; flex-direction: column;
+  animation: notifSlideIn .28s cubic-bezier(.4, 0, .2, 1) both;
 }
-.topbar-bell-item:hover { background: var(--surface); }
-.topbar-bell-item.unread { background: var(--purple-tint); }
-.topbar-bell-item-text { font-family: var(--font-body); font-size: .78rem; color: var(--ink); line-height: 1.35; }
-.topbar-bell-item-excerpt { color: var(--ink-soft); }
-.topbar-bell-item-time { font-family: var(--font-body); font-size: .68rem; color: var(--muted); }
+.notif-panel.closing { animation: notifSlideOut .24s cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes notifSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes notifSlideOut { from { transform: translateX(0); } to { transform: translateX(100%); } }
+
+.notif-panel__head { flex: none; padding: 20px 20px 14px; border-bottom: 1px solid var(--border); }
+.notif-panel__head-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.notif-panel__head-title {
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-head); font-weight: 700; font-size: 1.3rem; color: var(--ink);
+}
+.notif-panel__count-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 6px;
+  border-radius: 11px; background: var(--purple-tint); color: var(--purple);
+  font-family: var(--font-body); font-weight: 700; font-size: .78rem;
+}
+.notif-panel__subtitle { margin: 4px 0 14px; font-family: var(--font-body); font-size: .82rem; color: var(--muted); }
+.notif-panel__close {
+  border: none; background: var(--surface); color: var(--ink-soft); cursor: pointer;
+  width: 30px; height: 30px; border-radius: 50%; font-size: 18px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.notif-panel__close:hover { background: var(--purple-tint); color: var(--purple); }
+
+.notif-panel__tabs { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.notif-panel__tab {
+  border: 1px solid var(--border); background: #fff; color: var(--ink-soft); cursor: pointer;
+  padding: 7px 14px; border-radius: 20px;
+  font-family: var(--font-head); font-weight: 600; font-size: .76rem; transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.notif-panel__tab:hover { border-color: var(--purple); color: var(--purple); }
+.notif-panel__tab.active { background: rgba(107, 47, 160, .08); border-color: rgba(107, 47, 160, .14); color: var(--purple); }
+.notif-panel__mark-all {
+  margin-left: auto; border: none; background: none; cursor: pointer; padding: 0;
+  font-family: var(--font-body); font-weight: 600; font-size: .74rem; color: var(--purple);
+}
+.notif-panel__mark-all:hover { text-decoration: underline; }
+
+.notif-panel__list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+.notif-card {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+  padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: #fff; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.notif-card:hover { transform: translateY(-2px); border-color: rgba(107, 47, 160, .22); }
+.notif-card.no-link { cursor: default; }
+.notif-card.unread { background: rgba(107, 47, 160, .06); border-color: rgba(107, 47, 160, .16); }
+.notif-card__icon {
+  flex: none; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; background: var(--purple-tint);
+}
+.notif-card__icon--note { background: var(--purple-tint); }
+.notif-card__icon--deal { background: #E9F7EF; }
+.notif-card__icon--client { background: var(--purple-tint); }
+.notif-card__icon--task { background: #FBEAEA; }
+.notif-card__icon--system { background: var(--purple-tint); }
+.notif-card__body { flex: 1; min-width: 0; }
+.notif-card__title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.notif-card__title { font-family: var(--font-head); font-weight: 700; font-size: .86rem; color: var(--ink); }
+.notif-card__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--purple); }
+.notif-card__desc { margin-top: 3px; font-family: var(--font-body); font-size: .8rem; color: var(--ink-soft); line-height: 1.45; }
+.notif-card__time { margin-top: 6px; font-family: var(--font-body); font-size: .7rem; color: var(--muted); }
+
+.notif-panel__end { flex: none; text-align: center; padding: 28px 20px 8px; }
+.notif-panel__end-ic { font-size: 34px; opacity: .4; display: block; margin-bottom: 10px; }
+.notif-panel__end-title { font-family: var(--font-head); font-weight: 700; font-size: .88rem; color: var(--ink); }
+.notif-panel__end-sub { margin-top: 4px; font-family: var(--font-body); font-size: .78rem; color: var(--muted); line-height: 1.4; }
+
+@media (max-width: 480px) {
+  .notif-panel { width: 100vw; top: 0; }
+}
 
 /* Account */
 .topbar-account { display: flex; align-items: center; gap: 9px; }
 .topbar-avatar {
-  width: 34px; height: 34px; border-radius: 50%; background: var(--purple-tint); color: var(--purple);
+  width: 34px; height: 34px; border-radius: 50%; background: var(--purple-tint); color: var(--purple); overflow: hidden;
   display: flex; align-items: center; justify-content: center; flex: none; text-decoration: none;
   transition: background .18s ease, transform .18s ease;
 }
 .topbar-avatar:hover { background: var(--purple); color: #fff; transform: translateY(-1px); }
 .topbar-avatar svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.topbar-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .topbar-user { display: none; flex-direction: column; }
 .topbar-user-name { font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--ink); text-decoration: none; transition: color .15s ease; }
 .topbar-user-name:hover { color: var(--purple); }

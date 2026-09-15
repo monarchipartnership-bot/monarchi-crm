@@ -378,6 +378,15 @@ export async function fetchTasksSince(sinceIso, department = 'automation') {
   return data ?? [];
 }
 
+// Most recently created tasks across every department — for the Home
+// dashboard's "recent activity" feed, unlike fetchTasksSince (which orders
+// by task_date, not when the row was actually created).
+export async function fetchRecentTasks(limit = 5) {
+  const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (error) { console.warn('fetchRecentTasks failed', error); return []; }
+  return data ?? [];
+}
+
 // Every task linked to any deal, across every pipeline — backs the "Задачі"
 // button on the Deals page header (a cross-deal task inbox), so a manager can
 // see what's outstanding without opening each deal card one by one.

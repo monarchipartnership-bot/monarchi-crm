@@ -16,6 +16,11 @@ export const ROUTE_META = {
     desc: 'Хто з команди у відпустці чи на лікарняному цього місяця.',
     trail: [{ label: 'Team' }, { label: 'Team Calendar' }],
   },
+  '/team/members': {
+    title: 'Команда',
+    desc: 'Список учасників команди та їхні профілі.',
+    trail: [{ label: 'Team' }, { label: 'Команда' }],
+  },
   '/team/accounts': {
     title: 'Team Accounts',
     desc: 'Посилання на всі акаунти й платформи команди.',
@@ -163,5 +168,9 @@ export const DYNAMIC_ROUTE_META = [
   {
     test: (pathname) => /^\/projects\/[^/]+$/.test(pathname),
     trail: [{ label: 'Project Managers Department' }, { label: 'Projects' }, { label: 'Project' }],
+  },
+  {
+    test: (pathname) => /^\/team\/members\/[^/]+$/.test(pathname),
+    trail: [{ label: 'Team' }, { label: 'Команда', to: '/team/members' }, { label: 'Профіль' }],
   },
 ];

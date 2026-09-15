@@ -3,6 +3,12 @@
 
 .page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
 .page-actions .sp { flex: 1; }
+/* Two canonical button tiers, both "matte" (flat fills, soft shadows, no
+   gloss) — .btn is the additional/secondary action (light matte purple),
+   .btn-p is the important/primary one (bright matte purple gradient).
+   Previously buttons across the app were inconsistent (plain white here,
+   light purple there, bright purple elsewhere) — this is the one style
+   for each tier, reused everywhere via these two shared classes. */
 .btn {
   font-family: var(--font-head);
   font-weight: 600;
@@ -11,20 +17,25 @@
   padding: 9px 15px;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--ink-soft);
+  border: 1px solid rgba(107, 47, 160, .14);
+  background: rgba(107, 47, 160, .08);
+  color: var(--purple);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
-  transition: border-color .15s, color .15s, background .15s;
+  transition: border-color .15s, color .15s, background .15s, transform .1s;
 }
-.btn:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-tint); }
+.btn:hover { border-color: rgba(107, 47, 160, .26); color: var(--purple); background: rgba(107, 47, 160, .14); }
+.btn:active:not(:disabled) { transform: scale(.98); }
 .btn:disabled { opacity: .6; cursor: default; }
-.btn-p { background: var(--purple); border-color: var(--purple); color: #fff; }
-.btn-p:hover { background: var(--purple-hover); border-color: var(--purple-hover); color: #fff; }
+.btn-p {
+  background: linear-gradient(90deg, #7430b3 0%, #68229e 100%);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 6px 16px rgba(105, 35, 159, .22);
+}
+.btn-p:hover { background: linear-gradient(90deg, #7430b3 0%, #68229e 100%); border-color: transparent; color: #fff; filter: brightness(1.06); box-shadow: 0 8px 20px rgba(105, 35, 159, .3); }
 
 /* report header */
 .rpt-hero { margin-bottom: 22px; }

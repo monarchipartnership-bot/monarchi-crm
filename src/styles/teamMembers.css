@@ -1,0 +1,22 @@
+/* Team roster + member profile — reuses .client-row/.client-name-cell
+   (clientsDirectory.css), .cmp-table/.tbl-wrap (comparePage.css/clientsDirectory.css)
+   and .client-profile-* (clientProfile.css) for the shell; only the avatar
+   and a couple of layout tweaks are new. */
+
+.tm-search-wrap { margin-left: auto; }
+
+.tm-avatar {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--purple); color: #fff;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  font-family: var(--font-head); font-weight: 700; font-size: 13px;
+}
+.tm-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.tm-avatar--lg { width: 64px; height: 64px; font-size: 1.6rem; }
+
+.tm-edit-btn { margin-left: auto; text-decoration: none; flex: none; }
+
+@media (max-width: 640px) {
+  .team-member-profile-page .client-profile-hero { flex-wrap: wrap; }
+  .tm-edit-btn { margin-left: 0; }
+}

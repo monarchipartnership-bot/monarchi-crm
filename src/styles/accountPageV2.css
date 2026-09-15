@@ -1,0 +1,151 @@
+/* "Мій кабінет" v2 — two-column layout (profile summary + edit form).
+   Cards use the established "matte glass" look (.pulse-card in
+   homeDashboard.css) — translucent white + soft purple border/shadow/blur —
+   not var(--surface), which is itself a pale purple tint and read as
+   "light purple boxes" here. */
+
+.acp-card {
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid rgba(66, 19, 66, .08);
+  box-shadow: 0 8px 28px rgba(80, 30, 100, .1);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px; padding: 22px;
+}
+
+.account-layout { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 20px; align-items: start; margin-bottom: 20px; }
+.account-col-left, .account-col-right { display: flex; flex-direction: column; gap: 16px; }
+
+/* Profile summary card */
+.acp-profile-card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.acp-status-badge {
+  position: absolute; top: 18px; right: 18px; display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-head); font-size: .7rem; font-weight: 600; color: var(--ok);
+}
+.acp-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+.acp-avatar-wrap { position: relative; margin-bottom: 12px; }
+.acp-avatar-lg { cursor: default; }
+.acp-avatar-cam {
+  position: absolute; right: -2px; bottom: -2px; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--purple); border: 2px solid #fff; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.acp-avatar-cam svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.acp-avatar-menu {
+  position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; z-index: 30; min-width: 160px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35);
+}
+.acp-avatar-menu button {
+  display: block; width: 100%; text-align: left; border: none; background: none; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .84rem; color: var(--ink); border-radius: 6px; cursor: pointer;
+}
+.acp-avatar-menu button:hover { background: var(--surface); }
+
+.acp-name { font-family: var(--font-head); font-weight: 700; font-size: 1.15rem; color: var(--ink); }
+.acp-position { font-family: var(--font-body); font-size: .85rem; color: var(--muted); margin-top: 2px; }
+.acp-role-badge {
+  margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px;
+  background: var(--purple-tint); color: var(--purple); font-family: var(--font-head); font-size: .74rem; font-weight: 600;
+}
+.acp-role-badge svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+.acp-contacts { margin-top: 16px; width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.acp-contact-row { display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); }
+.acp-contact-row svg { flex: none; width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 1.8; }
+
+.acp-quote { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); font-family: var(--font-body); font-size: .8rem; font-style: italic; color: var(--muted); line-height: 1.5; }
+
+/* Mini summary cards */
+.acp-mini-card { display: block; width: 100%; text-align: left; cursor: pointer; transition: border-color .15s ease; }
+.acp-mini-card:hover { border-color: var(--purple); }
+.acp-mini-card--static { cursor: default; }
+.acp-mini-card--static:hover { border-color: var(--border); }
+.acp-mini-card__head { display: flex; align-items: center; gap: 8px; font-family: var(--font-head); font-size: .8rem; font-weight: 600; color: var(--ink-soft); }
+.acp-mini-card__value { margin-top: 8px; font-family: var(--font-head); font-weight: 700; font-size: 1.6rem; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.acp-mini-card__delta { font-size: .74rem; font-weight: 700; color: var(--purple); background: var(--purple-tint); padding: 2px 8px; border-radius: 10px; }
+.acp-mini-card__sub { margin-top: 2px; font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
+.acp-mini-card__role { margin-top: 8px; font-family: var(--font-head); font-weight: 700; font-size: 1rem; color: var(--ink); }
+
+/* Edit form */
+.acp-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.acp-section-title { display: flex; align-items: center; gap: 10px; }
+.acp-section-title .stitle { font-size: 1.05rem; }
+.acp-section-actions { display: flex; align-items: center; gap: 10px; }
+.acp-header-ic {
+  flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.acp-header-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+.acp-subgroup-head { display: flex; align-items: center; gap: 10px; margin: 22px 0 14px; }
+.acp-subgroup-head:first-of-type { margin-top: 16px; }
+.acp-subgroup-ic {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.acp-subgroup-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.acp-subgroup-title { font-family: var(--font-head); font-size: .95rem; font-weight: 700; color: var(--ink); }
+
+.acp-divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+.acp-security-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.acp-security-row .pf { flex: 1 1 200px; }
+.acp-2fa-block {
+  flex: 1 1 300px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-top: 22px;
+}
+.acp-2fa-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.acp-2fa-ic {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.acp-2fa-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.acp-2fa-btn { flex: none; white-space: nowrap; opacity: .7; cursor: not-allowed; }
+
+.pw-field { position: relative; }
+.pw-field input { width: 100%; padding-right: 34px; }
+.pw-eye {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: none; padding: 4px;
+  color: var(--muted); cursor: pointer; display: flex;
+}
+.pw-eye svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.pw-eye:hover { color: var(--purple); }
+
+.acp-2fa-title { font-family: var(--font-head); font-weight: 600; font-size: .86rem; color: var(--ink); }
+.acp-2fa-sub { font-family: var(--font-body); font-size: .76rem; color: var(--muted); margin-top: 2px; }
+
+/* Mini team calendar */
+.mini-cal-card { display: flex; flex-direction: column; gap: 4px; }
+.mini-cal-month { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); margin: 2px 0 8px; }
+.mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mini-cal-dow { text-align: center; font-family: var(--font-head); font-size: .64rem; font-weight: 700; color: var(--muted); padding-bottom: 4px; }
+.mini-cal-cell {
+  position: relative; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--font-body); font-size: .74rem; color: var(--ink-soft); border-radius: 8px;
+}
+.mini-cal-cell--blank { visibility: hidden; }
+.mini-cal-cell.is-today { background: var(--purple-tint); color: var(--purple); font-weight: 700; }
+.mini-cal-dots { display: flex; gap: 2px; margin-top: 2px; }
+.mini-cal-dot { width: 5px; height: 5px; border-radius: 50%; }
+.mini-cal-dot--vacation { background: var(--warn); }
+.mini-cal-dot--sick { background: var(--bad); }
+.mini-cal-legend { display: flex; gap: 14px; margin: 10px 0 4px; font-family: var(--font-body); font-size: .72rem; color: var(--muted); }
+.mini-cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.mini-cal-away-label { margin: 12px 0 8px; font-family: var(--font-head); font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
+
+/* Recent activity */
+.acp-activity-list { display: flex; flex-direction: column; gap: 2px; }
+.acp-activity-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.acp-activity-row:last-child { border-bottom: none; }
+.acp-activity-ic {
+  flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--purple-tint);
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.acp-activity-body { flex: 1; min-width: 0; }
+.acp-activity-title { font-family: var(--font-body); font-size: .84rem; color: var(--ink); }
+.acp-activity-time { flex: none; font-family: var(--font-body); font-size: .72rem; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .account-layout { grid-template-columns: 1fr; }
+}

@@ -1,6 +1,10 @@
-.sec-label { font-family: var(--font-head); font-weight: 700; font-size: 11px; letter-spacing: 1.5px; color: var(--ink-soft); text-transform: uppercase; margin: 28px 0 14px; display: flex; align-items: center; gap: 9px; }
-.sec-label.first { margin-top: 0; }
-.sec-label .ln { flex: 1; height: 1px; background: var(--border); }
+/* Scoped to this page (not bare .sec-label): that class also exists,
+   without this top margin, in pages.css and is used by other pages (e.g.
+   Home) — unscoped, this rule was leaking an unwanted 28px top gap into
+   every one of them. */
+.team-accounts-page .sec-label { font-family: var(--font-head); font-weight: 700; font-size: 11px; letter-spacing: 1.5px; color: var(--ink-soft); text-transform: uppercase; margin: 28px 0 14px; display: flex; align-items: center; gap: 9px; }
+.team-accounts-page .sec-label.first { margin-top: 0; }
+.team-accounts-page .sec-label .ln { flex: 1; height: 1px; background: var(--border); }
 
 .acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
 

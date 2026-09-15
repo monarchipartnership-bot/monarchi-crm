@@ -28,3 +28,15 @@ export async function deleteDealNote(id) {
   const { error } = await supabase.from('deal_notes').delete().eq('id', id);
   if (error) throw error;
 }
+
+// Most recent notes across every deal — for the Home dashboard's "recent
+// activity" feed, unlike fetchDealNotes (scoped to one deal).
+export async function fetchRecentDealNotes(limit = 5) {
+  const { data, error } = await supabase
+    .from('deal_notes')
+    .select('*, deals(title, clients(name, company))')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) { console.warn('fetchRecentDealNotes failed', error); return []; }
+  return data ?? [];
+}

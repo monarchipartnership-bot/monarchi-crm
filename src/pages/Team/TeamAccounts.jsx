@@ -7,7 +7,7 @@ export default function TeamAccounts() {
   const navigate = useNavigate();
 
   return (
-    <div className="report-page">
+    <div className="report-page team-accounts-page">
       <div className="page-actions">
         <button type="button" className="btn" onClick={() => navigate(-1)}>&#8592; Back</button>
       </div>

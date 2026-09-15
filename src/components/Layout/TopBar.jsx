@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTE_META, DYNAMIC_ROUTE_META } from '../../routes/routeMeta';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
+import { profileLabel } from '../../lib/api/profile';
 import NotificationBell from '../Sidebar/NotificationBell';
 import './TopBar.css';
 
@@ -15,7 +16,7 @@ function pageMeta(pathname) {
 }
 
 export default function TopBar() {
-  const { email, signOut } = useAuth();
+  const { email, signOut, profile } = useAuth();
   const { pathname } = useLocation();
   const [infoOpen, setInfoOpen] = useState(false);
   const infoRef = useRef(null);
@@ -58,10 +59,10 @@ export default function TopBar() {
         <NotificationBell />
         <div className="topbar-account">
           <Link className="topbar-avatar" to="/account" title="Мій кабінет">
-            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }} />
+            {profile?.photo ? <img src={profile.photo} alt="" /> : <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }} />}
           </Link>
           <div className="topbar-user">
-            <Link className="topbar-user-name" to="/account">{email ?? 'user@monarchi.agency'}</Link>
+            <Link className="topbar-user-name" to="/account">{profile ? profileLabel(profile) : (email ?? 'user@monarchi.agency')}</Link>
             <button type="button" onClick={signOut}>Вийти</button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchProfile } from '../lib/api/profile';
+import { logActivity } from '../lib/api/activityLog';
 
 const AuthContext = createContext(null);
 
@@ -11,6 +12,10 @@ export function AuthProvider({ children }) {
   // force a first-time user through SetPassword before the rest of the app.
   const [passwordSet, setPasswordSet] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  // Shared profile row (name, photo, position, ...) — kept here rather than
+  // re-fetched per component so TopBar's avatar/name update the moment
+  // Account.jsx saves, without needing a full page reload.
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -18,8 +23,13 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
+      // Only a real sign-in, not a session restored from storage on load
+      // (that fires INITIAL_SESSION instead) — see "Останні дії" on /account.
+      if (event === 'SIGNED_IN' && newSession?.user?.email) {
+        logActivity('account', 'login', { userAgent: navigator.userAgent }, newSession.user.email);
+      }
     });
 
     return () => listener.subscription.unsubscribe();
@@ -34,11 +44,18 @@ export function AuthProvider({ children }) {
       .catch(() => setPasswordSet(false));
   }
 
+  function refreshProfile() {
+    if (!email) return Promise.resolve();
+    return fetchProfile(email)
+      .then((p) => setProfile(p))
+      .catch(() => {});
+  }
+
   useEffect(() => {
-    if (!email) { setPasswordSet(null); setProfileLoading(false); return; }
+    if (!email) { setPasswordSet(null); setProfile(null); setProfileLoading(false); return; }
     setProfileLoading(true);
     fetchProfile(email)
-      .then((p) => setPasswordSet(Boolean(p?.password_set)))
+      .then((p) => { setPasswordSet(Boolean(p?.password_set)); setProfile(p); })
       .catch(() => setPasswordSet(false))
       .finally(() => setProfileLoading(false));
   }, [email]);
@@ -50,7 +67,9 @@ export function AuthProvider({ children }) {
     loading,
     passwordSet,
     profileLoading,
+    profile,
     refreshPasswordSet,
+    refreshProfile,
     signOut: () => supabase.auth.signOut(),
   };
 

@@ -13,3 +13,11 @@ export async function fetchActivitySince(sinceIso) {
   if (error) { console.warn('fetchActivitySince failed', error); return []; }
   return data ?? [];
 }
+
+// Most recent activity rows for one person — powers the "Останні дії" feed
+// on their own profile page.
+export async function fetchRecentActivityForUser(email, limit = 6) {
+  const { data, error } = await supabase.from('activity_log').select('*').eq('user_email', email).order('created_at', { ascending: false }).limit(limit);
+  if (error) { console.warn('fetchRecentActivityForUser failed', error); return []; }
+  return data ?? [];
+}

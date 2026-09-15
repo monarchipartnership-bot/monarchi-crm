@@ -4,7 +4,7 @@ import { DEPTS } from './sidebarData';
 import './Sidebar.css';
 
 function Icon({ svg }) {
-  return <span dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <span className="side-ic-box" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 // True if `pathname` is `base` or a path segment nested under it.

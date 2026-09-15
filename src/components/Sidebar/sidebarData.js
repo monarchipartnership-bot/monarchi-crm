@@ -24,7 +24,7 @@ export const DEPTS = {
     icon: IC.deptPM,
     items: [
       { key: 'dashboard', name: 'Dashboard', desc: 'Загальна картина по всіх проєктах: витрати, дохід, ROAS, статуси та тренди.', icon: IC.dashboard, type: 'link', to: '/projects/dashboard' },
-      { key: 'projects', name: 'Projects', desc: 'Database of all agency projects, managed by their owners.', icon: IC.reports, type: 'link', to: '/projects' },
+      { key: 'projects', name: 'Projects', desc: 'Database of all agency projects, managed by their owners.', icon: IC.projects, type: 'link', to: '/projects' },
       { key: 'clients', name: 'Clients Report', desc: 'Client-facing reporting for PMs.', icon: IC.clientsReport, type: 'link', to: '/clients' },
       { key: 'projDailyReport', name: 'Daily Report', desc: 'Щоденний звіт по рекламі для обраного проєкту.', icon: IC.daily, type: 'link', to: '/projects/reports/daily' },
       { key: 'projWeeklyReport', name: 'Weekly Report', desc: 'Тижневий звіт по рекламі для обраного проєкту.', icon: IC.week, type: 'link', to: '/projects/reports/weekly' },
@@ -45,8 +45,9 @@ export const DEPTS = {
     label: 'Team',
     icon: IC.clients,
     items: [
+      { key: 'members', name: 'Команда', desc: 'Список учасників команди та їхні профілі.', icon: IC.teamMembers, type: 'link', to: '/team/members' },
       { key: 'calendar', name: 'Team Calendar', desc: 'Хто з команди у відпустці чи на лікарняному цього місяця.', icon: IC.teamCalendar, type: 'link', to: '/team/calendar' },
-      { key: 'accounts', name: 'Team Accounts', desc: 'Посилання на всі акаунти й платформи команди.', icon: IC.deptTools, type: 'link', to: '/team/accounts' },
+      { key: 'accounts', name: 'Team Accounts', desc: 'Посилання на всі акаунти й платформи команди.', icon: IC.teamAccounts, type: 'link', to: '/team/accounts' },
     ],
   },
   tools: {

@@ -24,6 +24,8 @@ import ProjectDetail from './pages/Projects/ProjectDetail';
 import AdReportPage from './pages/Projects/Reports/AdReportPage';
 import TeamCalendar from './pages/Team/TeamCalendar';
 import TeamAccounts from './pages/Team/TeamAccounts';
+import TeamMembers from './pages/Team/TeamMembers';
+import TeamMemberProfile from './pages/Team/TeamMemberProfile';
 import Account from './pages/Account/Account';
 import Calculator from './pages/Tools/Calculator';
 import ImageStudio from './pages/Tools/ImageStudio';
@@ -75,6 +77,8 @@ function AuthGate() {
         <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/team/calendar" element={<TeamCalendar />} />
         <Route path="/team/accounts" element={<TeamAccounts />} />
+        <Route path="/team/members" element={<TeamMembers />} />
+        <Route path="/team/members/:email" element={<TeamMemberProfile />} />
         <Route path="/account" element={<Account />} />
         <Route path="/tools/calculator" element={<Calculator />} />
         <Route path="/tools/image-studio" element={<ImageStudio />} />

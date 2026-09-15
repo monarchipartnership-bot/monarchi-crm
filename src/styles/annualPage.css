@@ -50,14 +50,18 @@
 .annual-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 .annual-chart-grid .cmp-block { margin-bottom: 0; }
 
-/* Funnel — pure CSS bars, decreasing width per stage */
+/* Funnel — pure CSS bars, decreasing width per stage. Child selectors are
+   scoped under .funnel (not bare .funnel-row etc.): a same-named
+   .funnel-row also exists, with an incompatible flex layout, on the Home
+   dashboard's sales-funnel card — unscoped, this grid layout was leaking
+   there and making its sum column overflow the card. */
 .funnel { display: flex; flex-direction: column; gap: 14px; padding: 6px 0; }
-.funnel-row { display: grid; grid-template-columns: 110px 1fr 56px; align-items: center; gap: 10px; }
-.funnel-label { font-family: var(--font-body); font-size: .8rem; color: var(--ink-soft); }
-.funnel-track { background: var(--surface); border-radius: 8px; overflow: hidden; height: 30px; }
-.funnel-bar { height: 100%; background: var(--purple); border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; min-width: 32px; transition: width .3s ease; }
-.funnel-value { font-family: var(--font-head); font-weight: 700; font-size: .8rem; color: #fff; }
-.funnel-pct { font-family: var(--font-body); font-size: .76rem; color: var(--muted); text-align: right; }
+.funnel .funnel-row { display: grid; grid-template-columns: 110px 1fr 56px; align-items: center; gap: 10px; }
+.funnel .funnel-label { font-family: var(--font-body); font-size: .8rem; color: var(--ink-soft); }
+.funnel .funnel-track { background: var(--surface); border-radius: 8px; overflow: hidden; height: 30px; }
+.funnel .funnel-bar { height: 100%; background: var(--purple); border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; min-width: 32px; transition: width .3s ease; }
+.funnel .funnel-value { font-family: var(--font-head); font-weight: 700; font-size: .8rem; color: #fff; }
+.funnel .funnel-pct { font-family: var(--font-body); font-size: .76rem; color: var(--muted); text-align: right; }
 
 /* Деталізація по каналам */
 .detail-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
