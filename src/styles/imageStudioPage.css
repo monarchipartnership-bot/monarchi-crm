@@ -1,0 +1,106 @@
+/* Image Studio — canvas editor UI chrome (control panel + stage).
+   The canvas drawing itself is driven entirely by imageStudioEngine.js.
+   The whole tool is pinned to the viewport height (breadcrumb + page-actions
+   header stay put, canvas stage stays put) and only the settings panel (.side)
+   scrolls internally. The canvas is shown at its true 1:1 pixel size, shrinking
+   only if the stage genuinely doesn't have room to show it at full size. */
+.main:has(.studio-page) { height: 100vh; padding-bottom: 20px; overflow: hidden; display: flex; flex-direction: column; }
+.view:has(.studio-page) {
+  flex: 1; min-height: 0;
+  max-width: none; opacity: 1; transform: none; animation: none;
+  margin-left: clamp(-54px, -4vw, -20px);
+  margin-right: clamp(-54px, -4vw, -20px);
+  width: auto;
+}
+
+.studio-page { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+#app { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.studio-page .page-actions {
+  display: flex; align-items: center; gap: 14px; padding: 14px clamp(16px, 3vw, 28px);
+  border-bottom: 1px solid var(--border); background: #fff; border-radius: 14px 14px 0 0; margin-bottom: 0; flex: none;
+}
+.meta-line { font-family: var(--font-body); font-size: .78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.studio-page .sp { flex: 1; min-width: 0; }
+
+.studio-body { flex: 1; min-height: 0; display: flex; align-items: stretch; border: 1px solid var(--border); border-top: none; border-radius: 0 0 14px 14px; overflow: hidden; }
+.side { width: 340px; flex: none; border-right: 1px solid var(--border); background: var(--bg-side); padding: 20px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+.side section { display: flex; flex-direction: column; gap: 8px; }
+.side hr { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
+.lbl { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.lbl .hint { text-transform: none; letter-spacing: 0; opacity: .8; font-weight: 500; }
+.field { background: #fff; border: 1px solid var(--border); color: var(--ink); border-radius: 8px; padding: 9px 11px; font: 500 .84rem var(--font-body); width: 100%; outline: none; resize: vertical; }
+.field:focus { border-color: var(--purple); }
+select.field { appearance: none; cursor: pointer; }
+.fmt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fmt-btn { display: flex; flex-direction: column; align-items: center; gap: 7px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px; cursor: pointer; color: var(--ink-soft); transition: border-color .15s, background .15s, color .15s; }
+.fmt-btn:hover { border-color: var(--purple); }
+.fmt-btn.on { border-color: var(--purple); background: var(--purple-tint); color: var(--purple); }
+.fmt-ico { width: 22px; height: 22px; }
+.fmt-ico svg { width: 100%; height: 100%; }
+.fmt-nm { font-family: var(--font-body); font-size: .72rem; font-weight: 600; text-align: center; line-height: 1.25; }
+.mrow { display: flex; gap: 8px; }
+.field.sm { width: 96px; flex: none; }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* Note: buildCards() in imageStudioEngine.js generates literal className="card"
+   (untouched, ported verbatim) — scope under .side to avoid colliding with the
+   unrelated .card class used by other tool pages (e.g. Project Calculator). */
+.side .card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; text-align: left; transition: border-color .15s, box-shadow .15s; display: flex; flex-direction: column; gap: 7px; }
+.side .card:hover { border-color: var(--purple); }
+.side .card.on { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset; }
+.side .card .sw { height: 38px; border-radius: 6px; overflow: hidden; position: relative; border: 1px solid var(--border); }
+.side .card .nm { font-family: var(--font-body); font-size: .72rem; font-weight: 600; color: var(--ink); }
+.side .card .num { font-family: var(--font-body); font-size: .62rem; font-weight: 700; letter-spacing: .05em; color: var(--muted); }
+.presets { display: flex; gap: 8px; }
+.preset { flex: 1; height: 32px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.preset:hover { border-color: var(--purple); }
+.preset.on { box-shadow: 0 0 0 2px var(--purple); border-color: var(--purple); }
+.crow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.crow label { font-family: var(--font-body); font-size: .8rem; color: var(--ink); }
+.side input[type=color] { width: 48px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 2px; cursor: pointer; }
+.slot { border: 1.5px dashed var(--border); border-radius: 11px; background: #fff; cursor: pointer; min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; transition: border-color .15s; }
+.slot:hover { border-color: var(--purple); }
+.slot.drag { border-color: var(--purple); background: var(--purple-tint); }
+.slot-in { display: flex; flex-direction: column; gap: 3px; color: var(--muted); padding: 10px; }
+.slot-in .up { font-size: 18px; color: var(--purple); }
+.slot-in b { font-family: var(--font-body); font-size: .75rem; color: var(--ink); }
+.slot-in i { font-size: .64rem; font-style: normal; opacity: .85; }
+.slot img { width: 100%; height: 100%; object-fit: contain; max-height: 160px; background: repeating-conic-gradient(var(--surface) 0% 25%, #fff 0% 50%) 50%/16px 16px; }
+.mini { align-self: flex-start; background: none; border: none; color: var(--muted); font-family: var(--font-body); font-size: .72rem; cursor: pointer; text-decoration: underline; padding: 0; transition: color .15s; }
+.mini:hover { color: var(--purple); }
+.btn.reset { background: #fff; border: 1px solid var(--border); color: var(--purple); font-weight: 600; width: 100%; justify-content: center; font-family: var(--font-body); }
+.btn.reset:hover { border-color: var(--purple); background: var(--purple-tint); }
+.studio-foot { font-family: var(--font-body); font-size: .66rem; color: var(--muted); letter-spacing: .02em; text-align: center; line-height: 1.5; }
+
+.stage {
+  flex: 1; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center;
+  padding: 26px; background: var(--surface); overflow: hidden;
+}
+/* width + aspect-ratio (set inline by imageStudioEngine.js per template) only —
+   no explicit height — so the browser derives height from the ratio and, when
+   max-height clamps it, re-derives width from that clamped height too. Giving
+   both width AND height explicit values here would let the two axes get
+   capped independently by max-width/max-height, distorting the image. */
+.canvas-wrap { position: relative; width: var(--cv-w, 1000px); max-width: 100%; max-height: 100%; flex: none; }
+#cv { width: 100%; height: 100%; display: block; border-radius: 14px; box-shadow: 0 30px 70px -24px rgba(33, 18, 40, .35), 0 0 0 1px var(--border); }
+.drophint { position: absolute; inset: 0; border-radius: 14px; display: none; align-items: center; justify-content: center; background: rgba(33, 18, 40, .72); color: #fff; font-family: var(--font-body); font-weight: 600; font-size: .94rem; border: 2px dashed var(--purple); pointer-events: none; }
+.canvas-wrap.drag .drophint { display: flex; }
+
+.studio-page .ov { position: fixed; inset: 0; background: rgba(33, 18, 40, .45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 24px; }
+.studio-page .ovbox { background: #fff; border: 1px solid var(--border); border-radius: 14px; max-width: 700px; width: 100%; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 30px 60px -20px rgba(33, 18, 40, .35); }
+.ovtop { display: flex; align-items: center; justify-content: space-between; }
+.ovtop b { font-family: var(--font-body); font-size: .9rem; color: var(--ink); }
+.ovx { background: none; border: none; color: var(--muted); font-size: 17px; cursor: pointer; line-height: 1; transition: color .15s; }
+.ovx:hover { color: var(--bad); }
+.ovbox img { width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+.ovrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ovbox a.btn { text-decoration: none; }
+.ovhint { font-family: var(--font-body); font-size: .7rem; color: var(--muted); flex: 1; min-width: 160px; }
+
+@media (max-width: 860px) {
+  .studio-body { flex-direction: column; }
+  .stage { order: -1; flex: none; height: 38vh; min-height: 190px; padding: 12px; border-bottom: 1px solid var(--border); }
+  .side { width: 100%; flex: 1; min-height: 0; border-right: none; }
+  .studio-page .page-actions { gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
+  .meta-line { display: none; }
+}

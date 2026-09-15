@@ -1,0 +1,16 @@
+/* Full client profile page — hero + full-width tabs, reusing the
+   client-panel-tab / client-history / client-notes / client-files
+   classes from clientsDirectory.css so both surfaces look identical. */
+
+.client-profile-back { margin-bottom: 16px; }
+
+.client-profile-hero { display: flex; align-items: center; gap: 18px; }
+.client-profile-hero .sub { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+
+.client-profile-tabs { margin-bottom: 0; }
+.client-profile-section { max-width: 620px; }
+
+.client-profile-info .task-filter-row { margin-bottom: 12px; }
+.client-profile-info .task-filter-row select,
+.client-profile-info .task-filter-row input { width: 100%; }
+.client-profile-tags-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }

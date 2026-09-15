@@ -1,0 +1,71 @@
+/* Report Compare page — report-type picker, slot chips, add panel, comparison tables */
+
+.compare-type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width: 640px; }
+.compare-type-card {
+  text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 20px 22px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.compare-type-card:hover { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset; }
+.ctc-title { font-family: var(--font-head); font-weight: 700; font-size: 1.05rem; color: var(--ink); margin-bottom: 6px; }
+.ctc-desc { font-family: var(--font-body); font-size: .82rem; color: var(--muted); line-height: 1.5; }
+
+.slots-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
+.slot-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: 20px;
+  padding: 7px 8px 7px 14px; font-family: var(--font-body); font-size: .82rem; color: var(--ink);
+}
+.slot-chip b { font-weight: 600; }
+.slot-chip button {
+  width: 20px; height: 20px; border-radius: 50%; border: none; background: var(--surface);
+  color: var(--muted); cursor: pointer; font-size: .75rem; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.slot-chip button:hover { background: var(--bad); color: #fff; }
+
+.cmp-empty { max-width: 600px; background: var(--surface); border: 1px dashed var(--border); border-radius: 16px; padding: 30px 26px; }
+.cmp-empty p { font-family: var(--font-body); font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+.cmp-block { background: #fff; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 16px; overflow: hidden; }
+.cmp-block-head {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 18px; border: none; background: none; cursor: pointer; text-align: left;
+  font-family: var(--font-head); font-weight: 700; font-size: .95rem; color: var(--ink);
+}
+.cmp-block-head .chev { width: 14px; height: 14px; stroke: var(--muted); fill: none; stroke-width: 2.2; transition: transform .18s ease; flex: none; }
+.cmp-block-head .chev.open { transform: rotate(90deg); }
+.cmp-block-body { padding: 0 18px 18px; }
+
+.cmp-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: .84rem; margin-bottom: 14px; }
+.cmp-table th, .cmp-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--border); }
+.cmp-table th:first-child, .cmp-table td:first-child { text-align: left; color: var(--ink-soft); font-weight: 500; }
+.cmp-table thead th { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.cmp-table td.na { color: var(--muted); }
+.cmp-table td.best { color: var(--ok); font-weight: 700; background: rgba(30, 158, 93, .08); }
+.cmp-table tr.hl td { font-weight: 700; background: var(--purple-tint); }
+
+.cmp-chart { height: 220px; position: relative; }
+.cmp-chart-center {
+  /* top/left are set from JS (DonutChart's afterLayout hook) to the ring's
+     actual chartArea center — Chart.js's own bottom legend eats into the
+     canvas's layout, so that center isn't the box's geometric 50%/50%. */
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none;
+  text-align: center;
+}
+.cmp-chart-center b { font-family: var(--font-head); font-weight: 800; font-size: 1.4rem; color: var(--ink); }
+.cmp-chart-caption { margin-top: 6px; text-align: center; font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
+
+.cmp-list-row { display: grid; gap: 14px; margin-bottom: 14px; }
+.cmp-list-col { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 0; }
+.cmp-list-col h4 { font-family: var(--font-head); font-size: .82rem; font-weight: 700; margin-bottom: 10px; color: var(--purple); }
+.cmp-list-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.cmp-list-col li { font-family: var(--font-body); font-size: .82rem; color: var(--ink); line-height: 1.5; }
+.cmp-list-col li b { display: block; font-weight: 700; }
+.cmp-list-col .cmp-tag { font-size: .7rem; color: var(--muted); }
+.cmp-list-col .cmp-empty-line { color: var(--muted); font-style: italic; }
+
+@media (max-width: 700px) {
+  .cmp-table { font-size: .76rem; }
+  .cmp-table th, .cmp-table td { padding: 6px 6px; }
+}

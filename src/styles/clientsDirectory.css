@@ -1,0 +1,99 @@
+/* Клієнти — directory list + docked detail panel. Table itself reuses
+   .cmp-table (comparePage.css); this file adds the rest: avatars, status
+   dots, the grid layout, row menu, and the docked panel with its tabs. */
+
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.tbl-wrap .cmp-table { margin-bottom: 0; }
+.client-row { cursor: pointer; transition: background .12s ease; }
+.client-row:hover { background: var(--surface); }
+.client-row.active { background: var(--purple-tint); }
+
+.client-check-col, .client-menu-col { width: 36px; text-align: center; }
+.client-name-cell { display: flex; align-items: center; gap: 10px; }
+
+.client-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  border-radius: 50%; color: #fff; font-family: var(--font-head); font-weight: 700;
+}
+
+.status-dot-wrap { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); }
+
+.row-menu { position: relative; }
+.row-menu-btn { border: none; background: none; color: var(--muted); cursor: pointer; padding: 4px; display: inline-flex; }
+.row-menu-btn:hover { color: var(--purple); }
+.row-menu-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.row-menu-popover {
+  position: absolute; right: 0; top: 100%; z-index: 30; min-width: 170px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35);
+}
+.row-menu-popover button {
+  display: block; width: 100%; text-align: left; border: none; background: none; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .84rem; color: var(--ink); border-radius: 6px; cursor: pointer;
+}
+.row-menu-popover button:hover { background: var(--surface); }
+
+.task-filter-reset { margin-top: 10px; width: 100%; }
+
+/* Grid: table on the left, docked panel on the right (only when open) */
+.clients-directory-layout { display: block; }
+.clients-directory-layout.has-panel { display: grid; grid-template-columns: 1fr 380px; align-items: start; gap: 20px; }
+
+.client-panel {
+  position: relative; background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px;
+  box-shadow: 0 12px 32px -20px rgba(37, 28, 48, .3);
+}
+.client-panel-close { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; line-height: 1; }
+.client-panel-close:hover { color: var(--bad); }
+
+.client-panel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-right: 20px; }
+.client-panel-head h3 { font-family: var(--font-head); font-size: 1.05rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+
+.client-panel-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+.client-panel-actions .btn { flex: 1; text-align: center; }
+
+.client-panel-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; flex-wrap: wrap; }
+.client-panel-tab {
+  border: none; background: none; padding: 8px 10px; font-family: var(--font-head); font-size: .74rem; font-weight: 700;
+  letter-spacing: .02em; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.client-panel-tab:hover { color: var(--ink); }
+.client-panel-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+
+.client-panel-info .task-filter-row { margin-bottom: 10px; }
+.client-panel-info .task-filter-row select,
+.client-panel-info .task-filter-row input,
+.client-profile-info .task-filter-row input {
+  width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
+  padding: 6px 10px; font-size: .82rem; font-family: var(--font-body); outline: none;
+}
+.client-panel-info .task-filter-row input:focus,
+.client-profile-info .task-filter-row input:focus { border-color: var(--purple); }
+.client-panel-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+.client-history-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+.client-history-empty { font-family: var(--font-body); font-size: .82rem; color: var(--muted); font-style: italic; }
+.client-history-list { display: flex; flex-direction: column; gap: 10px; }
+.client-history-item { border-left: 2px solid var(--purple-tint); padding-left: 10px; }
+.client-history-week { font-family: var(--font-body); font-size: .72rem; font-weight: 600; color: var(--purple); }
+.client-history-text { font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); margin-top: 2px; line-height: 1.4; }
+.client-history-author { color: var(--muted); }
+
+.client-notes-textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; resize: vertical;
+  font-family: var(--font-body); font-size: .86rem; color: var(--ink); min-height: 160px;
+}
+.client-notes-textarea:focus { border-color: var(--purple); }
+
+.client-files-upload-btn { display: inline-block; margin-bottom: 14px; cursor: pointer; }
+.client-files-list { display: flex; flex-direction: column; gap: 8px; }
+.client-file-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.client-file-name { flex: 1; font-family: var(--font-body); font-size: .84rem; color: var(--purple); text-decoration: none; }
+.client-file-name:hover { text-decoration: underline; }
+.client-file-meta { font-family: var(--font-body); font-size: .74rem; color: var(--muted); white-space: nowrap; }
+.client-file-del { border: none; background: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; line-height: 1; }
+.client-file-del:hover { color: var(--bad); }
+
+@media (max-width: 900px) {
+  .clients-directory-layout.has-panel { grid-template-columns: 1fr; }
+}

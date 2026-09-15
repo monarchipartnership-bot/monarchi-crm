@@ -1,0 +1,14 @@
+/* Sales Dashboard — client list cards. KPI/chart-grid classes (.dash-kpi-row,
+   .dash-kpi, .delta-badge, .dash-chart, .dash-chart-grid) are shared with
+   automationDashboard.css, imported alongside this file. */
+
+.sd-client-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.sd-client-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+.sd-client-name { font-family: var(--font-head); font-weight: 700; font-size: .88rem; color: var(--ink); margin-bottom: 4px; }
+.sd-client-tag { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--purple); margin-bottom: 6px; }
+.sd-client-text { font-family: var(--font-body); font-size: .8rem; color: var(--ink-soft); line-height: 1.5; }
+
+.sales-dashboard-page .rpt-hero p.sub { max-width: none; }
+
+/* Full working area (same fix as the other Sales/Automation pages). */
+.view:has(.sales-dashboard-page) { max-width: none; opacity: 1; transform: none; animation: none; }

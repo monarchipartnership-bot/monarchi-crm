@@ -1,0 +1,25 @@
+/* Task Manager / Reports Manager — a grid of option cards that picks a
+   nested report/task page, replacing what used to be several separate
+   sidebar links. */
+
+.hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 22px; }
+
+.hub-card {
+  display: flex; align-items: flex-start; gap: 14px; padding: 20px;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px; text-decoration: none;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.hub-card:hover { border-color: var(--purple); box-shadow: 0 16px 32px -20px rgba(37, 28, 48, .35); transform: translateY(-1px); }
+
+.hub-card-icon {
+  flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.hub-card-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.hub-card-body { flex: 1; }
+.hub-card-body h3 { font-family: var(--font-head); font-size: .96rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.hub-card-body p { font-family: var(--font-body); font-size: .82rem; color: var(--muted); line-height: 1.45; }
+
+.hub-card-arrow { flex: none; color: var(--muted); font-size: 1.1rem; transition: transform .15s ease, color .15s ease; }
+.hub-card:hover .hub-card-arrow { color: var(--purple); transform: translateX(3px); }

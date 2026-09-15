@@ -1,0 +1,59 @@
+.shell { display: none; min-height: 100vh; }
+.shell.show { display: flex; }
+
+.main { flex: 1; min-width: 0; padding: 28px clamp(14px, 1.5vw, 24px) 70px; }
+/* No max-width here — every page fills the full working area (this used to
+   cap at 1120px; individual pages had been overriding it back to none one
+   by one via `.view:has(.some-page)`, which is now just redundant but
+   harmless to leave in place). */
+/* Opacity-only fade — a `transform` here (even the harmless-looking
+   translateY(0) an animation ends on) turns .view into a containing block
+   for any `position: fixed` descendant, so a modal's fullscreen overlay
+   gets clipped to this box instead of covering the viewport. */
+.view { opacity: 0; animation: viewIn .28s ease forwards; }
+@keyframes viewIn { to { opacity: 1; } }
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 16px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--muted);
+}
+.crumbs a { color: var(--muted); text-decoration: none; transition: color .15s; }
+.crumbs a:hover { color: var(--purple); }
+.crumbs .sep { opacity: .6; }
+.crumbs .cur { font-family: var(--font-head); color: var(--purple); font-weight: 600; }
+
+.menu-btn {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 60;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: #fff;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -8px rgba(0, 0, 0, .2);
+}
+.menu-btn svg { width: 18px; height: 18px; stroke: var(--ink); fill: none; stroke-width: 2; stroke-linecap: round; }
+
+.scrim { display: none; position: fixed; inset: 0; background: rgba(33, 18, 40, .28); z-index: 25; }
+.scrim.show { display: block; }
+
+@media (max-width: 900px) {
+  .menu-btn { display: flex; }
+  .main { padding-top: 70px; }
+}
+
+@media (max-width: 480px) {
+  .grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,8 @@
+/* Projects Dashboard — KPI/chart-grid classes (.dash-kpi-row, .dash-kpi,
+   .delta-badge, .dash-chart, .dash-chart-grid) are shared with
+   automationDashboard.css, imported alongside this file. */
+
+.projects-dashboard-page .rpt-hero p.sub { max-width: none; }
+
+/* Full working area (same fix as every other dashboard this session). */
+.view:has(.projects-dashboard-page) { max-width: none; opacity: 1; transform: none; animation: none; }

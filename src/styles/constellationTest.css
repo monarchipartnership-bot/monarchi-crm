@@ -1,0 +1,59 @@
+/* Constellation test page — experimental only, not part of the real
+   product surface. Dark stage on purpose (reads better for a node graph
+   than the app's usual light surface), everything else stays self-contained
+   in this file so it can be deleted along with the page with no residue. */
+
+.constellation-page { max-width: 1000px; margin: 0 auto; padding: 32px 24px 60px; }
+.constellation-head h1 { font-family: var(--font-head); font-size: 1.5rem; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.constellation-head p { font-family: var(--font-body); font-size: .88rem; color: var(--muted); max-width: 60ch; margin-bottom: 14px; }
+.constellation-reset { background: var(--purple-tint); color: var(--purple); border: none; border-radius: 8px; padding: 8px 14px; font-family: var(--font-body); font-size: .82rem; font-weight: 600; cursor: pointer; }
+.constellation-reset:hover { background: var(--purple); color: #fff; }
+
+.constellation-stage {
+  margin-top: 18px; background: radial-gradient(circle at 50% 42%, #241a35 0%, #150f22 70%, #0e0a17 100%);
+  border-radius: 20px; padding: 12px; box-shadow: 0 30px 60px -30px rgba(20, 10, 30, .55);
+  aspect-ratio: 1 / 1;
+}
+.constellation-svg { width: 100%; height: 100%; overflow: visible; }
+
+.core-glow { fill: #a878e6; opacity: .18; filter: blur(6px); }
+.core-particle { fill: #d8c2f7; animation: core-twinkle 2.4s ease-in-out infinite; }
+@keyframes core-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: .95; } }
+
+.constellation-branch { transition: opacity .25s ease; }
+.constellation-branch.dimmed { opacity: .18; }
+
+.constellation-edge { stroke: var(--dept-color); stroke-width: 1.4; opacity: .55; }
+.constellation-edge.leaf { stroke-width: 1; opacity: .35; }
+
+.constellation-hub, .constellation-leaf { cursor: pointer; }
+.hub-circle { fill: color-mix(in srgb, var(--dept-color) 22%, transparent); stroke: var(--dept-color); stroke-width: 1.8; transition: r .15s ease; }
+.constellation-hub:hover .hub-circle { r: 34; }
+.hub-label { fill: #EDE7F5; font-family: 'Inter', var(--font-body); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+
+.leaf-circle { fill: #1D1730; stroke: var(--dept-color); stroke-width: 1.3; opacity: .9; transition: r .15s ease, opacity .15s ease; }
+.constellation-leaf:hover .leaf-circle, .constellation-leaf.active .leaf-circle { r: 23; opacity: 1; }
+.leaf-label { fill: #B7ADCB; font-family: 'Inter', var(--font-body); font-size: 9.5px; opacity: 0; transition: opacity .15s ease; }
+.constellation-leaf:hover .leaf-label, .constellation-leaf.active .leaf-label { opacity: 1; fill: #EDE7F5; }
+
+.constellation-hub foreignObject span, .constellation-leaf foreignObject span {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--dept-color);
+}
+
+/* detail panel for a clicked menu item */
+.constellation-panel {
+  position: fixed; right: 28px; bottom: 28px; width: 300px; background: #fff; border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px 22px; box-shadow: 0 24px 48px -20px rgba(37, 28, 48, .35); z-index: 40;
+}
+.constellation-panel-close { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; line-height: 1; }
+.constellation-panel-close:hover { color: var(--bad); }
+.constellation-panel-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.constellation-panel-dept { font-family: var(--font-body); font-size: .68rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.constellation-panel h3 { font-family: var(--font-head); font-size: 1.05rem; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.constellation-panel p { font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); line-height: 1.5; margin-bottom: 14px; }
+.constellation-panel-link { display: inline-block; font-family: var(--font-body); font-size: .84rem; font-weight: 600; color: var(--purple); text-decoration: none; }
+.constellation-panel-link:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+  .constellation-panel { left: 16px; right: 16px; width: auto; bottom: 16px; }
+}

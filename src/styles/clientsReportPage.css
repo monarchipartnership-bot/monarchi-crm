@@ -1,0 +1,382 @@
+/* Clients Report — slide-deck builder (report type + CSV/SEO text input, 9 color
+   themes, 5 visual templates, ~9 slide types, drag-and-drop slide list, inline
+   contenteditable slide editing, PDF export). Ported from clients_report.html.
+   All the slide/theme/template CSS below is verbatim; only the host-page chrome
+   (how this tool sits inside the shared CRM Layout instead of owning the whole
+   viewport) has been adapted, same pattern as Image Studio:
+   - the page is pinned to the viewport height (breadcrumb stays put, this tool's
+     own toolbar + sidebar + stage fill the rest, only the sidebar scrolls
+     internally — fitStage() already scales the fixed 960x540 stage to whatever
+     room #stageWrap has, so no extra work needed there);
+   - the five --grad-start/--grad-end/--dark/--accent/--tint theme variables (and
+     --text/--muted) are scoped under .clients-report-page instead of :root — the
+     original set them globally on <html>, which would leak into the rest of the
+     CRM's UI (the app already has its own --muted design token). */
+.clients-report-page{
+  --grad-start:#B544B5;
+  --grad-end:#661466;
+  --dark:#3d0f40;
+  --accent:#883288;
+  --tint:#f8eef8;
+  --text:#2b1130;
+  --muted:#8a6b8a;
+  font-family:'Montserrat',sans-serif;
+  color:var(--text);
+  display:flex; flex-direction:column; height:100%; overflow:hidden;
+}
+.main:has(.clients-report-page){ height:100vh; padding-bottom:20px; overflow:hidden; display:flex; flex-direction:column; }
+.view:has(.clients-report-page){
+  flex:1; min-height:0;
+  max-width:none; opacity:1; transform:none; animation:none;
+  margin-left:clamp(-54px,-4vw,-20px);
+  margin-right:clamp(-54px,-4vw,-20px);
+  width:auto;
+}
+.clients-report-page *{box-sizing:border-box;}
+#crApp{flex:1; min-height:0; display:flex;}
+
+/* SIDEBAR */
+#sidebar{width:328px;flex:none;background:#fff;border-right:1px solid #e3dbe6;display:flex;flex-direction:column;overflow:hidden;}
+.brand{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid #eee;flex:none;}
+.brand .mark{width:30px;height:30px;flex:none;}
+.brand .name{font-weight:800;font-size:15px;color:var(--dark);line-height:1.2;}
+.brand .sub{font-size:10.5px;color:var(--muted);font-weight:600;}
+.sb-scroll{overflow-y:auto;flex:1;padding:16px 18px;}
+.sb-section{margin-bottom:22px;}
+.sb-section:last-child{margin-bottom:6px;}
+.sb-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;display:block;}
+.sb-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;}
+.sb-input, .sb-select{width:100%;padding:9px 11px;border:1px solid #ddd0e0;border-radius:8px;font-family:inherit;font-size:13px;background:#fbf8fc;color:var(--text);margin-bottom:10px;}
+.sb-input:last-child, .sb-select:last-child{margin-bottom:0;}
+.sb-input:focus, .sb-select:focus{outline:none;border-color:var(--grad-start);}
+textarea.sb-input{min-height:120px;resize:vertical;line-height:1.4;}
+.sb-btn-row{display:flex;gap:8px;margin-bottom:10px;}
+.sb-btn-row .sb-btn{flex:1;margin-bottom:0;}
+.sb-btn{width:100%;padding:10px 12px;border:none;border-radius:8px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;transition:.15s;}
+.sb-btn-primary{background:linear-gradient(135deg,var(--grad-start),var(--grad-end));color:#fff;}
+.sb-btn-primary:hover{filter:brightness(1.08);}
+.sb-btn-primary:disabled{opacity:.6;cursor:default;}
+.sb-btn-ghost{background:#f3ecf5;color:var(--dark);}
+.sb-btn-ghost:hover{background:#ecdfef;}
+.theme-row{display:flex;gap:10px;margin-top:2px;flex-wrap:wrap;}
+.theme-dot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1.5px #ddd0e0;}
+.theme-dot.active{box-shadow:0 0 0 2px var(--dark);}
+
+/* Template picker cards */
+.template-grid{display:flex;flex-direction:column;gap:6px;}
+.template-card{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;border:1.5px solid #e3dbe6;cursor:pointer;background:#fbf8fc;transition:.12s;}
+.template-card:hover{border-color:var(--grad-start);}
+.template-card.active{border-color:var(--grad-start);background:var(--tint);}
+.template-swatch{width:38px;height:38px;flex:none;border-radius:9px;position:relative;overflow:hidden;background:linear-gradient(135deg,var(--grad-start),var(--grad-end));}
+.template-swatch span{position:absolute;display:block;}
+.template-info{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.template-name{font-size:12.5px;font-weight:700;color:var(--text);}
+.template-desc{font-size:10px;color:var(--muted);line-height:1.3;}
+/* mini previews hinting at each template's visual signature */
+.swatch-classic span:nth-child(1){width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.35);filter:blur(3px);top:-6px;right:-6px;}
+.swatch-classic span:nth-child(2){width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.25);bottom:-4px;left:-4px;}
+.swatch-elegant{background:#fff;border:1px solid #ecdfef;}
+.swatch-elegant span:nth-child(1){left:8px;right:8px;top:14px;height:2px;background:var(--grad-start);}
+.swatch-elegant span:nth-child(2){left:10px;top:4px;font-size:13px;font-family:'Playfair Display',serif;font-weight:700;color:var(--dark);}
+.swatch-elegant span:nth-child(2)::after{content:'Aa';}
+.swatch-elegant span:nth-child(3){left:8px;right:8px;bottom:8px;height:1px;background:#e3dbe6;}
+.swatch-modern{background:var(--dark);}
+.swatch-modern span:nth-child(1){width:60px;height:16px;background:var(--grad-start);top:6px;left:-14px;transform:rotate(-30deg);}
+.swatch-modern span:nth-child(2){width:60px;height:8px;background:var(--accent);bottom:4px;left:-10px;transform:rotate(-30deg);}
+.swatch-minimal{background:#fff;border:1px solid #ecdfef;}
+.swatch-minimal span:nth-child(1){left:9px;top:9px;width:8px;height:8px;border:1.5px solid var(--grad-start);border-radius:50%;}
+.swatch-minimal span:nth-child(2){left:9px;bottom:11px;right:9px;height:1px;background:#ddd0e0;}
+.swatch-playful{background:var(--tint);}
+.swatch-playful span:nth-child(1){width:20px;height:20px;border-radius:50%;background:var(--grad-start);opacity:.85;top:2px;left:2px;}
+.swatch-playful span:nth-child(2){width:16px;height:16px;border-radius:50%;background:var(--accent);opacity:.75;bottom:2px;right:2px;}
+.swatch-playful span:nth-child(3){width:10px;height:10px;border-radius:50%;background:var(--grad-end);opacity:.6;bottom:6px;left:14px;}
+.add-wrap{position:relative;margin-bottom:10px;}
+.dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #e3dbe6;border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.14);padding:6px;display:none;z-index:50;max-height:260px;overflow-y:auto;}
+.dropdown.open{display:block;}
+.dropdown button{display:block;width:100%;text-align:left;padding:8px 10px;border:none;background:none;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text);}
+.dropdown button:hover{background:#f3ecf5;}
+.slide-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.slide-row{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;background:#faf7fb;border:1px solid #ede3ef;cursor:pointer;font-size:12px;}
+.slide-row.active{background:#f2e2f4;border-color:var(--grad-start);}
+.slide-row.hidden-slide{opacity:.42;}
+.slide-row .handle{cursor:grab;color:#c8b7cc;font-size:13px;}
+.slide-row .num{width:17px;height:17px;border-radius:50%;background:var(--accent);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;}
+.slide-row .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+.slide-row button{border:none;background:none;cursor:pointer;color:#a98fae;padding:2px 3px;font-size:13px;line-height:1;border-radius:4px;}
+.slide-row button:hover{color:var(--dark);background:#ecdfef;}
+#sidebarFooter{padding:14px 18px;border-top:1px solid #eee;flex:none;}
+
+/* WORKSPACE */
+#workspace{flex:1;display:flex;flex-direction:column;min-width:0;}
+#toolbar{height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 22px;background:#fff;border-bottom:1px solid #e3dbe6;border-radius:14px 14px 0 0;}
+#toolbar .crumb{font-size:13px;font-weight:700;color:var(--dark);}
+#toolbar .crumb span{color:var(--muted);font-weight:600;}
+#toolbar .sp{flex:1;min-width:0;}
+#stageWrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;
+  background-image:radial-gradient(circle at 1px 1px, #d8d0dc 1.4px, transparent 0);
+  background-size:20px 20px;background-color:#ece7ef;}
+#stage{width:960px;height:540px;transform-origin:center center;box-shadow:0 30px 80px rgba(40,10,45,.28);border-radius:14px;overflow:hidden;background:#fff;flex:none;}
+.mobile-toggle{display:none;}
+#sidebarOverlay{display:none;}
+
+/* SLIDE BASE */
+.slide{width:960px;height:540px;position:relative;overflow:hidden;font-family:'Montserrat',sans-serif;}
+.clients-report-page [contenteditable="true"]{outline:none;cursor:text;}
+.clients-report-page [contenteditable="true"]:hover{background:rgba(181,68,181,.07);border-radius:4px;}
+.clients-report-page [contenteditable="true"]:focus{background:rgba(181,68,181,.12);border-radius:4px;box-shadow:0 0 0 2px var(--grad-start);}
+.clients-report-page [contenteditable="true"]:empty:before{content:attr(data-ph);color:#bbb;}
+
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;pointer-events:none;}
+.dotgrid{position:absolute;width:260px;height:260px;background-image:radial-gradient(circle,rgba(255,255,255,.55) 1.6px, transparent 1.6px);background-size:16px 16px;opacity:.4;pointer-events:none;}
+.ring{position:absolute;border:1.5px solid rgba(255,255,255,.28);border-radius:50%;pointer-events:none;}
+.ring.thin{border-width:1px;border-color:rgba(255,255,255,.18);}
+.footer-strip{position:absolute;left:0;right:0;bottom:0;height:38px;display:flex;align-items:center;justify-content:flex-start;padding:0 40px;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;}
+.brand-topright{position:absolute;top:26px;right:34px;display:flex;align-items:center;gap:7px;z-index:2;color:#fff;}
+.brand-topright .mark{width:24px;height:24px;flex:none;}
+.brand-topright .mark svg{width:100%;height:100%;display:block;}
+.brand-topright span:last-child{font-weight:700;font-size:13px;}
+
+/* Title slide */
+.slide-title{background:linear-gradient(160deg,var(--dark),var(--grad-end) 55%,var(--grad-start));color:#fff;padding:64px 70px;}
+.slide-title .head{position:absolute;top:34px;right:44px;display:flex;align-items:center;gap:9px;}
+.slide-title .head .mark{width:30px;height:30px;flex:none;}
+.slide-title .head .mark svg{width:100%;height:100%;display:block;}
+.slide-title .head span{font-weight:700;font-size:16px;}
+.slide-title .rule{position:absolute;top:82px;left:70px;right:70px;height:1px;background:rgba(255,255,255,.35);}
+.slide-title .eyebrow{font-size:14px;font-weight:600;opacity:.85;margin:34px 0 16px;letter-spacing:.02em;max-width:600px;}
+.slide-title h1{font-size:42px;font-weight:800;line-height:1.18;margin:0 0 18px;max-width:660px;}
+.slide-title .period{font-size:18px;font-weight:500;opacity:.85;}
+
+/* Agenda */
+.slide-agenda{background:linear-gradient(135deg,var(--grad-start),var(--grad-end));color:#fff;padding:64px 70px;}
+.slide-agenda h2{font-size:36px;font-weight:800;color:#fff;margin:0 0 4px;}
+.slide-agenda .client{font-size:18px;font-weight:700;color:#fff;opacity:.9;margin:0 0 32px;}
+.agenda-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px;position:relative;padding-left:26px;border-left:2px solid rgba(255,255,255,.5);max-width:560px;}
+.agenda-list li{position:relative;font-size:18px;font-weight:600;color:#fff;}
+.agenda-list li::before{content:'';position:absolute;left:-33px;top:4px;width:14px;height:14px;border-radius:50%;background:#fff;}
+
+/* Section (solid) slide */
+.slide-section{background:linear-gradient(160deg,var(--grad-end),var(--dark));color:#fff;padding:64px 70px;}
+.slide-section h2{font-size:34px;font-weight:800;margin:0 0 22px;max-width:640px;}
+.slide-section .line{display:flex;gap:12px;align-items:flex-start;font-size:17px;font-weight:600;max-width:640px;}
+.slide-section .line .dot{width:10px;height:10px;border-radius:50%;background:#fff;margin-top:7px;flex:none;}
+
+/* General Metrics — pill list (matches reference deck's KPI bars) */
+.slide-metricslist{background:linear-gradient(135deg,var(--grad-start),var(--grad-end));color:#fff;padding:56px 70px 64px;}
+.slide-metricslist h2{font-size:30px;font-weight:800;color:#fff;margin:0 0 4px;}
+.slide-metricslist .looker{font-size:12px;font-weight:700;color:#fff;opacity:.85;text-decoration:underline;display:inline-block;margin-bottom:16px;}
+.pill-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px 22px;margin-top:18px;}
+.pill-grid.dense{grid-template-columns:repeat(2,1fr);gap:9px 18px;margin-top:10px;}
+.pill-grid.dense3{grid-template-columns:repeat(3,1fr);gap:8px 14px;margin-top:10px;}
+.metric-pill{position:relative;height:46px;border-radius:23px;background:rgba(255,255,255,.16);display:flex;align-items:center;padding:0 100px 0 20px;}
+.pill-grid.dense .metric-pill, .pill-grid.dense3 .metric-pill{height:38px;border-radius:19px;padding:0 88px 0 16px;}
+.metric-pill .label{font-weight:700;font-size:13.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pill-grid.dense .metric-pill .label, .pill-grid.dense3 .metric-pill .label{font-size:11.5px;}
+.metric-pill .value-chip{position:absolute;right:4px;top:4px;bottom:4px;min-width:84px;border-radius:19px;background:#fff;color:var(--dark);font-weight:800;font-size:13.5px;display:flex;align-items:center;justify-content:center;padding:0 14px;box-shadow:0 4px 10px rgba(0,0,0,.18);}
+.pill-grid.dense .value-chip, .pill-grid.dense3 .value-chip{font-size:11px;min-width:72px;}
+
+/* KPI cards (manual "KPI-карточки" option) */
+.slide-kpigrid{background:linear-gradient(160deg,var(--dark),var(--grad-end));color:#fff;padding:56px 70px 64px;}
+.slide-kpigrid h2{font-size:30px;font-weight:800;color:#fff;margin:0 0 20px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px;}
+.kpi-grid.dense{grid-template-columns:repeat(3,1fr);gap:11px;margin-top:12px;}
+.kpi-card{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:15px;padding:14px 16px 14px 20px;display:flex;align-items:center;gap:12px;position:relative;}
+.kpi-grid.dense .kpi-card{padding:10px 12px 10px 16px;}
+.kpi-card::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:5px;border-radius:4px;background:#fff;opacity:.85;}
+.kpi-icon{width:38px;height:38px;border-radius:11px;background:#fff;color:var(--dark);display:flex;align-items:center;justify-content:center;flex:none;}
+.kpi-grid.dense .kpi-icon{width:32px;height:32px;border-radius:9px;}
+.kpi-icon svg{width:19px;height:19px;}
+.kpi-grid.dense .kpi-icon svg{width:16px;height:16px;}
+.kpi-body{min-width:0;flex:1;}
+.kpi-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kpi-value{font-size:20px;font-weight:800;color:#fff;}
+.kpi-grid.dense .kpi-value{font-size:16px;}
+
+/* Bullet slide — same column-flex + overflow:hidden safety net as the table slides:
+   heading and footer always keep their space, the list itself clips instead of pushing
+   the footer down if pagination slightly under-estimates how much text fits. */
+.slide-bullets{background:linear-gradient(160deg,var(--dark),var(--grad-end));color:#fff;padding:64px 70px;display:flex;flex-direction:column;}
+.slide-bullets h2{font-size:32px;font-weight:800;color:#fff;margin:0 0 22px;border-left:5px solid #fff;padding-left:18px;flex:0 0 auto;}
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px;max-width:740px;position:relative;z-index:1;flex:1 1 auto;min-height:0;overflow:hidden;}
+.bullets li{display:flex;gap:12px;font-size:15px;font-weight:600;color:#fff;line-height:1.45;}
+.bullets li .dot{width:9px;height:9px;border-radius:50%;background:#fff;margin-top:6px;flex:none;}
+.slide-bullets .footer-strip{position:static;flex:0 0 auto;margin-top:10px;}
+
+/* Paragraph — same safety net as the bullet slide above. */
+.slide-paragraph{background:linear-gradient(135deg,var(--grad-start),var(--grad-end));color:#fff;padding:64px 70px;display:flex;flex-direction:column;}
+.slide-paragraph h2{font-size:32px;font-weight:800;color:#fff;margin:0 0 22px;position:relative;z-index:1;flex:0 0 auto;}
+.slide-paragraph .quote{font-size:120px;color:rgba(255,255,255,.22);position:absolute;top:-10px;right:50px;font-weight:800;font-family:Georgia,serif;}
+.paragraph-body{position:relative;z-index:1;flex:1 1 auto;min-height:0;overflow:hidden;}
+.paragraph-body p{font-size:14.5px;line-height:1.6;font-weight:500;max-width:800px;margin:0 0 12px;color:#fff;}
+.slide-paragraph .footer-strip{position:static;flex:0 0 auto;margin-top:10px;}
+
+/* Expandable table slides (campaign metrics / dynamics / generic).
+   These use a column flex layout (heading -> table area -> footer) so the footer is always
+   reserved its own space and can never be overlapped by table content, even if a table runs
+   a little tall — the table area clips (overflow:hidden) instead of bleeding into the footer. */
+.slide-darktable{background:linear-gradient(160deg,var(--dark),var(--grad-end));color:#fff;padding:40px 60px;display:flex;flex-direction:column;}
+.slide-darktable h2{font-size:22px;font-weight:800;color:#fff;margin:0 0 8px;flex:0 0 auto;}
+.slide-darktable .table-slot{flex:1 1 auto;min-height:0;overflow:hidden;}
+.table-panel{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:8px 10px;height:100%;overflow:hidden;display:flex;flex-direction:column;}
+.ctrl-row{display:flex;gap:6px;margin-bottom:6px;flex:0 0 auto;}
+.ctrl-btn{background:rgba(255,255,255,.92);color:var(--dark);border:none;border-radius:7px;padding:4px 9px;font-weight:700;font-size:9.5px;cursor:pointer;font-family:inherit;}
+.ctrl-btn:hover{background:#fff;}
+table.report-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10.5px;}
+table.report-table th,table.report-table td{word-break:break-word;overflow-wrap:anywhere;}
+table.report-table th{background:rgba(255,255,255,.18);color:#fff;padding:5px 6px;text-align:left;font-weight:700;line-height:1.15;}
+table.report-table th:first-child{border-radius:7px 0 0 7px;}
+table.report-table th:last-child{border-radius:0 7px 7px 0;}
+table.report-table td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.16);font-weight:600;color:#fff;line-height:1.2;}
+table.report-table tr:nth-child(even) td{background:rgba(255,255,255,.06);}
+body.exporting .ctrl-row{display:none!important;}
+.slide-darktable .footer-strip{position:static;flex:0 0 auto;margin-top:8px;}
+
+/* Closing */
+.slide-closing{background:linear-gradient(160deg,var(--dark),var(--grad-end));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.slide-closing .badge-wrap{width:84px;height:84px;}
+.slide-closing .badge-wrap svg{width:100%;height:100%;display:block;}
+.slide-closing h2{font-size:24px;font-weight:700;margin:0;text-align:center;max-width:640px;}
+
+/* ============================================================ TEMPLATES ============
+   Templates only ever touch cosmetics — background/text color, fonts, border-radius,
+   decoration shape/visibility, spacing — scoped under ".tpl-X" applied to #stage. They
+   never touch display/flex/overflow/position rules above (those are the overflow-safety
+   structure), so pagination and the no-overlap-with-footer guarantee still hold under
+   every template. All 9 color themes work with all 5 templates since templates read the
+   same --grad-start/--grad-end/--dark/--accent/--tint variables, just apply them differently
+   (e.g. Elegant/Minimal put them on a light background instead of a dark gradient). */
+
+/* Elegant + Minimal share the same "light background" base treatment (translucent-white
+   components designed for dark gradients need a light-bg equivalent); each then layers its
+   own font/decoration personality on top. */
+.tpl-elegant .slide-title,.tpl-elegant .slide-agenda,.tpl-elegant .slide-metricslist,
+.tpl-elegant .slide-kpigrid,.tpl-elegant .slide-bullets,.tpl-elegant .slide-paragraph,
+.tpl-elegant .slide-darktable,.tpl-elegant .slide-closing,
+.tpl-minimal .slide-title,.tpl-minimal .slide-agenda,.tpl-minimal .slide-metricslist,
+.tpl-minimal .slide-kpigrid,.tpl-minimal .slide-bullets,.tpl-minimal .slide-paragraph,
+.tpl-minimal .slide-darktable,.tpl-minimal .slide-closing{
+  background:var(--tint);color:var(--text);
+}
+.tpl-elegant .slide-title .head span,.tpl-elegant .slide-title h1,.tpl-elegant .slide-agenda h2,
+.tpl-elegant .slide-section h2,.tpl-elegant .slide-metricslist h2,.tpl-elegant .slide-kpigrid h2,
+.tpl-elegant .slide-bullets h2,.tpl-elegant .slide-paragraph h2,.tpl-elegant .slide-darktable h2,
+.tpl-elegant .slide-closing h2,
+.tpl-minimal .slide-title .head span,.tpl-minimal .slide-title h1,.tpl-minimal .slide-agenda h2,
+.tpl-minimal .slide-metricslist h2,.tpl-minimal .slide-kpigrid h2,.tpl-minimal .slide-bullets h2,
+.tpl-minimal .slide-paragraph h2,.tpl-minimal .slide-darktable h2,.tpl-minimal .slide-closing h2{
+  color:var(--dark);
+}
+.tpl-elegant .slide-title .eyebrow,.tpl-elegant .slide-title .period,.tpl-elegant .slide-agenda .client,
+.tpl-minimal .slide-title .eyebrow,.tpl-minimal .slide-title .period,.tpl-minimal .slide-agenda .client{
+  color:var(--accent);opacity:1;
+}
+.tpl-elegant .slide-title .rule,.tpl-minimal .slide-title .rule{background:var(--accent);opacity:.4;}
+.tpl-elegant .agenda-list,.tpl-minimal .agenda-list{border-left-color:var(--accent);}
+.tpl-elegant .agenda-list li,.tpl-minimal .agenda-list li{color:var(--text);}
+.tpl-elegant .agenda-list li::before,.tpl-minimal .agenda-list li::before{background:var(--grad-start);}
+.tpl-elegant .bullets li,.tpl-minimal .bullets li{color:var(--text);}
+.tpl-elegant .bullets li .dot,.tpl-minimal .bullets li .dot{background:var(--grad-start);}
+.tpl-elegant .slide-bullets h2,.tpl-minimal .slide-bullets h2{border-left-color:var(--grad-start);}
+.tpl-elegant .paragraph-body p,.tpl-minimal .paragraph-body p{color:var(--text);}
+.tpl-elegant .slide-paragraph .quote,.tpl-minimal .slide-paragraph .quote{color:rgba(136,50,136,.15);}
+.tpl-elegant .slide-section,.tpl-minimal .slide-section{color:#fff;} /* the accent slide stays a bold contrast moment in every template */
+.tpl-elegant .metric-pill,.tpl-minimal .metric-pill{background:rgba(136,50,136,.08);}
+.tpl-elegant .metric-pill .label,.tpl-minimal .metric-pill .label{color:var(--text);}
+.tpl-elegant .metric-pill .value-chip,.tpl-minimal .metric-pill .value-chip{background:var(--dark);color:#fff;box-shadow:none;}
+.tpl-elegant .slide-metricslist .looker,.tpl-minimal .slide-metricslist .looker{color:var(--accent);}
+.tpl-elegant .kpi-card,.tpl-minimal .kpi-card{background:#fff;border-color:#e3dbe6;box-shadow:0 3px 10px rgba(60,20,64,.06);}
+.tpl-elegant .kpi-card::before,.tpl-minimal .kpi-card::before{background:var(--grad-start);}
+.tpl-elegant .kpi-icon,.tpl-minimal .kpi-icon{background:var(--dark);color:#fff;}
+.tpl-elegant .kpi-label,.tpl-minimal .kpi-label{color:var(--muted);}
+.tpl-elegant .kpi-value,.tpl-minimal .kpi-value{color:var(--dark);}
+.tpl-elegant .table-panel,.tpl-minimal .table-panel{background:#fff;border-color:#e3dbe6;}
+.tpl-elegant table.report-table th,.tpl-minimal table.report-table th{background:var(--grad-start);color:#fff;}
+.tpl-elegant table.report-table td,.tpl-minimal table.report-table td{color:var(--text);border-bottom-color:#ece3ee;}
+.tpl-elegant table.report-table tr:nth-child(even) td,.tpl-minimal table.report-table tr:nth-child(even) td{background:rgba(136,50,136,.05);}
+.tpl-elegant .ctrl-btn,.tpl-minimal .ctrl-btn{background:var(--dark);color:#fff;}
+.tpl-elegant .slide-closing .badge-wrap,.tpl-minimal .slide-closing .badge-wrap{box-shadow:0 0 0 1px rgba(60,20,64,.1);border-radius:50%;}
+/* the footer text and top-right wordmark are white by default (inline style / dark-bg
+   assumption) — override to a readable dark tone on these light backgrounds */
+.tpl-elegant .footer-strip,.tpl-minimal .footer-strip{color:var(--muted)!important;}
+.tpl-elegant .brand-topright,.tpl-minimal .brand-topright{color:var(--dark);}
+.tpl-elegant .brand-topright .mark,.tpl-minimal .brand-topright .mark,
+.tpl-elegant .footer-strip .mark,.tpl-minimal .footer-strip .mark{box-shadow:0 0 0 1px rgba(60,20,64,.08);border-radius:50%;}
+
+/* Elegant — editorial/luxury: serif display headlines, hairline rules, understated
+   decoration (a single thin accent bar instead of blurred blobs/dot grids). */
+.tpl-elegant h1,.tpl-elegant h2,.tpl-elegant .slide-title .head span{font-family:'Playfair Display',Georgia,serif;}
+.tpl-elegant .slide-title .eyebrow,.tpl-elegant .slide-agenda .client{font-style:italic;font-weight:600;}
+.tpl-elegant .blob,.tpl-elegant .dotgrid{display:none;}
+.tpl-elegant .ring{border-color:rgba(136,50,136,.25);}
+.tpl-elegant .slide-title::before,.tpl-elegant .slide-agenda::before,.tpl-elegant .slide-bullets::before,
+.tpl-elegant .slide-paragraph::before,.tpl-elegant .slide-darktable::before,.tpl-elegant .slide-metricslist::before,
+.tpl-elegant .slide-kpigrid::before,.tpl-elegant .slide-closing::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(var(--grad-start),var(--grad-end));
+}
+.tpl-elegant .slide-darktable{padding-left:48px;}
+.tpl-elegant .slide-bullets,.tpl-elegant .slide-paragraph{padding-left:52px;}
+
+/* Modern Bold — geometric sans, sharp angular decoration, high contrast, tight tracking.
+   Keeps the dark gradient backgrounds (they suit a bold look) but squares off every
+   rounded component and swaps blurred circles for crisp diagonal shapes. */
+.tpl-modern h1,.tpl-modern h2,.tpl-modern .slide-title .head span{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em;}
+.tpl-modern .slide-title h1{text-transform:uppercase;font-weight:700;}
+.tpl-modern .slide-bullets h2,.tpl-modern .slide-darktable h2,.tpl-modern .slide-paragraph h2,
+.tpl-modern .slide-section h2{text-transform:uppercase;letter-spacing:.01em;}
+.tpl-modern .slide-bullets h2{border-left-width:8px;}
+.tpl-modern .blob{border-radius:0;filter:blur(0);opacity:.22;clip-path:polygon(0 0,100% 15%,70% 100%,0 100%);}
+.tpl-modern .dotgrid{display:none;}
+.tpl-modern .ring{border-radius:6px;transform:rotate(45deg);}
+.tpl-modern .metric-pill,.tpl-modern .value-chip,.tpl-modern .kpi-card,.tpl-modern .kpi-icon,
+.tpl-modern .table-panel,.tpl-modern table.report-table th:first-child,.tpl-modern table.report-table th:last-child,
+.tpl-modern .ctrl-btn{border-radius:4px;}
+.tpl-modern .bullets li .dot,.tpl-modern .agenda-list li::before{border-radius:2px;}
+.tpl-modern .slide-closing .badge-wrap{border-radius:0;}
+
+/* Minimal — clean and quiet: flat white, hairline top accent instead of any blob/dot/ring,
+   nothing competing with the content. */
+.tpl-minimal .blob,.tpl-minimal .dotgrid,.tpl-minimal .ring{display:none;}
+.tpl-minimal .slide::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--grad-start),var(--grad-end));z-index:2;}
+.tpl-minimal h2{font-weight:600;letter-spacing:.01em;}
+.tpl-minimal .slide-bullets h2,.tpl-minimal .slide-darktable h2{border-left-width:3px;font-weight:700;}
+.tpl-minimal .slide-title{padding-top:80px;}
+
+/* Playful — rounded, colorful, organic: friendly rounded display font, softer/bigger blobs,
+   thicker rings, extra-rounded corners on every component. */
+.tpl-playful h1,.tpl-playful h2,.tpl-playful .slide-title .head span{font-family:'Quicksand',sans-serif;font-weight:700;}
+.tpl-playful .blob{opacity:.7;}
+.tpl-playful .dotgrid{opacity:.6;}
+.tpl-playful .ring{border-width:3px;}
+.tpl-playful .metric-pill{border-radius:30px;}
+.tpl-playful .pill-grid.dense .metric-pill,.tpl-playful .pill-grid.dense3 .metric-pill{border-radius:24px;}
+.tpl-playful .value-chip{border-radius:24px;}
+.tpl-playful .kpi-card{border-radius:22px;}
+.tpl-playful .kpi-icon{border-radius:16px;}
+.tpl-playful .table-panel{border-radius:20px;}
+.tpl-playful table.report-table th:first-child{border-radius:12px 0 0 12px;}
+.tpl-playful table.report-table th:last-child{border-radius:0 12px 12px 0;}
+.tpl-playful .bullets li .dot{box-shadow:0 0 0 4px rgba(255,255,255,.22);}
+.tpl-playful .agenda-list li::before{box-shadow:0 0 0 4px rgba(255,255,255,.3);}
+.tpl-playful .slide-closing .badge-wrap{border-radius:50%;box-shadow:0 0 0 10px rgba(255,255,255,.08);}
+
+/* ============================================================ RESPONSIVE / MOBILE =====
+   Below the breakpoint the 328px sidebar would eat almost the entire phone screen, leaving
+   no room to see the slide — so it becomes an off-canvas drawer (hidden by default, opened
+   via the hamburger button in the toolbar) instead of a permanent flex column. The workspace
+   always gets full width, and the existing fitStage() JS (which scales the fixed 960×540
+   stage to whatever space #stageWrap has) needs no changes — it already adapts once the
+   sidebar is out of the flex flow. */
+@media (max-width:880px){
+  .mobile-toggle{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:none;background:#f3ecf5;border-radius:8px;font-size:18px;cursor:pointer;color:var(--dark);flex:none;}
+  #toolbar{padding:0 14px;gap:10px;}
+  .crumb-dims{display:none;}
+  .crumb-slide{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #sidebar{position:fixed;top:0;left:0;bottom:0;width:86vw;max-width:340px;z-index:210;
+    transform:translateX(-100%);transition:transform .25s ease;box-shadow:10px 0 34px rgba(20,5,20,.35);}
+  #crApp.sidebar-open #sidebar{transform:translateX(0);}
+  #sidebarOverlay{display:block;position:fixed;inset:0;background:rgba(20,5,20,.45);z-index:190;
+    opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  #crApp.sidebar-open #sidebarOverlay{opacity:1;pointer-events:auto;}
+  #workspace{width:100%;}
+  #stageWrap{padding:10px;}
+}

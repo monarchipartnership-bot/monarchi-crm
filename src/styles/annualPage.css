@@ -1,0 +1,89 @@
+/* Annual Report — 12-month grid + detail modal */
+
+/* Ефективність каналів — one channel's overview card at a time, switched
+   via the same Upwork/Інші платформи .chan-tabs pattern Weekly/Monthly use
+   for their full ChannelBlock (reportPage.css). Full section width, so the
+   4 stat cells get room instead of cramming into a grid tile. */
+.eff-platform-tabs { margin-top: 18px; }
+.eff-channel-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; }
+.eff-channel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.eff-channel-icon { flex: none; width: 38px; height: 38px; border-radius: 10px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; }
+.eff-channel-icon svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.eff-channel-title { font-family: var(--font-head); font-weight: 700; font-size: 1.05rem; color: var(--ink); }
+.eff-channel-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px; }
+.eff-channel-stat { text-align: center; padding: 0 4px; min-width: 0; }
+.eff-channel-stat-value { font-family: var(--font-head); font-weight: 800; font-size: 1.5rem; color: var(--ink); }
+.eff-channel-stat-value.hl { color: var(--purple); }
+.eff-channel-stat-label { font-family: var(--font-body); font-size: .74rem; color: var(--muted); margin-top: 4px; overflow-wrap: break-word; }
+@media (max-width: 640px) {
+  .eff-channel-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 18px; }
+}
+
+/* Тренди за місяцями — TrendBlock header: collapse-trigger + per-series KPI
+   widgets + kebab menu, three independent zones inside one flex row (the
+   old design had the whole header as one collapse-<button>, which no
+   longer works once the widgets/pills/menu need their own clicks). */
+.trend-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 18px; }
+.trend-collapse-btn { flex: none; display: flex; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; padding: 0; font-family: var(--font-head); font-weight: 700; font-size: .95rem; color: var(--ink); }
+.trend-collapse-btn .chev { width: 14px; height: 14px; stroke: var(--muted); fill: none; stroke-width: 2.2; transition: transform .18s ease; flex: none; }
+.trend-collapse-btn .chev.open { transform: rotate(90deg); }
+.trend-info-icon { width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--border); color: var(--muted); font-family: var(--font-body); font-style: italic; font-size: .64rem; display: flex; align-items: center; justify-content: center; cursor: help; }
+
+.trend-kpi-row { flex: 1; min-width: 0; display: flex; gap: 18px; flex-wrap: wrap; }
+.trend-kpi { display: flex; flex-direction: column; gap: 3px; min-width: 76px; }
+.trend-kpi-head { display: flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .68rem; color: var(--muted); white-space: nowrap; }
+.trend-kpi-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.trend-kpi-value { font-family: var(--font-head); font-weight: 800; font-size: .92rem; color: var(--ink); }
+
+.trend-menu-wrap { position: relative; flex: none; }
+.trend-menu-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; }
+.trend-menu-btn:hover { border-color: var(--purple); color: var(--purple); }
+.trend-menu-popover { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; min-width: 200px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 28px -12px rgba(0, 0, 0, .18); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.trend-menu-popover button { display: flex; align-items: center; width: 100%; text-align: left; padding: 8px 10px; border-radius: 7px; border: none; background: transparent; font-family: var(--font-body); font-size: .84rem; color: var(--ink); cursor: pointer; }
+.trend-menu-popover button:hover { background: var(--surface); }
+
+.trend-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.trend-pill { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: #fff; font-family: var(--font-body); font-size: .78rem; color: var(--muted); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.trend-pill-check svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* "Огляд" 3×3 chart grid */
+.annual-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.annual-chart-grid .cmp-block { margin-bottom: 0; }
+
+/* Funnel — pure CSS bars, decreasing width per stage */
+.funnel { display: flex; flex-direction: column; gap: 14px; padding: 6px 0; }
+.funnel-row { display: grid; grid-template-columns: 110px 1fr 56px; align-items: center; gap: 10px; }
+.funnel-label { font-family: var(--font-body); font-size: .8rem; color: var(--ink-soft); }
+.funnel-track { background: var(--surface); border-radius: 8px; overflow: hidden; height: 30px; }
+.funnel-bar { height: 100%; background: var(--purple); border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; min-width: 32px; transition: width .3s ease; }
+.funnel-value { font-family: var(--font-head); font-weight: 700; font-size: .8rem; color: #fff; }
+.funnel-pct { font-family: var(--font-body); font-size: .76rem; color: var(--muted); text-align: right; }
+
+/* Деталізація по каналам */
+.detail-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.detail-table-toolbar select { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-family: var(--font-body); font-size: .82rem; color: var(--ink); background: #fff; }
+
+.month-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.month-box { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 16px; max-width: 260px; display: flex; flex-direction: column; gap: 14px; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.month-box:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -16px rgba(66, 19, 66, .4); border-color: var(--purple); }
+.month-box.empty { opacity: .55; }
+.mb-top { display: flex; align-items: center; gap: 10px; }
+.month-ico { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: none; }
+.month-ico svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+.month-ico.s-winter { background: #2F6FED; }
+.month-ico.s-spring { background: #1E9E5D; }
+.month-ico.s-summer { background: #B8860B; }
+.month-ico.s-autumn { background: #D14343; }
+.month-name { font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: var(--ink); }
+.month-status { font-family: var(--font-body); font-size: .72rem; color: var(--muted); }
+
+.ov { display: none; position: fixed; inset: 0; background: rgba(33, 18, 40, .4); z-index: 80; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+.ov.open { display: flex; }
+.ovbox { background: #fff; border-radius: 16px; max-width: 900px; width: 100%; padding: 26px 28px 32px; box-shadow: 0 30px 60px -20px rgba(33, 18, 40, .4); }
+.ovtop { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.ovtop h3 { font-family: var(--font-head); font-size: 1.3rem; font-weight: 700; color: var(--ink); }
+.ov-season { font-family: var(--font-body); font-size: .82rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.ov-season svg { width: 15px; height: 15px; stroke: var(--purple); fill: none; stroke-width: 1.8; }
+.ov-close { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; flex: none; }
+.ov-close:hover { color: var(--bad); border-color: var(--bad); }
+.ov-empty { color: var(--muted); font-style: italic; padding: 20px 0; }

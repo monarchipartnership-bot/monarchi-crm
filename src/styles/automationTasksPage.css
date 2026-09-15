@@ -1,0 +1,655 @@
+/* Automation Department — Task Reports (Daily / Weekly / Monthly).
+   Builds on reportPage.css's .report-page/.rpt-hero/.report-section/.stitle/
+   .picker shell; adds the task-row, status-pill and day-grid pieces specific
+   to this feature. */
+
+.task-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+
+.task-row { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.task-row.done .task-text { color: var(--muted); }
+/* Strikethrough is kept only inside the "Тиждень" day-column calendar grid —
+   elsewhere it makes completed task text harder to read at a glance. */
+.week-grid .task-row.done .task-text { text-decoration: line-through; }
+.task-check { flex: none; width: 17px; height: 17px; accent-color: var(--purple); cursor: pointer; }
+.task-text { flex: 1; min-width: 0; font-family: var(--font-body); font-size: .86rem; color: var(--ink); word-break: break-word; }
+.task-text.clamp { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-row.clickable { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.task-row.clickable:hover { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset; }
+
+.task-actions { flex: none; display: flex; align-items: center; gap: 6px; }
+/* Wraps TaskBadges + task-actions so the due-status icon and the "move to
+   another day" date input can sit on one line together. */
+.task-row-meta { display: flex; align-items: center; gap: 8px; }
+.task-move { font-family: var(--font-body); font-size: .72rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 4px 6px; cursor: pointer; }
+.task-move:focus { outline: none; border-color: var(--purple); }
+.task-del { flex: none; width: 22px; height: 22px; border-radius: 6px; border: none; background: rgba(209, 67, 67, .1); color: var(--bad); cursor: pointer; font-size: .85rem; line-height: 1; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+.task-del:hover { background: rgba(209, 67, 67, .2); }
+
+.status-pill { flex: none; font-family: var(--font-head); font-weight: 700; font-size: .62rem; letter-spacing: .04em; text-transform: uppercase; padding: 4px 9px; border-radius: 20px; white-space: nowrap; }
+.status-pill.done { color: var(--ok); background: #E9F7EF; border: 1px solid rgba(30, 158, 93, .3); }
+.status-pill.pending { color: var(--bad); background: #FBEAEA; border: 1px solid rgba(209, 67, 67, .3); }
+.status-pill.moved { color: var(--warn); background: #FBF3DF; border: 1px solid rgba(184, 134, 11, .3); }
+.status-pill.carried { color: var(--muted); background: var(--surface); border: 1px solid var(--border); }
+.status-pill.cancelled { color: var(--bad); background: #FBEAEA; border: 1px solid rgba(209, 67, 67, .3); }
+
+/* Daily Tasks — per-row Done/Move/Cancel action buttons (pill-shaped) */
+.dt-actions { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dt-btn { flex: none; font-family: var(--font-head); font-weight: 700; font-size: .7rem; letter-spacing: .01em; border-radius: 20px; padding: 8px 14px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; transition: filter .15s; }
+.dt-btn:hover { filter: brightness(.94); }
+.dt-btn-done { color: var(--ok); background: #E9F7EF; border-color: rgba(30, 158, 93, .3); }
+.dt-btn-move { color: var(--warn); background: #FBF3DF; border-color: rgba(184, 134, 11, .3); }
+.dt-btn-cancel { color: var(--bad); background: #FBEAEA; border-color: rgba(209, 67, 67, .3); }
+.dt-undo { flex: none; font-family: var(--font-body); font-size: .72rem; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+.dt-undo:hover { color: var(--purple); }
+
+/* Daily Tasks — per-row "⋮" overflow menu (Редагувати/Видалити/Видалити
+   серію), same open/outside-click-close pattern as .task-filter-wrap. */
+.dt-menu-wrap { position: relative; flex: none; }
+.dt-menu-btn {
+  width: 30px; height: 30px; border-radius: 8px; border: 1px solid transparent; background: none;
+  color: var(--muted); font-size: 1.1rem; line-height: 1; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; transition: background .15s, color .15s;
+}
+.dt-menu-btn:hover { background: var(--surface); color: var(--ink); }
+.dt-menu-popover {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; min-width: 180px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 6px;
+  box-shadow: 0 20px 50px -20px rgba(33, 18, 40, .35); display: flex; flex-direction: column; gap: 2px;
+}
+.dt-menu-popover button {
+  text-align: left; background: none; border: none; border-radius: 7px; padding: 8px 10px; cursor: pointer;
+  font-family: var(--font-body); font-size: .82rem; color: var(--ink); transition: background .15s;
+}
+.dt-menu-popover button:hover { background: var(--surface); }
+.dt-menu-popover button.danger { color: var(--bad); }
+
+/* Daily Tasks — card redesign: leading category icon (primary tag) +
+   title/description split, sized bigger than the compact Weekly board card. */
+.daily-task-row { padding: 14px 16px; gap: 14px; }
+.daily-task-icon {
+  flex: none; width: 42px; height: 42px; border-radius: 12px; background: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.daily-task-icon.none { background: var(--surface-2); }
+.daily-task-icon svg { width: 21px; height: 21px; stroke: #fff; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.daily-task-icon.none svg { stroke: var(--muted); }
+.daily-task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.daily-task-title {
+  font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.daily-task-row.done .daily-task-title { color: var(--muted); }
+.daily-task-desc {
+  font-family: var(--font-body); font-size: .78rem; color: var(--muted); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Daily Tasks — KPI stats bar (Усього/Виконано/Перенесено/Скасовано) */
+.daily-stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+@media (max-width: 900px) { .daily-stats-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .daily-stats-row { grid-template-columns: 1fr; } }
+.daily-stat-card { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.daily-stat-icon { flex: none; width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
+.daily-stat-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.daily-stat-icon-total { background: var(--purple-tint); color: var(--purple); }
+.daily-stat-icon-done { background: #E9F7EF; color: var(--ok); }
+.daily-stat-icon-moved { background: #FBF3DF; color: var(--warn); }
+.daily-stat-icon-cancelled { background: #FBEAEA; color: var(--bad); }
+.daily-stat-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.daily-stat-body > span { font-family: var(--font-body); font-size: .74rem; color: var(--muted); }
+.daily-stat-body > b { font-family: var(--font-head); font-weight: 800; font-size: 1.3rem; color: var(--ink); }
+.daily-stat-body > em { font-style: normal; font-family: var(--font-body); font-size: .7rem; color: var(--muted); }
+
+/* Section-title inline badge (active-count, done-count, moved-count pills) */
+.stitle-badge {
+  font-family: var(--font-head); font-weight: 700; font-size: .68rem; color: var(--purple);
+  background: var(--purple-tint); border-radius: 20px; padding: 3px 10px; white-space: nowrap;
+}
+
+/* Filter button sitting on the same line as "Задачі на ..." — pushed to the
+   row's right edge instead of its own line above. */
+.stitle-filter { margin-left: auto; font-size: 1rem; font-weight: 400; }
+
+/* Daily Tasks — boxed "Додати нову задачу" creation panel */
+.daily-add-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-top: 14px; }
+.daily-add-panel-head { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--purple); margin-bottom: 12px; }
+
+/* Daily Tasks — Виконані/Перенесені side by side; Скасовані stays full width below */
+.daily-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 900px) { .daily-bottom-grid { grid-template-columns: 1fr; } }
+.daily-bottom-title { gap: 10px; }
+.daily-bottom-icon { flex: none; width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; }
+.daily-bottom-icon svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.daily-bottom-icon-done { background: #E9F7EF; color: var(--ok); }
+.daily-bottom-icon-moved { background: #FBF3DF; color: var(--warn); }
+.daily-bottom-title .stitle-badge { margin-left: auto; }
+
+.daily-empty-state {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+  padding: 32px 16px; color: var(--muted);
+}
+.daily-empty-icon {
+  width: 44px; height: 44px; border-radius: 50%; background: var(--surface-2); display: flex;
+  align-items: center; justify-content: center; margin-bottom: 4px;
+}
+.daily-empty-icon svg { width: 20px; height: 20px; stroke: var(--muted); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.daily-empty-state b { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); }
+.daily-empty-state span { font-family: var(--font-body); font-size: .78rem; color: var(--muted); max-width: 240px; }
+
+.moved-row, .cancelled-row { gap: 12px; }
+.task-cancel-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.task-cancel-body .task-text.done { color: var(--muted); }
+.task-cancel-reason { font-family: var(--font-body); font-size: .74rem; color: var(--muted); font-style: italic; }
+
+/* Move / Cancel modals */
+.tmodal-overlay { position: fixed; inset: 0; background: rgba(33, 18, 40, .45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+/* max-height + flex column so a tall body (e.g. AddDealModal's client
+   picker + several fields) scrolls internally instead of overflowing the
+   viewport — without this, .tmodal-overlay's flex centering clips the box
+   equally top and bottom, hiding the header when content is too tall. */
+.tmodal-box { background: #fff; border: 1px solid var(--border); border-radius: 16px; max-width: 420px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px -20px rgba(33, 18, 40, .35); }
+.tmodal-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.tmodal-head h3 { font-family: var(--font-head); font-weight: 700; font-size: 1.02rem; color: var(--ink); }
+.tmodal-close { background: none; border: none; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; transition: color .15s; }
+.tmodal-close:hover { color: var(--bad); }
+.tmodal-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px; display: flex; flex-direction: column; gap: 8px; }
+.tmodal-body p { font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); margin-bottom: 4px; }
+.tmodal-body label { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tmodal-body input[type=date], .tmodal-body input[type=text], .tmodal-body input[type=number] { font-family: var(--font-body); font-size: .9rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%; }
+.tmodal-body textarea { font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; resize: vertical; min-height: 90px; outline: none; }
+/* A bare <select> (the "Новий день" move-picker) still needs its own
+   rounded box — without this it falls back to the browser's plain
+   rectangular default, out of place next to the rest of the app. */
+.tmodal-body select {
+  font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff;
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: pointer; outline: none;
+}
+.tmodal-body textarea:focus, .tmodal-body input:focus, .tmodal-body select:focus { border-color: var(--purple); outline: none; }
+.tmodal-foot { flex: none; padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Edit-mode fields in the task detail modal — same icon-boxed field
+   convention as the creation form, just without its indent margin. */
+.task-detail-edit-fields { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+
+.daily-tasks-page .rpt-hero p.sub,
+.weekly-tasks-page .rpt-hero p.sub,
+.monthly-tasks-page .rpt-hero p.sub { max-width: none; }
+
+/* Monthly/Daily Tasks — Рік/Місяць(/День) moved onto the title's own row,
+   right-aligned, styled as the same icon-boxed fields the creation forms
+   already use instead of the plain .picker card (narrower than that
+   field's usual 208px — a 4-digit year / month name doesn't need that
+   much room). */
+.monthly-tasks-page .rpt-hero,
+.daily-tasks-page .rpt-hero { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.month-period-picker { display: flex; gap: 10px; flex-wrap: wrap; }
+.month-period-picker .wk-field-box { flex: 0 0 150px; }
+.month-period-picker .wk-field-box.month-period-day { flex: 0 0 90px; }
+
+/* Full working area (same fix as Follow-up Generator / Project Calculator):
+   Layout.css's .view keeps a resolved (identity) transform after its fade-in
+   finishes, which makes it the containing block for position:fixed modal
+   overlays and caps the page at 1120px — both undesired here. */
+.view:has(.daily-tasks-page),
+.view:has(.weekly-tasks-page),
+.view:has(.monthly-tasks-page) { max-width: none; opacity: 1; transform: none; animation: none; }
+
+.task-add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.task-add-row input[type=text] {
+  flex: 1; min-width: 200px; background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  color: var(--ink); padding: 10px 13px; font-size: .86rem; font-family: var(--font-body); outline: none; transition: border-color .15s;
+}
+.task-add-row input[type=text]:focus { border-color: var(--purple); }
+.task-add-row textarea {
+  flex: 1; min-width: 200px; background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  color: var(--ink); padding: 10px 13px; font-size: .86rem; font-family: var(--font-body); line-height: 1.5;
+  outline: none; resize: none; overflow: hidden; transition: border-color .15s;
+}
+.task-add-row textarea:focus { border-color: var(--purple); }
+.task-add-row select {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; color: var(--ink);
+  padding: 9px 10px; font-size: .82rem; font-family: var(--font-body); outline: none; cursor: pointer; transition: border-color .15s;
+}
+.task-add-row select:focus { border-color: var(--purple); }
+.task-add-row input[type=datetime-local],
+.task-add-row input[type=number] {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; color: var(--ink);
+  padding: 9px 10px; font-size: .82rem; font-family: var(--font-body); outline: none; transition: border-color .15s;
+}
+.task-add-row input[type=datetime-local] { min-width: 200px; }
+.task-add-row input[type=number] { width: 80px; }
+.task-add-row input[type=datetime-local]:focus,
+.task-add-row input[type=number]:focus { border-color: var(--purple); }
+.task-recur-toggle { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+.task-recur-toggle input { accent-color: var(--purple); cursor: pointer; }
+
+.task-filter-row { display: flex; align-items: center; gap: 10px; margin: -6px 0 16px; }
+.task-filter-row label { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.task-filter-row select {
+  background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
+  padding: 6px 10px; font-size: .82rem; font-family: var(--font-body); outline: none; cursor: pointer;
+}
+.task-filter-row select:focus { border-color: var(--purple); }
+
+/* Due-status badge (deriveDueStatus) — leading icon on every task row/card,
+   shown regardless of the older done/pending/moved/cancelled status pill.
+   See StatusLegend.jsx for the full icon/label set. */
+.due-badge { flex: none; width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.due-badge svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.due-badge.done { color: var(--ok); background: #E9F7EF; }
+.due-badge.overdue { color: var(--bad); background: #FBEAEA; }
+.due-badge.due_today { color: var(--warn); background: #FBF3DF; }
+.due-badge.upcoming { color: var(--purple); background: var(--purple-tint); }
+.due-badge.no_date, .due-badge.cancelled { color: var(--muted); background: #F1F1F3; }
+
+.status-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+.status-legend-item { display: flex; align-items: center; gap: 7px; font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); }
+
+/* Assignee / priority / recurrence badges shown inline on a task row */
+.task-badges { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.task-avatar {
+  width: 21px; height: 21px; border-radius: 50%; background: var(--purple-tint); color: var(--purple);
+  font-family: var(--font-head); font-weight: 700; font-size: .6rem; display: flex; align-items: center;
+  justify-content: center; flex: none; overflow: hidden;
+}
+.task-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.task-priority-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.task-recurring-badge { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: none; color: var(--muted); }
+.task-recurring-badge svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Subtask checklist — collapsed progress toggle that expands below the row */
+.task-subtasks { margin-top: 2px; }
+.task-subtasks-toggle {
+  display: inline-flex; align-items: center; gap: 4px; background: none; border: none; cursor: pointer;
+  font-family: var(--font-head); font-size: .68rem; font-weight: 700; color: var(--muted); padding: 2px 0;
+}
+.task-subtasks-toggle:hover { color: var(--purple); }
+.task-subtasks-toggle .caret { display: inline-block; font-size: .6rem; transition: transform .15s; }
+.task-subtasks-toggle .caret.open { transform: rotate(180deg); }
+.task-subtasks-body { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; padding-left: 4px; border-left: 2px solid var(--border); }
+.subtask-row { display: flex; align-items: center; gap: 8px; }
+.subtask-row input[type=checkbox] { flex: none; width: 14px; height: 14px; accent-color: var(--purple); cursor: pointer; }
+.subtask-text { flex: 1; min-width: 0; font-family: var(--font-body); font-size: .8rem; color: var(--ink); word-break: break-word; }
+.subtask-text.done { color: var(--muted); text-decoration: line-through; }
+.subtask-del { flex: none; width: 18px; height: 18px; border-radius: 5px; border: none; background: rgba(209, 67, 67, .1); color: var(--bad); cursor: pointer; font-size: .72rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.subtask-add-row { display: flex; gap: 6px; margin-top: 2px; }
+.subtask-add-row input {
+  flex: 1; min-width: 0; background: #fff; border: 1px solid var(--border); border-radius: 7px; color: var(--ink);
+  padding: 5px 8px; font-size: .78rem; font-family: var(--font-body); outline: none;
+}
+.subtask-add-row input:focus { border-color: var(--purple); }
+.subtask-add-row button { flex: none; width: 24px; border-radius: 7px; border: 1px solid var(--border); background: #fff; color: var(--purple); cursor: pointer; font-weight: 700; }
+
+.task-series-del { align-self: flex-start; background: none; border: none; color: var(--muted); font-family: var(--font-body); font-size: .7rem; cursor: pointer; text-decoration: underline; padding: 2px 0; margin-top: 2px; }
+.task-series-del:hover { color: var(--bad); }
+.task-detail-del-row { display: flex; gap: 16px; margin-top: 4px; }
+.task-detail-del-row .task-series-del { margin-top: 0; }
+
+/* Tag chips shown inline on a task row (TaskBadges) */
+.task-tag-chip { flex: none; font-family: var(--font-head); font-weight: 700; font-size: .58rem; letter-spacing: .02em; color: #fff; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+
+/* Tag input widget (creation form + detail-modal edit) */
+.tag-input { display: flex; flex-direction: column; gap: 6px; }
+.tag-input-chips {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 5px; background: #fff; border: 1px solid var(--border);
+  border-radius: 10px; padding: 6px 8px; min-height: 36px;
+}
+.tag-input-chips:focus-within { border-color: var(--purple); }
+.tag-chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-head); font-weight: 700; font-size: .68rem; color: #fff; padding: 3px 6px 3px 9px; border-radius: 20px; }
+.tag-chip button { background: none; border: none; color: #fff; opacity: .8; cursor: pointer; font-size: .8rem; line-height: 1; padding: 0; }
+.tag-chip button:hover { opacity: 1; }
+.tag-input-chips input { flex: 1; min-width: 70px; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: .82rem; color: var(--ink); }
+.tag-input-suggestions { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag-suggestion {
+  font-family: var(--font-head); font-weight: 700; font-size: .66rem; color: var(--tag-color); background: color-mix(in srgb, var(--tag-color) 14%, #fff);
+  border: 1px solid var(--tag-color); border-radius: 20px; padding: 3px 9px; cursor: pointer; transition: filter .15s;
+}
+.tag-suggestion:hover { filter: brightness(.95); }
+
+/* Creation-form rich rows — subtasks button + indented subtask rows + the
+   field row (day/assignee/priority/tag/recurrence) revealed once text is typed */
+.wk-row-rich { flex-direction: column; align-items: stretch; }
+.wk-row-rich .item-box { align-items: center; }
+.wk-row-subtask-btn {
+  flex: none; font-family: var(--font-head); font-weight: 700; font-size: .68rem; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+  white-space: nowrap; transition: border-color .15s, color .15s, background .15s;
+}
+.wk-row-subtask-btn:hover, .wk-row-subtask-btn.on { border-color: var(--purple); color: var(--purple); background: var(--purple-tint); }
+.wk-row-subtasks { margin: 6px 0 0 14px; padding-left: 12px; border-left: 2px solid var(--purple-tint); }
+
+/* Each field (day/assignee/priority/tag/recurrence) is its own single box —
+   `.wk-row-fields` is just a plain wrapping flex row, not boxed itself, so
+   fields never end up double-boxed (one outer box + one inner box).
+   Every box shares the same fixed width so the row lines up neatly instead
+   of each box sizing to its own (wildly different-length) select content —
+   Тег is the one exception (it needs real room for chips) and always
+   renders last, sitting on its own full-width line below the rest. */
+.wk-row-fields { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin: 8px 0 0 14px; }
+.wk-field-box { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 7px 11px; transition: border-color .15s, flex-basis .15s; flex: 0 0 208px; }
+.wk-field-box:focus-within { border-color: var(--purple); }
+.wk-field-icon { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--purple-tint); display: flex; align-items: center; justify-content: center; }
+.wk-field-icon svg { width: 13px; height: 13px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.wk-field-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.wk-field-body > label { font-family: var(--font-head); font-size: .58rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.wk-field-body select {
+  background: transparent; border: none; color: var(--ink); padding: 0; font-size: .82rem;
+  font-family: var(--font-body); outline: none; cursor: pointer; width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wk-field-box-tag { align-items: flex-start; flex: 1 1 100%; }
+.wk-field-box-tag .wk-field-body { flex: 1; min-width: 0; }
+.wk-field-box-tag .tag-input { min-width: 160px; }
+.wk-field-box-recur { align-items: flex-start; }
+.wk-field-box-recur.open { flex: 1 1 100%; }
+.wk-field-box-recur .task-recur-toggle { margin-top: 1px; }
+.wk-field-submit { align-self: flex-start; flex: 0 0 auto; }
+
+.wk-row-recurrence { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; margin-top: 6px; }
+.wk-row-recurrence select {
+  font-family: var(--font-body); font-size: .8rem; color: var(--ink); background: #fff;
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; cursor: pointer; outline: none;
+}
+.wk-row-recurrence select:focus { border-color: var(--purple); }
+.wk-weekday-picker { display: flex; gap: 4px; }
+.wk-weekday-picker button {
+  width: 30px; height: 28px; font-family: var(--font-head); font-weight: 700; font-size: .68rem;
+  background: #fff; border: 1px solid var(--border); color: var(--ink-soft); border-radius: 7px; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.wk-weekday-picker button.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+.wk-day-of-month { width: 120px; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); padding: 6px 9px; font-size: .8rem; font-family: var(--font-body); outline: none; }
+.wk-day-of-month:focus { border-color: var(--purple); }
+
+/* Task detail modal */
+.task-detail-modal { max-width: 480px; }
+.task-detail-head-actions { display: flex; align-items: center; gap: 10px; }
+.task-detail-actions { display: flex; justify-content: center; gap: 8px; padding: 14px 22px 0; flex-wrap: wrap; }
+.task-detail-inline-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.task-detail-view .wk-view-text { margin-bottom: 4px; }
+.task-subtasks.forced { margin: 10px 0; }
+.task-detail-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.task-detail-field { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }
+.task-detail-field-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.task-detail-field-body > span { font-family: var(--font-head); font-size: .6rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.task-detail-field-body b { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); }
+.task-detail-tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 1px; }
+
+.week-add-row { display: flex; flex-direction: column; gap: 12px; }
+.week-add-row input[type=text] {
+  width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  color: var(--ink); padding: 10px 13px; font-size: .86rem; font-family: var(--font-body); outline: none; transition: border-color .15s;
+}
+.week-add-row input[type=text]:focus { border-color: var(--purple); }
+.week-add-row > .btn { align-self: flex-start; }
+
+.day-select { display: flex; gap: 6px; flex-wrap: wrap; }
+.day-select button {
+  font-family: var(--font-head); font-weight: 600; font-size: .72rem; text-align: center;
+  background: #fff; border: 1px solid var(--border); color: var(--ink-soft); border-radius: 8px;
+  padding: 7px 10px; cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+}
+.day-select button .hint { display: block; font-weight: 400; color: var(--muted); font-size: .64rem; margin-top: 2px; }
+.day-select button.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+.day-select button.on .hint { color: rgba(255, 255, 255, .8); }
+
+/* Weekly Tasks — list-builder + bulk select/move/delete toolbar */
+.wk-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.wk-toolbar .sp { flex: 1; }
+.wk-list-row { display: flex; align-items: center; gap: 10px; }
+.wk-list-row .task-row-wrap { flex: 1; min-width: 0; }
+.task-row-wrap { min-width: 0; }
+.wk-select { flex: none; width: 16px; height: 16px; accent-color: var(--purple); cursor: pointer; }
+
+.wk-list-modal { max-width: 700px; }
+.wk-list-modal .items { max-height: 50vh; overflow-y: auto; padding-right: 4px; }
+.wk-row-outer { display: flex; align-items: stretch; gap: 10px; }
+.wk-row-outer .item-box { flex: 1; min-width: 0; }
+textarea.wk-row-text { width: 100%; border: none; background: transparent; color: var(--ink); font-family: var(--font-body); font-size: .86rem; line-height: 1.5; resize: none; outline: none; overflow: hidden; padding: 2px 0 0; min-height: 0; }
+.wk-row-text::placeholder { color: var(--muted); }
+
+.wk-view-text { font-family: var(--font-body); font-size: .9rem; color: var(--ink); line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
+
+.btn.btn-move { color: var(--warn); background: #FBF3DF; border-color: rgba(184, 134, 11, .3); }
+.btn.btn-move:hover { color: var(--warn); background: #FBF3DF; border-color: var(--warn); filter: brightness(.96); }
+.btn.btn-danger { color: var(--bad); background: #FBEAEA; border-color: rgba(209, 67, 67, .3); }
+.btn.btn-danger:hover { color: var(--bad); background: #FBEAEA; border-color: var(--bad); filter: brightness(.96); }
+
+/* Weekly Tasks — sidebar (week nav + progress + quick stats) + main column */
+.wk-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .wk-layout { grid-template-columns: 1fr; } }
+
+.wk-sidebar { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 16px; }
+.wk-side-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.wk-side-label { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+
+.wk-side-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wk-side-nav-mid { text-align: center; flex: 1; min-width: 0; }
+.wk-side-nav .wk-side-label { margin-bottom: 2px; }
+.wk-side-range { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); }
+.wk-side-arrow {
+  flex: none; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: #fff;
+  color: var(--ink-soft); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.wk-side-arrow:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-tint); }
+.wk-side-today {
+  width: 100%; margin-top: 12px; font-family: var(--font-head); font-weight: 700; font-size: .78rem;
+  color: var(--purple); background: var(--purple-tint); border: 1px solid rgba(107, 47, 160, .3); border-radius: 8px;
+  padding: 8px; cursor: pointer; transition: background .15s;
+}
+.wk-side-today:hover { background: #ece0f5; }
+.wk-side-pick {
+  width: 100%; margin-top: 8px; font-family: var(--font-body); font-weight: 600; font-size: .78rem;
+  color: var(--ink-soft); background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px; cursor: pointer; transition: border-color .15s, color .15s;
+}
+.wk-side-pick:hover { border-color: var(--purple); color: var(--purple); }
+
+.wk-progress-panel { text-align: center; }
+.wk-progress-chart .cmp-chart { height: 140px; }
+
+.wk-side-stat { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); }
+.wk-side-stat:last-child { border-bottom: none; }
+.wk-side-stat b { font-family: var(--font-head); font-weight: 700; color: var(--ink); }
+
+/* Backlog ("Без дати") panel — narrow sidebar column, so each task row
+   wraps its action controls onto their own line instead of overflowing. */
+.wk-backlog-list .task-row { flex-wrap: wrap; row-gap: 6px; }
+.wk-backlog-list .task-actions { flex: 1 1 100%; justify-content: flex-end; }
+
+.wk-main { min-width: 0; }
+.wk-main-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.wk-view-toggle { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+.wk-view-toggle button {
+  width: 32px; height: 28px; border: none; border-radius: 6px; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: .82rem; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s;
+}
+.wk-view-toggle button.on { background: #fff; color: var(--purple); box-shadow: 0 1px 3px rgba(33, 18, 40, .12); }
+
+/* Filter button + popover — Виконавець/Пріоритет/Тег consolidated behind one
+   icon button instead of three always-visible selects. */
+.task-filter-wrap { position: relative; display: inline-flex; }
+.task-filter-btn { display: inline-flex; align-items: center; gap: 7px; }
+.task-filter-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.task-filter-btn.has-active { border-color: var(--purple); color: var(--purple); background: var(--purple-tint); }
+.task-filter-popover {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 50; min-width: 220px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+  box-shadow: 0 20px 50px -20px rgba(33, 18, 40, .35); display: flex; flex-direction: column; gap: 12px;
+}
+.task-filter-popover .task-filter-row { margin: 0; flex-direction: column; align-items: stretch; gap: 4px; }
+.task-filter-popover .task-filter-row select { width: 100%; }
+
+.wk-add-task-btn {
+  margin-top: auto; width: 100%; background: #fff; border: 1px dashed var(--border); border-radius: 8px;
+  color: var(--muted); font-family: var(--font-head); font-weight: 600; font-size: .72rem;
+  padding: 7px 8px; cursor: pointer; text-align: center; transition: border-color .15s, color .15s, background .15s;
+}
+.wk-add-task-btn:hover { border-color: var(--purple); border-style: solid; color: var(--purple); background: var(--purple-tint); }
+.wk-inline-add input {
+  width: 100%; background: #fff; border: 1px solid var(--purple); border-radius: 8px; color: var(--ink);
+  padding: 7px 9px; font-size: .8rem; font-family: var(--font-body); outline: none;
+}
+
+/* "Календар тижня" heading — icon stretches to match the title+subtitle
+   text column's own height (via align-items: stretch), so it scales with
+   whatever those two lines actually take up instead of a guessed pixel size. */
+.wk-cal-heading { display: flex; align-items: stretch; gap: 14px; margin: 6px 0 14px; }
+.wk-cal-icon { flex: none; width: 44px; border-radius: 12px; background: var(--purple-tint); display: flex; align-items: center; justify-content: center; }
+.wk-cal-icon svg { width: 22px; height: 22px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.wk-cal-text { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.wk-cal-text .stitle { margin: 0; }
+.wk-cal-text .week-cal-sub { margin: 0; }
+
+.week-cal-sub { font-family: var(--font-body); font-size: .84rem; color: var(--muted); }
+
+.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; align-items: stretch; }
+@media (max-width: 1100px) { .week-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 720px) { .week-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .week-grid { grid-template-columns: 1fr; } }
+.week-day-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.week-day-col:hover { box-shadow: 0 10px 22px -16px rgba(66, 19, 66, .35); }
+.week-day-col.drag-over { border-color: var(--purple); background: var(--purple-tint); }
+.week-day-col.today { border-color: var(--purple); box-shadow: 0 0 0 1.5px var(--purple) inset; }
+/* The day column stretches to match the tallest column in its grid row
+   (align-items:stretch above) — task-list grows to fill that extra space so
+   "+ Додати задачу" always lands pinned to the bottom of the column instead
+   of floating right under the last task. */
+.week-day-col .task-list { flex: 1; margin-bottom: 0; }
+.week-day-col .wk-inline-add { margin-top: auto; }
+
+.week-day-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-family: var(--font-head); font-weight: 700; font-size: .74rem; color: var(--ink); }
+.week-day-col.today .week-day-head { color: var(--purple); }
+.week-day-head .hint { display: block; font-weight: 500; color: var(--muted); font-size: .68rem; margin-top: 2px; text-transform: none; }
+.week-day-count { flex: none; font-family: var(--font-head); font-weight: 700; font-size: .64rem; color: var(--muted); background: var(--surface-2); border-radius: 20px; padding: 2px 7px; line-height: 1.4; }
+.week-day-col.today .week-day-count { color: var(--purple); background: var(--purple-tint); }
+
+.week-day-col .task-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 9px 10px 9px 12px;
+  border-left: 3px solid var(--border);
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+  /* Hard guard so nothing (the native date-input's own rendering included)
+     can ever visually spill past the card's rounded border on a narrow
+     column — a fixed width alone isn't always enough to shrink it. */
+  overflow: hidden;
+}
+.week-day-col .task-row:hover { transform: translateX(2px); }
+.week-day-col .task-row.status-done { border-left-color: var(--ok); }
+.week-day-col .task-row.status-pending { border-left-color: var(--bad); }
+.week-day-col .task-row.status-moved { border-left-color: var(--warn); }
+.week-day-col .task-row.status-cancelled { border-left-color: var(--muted); }
+/* Wrap instead of overflow — a long pill (e.g. the "carried from last week"
+   badge) must never spill past the narrow day column. */
+.week-day-col .status-pill { align-self: flex-start; white-space: normal; max-width: 100%; text-align: center; }
+
+/* Compact card body — due-badge/badges on the left, date+delete on the
+   right, on one line where it fits (wraps rather than overflowing when a
+   card carries several badges at once). Everything below is sized down
+   specifically for this narrow day-column card; list/Monthly/Dashboard rows
+   keep the roomier default sizes from the rules above. */
+.week-day-col .task-text { font-size: .8rem; }
+.week-day-col .task-row-meta { width: 100%; justify-content: space-between; flex-wrap: wrap; row-gap: 4px; }
+.week-day-col .task-badges { gap: 4px; }
+.week-day-col .due-badge { width: 17px; height: 17px; border-radius: 5px; }
+.week-day-col .due-badge svg { width: 10px; height: 10px; }
+.week-day-col .task-avatar { width: 17px; height: 17px; font-size: .52rem; }
+.week-day-col .task-priority-dot { width: 7px; height: 7px; }
+.week-day-col .task-tag-chip { font-size: .54rem; padding: 2px 6px; }
+.week-day-col .task-actions { gap: 4px; }
+.week-day-col .task-move { font-size: .64rem; padding: 3px 4px; width: 88px; max-width: 100%; }
+.week-day-col .task-del { width: 18px; height: 18px; font-size: .74rem; }
+
+/* Monthly Tasks — 5-card stats row (reuses .daily-stat-* from Daily Tasks;
+   the 5th "Виконання" card is a plain stat card too now — a donut ring
+   made the whole row noticeably taller than the other four cards). */
+.month-stats-row { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1100px) { .month-stats-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px) { .month-stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* Breathing room between a section's title and its content, on the two
+   sections where the title otherwise sat right on top of it. */
+.month-section-body { margin-top: 14px; }
+
+/* Monthly Tasks — horizontal weekly progress stepper */
+.month-stepper { display: flex; align-items: flex-start; gap: 4px; }
+.month-step { flex: 1; min-width: 0; position: relative; padding-top: 2px; }
+.month-step-head { display: flex; align-items: center; justify-content: center; gap: 6px; position: relative; z-index: 1; }
+.month-step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); flex: none; }
+.month-step-label { font-family: var(--font-head); font-weight: 700; font-size: .78rem; color: var(--ink); display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.month-step-today { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+.month-step-range { text-align: center; font-family: var(--font-body); font-size: .68rem; color: var(--muted); margin: 2px 0 8px; }
+.month-step-bar { height: 7px; border-radius: 20px; background: var(--surface-2); overflow: hidden; margin: 0 6px; }
+.month-step-bar-fill { height: 100%; border-radius: 20px; transition: width .25s ease; }
+.month-step-bar-fill.good { background: var(--ok); }
+.month-step-bar-fill.mid { background: var(--warn); }
+.month-step-bar-fill.low { background: var(--bad); }
+.month-step-pct { text-align: center; font-family: var(--font-head); font-weight: 700; font-size: .72rem; color: var(--ink-soft); margin-top: 4px; }
+
+/* Monthly Tasks — "По тижнях" card grid (replaces the old stacked rows) */
+.month-week-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.month-week-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.month-week-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.month-week-card-head b { display: block; font-family: var(--font-head); font-weight: 700; font-size: .82rem; color: var(--ink); }
+.month-week-card-head .hint { display: block; font-weight: 400; color: var(--muted); font-size: .7rem; text-transform: none; margin-top: 1px; }
+.month-week-card-stats { display: flex; flex-direction: column; gap: 6px; }
+.month-week-card-stats span { display: flex; align-items: center; gap: 7px; font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); }
+.month-week-card-stats .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.month-week-card-stats .dot.done { background: var(--ok); }
+.month-week-card-stats .dot.pending { background: var(--bad); }
+.month-week-card-stats .dot.moved { background: var(--warn); }
+
+/* Monthly Tasks — "Усі задачі за місяць" table + pagination */
+.month-table-wrap { width: 100%; overflow-x: auto; }
+.month-task-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: .84rem; }
+.month-task-table th { text-align: left; font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 0 10px 10px; border-bottom: 1px solid var(--border); }
+.month-task-table th.ic, .month-task-table td.ic { width: 40px; }
+.month-task-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--ink); }
+.month-task-table tr:last-child td { border-bottom: none; }
+.month-task-row { cursor: pointer; transition: background .15s; }
+.month-task-row:hover { background: var(--surface); }
+.month-task-icon { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; background: var(--muted); }
+.month-task-icon.none { background: var(--surface-2); }
+.month-task-icon svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.month-task-icon.none svg { stroke: var(--muted); }
+.month-task-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.month-task-text.expanded { max-width: none; overflow: visible; text-overflow: unset; white-space: normal; word-break: break-word; }
+.month-task-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.month-task-date { color: var(--muted); white-space: nowrap; }
+.month-badge { display: inline-block; font-family: var(--font-head); font-weight: 700; font-size: .68rem; border: 1px solid; border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.month-status-cell { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-head); font-weight: 700; font-size: .78rem; white-space: nowrap; }
+.month-status-ic { display: flex; flex: none; }
+.month-status-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.month-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; }
+.month-pagination-size { display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .8rem; color: var(--muted); }
+.month-pagination-size select { background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); padding: 5px 8px; font-size: .8rem; font-family: var(--font-body); cursor: pointer; }
+.month-pagination-hint { font-family: var(--font-body); font-size: .8rem; color: var(--muted); }
+.month-pagination-pages { display: flex; gap: 4px; margin-left: auto; }
+.month-pagination-pages button {
+  min-width: 30px; height: 30px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--border); background: #fff;
+  color: var(--ink-soft); font-family: var(--font-head); font-weight: 600; font-size: .78rem; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.month-pagination-pages button:disabled { opacity: .4; cursor: not-allowed; }
+.month-pagination-pages button.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+.month-pagination-pages button:not(.on):not(:disabled):hover { border-color: var(--purple); color: var(--purple); }
+
+@media (max-width: 480px) {
+  .task-row { flex-wrap: wrap; }
+  .task-add-row { flex-direction: column; align-items: stretch; }
+  .task-add-row .btn { width: 100%; justify-content: center; }
+}

@@ -1,0 +1,63 @@
+/* Automation Dashboard — KPI cards, delta badges, chart grids. Builds on
+   reportPage.css's shell (.report-page/.rpt-hero/.report-section/.stitle)
+   and comparePage.css's .cmp-table/.cmp-chart. */
+
+.dash-kpi-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.dash-kpi { flex: 1; min-width: 210px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.dash-kpi-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dash-kpi-icon { flex: none; width: 32px; height: 32px; border-radius: 9px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; }
+.dash-kpi-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dash-kpi-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 0; }
+.dash-kpi-value { font-family: var(--font-head); font-weight: 800; font-size: 1.6rem; color: var(--ink); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.dash-kpi-value .pct { font-size: .95rem; font-weight: 700; color: var(--purple); }
+.dash-kpi-sub { font-family: var(--font-body); font-size: .78rem; color: var(--muted); margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dash-sparkline { display: block; width: 100%; height: 28px; margin-top: 10px; }
+
+.delta-badge { display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-head); font-weight: 700; font-size: .7rem; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+.delta-badge.up { color: var(--ok); background: #E9F7EF; }
+.delta-badge.down { color: var(--bad); background: #FBEAEA; }
+.delta-badge.neutral { color: var(--muted); background: var(--surface-2); }
+
+.dash-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 880px) { .dash-lists { grid-template-columns: 1fr; } }
+.dash-list-footer { font-family: var(--font-body); font-size: .78rem; color: var(--muted); margin-top: 6px; }
+
+/* Dashboard's own compact, glance-only task card (DashboardTaskCard) —
+   title/description + the task's primary tag on the right, no actions. */
+.dash-task-card { display: flex; align-items: flex-start; gap: 10px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.dash-task-done-ic { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #E9F7EF; color: var(--ok); display: flex; align-items: center; justify-content: center; }
+.dash-task-done-ic svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dash-task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dash-task-title { font-family: var(--font-head); font-weight: 700; font-size: .86rem; color: var(--ink); }
+.dash-task-desc { font-family: var(--font-body); font-size: .78rem; color: var(--muted); line-height: 1.4; }
+.dash-task-tag-group { flex: none; display: flex; align-items: center; gap: 6px; }
+.dash-task-tag-icon { flex: none; width: 24px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.dash-task-tag-icon svg { width: 12px; height: 12px; stroke: #fff; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.dash-chart { height: 280px; }
+
+.dash-chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 1000px) { .dash-chart-grid { grid-template-columns: 1fr; } }
+
+/* A section-title dropdown (week/trend-window selectors), pushed to the
+   row's right edge — same pattern as Daily Tasks' inline filter button. */
+.dash-period-select {
+  margin-left: auto; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
+  padding: 6px 10px; font-size: .8rem; font-family: var(--font-body); outline: none; cursor: pointer; transition: border-color .15s;
+}
+.dash-period-select:focus, .dash-period-select:hover { border-color: var(--purple); }
+
+/* Status donut + its own custom legend (replaces Chart.js's built-in one —
+   this needs counts and percentages per row, not just a color/label swatch). */
+.dash-donut-row { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.dash-donut-chart { flex: none; width: 200px; height: 200px; }
+.dash-donut-legend { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 180px; }
+.dash-donut-legend-item { display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); }
+.dash-donut-legend-item .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.dash-donut-legend-item .label { flex: 1; }
+.dash-donut-legend-item .value { font-family: var(--font-head); font-weight: 700; color: var(--ink); }
+
+.automation-dashboard-page .rpt-hero p.sub { max-width: none; }
+
+/* Full working area (same fix as the other Automation task pages). */
+.view:has(.automation-dashboard-page) { max-width: none; opacity: 1; transform: none; animation: none; }

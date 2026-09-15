@@ -1,0 +1,71 @@
+/* Project Detail page (tabs) + shared AdReportForm (Daily/Weekly/Monthly ad
+   reports). Builds on reportPage.css's shell (.report-page/.rpt-hero/.picker/
+   .report-section/.stitle) and projectsPage.css's .pf/.pf-grid form fields. */
+
+.pd-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.pd-header-meta { display: flex; flex-direction: column; gap: 6px; }
+.pd-header-name { font-family: var(--font-head); font-weight: 700; font-size: 1.3rem; color: var(--ink); }
+.pd-header-sub { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--font-body); font-size: .84rem; color: var(--muted); }
+
+/* Overview tab — boxed fields with thematic icons, toggle-edit + always-on notes */
+.ov-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.ov-edit-actions { display: flex; gap: 8px; }
+
+.ov-field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+@media (max-width: 880px) { .ov-field-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .ov-field-grid { grid-template-columns: 1fr; } }
+
+.ov-field-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; display: flex; flex-direction: column; gap: 8px; }
+.ov-field-box-wide { grid-column: span 2; }
+@media (max-width: 520px) { .ov-field-box-wide { grid-column: span 1; } }
+
+.ov-field-label { display: flex; align-items: center; gap: 7px; font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.ov-field-icon { display: inline-flex; flex: none; }
+.ov-field-icon svg { width: 15px; height: 15px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.ov-field-value { font-family: var(--font-body); font-size: .9rem; color: var(--ink); word-break: break-word; }
+.ov-link { color: var(--purple); text-decoration: none; }
+.ov-link:hover { text-decoration: underline; }
+
+.ov-field-box input[type=text], .ov-field-box input[type=date] { font-family: var(--font-body); font-size: .88rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; outline: none; width: 100%; transition: border-color .15s; }
+.ov-field-box input:focus { border-color: var(--purple); }
+.ov-date-row { display: flex; align-items: center; gap: 8px; }
+.ov-date-row span { color: var(--muted); }
+
+.ov-delete-link { margin-top: 4px; }
+
+.ov-notes-box { gap: 10px; }
+.ov-notes-box textarea {
+  font-family: var(--font-body); font-size: .88rem; color: var(--ink); line-height: 1.5; min-height: 60px;
+  width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+  outline: none; resize: none; transition: border-color .15s;
+}
+.ov-notes-box textarea:focus { border-color: var(--purple); }
+.ov-notes-save { align-self: flex-start; }
+
+.pd-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+.pd-tab {
+  font-family: var(--font-head); font-weight: 600; font-size: .86rem; color: var(--ink-soft);
+  background: none; border: none; padding: 10px 16px; cursor: pointer; position: relative; top: 1px;
+  border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+}
+.pd-tab:hover { color: var(--purple); }
+.pd-tab.on { color: var(--purple); border-bottom-color: var(--purple); }
+
+.ad-csv-btn { display: inline-flex; align-items: center; align-self: flex-end; cursor: pointer; white-space: nowrap; }
+
+.ad-metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+@media (max-width: 720px) { .ad-metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .ad-metrics-grid { grid-template-columns: 1fr; } }
+
+.ad-stat-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.ad-stat { flex: 1; min-width: 110px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; text-align: center; }
+.ad-stat-value { font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; color: var(--ink); }
+.ad-stat-label { font-family: var(--font-body); font-size: .7rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
+
+.project-detail-page .rpt-hero p.sub,
+.ad-report-page .rpt-hero p.sub { max-width: none; }
+
+/* Full working area (same fix as every other report page this session). */
+.view:has(.project-detail-page),
+.view:has(.ad-report-page) { max-width: none; opacity: 1; transform: none; animation: none; }

@@ -1,0 +1,20 @@
+.sec-label { font-family: var(--font-head); font-weight: 700; font-size: 11px; letter-spacing: 1.5px; color: var(--ink-soft); text-transform: uppercase; margin: 28px 0 14px; display: flex; align-items: center; gap: 9px; }
+.sec-label.first { margin-top: 0; }
+.sec-label .ln { flex: 1; height: 1px; background: var(--border); }
+
+.acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+
+.acct-card { display: flex; align-items: center; gap: 14px; max-width: 420px; text-decoration: none; color: inherit; cursor: pointer; border-radius: 14px; padding: 18px; border: 1px solid var(--acct-border, var(--border)); background: var(--acct-bg, #fff); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.acct-card:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -18px rgba(33, 18, 40, .28); border-color: var(--acct-accent, var(--purple)); }
+.acct-badge { flex: none; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--acct-badge-bg, var(--acct-accent, var(--purple))); box-shadow: 0 6px 14px -6px var(--acct-accent, var(--purple)); overflow: hidden; }
+.acct-badge svg { width: 26px; height: 26px; }
+.acct-badge img { width: 26px; height: 26px; object-fit: contain; }
+.acct-text { flex: 1; min-width: 0; }
+.acct-platform { font-family: var(--font-head); font-weight: 700; font-size: .94rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-name { font-family: var(--font-body); font-size: .82rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-arrow { flex: none; width: 16px; height: 16px; stroke: var(--muted); fill: none; stroke-width: 2; transition: transform .18s ease, stroke .18s ease; }
+.acct-card:hover .acct-arrow { transform: translate(2px, -2px); stroke: var(--acct-accent, var(--purple)); }
+
+@media (max-width: 480px) {
+  .acct-grid { grid-template-columns: 1fr; }
+}

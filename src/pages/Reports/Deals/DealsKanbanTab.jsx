@@ -1,0 +1,140 @@
+import { useMemo, useState } from 'react';
+import { moveDealStage } from '../../../lib/api/deals';
+import DealCard from '../../../components/Deals/DealCard';
+
+const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
+
+export default function DealsKanbanTab({ deals, stages, reload, onAddDeal, onManageStages, onViewDeal }) {
+  const [dragOverStage, setDragOverStage] = useState(null);
+  const [lostModal, setLostModal] = useState(null); // { dealId, stage }
+  const [lostReason, setLostReason] = useState('');
+  const [search, setSearch] = useState('');
+  const [managerFilter, setManagerFilter] = useState('');
+
+  const managerOptions = useMemo(() => Array.from(new Set(deals.map((d) => d.manager).filter(Boolean))).sort(), [deals]);
+
+  const filteredDeals = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return deals.filter((d) => {
+      // Archived deals leave the working board — Lost deals archive
+      // themselves the moment they close, Won deals stay here until
+      // someone explicitly clicks "Завершити угоду" (ongoing invoicing/
+      // follow-up work happens while a deal is Won but not yet archived).
+      if (d.archived) return false;
+      if (managerFilter && d.manager !== managerFilter) return false;
+      if (q) {
+        const inTitle = d.title?.toLowerCase().includes(q);
+        const inClient = d.clients?.name?.toLowerCase().includes(q);
+        const inCompany = d.clients?.company?.toLowerCase().includes(q);
+        if (!inTitle && !inClient && !inCompany) return false;
+      }
+      return true;
+    });
+  }, [deals, search, managerFilter]);
+
+  const byStage = useMemo(() => {
+    const map = {};
+    stages.forEach((s) => { map[s.id] = []; });
+    filteredDeals.forEach((d) => { if (map[d.stage_id]) map[d.stage_id].push(d); });
+    return map;
+  }, [filteredDeals, stages]);
+
+  async function applyStageMove(dealId, stage, reason) {
+    try {
+      await moveDealStage(dealId, stage, reason);
+      reload();
+    } catch (e) {
+      alert('Помилка переносу угоди: ' + (e.message || e));
+      reload();
+    }
+  }
+
+  function handleDrop(e, stage) {
+    e.preventDefault();
+    setDragOverStage(null);
+    const dealId = e.dataTransfer.getData('text/plain');
+    if (!dealId) return;
+    if (stage.is_lost) {
+      setLostModal({ dealId, stage });
+      setLostReason('');
+      return;
+    }
+    applyStageMove(dealId, stage, null);
+  }
+
+  function confirmLost() {
+    if (!lostModal) return;
+    applyStageMove(lostModal.dealId, lostModal.stage, lostReason.trim());
+    setLostModal(null);
+  }
+
+  return (
+    <>
+      <div className="deals-kanban-toolbar">
+        <div className="mc-client-search">
+          <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Пошук за назвою або клієнтом..." />
+        </div>
+        <select className="dash-period-select" value={managerFilter} onChange={(e) => setManagerFilter(e.target.value)}>
+          <option value="">Усі менеджери</option>
+          {managerOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <span className="sp" />
+        <button type="button" className="btn" onClick={onManageStages}>Налаштувати етапи</button>
+      </div>
+
+      <div className="deals-board">
+        {stages.map((stage) => (
+          <div
+            key={stage.id}
+            className={'deals-column' + (dragOverStage === stage.id ? ' drag-over' : '')}
+            style={{ '--stage-color': stage.color || '#7C3AED' }}
+            onDragOver={(e) => { e.preventDefault(); setDragOverStage(stage.id); }}
+            onDragLeave={() => setDragOverStage((cur) => (cur === stage.id ? null : cur))}
+            onDrop={(e) => handleDrop(e, stage)}
+          >
+            <div className="deals-column-head">
+              <span className="deals-column-label">
+                <span className="deals-column-dot" style={{ background: stage.color || '#7C3AED' }} />
+                {stage.label}
+              </span>
+              <span className="week-day-count">{(byStage[stage.id] || []).length}</span>
+            </div>
+            <div className="deals-column-body">
+              {(byStage[stage.id] || []).length === 0 && <div className="empty-hint">Немає угод</div>}
+              {(byStage[stage.id] || []).map((deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData('text/plain', deal.id)}
+                  onClick={onViewDeal}
+                />
+              ))}
+            </div>
+            <button type="button" className="wk-add-task-btn" onClick={() => onAddDeal(stage.id)}>+ Додати угоду</button>
+          </div>
+        ))}
+      </div>
+
+      {lostModal && (
+        <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setLostModal(null); }}>
+          <div className="tmodal-box">
+            <div className="tmodal-head">
+              <h3>Причина програшу</h3>
+              <button type="button" className="tmodal-close" onClick={() => setLostModal(null)} aria-label="Закрити">&times;</button>
+            </div>
+            <div className="tmodal-body">
+              <label>Причина</label>
+              <textarea value={lostReason} onChange={(e) => setLostReason(e.target.value)} placeholder="Вкажіть причину..." autoFocus />
+              <div className="task-detail-inline-actions">
+                <button type="button" className="btn" onClick={() => setLostModal(null)}>Назад</button>
+                <button type="button" className="btn btn-p" onClick={confirmLost}>Підтвердити</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

@@ -1,0 +1,513 @@
+/* Shared styling for all report Create/History pages (Daily/Weekly/Monthly/Annual).
+   Ported 1:1 from the legacy report pages' inline <style> blocks. */
+
+.page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
+.page-actions .sp { flex: 1; }
+.btn {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: .78rem;
+  letter-spacing: .01em;
+  padding: 9px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink-soft);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.btn:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-tint); }
+.btn:disabled { opacity: .6; cursor: default; }
+.btn-p { background: var(--purple); border-color: var(--purple); color: #fff; }
+.btn-p:hover { background: var(--purple-hover); border-color: var(--purple-hover); color: #fff; }
+
+/* report header */
+.rpt-hero { margin-bottom: 22px; }
+.rpt-hero h1 { font-family: var(--font-head); font-weight: 700; font-size: clamp(26px, 4.4vw, 36px); letter-spacing: -.02em; margin-bottom: 14px; color: var(--ink); }
+.rpt-hero-heading { display: flex; align-items: center; gap: 14px; }
+.rpt-hero-heading h1 { margin-bottom: 0; }
+.rpt-hero-icon { flex: none; width: 46px; height: 46px; border-radius: 12px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; }
+.rpt-hero-icon svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.rpt-hero-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.mgr-select { width: 100%; font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; outline: none; cursor: pointer; }
+.mgr-select:focus { border-color: var(--purple); }
+.rpt-hero p.sub { font-family: var(--font-body); font-size: .9rem; color: var(--muted); max-width: 620px; line-height: 1.55; }
+/* Sales Daily Report — Рік/Місяць/День inline on the title row, same pattern
+   as Automation's Daily/Monthly Tasks (.month-period-picker/.wk-field-box). */
+.daily-report-page .rpt-hero-top-row,
+.weekly-report-page .rpt-hero-top-row,
+.monthly-report-page .rpt-hero-top-row,
+.annual-report-page .rpt-hero-top-row,
+.deals-page .rpt-hero-top-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
+.rpt-sub-row { display: flex; flex-wrap: wrap; gap: 26px; align-items: center; }
+.rpt-sub { display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .86rem; color: var(--muted); }
+.rpt-sub svg { width: 16px; height: 16px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; flex-shrink: 0; }
+.rpt-sub b { color: var(--ink); font-weight: 600; }
+.rpt-sub input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed var(--border);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: .86rem;
+  font-weight: 600;
+  padding: 2px 0;
+  min-width: 140px;
+  outline: none;
+}
+.rpt-sub input:focus { border-bottom-color: var(--purple); }
+
+/* month/week fullness bar shell — shared card wrapper reused by
+   MonthFullness (day pills) and WeekFullness (circle stepper) below. */
+.fullness { margin: 22px 0 24px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+
+/* Weekly Report's WeekFullness redesign — a circle stepper (one node per
+   week, connected by a line) + an overall completion stat on the right. */
+.wk-stepper-row { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.wk-stepper { display: flex; align-items: flex-start; flex: 1; min-width: 260px; }
+.wk-step { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; }
+.wk-step-dot { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--border); background: #fff; color: var(--muted); font-family: var(--font-head); font-weight: 700; font-size: .8rem; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; flex: none; transition: border-color .15s, background .15s; }
+.wk-step-dot svg { width: 16px; height: 16px; stroke: #fff; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.wk-step-dot.done { background: var(--purple); border-color: var(--purple); }
+.wk-step-dot.cur { border-color: var(--purple-deep); color: var(--purple-deep); background: #fff; }
+.wk-step-dot.cur.done { background: var(--purple); color: #fff; }
+.wk-step-label { font-family: var(--font-body); font-size: .74rem; color: var(--muted); white-space: nowrap; }
+.wk-step-line { flex: 1; height: 2px; background: var(--border); margin-top: 18px; min-width: 20px; }
+.wk-step-line.done { background: var(--purple); }
+.wk-stepper-side { flex: none; text-align: right; display: flex; flex-direction: column; gap: 3px; min-width: 160px; }
+.wk-stepper-count { font-family: var(--font-head); font-weight: 800; font-size: 1.05rem; color: var(--ink); }
+.wk-stepper-pct { font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
+.wk-stepper-bar { height: 6px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.wk-stepper-bar-fill { height: 100%; background: var(--purple); border-radius: 4px; }
+
+/* Sales Daily Report's own MonthFullness redesign — day pills (number +
+   status dot) with a days-in-month stat and a vertical legend on the right.
+   Reuses the shared `.fullness` card shell but its own inner classes (mf-*),
+   so WeekFullness's fullness-head/wdots-full layout above is untouched. */
+.mf-title { font-family: var(--font-head); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--purple); margin-bottom: 16px; }
+.mf-row { display: flex; gap: 22px; }
+.mf-days { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px; padding-right: 22px; border-right: 1px solid var(--border); }
+.mf-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 42px; height: 58px; border-radius: 14px; border: 1px solid var(--border); background: #fff; cursor: pointer; padding: 0; flex: none; transition: transform .15s, border-color .15s; }
+.mf-day:hover { transform: translateY(-2px); }
+.mf-day-num { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink-soft); }
+.mf-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.mf-day.over { background: #FBEAEA; border-color: rgba(209, 67, 67, .3); }
+.mf-day.over .mf-day-num { color: var(--bad); }
+.mf-day.over .mf-day-dot { background: var(--bad); }
+.mf-day.done { background: var(--purple-tint); border-color: rgba(107, 47, 160, .3); }
+.mf-day.done .mf-day-num { color: var(--purple); }
+.mf-day.done .mf-day-dot { background: var(--purple); }
+.mf-day.future .mf-day-num { color: var(--muted); }
+.mf-day.future .mf-day-dot { background: var(--border); }
+.mf-day.cur { background: #fff; border: 2px solid var(--purple-deep); }
+.mf-day.cur .mf-day-num { color: var(--purple-deep); font-weight: 800; }
+.mf-day.cur .mf-day-dot { background: var(--purple-deep); }
+.mf-side { flex: none; width: 200px; display: flex; flex-direction: column; gap: 20px; justify-content: center; }
+.mf-stat { display: flex; align-items: center; gap: 12px; }
+.mf-stat-icon { flex: none; width: 40px; height: 40px; border-radius: 11px; background: var(--purple-tint); display: flex; align-items: center; justify-content: center; }
+.mf-stat-icon svg { width: 20px; height: 20px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mf-stat-body { display: flex; flex-direction: column; gap: 1px; }
+.mf-stat-body b { font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; color: var(--ink); }
+.mf-stat-body span { font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
+.mf-legend { display: flex; flex-direction: column; gap: 9px; }
+.mf-legend-item { display: flex; align-items: center; gap: 7px; font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
+.mf-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.mf-legend-dot.over { background: var(--bad); }
+.mf-legend-dot.done { background: var(--purple); }
+.mf-legend-dot.future { background: var(--surface-2); border: 1px solid var(--border); }
+@media (max-width: 700px) {
+  .mf-row { flex-direction: column; }
+  .mf-days { padding-right: 0; border-right: none; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .mf-side { width: auto; flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+}
+.wdot.done { background: var(--purple); border-color: var(--purple); }
+.wdot.over { background: var(--bad); border-color: var(--bad); }
+.wdot.cur { outline: 2px solid var(--purple-deep); outline-offset: 2px; }
+
+/* period/day picker panel */
+.picker { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 0 0 28px; padding: 16px 18px; background: #fff; border: 1px solid var(--border); border-radius: 14px; }
+.picker.picker-tinted { background: var(--surface); margin-top: 20px; }
+.pk-field { display: flex; flex-direction: column; gap: 5px; }
+.pk-field label { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.pk-field select {
+  font-family: var(--font-body);
+  font-size: .84rem;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 110px;
+}
+.pk-field select:focus { outline: none; border-color: var(--purple); }
+.pk-sp { flex: 1; }
+.save-state { font-family: var(--font-body); font-size: .74rem; color: var(--muted); white-space: nowrap; }
+
+/* Sales Daily Report — two-column layout, main content first, stats
+   sidebar on the right (distinct from Automation's left-sidebar .wk-layout). */
+.rpt-layout { display: grid; grid-template-columns: 1fr 260px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .rpt-layout { grid-template-columns: 1fr; } }
+
+/* Клієнти fields laid out as icon-boxed .wk-field-box instead of plain .cf
+   (Sales Daily Report only — Monthly's own usage stays unboxed). */
+.client-fields-boxed .wk-field-box { flex: 1 1 190px; }
+.wk-field-box-wide { flex: 1 1 100% !important; }
+
+/* EditableItemList's tag/priority/carry-forward row (Sales Daily Report
+   only) reuses Automation's own .wk-row-fields/.wk-field-box styling
+   (imported via automationTasksPage.css) so a report item looks like an
+   Automation task row — no page-specific CSS needed here. */
+
+/* section titles */
+.stitle { font-family: var(--font-head); font-size: 1.55rem; font-weight: 700; letter-spacing: -.01em; margin: 6px 0 4px; color: var(--ink); display: flex; align-items: center; gap: 12px; }
+.stitle-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; flex: none; }
+.stitle-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.report-section { margin-bottom: 8px; padding-top: 6px; scroll-margin-top: 24px; }
+
+/* editable item lists (Виконано / Плани) with auto-numbering */
+.items { display: flex; flex-direction: column; gap: 9px; margin-bottom: 12px; }
+.item-box { background: #fff; border: 1px solid var(--border); border-radius: 11px; padding: 11px 36px 11px 13px; position: relative; transition: border-color .15s ease, box-shadow .15s ease; }
+/* Border + shadow only (no background tint) — a background matching
+   ::selection's color here would make selected textarea text invisible
+   while the cursor hovers the box, which is exactly when you're selecting it. */
+.item-box:hover { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset; }
+.item-box.numbered { display: flex; gap: 11px; align-items: flex-start; }
+.item-num { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--purple-tint); color: var(--purple); font-family: var(--font-head); font-weight: 700; font-size: .72rem; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.item-box-body { flex: 1; min-width: 0; }
+.item-box textarea { width: 100%; display: block; border: none; background: transparent; color: var(--ink); font-family: var(--font-body); font-size: .86rem; line-height: 1.5; resize: none; overflow: hidden; outline: none; min-height: 20px; }
+.item-box textarea::placeholder { color: var(--muted); }
+.capture-text { width: 100%; display: block; font-family: var(--font-body); font-size: .86rem; line-height: 1.5; color: var(--ink); white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; min-height: 20px; }
+.del-btn { position: absolute; top: 8px; right: 8px; width: 21px; height: 21px; border-radius: 6px; border: none; background: rgba(209, 67, 67, .1); color: var(--bad); cursor: pointer; opacity: 0; transition: opacity .15s; font-size: .8rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.item-box:hover .del-btn { opacity: 1; }
+.empty-hint { font-family: var(--font-body); font-size: .8rem; color: var(--muted); font-style: italic; padding: 2px 2px 9px; }
+.add-btn { font-family: var(--font-head); font-weight: 600; font-size: .8rem; color: var(--purple); background: var(--purple-tint); border: 1.5px dashed rgba(107, 47, 160, .35); border-radius: 10px; padding: 9px 15px; cursor: pointer; transition: background .15s, border-color .15s; }
+.add-btn:hover { background: #ece0f5; border-color: var(--purple); }
+
+/* Клієнти row fields (no numbering) */
+.client-fields { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; padding-right: 20px; }
+.cf { display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.cf label { font-family: var(--font-head); font-size: .62rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.cf select, .cf input { font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; outline: none; }
+.cf select:focus, .cf input:focus { border-color: var(--purple); }
+.cf textarea { font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; line-height: 1.5; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; outline: none; resize: none; overflow: hidden; min-height: 34px; width: 100%; }
+.cf textarea:focus { border-color: var(--purple); }
+.cf-wide { flex: 1; min-width: 220px; }
+
+/* final Save row */
+.save-row { display: flex; justify-content: flex-end; margin-top: 32px; padding-top: 22px; border-top: 1px solid var(--border); }
+.btn-save { padding: 13px 26px; font-size: .86rem; }
+
+/* read-only rendering (History pages) */
+.empty-state { max-width: 640px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 30px 26px; margin-top: 6px; }
+.empty-state p { font-family: var(--font-body); font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+.ro-item { background: #fff; border: 1px solid var(--border); border-radius: 11px; padding: 11px 14px; font-family: var(--font-body); font-size: .86rem; line-height: 1.5; color: var(--ink); display: flex; gap: 11px; align-items: flex-start; }
+.ro-item .item-num { margin-top: 1px; }
+.ro-body { flex: 1; min-width: 0; white-space: pre-wrap; word-wrap: break-word; }
+.ro-empty { color: var(--muted); font-style: italic; font-size: .82rem; padding: 4px 2px; }
+.ro-client-meta { display: flex; gap: 8px; margin-bottom: 7px; flex-wrap: wrap; }
+.ro-badge { font-family: var(--font-head); font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 3px 10px; border-radius: 20px; background: var(--surface-2); color: var(--ink-soft); }
+.ro-badge.platform { color: var(--purple); background: var(--purple-tint); border: 1px solid rgba(107, 47, 160, .3); }
+.ro-badge.leadtype { color: var(--purple-deep); background: #F3E9F3; border: 1px solid rgba(66, 19, 66, .25); }
+.ro-client-name { font-family: var(--font-head); font-weight: 700; font-size: .86rem; color: var(--ink); margin-bottom: 4px; }
+.ro-client-text { font-family: var(--font-body); font-size: .86rem; color: var(--ink); line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+
+.archive-list { list-style: disc; padding-left: 20px; margin: 0 0 16px; font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); line-height: 1.6; }
+
+/* ===== Weekly Report: channel blocks, kcards, finance, tasks grid ===== */
+.ssub { font-family: var(--font-head); font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--purple); margin: 14px 0 12px; display: flex; align-items: center; gap: 10px; }
+.ssub::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.ssub-count { font-family: var(--font-body); font-weight: 600; font-size: .68rem; letter-spacing: normal; text-transform: none; color: var(--purple); background: var(--purple-tint); border-radius: 20px; padding: 2px 9px; }
+
+.chbox-unified { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px 22px; margin-bottom: 14px; }
+.chbox-title { font-family: var(--font-head); font-weight: 600; font-size: 1.1rem; margin-bottom: 18px; color: var(--ink); display: flex; align-items: center; gap: 10px; }
+.chbox-icon { width: 32px; height: 32px; border-radius: 9px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; flex: none; }
+.chbox-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.kcard-row-label { font-family: var(--font-head); font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; color: var(--purple); text-align: center; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid var(--purple-tint); }
+.kcard-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-bottom: 18px; }
+.kcard-row:last-child { margin-bottom: 0; }
+.kcard {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  flex: 0 0 calc((100% - 70px) / 6);
+  max-width: calc((100% - 70px) / 6);
+  min-width: 150px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.kcard:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -16px rgba(66, 19, 66, .4); border-color: var(--purple); }
+.kcard-label { font-family: var(--font-body); font-size: .72rem; font-weight: 600; color: var(--ink-soft); line-height: 1.3; min-height: 2.4em; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.kcard-icon { width: 20px; height: 20px; border-radius: 6px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; flex: none; }
+.kcard-icon svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.weeks-badge { font-family: var(--font-head); font-weight: 700; font-size: .95rem; color: var(--purple); }
+.weeks-missing { display: flex; align-items: flex-start; gap: 10px; background: #FFF8ED; border: 1px solid rgba(184, 134, 11, .3); border-radius: 12px; padding: 12px 16px; margin: -6px 0 20px; font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); line-height: 1.5; }
+.weeks-missing-icon { flex: none; width: 20px; height: 20px; color: var(--warn); margin-top: 1px; }
+.weeks-missing-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.weeks-missing b { color: var(--warn); font-weight: 700; }
+.task-col .ssub { margin-top: 0; }
+.kcard-bar { width: 100%; height: 6px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.kcard-bar-fill { height: 100%; width: 0; border-radius: 4px; background: var(--muted); transition: width .2s ease, background .2s ease; }
+
+/* ===== Weekly/Monthly Report's own compact KCard layout ===== A big Факт
+   value with the % of plan achieved inline beside it, and a small secondary
+   "План" line underneath. Scoped to these two pages since .kcard/.kcard-row/
+   .kcard-bar are also shared with Compare's read-only history views, which
+   keep the original larger centered layout untouched. */
+.weekly-report-page .kcard,
+.monthly-report-page .kcard,
+.annual-report-page .kcard { padding: 10px 12px; align-items: flex-start; text-align: left; gap: 6px; min-width: 130px; border-radius: 10px; }
+.weekly-report-page .kcard-label,
+.monthly-report-page .kcard-label,
+.annual-report-page .kcard-label { font-size: .68rem; min-height: 0; justify-content: flex-start; }
+.weekly-report-page .kcard-icon,
+.monthly-report-page .kcard-icon,
+.annual-report-page .kcard-icon { width: 18px; height: 18px; }
+.weekly-report-page .kcard-icon svg,
+.monthly-report-page .kcard-icon svg,
+.annual-report-page .kcard-icon svg { width: 11px; height: 11px; }
+.weekly-report-page .kcard-bar,
+.monthly-report-page .kcard-bar,
+.annual-report-page .kcard-bar { height: 4px; }
+.weekly-report-page .chbox-unified,
+.monthly-report-page .chbox-unified,
+.annual-report-page .chbox-unified { background: transparent; border: none; padding: 0 0 14px; }
+.weekly-report-page .kcard-row-label,
+.monthly-report-page .kcard-row-label,
+.annual-report-page .kcard-row-label { text-align: left; }
+.weekly-report-page .kcard-row,
+.monthly-report-page .kcard-row,
+.annual-report-page .kcard-row { justify-content: flex-start; }
+.kcard-main { display: flex; align-items: baseline; gap: 6px; width: 100%; }
+.kcard-value { font-family: var(--font-head); font-weight: 800; font-size: 1.05rem; color: var(--ink); line-height: 1; }
+.kcard-value-input { font-family: var(--font-head); font-weight: 800; font-size: 1.05rem; color: var(--ink); line-height: 1; width: 2.6em; min-width: 0; background: transparent; border: none; border-bottom: 1px dashed var(--border); text-align: left; outline: none; padding: 0 0 1px; }
+.kcard-value-input:focus { border-bottom-color: var(--purple); }
+.kcard-value-input[type=number]::-webkit-inner-spin-button, .kcard-value-input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.kcard-value-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.kcard-pct-inline { font-family: var(--font-head); font-weight: 700; font-size: .7rem; white-space: nowrap; }
+.kcard-plan-line { font-family: var(--font-body); font-size: .64rem; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+.kcard-plan-line b { color: var(--ink-soft); font-weight: 700; }
+.kcard-plan-input { width: 2.2em; min-width: 0; background: transparent; border: none; border-bottom: 1px dashed var(--border); color: var(--ink-soft); font-family: var(--font-body); font-size: .64rem; font-weight: 700; text-align: left; outline: none; padding: 0 0 1px; }
+.kcard-plan-input:focus { border-bottom-color: var(--purple); }
+.kcard-plan-input[type=number]::-webkit-inner-spin-button, .kcard-plan-input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.kcard-plan-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+/* Trend sparkline + delta caption appended to a metric/ratio card, once
+   ≥2 weeks of history exist (Weekly Report only). */
+.kcard-trend { width: 100%; margin-top: 2px; padding-top: 5px; border-top: 1px solid var(--border); }
+.kcard-trend .dash-sparkline { height: 16px; }
+.kcard-trend-caption { display: flex; align-items: center; gap: 4px; font-family: var(--font-body); font-size: .58rem; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.kcard-trend-caption .delta-badge { font-size: .6rem; padding: 1px 6px; }
+
+/* EditableItemList's collapsed tag field (Sales Daily/Weekly Report) — a
+   compact icon+name chip that expands into the full TagInput picker only
+   on click, instead of always showing the picker + suggestion row. */
+.task-tag-compact { display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px 4px 4px; cursor: pointer; font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); transition: border-color .15s; }
+.task-tag-compact:hover { border-color: var(--purple); }
+.task-tag-compact-icon { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--purple); display: flex; align-items: center; justify-content: center; }
+.task-tag-compact-icon svg { width: 12px; height: 12px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.task-tag-compact-icon.none { background: var(--surface-2); }
+.task-tag-compact-icon.none svg { stroke: var(--muted); }
+.task-tag-compact-label { font-weight: 600; }
+
+/* Weekly Report KPI summary row — reuses .dash-kpi/.delta-badge from
+   automationDashboard.css, plus this page-specific "План: X" line and the
+   .kcard-bar progress bar underneath. */
+.dash-kpi-plan { font-family: var(--font-body); font-size: .76rem; color: var(--muted); margin-top: 2px; }
+
+/* Weekly Report channel tabs (Manual Bidding / Invites / ... / GetMany) */
+.chan-tabs { display: flex; gap: 4px; background: var(--surface); border-radius: 12px; padding: 4px; overflow-x: auto; margin: 14px 0; }
+.chan-tab { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 9px; font-family: var(--font-head); font-weight: 600; font-size: .84rem; color: var(--ink-soft); cursor: pointer; white-space: nowrap; background: transparent; border: none; transition: background .15s, color .15s; }
+.chan-tab svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.chan-tab-logo { width: 15px; height: 15px; object-fit: contain; border-radius: 3px; flex: none; }
+.chan-tab:hover { background: #fff; }
+.chan-tab.active { background: var(--purple); color: #fff; }
+
+/* Weekly Report — Рік/Місяць/Тиждень inline on the title row, same pattern
+   as Automation's Daily/Monthly Tasks (.month-period-picker/.wk-field-box),
+   just wider for Тиждень's long "Тиждень N (date–date)" label. */
+.week-period-picker { display: flex; gap: 10px; flex-wrap: wrap; }
+.week-period-picker .wk-field-box { flex: 0 0 150px; }
+.week-period-picker .wk-field-box.week-period-week { flex: 0 0 280px; }
+
+/* Monthly Report's Клієнти toolbar (search + filter), right-aligned on the
+   .stitle row via the shared .stitle-filter margin-left:auto modifier. */
+.mc-client-toolbar { display: flex; align-items: center; gap: 10px; }
+.mc-client-search { position: relative; width: 220px; }
+.mc-client-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 2; stroke-linecap: round; }
+.mc-client-search input { width: 100%; padding: 8px 12px 8px 33px; border: 1px solid var(--border); border-radius: 9px; font-family: var(--font-body); font-size: .82rem; font-weight: 400; color: var(--ink); background: #fff; outline: none; transition: border-color .15s; }
+.mc-client-search input:focus { border-color: var(--purple); }
+@media (max-width: 700px) {
+  .mc-client-toolbar { width: 100%; flex-wrap: wrap; }
+  .mc-client-search { width: 100%; }
+}
+
+/* Monthly Report's explanatory notes above Клієнти/Задачі reuse the shared
+   .placeholder box (pages.css) but shouldn't be capped at its default
+   600px, nor keep its generous empty-state padding — this is a plain
+   single-paragraph info banner, not a centered icon+title+text card. */
+.monthly-report-page .placeholder { max-width: none; padding: 14px 18px; margin-bottom: 14px; }
+.monthly-report-page .placeholder p { margin-bottom: 0; }
+
+/* Weekly Report toolbar row (replaces the old WeekPicker box) — Тип
+   плану + Менеджер field-boxes on the left, save-state + Експорт on the
+   right, all on one line. */
+.week-toolbar-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin: 0 0 28px; }
+.week-toolbar-left { display: flex; gap: 10px; flex-wrap: wrap; }
+.week-toolbar-left .wk-field-box { flex: 0 0 210px; }
+.week-toolbar-right { display: flex; align-items: center; gap: 14px; }
+
+/* Header "Експорт" dropdown (Weekly Report — replaces separate PDF/JPEG
+   buttons with one button + a small menu). */
+.export-menu-wrap { position: relative; }
+.export-menu { position: absolute; top: calc(100% + 6px); right: 0; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 28px -12px rgba(0, 0, 0, .18); padding: 6px; min-width: 180px; z-index: 20; display: flex; flex-direction: column; gap: 2px; }
+.export-menu button { display: flex; align-items: center; width: 100%; text-align: left; padding: 8px 10px; border-radius: 7px; border: none; background: transparent; font-family: var(--font-body); font-size: .84rem; color: var(--ink); cursor: pointer; }
+.export-menu button:hover { background: var(--surface); }
+
+.li-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
+
+.fin-income { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.fin-income .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 6px; }
+.kl { font-family: var(--font-head); font-size: .62rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.cost-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 6px; }
+.cost-row { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 13px; display: flex; align-items: center; gap: 10px; }
+.cost-label { flex: 1; font-family: var(--font-body); font-size: .8rem; color: var(--ink-soft); }
+.cost-input { width: 60px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--ink); font-family: var(--font-body); padding: 5px 7px; font-size: .92rem; outline: none; }
+.cost-input:focus { border-color: var(--purple); }
+.cost-dollar { width: 70px; text-align: right; font-family: var(--font-body); font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.frow { display: flex; flex-wrap: wrap; gap: 12px; }
+.fc { flex: 1; min-width: 150px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 15px 17px; }
+.fc.hl { background: var(--purple-tint); border-color: rgba(107, 47, 160, .3); }
+.fc.pr { background: #E9F7EF; border-color: rgba(30, 158, 93, .3); }
+.fc.pr .fv { color: var(--ok); }
+.fc.loss { background: #FBEAEA; border-color: rgba(209, 67, 67, .3); }
+.fc.loss .fv { color: var(--bad); }
+.fl { font-family: var(--font-head); font-size: .62rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+.fv { font-family: var(--font-body); font-size: 1.35rem; font-weight: 600; color: var(--ink); }
+
+/* ===== Weekly Report's Фінанси redesign — KPI row + collapsible cards =====
+   Cards are plain white + border (not surface-tinted) so stacked blocks read
+   as separate cards on the white page background instead of one continuous
+   tinted region — separation comes from spacing + border, not fill color. */
+.fin-kpi-row.dash-kpi-row { gap: 16px; margin-top: 16px; margin-bottom: 24px; }
+.fin-kpi-row .dash-kpi { background: #fff; display: flex; flex-direction: column; }
+.fin-kpi-row .dash-kpi-sub { min-height: 20px; }
+.fin-kpi-row .dash-sparkline { margin-top: auto; padding-top: 10px; }
+.fin-kpi-icon.green { background: #E9F7EF; color: var(--ok); }
+.fin-kpi-icon.red { background: #FBEAEA; color: var(--bad); }
+.fin-kpi-icon.purple { background: var(--purple-tint); color: var(--purple); }
+.fin-kpi-icon.blue { background: #EAF2FE; color: #2F80ED; }
+.fin-kpi-icon svg { stroke: currentColor; }
+
+.fin-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 20px; overflow: hidden; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.fin-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px -16px rgba(66, 19, 66, .35); border-color: var(--purple); }
+.fin-card.highlight { background: var(--purple-tint); border-color: rgba(107, 47, 160, .35); }
+.fin-card.highlight .fin-card-icon { background: var(--purple); color: #fff; }
+.fin-card-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px 18px; background: transparent; border: none; cursor: pointer; text-align: left; }
+.fin-card-icon { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; }
+.fin-card-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fin-card-titles { flex: 1; min-width: 0; }
+.fin-card-title { font-family: var(--font-head); font-weight: 700; font-size: .96rem; color: var(--ink); }
+.fin-card-subtitle { font-family: var(--font-body); font-size: .76rem; color: var(--muted); margin-top: 2px; }
+.fin-card-toggle { flex: none; width: 18px; height: 18px; color: var(--muted); transition: transform .15s; }
+.fin-card-toggle svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fin-card-toggle.closed { transform: rotate(-90deg); }
+.fin-card-body { padding: 0 18px 18px; }
+
+.fin-income-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.fin-income-item { flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; }
+.fin-income-icon { flex: none; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; }
+.fin-income-icon svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fin-income-icon.green { background: #E9F7EF; color: var(--ok); }
+.fin-income-icon.blue { background: #EAF2FE; color: #2F80ED; }
+.fin-income-body { flex: 1; min-width: 0; }
+.fin-income-label { font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); font-weight: 600; }
+.fin-income-value { font-family: var(--font-head); font-weight: 800; font-size: 1rem; color: var(--ink); margin-top: 2px; }
+.fin-income-input { width: 100%; margin-top: 2px; background: transparent; border: none; border-bottom: 1px dashed var(--border); color: var(--ink); font-family: var(--font-head); font-weight: 800; font-size: 1rem; padding: 0 0 1px; outline: none; }
+.fin-income-input:focus { border-bottom-color: var(--purple); }
+.fin-income-chevron { flex: none; width: 16px; height: 16px; color: var(--muted); }
+.fin-income-chevron svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.fin-summary-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.fin-summary-pill { flex: 1; min-width: 130px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.fin-summary-pill.hl { background: var(--purple-tint); border-color: rgba(107, 47, 160, .3); }
+.fin-summary-pill.profit.pr { background: #E9F7EF; border-color: rgba(30, 158, 93, .3); }
+.fin-summary-pill.profit.pr .fin-summary-value { color: var(--ok); }
+.fin-summary-pill.profit.loss { background: #FBEAEA; border-color: rgba(209, 67, 67, .3); }
+.fin-summary-pill.profit.loss .fin-summary-value { color: var(--bad); }
+.fin-summary-label { font-family: var(--font-head); font-size: .6rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.fin-summary-value { font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; color: var(--ink); }
+
+.task-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+.task-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+@media (max-width: 1100px) { .task-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .task-grid-4 { grid-template-columns: 1fr; } }
+.cf-daily-tag { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-head); font-size: .62rem; font-weight: 700; letter-spacing: .03em; color: var(--purple); background: var(--purple-tint); border: 1px solid rgba(107, 47, 160, .3); border-radius: 20px; padding: 3px 10px; margin-bottom: 8px; white-space: nowrap; }
+
+@media (max-width: 1300px) { .kcard { flex-basis: calc((100% - 42px) / 3); max-width: calc((100% - 42px) / 3); } }
+@media (max-width: 880px) {
+  .li-grid, .task-grid { grid-template-columns: 1fr; }
+  .fin-income { grid-template-columns: repeat(2, 1fr); }
+  .kcard { flex-basis: calc((100% - 14px) / 2); max-width: calc((100% - 14px) / 2); }
+}
+
+@media (max-width: 480px) {
+  .btn { font-size: .7rem; padding: 7px 10px; gap: 4px; }
+  .rpt-hero h1 { font-size: 24px; }
+  .rpt-hero p.sub { font-size: .8rem; }
+  .rpt-sub-row { gap: 14px; }
+  .rpt-sub { font-size: .78rem; }
+  .stitle { font-size: 1.3rem; }
+  .cf select, .cf input { font-size: .8rem; padding: 6px 8px; }
+  .add-btn { font-size: .75rem; padding: 8px 12px; }
+  .item-box textarea { font-size: .82rem; }
+  .fullness-head { flex-direction: column; align-items: flex-start; }
+  .save-row { justify-content: stretch; }
+  .btn-save { width: 100%; justify-content: center; }
+  .ro-item { font-size: .82rem; padding: 9px 11px; }
+}
+
+/* hide interactive-only chrome while html2canvas snapshots the page */
+body.capturing .btn,
+body.capturing .sidebar,
+body.capturing .menu-btn,
+body.capturing .page-actions,
+body.capturing .add-btn,
+body.capturing .del-btn,
+body.capturing .save-row {
+  display: none !important;
+}
+
+@media print {
+  .sidebar, .page-actions, .rpt-hero-actions, .menu-btn, .crumbs { display: none !important; }
+  .main { padding: 0 !important; }
+  .report-page { background: #fff !important; color: #111; }
+  .add-btn, .del-btn, .save-row { display: none !important; }
+}
+
+/* Full working area (same fix as Automation/Follow-up Generator/Project
+   Calculator): Layout.css's .view keeps a resolved (identity) transform
+   after its fade-in finishes, which makes it the containing block for any
+   position:fixed modal overlay and caps the page at 1120px — both
+   undesired for these wide, table/chart-heavy report pages. */
+.daily-report-page .rpt-hero p.sub,
+.weekly-report-page .rpt-hero p.sub,
+.monthly-report-page .rpt-hero p.sub,
+.annual-report-page .rpt-hero p.sub,
+.reports-compare-page .rpt-hero p.sub { max-width: none; }
+
+.view:has(.daily-report-page),
+.view:has(.weekly-report-page),
+.view:has(.monthly-report-page),
+.view:has(.annual-report-page),
+.view:has(.reports-compare-page) { max-width: none; opacity: 1; transform: none; animation: none; }
