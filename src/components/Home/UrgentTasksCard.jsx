@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchTasksForDay } from '../../lib/api/tasks';
+import { fetchDepartmentIdByName } from '../../lib/api/departments';
 import { deriveTaskStatus } from '../../lib/taskStatus';
 import { todayIso } from '../../lib/dateHelpers';
 
@@ -9,7 +10,8 @@ export default function UrgentTasksCard() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchTasksForDay(todayIso())
+    fetchDepartmentIdByName('Відділ автоматизації')
+      .then((deptId) => fetchTasksForDay(todayIso(), deptId))
       .then((rows) => { if (!cancelled) setTasks(rows.filter((t) => deriveTaskStatus(t) === 'pending')); })
       .catch(() => { if (!cancelled) setTasks([]); });
     return () => { cancelled = true; };
@@ -39,7 +41,7 @@ export default function UrgentTasksCard() {
         })}
       </div>
 
-      <Link to="/automation/tasks/daily" className="pulse-card__cta">Відкрити Task Manager</Link>
+      <Link to="/tasks" className="pulse-card__cta">Відкрити Task Manager</Link>
     </div>
   );
 }

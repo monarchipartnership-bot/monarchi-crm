@@ -2,15 +2,474 @@
    client-panel-tab / client-history / client-notes / client-files
    classes from clientsDirectory.css so both surfaces look identical. */
 
-.client-profile-back { margin-bottom: 16px; }
+.client-profile-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.client-profile-back { flex: none; }
+.client-profile-top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-.client-profile-hero { display: flex; align-items: center; gap: 18px; }
-.client-profile-hero .sub { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+/* Each top-row action button gets a small gradient icon chip — same
+   fixed brand recipe as the stat/quick-view icons (gradient fill, white
+   icon, soft shadow), just sized down to sit inline in a button. The
+   `--ghost` variant is for a button that's already solid-purple (`.btn-p`)
+   — a translucent-white chip instead of a second saturated color, so it
+   doesn't fight the button's own fill. */
+.client-profile-top-actions .btn { padding-left: 6px; }
+.client-profile-action-ic {
+  flex: none; width: 22px; height: 22px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; margin-right: 2px; box-shadow: 0 3px 8px -3px rgba(37, 28, 48, .5);
+}
+.client-profile-action-ic svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-action-ic--ghost { background: rgba(255, 255, 255, .22); box-shadow: none; }
+.client-profile-btn-danger { color: #DC2626; }
+.client-profile-btn-danger:hover { border-color: rgba(220, 38, 38, .3); background: rgba(220, 38, 38, .08); color: #DC2626; }
 
-.client-profile-tabs { margin-bottom: 0; }
-.client-profile-section { max-width: 620px; }
+/* The hero card itself — full-width white card holding avatar/name/status
+   on top and the Платформа/Джерело/Країна/Менеджер/Теги quick-view strip
+   below a divider. Same floating-card recipe as the rest of the app's list
+   rows/KPI cards (soft purple-tinted shadow), not just a flat bordered box. */
+.client-profile-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; margin-bottom: 20px; box-shadow: 0 4px 18px rgba(80, 30, 100, .07); }
+.client-profile-card-top { display: flex; align-items: center; gap: 16px; }
+.client-profile-name-block { min-width: 0; }
+.client-profile-name-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.client-profile-name-row h1 { margin: 0; }
+.client-profile-card .sub { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.client-profile-card .sub svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
 
-.client-profile-info .task-filter-row { margin-bottom: 12px; }
-.client-profile-info .task-filter-row select,
-.client-profile-info .task-filter-row input { width: 100%; }
-.client-profile-tags-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+.client-profile-status { position: relative; flex: none; }
+.client-profile-status-trigger {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+  padding: 5px 12px 5px 10px; font-family: var(--font-head); font-weight: 700; font-size: .8rem;
+}
+.client-profile-status-trigger:disabled { cursor: default; }
+.client-profile-status-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.client-profile-status-chevron { flex: none; width: 13px; height: 13px; display: inline-flex; }
+.client-profile-status-chevron svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-status-menu { top: calc(100% + 6px); min-width: 170px; }
+
+.client-profile-quickrow {
+  display: flex; flex-wrap: wrap; gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.client-profile-quick-field {
+  flex: 1; min-width: 170px; display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+}
+.client-profile-quick-ic {
+  flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  color: #fff; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
+}
+.client-profile-quick-ic svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-quick-body { min-width: 0; flex: 1; }
+.client-profile-quick-field label {
+  display: block; font-family: var(--font-head); font-size: .68rem; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
+}
+.client-profile-quick-field .client-profile-readonly { padding: 0; }
+.client-profile-quick-tags { flex: 1.6; min-width: 220px; }
+.client-profile-quick-tags .tag-input-chips {
+  border: 1px solid var(--border); border-radius: 8px; padding: 4px 6px; min-height: 34px; background: #fff;
+}
+
+/* Stats row — three cards (Угоди/Задачі/Компанії) between the hero card and
+   the tabs. Same floating-card shadow as the rest of the page; the icon is
+   its own gradient-filled square (unlike the pastel quick-view icons above)
+   to match the reference mockup. Each card gets a genuinely different
+   decorative graphic — wave/area, bar chart, ring — rather than the same
+   shape recolored three times. */
+.client-profile-stats-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.client-profile-stat-card {
+  flex: 1; min-width: 220px; position: relative; overflow: hidden;
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  padding: 18px 20px; box-shadow: 0 4px 18px rgba(80, 30, 100, .07);
+}
+.client-profile-stat-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.client-profile-stat-icon {
+  flex: none; width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  color: #fff; box-shadow: 0 8px 18px -6px rgba(37, 28, 48, .45);
+}
+.client-profile-stat-icon svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-stat-label { font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); }
+.client-profile-stat-value { position: relative; z-index: 1; font-family: var(--font-head); font-weight: 800; font-size: 1.9rem; color: var(--ink); line-height: 1; }
+.client-profile-stat-sub { position: relative; z-index: 1; margin-top: 4px; font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
+
+.client-profile-stat-wave { position: absolute; right: 0; bottom: 0; z-index: 0; width: 70%; height: 96px; opacity: .9; }
+
+.client-profile-stat-bars {
+  position: absolute; right: 18px; bottom: 14px; z-index: 0; width: 62%; height: 90px;
+  display: flex; align-items: flex-end; gap: 7px;
+}
+.client-profile-stat-bar { flex: 1; border-radius: 6px 6px 2px 2px; }
+
+.client-profile-stat-donut { position: absolute; right: 16px; bottom: 12px; z-index: 0; width: 84px; height: 84px; }
+.client-profile-stat-donut svg { width: 100%; height: 100%; }
+.client-profile-stat-donut-ic {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #0D9488; opacity: .8;
+}
+.client-profile-stat-donut-ic svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 900px) {
+  .client-profile-stat-wave, .client-profile-stat-bars, .client-profile-stat-donut { display: none; }
+}
+
+@media (max-width: 900px) {
+  .client-profile-stat-wave { display: none; }
+}
+
+/* Editable avatar — same "circle + overlaid camera button + small menu"
+   recipe as the team's own profile photo (Account.jsx's .acp-avatar-*),
+   rebuilt under this page's own names since that's a different page's CSS. */
+.client-profile-avatar-wrap { position: relative; flex: none; }
+.client-profile-avatar-cam {
+  position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--purple); border: 2px solid #fff; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.client-profile-avatar-cam svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.client-profile-avatar-menu {
+  position: absolute; left: 0; top: 100%; margin-top: 6px; z-index: 30; min-width: 160px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35);
+}
+.client-profile-avatar-menu button {
+  display: block; width: 100%; text-align: left; border: none; background: none; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .84rem; color: var(--ink); border-radius: 6px; cursor: pointer;
+}
+.client-profile-avatar-menu button:hover { background: var(--surface); }
+
+/* Horizontal-scroll pill tab bar — 10 tabs don't fit on one line, so this
+   scrolls sideways instead of wrapping (wrapping would push the page content
+   down a variable, jumpy amount depending on window width). A rounded
+   surface strip holding pill buttons, active tab lifted on a white pill with
+   a soft shadow — same floating-card language as the rest of the page,
+   applied to navigation instead of a content card. */
+.client-profile-tabs {
+  margin-bottom: 0; flex-wrap: nowrap; overflow-x: auto; gap: 4px;
+  border-bottom: none; background: var(--surface); border-radius: 14px; padding: 5px;
+  scrollbar-width: none;
+}
+.client-profile-tabs::-webkit-scrollbar { display: none; }
+.client-profile-tabs .client-panel-tab {
+  flex: none; border-bottom: none; margin-bottom: 0; border-radius: 10px;
+  padding: 8px 16px; white-space: nowrap; transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.client-profile-tabs .client-panel-tab:hover:not(:disabled) { background: rgba(255, 255, 255, .6); }
+.client-profile-tabs .client-panel-tab.active {
+  background: #fff; color: var(--purple); box-shadow: 0 3px 10px rgba(80, 30, 100, .14);
+}
+.client-profile-tabs .client-panel-tab:disabled { opacity: .45; cursor: default; }
+.client-profile-section { max-width: 680px; }
+
+/* ===== "Основна інформація" two-column layout =====
+   Collapsible info cards on the left, a fixed-width widget sidebar on the
+   right. Only this tab needs the wider canvas — every other tab keeps the
+   page's normal 680px single-column cap. */
+.client-profile-section--wide { max-width: none; }
+.client-profile-info-layout { display: grid; grid-template-columns: 1fr 460px; gap: 20px; align-items: start; }
+.client-profile-info-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.client-profile-section-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07); overflow: hidden;
+}
+.client-profile-section-head {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 16px 18px;
+  border: none; background: none; cursor: pointer; text-align: left;
+}
+.client-profile-section-ic {
+  flex: none; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  color: #fff; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
+}
+.client-profile-section-ic svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-section-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.client-profile-section-title { font-family: var(--font-head); font-weight: 700; font-size: .96rem; color: var(--ink); }
+.client-profile-section-sub { font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
+.client-profile-section-chevron { flex: none; width: 18px; height: 18px; color: var(--muted); display: inline-flex; transition: transform .15s ease; }
+.client-profile-section-chevron svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-section-chevron.open { transform: rotate(180deg); }
+.client-profile-section-body { padding: 4px 18px 8px; border-top: 1px solid var(--border); }
+
+.client-profile-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.client-profile-row:last-child { border-bottom: none; }
+.client-profile-row-ic { flex: none; width: 16px; height: 16px; color: var(--muted); display: inline-flex; margin-top: 2px; }
+.client-profile-row-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-row-label { flex: 1; min-width: 0; font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); padding-top: 2px; }
+/* Long unbroken values (a long word/URL with no spaces) would otherwise
+   overflow past the card edge instead of wrapping — `anywhere` breaks even
+   mid-word if it has to, `min-width: 0` lets the flex item actually shrink
+   below its content size so the wrap can kick in at all. The row has no
+   fixed height, so it just grows taller to fit a wrapped value. */
+.client-profile-row-value {
+  flex: 0 1 55%; min-width: 0; max-width: 55%; text-align: right;
+  font-family: var(--font-head); font-weight: 600; font-size: .86rem; color: var(--ink);
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.4;
+}
+.client-profile-row-edit { flex: none; width: 55%; }
+.client-profile-row-edit input, .client-profile-row-edit .ui-select, .client-profile-row-edit .platform-picker, .client-profile-row-edit .multi-text-field { width: 100%; }
+.client-profile-row-edit input {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+  font-family: var(--font-body); font-size: .84rem; color: var(--ink); outline: none;
+}
+.client-profile-row-edit input:focus { border-color: var(--purple); }
+.client-profile-row-platform { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.client-profile-row-platform img { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; }
+.client-profile-row-platform span[class^="fi"] { width: 16px; height: 16px; border-radius: 50%; }
+
+/* Right-hand widget sidebar */
+.client-profile-info-sidebar { display: flex; flex-direction: column; gap: 16px; }
+.client-profile-side-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07);
+}
+.client-profile-side-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.client-profile-side-title { font-family: var(--font-head); font-weight: 700; font-size: .88rem; color: var(--ink); }
+.client-profile-side-link { border: none; background: none; padding: 0; font-family: var(--font-body); font-size: .76rem; color: var(--purple); cursor: pointer; font-weight: 600; }
+.client-profile-side-link:hover { text-decoration: underline; }
+
+.client-profile-activity-list { display: flex; flex-direction: column; gap: 14px; }
+.client-profile-activity-row { display: flex; align-items: flex-start; gap: 10px; }
+.client-profile-activity-ic { flex: none; width: 30px; height: 30px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; }
+.client-profile-activity-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-activity-body { flex: 1; min-width: 0; }
+.client-profile-activity-text {
+  font-family: var(--font-body); font-size: .82rem; color: var(--ink);
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+}
+.client-profile-activity-time { font-family: var(--font-body); font-size: .72rem; color: var(--muted); margin-top: 2px; }
+
+.client-profile-note-preview-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.client-profile-note-preview { display: flex; align-items: flex-start; gap: 8px; }
+.client-profile-note-avatar {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--purple-tint); color: var(--purple);
+  font-family: var(--font-head); font-weight: 700; font-size: .74rem; display: flex; align-items: center; justify-content: center;
+}
+.client-profile-note-preview-body { min-width: 0; }
+.client-profile-note-preview-top { display: flex; align-items: center; gap: 6px; }
+.client-profile-note-preview-author { font-family: var(--font-head); font-weight: 700; font-size: .78rem; color: var(--ink); }
+.client-profile-note-preview-date { font-family: var(--font-body); font-size: .7rem; color: var(--muted); }
+.client-profile-note-preview-text { font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); margin-top: 2px; }
+
+.client-profile-quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.client-profile-quick-action {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border: none; border-radius: 14px;
+  padding: 12px; cursor: pointer; font-family: var(--font-head); font-weight: 600; font-size: .78rem; color: var(--ink);
+  transition: transform .12s ease;
+}
+.client-profile-quick-action:hover:not(:disabled) { transform: translateY(-1px); }
+.client-profile-quick-action:disabled { opacity: .5; cursor: default; }
+.client-profile-quick-action-ic {
+  width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.client-profile-quick-action-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.client-profile-subtabs { display: flex; gap: 6px; background: var(--surface); border-radius: 10px; padding: 4px; margin-bottom: 12px; }
+.client-profile-subtab {
+  flex: 1; border: none; background: none; padding: 6px 10px; border-radius: 8px;
+  font-family: var(--font-head); font-weight: 600; font-size: .76rem; color: var(--muted); cursor: pointer;
+}
+.client-profile-subtab.active { background: #fff; color: var(--purple); box-shadow: 0 2px 6px rgba(80, 30, 100, .12); }
+
+.client-profile-side-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 14px 8px; }
+.client-profile-side-empty-ic {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--surface); color: var(--muted);
+  display: flex; align-items: center; justify-content: center; margin-bottom: 4px;
+}
+.client-profile-side-empty-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-side-empty-title { font-family: var(--font-head); font-weight: 700; font-size: .82rem; color: var(--ink); margin: 0; }
+.client-profile-side-empty-sub { font-family: var(--font-body); font-size: .74rem; color: var(--muted); margin: 0 0 4px; }
+
+.client-profile-file-preview-list { display: flex; flex-direction: column; gap: 8px; }
+.client-profile-file-preview-row { display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .82rem; color: var(--ink); }
+.client-profile-file-preview-row svg { width: 15px; height: 15px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+/* Клікабельні прев'ю-рядки угод/завдань — той самий рецепт іконки-бейджа
+   (градієнт + білий значок), плюс іконка "відкрити зовні" справа, оскільки
+   клік веде на іншу сторінку (Угоди/Задачі), а не розгортає щось тут. */
+.client-profile-mini-list { display: flex; flex-direction: column; gap: 8px; }
+.client-profile-mini-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--border); background: var(--surface);
+  border-radius: 12px; padding: 8px 10px; cursor: pointer; text-align: left; transition: background .15s ease, border-color .15s ease;
+}
+.client-profile-mini-row:hover { background: #fff; border-color: var(--purple); }
+.client-profile-mini-row-ic {
+  flex: none; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  color: #fff; box-shadow: 0 4px 10px -4px rgba(37, 28, 48, .45);
+}
+.client-profile-mini-row-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-mini-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.client-profile-mini-row-title {
+  font-family: var(--font-head); font-weight: 600; font-size: .82rem; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.client-profile-mini-row-sub { font-family: var(--font-body); font-size: .72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.client-profile-mini-row-go { flex: none; width: 15px; height: 15px; color: var(--muted); display: inline-flex; }
+.client-profile-mini-row-go svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-mini-row:hover .client-profile-mini-row-go { color: var(--purple); }
+
+@media (max-width: 1000px) {
+  .client-profile-info-layout { grid-template-columns: 1fr; }
+  .client-profile-deals-layout { grid-template-columns: 1fr; }
+}
+
+.client-profile-readonly { padding: 6px 10px; font-size: .82rem; font-family: var(--font-body); color: var(--ink-soft); }
+
+/* ===== "Угоди" tab — master/detail ===== */
+.client-profile-deals-layout { display: grid; grid-template-columns: 1fr 1.15fr; gap: 20px; align-items: start; }
+
+.client-profile-deals-list-card, .client-profile-deal-detail-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07);
+}
+.client-profile-deals-list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.client-profile-deals-list-head h3 { margin: 0; font-family: var(--font-head); font-weight: 700; font-size: 1rem; color: var(--ink); }
+.client-profile-deals-search {
+  display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 10px; margin-bottom: 14px; background: var(--surface);
+}
+.client-profile-deals-search svg { flex: none; width: 15px; height: 15px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; }
+.client-profile-deals-search input { flex: 1; border: none; background: none; outline: none; font-family: var(--font-body); font-size: .84rem; color: var(--ink); }
+.client-profile-deals-list { display: flex; flex-direction: column; gap: 10px; max-height: 640px; overflow-y: auto; }
+
+.client-profile-deal-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--border); background: #fff;
+  border-radius: 14px; padding: 12px; cursor: pointer; text-align: left; transition: border-color .15s ease, background .15s ease;
+}
+.client-profile-deal-row:hover { border-color: var(--purple); }
+.client-profile-deal-row.active { border-color: var(--purple); background: var(--purple-tint); }
+.client-profile-deal-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.client-profile-deal-row-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.client-profile-deal-row-stage {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; color: #fff;
+  font-family: var(--font-head); font-weight: 700; font-size: .66rem; letter-spacing: .02em;
+  padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+}
+.client-profile-deal-row-title { flex: 1; min-width: 0; font-family: var(--font-head); font-weight: 700; font-size: .9rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.client-profile-deal-row-meta { display: flex; flex-wrap: wrap; gap: 10px; }
+.client-profile-deal-row-meta span { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-body); font-size: .74rem; color: var(--muted); white-space: nowrap; }
+.client-profile-deal-row-meta svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.client-profile-deal-row-avatar {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--purple-tint); color: var(--purple);
+  font-family: var(--font-head); font-weight: 700; font-size: .68rem; display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.client-profile-deal-row-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.client-profile-deal-row-avatar--lg { width: 40px; height: 40px; font-size: .84rem; }
+.client-profile-deal-row-chevron { flex: none; width: 15px; height: 15px; color: var(--muted); display: inline-flex; }
+.client-profile-deal-row-chevron svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+.client-profile-deal-detail-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.client-profile-deal-detail-top-actions { display: flex; align-items: center; gap: 8px; }
+.client-profile-deal-detail-stage {
+  display: inline-flex; align-items: center; gap: 6px; color: #fff;
+  font-family: var(--font-head); font-weight: 700; font-size: .74rem;
+  padding: 4px 12px; border-radius: 20px; white-space: nowrap;
+}
+.client-profile-deal-detail-title { margin: 0 0 12px; font-family: var(--font-head); font-weight: 700; font-size: 1.3rem; color: var(--ink); }
+.client-profile-deal-detail-tags { display: flex; flex-wrap: wrap; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.client-profile-deal-detail-tags span { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); }
+.client-profile-deal-detail-tags svg { width: 15px; height: 15px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+.client-profile-deal-detail-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+}
+.client-profile-deal-detail-stat-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.client-profile-deal-detail-stat-value { font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; color: var(--ink); }
+.client-profile-deal-detail-stat-value--sm { display: flex; align-items: center; gap: 6px; font-size: .88rem; font-weight: 700; }
+.client-profile-deal-detail-stat-value--sm svg { width: 14px; height: 14px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; }
+.client-profile-deal-detail-stat-sub { font-family: var(--font-body); font-size: .74rem; color: var(--muted); margin-top: 2px; }
+
+.client-profile-deal-detail-owner { padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.client-profile-deal-detail-owner-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.client-profile-deal-detail-owner-name { font-family: var(--font-head); font-weight: 700; font-size: .88rem; color: var(--ink); }
+.client-profile-deal-detail-owner-role { font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
+
+.client-profile-deal-detail-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.client-profile-deal-mini-card { background: var(--surface); border-radius: 14px; padding: 14px; }
+.client-profile-deal-mini-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.client-profile-deal-mini-card-head svg { width: 15px; height: 15px; color: var(--purple); stroke: currentColor; fill: none; stroke-width: 1.8; }
+.client-profile-deal-mini-card-title { font-family: var(--font-head); font-weight: 700; font-size: .8rem; color: var(--ink); }
+.client-profile-deal-mini-card-time { margin-left: auto; font-family: var(--font-body); font-size: .68rem; color: var(--muted); white-space: nowrap; }
+.client-profile-deal-mini-card-text { font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); margin: 0 0 10px; overflow-wrap: anywhere; }
+.client-profile-deal-mini-card-text--bold { color: var(--ink); font-weight: 600; }
+.client-profile-deal-mini-card-author { display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); }
+.client-profile-deal-mini-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.client-profile-deal-mini-card-footer .btn { font-size: .72rem; padding: 6px 10px; }
+.client-profile-deal-mini-card-footer .btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; margin-right: 4px; vertical-align: -2px; }
+
+@media (max-width: 900px) {
+  .client-profile-deal-detail-stats, .client-profile-deal-detail-cards { grid-template-columns: 1fr; }
+}
+
+/* ===== "Активність" tab — full audit-log timeline ===== */
+.client-profile-activity-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.client-profile-activity-heading h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-family: var(--font-head); font-weight: 700; font-size: 1.1rem; color: var(--ink); }
+.client-profile-activity-heading p { margin: 0; font-family: var(--font-body); font-size: .8rem; color: var(--muted); }
+.client-profile-activity-count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 6px;
+  border-radius: 10px; background: var(--purple-tint); color: var(--purple); font-size: .74rem; font-weight: 700;
+}
+.client-profile-activity-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.client-profile-activity-search {
+  display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 12px; background: #fff; min-width: 220px;
+}
+.client-profile-activity-search svg { flex: none; width: 15px; height: 15px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; }
+.client-profile-activity-search input { flex: 1; border: none; background: none; outline: none; font-family: var(--font-body); font-size: .82rem; color: var(--ink); }
+.client-profile-activity-filters { display: flex; gap: 4px; background: var(--surface); border-radius: 10px; padding: 4px; }
+.client-profile-activity-filter {
+  border: none; background: none; padding: 6px 12px; border-radius: 8px; white-space: nowrap;
+  font-family: var(--font-head); font-weight: 600; font-size: .76rem; color: var(--muted); cursor: pointer;
+}
+.client-profile-activity-filter.active { background: var(--purple); color: #fff; }
+.client-profile-activity-sort {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: #fff; border-radius: 10px;
+  padding: 8px 12px; font-family: var(--font-head); font-weight: 600; font-size: .78rem; color: var(--ink-soft); cursor: pointer; white-space: nowrap;
+}
+.client-profile-activity-sort svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-activity-sort:hover { border-color: var(--purple); color: var(--purple); }
+
+.client-profile-activity-group { margin-bottom: 20px; }
+.client-profile-activity-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.client-profile-activity-group-date { font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: var(--ink); }
+.client-profile-activity-group-count {
+  font-family: var(--font-head); font-weight: 600; font-size: .72rem; color: var(--purple); background: var(--purple-tint);
+  padding: 2px 9px; border-radius: 20px;
+}
+
+.client-profile-activity-timeline { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.client-profile-activity-timeline::before { content: ''; position: absolute; left: 3px; top: 10px; bottom: 10px; width: 2px; background: var(--border); }
+.client-profile-activity-tl-row {
+  position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 12px 14px 12px 22px;
+  border-radius: 12px; transition: background .15s ease;
+}
+.client-profile-activity-tl-row:hover { background: var(--surface); }
+.client-profile-activity-tl-dot {
+  position: absolute; left: 0; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: var(--purple);
+  box-shadow: 0 0 0 3px #fff;
+}
+.client-profile-activity-tl-time { flex: none; width: 46px; padding-top: 8px; font-family: var(--font-body); font-size: .74rem; color: var(--muted); }
+.client-profile-activity-tl-ic {
+  flex: none; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  color: #fff; box-shadow: 0 4px 10px -4px rgba(37, 28, 48, .45);
+}
+.client-profile-activity-tl-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-profile-activity-tl-main { flex: none; width: 220px; min-width: 0; }
+.client-profile-activity-tl-title { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); }
+.client-profile-activity-tl-user { font-family: var(--font-body); font-size: .74rem; color: var(--muted); margin-top: 2px; }
+/* `space-between` spreads Поле/Було/Стало across the rest of the row's
+   width instead of clumping them right after the title, which left most of
+   the (very wide) page empty — see the 3 groups this spreads: the field
+   name, the "Було" pill, and the "Стало" pill. */
+.client-profile-activity-tl-diff { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 6px; }
+.client-profile-activity-tl-diff-field { flex: none; font-family: var(--font-body); font-size: .78rem; color: var(--muted); white-space: nowrap; }
+.client-profile-activity-tl-diff-field b { color: var(--ink-soft); font-weight: 600; }
+.client-profile-activity-tl-diff-group { flex: none; display: inline-flex; align-items: center; gap: 8px; }
+.client-profile-activity-tl-diff-label { font-family: var(--font-body); font-size: .74rem; color: var(--muted); }
+.client-profile-activity-tl-pill {
+  display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-head); font-weight: 700; font-size: .74rem; padding: 3px 10px; border-radius: 20px;
+}
+.client-profile-activity-tl-arrow { flex: none; color: var(--muted); font-size: .8rem; }
+.client-profile-activity-tl-mention-text { font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); }
+
+@media (max-width: 900px) {
+  .client-profile-activity-tl-row { flex-wrap: wrap; }
+  .client-profile-activity-tl-main { width: auto; }
+}

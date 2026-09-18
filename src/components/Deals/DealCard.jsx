@@ -1,5 +1,6 @@
 import ClientAvatar from '../Clients/ClientAvatar';
 import { fmtDate } from '../../lib/dateHelpers';
+import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 
 function fmtAmount(amount, currency) {
   if (amount == null || amount === '') return null;
@@ -27,8 +28,8 @@ export default function DealCard({ deal, onClick, draggable, onDragStart }) {
         <div className="deal-card-sub">{deal.title ? clientLabel : deal.clients.name}</div>
       )}
       <div className="deal-card-meta">
-        {amountLabel && <span className="deal-card-amount">{amountLabel}</span>}
-        <span className="deal-card-date">{fmtCreated(deal.created_at)}</span>
+        {amountLabel && <span className="deal-card-amount"><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.currency }} />{amountLabel}</span>}
+        <span className="deal-card-date"><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />{fmtCreated(deal.created_at)}</span>
       </div>
       {deal.manager && (
         <div className="deal-card-footer">

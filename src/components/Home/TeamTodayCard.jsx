@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAllProfiles, profileLabel } from '../../lib/api/profile';
+import ProfileAvatar from '../common/ProfileAvatar';
 
 const MAX_SHOWN = 5;
 
@@ -27,7 +28,7 @@ export default function TeamTodayCard() {
         {profiles?.length === 0 && <p className="sec-empty">Профілів ще немає.</p>}
         {shown.map((p) => (
           <div className="team-row" key={p.email}>
-            <span className="team-row__avatar">{(p.first_name || p.email)[0].toUpperCase()}</span>
+            <ProfileAvatar profile={p} email={p.email} className="team-row__avatar" fallbackColor="var(--purple)" />
             <div>
               <div className="team-row__name">{profileLabel(p)}</div>
               {p.position && <div className="team-row__role">{p.position}</div>}

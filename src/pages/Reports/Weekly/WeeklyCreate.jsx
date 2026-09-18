@@ -1,22 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import WeekFullness from '../../../components/Reports/Weekly/WeekFullness';
+import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
 import ChannelBlock from '../../../components/Reports/Weekly/ChannelBlock';
 import FinanceSection from '../../../components/Reports/Weekly/FinanceSection';
 import EditableClientList from '../../../components/Reports/EditableClientList';
 import EditableItemList from '../../../components/Reports/EditableItemList';
 import DeltaBadge from '../../../components/Automation/DeltaBadge';
 import { fetchSavedWeekIndexes, fetchReportByWeekStart, fetchWeeklyRowsBetween, saveWeeklyReport, fetchDailyClientsForWeek } from '../../../lib/api/weeklyReports';
-import { upsertClientDirectoryEntry } from '../../../lib/api/clients';
-import { fetchOpenDealForClient, createDeal } from '../../../lib/api/deals';
-import { fetchPipelines } from '../../../lib/api/pipelines';
+import { syncReportClientsToDirectory } from '../../../lib/reportClientSync';
 import { fetchAllProfiles } from '../../../lib/api/profile';
 import { fetchCustomTags, saveCustomTag } from '../../../lib/api/customTags';
 import { fetchTasksForWeek } from '../../../lib/api/tasks';
+import { fetchDepartmentIdByName } from '../../../lib/api/departments';
 import { deriveTaskStatus, STATUS_LABELS } from '../../../lib/taskStatus';
 import { aggregateDailyClients } from '../../../lib/weeklyClientImport';
 import { computeWeeksForMonth, defaultWeekIndexFor, fmtDate, isoDate, addDaysIso, MONTH_NAMES, yearOptions } from '../../../lib/dateHelpers';
 import { CHANNELS, LI_CHANNEL, allFieldIds, applyPlanPreset, achievement, pct, toNum } from '../../../lib/weeklyLogic';
-import { CLIENT_PLATFORMS, CLIENT_TYPES } from '../../../lib/reportConstants';
+import { CLIENT_PLATFORMS } from '../../../lib/reportConstants';
+import { STATUSES } from '../../../lib/clientStatus';
 import { exportPDF, exportJPEG } from '../../../lib/exportHelpers';
 import { SECTION_ICONS, CHANNEL_ICONS } from '../../../lib/reportIcons';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
@@ -133,8 +134,13 @@ export default function WeeklyCreate() {
   const [tagSuggestions, setTagSuggestions] = useState(ACTIVITY_TAGS);
   const [weekSalesTasks, setWeekSalesTasks] = useState([]);
   const [nextWeekSalesTasks, setNextWeekSalesTasks] = useState([]);
+  const [salesDeptId, setSalesDeptId] = useState(null);
   const saveTimerRef = useRef(null);
   const skipNextSaveRef = useRef(false);
+
+  useEffect(() => {
+    fetchDepartmentIdByName('Sales відділ').then(setSalesDeptId);
+  }, []);
 
   useEffect(() => {
     fetchAllProfiles().then(setProfiles);
@@ -225,21 +231,21 @@ export default function WeeklyCreate() {
   // grouped by deriveTaskStatus below, plus a read-only preview of what's
   // already planned for next week (replaces the old manually-typed t_next).
   useEffect(() => {
-    if (!currentWeek || !managerEmail) { setWeekSalesTasks([]); setNextWeekSalesTasks([]); return; }
+    if (!currentWeek || !managerEmail || !salesDeptId) { setWeekSalesTasks([]); setNextWeekSalesTasks([]); return; }
     let cancelled = false;
     const weekStartIso = isoDate(currentWeek.start.getFullYear(), currentWeek.start.getMonth() + 1, currentWeek.start.getDate());
     const weekEndIso = isoDate(currentWeek.end.getFullYear(), currentWeek.end.getMonth() + 1, currentWeek.end.getDate());
     const nextWeekStartIso = addDaysIso(weekStartIso, 7);
     const nextWeekEndIso = addDaysIso(weekEndIso, 7);
-    fetchTasksForWeek(weekStartIso, weekEndIso, 'sales')
+    fetchTasksForWeek(weekStartIso, weekEndIso, salesDeptId)
       .then((rows) => { if (!cancelled) setWeekSalesTasks(rows.filter((t) => t.assignee_email === managerEmail)); })
       .catch((e) => console.warn('load week sales tasks failed', e));
-    fetchTasksForWeek(nextWeekStartIso, nextWeekEndIso, 'sales')
+    fetchTasksForWeek(nextWeekStartIso, nextWeekEndIso, salesDeptId)
       .then((rows) => { if (!cancelled) setNextWeekSalesTasks(rows.filter((t) => t.assignee_email === managerEmail)); })
       .catch((e) => console.warn('load next week sales tasks failed', e));
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period.year, period.month, period.weekIndex, managerEmail]);
+  }, [period.year, period.month, period.weekIndex, managerEmail, salesDeptId]);
 
   function handlePlanPreset(value) {
     setPlanPresetSel(value);
@@ -268,30 +274,17 @@ export default function WeeklyCreate() {
             t_next: tasks.t_next.map((it) => ({ text: it.text, tag: it.tag || '' })),
             t_conc: tasks.t_conc.map((it) => ({ text: it.text, tag: it.tag || '' })),
           },
-          clients: clients.map((c) => ({ name: c.name, platform: c.platform, leadType: c.leadType, text: c.text })),
+          clients: clients.map((c) => ({ name: c.name, platform: c.platform, leadType: c.leadType, title: c.title || '', text: c.text })),
         };
         await saveWeeklyReport({ year: period.year, month: period.month, weekIndex: period.weekIndex, week: currentWeek, manager: fields.manager, data });
         setSavedWeekIndexes((prev) => new Set(prev).add(period.weekIndex));
         setStatusLabel('Збережено ' + new Date().toLocaleString('uk-UA'));
-        // Sync into the client directory — best-effort, never blocks the
-        // week's own save/status if the directory table has an issue. Each
-        // synced client also gets one open deal in the pipeline matching
-        // their platform (not a new one per week — fetchOpenDealForClient
-        // checks first, scoped per-pipeline since a client can genuinely
-        // have separate open deals across different platforms at once).
-        fetchPipelines().then((pipelines) => {
-          data.clients.forEach((c) => {
-            const pipeline = pipelines.find((p) => p.name === c.platform);
-            if (!pipeline) return;
-            upsertClientDirectoryEntry({ name: c.name, platform: c.platform, leadType: c.leadType, manager: fields.manager })
-              .then(async (client) => {
-                if (!client) return;
-                const existing = await fetchOpenDealForClient(client.id, pipeline.id);
-                if (!existing) await createDeal({ clientId: client.id, manager: fields.manager, pipelineId: pipeline.id });
-              })
-              .catch(() => {});
-          });
-        });
+        // Only rows added directly in Weekly (never mentioned in a Daily
+        // Report) — a Daily-imported row was already synced when the day
+        // itself saved, so re-processing it here on every Weekly autosave
+        // would just be redundant work against the exact same client/deal.
+        const weekStartIso = isoDate(currentWeek.start.getFullYear(), currentWeek.start.getMonth() + 1, currentWeek.start.getDate());
+        syncReportClientsToDirectory(clients.filter((c) => !c.fromDaily), fields.manager, weekStartIso);
       } catch (e) {
         console.warn('autosave failed', e);
         setStatusLabel('Помилка збереження');
@@ -375,6 +368,7 @@ export default function WeeklyCreate() {
 
   return (
     <div className="report-page weekly-report-page" ref={pageRef}>
+      {!capturing && <ReportTypeSwitcher />}
       <section className="rpt-hero">
         <div className="rpt-hero-top-row">
           <div className="rpt-hero-heading">
@@ -589,7 +583,7 @@ export default function WeeklyCreate() {
         <EditableClientList
           items={clients}
           onChange={(id, item) => setClients((c) => c.map((it) => (it.id === id ? item : it)))}
-          onAdd={() => setClients((c) => [...c, { id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: CLIENT_TYPES[0], name: '', text: '', fromDaily: false }])}
+          onAdd={() => setClients((c) => [...c, { id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: STATUSES[0], name: '', title: '', text: '', clientId: null, fromDaily: false }])}
           onRemove={(id) => setClients((c) => c.filter((it) => it.id !== id))}
           capturing={capturing}
           iconBoxed
@@ -618,7 +612,7 @@ export default function WeeklyCreate() {
             <div>
               <div className="ssub">Плани на наступний тиждень{nextWeekSalesTasks.length > 0 && <span className="ssub-count">{nextWeekSalesTasks.length}</span>}</div>
               {nextWeekSalesTasks.length === 0 ? (
-                <div className="empty-hint">Ще нічого не заплановано — сплануйте у Weekly Tasks.</div>
+                <div className="empty-hint">Ще нічого не заплановано — сплануйте у Task Manager.</div>
               ) : (
                 <ul className="archive-list">{nextWeekSalesTasks.map((t) => <li key={t.id}>{(t.text || '').split('\n')[0]}</li>)}</ul>
               )}

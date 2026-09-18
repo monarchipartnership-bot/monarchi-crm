@@ -91,25 +91,10 @@ export const ROUTE_META = {
     desc: 'Compare saved Weekly or Monthly reports side by side.',
     trail: [{ label: 'Sales Managers Department' }, { label: 'Reports Manager', to: '/reports/hub' }, { label: 'Compare' }],
   },
-  '/reports/tasks': {
-    title: 'Task Manager',
-    desc: 'Daily, Weekly, Monthly — оберіть рівень планування задач.',
-    trail: [{ label: 'Sales Managers Department' }, { label: 'Task Manager' }],
-  },
-  '/reports/tasks/daily': {
-    title: 'Daily Tasks',
-    desc: 'Задачі лідогенератора на конкретний день.',
-    trail: [{ label: 'Sales Managers Department' }, { label: 'Task Manager', to: '/reports/tasks' }, { label: 'Daily Tasks' }],
-  },
-  '/reports/tasks/weekly': {
-    title: 'Weekly Tasks',
-    desc: 'Тижневе планування задач лідогенератора.',
-    trail: [{ label: 'Sales Managers Department' }, { label: 'Task Manager', to: '/reports/tasks' }, { label: 'Weekly Tasks' }],
-  },
-  '/reports/tasks/monthly': {
-    title: 'Monthly Tasks',
-    desc: 'Зведення всіх задач лідогенератора за місяць.',
-    trail: [{ label: 'Sales Managers Department' }, { label: 'Task Manager', to: '/reports/tasks' }, { label: 'Monthly Tasks' }],
+  '/reports/deal-tasks': {
+    title: 'Задачі',
+    desc: 'Усі задачі та дзвінки з угод в одному місці — статуси, пріоритети, виконавці.',
+    trail: [{ label: 'Sales Managers Department' }, { label: 'Задачі' }],
   },
   '/reports/deals': {
     title: 'Угоди',
@@ -118,9 +103,9 @@ export const ROUTE_META = {
     trail: [{ label: 'Sales Managers Department' }, { label: 'Угоди' }],
   },
   '/reports/clients-directory': {
-    title: 'База клієнтів',
+    title: 'Контакти',
     desc: 'Єдина картка на кожного клієнта — платформа, тип, історія згадувань у тижневих звітах.',
-    trail: [{ label: 'Sales Managers Department' }, { label: 'База клієнтів' }],
+    trail: [{ label: 'Sales Managers Department' }, { label: 'Контакти' }],
   },
   '/tools/image-studio': {
     title: 'Image Studio',
@@ -142,20 +127,15 @@ export const ROUTE_META = {
     desc: 'Загальна картина по задачах: сьогодні, вчора, тижні та місяці.',
     trail: [{ label: 'Automation Department' }, { label: 'Dashboard' }],
   },
-  '/automation/tasks/daily': {
-    title: 'Daily Tasks',
-    desc: 'Задачі на конкретний день — виконання, перенесення, додавання.',
-    trail: [{ label: 'Automation Department' }, { label: 'Daily Tasks' }],
+  '/tasks': {
+    title: 'Task Manager',
+    desc: 'Єдиний внутрішній задачник по всій платформі — відділи, статистика, список/канбан/календар.',
+    trail: [{ label: 'Task Manager' }],
   },
-  '/automation/tasks/weekly': {
-    title: 'Weekly Tasks',
-    desc: 'Розподіл задач на тиждень по днях і підсумок виконання.',
-    trail: [{ label: 'Automation Department' }, { label: 'Weekly Tasks' }],
-  },
-  '/automation/tasks/monthly': {
-    title: 'Monthly Tasks',
-    desc: 'Сукупність усіх задач, запланованих за місяць.',
-    trail: [{ label: 'Automation Department' }, { label: 'Monthly Tasks' }],
+  '/tasks/analytics': {
+    title: 'Аналітика задач',
+    desc: 'Детальний огляд ефективності по відділах і виконавцях.',
+    trail: [{ label: 'Task Manager', to: '/tasks' }, { label: 'Аналітика' }],
   },
 };
 

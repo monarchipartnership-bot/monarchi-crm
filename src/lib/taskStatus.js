@@ -7,9 +7,20 @@ import { mondayOf } from './dateHelpers';
 // - 'moved': still pending, and its current day (task_date) now falls in a
 //   later real calendar week than the week it was originally planned for.
 // - 'pending': still pending, and hasn't moved past its own planned week.
-export function deriveTaskStatus(task) {
-  if (task.status === 'done') return 'done';
-  if (task.status === 'cancelled') return 'cancelled';
+//
+// `stagesById` (optional, `{[stage.id]: stage}` for the task's own
+// department) resolves done/cancelled via the task's `stage_id` and that
+// stage's `is_done`/`is_cancelled` flags — the Task Manager source of
+// truth, same idea as deals deriving won/lost from their stage. Omit it (or
+// pass a task whose `stage_id` doesn't resolve in the map, e.g. a deal/
+// client-tied task with no department at all) to fall back to the legacy
+// `task.status` string check.
+export function deriveTaskStatus(task, stagesById) {
+  const stage = task.stage_id ? stagesById?.[task.stage_id] : null;
+  const done = stage ? stage.is_done : task.status === 'done';
+  const cancelled = stage ? stage.is_cancelled : task.status === 'cancelled';
+  if (done) return 'done';
+  if (cancelled) return 'cancelled';
   // Backlog tasks (no dates at all) have nothing to compare — treat as
   // a plain open task; see dueStatus.js for their real ("no_date") status.
   if (!task.planned_date || !task.task_date) return 'pending';

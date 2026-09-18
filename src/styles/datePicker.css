@@ -1,0 +1,53 @@
+.date-picker { position: relative; }
+.date-picker-trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .88rem; color: var(--ink); transition: border-color .15s ease;
+}
+.date-picker-trigger:hover { border-color: var(--purple); }
+/* Used inside an already-boxed field (e.g. .wk-field-box) that supplies its
+   own border/icon — the trigger just needs to read as plain text. */
+.date-picker--bare .date-picker-trigger { border: none; background: transparent; padding: 0; font-size: .82rem; }
+.date-picker-placeholder { color: var(--muted); }
+.date-picker-ic { flex: none; width: 16px; height: 16px; color: var(--muted); display: inline-flex; }
+.date-picker-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.date-picker-menu {
+  /* position:fixed + top/left come from an inline style (useFloatingPosition)
+     — portaled to document.body so a later sibling card (which, like this
+     one's own ancestor, uses backdrop-filter and so starts a fresh stacking
+     context) can never paint over it regardless of z-index. */
+  z-index: 1000; width: 270px;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 14px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35);
+  transform-origin: top left;
+  animation: dropdownIn .16s cubic-bezier(.4, 0, .2, 1) both;
+}
+.date-picker-menu.closing { animation: dropdownOut .14s cubic-bezier(.4, 0, .2, 1) both; }
+.date-picker-menu.placement-top { transform-origin: bottom left; }
+.date-picker-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.date-picker-month-label { font-family: var(--font-head); font-weight: 700; font-size: .86rem; color: var(--ink); text-transform: capitalize; }
+.date-picker-nav-btns { display: flex; gap: 4px; }
+.date-picker-nav-btns button {
+  width: 26px; height: 26px; border-radius: 7px; border: none; background: var(--surface); color: var(--ink-soft);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.date-picker-nav-btns button:hover { background: var(--purple-tint); color: var(--purple); }
+.date-picker-nav-btns svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.date-picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.date-picker-dow { text-align: center; font-family: var(--font-head); font-size: .62rem; font-weight: 700; color: var(--muted); padding-bottom: 4px; text-transform: uppercase; }
+.date-picker-day {
+  aspect-ratio: 1; border: none; background: none; border-radius: 8px; cursor: pointer;
+  font-family: var(--font-body); font-size: .8rem; color: var(--ink); display: flex; align-items: center; justify-content: center;
+  transition: background .12s ease;
+}
+.date-picker-day:hover { background: var(--surface); }
+.date-picker-day.out { color: var(--muted); opacity: .5; }
+.date-picker-day.today { border: 1px solid var(--purple); font-weight: 700; }
+.date-picker-day.selected { background: var(--purple); color: #fff; font-weight: 700; }
+.date-picker-day.selected.today { border-color: #fff; }
+
+.date-picker-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.date-picker-footer button { border: none; background: none; color: var(--purple); font-family: var(--font-head); font-weight: 600; font-size: .78rem; cursor: pointer; }
+.date-picker-footer button:hover { text-decoration: underline; }

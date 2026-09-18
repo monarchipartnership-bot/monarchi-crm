@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchTasksForDay } from '../../lib/api/tasks';
+import { fetchDepartmentIdByName } from '../../lib/api/departments';
 import { fetchReportByDate } from '../../lib/api/dailyReports';
 import { fetchProjects } from '../../lib/api/projects';
 import { fetchAllDailyReportsForDate } from '../../lib/api/projectReports';
@@ -74,11 +75,12 @@ export default function TodayImportant() {
       const bizYesterdayI = lastBusinessDayIso(todayI);
       const { y, m, d } = ymd(bizYesterdayI);
 
+      const automationDeptId = await safe(fetchDepartmentIdByName('Відділ автоматизації'), null);
       const [salesYesterday, projects, pmYesterday, tasksToday, pendingQueue] = await Promise.all([
         safe(fetchReportByDate(y, m, d), null),
         safe(fetchProjects(), []),
         safe(fetchAllDailyReportsForDate(bizYesterdayI), []),
-        safe(fetchTasksForDay(todayI), []),
+        safe(fetchTasksForDay(todayI, automationDeptId), []),
         safe(fetchPendingQueue(), []),
       ]);
       if (cancelled) return;
@@ -100,7 +102,7 @@ export default function TodayImportant() {
       <div className="sec-label">&#9889; Що важливо сьогодні<span className="ln" /></div>
       <div className="ti-row">
         <StatCard icon="&#9200;" tone="danger" count={counts ? counts.overdueReports : '–'} label="Прострочені звіти" to="/reports/hub" />
-        <StatCard icon="&#9989;" tone="ok" count={counts ? counts.urgentTasks : '–'} label="Термінові задачі" to="/automation/tasks/daily" />
+        <StatCard icon="&#9989;" tone="ok" count={counts ? counts.urgentTasks : '–'} label="Термінові задачі" to="/tasks" />
         <SoonCard icon="&#128197;" tone="info" label="Зустрічі сьогодні" />
         <StatCard icon="&#128203;" tone="warn" count={counts ? counts.pendingApprovals : '–'} label="Очікують погодження" to="/account" />
         <Link to="#" className="ti-ai-btn" onClick={(e) => e.preventDefault()}>

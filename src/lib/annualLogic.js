@@ -3,7 +3,7 @@
 // conversion % from the summed totals — the same "sum first" rule one level
 // up from Monthly. Ported 1:1 from annual.html's computeAnnualSums.
 import { CHANNELS, LI_CHANNEL, COST_ITEMS, INCOME_FIELDS, pct, financeCalc, costLine } from './weeklyLogic';
-import { CLIENT_TYPES } from './reportConstants';
+import { STATUSES } from './clientStatus';
 
 // Every channel's metrics[] has a different shape (upworkish: 6 stages,
 // organic: 4, LinkedIn: 6), but all of them share three universal stages
@@ -104,13 +104,16 @@ export function monthValuesFor(monthsByIndex, getter, idOrItem) {
   return out;
 }
 
-// Tallies `leadType` across every month's saved `clients[]` (added to
-// Monthly Report's payload in its _version 2). Months saved before that
-// upgrade simply have no `clients` array and contribute nothing — the
-// donut just reflects whatever part of the year already carries the field.
+// Tallies `leadType` (the client's Статус at the time of the mention)
+// across every month's saved `clients[]` (added to Monthly Report's payload
+// in its _version 2). Months saved before that upgrade simply have no
+// `clients` array and contribute nothing — the donut just reflects whatever
+// part of the year already carries the field. Months saved before the
+// leadType field switched from a separate lead-type enum to STATUSES fall
+// into `other` below, same as any other unrecognized value.
 export function computeClientTypeBreakdown(monthsByIndex) {
   const counts = {};
-  CLIENT_TYPES.forEach((t) => { counts[t] = 0; });
+  STATUSES.forEach((s) => { counts[s] = 0; });
   let other = 0;
   Object.values(monthsByIndex).forEach((row) => {
     (row?.data?.clients || []).forEach((c) => {

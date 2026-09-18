@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MonthlyChannelBlock from '../../../components/Reports/Monthly/MonthlyChannelBlock';
+import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
 import MonthlyFinanceSection from '../../../components/Reports/Monthly/MonthlyFinanceSection';
 import EditableItemList from '../../../components/Reports/EditableItemList';
 import EditableClientList from '../../../components/Reports/EditableClientList';
@@ -9,10 +10,12 @@ import { fetchCustomTags, saveCustomTag } from '../../../lib/api/customTags';
 import { computeSums, findMissingWeeks } from '../../../lib/monthlyLogic';
 import { aggregateClientsFromWeeks, aggregateTasksFromWeeks, buildMonthSummary } from '../../../lib/monthlyAggregation';
 import { fetchTasksForMonth } from '../../../lib/api/tasks';
+import { fetchDepartmentIdByName } from '../../../lib/api/departments';
 import { deriveTaskStatus, STATUS_LABELS } from '../../../lib/taskStatus';
 import { computeWeeksForMonth, MONTH_NAMES, fmtDate, isoDate, yearOptions } from '../../../lib/dateHelpers';
 import { CHANNELS, LI_CHANNEL, pct, achievement, toNum } from '../../../lib/weeklyLogic';
-import { CLIENT_PLATFORMS, CLIENT_TYPES } from '../../../lib/reportConstants';
+import { CLIENT_PLATFORMS } from '../../../lib/reportConstants';
+import { STATUSES } from '../../../lib/clientStatus';
 import { exportPDF, exportJPEG } from '../../../lib/exportHelpers';
 import { SECTION_ICONS, CHANNEL_ICONS } from '../../../lib/reportIcons';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
@@ -105,7 +108,12 @@ export default function MonthlyCreate() {
   const [legacyPlan, setLegacyPlan] = useState([]);
   const [legacyDone, setLegacyDone] = useState([]);
   const [monthSalesTasks, setMonthSalesTasks] = useState([]);
+  const [salesDeptId, setSalesDeptId] = useState(null);
   const [statusLabel, setStatusLabel] = useState('—');
+
+  useEffect(() => {
+    fetchDepartmentIdByName('Sales відділ').then(setSalesDeptId);
+  }, []);
   const [capturing, setCapturing] = useState(false);
   const [exportingJPEG, setExportingJPEG] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -143,16 +151,16 @@ export default function MonthlyCreate() {
   const managerEmail = useMemo(() => profiles.find((p) => profileLabel(p) === manager)?.email || '', [profiles, manager]);
 
   useEffect(() => {
-    if (!managerEmail) { setMonthSalesTasks([]); return; }
+    if (!managerEmail || !salesDeptId) { setMonthSalesTasks([]); return; }
     let cancelled = false;
     const startIso = isoDate(period.year, period.month, 1);
     const dim = new Date(period.year, period.month, 0).getDate();
     const endIso = isoDate(period.year, period.month, dim);
-    fetchTasksForMonth(startIso, endIso, 'sales')
+    fetchTasksForMonth(startIso, endIso, salesDeptId)
       .then((rows) => { if (!cancelled) setMonthSalesTasks(rows.filter((t) => t.assignee_email === managerEmail)); })
       .catch((e) => console.warn('load month sales tasks failed', e));
     return () => { cancelled = true; };
-  }, [period.year, period.month, managerEmail]);
+  }, [period.year, period.month, managerEmail, salesDeptId]);
 
   function handleNewTag(tag) {
     setTagSuggestions((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
@@ -259,10 +267,17 @@ export default function MonthlyCreate() {
           tasks_done_count: monthSalesTasks.filter((t) => deriveTaskStatus(t) === 'done').length,
           tasks_total_count: monthSalesTasks.length,
           tasks: Object.fromEntries(TASK_SECTIONS.map((s) => [s.key, tasks[s.key].map((it) => ({ text: it.text, tag: it.tag || '' }))])),
-          clients: clients.map((c) => ({ name: c.name || '', platform: c.platform, leadType: c.leadType, text: c.text })),
+          clients: clients.map((c) => ({ name: c.name || '', platform: c.platform, leadType: c.leadType, title: c.title || '', text: c.text })),
         };
         await saveMonthlyReport({ year: period.year, month: period.month, manager, weeksFound, weeksTotal, data });
         setStatusLabel('Збережено ' + new Date().toLocaleString('uk-UA'));
+        // Monthly no longer syncs into the client directory — it's a
+        // read-mostly rollup of that month's Weekly reports (see
+        // aggregateClientsFromWeeks), which already synced each client
+        // themselves when their own Weekly report saved. Daily is the one
+        // true origin for a brand-new client/deal, Weekly only adds the
+        // rare directly-typed-in-Weekly client on top — Monthly adds nothing
+        // that isn't already covered by one of those two.
       } catch (e) {
         console.warn('autosave failed', e);
         setStatusLabel('Помилка збереження');
@@ -283,7 +298,7 @@ export default function MonthlyCreate() {
     setClientSearch('');
     setClientPlatformFilter('');
     setClientTypeFilter('');
-    setClients((c) => [...c, { id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: CLIENT_TYPES[0], name: '', text: '' }]);
+    setClients((c) => [...c, { id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: STATUSES[0], name: '', title: '', text: '', clientId: null }]);
     setClientPage(Infinity); // clamped to the real last page below, so the new row is visible
   }
 
@@ -345,6 +360,7 @@ export default function MonthlyCreate() {
 
   return (
     <div className="report-page monthly-report-page" ref={pageRef}>
+      {!capturing && <ReportTypeSwitcher />}
       <section className="rpt-hero">
         <div className="rpt-hero-top-row">
           <div className="rpt-hero-heading">
@@ -560,10 +576,10 @@ export default function MonthlyCreate() {
                       </select>
                     </div>
                     <div className="task-filter-row">
-                      <label>Тип клієнта</label>
+                      <label>Статус</label>
                       <select value={clientTypeFilter} onChange={(e) => { setClientTypeFilter(e.target.value); setClientPage(1); }}>
                         <option value="">Усі</option>
-                        {CLIENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                   </div>

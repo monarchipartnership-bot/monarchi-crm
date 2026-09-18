@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { updateDealFields, moveDealStage, deleteDeal, duplicateDeal, archiveDeal } from '../../lib/api/deals';
 import { updateClientDirectoryEntry } from '../../lib/api/clients';
-import { fetchTasksForDeal, createTask, setTaskStatus, ACTIVITY_TYPES } from '../../lib/api/tasks';
-import { fetchDealActivity, logDealActivity } from '../../lib/api/dealActivity';
+import { fetchTasksForDeal, createTask, setTaskStatus, deleteTask, ACTIVITY_TYPES } from '../../lib/api/tasks';
 import { fetchDealParticipants, addDealParticipant, removeDealParticipant } from '../../lib/api/dealParticipants';
 import { fetchDealNotes, addDealNote, setNotePinned, deleteDealNote } from '../../lib/api/dealNotes';
 import { uploadDealNoteImage } from '../../lib/api/dealNoteImages';
-import { createMentionNotification } from '../../lib/api/notifications';
+import { createMentionNotification, createTaskAssignedNotification } from '../../lib/api/notifications';
 import { buildDealExportRows, exportDealCSV, exportDealXLSX, exportDealPNG, exportDealPDF } from '../../lib/dealExport';
 import { sanitizeHtml, htmlToPlainText } from '../../lib/sanitizeHtml';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,7 +15,30 @@ import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { fmtDate } from '../../lib/dateHelpers';
 import { copyToClipboard } from '../../lib/clipboard';
 import ClientPicker from '../Clients/ClientPicker';
+import Select from '../common/Select';
+import DatePicker from '../common/DatePicker';
+import TimePicker from '../common/TimePicker';
 import NoteEditor from './NoteEditor';
+import CreateDealTaskModal from './CreateDealTaskModal';
+import ServiceTagsField from './ServiceTagsField';
+import { fetchServiceTags, createServiceTag } from '../../lib/api/dealServiceTags';
+import { COUNTRIES, flagClass } from '../../lib/countries';
+import { BUSINESS_NICHES } from '../../lib/businessNiches';
+
+const LEAD_WARMTH_OPTIONS = [
+  { value: 'warm', label: 'Теплий' },
+  { value: 'cold', label: 'Холодний' },
+];
+
+const QUALIFICATION_OPTIONS = [
+  { value: 'SQL', label: 'SQL' },
+  { value: 'MQL', label: 'MQL' },
+  { value: 'unqualified', label: 'Unqualified' },
+];
+
+const NICHE_OPTIONS = BUSINESS_NICHES.map((n) => ({ value: n, label: n }));
+
+const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.code, label: c.name, iconClassName: flagClass(c.code) }));
 
 // Days spent on the deal's current stage — driven by `stage_changed_at`,
 // stamped by moveDealStage on every stage move (falls back to created_at for
@@ -94,17 +117,49 @@ function LinkField({ icon, label, value, onChange, onBlur, placeholder }) {
   );
 }
 
-const PRIORITY_OPTIONS = [
-  { value: '', label: 'Без пріоритету' },
-  { value: 'high', label: 'Високий' },
-  { value: 'medium', label: 'Середній' },
-  { value: 'low', label: 'Низький' },
+const DIAMOND_ICON = '<svg viewBox="0 0 24 24"><path d="M12 2l10 10-10 10L2 12z"/></svg>';
+const CROWN_ICON = '<svg viewBox="0 0 24 24"><path d="M4 8l4 3 4-6 4 6 4-3-1.5 10h-13z"/><path d="M6.5 19h11"/></svg>';
+
+// "Задача" and "Дзвінок" both open the same popup — same fields and layout
+// either way, "Дзвінок" just also asks for a time alongside the date.
+const ACTIVITY_MODAL_META = {
+  task: { title: 'Нова задача', sub: 'Створіть задачу, щоб нічого не пропустити', icon: 'checklist', addLabel: 'Додати задачу' },
+  call: { title: 'Новий дзвінок', sub: 'Заплануйте дзвінок, щоб нічого не пропустити', icon: 'phone', addLabel: 'Додати дзвінок' },
+};
+
+// The tabbed "Історія угоди" section — one color/icon per activity type so
+// the combined "all" feed reads at a glance, plus a dedicated tab per type
+// the user asked to be able to isolate (meeting/email/deadline items only
+// ever show up in "all" — no tab of their own was asked for).
+const HISTORY_TYPE_META = {
+  note: { label: 'Нотатка', color: '#D97706', tint: '#FEF3C7', icon: '<svg viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3z"/><path d="M12 15v5"/></svg>' },
+  task: { label: 'Задача', color: '#7C3AED', tint: '#EDE7FB', icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l1.5 1.5L11 8"/><path d="M14 9h5"/><path d="M7 15l1.5 1.5L11 14"/><path d="M14 15h5"/></svg>' },
+  call: { label: 'Дзвінок', color: '#2563EB', tint: '#E8F0FE', icon: '<svg viewBox="0 0 24 24"><path d="M4.5 4h3.8l1.6 4.2-2.2 1.6a12.5 12.5 0 0 0 6.5 6.5l1.6-2.2 4.2 1.6v3.8a2 2 0 0 1-2.1 2A16.5 16.5 0 0 1 2.5 6.1 2 2 0 0 1 4.5 4z"/></svg>' },
+  meeting: { label: 'Зустріч', color: '#0D9488', tint: '#E1F5F2', icon: '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20a6 6 0 0 1 12 0"/><path d="M10 20a6 6 0 0 1 12 0"/></svg>' },
+  email: { label: 'Email', color: '#DB2777', tint: '#FCE7F3', icon: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>' },
+  deadline: { label: 'Дедлайн', color: '#DC2626', tint: '#FEE2E2', icon: '<svg viewBox="0 0 24 24"><path d="M5 3v18"/><path d="M5 4h12l-2.5 3.5L17 11H5"/></svg>' },
+};
+
+const HISTORY_TABS = [
+  { key: 'all', label: 'Історія угоди' },
+  { key: 'note', label: 'Історія нотатків' },
+  { key: 'task', label: 'Історія задач' },
+  { key: 'call', label: 'Історія дзвінків' },
 ];
 
-function SectionHead({ icon, title, subtitle }) {
+// The three priority levels for the task/call popup, rendered as colored
+// chips instead of a plain select — the color itself should signal how
+// urgent something is at a glance, not just its label.
+const PRIORITY_CHIPS = [
+  { value: 'high', label: 'Високий', color: '#DC2626', tint: '#FEE2E2' },
+  { value: 'medium', label: 'Середній', color: '#D97706', tint: '#FEF3C7' },
+  { value: 'low', label: 'Низький', color: '#16A34A', tint: '#DCFCE7' },
+];
+
+function SectionHead({ icon, title, subtitle, gradient }) {
   return (
     <div className="deal-section-head">
-      <span className="deal-section-icon" dangerouslySetInnerHTML={{ __html: icon }} />
+      <span className="deal-section-icon" style={{ background: gradient || 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: icon }} />
       <div className="deal-section-text">
         <h4>{title}</h4>
         <p>{subtitle}</p>
@@ -130,6 +185,13 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   const [chatLink, setChatLink] = useState(deal.chat_link || '');
   const [website, setWebsite] = useState(deal.website || '');
   const [lostReason, setLostReason] = useState(deal.lost_reason || '');
+  const [leadWarmth, setLeadWarmth] = useState(deal.lead_warmth || '');
+  const [niche, setNiche] = useState(deal.niche || '');
+  const [country, setCountry] = useState(deal.country || '');
+  const [qualification, setQualification] = useState(deal.qualification || '');
+  const [serviceTagIds, setServiceTagIds] = useState(deal.service_tag_ids || []);
+  const [serviceTagsCatalog, setServiceTagsCatalog] = useState([]);
+  useEffect(() => { fetchServiceTags().then(setServiceTagsCatalog); }, []);
   // Unlike the fields above, this one can now also be set from OUTSIDE this
   // input — the "Програно" reason modal saves it via moveDealStage, and the
   // resulting reload() hands this component a new `deal` prop. A plain
@@ -137,26 +199,33 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   // would keep showing stale (empty) text after the modal saves.
   useEffect(() => { setLostReason(deal.lost_reason || ''); }, [deal.lost_reason]);
 
-  // 'notes' or one of ACTIVITY_TYPES' values ('task'/'call'/'meeting'/'email'/'deadline')
-  // — each activity type is its own top-level pill rather than being tucked
-  // behind a single generic "Активності" tab.
+  // Only ever 'notes' in practice now — Задача/Дзвінок open their popup
+  // without touching this, and Email is a disabled "Скоро" stub, so nothing
+  // else is left that can switch it.
   const [subTab, setSubTab] = useState('notes');
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [newTaskText, setNewTaskText] = useState('');
-  const [newScheduledAt, setNewScheduledAt] = useState('');
-  const [newDurationMinutes, setNewDurationMinutes] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
   const [adding, setAdding] = useState(false);
+  // "Задача" and "Дзвінок" open a dedicated popup — its own type is tracked
+  // separately from `subTab` (which stays on "Нотатки"), since which of the
+  // two pills triggered it still decides the popup's title/icon/fields.
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [activityModalType, setActivityModalType] = useState('task');
+  const [newTaskDate, setNewTaskDate] = useState('');
+  const [newTaskTime, setNewTaskTime] = useState('');
+  const [newTaskCreatedBy, setNewTaskCreatedBy] = useState('');
+
+  const [historyTab, setHistoryTab] = useState('all');
+  const [historyDetail, setHistoryDetail] = useState(null); // the raw task row being viewed, or null
+  const [editTaskOpen, setEditTaskOpen] = useState(false); // true while CreateDealTaskModal is open in edit mode for historyDetail
 
   const [dealNotes, setDealNotes] = useState([]);
   const [notesLoading, setNotesLoading] = useState(true);
   const [addingNote, setAddingNote] = useState(false);
   const [noteAuthorName, setNoteAuthorName] = useState('');
-
-  const [history, setHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
 
   const [participants, setParticipants] = useState([]);
 
@@ -182,11 +251,6 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
     fetchTasksForDeal(deal.id).then(setTasks).finally(() => setTasksLoading(false));
   }
 
-  function reloadHistory() {
-    setHistoryLoading(true);
-    fetchDealActivity(deal.id).then(setHistory).finally(() => setHistoryLoading(false));
-  }
-
   function reloadParticipants() {
     fetchDealParticipants(deal.id).then(setParticipants);
   }
@@ -198,7 +262,6 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
 
   useEffect(() => {
     reloadTasks();
-    reloadHistory();
     reloadParticipants();
     reloadNotes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,8 +277,6 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
         await createMentionNotification({ recipientEmail: email, senderEmail: myEmail, dealId: deal.id, noteExcerpt: plain.slice(0, 140) });
       }
       reloadNotes();
-      await logDealActivity({ dealId: deal.id, eventType: 'note_added', text: `Додано нотатку: ${plain.split('\n')[0].slice(0, 80)}`, createdBy: myEmail });
-      reloadHistory();
       return true;
     } catch (e) {
       alert('Помилка додавання нотатки: ' + (e.message || e));
@@ -250,6 +311,20 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
 
   function saveField(patch) {
     updateDealFields(deal.id, patch).then(() => onChanged?.());
+  }
+
+  function handleToggleServiceTag(tagId) {
+    const next = serviceTagIds.includes(tagId) ? serviceTagIds.filter((id) => id !== tagId) : [...serviceTagIds, tagId];
+    setServiceTagIds(next);
+    saveField({ service_tag_ids: next });
+  }
+
+  async function handleCreateServiceTag(label, color) {
+    const created = await createServiceTag(label, color);
+    setServiceTagsCatalog((c) => [...c, created]);
+    const next = [...serviceTagIds, created.id];
+    setServiceTagIds(next);
+    saveField({ service_tag_ids: next });
   }
 
   function saveCompany(value) {
@@ -316,23 +391,42 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
     }
   }
 
+  function openActivityModal(type) {
+    setActivityModalType(type);
+    setNewTaskCreatedBy(myEmail || '');
+    setActivityModalOpen(true);
+  }
+  function closeActivityModal() {
+    setActivityModalOpen(false);
+    setNewTaskText(''); setNewTaskPriority(''); setNewTaskAssignee(''); setNewTaskDate(''); setNewTaskTime(''); setNewTaskCreatedBy('');
+  }
+
   async function handleAddTask() {
     const text = newTaskText.trim();
     if (!text) return;
     setAdding(true);
     try {
+      // "Дзвінок" combines its date field with a time; "Задача" is date-only.
+      const scheduledAt = !newTaskDate ? null
+        : activityModalType === 'call'
+          ? new Date(`${newTaskDate}T${newTaskTime || '00:00'}`).toISOString()
+          : new Date(newTaskDate).toISOString();
       const row = await createTask({
         text, assigneeEmail: newTaskAssignee, priority: newTaskPriority,
-        department: 'sales', clientId: deal.client_id, dealId: deal.id, createdByEmail: myEmail,
-        activityType: subTab,
-        scheduledAt: newScheduledAt ? new Date(newScheduledAt).toISOString() : null,
-        durationMinutes: newDurationMinutes === '' ? null : Number(newDurationMinutes),
+        departmentId: null, clientId: deal.client_id, dealId: deal.id,
+        createdByEmail: newTaskCreatedBy || myEmail,
+        activityType: activityModalType,
+        scheduledAt,
       });
       setTasks((t) => [row, ...t]);
-      setNewTaskText(''); setNewTaskPriority(''); setNewTaskAssignee(''); setNewScheduledAt(''); setNewDurationMinutes('');
-      const typeLabel = ACTIVITY_TYPES.find((t) => t.value === subTab)?.label || 'Задача';
-      await logDealActivity({ dealId: deal.id, eventType: 'task_added', text: `Додано (${typeLabel.toLowerCase()}): ${text}`, createdBy: myEmail });
-      reloadHistory();
+      createTaskAssignedNotification({
+        recipientEmail: newTaskAssignee, senderEmail: newTaskCreatedBy || myEmail,
+        dealId: deal.id, taskId: row.id, noteExcerpt: text,
+        dealTitle: deal.title || deal.clients?.company || deal.clients?.name || 'Угода',
+        clientLabel: deal.clients?.name || deal.clients?.company || null,
+        scheduledAt, activityType: activityModalType,
+      });
+      closeActivityModal();
     } catch (e) {
       alert('Помилка додавання активності: ' + (e.message || e));
     } finally {
@@ -340,17 +434,23 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
     }
   }
 
-  async function handleToggleDone(task) {
-    const next = task.status === 'done' ? 'pending' : 'done';
-    setTasks((t) => t.map((it) => (it.id === task.id ? { ...it, status: next } : it)));
-    await setTaskStatus(task.id, next);
-    const label = (task.text || '').split('\n')[0];
-    await logDealActivity({
-      dealId: deal.id, eventType: next === 'done' ? 'task_done' : 'task_reopened',
-      text: next === 'done' ? `Задача виконана: ${label}` : `Задача повернена в роботу: ${label}`,
-      createdBy: myEmail,
-    });
-    reloadHistory();
+  // Unlike Скасувати (which just marks the task cancelled), this actually
+  // removes the row — for a task added by mistake, not one that just didn't
+  // happen.
+  async function handleDeleteTask(task) {
+    if (!confirm('Видалити цю задачу назавжди? Цю дію не можна скасувати.')) return;
+    setTasks((t) => t.filter((it) => it.id !== task.id));
+    setHistoryDetail((d) => (d && d.id === task.id ? null : d));
+    await deleteTask(task.id);
+  }
+
+  // Drives the status buttons in the history detail popup — updates both the
+  // task list (so the row's gradient badge reflects it right away) and the
+  // open popup itself (so its own buttons re-render for the new status).
+  async function handleSetTaskStatus(task, status) {
+    setTasks((t) => t.map((it) => (it.id === task.id ? { ...it, status } : it)));
+    setHistoryDetail((d) => (d && d.id === task.id ? { ...d, status } : d));
+    await setTaskStatus(task.id, status);
   }
 
   async function handleDelete() {
@@ -369,6 +469,30 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   const focusNotes = dealNotes.filter((n) => n.pinned);
   const showFocus = focusActivities.length > 0 || focusNotes.length > 0;
 
+  // Display name for a creator/assignee email — falls back to the raw email
+  // when it's not a known profile (e.g. an account that's since been removed).
+  function profileLabelFor(email) {
+    if (!email) return null;
+    return profiles.find((p) => p.email === email)?.label || email;
+  }
+
+  // "Історія угоди" feed — built straight from the notes and task rows
+  // (rather than a separate generic activity log) so it can show real
+  // structured data per type: who created it, and for tasks/calls, who it
+  // was assigned to.
+  const historyRows = useMemo(() => {
+    const noteRows = dealNotes.map((n) => ({
+      id: `note-${n.id}`, type: 'note', text: htmlToPlainText(n.text), createdAt: n.created_at, createdBy: n.created_by, note: n,
+    }));
+    const taskRows = tasks.map((t) => ({
+      id: `task-${t.id}`, type: t.activity_type || 'task', text: (t.text || '').split('\n')[0], createdAt: t.created_at,
+      createdBy: t.created_by_email, assignee: t.assignee_email, task: t,
+    }));
+    return [...noteRows, ...taskRows].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [dealNotes, tasks]);
+
+  const filteredHistoryRows = historyTab === 'all' ? historyRows : historyRows.filter((r) => r.type === historyTab);
+
   const wonStage = stages.find((s) => s.is_won);
   const lostStage = stages.find((s) => s.is_lost);
   const firstStage = [...stages].sort((a, b) => a.position - b.position)[0];
@@ -382,7 +506,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   return (
     <div className="report-page deal-page" ref={dealPageRef}>
       <section className="rpt-hero deal-page-hero">
-        <span className="deal-section-icon deal-detail-head-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
+        <span className="deal-section-icon deal-detail-head-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
         <div className="deal-detail-head-text">
           <input
             type="text" className="deal-title-input" value={title}
@@ -398,24 +522,24 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
             <>
               {wonStage && (
                 <button type="button" className="btn deal-btn-won" onClick={() => handleStageChange(wonStage.id)}>
-                  <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> Виграно
+                  <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> Виграно
                 </button>
               )}
               {lostStage && (
                 <button type="button" className="btn deal-btn-lost" onClick={() => handleStageChange(lostStage.id)}>
-                  <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Програно
+                  <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Програно
                 </button>
               )}
             </>
           )}
           {showFinish && (
             <button type="button" className="btn deal-btn-finish" disabled={finishing} onClick={handleFinishDeal}>
-              <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.archive }} /> {finishing ? 'Завершуємо…' : 'Завершити угоду'}
+              <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.archive }} /> {finishing ? 'Завершуємо…' : 'Завершити угоду'}
             </button>
           )}
           {isClosed && (
             <button type="button" className="btn deal-btn-reopen" onClick={() => handleStageChange(firstStage.id)}>
-              <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Повернути в роботу
+              <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Повернути в роботу
             </button>
           )}
           <div className="deal-kebab-wrap" ref={kebabRef}>
@@ -457,7 +581,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
 
       <div className="deal-page-body">
         <div className="deal-section">
-          <SectionHead icon={FIELD_ICONS.document} title="Основна інформація" subtitle="Базові дані про угоду" />
+          <SectionHead icon={FIELD_ICONS.document} title="Основна інформація" subtitle="Базові дані про угоду" gradient="linear-gradient(135deg, #A78BFA, #7C3AED)" />
           <div className="deal-section-body deal-basic-info-row">
             <div className="wk-field-box">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.pipeline }} />
@@ -477,14 +601,18 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                 />
               </div>
             </div>
+            <ServiceTagsField
+              value={serviceTagIds} catalog={serviceTagsCatalog}
+              onToggle={handleToggleServiceTag} onCreate={handleCreateServiceTag}
+            />
             <div className="wk-field-box">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.owner }} />
               <div className="wk-field-body">
                 <label>Owner</label>
-                <select value={manager} onChange={(e) => { setManager(e.target.value); saveField({ manager: e.target.value }); }}>
-                  <option value="">Не призначено</option>
-                  {profiles.map((p) => <option key={p.email} value={p.label}>{p.label}</option>)}
-                </select>
+                <Select
+                  bare value={manager} onChange={(v) => { setManager(v); saveField({ manager: v }); }}
+                  options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.label, label: p.label }))]}
+                />
               </div>
             </div>
           </div>
@@ -493,7 +621,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
         <div className="deal-page-columns">
           <div className="deal-page-sidebar">
             <div className="deal-section">
-              <SectionHead icon={FIELD_ICONS.barChart} title="Параметри угоди" subtitle="Стадія, сума та терміни" />
+              <SectionHead icon={FIELD_ICONS.barChart} title="Параметри угоди" subtitle="Стадія, сума та терміни" gradient="linear-gradient(135deg, #60A5FA, #2563EB)" />
               <div className="deal-section-body deal-sidebar-fields">
                 <div className="wk-field-box wk-field-box-wide">
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
@@ -506,39 +634,9 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.status }} />
                   <div className="wk-field-body">
                     <label>Стадія</label>
-                    <select value={deal.stage_id} onChange={(e) => handleStageChange(e.target.value)}>
-                      {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="wk-field-box wk-field-box-wide">
-                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.amount }} />
-                  <div className="wk-field-body">
-                    <label>Сума</label>
-                    <input
-                      type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-                      onBlur={() => saveField({ amount: amount === '' ? null : Number(amount) })}
-                    />
-                  </div>
-                </div>
-                <div className="wk-field-box wk-field-box-wide">
-                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.currency }} />
-                  <div className="wk-field-body">
-                    <label>Валюта</label>
-                    <select value={currency} onChange={(e) => { setCurrency(e.target.value); saveField({ currency: e.target.value }); }}>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="UAH">UAH</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="wk-field-box wk-field-box-wide">
-                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
-                  <div className="wk-field-body">
-                    <label>Очікуване закриття</label>
-                    <input
-                      type="date" value={expectedClose || ''}
-                      onChange={(e) => { setExpectedClose(e.target.value); saveField({ expected_close_date: e.target.value || null }); }}
+                    <Select
+                      bare value={deal.stage_id} onChange={handleStageChange}
+                      options={stages.map((s) => ({ value: s.id, label: s.label }))}
                     />
                   </div>
                 </div>
@@ -554,6 +652,78 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                   onBlur={() => saveField({ website: website.trim() || null })}
                   placeholder="https://..."
                 />
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.thermometer }} />
+                  <div className="wk-field-body">
+                    <label>Прогрів ліда</label>
+                    <Select
+                      bare value={leadWarmth} onChange={(v) => { setLeadWarmth(v); saveField({ lead_warmth: v || null }); }}
+                      options={LEAD_WARMTH_OPTIONS} placeholder="Не вказано"
+                    />
+                  </div>
+                </div>
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
+                  <div className="wk-field-body">
+                    <label>Ніша бізнесу</label>
+                    <Select
+                      bare value={niche} onChange={(v) => { setNiche(v); saveField({ niche: v || null }); }}
+                      options={NICHE_OPTIONS} placeholder="Не вказано"
+                    />
+                  </div>
+                </div>
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.mapPin }} />
+                  <div className="wk-field-body">
+                    <label>Країна</label>
+                    <Select
+                      bare searchable value={country} onChange={(v) => { setCountry(v); saveField({ country: v || null }); }}
+                      options={COUNTRY_OPTIONS} placeholder="Не вказано"
+                    />
+                  </div>
+                </div>
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.target }} />
+                  <div className="wk-field-body">
+                    <label>MQL чи SQL</label>
+                    <Select
+                      bare value={qualification} onChange={(v) => { setQualification(v); saveField({ qualification: v || null }); }}
+                      options={QUALIFICATION_OPTIONS} placeholder="Не вказано"
+                    />
+                  </div>
+                </div>
+                <div className="deal-field-pair-row">
+                  <div className="wk-field-box">
+                    <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.amount }} />
+                    <div className="wk-field-body">
+                      <label>Сума</label>
+                      <input
+                        type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+                        onBlur={() => saveField({ amount: amount === '' ? null : Number(amount) })}
+                      />
+                    </div>
+                  </div>
+                  <div className="wk-field-box">
+                    <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.currency }} />
+                    <div className="wk-field-body">
+                      <label>Валюта</label>
+                      <Select
+                        bare value={currency} onChange={(v) => { setCurrency(v); saveField({ currency: v }); }}
+                        options={[{ value: 'USD', label: 'USD' }, { value: 'EUR', label: 'EUR' }, { value: 'UAH', label: 'UAH' }]}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
+                  <div className="wk-field-body">
+                    <label>Очікуване закриття</label>
+                    <DatePicker
+                      bare value={expectedClose || ''}
+                      onChange={(v) => { setExpectedClose(v); saveField({ expected_close_date: v || null }); }}
+                    />
+                  </div>
+                </div>
               </div>
 
               {deal.deal_stages?.is_lost && (
@@ -569,7 +739,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
             </div>
 
             <div className="deal-section">
-              <SectionHead icon={FIELD_ICONS.assignee} title="Клієнт" subtitle="Контакт, компанія та учасники угоди" />
+              <SectionHead icon={FIELD_ICONS.assignee} title="Клієнт" subtitle="Контакт, компанія та учасники угоди" gradient="linear-gradient(135deg, #2DD4BF, #0D9488)" />
               <div className="deal-section-body">
                 <div className="deal-client-name-row">
                   <span className="deal-client-name">{deal.clients?.name || '—'}</span>
@@ -614,7 +784,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
 
           <div className="deal-page-main">
             <div className="deal-section">
-              <SectionHead icon={FIELD_ICONS.checklist} title="Нотатки та задачі" subtitle="Ведіть нотатки та активності по угоді" />
+              <SectionHead icon={FIELD_ICONS.checklist} title="Нотатки та задачі" subtitle="Ведіть нотатки та активності по угоді" gradient="linear-gradient(135deg, #F472B6, #DB2777)" />
               <div className="deal-section-body">
                 {showFocus && (
                   <div className="deal-focus">
@@ -638,14 +808,26 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                 <div className="chan-tabs deal-subtabs">
                   <button type="button" className={'chan-tab' + (subTab === 'notes' ? ' active' : '')} onClick={() => setSubTab('notes')}>Нотатки</button>
                   {ACTIVITY_TYPES.map((t) => (
-                    <button key={t.value} type="button" className={'chan-tab' + (subTab === t.value ? ' active' : '')} onClick={() => setSubTab(t.value)}>
-                      <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[t.icon] }} />
-                      {t.label}
-                    </button>
+                    t.value === 'email' ? (
+                      <button key={t.value} type="button" className="chan-tab" disabled title="Скоро">
+                        <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[t.icon] }} />
+                        {t.label}
+                      </button>
+                    ) : (
+                      // Задача/Дзвінок only ever open their own popup — the
+                      // active tab deliberately stays on "Нотатки" instead of
+                      // following them here, since there's nothing of their
+                      // own left to show underneath (their history now lives
+                      // in the tabbed "Історія угоди" section below).
+                      <button key={t.value} type="button" className="chan-tab" onClick={() => openActivityModal(t.value)}>
+                        <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[t.icon] }} />
+                        {t.label}
+                      </button>
+                    )
                   ))}
                 </div>
 
-                {subTab === 'notes' ? (
+                {subTab === 'notes' && (
                   <>
                     <div className="deal-note-add-row">
                       <div className="deal-note-author-field">
@@ -656,94 +838,70 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                           placeholder="Ім'я Прізвище"
                         />
                       </div>
-                      <NoteEditor dealId={deal.id} profiles={profiles} saving={addingNote} onSave={handleAddNote} />
+                      <NoteEditor profiles={profiles} saving={addingNote} onSave={handleAddNote} onUploadImage={(file) => uploadDealNoteImage(deal.id, file)} />
                     </div>
-                    {notesLoading ? (
-                      <p className="client-history-empty">Завантаження…</p>
-                    ) : dealNotes.length > 0 && (
-                      <div className="client-history-list">
-                        {dealNotes.map((n) => (
-                          <div className={'client-history-item deal-note-item' + (n.pinned ? ' pinned' : '')} key={n.id}>
-                            <div className="deal-note-head">
-                              <div className="deal-note-meta">
-                                <span className="deal-note-author">{n.created_by || 'Без автора'}</span>
-                                <span className="client-history-week">{new Date(n.created_at).toLocaleString('uk-UA')}</span>
-                              </div>
-                              <div className="deal-note-actions">
-                                <button type="button" className={'deal-field-icon-btn' + (n.pinned ? ' active' : '')} title={n.pinned ? 'Відкріпити' : 'Закріпити'} onClick={() => handleTogglePin(n)}>
-                                  <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.pin }} />
-                                </button>
-                                <button type="button" className="deal-field-icon-btn" title="Видалити" onClick={() => handleDeleteNote(n)}>&times;</button>
-                              </div>
-                            </div>
-                            <div className="client-history-text deal-note-rich" dangerouslySetInnerHTML={{ __html: sanitizeHtml(n.text) }} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="deal-activity-add">
-                      <div className="task-add-row">
-                        <input type="text" value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Що зробити..." />
-                        <input type="datetime-local" value={newScheduledAt} onChange={(e) => setNewScheduledAt(e.target.value)} />
-                        {(subTab === 'call' || subTab === 'meeting') && (
-                          <input type="number" value={newDurationMinutes} onChange={(e) => setNewDurationMinutes(e.target.value)} placeholder="Хв." className="deal-activity-duration" />
-                        )}
-                      </div>
-                      <div className="task-add-row" style={{ marginTop: 8 }}>
-                        <select value={newTaskPriority} onChange={(e) => setNewTaskPriority(e.target.value)}>
-                          {PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                        <select value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
-                          <option value="">Не призначено</option>
-                          {profiles.map((p) => <option key={p.email} value={p.email}>{p.label}</option>)}
-                        </select>
-                        <button type="button" className="btn btn-p" onClick={handleAddTask} disabled={adding || !newTaskText.trim()}>+ Додати</button>
-                      </div>
-                    </div>
-                    {tasksLoading ? (
-                      <p className="client-history-empty">Завантаження…</p>
-                    ) : tasks.length === 0 ? (
-                      <p className="client-history-empty">Активностей по цій угоді ще немає.</p>
-                    ) : (
-                      <div className="client-history-list">
-                        {tasks.map((t) => (
-                          <div className="client-history-item" key={t.id}>
-                            <label className="task-recur-toggle">
-                              <input type="checkbox" checked={t.status === 'done'} onChange={() => handleToggleDone(t)} />
-                              <span className="deal-activity-icon" dangerouslySetInnerHTML={{ __html: activityIcon(t.activity_type) }} />
-                              <span className={t.status === 'done' ? 'task-text done' : ''}>{(t.text || '').split('\n')[0]}</span>
-                              {t.scheduled_at && <span className="deal-activity-time">{fmtActivityTime(t.scheduled_at)}</span>}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </>
                 )}
               </div>
             </div>
 
             <div className="deal-section">
-              <SectionHead icon={FIELD_ICONS.history} title="Історія угоди" subtitle="Останні дії за цією угодою" />
+              <SectionHead icon={FIELD_ICONS.history} title="Історія угоди" subtitle="Останні дії за цією угодою" gradient="linear-gradient(135deg, #94A3B8, #475569)" />
               <div className="deal-section-body">
-                {historyLoading ? (
+                <div className="chan-tabs deal-history-tabs">
+                  {HISTORY_TABS.map((t) => (
+                    <button key={t.key} type="button" className={'chan-tab' + (historyTab === t.key ? ' active' : '')} onClick={() => setHistoryTab(t.key)}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {tasksLoading || notesLoading ? (
                   <p className="client-history-empty">Завантаження…</p>
-                ) : history.length === 0 ? (
+                ) : filteredHistoryRows.length === 0 ? (
                   <p className="client-history-empty">Історія поки що порожня.</p>
                 ) : (
                   <div className="client-history-list">
-                    {history.map((h) => (
-                      <div className="client-history-item" key={h.id}>
-                        <div className="client-history-week">{new Date(h.created_at).toLocaleString('uk-UA')}</div>
-                        <div className="client-history-text">
-                          {h.text}
-                          {h.created_by && <span className="client-history-author"> · {h.created_by}</span>}
+                    {filteredHistoryRows.map((r) => {
+                      const meta = HISTORY_TYPE_META[r.type] || HISTORY_TYPE_META.task;
+                      const statusMeta = r.task?.status === 'done' ? { label: 'Виконана', cls: 'done' }
+                        : r.task?.status === 'cancelled' ? { label: 'Скасовано', cls: 'cancelled' } : null;
+                      return (
+                        <div
+                          key={r.id} className={'deal-history-row' + (r.task ? ' clickable' : '')}
+                          style={{ '--history-color': meta.color, '--history-tint': meta.tint }}
+                          onClick={r.task ? () => setHistoryDetail(r.task) : undefined}
+                        >
+                          <span className="deal-history-ic" dangerouslySetInnerHTML={{ __html: meta.icon }} />
+                          <div className="deal-history-body">
+                            <div className="deal-history-top">
+                              <span className="deal-history-type">{meta.label}</span>
+                              <span className="client-history-week">{new Date(r.createdAt).toLocaleString('uk-UA')}</span>
+                            </div>
+                            <div className="client-history-text">{r.text || '—'}</div>
+                            {r.type === 'note' ? (
+                              r.createdBy && <div className="deal-history-meta">{r.createdBy}</div>
+                            ) : (
+                              (r.createdBy || r.assignee) && (
+                                <div className="deal-history-meta">
+                                  {r.createdBy && <span>Поставив: {profileLabelFor(r.createdBy)}</span>}
+                                  {r.assignee && <span>Призначено: {profileLabelFor(r.assignee)}</span>}
+                                </div>
+                              )
+                            )}
+                          </div>
+                          {r.type === 'note' ? (
+                            <div className="deal-history-actions" onClick={(e) => e.stopPropagation()}>
+                              <button type="button" className={'deal-field-icon-btn' + (r.note.pinned ? ' active' : '')} title={r.note.pinned ? 'Відкріпити' : 'Закріпити'} onClick={() => handleTogglePin(r.note)}>
+                                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.pin }} />
+                              </button>
+                              <button type="button" className="deal-field-icon-btn" title="Видалити" onClick={() => handleDeleteNote(r.note)}>&times;</button>
+                            </div>
+                          ) : statusMeta && (
+                            <div className={'deal-history-status ' + statusMeta.cls}>{statusMeta.label}</div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -751,6 +909,65 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
           </div>
         </div>
       </div>
+
+      {historyDetail && createPortal(
+        <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setHistoryDetail(null); }}>
+          <div className="tmodal-box task-detail-box">
+            <div className="tmodal-head">
+              <div className="pipeline-modal-head">
+                <span
+                  className="pipeline-modal-head-ic"
+                  dangerouslySetInnerHTML={{ __html: (HISTORY_TYPE_META[historyDetail.activity_type] || HISTORY_TYPE_META.task).icon }}
+                />
+                <div>
+                  <h3>{(ACTIVITY_TYPES.find((t) => t.value === historyDetail.activity_type)?.label) || 'Задача'}</h3>
+                  <p>{new Date(historyDetail.created_at).toLocaleString('uk-UA')}</p>
+                </div>
+              </div>
+              <button type="button" className="tmodal-close" onClick={() => setHistoryDetail(null)} aria-label="Закрити">&times;</button>
+            </div>
+            <div className="tmodal-body">
+              <p className="task-detail-text">{historyDetail.text || '—'}</p>
+              {(historyDetail.created_by_email || historyDetail.assignee_email) && (
+                <div className="deal-history-meta task-detail-meta">
+                  {historyDetail.created_by_email && <span>Поставив: {profileLabelFor(historyDetail.created_by_email)}</span>}
+                  {historyDetail.assignee_email && <span>Призначено: {profileLabelFor(historyDetail.assignee_email)}</span>}
+                </div>
+              )}
+            </div>
+            <div className="tmodal-foot">
+              <button type="button" className="btn btn-danger" style={{ marginRight: 'auto' }} onClick={() => handleDeleteTask(historyDetail)}>Видалити</button>
+              <button type="button" className="btn" onClick={() => setEditTaskOpen(true)}>Редагувати</button>
+              {historyDetail.status === 'pending' ? (
+                <>
+                  <button type="button" className="btn deal-btn-lost" onClick={() => handleSetTaskStatus(historyDetail, 'cancelled')}>Скасувати</button>
+                  <button type="button" className="btn deal-btn-won" onClick={() => handleSetTaskStatus(historyDetail, 'done')}>Виконано</button>
+                </>
+              ) : (
+                <button type="button" className="btn" onClick={() => handleSetTaskStatus(historyDetail, 'pending')}>
+                  <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Повернути в роботу
+                </button>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {editTaskOpen && historyDetail && (
+        <CreateDealTaskModal
+          task={historyDetail}
+          deal={deal}
+          profiles={profiles}
+          myEmail={myEmail}
+          onClose={() => setEditTaskOpen(false)}
+          onSaved={(patch) => {
+            setTasks((t) => t.map((it) => (it.id === historyDetail.id ? { ...it, ...patch } : it)));
+            setHistoryDetail((h) => (h ? { ...h, ...patch } : h));
+            setEditTaskOpen(false);
+          }}
+        />
+      )}
 
       {lostModalReason && (
         <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setLostModalReason(null); }}>
@@ -773,6 +990,124 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
             </div>
           </div>
         </div>
+      )}
+
+      {activityModalOpen && createPortal(
+        <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeActivityModal(); }}>
+          <div className="tmodal-box task-modal-box">
+            <div className="tmodal-head">
+              <div className="pipeline-modal-head">
+                <span className="pipeline-modal-head-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[ACTIVITY_MODAL_META[activityModalType]?.icon] }} />
+                <div>
+                  <h3>{ACTIVITY_MODAL_META[activityModalType]?.title}</h3>
+                  <p>{ACTIVITY_MODAL_META[activityModalType]?.sub}</p>
+                </div>
+              </div>
+              <button type="button" className="tmodal-close" onClick={closeActivityModal} aria-label="Закрити">&times;</button>
+            </div>
+            <div className="tmodal-body">
+              <div className="task-modal-grid">
+                <div className="task-modal-section">
+                  <div className="task-modal-section-head">
+                    <span className="task-modal-section-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
+                    <div>
+                      <div className="task-modal-section-title">{activityModalType === 'call' ? 'Дата та час' : 'Дата'}</div>
+                      <div className="task-modal-section-sub">Оберіть дату виконання задачі</div>
+                    </div>
+                  </div>
+                  <div className="wk-field-box wk-field-box-wide task-modal-input-box">
+                    <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
+                    <div className="wk-field-body">
+                      <div className="task-modal-datetime-row">
+                        <DatePicker bare value={newTaskDate} onChange={setNewTaskDate} />
+                        {activityModalType === 'call' && (
+                          <TimePicker className="task-modal-time-input" value={newTaskTime} onChange={setNewTaskTime} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="task-modal-section">
+                  <div className="task-modal-section-head">
+                    <span className="task-modal-section-ic" dangerouslySetInnerHTML={{ __html: DIAMOND_ICON }} />
+                    <div>
+                      <div className="task-modal-section-title">Пріоритет</div>
+                      <div className="task-modal-section-sub">Визначте важливість задачі</div>
+                    </div>
+                  </div>
+                  <div className="task-priority-chips">
+                    {PRIORITY_CHIPS.map((p) => {
+                      const active = newTaskPriority === p.value;
+                      return (
+                        <button
+                          key={p.value} type="button" className={'task-priority-chip' + (active ? ' active' : '')}
+                          style={active ? { background: p.tint, borderColor: p.color, color: p.color } : undefined}
+                          onClick={() => setNewTaskPriority(active ? '' : p.value)}
+                        >
+                          <span className="task-priority-dot" style={{ background: p.color }} />
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="task-modal-section">
+                <div className="task-modal-section-head">
+                  <span className="task-modal-section-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.document }} />
+                  <div>
+                    <div className="task-modal-section-title">Задача</div>
+                    <div className="task-modal-section-sub">Опишіть, що потрібно зробити</div>
+                  </div>
+                </div>
+                <textarea
+                  className="task-modal-textarea" autoFocus
+                  value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)}
+                  placeholder="Що потрібно зробити..."
+                />
+              </div>
+
+              <div className="task-modal-grid">
+                <div className="task-modal-section">
+                  <div className="task-modal-section-head">
+                    <span className="task-modal-section-ic" dangerouslySetInnerHTML={{ __html: CROWN_ICON }} />
+                    <div>
+                      <div className="task-modal-section-title">Хто ставить задачу</div>
+                      <div className="task-modal-section-sub">Автор задачі</div>
+                    </div>
+                  </div>
+                  <Select
+                    value={newTaskCreatedBy} onChange={setNewTaskCreatedBy}
+                    options={profiles.map((p) => ({ value: p.email, label: p.label }))}
+                  />
+                </div>
+
+                <div className="task-modal-section">
+                  <div className="task-modal-section-head">
+                    <span className="task-modal-section-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
+                    <div>
+                      <div className="task-modal-section-title">Кому призначено</div>
+                      <div className="task-modal-section-sub">Виконавець задачі</div>
+                    </div>
+                  </div>
+                  <Select
+                    value={newTaskAssignee} onChange={setNewTaskAssignee}
+                    options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.email, label: p.label }))]}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="tmodal-foot">
+              <button type="button" className="btn" onClick={closeActivityModal}>Скасувати</button>
+              <button type="button" className="btn btn-p" onClick={handleAddTask} disabled={adding || !newTaskText.trim()}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.plus }} /> {adding ? 'Додаємо...' : ACTIVITY_MODAL_META[activityModalType]?.addLabel}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

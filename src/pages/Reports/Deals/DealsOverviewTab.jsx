@@ -7,6 +7,7 @@ import FunnelChart from '../../../components/Reports/Annual/FunnelChart';
 import ClientAvatar from '../../../components/Clients/ClientAvatar';
 import DateRangePicker, { presetRange } from '../../../components/Deals/DateRangePicker';
 import { addDaysIso, fmtDate } from '../../../lib/dateHelpers';
+import { stagePillStyle } from '../../../lib/stagePillStyle';
 
 function toIsoDay(dt) {
   return (dt || '').slice(0, 10);
@@ -164,7 +165,7 @@ export default function DealsOverviewTab({ deals, stages, onViewDeal }) {
                   return (
                     <tr key={d.id} className="client-row" onClick={() => onViewDeal(d)}>
                       <td className="ink">{d.clients?.company || d.clients?.name || '—'}</td>
-                      <td><span className="deal-stage-pill" style={{ color: stage?.color, borderColor: stage?.color }}>{stage?.label || '—'}</span></td>
+                      <td><span className="deal-stage-pill" style={stagePillStyle(stage?.color)}>{stage?.label || '—'}</span></td>
                       <td>{d.amount ? `${Number(d.amount).toLocaleString('uk-UA')} ${d.currency}` : '—'}</td>
                       <td>{fmtShort(toIsoDay(d.created_at))}</td>
                       <td>

@@ -18,12 +18,12 @@ export function aggregateDailyClients(dailyRows) {
       const name = (c.name || '').trim();
       if (!name) return;
       const key = name.toLowerCase();
-      if (!map[key]) { map[key] = { name, platform: c.platform, leadType: c.leadType, notes: [] }; order.push(key); }
+      if (!map[key]) { map[key] = { name, platform: c.platform, leadType: c.leadType, title: c.title || '', notes: [] }; order.push(key); }
       if (c.text && c.text.trim()) map[key].notes.push(`${dateLabel}: ${c.text.trim()}`);
     });
   });
   return order.map((key) => {
     const e = map[key];
-    return { name: e.name, platform: e.platform, leadType: e.leadType, text: e.notes.join('\n'), fromDaily: true };
+    return { name: e.name, platform: e.platform, leadType: e.leadType, title: e.title, text: e.notes.join('\n'), fromDaily: true };
   });
 }

@@ -156,7 +156,13 @@
 .tmodal-body p { font-family: var(--font-body); font-size: .84rem; color: var(--ink-soft); margin-bottom: 4px; }
 .tmodal-body label { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .tmodal-body input[type=date], .tmodal-body input[type=text], .tmodal-body input[type=number] { font-family: var(--font-body); font-size: .9rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%; }
-.tmodal-body textarea { font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; resize: vertical; min-height: 90px; outline: none; }
+/* Missing `width: 100%` here (unlike the input rule just above) let any
+   plain <textarea> — e.g. AutoResizeTextarea with no explicit className,
+   used by both "Ім'я клієнта" (nested inside .client-name-field) and
+   "Інформація" in AddClientModal — fall back to the browser's intrinsic
+   ~199px textarea width instead of filling the field like every other
+   control, which is exactly the "some fields wide, some narrow" look. */
+.tmodal-body textarea { font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; resize: vertical; min-height: 90px; outline: none; width: 100%; }
 /* A bare <select> (the "Новий день" move-picker) still needs its own
    rounded box — without this it falls back to the browser's plain
    rectangular default, out of place next to the rest of the app. */
@@ -166,6 +172,59 @@
 }
 .tmodal-body textarea:focus, .tmodal-body input:focus, .tmodal-body select:focus { border-color: var(--purple); outline: none; }
 .tmodal-foot { flex: none; padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+.tmodal-foot .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* .task-detail-inline-actions (move/cancel/edit forms' own Назад/Підтвердити
+   row) shares the same icon-chip convention as .tmodal-foot buttons —
+   .deal-action-ic/--ghost normally lives in dealsBoard.css, but
+   TaskDetailModal is also used from Automation's Daily/Weekly Tasks pages
+   which don't import that stylesheet, so it's redeclared here (identical
+   recipe) to render correctly everywhere .tmodal-* does. */
+.task-detail-inline-actions .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deal-action-ic { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; flex: none; }
+.deal-action-ic svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deal-action-ic--ghost { background: rgba(255, 255, 255, .25); }
+
+/* Icon-badge + subtitle modal header — an enhanced variant of the plain
+   .tmodal-head title, for a popup that benefits from more context up top
+   (e.g. AddClientModal). Wrapping the icon+text in .tmodal-head-left keeps
+   .tmodal-head's own space-between pushing the close button to the right,
+   without changing that shared rule for every other modal using it. */
+.tmodal-head-left { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+/* flex-start top-aligns the icon with a title+subtitle pair (AddClientModal)
+   — for a single-line title with no subtitle (TaskDetailModal's cancel
+   header), that leaves the text sitting above the icon's own center instead
+   of level with it. */
+.tmodal-head-left--center { align-items: center; }
+.tmodal-head-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex: none; color: #fff;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
+}
+.tmodal-head-icon svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tmodal-head-text p { margin: 2px 0 0; font-family: var(--font-body); font-size: .8rem; color: var(--muted); }
+
+/* Vertical form field — icon+label+description header row, then the
+   control on its own full-width line below (vs. .wk-field-box's compact
+   icon-beside-control row) — for a popup with room to breathe and explain
+   what each field is for, unlike a report's own always-open inline row.
+   Overrides .tmodal-body's own generic label/p styling (tiny uppercase /
+   muted paragraph) since this header needs to read as a real sub-heading. */
+.modal-field { margin-bottom: 16px; }
+.modal-field:last-child { margin-bottom: 0; }
+.modal-field-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+/* Full gradient icon badge (locked design system, .deal-section-icon
+   recipe) — not the flat pastel-tint square this used to be. Background is
+   set per-field via inline style (each field gets its own color from the
+   same 5-gradient palette as SectionHead), same convention as
+   .deal-section-icon/.tmodal-head-icon. */
+.modal-field-icon {
+  width: 34px; height: 34px; border-radius: 9px; color: #fff;
+  display: flex; align-items: center; justify-content: center; flex: none;
+  box-shadow: 0 4px 10px -3px rgba(37, 28, 48, .4);
+}
+.modal-field-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.modal-field-head label { display: block; font-family: var(--font-head); font-weight: 700; font-size: .86rem; letter-spacing: normal; text-transform: none; color: var(--ink); }
+.modal-field-head p { margin: 1px 0 0; font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
 
 /* Edit-mode fields in the task detail modal — same icon-boxed field
    convention as the creation form, just without its indent margin. */
@@ -299,6 +358,8 @@
 .tag-chip button { background: none; border: none; color: #fff; opacity: .8; cursor: pointer; font-size: .8rem; line-height: 1; padding: 0; }
 .tag-chip button:hover { opacity: 1; }
 .tag-input-chips input { flex: 1; min-width: 70px; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: .82rem; color: var(--ink); }
+.tag-input--disabled .tag-input-chips { background: var(--surface); }
+.tag-input-empty { font-family: var(--font-body); font-size: .82rem; color: var(--muted); }
 .tag-input-suggestions { display: flex; gap: 6px; flex-wrap: wrap; }
 .tag-suggestion {
   font-family: var(--font-head); font-weight: 700; font-size: .66rem; color: var(--tag-color); background: color-mix(in srgb, var(--tag-color) 14%, #fff);
@@ -420,8 +481,18 @@ textarea.wk-row-text { width: 100%; border: none; background: transparent; color
 @media (max-width: 900px) { .wk-layout { grid-template-columns: 1fr; } }
 
 .wk-sidebar { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 16px; }
-.wk-side-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+/* Same "white card, barely-there shadow" recipe as .client-profile-side-card
+   (clientProfile.css) — the CRM's fixed style for a plain content card on a
+   light page background (distinct from Home's translucent "matte glass"
+   cards, which are tuned for a colored/gradient backdrop instead). */
+.wk-side-panel { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; box-shadow: 0 4px 18px rgba(80, 30, 100, .07); }
 .wk-side-label { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+
+/* Менеджер/Завантажити on Daily Report's sidebar reuse dealsBoard.css's
+   .deal-section-head/-icon/-text/-body (gradient icon badge + title +
+   subtitle) inside this panel's own card chrome — see dealsBoard.css. */
+.wk-dl-row { display: flex; gap: 8px; margin-top: 4px; margin-bottom: 10px; }
+.wk-dl-btn { flex: 1; justify-content: center; }
 
 .wk-side-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .wk-side-nav-mid { text-align: center; flex: 1; min-width: 0; }
@@ -449,9 +520,15 @@ textarea.wk-row-text { width: 100%; border: none; background: transparent; color
 .wk-progress-panel { text-align: center; }
 .wk-progress-chart .cmp-chart { height: 140px; }
 
-.wk-side-stat { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); }
+.wk-side-stat { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); }
 .wk-side-stat:last-child { border-bottom: none; }
 .wk-side-stat b { font-family: var(--font-head); font-weight: 700; color: var(--ink); }
+/* Small plain (non-badge) icon before the row's own label — same "meta-row
+   icon stays plain" convention as DealCard's amount/date icons; the row
+   already carries its own text, so it doesn't need a full gradient chip. */
+.wk-side-stat-ic { flex: none; width: 15px; height: 15px; color: var(--purple); display: inline-flex; }
+.wk-side-stat-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.wk-side-stat > span:not(.wk-side-stat-ic) { flex: 1; }
 
 /* Backlog ("Без дати") panel — narrow sidebar column, so each task row
    wraps its action controls onto their own line instead of overflowing. */

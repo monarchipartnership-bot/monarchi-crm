@@ -65,14 +65,21 @@ export default function TaskDetailModal({
     <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="tmodal-box task-detail-modal">
         <div className="tmodal-head">
-          <h3>Задача</h3>
+          <div className={'tmodal-head-left' + (mode === 'cancel' ? ' tmodal-head-left--center' : '')}>
+            {mode === 'cancel' && (
+              <span className="tmodal-head-icon" style={{ background: 'linear-gradient(135deg, #F87171, #DC2626)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} />
+            )}
+            <div className="tmodal-head-text">
+              <h3>{mode === 'cancel' ? 'Скасування задачі' : 'Задача'}</h3>
+            </div>
+          </div>
           <div className="task-detail-head-actions">
             {mode === 'view' && <button type="button" className="btn" onClick={() => setMode('edit')}>Редагувати</button>}
             <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>
           </div>
         </div>
 
-        {mode !== 'edit' && (
+        {mode !== 'edit' && mode !== 'cancel' && (
           <div className="task-detail-actions">
             <button type="button" className={'btn' + (done ? ' btn-p' : '')} onClick={() => onToggleDone(task)}>
               {done ? '↺ Повернути' : '✓ Виконати'}
@@ -100,8 +107,12 @@ export default function TaskDetailModal({
             <label>Причина скасування</label>
             <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Вкажіть причину..." />
             <div className="task-detail-inline-actions">
-              <button type="button" className="btn" onClick={() => setMode('view')}>Назад</button>
-              <button type="button" className="btn btn-p" onClick={() => { onCancel(task, cancelReason.trim()); onClose(); }}>Підтвердити скасування</button>
+              <button type="button" className="btn" onClick={() => setMode('view')}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Назад
+              </button>
+              <button type="button" className="btn btn-p" onClick={() => { onCancel(task, cancelReason.trim()); onClose(); }}>
+                <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> Підтвердити скасування
+              </button>
             </div>
           </div>
         )}
@@ -149,7 +160,7 @@ export default function TaskDetailModal({
               <button type="button" className="btn btn-p" onClick={saveEdits} disabled={saving}>{saving ? '...' : 'Зберегти'}</button>
             </div>
           </div>
-        ) : (
+        ) : mode === 'cancel' ? null : (
           <div className="tmodal-body task-detail-view">
             <p className="wk-view-text">{task.text}</p>
 

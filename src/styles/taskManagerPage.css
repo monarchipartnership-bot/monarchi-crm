@@ -1,0 +1,131 @@
+/* Task Manager — unified internal task management (departments, stages,
+   categories), replacing the old per-department Daily/Weekly/Monthly Tasks
+   report pages. Reuses tmodal-, modal-field-, stage- and pipeline- classes
+   from automationTasksPage.css and dealsBoard.css wherever the pattern
+   already exists 1:1 — only genuinely new layout lives here. */
+
+/* DepartmentEditModal's icon grid — same "grid of equal-size choice
+   buttons" shape as ColorPickerControl's quick-swatch row, just icons
+   instead of color swatches (no dedicated icon-picker exists elsewhere). */
+.department-icon-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.department-icon-choice {
+  width: 100%; aspect-ratio: 1; border-radius: 9px; border: 1px solid var(--border); background: #fff;
+  color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.department-icon-choice svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.department-icon-choice:hover { border-color: var(--purple); color: var(--purple); }
+.department-icon-choice.active { border-color: transparent; color: #fff; box-shadow: 0 4px 10px -3px rgba(37, 28, 48, .4); }
+
+/* Department switcher — same card shape as ReportTypeSwitcher.jsx
+   (.report-type-switcher/-card/-card-icon/-card-label in reportPage.css),
+   duplicated under its own names since Task Manager isn't a "report" page
+   and shouldn't couple to that stylesheet just for this one shared shape. */
+.tm-dept-tabs { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+.tm-dept-card {
+  flex: 1 1 170px; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px; cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.tm-dept-card:hover { border-color: var(--purple); box-shadow: 0 14px 30px -20px rgba(37, 28, 48, .35); transform: translateY(-1px); }
+.tm-dept-card.active { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple) inset; }
+.tm-dept-card-icon {
+  flex: none; width: 38px; height: 38px; border-radius: 10px; color: #fff;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
+}
+.tm-dept-card-icon svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tm-dept-card-label { font-family: var(--font-head); font-size: .86rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.tm-dept-add { flex: none; }
+
+/* Stats row — locked "solid white card" recipe (.client-profile-side-card)
+   + gradient icon badge, not the older flat .dash-kpi look. */
+.tm-stats-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.tm-stat-card {
+  flex: 1 1 170px; display: flex; align-items: flex-start; gap: 12px;
+  background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07);
+}
+.tm-stat-icon {
+  flex: none; width: 38px; height: 38px; border-radius: 10px; color: #fff;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
+}
+.tm-stat-icon svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tm-stat-body { min-width: 0; }
+.tm-stat-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.tm-stat-value { font-family: var(--font-head); font-weight: 800; font-size: 1.6rem; color: var(--ink); margin-top: 2px; }
+.tm-stat-sub { font-family: var(--font-body); font-size: .76rem; color: var(--muted); margin-top: 4px; }
+
+.tm-stat-cta {
+  flex: 1 1 220px; display: flex; align-items: flex-start; gap: 12px; text-decoration: none;
+  background: linear-gradient(135deg, #7430b3, #68229e); border-radius: 16px; padding: 16px 18px;
+  box-shadow: 0 8px 20px -6px rgba(105, 35, 159, .45); transition: filter .15s;
+}
+.tm-stat-cta:hover { filter: brightness(1.06); }
+.tm-stat-cta-ic { flex: none; width: 38px; height: 38px; border-radius: 10px; background: rgba(255, 255, 255, .2); color: #fff; display: flex; align-items: center; justify-content: center; }
+.tm-stat-cta-ic svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tm-stat-cta-title { font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: #fff; display: flex; align-items: center; gap: 6px; }
+.tm-stat-cta-title svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tm-stat-cta-sub { font-family: var(--font-body); font-size: .76rem; color: rgba(255, 255, 255, .8); margin-top: 3px; }
+
+/* Toolbar — view switch (список/канбан/календар) + sort + filter + search +
+   "+ Додати задачу", same building blocks as DealsListTab's own toolbar
+   row (.mc-client-search/.task-filter-*, from automationTasksPage.css). */
+.tm-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.tm-view-switch { display: flex; gap: 4px; background: var(--purple-tint); border-radius: 12px; padding: 4px; }
+.tm-view-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; border: none;
+  background: transparent; color: var(--ink-soft); font-family: var(--font-head); font-size: .78rem; font-weight: 700;
+  cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
+}
+.tm-view-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tm-view-btn.active { background: #fff; color: var(--purple); box-shadow: 0 4px 10px -4px rgba(37, 28, 48, .35); }
+
+/* List view — same "click-to-expand compact row" mechanics as Daily
+   Report's .daily-client-grid/.daily-task-grid (reportPage.css), scoped
+   under its own ancestor class since Task Manager's list has its own
+   column set (Задача / Відділ / Категорія / Виконавець / Дедлайн / Етап). */
+.tm-task-grid .client-grid-header { grid-template-columns: 1.6fr .9fr .8fr .7fr 1fr; }
+.tm-task-grid .daily-list-row-main { grid-template-columns: 1.6fr .9fr .8fr .7fr 1fr; }
+.tm-task-grid--all .client-grid-header { grid-template-columns: 1.4fr .8fr .9fr .8fr .7fr 1fr; }
+.tm-task-grid--all .daily-list-row-main { grid-template-columns: 1.4fr .8fr .9fr .8fr .7fr 1fr; }
+/* .client-grid-row defaults to clientsDirectory.css's own 7-column grid —
+   same override DailyCreate.jsx's .daily-client-grid/.daily-task-grid need
+   (reportPage.css) to turn it into the "tinted backdrop behind a flex:1
+   white card" shell instead, so .daily-list-row-main's own grid actually
+   gets the row's full width. */
+.tm-task-grid .client-grid-row {
+  display: flex; align-items: stretch; padding: 0; gap: 0;
+  background: var(--purple-tint); box-shadow: 0 4px 18px rgba(80, 30, 100, .07);
+}
+.tm-task-grid .client-grid-row:hover { box-shadow: 0 10px 28px rgba(80, 30, 100, .14); }
+.tm-task-grid .client-grid-row.expanded .daily-list-row-actions { width: 90px; }
+.tm-task-grid-dept { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); }
+.tm-task-grid-dept-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+/* Calendar view — own month grid (no existing task-specific calendar to
+   reuse; TeamCalendar.jsx's mini-grid is dot-only, this one needs to hold
+   clickable task chips per day). */
+.tm-cal-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.tm-cal-toolbar h3 { font-family: var(--font-head); font-size: 1.05rem; color: var(--ink); text-transform: capitalize; }
+.tm-cal-nav-btn {
+  width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border); background: #fff;
+  color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.tm-cal-nav-btn:hover { border-color: var(--purple); color: var(--purple); }
+.tm-cal-nav-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tm-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.tm-cal-dow { font-family: var(--font-head); font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 0 4px 4px; }
+.tm-cal-cell {
+  min-height: 96px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.tm-cal-cell--blank { background: transparent; border: none; }
+.tm-cal-cell.is-today { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset; }
+.tm-cal-cell-day { font-family: var(--font-head); font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
+.tm-cal-cell.is-today .tm-cal-cell-day { color: var(--purple); }
+.tm-cal-task-chip {
+  display: block; width: 100%; text-align: left; border: none; border-radius: 6px; padding: 3px 6px;
+  font-family: var(--font-body); font-size: .7rem; color: #fff; cursor: pointer; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.tm-cal-more { font-family: var(--font-body); font-size: .68rem; color: var(--muted); }

@@ -54,6 +54,7 @@
   text-align: center;
 }
 .cmp-chart-center b { font-family: var(--font-head); font-weight: 800; font-size: 1.4rem; color: var(--ink); }
+.cmp-chart-center--sm b { font-size: 1rem; }
 .cmp-chart-caption { margin-top: 6px; text-align: center; font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
 
 .cmp-list-row { display: grid; gap: 14px; margin-bottom: 14px; }

@@ -115,25 +115,6 @@
 .acp-2fa-title { font-family: var(--font-head); font-weight: 600; font-size: .86rem; color: var(--ink); }
 .acp-2fa-sub { font-family: var(--font-body); font-size: .76rem; color: var(--muted); margin-top: 2px; }
 
-/* Mini team calendar */
-.mini-cal-card { display: flex; flex-direction: column; gap: 4px; }
-.mini-cal-month { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); margin: 2px 0 8px; }
-.mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.mini-cal-dow { text-align: center; font-family: var(--font-head); font-size: .64rem; font-weight: 700; color: var(--muted); padding-bottom: 4px; }
-.mini-cal-cell {
-  position: relative; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-family: var(--font-body); font-size: .74rem; color: var(--ink-soft); border-radius: 8px;
-}
-.mini-cal-cell--blank { visibility: hidden; }
-.mini-cal-cell.is-today { background: var(--purple-tint); color: var(--purple); font-weight: 700; }
-.mini-cal-dots { display: flex; gap: 2px; margin-top: 2px; }
-.mini-cal-dot { width: 5px; height: 5px; border-radius: 50%; }
-.mini-cal-dot--vacation { background: var(--warn); }
-.mini-cal-dot--sick { background: var(--bad); }
-.mini-cal-legend { display: flex; gap: 14px; margin: 10px 0 4px; font-family: var(--font-body); font-size: .72rem; color: var(--muted); }
-.mini-cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.mini-cal-away-label { margin: 12px 0 8px; font-family: var(--font-head); font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
-
 /* Recent activity */
 .acp-activity-list { display: flex; flex-direction: column; gap: 2px; }
 .acp-activity-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }

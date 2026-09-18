@@ -94,6 +94,27 @@ export function isoWeekRange(dateLike) {
   };
 }
 
+// A Monday-start 6-week (42-cell) grid, including the tail of the previous
+// month and the head of the next one (marked `out: true`) so the grid never
+// changes height between months.
+export function buildMonthGrid(year, month) {
+  const dow = new Date(year, month - 1, 1).getDay();
+  const leading = dow === 0 ? 6 : dow - 1;
+  const total = daysInMonth(year, month);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevTotal = daysInMonth(prevYear, prevMonth);
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+
+  const cells = [];
+  for (let i = leading - 1; i >= 0; i--) cells.push({ day: prevTotal - i, year: prevYear, month: prevMonth, out: true });
+  for (let d = 1; d <= total; d++) cells.push({ day: d, year, month, out: false });
+  let nextDay = 1;
+  while (cells.length < 42) cells.push({ day: nextDay++, year: nextYear, month: nextMonth, out: true });
+  return cells;
+}
+
 export function todayIso() {
   const d = new Date();
   return isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());

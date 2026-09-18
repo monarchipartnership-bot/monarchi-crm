@@ -2,6 +2,102 @@
    .cmp-table (comparePage.css); this file adds the rest: avatars, status
    dots, the grid layout, row menu, and the docked panel with its tabs. */
 
+/* KPI row — icon + value/delta/sub on the left, a decorative graphic (wave/
+   donut/bars) on the right. Cards stay plain white; only the icon badge and
+   the graphic carry color, matching the reference mockup. */
+.client-kpi-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+
+/* Same box as ImportDealsModal's .import-deals-modal — mirrored here rather
+   than shared since the two importers live in different components. */
+.import-contacts-modal { max-width: 640px; width: 100%; }
+
+/* Toolbar above the client grid — no section title, so the search field
+   grows to fill the row instead of sitting at a fixed 220px (that width is
+   still the right default everywhere .mc-client-search sits next to a
+   heading, so it's overridden here rather than in the shared rule). */
+.client-directory-toolbar { width: 100%; margin-bottom: 16px; }
+.client-directory-toolbar .mc-client-search { flex: 1; width: auto; min-width: 220px; }
+@media (max-width: 700px) {
+  .client-directory-toolbar { flex-wrap: wrap; }
+  .client-directory-toolbar .mc-client-search { width: 100%; }
+}
+.client-kpi-card {
+  flex: 1; min-width: 230px; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.client-kpi-left { min-width: 0; }
+.client-kpi-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.client-kpi-icon { flex: none; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.client-kpi-icon svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.client-kpi-icon.blue { background: #EFF6FF; color: #3B82F6; }
+.client-kpi-icon.orange { background: #FFF1E6; color: #F97316; }
+.client-kpi-label { font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); white-space: nowrap; }
+.client-kpi-value-row { display: flex; align-items: center; gap: 8px; }
+.client-kpi-value { font-family: var(--font-head); font-weight: 800; font-size: 1.7rem; color: var(--ink); line-height: 1; white-space: nowrap; }
+.client-kpi-value--text { font-size: 1.3rem; }
+.client-kpi-delta {
+  font-family: var(--font-head); font-weight: 700; font-size: .72rem; color: #16A34A; background: #DCFCE7;
+  padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+}
+.client-kpi-sub { margin-top: 4px; font-family: var(--font-body); font-size: .72rem; color: var(--muted); white-space: nowrap; }
+
+.client-kpi-wave { flex: none; width: 110px; height: 56px; }
+.client-kpi-donut { flex: none; position: relative; width: 76px; height: 76px; }
+.client-kpi-donut svg { width: 100%; height: 100%; }
+.client-kpi-donut-center {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head); font-weight: 800; font-size: .9rem; color: var(--ink);
+}
+.client-kpi-bars { flex: none; display: flex; align-items: flex-end; gap: 4px; height: 56px; width: 90px; }
+.client-kpi-bar { flex: 1; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, #A78BFA, #7C3AED); }
+
+@media (max-width: 1100px) {
+  .client-kpi-wave, .client-kpi-donut, .client-kpi-bars { display: none; }
+}
+
+/* Client list — same "floating rounded card per row" look as the Задачі
+   page's own list (.deal-tasks-grid in dealTasksPage.css), reimplemented
+   under this page's own class names rather than importing that page's
+   stylesheet, so nothing here is coupled to an unrelated page's styles. */
+.client-grid { display: flex; flex-direction: column; gap: 10px; }
+.client-grid-header, .client-grid-row {
+  display: grid; grid-template-columns: 1.7fr .9fr .9fr .9fr .9fr .5fr .9fr;
+  align-items: center; gap: 12px; padding: 0 18px;
+}
+.client-grid-header {
+  padding: 4px 18px 10px; font-family: var(--font-head); font-size: .68rem; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+}
+.client-grid-row {
+  background: #fff; border-radius: 16px; padding: 14px 18px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07); cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.client-grid-row:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(80, 30, 100, .14); }
+.client-grid-row.active { box-shadow: 0 0 0 2px var(--purple) inset, 0 4px 18px rgba(80, 30, 100, .07); }
+.client-grid-name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.client-grid-name-text { min-width: 0; }
+.client-grid-name-text .ink { font-size: .88rem; font-weight: 600; }
+.client-grid-subtitle { font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
+.client-grid-badge {
+  display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-head); font-weight: 700; font-size: .74rem;
+  padding: 4px 10px 4px 6px; border-radius: 20px; white-space: nowrap;
+}
+.client-grid-badge-logo { flex: none; width: 16px; height: 16px; border-radius: 50%; object-fit: cover; }
+/* Platform badge keeps a light tint (not a solid gradient) — the brand logo
+   inside needs a pale background to stay legible against its own colors. */
+.client-grid-badge--platform { padding: 4px 12px 4px 6px; }
+/* Status badge — same light-tint + colored dot recipe as the status pill on
+   the client's own profile card (STATUS_META, clientStatus.js), so the same
+   status always looks identical in both places. */
+.client-grid-status-badge { padding: 4px 12px 4px 8px; }
+.client-grid-status-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.client-grid-plain { font-family: var(--font-body); font-size: .84rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.client-grid-country { display: inline-flex; align-items: center; gap: 6px; }
+.client-grid-country span[class^="fi"] { flex: none; width: 16px; height: 16px; border-radius: 50%; background-size: cover; }
+.client-grid-date { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; color: var(--ink); white-space: nowrap; }
+.client-grid-date svg { flex: none; width: 14px; height: 14px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .tbl-wrap .cmp-table { margin-bottom: 0; }
 .client-row { cursor: pointer; transition: background .12s ease; }
@@ -13,8 +109,9 @@
 
 .client-avatar {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  border-radius: 50%; color: #fff; font-family: var(--font-head); font-weight: 700;
+  border-radius: 50%; color: #fff; font-family: var(--font-head); font-weight: 700; overflow: hidden;
 }
+.client-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .status-dot-wrap { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); }
 
@@ -32,25 +129,12 @@
   font-family: var(--font-body); font-size: .84rem; color: var(--ink); border-radius: 6px; cursor: pointer;
 }
 .row-menu-popover button:hover { background: var(--surface); }
+.row-menu-popover button.danger { color: var(--bad); }
+.row-menu-popover button.danger:hover { background: #FBEAEA; }
 
 .task-filter-reset { margin-top: 10px; width: 100%; }
 
-/* Grid: table on the left, docked panel on the right (only when open) */
 .clients-directory-layout { display: block; }
-.clients-directory-layout.has-panel { display: grid; grid-template-columns: 1fr 380px; align-items: start; gap: 20px; }
-
-.client-panel {
-  position: relative; background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px;
-  box-shadow: 0 12px 32px -20px rgba(37, 28, 48, .3);
-}
-.client-panel-close { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; line-height: 1; }
-.client-panel-close:hover { color: var(--bad); }
-
-.client-panel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-right: 20px; }
-.client-panel-head h3 { font-family: var(--font-head); font-size: 1.05rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
-
-.client-panel-actions { display: flex; gap: 8px; margin-bottom: 14px; }
-.client-panel-actions .btn { flex: 1; text-align: center; }
 
 .client-panel-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; flex-wrap: wrap; }
 .client-panel-tab {
@@ -60,16 +144,14 @@
 .client-panel-tab:hover { color: var(--ink); }
 .client-panel-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
 
-.client-panel-info .task-filter-row { margin-bottom: 10px; }
-.client-panel-info .task-filter-row select,
-.client-panel-info .task-filter-row input,
 .client-profile-info .task-filter-row input {
   width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
   padding: 6px 10px; font-size: .82rem; font-family: var(--font-body); outline: none;
 }
-.client-panel-info .task-filter-row input:focus,
 .client-profile-info .task-filter-row input:focus { border-color: var(--purple); }
-.client-panel-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.client-profile-info .task-filter-row input:disabled {
+  background: var(--surface); color: var(--ink-soft); cursor: default;
+}
 
 .client-history-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
 .client-history-empty { font-family: var(--font-body); font-size: .82rem; color: var(--muted); font-style: italic; }

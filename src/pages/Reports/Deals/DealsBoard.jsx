@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchDeals, fetchAllDeals } from '../../../lib/api/deals';
 import { fetchDealStages } from '../../../lib/api/dealStages';
 import { fetchPipelines } from '../../../lib/api/pipelines';
 import { fetchAllProfiles, profileLabel } from '../../../lib/api/profile';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
+import Select from '../../../components/common/Select';
 import AddDealModal from '../../../components/Deals/AddDealModal';
 import DealDetailModal from '../../../components/Deals/DealDetailModal';
 import StageManagerModal from '../../../components/Deals/StageManagerModal';
 import PipelineManagerModal from '../../../components/Deals/PipelineManagerModal';
-import AllDealTasksModal from '../../../components/Deals/AllDealTasksModal';
 import ImportDealsModal from '../../../components/Deals/ImportDealsModal';
+import ImportNetHuntDealsModal from '../../../components/Deals/ImportNetHuntDealsModal';
 import DealsKanbanTab from './DealsKanbanTab';
 import DealsOverviewTab from './DealsOverviewTab';
 import DealsListTab from './DealsListTab';
@@ -23,13 +24,14 @@ import '../../../styles/clientsDirectory.css';
 import '../../../styles/dealsBoard.css';
 
 const TABS = [
-  { key: 'overview', label: 'Огляд', icon: FIELD_ICONS.barChart },
   { key: 'kanban', label: 'Канбан', icon: FIELD_ICONS.kanban },
   { key: 'list', label: 'Список', icon: FIELD_ICONS.list },
   { key: 'archive', label: 'Архів', icon: FIELD_ICONS.archive },
+  { key: 'overview', label: 'Огляд', icon: FIELD_ICONS.barChart },
 ];
 
 export default function DealsBoard() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState('kanban');
   const [pipelines, setPipelines] = useState([]);
   const [pipelineId, setPipelineId] = useState(null);
@@ -41,10 +43,11 @@ export default function DealsBoard() {
   const [addModalStageId, setAddModalStageId] = useState(null);
   const [stageManagerOpen, setStageManagerOpen] = useState(false);
   const [pipelineManagerOpen, setPipelineManagerOpen] = useState(false);
-  const [tasksModalOpen, setTasksModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [netHuntImportOpen, setNetHuntImportOpen] = useState(false);
   const [viewDeal, setViewDeal] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
 
   function reload() {
     if (!pipelineId) return;
@@ -90,6 +93,16 @@ export default function DealsBoard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Clicking "Угоди" in the sidebar/topbar while a deal is already open
+  // navigates to the same /reports/deals path — React Router still pushes a
+  // new history entry (a fresh `location.key`) for that, but since it's the
+  // same route this component isn't remounted, so nothing else here would
+  // otherwise notice the click and clear `viewDeal` back to the board.
+  useEffect(() => {
+    setViewDeal(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
   function openAddDeal(stageId) {
     setAddModalStageId(stageId || null);
     setAddModalOpen(true);
@@ -115,18 +128,22 @@ export default function DealsBoard() {
             <span className="pipeline-switcher-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.pipeline }} />
             <span className="pipeline-switcher-label">Обрати Pipeline</span>
             <span className="pipeline-switcher-dot" style={{ background: pipelines.find((p) => p.id === pipelineId)?.color || '#7C3AED' }} />
-            <select className="dash-period-select" value={pipelineId || ''} onChange={(e) => setPipelineId(Number(e.target.value))}>
-              {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <Select
+              bare className="dash-period-select" value={pipelineId || ''} onChange={(v) => setPipelineId(Number(v))}
+              options={pipelines.map((p) => ({ value: p.id, label: p.name }))}
+            />
           </div>
           <button type="button" className="btn" onClick={() => setPipelineManagerOpen(true)}>
             <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.settings }} /> Керувати Pipeline
           </button>
-          <button type="button" className="btn" onClick={() => setTasksModalOpen(true)}>
+          <button type="button" className="btn" onClick={() => navigate('/reports/deal-tasks')}>
             <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.checklist }} /> Задачі
           </button>
           <button type="button" className="btn" onClick={() => setImportModalOpen(true)}>
             <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.upload }} /> Імпорт
+          </button>
+          <button type="button" className="btn" onClick={() => setNetHuntImportOpen(true)}>
+            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.upload }} /> Імпорт з NetHunt
           </button>
           <button type="button" className="btn btn-p deals-add-btn" onClick={() => openAddDeal(null)}>
             <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.plus }} /> Додати угоду
@@ -190,16 +207,20 @@ export default function DealsBoard() {
         />
       )}
 
-      {tasksModalOpen && (
-        <AllDealTasksModal profiles={profiles} onClose={() => setTasksModalOpen(false)} />
-      )}
-
       {importModalOpen && (
         <ImportDealsModal
           pipelines={pipelines}
           defaultPipelineId={pipelineId}
           profiles={profiles}
           onClose={() => setImportModalOpen(false)}
+          onImported={reload}
+        />
+      )}
+
+      {netHuntImportOpen && (
+        <ImportNetHuntDealsModal
+          pipelines={pipelines}
+          onClose={() => setNetHuntImportOpen(false)}
           onImported={reload}
         />
       )}

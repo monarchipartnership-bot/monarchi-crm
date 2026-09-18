@@ -7,16 +7,19 @@ export const DEPTS = {
     icon: IC.deptSales,
     items: [
       { key: 'dashboard', name: 'Dashboard', desc: 'Загальна картина по лідах, контрактах і доході: цей тиждень, цей місяць, канали та тренди.', icon: IC.dashboard, type: 'link', to: '/reports/dashboard' },
-      { key: 'taskManager', name: 'Task Manager', desc: 'Daily, Weekly, Monthly — оберіть рівень планування задач.', icon: IC.salesTasks, type: 'link', to: '/reports/tasks' },
+      { key: 'taskManager', name: 'Task Manager', desc: 'Єдиний внутрішній задачник по всій платформі — відділи, статистика, список/канбан/календар.', icon: IC.salesTasks, type: 'link', to: '/tasks' },
       {
-        key: 'reportsManager', name: 'Reports Manager', desc: 'Daily, Weekly, Monthly, Annual та Compare — оберіть тип звіту.', icon: IC.reports, type: 'link', to: '/reports/hub',
-        // The actual report pages live at sibling routes (/reports/daily etc.),
-        // not nested under /reports/hub/, so the sidebar's default prefix-match
+        key: 'reportsManager', name: 'Reports Manager', desc: 'Daily, Weekly, Monthly, Annual та Compare — оберіть тип звіту.', icon: IC.reports, type: 'link', to: '/reports/daily',
+        // Daily Report doubles as this section's landing page (its own
+        // ReportTypeSwitcher lets you jump to Weekly/Monthly/Annual/Compare
+        // from there) — the other report pages are sibling routes, not
+        // nested under /reports/daily/, so the sidebar's default prefix-match
         // active-highlighting can't see them — listed explicitly instead.
         activeMatch: ['/reports/daily', '/reports/weekly', '/reports/monthly', '/reports/annual', '/reports/compare'],
       },
       { key: 'deals', name: 'Угоди', desc: 'Воронка продажів — угоди по стадіях, сума, менеджер, задачі по угоді.', icon: IC.deals, type: 'link', to: '/reports/deals' },
-      { key: 'clientsDirectory', name: 'База клієнтів', desc: 'Єдина картка на кожного клієнта — платформа, тип, історія згадувань у тижневих звітах.', icon: IC.clients, type: 'link', to: '/reports/clients-directory' },
+      { key: 'dealTasks', name: 'Задачі', desc: 'Усі задачі та дзвінки з угод в одному місці — статуси, пріоритети, виконавці.', icon: IC.myTasks, type: 'link', to: '/reports/deal-tasks' },
+      { key: 'clientsDirectory', name: 'Контакти', desc: 'Єдина картка на кожного клієнта — платформа, тип, історія згадувань у тижневих звітах.', icon: IC.clients, type: 'link', to: '/reports/clients-directory' },
     ],
   },
   pm: {
@@ -36,9 +39,6 @@ export const DEPTS = {
     icon: IC.deptAutomation,
     items: [
       { key: 'dashboard', name: 'Dashboard', desc: 'Загальна картина по задачах: сьогодні, вчора, тижні та місяці.', icon: IC.dashboard, type: 'link', to: '/automation/dashboard' },
-      { key: 'tasksDaily', name: 'Daily Tasks', desc: 'Задачі на конкретний день — виконання, перенесення, додавання.', icon: IC.aiDaily, type: 'link', to: '/automation/tasks/daily' },
-      { key: 'tasksWeekly', name: 'Weekly Tasks', desc: 'Розподіл задач на тиждень по днях і підсумок виконання.', icon: IC.aiWeek, type: 'link', to: '/automation/tasks/weekly' },
-      { key: 'tasksMonthly', name: 'Monthly Tasks', desc: 'Сукупність усіх задач, запланованих за місяць.', icon: IC.aiMonth, type: 'link', to: '/automation/tasks/monthly' },
     ],
   },
   team: {

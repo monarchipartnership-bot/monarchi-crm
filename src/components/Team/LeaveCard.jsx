@@ -1,3 +1,5 @@
+import { leaveTypeInfo } from '../../lib/leaveTypes';
+
 function personLabel(p) {
   if (!p) return null;
   const full = `${p.first_name || ''} ${p.last_name || ''}`.trim();
@@ -19,6 +21,7 @@ export default function LeaveCard({ row, profile, onCancel, onApprove, onReject 
   const name = personLabel(profile) || row.email;
   const photo = profile?.photo;
   const isPending = row.status === 'pending';
+  const typeInfo = leaveTypeInfo(row.type);
 
   return (
     <div className="leave-card">
@@ -30,7 +33,10 @@ export default function LeaveCard({ row, profile, onCancel, onApprove, onReject 
         <div className="leave-dates">{fmtIsoDate(row.date_start)} — {fmtIsoDate(row.date_end)}{row.reason ? ` · ${row.reason}` : ''}</div>
       </div>
       <div className="leave-tags">
-        <span className={'tag ' + (row.type === 'sick' ? 'sick' : 'vacation')}>{row.type === 'sick' ? 'Лікарняний' : 'Відпустка'}</span>
+        <span className="tag type-tag" style={{ color: typeInfo.color, background: typeInfo.tint, border: `1px solid ${typeInfo.color}4D` }}>
+          <span className="type-tag-ic" dangerouslySetInnerHTML={{ __html: typeInfo.icon }} />
+          {typeInfo.label}
+        </span>
         {row.status && row.status !== 'approved' && (
           <span className={'tag ' + row.status}>{row.status === 'pending' ? 'На розгляді' : 'Відхилено'}</span>
         )}

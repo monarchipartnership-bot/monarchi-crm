@@ -1,0 +1,128 @@
+.myreq-hero-row { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 22px; }
+.myreq-hero-title-row { display: flex; align-items: flex-start; gap: 14px; }
+.myreq-hero-ic {
+  flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.myreq-hero-ic svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.myreq-hero-title-row h1 { margin: 0; }
+.myreq-hero-title-row .sub { margin: 2px 0 0; }
+.myreq-hero-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.myreq-hero-actions .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; margin-right: 4px; vertical-align: -2px; }
+
+.myreq-kpi-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.myreq-kpi-card {
+  flex: 1; min-width: 230px; border-radius: 14px; padding: 18px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+}
+.myreq-kpi-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.myreq-kpi-ic {
+  flex: none; width: 38px; height: 38px; border-radius: 10px; background: rgba(255, 255, 255, .7);
+  display: flex; align-items: center; justify-content: center;
+}
+.myreq-kpi-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.myreq-kpi-label { font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); white-space: nowrap; }
+.myreq-kpi-value-row { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.myreq-kpi-value { font-family: var(--font-head); font-weight: 800; font-size: 1.65rem; color: var(--ink); line-height: 1; }
+.myreq-kpi-delta {
+  font-family: var(--font-head); font-size: .68rem; font-weight: 700; color: var(--ok); background: #fff;
+  padding: 2px 7px; border-radius: 10px; white-space: nowrap;
+}
+.myreq-kpi-sub { font-family: var(--font-body); font-size: .72rem; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.myreq-kpi-spark { flex: none; display: flex; align-items: flex-end; gap: 3px; height: 34px; }
+.myreq-kpi-bar { width: 5px; border-radius: 2px 2px 0 0; }
+
+@media (max-width: 900px) {
+  .myreq-kpi-spark { display: none; }
+}
+
+.myreq-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.myreq-tab {
+  border: 1px solid var(--border); background: #fff; color: var(--ink-soft); cursor: pointer;
+  padding: 8px 14px; border-radius: 20px; display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-head); font-weight: 600; font-size: .8rem; transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.myreq-tab:hover { border-color: var(--purple); color: var(--purple); }
+.myreq-tab.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+.myreq-tab-count {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--purple-tint); color: var(--purple);
+  display: inline-flex; align-items: center; justify-content: center; font-size: .7rem;
+}
+.myreq-tab.active .myreq-tab-count { background: rgba(255, 255, 255, .25); color: #fff; }
+
+.type-picker { position: relative; min-width: 220px; }
+.type-picker-trigger {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .88rem; color: var(--ink); transition: border-color .15s ease;
+}
+.type-picker-trigger:hover { border-color: var(--purple); }
+.type-picker-trigger > span:nth-child(2) { flex: 1; }
+.type-picker-chevron { flex: none; width: 14px; height: 14px; color: var(--muted); display: inline-flex; }
+.type-picker-chevron svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.type-picker-ic {
+  flex: none; width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+}
+.type-picker-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.type-picker-menu {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: 100%; min-width: 240px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 6px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35); display: flex; flex-direction: column; gap: 2px;
+  transform-origin: top left;
+  animation: dropdownIn .16s cubic-bezier(.4, 0, .2, 1) both;
+}
+.type-picker-menu.closing { animation: dropdownOut .14s cubic-bezier(.4, 0, .2, 1) both; }
+.type-picker-row {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; border: none; background: none;
+  padding: 7px 8px; border-radius: 8px; cursor: pointer; font-family: var(--font-body); font-size: .86rem; color: var(--ink);
+}
+.type-picker-row:hover { background: var(--surface); }
+.type-picker-row.active { background: var(--purple-tint); font-weight: 600; }
+
+.myreq-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-bottom: 18px; }
+.myreq-filters .pf { min-width: 150px; }
+.myreq-keyword { flex: 1; min-width: 220px; }
+.myreq-keyword .mc-client-search { width: 100%; }
+/* .pf input's own padding (projectsPage.css) can win the cascade over
+   .mc-client-search's icon-reserving padding-left depending on load order —
+   scope a higher-specificity override here so the icon never sits under
+   the placeholder text. */
+.myreq-keyword .mc-client-search input { padding-left: 33px; }
+.myreq-reset-wrap { flex: none; }
+.myreq-reset-label { visibility: hidden; }
+.myreq-reset { flex: none; }
+.myreq-reset svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; margin-right: 4px; vertical-align: -2px; }
+
+.myreq-reason-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.myreq-actions-col { width: 64px; white-space: nowrap; }
+.myreq-actions-col .row-menu-btn { display: inline-flex; }
+/* .row-menu-btn svg's own fill:currentColor (clientsDirectory.css) is
+   tuned for a dot-based icon elsewhere — these are outline icons and need
+   their own higher-specificity stroke rendering, not a solid fill. */
+.myreq-eye-btn svg, .myreq-cancel-btn svg {
+  fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.myreq-cancel-btn:hover { color: var(--bad); }
+
+.myreq-form-submit { width: 100%; margin-top: 4px; justify-content: center; }
+
+/* .tmodal-body's own scrollbar (once the date-picker dropdown makes the
+   form taller than the modal) otherwise squares off .tmodal-box's rounded
+   bottom-right corner — clip to the box's own radius instead. */
+.myreq-form-box { overflow: hidden; }
+
+.myreq-expand-row td { background: var(--surface); padding: 0; }
+.myreq-expand-body { padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 20px; }
+.myreq-expand-item { display: flex; align-items: flex-start; gap: 10px; min-width: 180px; flex: 1; }
+.myreq-expand-ic {
+  flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.myreq-expand-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.myreq-expand-label { font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.myreq-expand-value { margin-top: 3px; font-family: var(--font-body); font-size: .84rem; color: var(--ink); line-height: 1.4; word-break: break-word; }
+
+@media (max-width: 640px) {
+  .myreq-filters .pf { min-width: 100%; }
+}

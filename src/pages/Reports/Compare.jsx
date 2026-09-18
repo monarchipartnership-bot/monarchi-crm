@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WeekPicker from '../../components/Reports/Weekly/WeekPicker';
+import ReportTypeSwitcher from '../../components/Reports/ReportTypeSwitcher';
 import CompareBlock from '../../components/Reports/Weekly/CompareBlock';
 import CompareListBlock from '../../components/Reports/Weekly/CompareListBlock';
 import { fetchReportByWeekStart } from '../../lib/api/weeklyReports';
@@ -367,6 +368,7 @@ export default function ReportsCompare() {
 
   return (
     <div className="report-page reports-compare-page" ref={pageRef}>
+      {!exportingJPEG && <ReportTypeSwitcher />}
       <div className="page-actions">
         <button type="button" className="btn" onClick={() => (reportType ? setReportType(null) : navigate(-1))}>
           &#8592; {reportType ? 'Змінити тип звіту' : 'Back'}

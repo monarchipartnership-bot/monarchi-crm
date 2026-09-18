@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import ClientPicker from '../Clients/ClientPicker';
+import Select from '../common/Select';
+import DatePicker from '../common/DatePicker';
 import { createDeal } from '../../lib/api/deals';
 import { updateClientDirectoryEntry } from '../../lib/api/clients';
 import { fetchDealStages } from '../../lib/api/dealStages';
@@ -89,9 +91,10 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.pipeline }} />
               <div className="wk-field-body">
                 <label>Pipeline</label>
-                <select value={pipelineId} onChange={(e) => setPipelineId(Number(e.target.value))}>
-                  {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <Select
+                  bare value={pipelineId} onChange={(v) => setPipelineId(Number(v))}
+                  options={pipelines.map((p) => ({ value: p.id, label: p.name }))}
+                />
               </div>
             </div>
 
@@ -99,7 +102,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
               <div className="wk-field-body">
                 <label>Contact</label>
-                <ClientPicker value={client?.id} onChange={handleClientChange} placeholder="Пошук клієнта..." defaultPlatform={activePipeline?.name} />
+                <ClientPicker value={client?.id} onChange={handleClientChange} placeholder="Пошук клієнта..." defaultPlatform={activePipeline?.name} manager={manager} />
               </div>
             </div>
 
@@ -141,9 +144,10 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.status }} />
                   <div className="wk-field-body">
                     <label>Стадія</label>
-                    <select value={stageId} onChange={(e) => setStageId(e.target.value)}>
-                      {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
+                    <Select
+                      bare value={stageId} onChange={setStageId}
+                      options={stages.map((s) => ({ value: s.id, label: s.label }))}
+                    />
                   </div>
                 </div>
 
@@ -151,11 +155,10 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.currency }} />
                   <div className="wk-field-body">
                     <label>Валюта</label>
-                    <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="UAH">UAH</option>
-                    </select>
+                    <Select
+                      bare value={currency} onChange={setCurrency}
+                      options={[{ value: 'USD', label: 'USD' }, { value: 'EUR', label: 'EUR' }, { value: 'UAH', label: 'UAH' }]}
+                    />
                   </div>
                 </div>
 
@@ -163,10 +166,10 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.owner }} />
                   <div className="wk-field-body">
                     <label>Owner</label>
-                    <select value={manager} onChange={(e) => setManager(e.target.value)}>
-                      <option value="">Не призначено</option>
-                      {profiles.map((p) => <option key={p.email} value={p.label}>{p.label}</option>)}
-                    </select>
+                    <Select
+                      bare value={manager} onChange={setManager}
+                      options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.label, label: p.label }))]}
+                    />
                   </div>
                 </div>
 
@@ -174,7 +177,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
                   <div className="wk-field-body">
                     <label>Очікуване закриття</label>
-                    <input type="date" value={expectedClose} onChange={(e) => setExpectedClose(e.target.value)} />
+                    <DatePicker bare value={expectedClose} onChange={setExpectedClose} />
                   </div>
                 </div>
               </>

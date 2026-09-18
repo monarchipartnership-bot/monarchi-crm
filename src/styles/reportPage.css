@@ -3,6 +3,78 @@
 
 .page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
 .page-actions .sp { flex: 1; }
+
+/* Daily Report's own "Клієнти" AND "Задачі" lists reuse ClientsDirectory's
+   .client-grid row (clientsDirectory.css) — same "Контакти" list look the
+   user asked for applied by analogy to both — each trimmed to its own
+   column set via its own `.daily-*-grid` scope. Clicking a row doesn't open
+   an edit modal directly — it expands the row (see below) to reveal quick
+   actions; a pencil icon inside that panel opens the real edit affordance
+   (AddClientModal for clients, TaskDetailModal for tasks). */
+.daily-client-grid .client-grid-header { grid-template-columns: 1.4fr .9fr 1fr 1.1fr 28px; }
+.daily-client-grid .del-btn { position: static; opacity: 0; }
+.daily-client-grid .client-grid-row:hover .del-btn { opacity: 1; }
+.daily-task-grid .client-grid-header { grid-template-columns: 1fr 150px; }
+/* Overdue task — same "tinted stage card" recipe as the day-strip/kanban
+   columns, just in red instead of the row's usual purple-tint backdrop, so
+   an overdue task reads as urgent at a glance instead of blending in. */
+.daily-task-grid .client-grid-row.overdue {
+  background: color-mix(in srgb, var(--bad) 12%, #fff);
+  box-shadow: 0 4px 18px -4px color-mix(in srgb, var(--bad) 35%, transparent);
+}
+.daily-task-grid .client-grid-row.overdue:hover {
+  box-shadow: 0 10px 28px -6px color-mix(in srgb, var(--bad) 45%, transparent);
+}
+
+/* Click-to-expand row — the outer `.client-grid-row` becomes the "tinted
+   backdrop" (locked design system: light-purple tint, like `.wk-side-today`)
+   that's normally fully hidden behind `.daily-list-row-main`, the actual
+   white card (own radius/shadow, moved here from the old plain
+   `.client-grid-row` rule). `.daily-list-row-main` is a flex:1 item next
+   to `.daily-list-row-actions` (flex:none, width 0→auto) — growing the
+   actions panel naturally shrinks the white card to make room, instead of
+   overlaying a translucent panel on top of it (which read as "cards
+   overlapping", not "card sliding away"). The `.daily-client-grid`/
+   `.daily-task-grid` ancestor prefix (2 classes) is needed to beat
+   clientsDirectory.css's own same-specificity `.client-grid-row` rules
+   regardless of which stylesheet happens to load last, and lets each list
+   set its own column count on the shared `.daily-list-row-main` grid. */
+.daily-client-grid .client-grid-row,
+.daily-task-grid .client-grid-row {
+  display: flex; align-items: stretch; padding: 0; gap: 0;
+  background: var(--purple-tint); box-shadow: 0 4px 18px rgba(80, 30, 100, .07);
+}
+.daily-client-grid .client-grid-row:hover,
+.daily-task-grid .client-grid-row:hover { box-shadow: 0 10px 28px rgba(80, 30, 100, .14); }
+.daily-list-row-main {
+  flex: 1; min-width: 0; display: grid; align-items: center; gap: 12px;
+  padding: 14px 18px; background: #fff; border-radius: 16px;
+  transition: margin-right .25s ease; position: relative; z-index: 1;
+}
+.daily-client-grid .daily-list-row-main { grid-template-columns: 1.4fr .9fr 1fr 1.1fr 28px; }
+.daily-task-grid .daily-list-row-main { grid-template-columns: 1fr auto; }
+/* Status cell holds 1-2 pills (the usual done/pending one, plus a
+   "Протерміновано" one when overdue) — auto-width column + flex row lets it
+   grow only when the overdue pill is actually present. */
+.daily-task-status-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.daily-list-row-actions {
+  flex: none; width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: width .25s ease;
+}
+.daily-client-grid .client-grid-row.expanded .daily-list-row-actions { width: 130px; }
+.daily-task-grid .client-grid-row.expanded .daily-list-row-actions { width: 160px; }
+.daily-list-row-actions .deal-field-icon-btn { flex: none; }
+
+/* Задачі row — leading colored tag icon (same recipe as the old
+   .daily-task-icon), badges row under the title reusing the shared
+   TaskBadges component so due-status/priority/tags/recurrence stay
+   consistent with every other task list in the app. */
+.daily-task-grid-icon {
+  width: 34px; height: 34px; border-radius: 9px; color: #fff; flex: none;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px -3px rgba(37, 28, 48, .4);
+}
+.daily-task-grid-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.daily-task-grid .client-grid-name-text .task-badges { margin-top: 4px; }
 /* Two canonical button tiers, both "matte" (flat fills, soft shadows, no
    gloss) — .btn is the additional/secondary action (light matte purple),
    .btn-p is the important/primary one (bright matte purple gradient).
@@ -37,6 +109,27 @@
 }
 .btn-p:hover { background: linear-gradient(90deg, #7430b3 0%, #68229e 100%); border-color: transparent; color: #fff; filter: brightness(1.06); box-shadow: 0 8px 20px rgba(105, 35, 159, .3); }
 
+/* Report-type switcher (ReportTypeSwitcher.jsx) — pinned above the hero on
+   whichever report page currently doubles as the section's landing page.
+   Same "floating white box" language as .hub-card, but a compact row
+   instead of a grid, with our-style gradient icon badges instead of the
+   flat purple-tint ones (this row is a peer/sibling picker, not a one-off
+   accent, so it gets the full brand icon treatment). */
+.report-type-switcher { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
+.report-type-card {
+  flex: 1 1 190px; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px; text-decoration: none;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.report-type-card:hover { border-color: var(--purple); box-shadow: 0 14px 30px -20px rgba(37, 28, 48, .35); transform: translateY(-1px); }
+.report-type-card.active { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple) inset; }
+.report-type-card-icon {
+  flex: none; width: 38px; height: 38px; border-radius: 10px; color: #fff;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
+}
+.report-type-card-icon svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.report-type-card-label { font-family: var(--font-head); font-size: .86rem; font-weight: 700; color: var(--ink); }
+
 /* report header */
 .rpt-hero { margin-bottom: 22px; }
 .rpt-hero h1 { font-family: var(--font-head); font-weight: 700; font-size: clamp(26px, 4.4vw, 36px); letter-spacing: -.02em; margin-bottom: 14px; color: var(--ink); }
@@ -44,9 +137,6 @@
 .rpt-hero-heading h1 { margin-bottom: 0; }
 .rpt-hero-icon { flex: none; width: 46px; height: 46px; border-radius: 12px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; }
 .rpt-hero-icon svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.rpt-hero-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
-.mgr-select { width: 100%; font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; outline: none; cursor: pointer; }
-.mgr-select:focus { border-color: var(--purple); }
 .rpt-hero p.sub { font-family: var(--font-body); font-size: .9rem; color: var(--muted); max-width: 620px; line-height: 1.55; }
 /* Sales Daily Report — Рік/Місяць/День inline on the title row, same pattern
    as Automation's Daily/Monthly Tasks (.month-period-picker/.wk-field-box). */
@@ -54,7 +144,8 @@
 .weekly-report-page .rpt-hero-top-row,
 .monthly-report-page .rpt-hero-top-row,
 .annual-report-page .rpt-hero-top-row,
-.deals-page .rpt-hero-top-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
+.deals-page .rpt-hero-top-row,
+.deal-tasks-page .rpt-hero-top-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
 .rpt-sub-row { display: flex; flex-wrap: wrap; gap: 26px; align-items: center; }
 .rpt-sub { display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .86rem; color: var(--muted); }
 .rpt-sub svg { width: 16px; height: 16px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; flex-shrink: 0; }
@@ -74,8 +165,85 @@
 .rpt-sub input:focus { border-bottom-color: var(--purple); }
 
 /* month/week fullness bar shell — shared card wrapper reused by
-   MonthFullness (day pills) and WeekFullness (circle stepper) below. */
+   WeekFullness (circle stepper) below. Daily Report's own equivalent
+   (DailyReportHero.jsx) has its own dedicated classes just below instead,
+   since it also carries the page title/icon, not just the day picker. */
 .fullness { margin: 22px 0 24px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+
+/* Daily Report's combined title + month-nav + day-strip header
+   (DailyReportHero.jsx) — replaces the old separate rpt-hero title row and
+   MonthFullness day grid. Icon badge, the current day AND the over/done
+   status pills all use our solid-gradient recipe now (color-mix off the
+   same --bad/--ok tokens used everywhere else) instead of pale flat tints
+   — only "future" (nothing to report yet) stays a plain neutral surface. */
+.daily-hero { display: flex; align-items: center; gap: 24px; background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 18px 22px; margin-bottom: 22px; flex-wrap: wrap; }
+.daily-hero-title { display: flex; align-items: center; gap: 14px; flex: none; }
+.daily-hero-icon {
+  flex: none; width: 46px; height: 46px; border-radius: 12px; color: #fff; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 8px 18px -6px rgba(124, 58, 237, .45);
+}
+.daily-hero-icon svg { width: 23px; height: 23px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.daily-hero-title h1 { font-family: var(--font-head); font-weight: 700; font-size: 1.3rem; color: var(--ink); margin: 0 0 2px; }
+.daily-hero-title p { font-family: var(--font-body); font-size: .82rem; color: var(--muted); margin: 0; }
+
+.daily-hero-calendar { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding-left: 22px; border-left: 1px solid var(--border); }
+.daily-hero-nav { display: flex; align-items: center; gap: 10px; }
+.daily-hero-nav-btn { flex: none; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border); background: #fff; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: border-color .15s, color .15s; }
+.daily-hero-nav-btn:hover { border-color: var(--purple); color: var(--purple); }
+.daily-hero-nav-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.daily-hero-nav-label { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: var(--ink); min-width: 150px; }
+.daily-hero-season-ic { flex: none; width: 17px; height: 17px; display: inline-flex; }
+.daily-hero-season-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Wrapper positions the two carousel arrows over the strip's edges instead
+   of relying on the native scrollbar (removed below) — wheel-scroll is
+   wired up in JS (redirects vertical wheel delta to scrollLeft). */
+.daily-hero-days-wrap { position: relative; display: flex; align-items: center; gap: 8px; }
+/* No `scroll-behavior: smooth` here on purpose — the wheel handler sets
+   scrollLeft directly on every tick, and smooth-scrolling would queue each
+   tick into its own animation, fighting the next one instead of just
+   tracking the wheel. The arrow buttons and auto-centering already ask
+   for smooth explicitly per call (scrollBy/scrollIntoView's own `behavior`
+   option), so they're unaffected. */
+/* padding top/bottom — `overflow-x: auto` forces overflow-y to clip too
+   (CSS Overflow spec), so without this a pill's hover lift (translateY)
+   gets cut off flush against the container's own edge instead of lifting
+   cleanly above it. */
+.daily-hero-days { display: flex; gap: 8px; padding: 4px 0; overflow-x: auto; scrollbar-width: none; }
+.daily-hero-days::-webkit-scrollbar { display: none; }
+.daily-hero-scroll-btn {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; box-shadow: 0 6px 14px -6px rgba(37, 28, 48, .25);
+  transition: border-color .15s, color .15s, transform .15s;
+}
+.daily-hero-scroll-btn:hover { border-color: var(--purple); color: var(--purple); transform: scale(1.06); }
+.daily-hero-scroll-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.daily-hero-day {
+  flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 46px; height: 56px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 0;
+  transition: transform .15s, border-color .15s;
+}
+.daily-hero-day:hover { transform: translateY(-2px); border-color: var(--purple); }
+.daily-hero-day-num { font-family: var(--font-head); font-weight: 700; font-size: .88rem; color: var(--ink); }
+.daily-hero-day-wd { font-family: var(--font-body); font-size: .64rem; color: var(--muted); text-transform: uppercase; }
+
+.daily-hero-day.over { background: linear-gradient(135deg, color-mix(in srgb, var(--bad) 45%, #fff), var(--bad)); border-color: transparent; }
+.daily-hero-day.over .daily-hero-day-num, .daily-hero-day.over .daily-hero-day-wd { color: #fff; }
+.daily-hero-day.done { background: linear-gradient(135deg, color-mix(in srgb, var(--ok) 45%, #fff), var(--ok)); border-color: transparent; }
+.daily-hero-day.done .daily-hero-day-num, .daily-hero-day.done .daily-hero-day-wd { color: #fff; }
+/* Weekends never expect a report — plain white, never red even if past
+   and never filled in, so they don't read as "missed". */
+.daily-hero-day.weekend { background: #fff; border-color: var(--border); }
+.daily-hero-day.weekend .daily-hero-day-num { color: var(--ink-soft); }
+
+.daily-hero-day.cur { background: linear-gradient(135deg, #A78BFA, #7C3AED); border-color: transparent; box-shadow: 0 8px 18px -6px rgba(124, 58, 237, .45); }
+.daily-hero-day.cur .daily-hero-day-num, .daily-hero-day.cur .daily-hero-day-wd { color: #fff; }
+
+@media (max-width: 900px) {
+  .daily-hero { flex-direction: column; align-items: stretch; }
+  .daily-hero-calendar { padding-left: 0; border-left: none; padding-top: 14px; border-top: 1px solid var(--border); }
+}
 
 /* Weekly Report's WeekFullness redesign — a circle stepper (one node per
    week, connected by a line) + an overall completion stat on the right. */
@@ -96,46 +264,6 @@
 .wk-stepper-bar { height: 6px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
 .wk-stepper-bar-fill { height: 100%; background: var(--purple); border-radius: 4px; }
 
-/* Sales Daily Report's own MonthFullness redesign — day pills (number +
-   status dot) with a days-in-month stat and a vertical legend on the right.
-   Reuses the shared `.fullness` card shell but its own inner classes (mf-*),
-   so WeekFullness's fullness-head/wdots-full layout above is untouched. */
-.mf-title { font-family: var(--font-head); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--purple); margin-bottom: 16px; }
-.mf-row { display: flex; gap: 22px; }
-.mf-days { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px; padding-right: 22px; border-right: 1px solid var(--border); }
-.mf-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 42px; height: 58px; border-radius: 14px; border: 1px solid var(--border); background: #fff; cursor: pointer; padding: 0; flex: none; transition: transform .15s, border-color .15s; }
-.mf-day:hover { transform: translateY(-2px); }
-.mf-day-num { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink-soft); }
-.mf-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
-.mf-day.over { background: #FBEAEA; border-color: rgba(209, 67, 67, .3); }
-.mf-day.over .mf-day-num { color: var(--bad); }
-.mf-day.over .mf-day-dot { background: var(--bad); }
-.mf-day.done { background: var(--purple-tint); border-color: rgba(107, 47, 160, .3); }
-.mf-day.done .mf-day-num { color: var(--purple); }
-.mf-day.done .mf-day-dot { background: var(--purple); }
-.mf-day.future .mf-day-num { color: var(--muted); }
-.mf-day.future .mf-day-dot { background: var(--border); }
-.mf-day.cur { background: #fff; border: 2px solid var(--purple-deep); }
-.mf-day.cur .mf-day-num { color: var(--purple-deep); font-weight: 800; }
-.mf-day.cur .mf-day-dot { background: var(--purple-deep); }
-.mf-side { flex: none; width: 200px; display: flex; flex-direction: column; gap: 20px; justify-content: center; }
-.mf-stat { display: flex; align-items: center; gap: 12px; }
-.mf-stat-icon { flex: none; width: 40px; height: 40px; border-radius: 11px; background: var(--purple-tint); display: flex; align-items: center; justify-content: center; }
-.mf-stat-icon svg { width: 20px; height: 20px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.mf-stat-body { display: flex; flex-direction: column; gap: 1px; }
-.mf-stat-body b { font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; color: var(--ink); }
-.mf-stat-body span { font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
-.mf-legend { display: flex; flex-direction: column; gap: 9px; }
-.mf-legend-item { display: flex; align-items: center; gap: 7px; font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
-.mf-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.mf-legend-dot.over { background: var(--bad); }
-.mf-legend-dot.done { background: var(--purple); }
-.mf-legend-dot.future { background: var(--surface-2); border: 1px solid var(--border); }
-@media (max-width: 700px) {
-  .mf-row { flex-direction: column; }
-  .mf-days { padding-right: 0; border-right: none; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-  .mf-side { width: auto; flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
-}
 .wdot.done { background: var(--purple); border-color: var(--purple); }
 .wdot.over { background: var(--bad); border-color: var(--bad); }
 .wdot.cur { outline: 2px solid var(--purple-deep); outline-offset: 2px; }
@@ -176,7 +304,14 @@
 
 /* section titles */
 .stitle { font-family: var(--font-head); font-size: 1.55rem; font-weight: 700; letter-spacing: -.01em; margin: 6px 0 4px; color: var(--ink); display: flex; align-items: center; gap: 12px; }
-.stitle-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--purple-tint); color: var(--purple); display: flex; align-items: center; justify-content: center; flex: none; }
+/* Gradient icon badge (locked design system) — was a flat purple-tint
+   square; every report section header (Клієнти/Задачі/etc. on Daily/Weekly/
+   Monthly/Annual) shares this one class, so this upgrades all of them at
+   once instead of just the one section that prompted it. */
+.stitle-icon {
+  width: 34px; height: 34px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #A78BFA, #7C3AED); color: #fff; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
+}
 .stitle-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .report-section { margin-bottom: 8px; padding-top: 6px; scroll-margin-top: 24px; }
 
@@ -208,6 +343,24 @@
 .cf textarea { font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; line-height: 1.5; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; outline: none; resize: none; overflow: hidden; min-height: 34px; width: 100%; }
 .cf textarea:focus { border-color: var(--purple); }
 .cf-wide { flex: 1; min-width: 220px; }
+
+/* Ім'я клієнта's live directory search (EditableClientList.jsx) — a
+   dropdown of matches under the growing textarea, same look as
+   ClientPicker.jsx's own suggestion list but its own classes since the
+   surrounding markup differs (no dedicated input, just the shared
+   AutoResizeTextarea + .cf/.wk-field-box wrapper). */
+.client-name-field { position: relative; }
+.client-name-linked { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-family: var(--font-body); font-size: .72rem; font-weight: 600; color: var(--ok); }
+.client-name-suggestions {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 20; margin-top: 4px; max-height: 220px; overflow-y: auto;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35);
+}
+.client-name-suggestions button {
+  display: block; width: 100%; text-align: left; border: none; background: none; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .84rem; color: var(--ink); cursor: pointer;
+}
+.client-name-suggestions button:hover { background: var(--surface); }
+.client-name-suggestions .hint { color: var(--muted); }
 
 /* final Save row */
 .save-row { display: flex; justify-content: flex-end; margin-top: 32px; padding-top: 22px; border-top: 1px solid var(--border); }
@@ -337,12 +490,20 @@
 .dash-kpi-plan { font-family: var(--font-body); font-size: .76rem; color: var(--muted); margin-top: 2px; }
 
 /* Weekly Report channel tabs (Manual Bidding / Invites / ... / GetMany) */
-.chan-tabs { display: flex; gap: 4px; background: var(--surface); border-radius: 12px; padding: 4px; overflow-x: auto; margin: 14px 0; }
+/* `flex: none` — its own `overflow-x: auto` would otherwise give it an
+   automatic minimum size of 0 (per the flexbox spec) wherever it sits inside
+   another flex container that's short on space (e.g. a modal's scrollable
+   .tmodal-body), letting it get crushed down to a sliver instead of keeping
+   its natural pill-row height. */
+.chan-tabs { flex: none; display: flex; gap: 4px; background: var(--surface); border-radius: 12px; padding: 4px; overflow-x: auto; margin: 14px 0; }
 .chan-tab { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 9px; font-family: var(--font-head); font-weight: 600; font-size: .84rem; color: var(--ink-soft); cursor: pointer; white-space: nowrap; background: transparent; border: none; transition: background .15s, color .15s; }
 .chan-tab svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .chan-tab-logo { width: 15px; height: 15px; object-fit: contain; border-radius: 3px; flex: none; }
 .chan-tab:hover { background: #fff; }
 .chan-tab.active { background: var(--purple); color: #fff; }
+.chan-tab:disabled { cursor: default; opacity: .55; }
+.chan-tab:disabled:hover { background: transparent; }
+.chan-tab.active:disabled:hover { background: var(--purple); }
 
 /* Weekly Report — Рік/Місяць/Тиждень inline on the title row, same pattern
    as Automation's Daily/Monthly Tasks (.month-period-picker/.wk-field-box),
@@ -500,7 +661,7 @@ body.capturing .save-row {
 }
 
 @media print {
-  .sidebar, .page-actions, .rpt-hero-actions, .menu-btn, .crumbs { display: none !important; }
+  .sidebar, .page-actions, .wk-dl-row, .menu-btn, .crumbs { display: none !important; }
   .main { padding: 0 !important; }
   .report-page { background: #fff !important; color: #111; }
   .add-btn, .del-btn, .save-row { display: none !important; }

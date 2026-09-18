@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import MonthlyChannelBlock from '../../../components/Reports/Monthly/MonthlyChannelBlock';
+import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
 import MonthlyFinanceSection from '../../../components/Reports/Monthly/MonthlyFinanceSection';
 import MonthGrid from '../../../components/Reports/Annual/MonthGrid';
 import MonthDetailModal from '../../../components/Reports/Annual/MonthDetailModal';
@@ -158,6 +159,7 @@ export default function AnnualCreate() {
 
   return (
     <div className="report-page annual-report-page" ref={pageRef}>
+      {!capturing && <ReportTypeSwitcher />}
       <section className="rpt-hero">
         <div className="rpt-hero-top-row">
           <div className="rpt-hero-heading">

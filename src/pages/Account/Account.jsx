@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import LeaveCard from '../../components/Team/LeaveCard';
-import MiniTeamCalendar from '../../components/Account/MiniTeamCalendar';
+import MyRequestsPanel from '../../components/Account/MyRequestsPanel';
+import DatePicker from '../../components/common/DatePicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { wishOfTheDay } from '../../lib/greeting';
 import {
-  fetchProfile, saveProfile, fetchMyLeaveRequests, submitLeaveRequest,
-  cancelLeaveRequest, fetchPendingQueue, reviewLeaveRequest, markPasswordSet,
+  fetchProfile, saveProfile, fetchMyLeaveRequests,
+  fetchPendingQueue, reviewLeaveRequest, markPasswordSet,
 } from '../../lib/api/profile';
 import { fetchProfilesByEmails } from '../../lib/api/leaveRequests';
 import { logActivity, fetchRecentActivityForUser } from '../../lib/api/activityLog';
@@ -25,6 +26,15 @@ const PERSON_ICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><pat
 const EDIT_ICON = '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const LOCK_ICON = '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 const SHIELD_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/></svg>';
+const INFO_ICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 11h1v5h1"/></svg>';
+const CAKE_ICON = '<svg viewBox="0 0 24 24"><path d="M4 21v-7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7"/><path d="M4 21h16"/><path d="M8 12V8M12 12V8M16 12V9"/><path d="M8 5.5c0-1 .6-1.5.6-2S8 2 8 2M12 5.5c0-1 .6-1.5.6-2S12 2 12 2"/></svg>';
+const PACKAGE_ICON = '<svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>';
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+}
 
 function initials(name, email) {
   if (name?.trim()) return name.trim()[0].toUpperCase();
@@ -58,16 +68,22 @@ export default function Account() {
   const fileInputRef = useRef(null);
   const avatarMenuRef = useRef(null);
 
-  const [form, setForm] = useState({ first_name: '', last_name: '', position: '', phone: '', location: '', role: 'member' });
+  const [form, setForm] = useState({
+    first_name: '', last_name: '', position: '', phone: '', location: '', role: 'member',
+    extra_email: '', extra_phone: '', birth_date: '', nova_poshta: '',
+  });
   const [photo, setPhoto] = useState(null);
+  // Snapshot of the last saved values — "Скасувати" reverts unsaved edits
+  // back to this (not to blank defaults), so real saved data is never lost.
+  const [savedForm, setSavedForm] = useState(form);
+  const [savedPhoto, setSavedPhoto] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [saveMsg, setSaveMsg] = useState({ text: '', error: false });
   const [saving, setSaving] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
 
   const [myRequests, setMyRequests] = useState([]);
-  const [reqForm, setReqForm] = useState({ type: 'vacation', start: '', end: '', reason: '' });
-  const [submitting, setSubmitting] = useState(false);
+  const [requestsLoaded, setRequestsLoaded] = useState(false);
 
   const [isManager, setIsManager] = useState(false);
   const [pendingQueue, setPendingQueue] = useState([]);
@@ -98,9 +114,15 @@ export default function Account() {
           phone: p?.phone || '',
           location: p?.location || '',
           role: p?.role || 'member',
+          extra_email: p?.extra_email || '',
+          extra_phone: p?.extra_phone || '',
+          birth_date: p?.birth_date || '',
+          nova_poshta: p?.nova_poshta || '',
         };
         setForm(loaded);
+        setSavedForm(loaded);
         setPhoto(p?.photo || null);
+        setSavedPhoto(p?.photo || null);
         setIsManager(p?.role === 'ops_manager');
       } catch (e) {
         console.warn('loadProfile failed', e);
@@ -121,8 +143,13 @@ export default function Account() {
     function onDocClick(e) {
       if (avatarMenuRef.current && !avatarMenuRef.current.contains(e.target)) setAvatarMenuOpen(false);
     }
+    function onKeyDown(e) { if (e.key === 'Escape') setAvatarMenuOpen(false); }
     document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [avatarMenuOpen]);
 
   async function reloadMyRequests() {
@@ -130,6 +157,8 @@ export default function Account() {
       setMyRequests(await fetchMyLeaveRequests(email));
     } catch (e) {
       console.warn('loadMyRequests failed', e);
+    } finally {
+      setRequestsLoaded(true);
     }
   }
 
@@ -161,6 +190,8 @@ export default function Account() {
     try {
       await saveProfile({ email, ...form, photo, updated_at: new Date().toISOString() });
       setIsManager(form.role === 'ops_manager');
+      setSavedForm(form);
+      setSavedPhoto(photo);
       setSaveMsg({ text: 'Збережено', error: false });
       setTimeout(() => setSaveMsg({ text: '', error: false }), 2500);
       logActivity('account', 'profile_updated', {}, email);
@@ -175,10 +206,12 @@ export default function Account() {
     }
   }
 
-  // "Скасувати" only collapses the panel — nothing is written to the
-  // database until "Зберегти зміни" is clicked, so there is nothing to
-  // revert here; it just clears the one-shot password fields.
+  // "Скасувати" discards any unsaved edits — reverts to the last actually
+  // saved snapshot (not blank defaults, so real saved data is never lost)
+  // — then closes the panel.
   function handleCancelEdit() {
+    setForm(savedForm);
+    setPhoto(savedPhoto);
     setNewPassword('');
     setConfirmPassword('');
     setPwMsg({ text: '', error: false });
@@ -206,32 +239,9 @@ export default function Account() {
     }
   }
 
-  async function handleSubmitRequest() {
-    if (!reqForm.start || !reqForm.end) { alert('Оберіть дату початку і закінчення.'); return; }
-    if (reqForm.end < reqForm.start) { alert('Дата закінчення не може бути раніше дати початку.'); return; }
-    setSubmitting(true);
-    try {
-      await submitLeaveRequest({ email, ...reqForm });
-      setReqForm({ type: 'vacation', start: '', end: '', reason: '' });
-      await reloadMyRequests();
-      logActivity('account', 'leave_request_created', { type: reqForm.type }, email);
-      reloadActivity();
-    } catch (e) {
-      console.warn('submitRequest failed', e);
-      alert('Не вдалося подати заявку.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleCancel(id) {
-    try {
-      await cancelLeaveRequest(id);
-      await reloadMyRequests();
-    } catch (e) {
-      console.warn('cancelRequest failed', e);
-      alert('Не вдалося скасувати заявку.');
-    }
+  function handleRequestsChanged() {
+    reloadMyRequests();
+    reloadActivity();
   }
 
   async function handleReview(id, status) {
@@ -285,6 +295,10 @@ export default function Account() {
               <div className="acp-contact-row"><span dangerouslySetInnerHTML={{ __html: MAIL_ICON }} />{email}</div>
               {form.phone && <div className="acp-contact-row"><span dangerouslySetInnerHTML={{ __html: PHONE_ICON }} />{form.phone}</div>}
               {form.location && <div className="acp-contact-row"><span dangerouslySetInnerHTML={{ __html: PIN_ICON }} />{form.location}</div>}
+              {form.extra_email && <div className="acp-contact-row"><span dangerouslySetInnerHTML={{ __html: MAIL_ICON }} />{form.extra_email}</div>}
+              {form.extra_phone && <div className="acp-contact-row"><span dangerouslySetInnerHTML={{ __html: PHONE_ICON }} />{form.extra_phone}</div>}
+              {form.birth_date && <div className="acp-contact-row"><span dangerouslySetInnerHTML={{ __html: CAKE_ICON }} />{fmtDate(form.birth_date)}</div>}
+              {form.nova_poshta && <div className="acp-contact-row"><span dangerouslySetInnerHTML={{ __html: PACKAGE_ICON }} />{form.nova_poshta}</div>}
             </div>
 
             <p className="acp-quote">&laquo;{wishOfTheDay()}&raquo;</p>
@@ -364,6 +378,18 @@ export default function Account() {
                 <div className="acp-divider" />
 
                 <div className="acp-subgroup-head">
+                  <span className="acp-subgroup-ic" dangerouslySetInnerHTML={{ __html: INFO_ICON }} />
+                  <span className="acp-subgroup-title">Додаткова інформація</span>
+                </div>
+                <div className="profile-fields">
+                  <div className="pf"><label>Додатковий email</label><input type="text" value={form.extra_email} onChange={(e) => setField('extra_email', e.target.value)} placeholder="напр. особиста скринька" /></div>
+                  <div className="pf"><label>Додатковий номер</label><input type="text" value={form.extra_phone} onChange={(e) => setField('extra_phone', e.target.value)} placeholder="+380..." /></div>
+                  <div className="pf"><label>Дата народження</label><DatePicker value={form.birth_date} onChange={(iso) => setField('birth_date', iso)} /></div>
+                  <div className="pf"><label>Адреса Нової пошти</label><input type="text" value={form.nova_poshta} onChange={(e) => setField('nova_poshta', e.target.value)} placeholder="напр. м. Київ, відділення №1" /></div>
+                </div>
+                <div className="acp-divider" />
+
+                <div className="acp-subgroup-head">
                   <span className="acp-subgroup-ic" dangerouslySetInnerHTML={{ __html: LOCK_ICON }} />
                   <span className="acp-subgroup-title">Безпека</span>
                 </div>
@@ -403,7 +429,9 @@ export default function Account() {
             )}
           </section>
 
-          <MiniTeamCalendar />
+          <div className="acp-card">
+            <MyRequestsPanel rows={myRequests} loading={!requestsLoaded} onChanged={handleRequestsChanged} />
+          </div>
 
           <div className="acp-card">
             <div className="pulse-card__head" style={{ marginBottom: 4 }}>
@@ -430,32 +458,6 @@ export default function Account() {
           </div>
         </div>
       </div>
-
-      <section className="report-section" id="my-requests-section">
-        <div className="stitle">Мої заявки</div>
-        <div className="req-form">
-          <div className="pf">
-            <label>Тип</label>
-            <select value={reqForm.type} onChange={(e) => setReqForm((f) => ({ ...f, type: e.target.value }))}>
-              <option value="vacation">Відпустка</option>
-              <option value="sick">Лікарняний</option>
-            </select>
-          </div>
-          <div className="pf"><label>Дата з</label><input type="date" value={reqForm.start} onChange={(e) => setReqForm((f) => ({ ...f, start: e.target.value }))} /></div>
-          <div className="pf"><label>Дата по</label><input type="date" value={reqForm.end} onChange={(e) => setReqForm((f) => ({ ...f, end: e.target.value }))} /></div>
-          <div className="pf pf-full"><label>Коментар (необов&#39;язково)</label><input type="text" value={reqForm.reason} onChange={(e) => setReqForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Коротко про причину" /></div>
-          <button type="button" className="btn btn-p" onClick={handleSubmitRequest} disabled={submitting}>
-            {submitting ? '...' : '+ Подати заявку'}
-          </button>
-        </div>
-        <div className="leave-list">
-          {!myRequests.length ? (
-            <div className="leave-empty">Ви ще не подавали заявок.</div>
-          ) : (
-            myRequests.map((r) => <LeaveCard key={r.id} row={r} profile={{ first_name: form.first_name, last_name: form.last_name, photo }} onCancel={handleCancel} />)
-          )}
-        </div>
-      </section>
 
       {isManager && (
         <section className="report-section">

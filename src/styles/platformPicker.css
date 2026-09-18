@@ -1,0 +1,37 @@
+/* PlatformPicker — same recipe as "Мій кабінет"'s leave-type picker
+   (.type-picker*, myRequestsPage.css), just showing a logo image per row
+   instead of a tinted SVG icon box. */
+.platform-picker { position: relative; min-width: 160px; }
+.platform-picker-trigger {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .88rem; color: var(--ink); transition: border-color .15s ease;
+}
+.platform-picker-trigger:hover { border-color: var(--purple); }
+.platform-picker--disabled .platform-picker-trigger { cursor: default; }
+.platform-picker--disabled .platform-picker-trigger:hover { border-color: var(--border); }
+/* Used inline in an already-compact context (e.g. the profile hero's quick
+   field strip) that doesn't want its own visible box — same idea as
+   Select.jsx's `bare`. */
+.platform-picker--bare .platform-picker-trigger { border: none; background: transparent; padding: 0; }
+.platform-picker-label, .platform-picker-placeholder { flex: 1; min-width: 0; }
+.platform-picker-placeholder { color: var(--muted); }
+.platform-picker-chevron { flex: none; width: 14px; height: 14px; color: var(--muted); display: inline-flex; }
+.platform-picker-chevron svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.platform-picker-ic { flex: none; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+
+.platform-picker-menu {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: 100%; min-width: 200px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 6px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35); display: flex; flex-direction: column; gap: 2px;
+  max-height: 320px; overflow-y: auto;
+  transform-origin: top left;
+  animation: dropdownIn .16s cubic-bezier(.4, 0, .2, 1) both;
+}
+.platform-picker-menu.closing { animation: dropdownOut .14s cubic-bezier(.4, 0, .2, 1) both; }
+.platform-picker-row {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; border: none; background: none;
+  padding: 7px 8px; border-radius: 8px; cursor: pointer; font-family: var(--font-body); font-size: .86rem; color: var(--ink);
+}
+.platform-picker-row:hover { background: var(--surface); }
+.platform-picker-row.active { background: var(--purple-tint); font-weight: 600; }

@@ -36,7 +36,7 @@ export async function saveDailyReport({ year, month, day, name, done, clients, p
     _version: 3,
     name,
     done: done.map((it) => ({ id: it.id, text: it.text, tag: it.tag || '' })),
-    clients: clients.map((it) => ({ platform: it.platform, leadType: it.leadType, name: it.name, text: it.text })),
+    clients: clients.map((it) => ({ platform: it.platform, leadType: it.leadType, name: it.name, title: it.title || '', text: it.text, clientId: it.clientId || null })),
     plans: plans.map((it) => ({ id: it.id, text: it.text, tag: it.tag || '', priority: it.priority || '' })),
   };
   const payload = {

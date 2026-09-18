@@ -1,9 +1,18 @@
 import { supabase } from '../supabaseClient';
 
-// Task Reports (Automation Department) — a normalized `tasks` table, one row
-// per task, mutated immediately per action (no batch "Save" button like the
-// numeric report pages) since tasks need independent per-item edits and
-// cross-period queries (a task can move out of the week it was planned for).
+// Task Manager — a normalized `tasks` table, one row per task, mutated
+// immediately per action (no batch "Save" button) since tasks need
+// independent per-item edits and cross-period queries (a task can move out
+// of the week it was planned for).
+//
+// `department_id`/`stage_id` (FKs to `departments`/`task_stages`) are the
+// source of truth for which department owns a task and where it sits in
+// that department's own pipeline — see taskStages.js's moveTaskStage. The
+// legacy `department` (text) and `status` (text) columns are kept in sync
+// for any not-yet-migrated reader but are no longer written by anything new
+// in this file except via that same sync. A task with `department_id=null`
+// is a deal/client-tied task (see dealId/clientId below) — outside every
+// department, never shown in Task Manager.
 //
 // `planned_date` is immutable — the day/week a task was ORIGINALLY planned
 // for; Weekly/Monthly views group by this. `task_date` is mutable — the day
@@ -22,21 +31,19 @@ function nowIso() {
 export const ACTIVITY_TYPES = [
   { value: 'task', label: 'Задача', icon: 'checklist' },
   { value: 'call', label: 'Дзвінок', icon: 'phone' },
-  { value: 'meeting', label: 'Зустріч', icon: 'meeting' },
   { value: 'email', label: 'Email', icon: 'email' },
-  { value: 'deadline', label: 'Дедлайн', icon: 'deadline' },
 ];
 
-// All tasks currently sitting on a given day (Daily Tasks view).
-// `department` scopes to 'automation' (default, backward-compatible),
-// 'sales', or 'pm' — one shared engine reused across departments rather
-// than a parallel table per department.
-export async function fetchTasksForDay(dateIso, department = 'automation') {
+// All tasks currently sitting on a given day (Daily Tasks view). Scoped by
+// `departmentId` (Task Manager's departments table) — a deal/client-tied
+// task always has `department_id = null` and never shows up here; those
+// live in fetchTasksForDeal/fetchTasksForClient/fetchAllDealTasks instead.
+export async function fetchTasksForDay(dateIso, departmentId) {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .eq('task_date', dateIso)
-    .eq('department', department)
+    .eq('department_id', departmentId)
     .order('created_at', { ascending: true });
   if (error) throw error;
   return data ?? [];
@@ -45,25 +52,25 @@ export async function fetchTasksForDay(dateIso, department = 'automation') {
 // Just the count for a day (head-count query, no rows) — used for the
 // "+N від вчора" delta on Daily Tasks' stats bar so it doesn't need to pull
 // yesterday's full task rows just to measure how many there were.
-export async function fetchTaskCountForDay(dateIso, department = 'automation') {
+export async function fetchTaskCountForDay(dateIso, departmentId) {
   const { count, error } = await supabase
     .from('tasks')
     .select('id', { count: 'exact', head: true })
     .eq('task_date', dateIso)
-    .eq('department', department);
+    .eq('department_id', departmentId);
   if (error) { console.warn('fetchTaskCountForDay failed', error); return 0; }
   return count ?? 0;
 }
 
 // Tasks originally planned for this week (Weekly Tasks view's own rows —
 // shown under their original day regardless of where task_date has since moved).
-export async function fetchTasksForWeek(startIso, endIso, department = 'automation') {
+export async function fetchTasksForWeek(startIso, endIso, departmentId) {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .gte('planned_date', startIso)
     .lte('planned_date', endIso)
-    .eq('department', department)
+    .eq('department_id', departmentId)
     .order('planned_date', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -72,36 +79,46 @@ export async function fetchTasksForWeek(startIso, endIso, department = 'automati
 
 // Tasks planned for an EARLIER week but currently sitting on a day within
 // this week — i.e. carried in from a previous week's overflow.
-export async function fetchCarriedInTasks(startIso, endIso, department = 'automation') {
+export async function fetchCarriedInTasks(startIso, endIso, departmentId) {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .gte('task_date', startIso)
     .lte('task_date', endIso)
     .lt('planned_date', startIso)
-    .eq('department', department)
+    .eq('department_id', departmentId)
     .order('task_date', { ascending: true });
   if (error) throw error;
   return data ?? [];
 }
 
 // All tasks planned within a month (Monthly Tasks rollup).
-export async function fetchTasksForMonth(startIso, endIso, department = 'automation') {
+export async function fetchTasksForMonth(startIso, endIso, departmentId) {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .gte('planned_date', startIso)
     .lte('planned_date', endIso)
-    .eq('department', department)
+    .eq('department_id', departmentId)
     .order('planned_date', { ascending: true });
   if (error) throw error;
   return data ?? [];
 }
 
+// `departmentId`/`stageId` are the Task Manager pipeline fields — omit both
+// for a deal/client-tied task (CreateDealTaskModal.jsx/DealDetailModal.jsx),
+// which stays outside every department. When `departmentId` is given but
+// `stageId` isn't, resolves that department's first (position 1) stage —
+// same convenience as deals.js's createDeal.
 export async function createTask({
-  text, plannedDate, taskDate, assigneeEmail, priority, tags, subtasks, department = 'automation', clientId, dealId, createdByEmail,
+  text, plannedDate, taskDate, assigneeEmail, priority, tags, subtasks, departmentId, stageId, clientId, dealId, createdByEmail,
   activityType, scheduledAt, durationMinutes,
 }) {
+  let sid = stageId;
+  if (!sid && departmentId) {
+    const { data: firstStage } = await supabase.from('task_stages').select('id').eq('department_id', departmentId).order('position', { ascending: true }).limit(1).maybeSingle();
+    sid = firstStage?.id || null;
+  }
   const payload = {
     text,
     planned_date: plannedDate ?? null,
@@ -111,7 +128,8 @@ export async function createTask({
     priority: priority || null,
     tags: tags?.length ? tags : [],
     subtasks: subtasks?.length ? subtasks : [],
-    department,
+    department_id: departmentId || null,
+    stage_id: sid || null,
     client_id: clientId || null,
     deal_id: dealId || null,
     created_by_email: createdByEmail || null,
@@ -130,6 +148,14 @@ export async function createTask({
 export async function fetchTasksForDeal(dealId) {
   const { data, error } = await supabase.from('tasks').select('*').eq('deal_id', dealId).order('created_at', { ascending: false });
   if (error) { console.warn('fetchTasksForDeal failed', error); return []; }
+  return data ?? [];
+}
+
+// Tasks linked directly to a client (not via a deal) — used by the client
+// profile's own stats row.
+export async function fetchTasksForClient(clientId) {
+  const { data, error } = await supabase.from('tasks').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
+  if (error) { console.warn('fetchTasksForClient failed', error); return []; }
   return data ?? [];
 }
 
@@ -216,9 +242,15 @@ export function datesForRule(startDateIso, rule, occurrences) {
 // a fixed batch up front rather than a live background job, since the app
 // has no server to run one. `fetchSeriesFutureCount` + a manual "continue
 // series" action top it back up later if it runs low.
-export async function createRecurringSeries({ text, startDate, rule, assigneeEmail, priority, tags, subtasks, department = 'automation', clientId, createdByEmail }) {
+export async function createRecurringSeries({ text, startDate, rule, assigneeEmail, priority, tags, subtasks, departmentId, clientId, createdByEmail }) {
   const dates = datesForRule(startDate, rule);
   const [firstDate, ...restDates] = dates;
+
+  let stageId = null;
+  if (departmentId) {
+    const { data: firstStage } = await supabase.from('task_stages').select('id').eq('department_id', departmentId).order('position', { ascending: true }).limit(1).maybeSingle();
+    stageId = firstStage?.id || null;
+  }
 
   const basePayload = {
     text,
@@ -227,7 +259,8 @@ export async function createRecurringSeries({ text, startDate, rule, assigneeEma
     assignee_email: assigneeEmail || null,
     priority: priority || null,
     tags: tags?.length ? tags : [],
-    department,
+    department_id: departmentId || null,
+    stage_id: stageId,
     client_id: clientId || null,
     created_by_email: createdByEmail || null,
     updated_at: nowIso(),
@@ -326,14 +359,14 @@ export async function cancelTask(id, reason) {
 
 // Tasks that were originally planned for this day but have since been moved
 // to a different day — still pending there, shown here as a "moved out" log.
-export async function fetchMovedOutTasks(dateIso, department = 'automation') {
+export async function fetchMovedOutTasks(dateIso, departmentId) {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .eq('planned_date', dateIso)
     .neq('task_date', dateIso)
     .eq('status', 'pending')
-    .eq('department', department)
+    .eq('department_id', departmentId)
     .order('task_date', { ascending: true });
   if (error) throw error;
   return data ?? [];
@@ -356,23 +389,35 @@ export async function deleteTask(id) {
 // Tasks with no date at all — the "Без дати" backlog. Only ever created via
 // WeeklyTasks' creation form; Daily/Monthly's own fetches are date-scoped so
 // backlog rows can never appear there.
-export async function fetchBacklogTasks(department = 'automation') {
+// Task Manager's own fetch — every department-owned task (deal/client-tied
+// tasks have department_id = NULL and are never included), not scoped to
+// any date range. `departmentId` null/undefined means "Всі задачі": every
+// task across every department.
+export async function fetchTasksForDepartment(departmentId) {
+  let query = supabase.from('tasks').select('*').order('task_date', { ascending: true, nullsFirst: false });
+  query = departmentId ? query.eq('department_id', departmentId) : query.not('department_id', 'is', null);
+  const { data, error } = await query;
+  if (error) { console.warn('fetchTasksForDepartment failed', error); return []; }
+  return data ?? [];
+}
+
+export async function fetchBacklogTasks(departmentId) {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .is('task_date', null)
-    .eq('department', department)
+    .eq('department_id', departmentId)
     .order('created_at', { ascending: true });
   if (error) throw error;
   return data ?? [];
 }
 
-export async function fetchTasksSince(sinceIso, department = 'automation') {
+export async function fetchTasksSince(sinceIso, departmentId) {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .or(`planned_date.gte.${sinceIso},task_date.gte.${sinceIso}`)
-    .eq('department', department)
+    .eq('department_id', departmentId)
     .order('task_date', { ascending: true });
   if (error) throw error;
   return data ?? [];

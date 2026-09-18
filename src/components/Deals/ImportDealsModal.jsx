@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
+import Select from '../common/Select';
 import { createDeal } from '../../lib/api/deals';
 import { fetchDealStages } from '../../lib/api/dealStages';
 import { fetchClientDirectory, upsertClientDirectoryEntry } from '../../lib/api/clients';
 import { normText } from '../../lib/monthlyAggregation';
+import { STATUSES } from '../../lib/clientStatus';
 
 // Universal CSV importer — no source system is hard-coded (works for a
 // NetHunt export just as well as anything else) since the user maps each
@@ -137,7 +139,7 @@ export default function ImportDealsModal({ pipelines, defaultPipelineId, profile
       try {
         let client = directory.find((c) => c.name_key === normText(row.clientName));
         if (!client) {
-          client = await upsertClientDirectoryEntry({ name: row.clientName, platform: pipeline?.name });
+          client = await upsertClientDirectoryEntry({ name: row.clientName, platform: pipeline?.name, status: STATUSES[0], manager: row.owner || '' });
           if (!client) { skipped.push({ reason: `Не вдалося створити клієнта «${row.clientName}»` }); continue; }
           directory.push(client);
           createdClients++;
@@ -192,17 +194,19 @@ export default function ImportDealsModal({ pipelines, defaultPipelineId, profile
               <p>Файл: <b>{fileName}</b> · {rows.length} рядків</p>
 
               <label style={{ marginTop: 10 }}>Pipeline для імпорту</label>
-              <select value={pipelineId} onChange={(e) => setPipelineId(Number(e.target.value))}>
-                {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <Select
+                value={pipelineId} onChange={(v) => setPipelineId(Number(v))}
+                options={pipelines.map((p) => ({ value: p.id, label: p.name }))}
+              />
 
               <div className="import-map-list" style={{ marginTop: 14 }}>
                 {headers.map((h) => (
                   <div className="import-map-row" key={h}>
                     <span className="import-map-header">{h}</span>
-                    <select value={columnMap[h]} onChange={(e) => setColumnMap((m) => ({ ...m, [h]: e.target.value }))}>
-                      {TARGET_FIELDS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                    </select>
+                    <Select
+                      value={columnMap[h]} onChange={(v) => setColumnMap((m) => ({ ...m, [h]: v }))}
+                      options={TARGET_FIELDS}
+                    />
                   </div>
                 ))}
               </div>

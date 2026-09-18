@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { normText } from '../monthlyAggregation';
 import { fetchWeeklyRowsBetween } from './weeklyReports';
+import { splitClientName } from '../clientName';
 
 // Canonical client directory — a synced index on top of what Weekly Report
 // already saves into weekly_reports.data.clients, not a replacement of it.
@@ -17,12 +18,21 @@ import { fetchWeeklyRowsBetween } from './weeklyReports';
 // client-side rather than computed in SQL.
 // Returns the upserted row (used by WeeklyCreate.jsx's autosave to also
 // ensure the client has an open deal — see deals.js's fetchOpenDealForClient).
-export async function upsertClientDirectoryEntry({ name, platform, leadType, manager }) {
+// `status` is the client's real lifecycle stage (STATUSES in clientStatus.js
+// — Новий/В роботі/Активний/На зв'язку/Втрачений), the same field shown as
+// the pill on ClientProfile.jsx/ClientsDirectory.jsx. Every creation surface
+// (WeeklyCreate/DailyCreate/MonthlyCreate autosave, ClientPicker's inline
+// quick-add, ImportDealsModal, CreateClientModal) passes it now — there is
+// no separate "lead type" concept any more.
+export async function upsertClientDirectoryEntry({ name, platform, status, manager }) {
   const trimmed = (name || '').trim();
   const key = normText(trimmed);
   if (!trimmed || !key) return null;
+  // The report's own name field is one combined "First Last" string — split
+  // it so the profile's separate Ім'я/Прізвище columns come pre-filled.
+  const { name: firstName, lastName } = splitClientName(trimmed);
   const { data, error } = await supabase.from('clients').upsert(
-    { name: trimmed, name_key: key, platform, lead_type: leadType, manager: manager || null, updated_at: new Date().toISOString() },
+    { name: firstName, last_name: lastName || null, name_key: key, platform, status, manager: manager || null, updated_at: new Date().toISOString() },
     { onConflict: 'name_key' },
   ).select().single();
   if (error) { console.warn('upsertClientDirectoryEntry failed', error); return null; }
@@ -33,6 +43,27 @@ export async function fetchClientDirectory() {
   const { data, error } = await supabase.from('clients').select('*').order('updated_at', { ascending: false });
   if (error) { console.warn('fetchClientDirectory failed', error); return []; }
   return data ?? [];
+}
+
+// Plain insert for a brand-new client row — used by the manual "Створити
+// контакт" form and the NetHunt contacts importer, both of which already
+// resolve their own name_key dedup before calling this (unlike
+// upsertClientDirectoryEntry, which exists for the report-autosave/quick-add
+// flows and always upserts by name_key).
+export async function createClientDirectoryEntry(fields) {
+  const { data, error } = await supabase.from('clients').insert(fields).select().single();
+  if (error) { console.warn('createClientDirectoryEntry failed', error); throw error; }
+  return data;
+}
+
+// Real, permanent removal of a client row — the caller (ClientProfile.jsx)
+// confirms with the user first and warns if the client still has open
+// deals, since those rows aren't cascade-deleted here (client_id on
+// deals/tasks/notes has no FK constraint, so they'd just be orphaned, not
+// deleted, if left behind).
+export async function deleteClientDirectoryEntry(id) {
+  const { error } = await supabase.from('clients').delete().eq('id', id);
+  if (error) { console.warn('deleteClientDirectoryEntry failed', error); throw error; }
 }
 
 export async function fetchClientById(id) {

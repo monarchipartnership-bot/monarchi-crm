@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { fmtDate } from '../../lib/dateHelpers';
+import DatePicker from '../common/DatePicker';
 
 function isoToDMY(iso) {
   if (!iso) return '';
@@ -70,11 +71,11 @@ export default function DateRangePicker({ range, onChange }) {
           </div>
           <div className="task-filter-row">
             <label>Від</label>
-            <input type="date" value={draft.start} onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))} />
+            <DatePicker style={{ flex: 1 }} value={draft.start} onChange={(v) => setDraft((d) => ({ ...d, start: v }))} />
           </div>
           <div className="task-filter-row">
             <label>До</label>
-            <input type="date" value={draft.end} onChange={(e) => setDraft((d) => ({ ...d, end: e.target.value }))} />
+            <DatePicker style={{ flex: 1 }} value={draft.end} onChange={(v) => setDraft((d) => ({ ...d, end: v }))} />
           </div>
           <button type="button" className="btn btn-p" onClick={() => apply(draft)}>Застосувати</button>
         </div>

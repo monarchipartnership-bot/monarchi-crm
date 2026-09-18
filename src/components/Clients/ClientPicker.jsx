@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchClientDirectory, upsertClientDirectoryEntry } from '../../lib/api/clients';
-import { CLIENT_PLATFORMS, CLIENT_TYPES } from '../../lib/reportConstants';
+import { CLIENT_PLATFORMS } from '../../lib/reportConstants';
+import { STATUSES } from '../../lib/clientStatus';
+import Select from '../common/Select';
+import PlatformPicker from '../common/PlatformPicker';
 
 // Search-and-pick dropdown over the already-small client directory — filters
 // client-side rather than querying per keystroke. `value` is the selected
 // client's id; `onChange(client)` fires with the full row (or null on clear).
 // `defaultPlatform` pre-fills the inline "create new client" form's platform
 // select (e.g. with whatever Pipeline the caller currently has chosen, since
-// pipeline names match CLIENT_PLATFORMS).
-export default function ClientPicker({ value, onChange, placeholder = 'Пошук клієнта...', defaultPlatform }) {
+// pipeline names match CLIENT_PLATFORMS). `manager` (a profile label, same
+// shape as a deal's own Owner field) is passed straight through to the new
+// client row, so a contact quick-created while adding a deal starts out
+// owned by whoever that deal is assigned to — same "unify contact creation"
+// shape as WeeklyCreate.jsx's own autosave.
+export default function ClientPicker({ value, onChange, placeholder = 'Пошук клієнта...', defaultPlatform, manager }) {
   const [clients, setClients] = useState([]);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPlatform, setNewPlatform] = useState(defaultPlatform || CLIENT_PLATFORMS[0]);
-  const [newType, setNewType] = useState(CLIENT_TYPES[0]);
+  const [newStatus, setNewStatus] = useState(STATUSES[0]);
   const [saving, setSaving] = useState(false);
   const wrapRef = useRef(null);
 
@@ -49,7 +56,7 @@ export default function ClientPicker({ value, onChange, placeholder = 'Пошу�
   function openCreate() {
     setNewName(query.trim());
     setNewPlatform(defaultPlatform || CLIENT_PLATFORMS[0]);
-    setNewType(CLIENT_TYPES[0]);
+    setNewStatus(STATUSES[0]);
     setCreating(true);
   }
 
@@ -58,7 +65,7 @@ export default function ClientPicker({ value, onChange, placeholder = 'Пошу�
     if (!name) return;
     setSaving(true);
     try {
-      const client = await upsertClientDirectoryEntry({ name, platform: newPlatform, leadType: newType });
+      const client = await upsertClientDirectoryEntry({ name, platform: newPlatform, status: newStatus, manager });
       if (client) {
         await reloadClients();
         pick(client);
@@ -109,15 +116,11 @@ export default function ClientPicker({ value, onChange, placeholder = 'Пошу�
           </div>
           <div className="task-filter-row">
             <label>Платформа</label>
-            <select value={newPlatform} onChange={(e) => setNewPlatform(e.target.value)}>
-              {CLIENT_PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
+            <PlatformPicker value={newPlatform} onChange={setNewPlatform} />
           </div>
           <div className="task-filter-row">
-            <label>Тип</label>
-            <select value={newType} onChange={(e) => setNewType(e.target.value)}>
-              {CLIENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <label>Статус</label>
+            <Select value={newStatus} onChange={setNewStatus} options={STATUSES.map((s) => ({ value: s, label: s }))} />
           </div>
           <div className="client-picker-create-actions">
             <button type="button" className="btn" onClick={() => setCreating(false)}>Назад</button>

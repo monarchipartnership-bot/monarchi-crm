@@ -28,31 +28,54 @@
 @media (max-width: 720px) { .deals-board { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 480px) { .deals-board { grid-template-columns: 1fr; } }
 
+/* Matches the tinted "KPI card" convention used elsewhere (Мої заявки,
+   leave-type tags) — a soft wash of the stage's own color instead of a flat
+   grey box with a hard top-border stripe, computed live via color-mix so it
+   works for any color a pipeline's stages happen to use. */
 .deals-column {
-  background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--stage-color, var(--purple));
-  border-radius: 12px; padding: 10px; min-height: 140px; transition: border-color .12s ease, background .12s ease;
+  --tint: color-mix(in srgb, var(--stage-color, var(--purple)) 9%, #fff);
+  --tint-strong: color-mix(in srgb, var(--stage-color, var(--purple)) 22%, #fff);
+  --tint-border: color-mix(in srgb, var(--stage-color, var(--purple)) 24%, var(--border));
+  background: var(--tint); border: 1px solid var(--tint-border);
+  border-radius: 16px; padding: 14px; min-height: 140px;
+  box-shadow: 0 10px 24px -18px color-mix(in srgb, var(--stage-color, var(--purple)) 50%, transparent);
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
 }
-.deals-column.drag-over { border-color: var(--purple); border-top-color: var(--purple); background: var(--purple-tint); }
+.deals-column.drag-over { border-color: var(--stage-color, var(--purple)); background: var(--tint-strong); }
 
 .deals-column-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  font-family: var(--font-head); font-weight: 700; font-size: .74rem; color: var(--ink); margin-bottom: 10px;
+  font-family: var(--font-head); font-weight: 700; font-size: .76rem; margin-bottom: 12px;
 }
-.deals-column-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.deals-column-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.deals-column-label { display: flex; align-items: center; gap: 7px; min-width: 0; color: color-mix(in srgb, var(--stage-color, var(--purple)) 80%, var(--ink)); }
+.deals-column-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--stage-color, var(--purple));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--stage-color, var(--purple)) 22%, transparent);
+}
+.deals-column-count {
+  flex: none; font-family: var(--font-head); font-weight: 700; font-size: .68rem; line-height: 1.5;
+  color: color-mix(in srgb, var(--stage-color, var(--purple)) 85%, var(--ink)); background: var(--tint-strong);
+  border-radius: 20px; padding: 2px 8px;
+}
 
 .deals-column-body { display: flex; flex-direction: column; gap: 8px; }
+.deals-column .wk-add-task-btn:hover { border-color: var(--stage-color, var(--purple)); color: color-mix(in srgb, var(--stage-color, var(--purple)) 80%, var(--ink)); }
 
 .deal-card {
   background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: grab;
-  transition: box-shadow .12s ease, border-color .12s ease;
+  transition: box-shadow .12s ease, border-color .12s ease, transform .12s ease;
 }
-.deal-card:hover { border-color: var(--purple); box-shadow: 0 6px 16px -10px rgba(37, 28, 48, .3); }
+.deal-card:hover {
+  border-color: color-mix(in srgb, var(--stage-color, var(--purple)) 55%, var(--border));
+  box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--stage-color, var(--purple)) 45%, rgba(37, 28, 48, .3));
+  transform: translateY(-1px);
+}
 .deal-card-name { font-family: var(--font-head); font-weight: 700; font-size: .82rem; color: var(--ink); }
 .deal-card-sub { font-family: var(--font-body); font-size: .72rem; color: var(--muted); margin-top: 1px; }
 .deal-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-family: var(--font-body); font-size: .74rem; }
-.deal-card-amount { color: var(--purple); font-weight: 700; }
-.deal-card-date { color: var(--muted); }
+.deal-card-amount { display: inline-flex; align-items: center; gap: 4px; color: var(--purple); font-weight: 700; }
+.deal-card-date { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.deal-card-amount svg, .deal-card-date svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.8; flex: none; }
 .deal-card-footer { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .deal-card-manager { font-family: var(--font-body); font-size: .74rem; color: var(--muted); }
 
@@ -82,24 +105,43 @@
 /* Header action row — Виграно/Програно/Повернути + kebab menu, to the right
    of the editable title. */
 .deal-page-actions-row { display: flex; align-items: center; gap: 8px; flex: none; }
-.deal-btn-won, .deal-btn-lost, .deal-btn-reopen, .deal-btn-finish {
+.deal-btn-won, .deal-btn-lost, .deal-btn-reopen, .deal-btn-finish, .deal-btn-soft {
   display: flex; align-items: center; gap: 6px; border: none; border-radius: 8px;
   padding: 9px 14px; font-family: var(--font-body); font-size: .82rem; font-weight: 600;
   color: #fff; cursor: pointer;
 }
-.deal-btn-won svg, .deal-btn-lost svg, .deal-btn-reopen svg, .deal-btn-finish svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deal-btn-won svg, .deal-btn-lost svg, .deal-btn-reopen svg, .deal-btn-finish svg, .deal-btn-soft svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* A small icon chip inside these already-solid-colored buttons — the
+   `--ghost` (translucent-white) variant, same convention as the top action
+   row's "Створити угоду": a second fully-saturated gradient on top of an
+   already-saturated button would just fight itself. */
+.deal-action-ic { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; flex: none; }
+.deal-action-ic svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deal-action-ic--ghost { background: rgba(255, 255, 255, .25); }
 /* Element+class selectors here beat the generic `.btn:hover` rule from
    reportPage.css (which paints every hovered .btn purple) regardless of
-   stylesheet import order. */
-button.deal-btn-won { background: #16a34a; }
-button.deal-btn-won:hover { background: #128a3e; border-color: #128a3e; color: #fff; }
-button.deal-btn-lost { background: #dc2626; }
-button.deal-btn-lost:hover { background: #c31f1f; border-color: #c31f1f; color: #fff; }
-button.deal-btn-reopen { background: var(--ink-soft, #55555c); }
-button.deal-btn-reopen:hover { background: var(--ink, #333); border-color: var(--ink, #333); color: #fff; }
-button.deal-btn-finish { background: var(--purple); }
-button.deal-btn-finish:hover { background: var(--purple-hover); border-color: var(--purple-hover); color: #fff; }
+   stylesheet import order. Solid → gradient fills, matching the rest of the
+   app's fixed icon/badge/button brand style instead of a flat color. The
+   :hover variants re-declare the same `background`, not just `filter` —
+   otherwise `.btn:hover`'s own flat-purple `background` (same specificity
+   tier, since neither :hover rule beats the other on that property alone)
+   wins on hover and washes the button out to pale purple instead of a
+   brighter version of its own color. */
+button.deal-btn-won { background: linear-gradient(135deg, #4ADE80, #16A34A); box-shadow: 0 4px 12px -4px rgba(22, 163, 74, .5); }
+button.deal-btn-won:hover { background: linear-gradient(135deg, #4ADE80, #16A34A); filter: brightness(1.06); color: #fff; }
+button.deal-btn-lost { background: linear-gradient(135deg, #F87171, #DC2626); box-shadow: 0 4px 12px -4px rgba(220, 38, 38, .5); }
+button.deal-btn-lost:hover { background: linear-gradient(135deg, #F87171, #DC2626); filter: brightness(1.06); color: #fff; }
+button.deal-btn-reopen { background: linear-gradient(135deg, #60A5FA, #2563EB); box-shadow: 0 4px 12px -4px rgba(37, 99, 235, .5); }
+button.deal-btn-reopen:hover { background: linear-gradient(135deg, #60A5FA, #2563EB); filter: brightness(1.06); color: #fff; }
+button.deal-btn-finish { background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 4px 12px -4px rgba(124, 58, 237, .5); }
+button.deal-btn-finish:hover { background: linear-gradient(135deg, #A78BFA, #7C3AED); filter: brightness(1.06); color: #fff; }
 button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
+/* Same recipe, same purple as .deal-btn-finish — a generic "secondary but
+   still solid" action button (e.g. Daily Report's PDF/JPEG export), lighter
+   than .btn-p's bright gradient so it doesn't compete with primary actions. */
+button.deal-btn-soft { background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 4px 12px -4px rgba(124, 58, 237, .5); }
+button.deal-btn-soft:hover { background: linear-gradient(135deg, #A78BFA, #7C3AED); filter: brightness(1.06); color: #fff; }
+button.deal-btn-soft:disabled { opacity: .7; cursor: default; }
 
 .deal-kebab-wrap { position: relative; }
 .deal-kebab-btn { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink-soft); cursor: pointer; }
@@ -136,13 +178,64 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
 
 /* Full-width "Основна інформація" row, then a 320px sidebar + flexible main
    column below it — the working-area layout described for the deal page. */
-.deal-basic-info-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.deal-basic-info-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 @media (max-width: 700px) { .deal-basic-info-row { grid-template-columns: 1fr; } }
 
 .deal-page-columns { display: grid; grid-template-columns: 320px 1fr; gap: 18px; align-items: start; }
 @media (max-width: 900px) { .deal-page-columns { grid-template-columns: 1fr; } }
 .deal-page-sidebar, .deal-page-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .deal-sidebar-fields { display: flex; flex-direction: column; gap: 12px; }
+
+/* Сума + Валюта sit side by side instead of each taking the full sidebar
+   width — the only pair of "Параметри угоди" fields short enough to share a
+   row. */
+.deal-field-pair-row { display: flex; gap: 12px; }
+.deal-field-pair-row .wk-field-box { flex: 1 1 0; min-width: 0; }
+
+/* "Сервіс" field — a multi-select of colored tags shared across every deal
+   (see ServiceTagsField.jsx), styled to sit inside the same .wk-field-box
+   icon frame as every other field in this section. */
+.service-tags-trigger { width: 100%; text-align: left; border: none; background: none; padding: 0; cursor: pointer; font-family: var(--font-body); font-size: .84rem; color: var(--ink); }
+.service-tags-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.service-tag-chip { padding: 2px 9px; border-radius: 100px; font-size: .76rem; font-weight: 600; white-space: nowrap; }
+
+.service-tags-menu {
+  z-index: 1000; width: 260px; max-width: min(260px, calc(100vw - 24px));
+  background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 8px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35); display: flex; flex-direction: column; gap: 8px;
+  transform-origin: top left;
+  animation: dropdownIn .16s cubic-bezier(.4, 0, .2, 1) both;
+}
+.service-tags-menu.closing { animation: dropdownOut .14s cubic-bezier(.4, 0, .2, 1) both; }
+.service-tags-menu.placement-top { transform-origin: bottom left; }
+.service-tags-list { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; }
+.service-tags-row {
+  flex: none; display: flex; align-items: center; gap: 8px; border: none; background: none; padding: 7px 8px; border-radius: 7px;
+  cursor: pointer; font-family: var(--font-body); font-size: .85rem; color: var(--ink); text-align: left;
+}
+.service-tags-row:hover { background: var(--surface); }
+.service-tags-row.active { background: var(--purple-tint); }
+.service-tags-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.service-tags-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.service-tags-check { flex: none; width: 14px; height: 14px; color: var(--purple); display: inline-flex; }
+.service-tags-check svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+.service-tags-add { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.service-tags-add-colors { display: flex; gap: 5px; flex-wrap: wrap; }
+.service-tags-add-swatch { width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.service-tags-add-swatch.active { border-color: var(--ink); }
+.service-tags-add-row { display: flex; gap: 6px; }
+.service-tags-add-row input {
+  flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px;
+  font-family: var(--font-body); font-size: .84rem; color: var(--ink);
+}
+.service-tags-add-row input:focus { border-color: var(--purple); outline: none; }
+.service-tags-add-btn {
+  flex: none; width: 30px; height: 30px; border-radius: 7px; border: none; background: var(--purple); color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.service-tags-add-btn:disabled { opacity: .45; cursor: default; }
+.service-tags-add-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 .wk-field-static { font-family: var(--font-body); font-size: .84rem; color: var(--ink); }
 
@@ -152,7 +245,7 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
 .deal-section { border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
 .deal-section-head { display: flex; align-items: flex-start; gap: 12px; }
 .deal-section-icon {
-  width: 36px; height: 36px; border-radius: 10px; background: var(--purple-tint); color: var(--purple);
+  width: 36px; height: 36px; border-radius: 10px; color: #fff; box-shadow: 0 6px 14px -5px rgba(37, 28, 48, .45);
   display: flex; align-items: center; justify-content: center; flex: none;
 }
 .deal-section-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -269,7 +362,7 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
 .deal-participants { display: flex; flex-direction: column; gap: 6px; }
 .deal-participant-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .deal-participant-chip {
-  display: inline-flex; align-items: center; gap: 6px; background: var(--purple-tint); color: var(--purple);
+  display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #A78BFA, #7C3AED); color: #fff;
   border-radius: 20px; padding: 4px 6px 4px 10px; font-family: var(--font-body); font-size: .78rem; font-weight: 600;
 }
 .deal-participant-chip button {
@@ -289,7 +382,7 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
 }
 .import-map-header { font-family: var(--font-mono, monospace); font-size: .82rem; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.import-map-row select { flex: none; width: 220px; }
+.import-map-row select, .import-map-row .ui-select { flex: none; width: 220px; }
 
 .import-preview-wrap { margin-top: 12px; max-height: 320px; overflow-y: auto; }
 .import-preview-more { font-size: .78rem; color: var(--muted); margin-top: 8px; font-style: italic; }
@@ -319,7 +412,7 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
 @media (max-width: 1100px) { .deals-overview-grid { grid-template-columns: 1fr; } }
 
 .deal-stage-pill {
-  display: inline-block; padding: 3px 10px; border-radius: 20px; border: 1px solid; font-size: .74rem; font-weight: 700;
+  display: inline-block; padding: 3px 12px; border-radius: 20px; font-family: var(--font-head); font-size: .74rem; font-weight: 700;
 }
 
 /* Client picker (search + dropdown) — used by AddDealModal */
@@ -354,6 +447,7 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
   width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
   padding: 6px 10px; font-size: .82rem; font-family: var(--font-body); outline: none;
 }
+.client-picker-create-form .task-filter-row .ui-select { width: 100%; }
 .client-picker-create-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
 /* Date range picker */
@@ -373,15 +467,56 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
 /* Cross-deal tasks modal */
 .deal-tasks-modal { max-width: 560px; width: 100%; }
 
-/* Stage manager modal */
-.stage-manager-modal { max-width: 620px; width: 100%; }
-.stage-manager-list { display: flex; flex-direction: column; gap: 8px; }
-.stage-manager-row { display: flex; align-items: center; gap: 8px; }
-.stage-manager-row input[type="text"] {
-  flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
-  padding: 6px 10px; font-size: .84rem; font-family: var(--font-body); outline: none;
+/* Stage manager modal — same "one wide row, staged save" convention as
+   PipelineManagerModal, laid out as a real table since a stage row also
+   needs the Won/Lost result flags and reorder buttons alongside the color
+   picker. */
+.stage-manager-modal { max-width: 820px; width: 100%; }
+
+.stage-info-banner {
+  display: flex; align-items: flex-start; gap: 10px; background: var(--purple-tint); color: var(--ink);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; font-family: var(--font-body); font-size: .84rem; line-height: 1.5;
 }
-.stage-manager-color { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.stage-info-banner b { color: var(--purple); }
+.stage-info-ic { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--purple); color: #fff; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.stage-info-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.stage-table { display: flex; flex-direction: column; }
+.stage-table-row {
+  display: grid; grid-template-columns: 22px 1fr 260px 150px 104px; align-items: center; gap: 10px;
+  padding: 10px 6px; border-bottom: 1px solid var(--border);
+}
+.stage-table-head {
+  font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--muted); background: var(--surface); border-radius: 10px 10px 0 0; padding: 10px 6px;
+}
+.stage-table-row.drag-over { background: var(--purple-tint); border-radius: 10px; }
+.stage-name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.stage-color-cell { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.stage-final-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.stage-actions-cell { display: flex; align-items: center; gap: 6px; }
+
+.stage-final-check { display: flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .82rem; color: var(--ink-soft); cursor: pointer; user-select: none; }
+.stage-final-check input { position: absolute; opacity: 0; width: 0; height: 0; }
+.stage-final-box {
+  flex: none; width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border); background: #fff;
+  display: flex; align-items: center; justify-content: center; color: transparent; transition: background .12s, border-color .12s;
+}
+.stage-final-box svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.stage-final-check.active-won .stage-final-box, .stage-final-check.active-lost .stage-final-box { background: var(--purple); border-color: var(--purple); color: #fff; }
+.stage-final-check.active-won { color: var(--ink); font-weight: 600; }
+.stage-final-check.active-lost { color: var(--ink); font-weight: 600; }
+
+.stage-add-row { border-bottom: none; border-top: 1.5px dashed var(--purple); background: var(--purple-tint); border-radius: 10px; margin-top: 6px; }
+/* This row skips the Won/Lost column entirely (a draft stage has no result
+   flags yet) — let the "+ Додати етап" button reclaim that freed-up space
+   instead of squeezing into the narrow actions column meant for 3 icon
+   buttons, where its full label would otherwise overflow the dashed box. */
+.stage-add-row .stage-add-actions { grid-column: 4 / 6; justify-content: flex-end; }
+.stage-add-ic {
+  width: 24px; height: 24px; border-radius: 50%; background: #fff; color: var(--purple); flex: none;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem;
+}
 
 /* Pipeline switcher (header) — a colored dot in front of the plain <select>
    shows the active pipeline's own color at a glance. */
@@ -395,24 +530,261 @@ button.deal-btn-finish:disabled { opacity: .7; cursor: default; }
 .pipeline-switcher-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .pipeline-switcher .dash-period-select { border: none; background: transparent; padding: 0; margin-left: 0; }
 
-/* Pipeline manager modal — same list/row convention as the stage manager,
-   plus a row of clickable color swatches under each pipeline's name. */
-.pipeline-manager-modal { max-width: 620px; width: 100%; }
-.pipeline-manager-list { display: flex; flex-direction: column; gap: 14px; }
-.pipeline-manager-row { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-.pipeline-manager-row:last-child { border-bottom: none; padding-bottom: 0; }
-.pipeline-manager-row-main { display: flex; align-items: center; gap: 8px; }
-.pipeline-manager-row-main input[type="text"] {
-  flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
-  padding: 6px 10px; font-size: .84rem; font-family: var(--font-body); outline: none;
-}
-.pipeline-manager-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
-.pipeline-manager-add { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--border); }
+/* .dash-period-select's own box styling (border/background/padding) is meant
+   for a bare <select> — when it's used as our Select component's wrapper
+   class instead, that box already lives on .ui-select-trigger inside it, so
+   strip the wrapper's copy to avoid a double border. */
+.ui-select.dash-period-select { background: none; border: none; padding: 0; }
 
-.pipeline-color-row { display: flex; align-items: center; gap: 6px; padding-left: 22px; }
+/* Pipeline manager modal — one wide row per source: drag handle, colored
+   dot, name, quick colors + "Свій колір" dropdown + hex readout, delete. */
+.pipeline-manager-modal { max-width: 720px; width: 100%; }
+
+.pipeline-modal-head { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.pipeline-modal-head-ic {
+  flex: none; width: 52px; height: 52px; border-radius: 14px; color: #fff;
+  background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 6px 16px -6px rgba(124, 58, 237, .5);
+  display: flex; align-items: center; justify-content: center;
+}
+.pipeline-modal-head-ic svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pipeline-modal-head h3 { font-size: 1.15rem; }
+.pipeline-modal-head p { font-family: var(--font-body); font-size: .84rem; color: var(--muted); margin-top: 3px; }
+
+.pipeline-manager-list { display: flex; flex-direction: column; gap: 10px; }
+.pipeline-manager-row {
+  display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; transition: border-color .15s ease, background .15s ease;
+}
+.pipeline-manager-row.drag-over { border-color: var(--purple); background: var(--purple-tint); }
+.pipeline-row-top { display: flex; align-items: center; gap: 12px; }
+.pipeline-row-colors { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-left: 30px; }
+.pipeline-drag-handle { flex: none; width: 18px; height: 18px; color: var(--muted); cursor: grab; display: flex; }
+.pipeline-drag-handle:active { cursor: grabbing; }
+.pipeline-drag-handle svg { width: 18px; height: 18px; fill: currentColor; }
+.pipeline-manager-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.pipeline-name-input {
+  flex: 1; min-width: 0; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
+  padding: 8px 10px; font-size: .86rem; font-family: var(--font-body); outline: none; transition: border-color .15s;
+}
+.pipeline-name-input:focus { border-color: var(--purple); }
+
+.pipeline-color-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pipeline-color-swatch {
   width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
   padding: 0; transition: transform .1s ease, border-color .1s ease;
 }
 .pipeline-color-swatch:hover { transform: scale(1.12); }
 .pipeline-color-swatch.active { border-color: var(--ink); }
+
+.pipeline-custom-wrap { position: relative; flex: none; }
+.pipeline-custom-btn {
+  display: flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; background: var(--purple-tint); color: var(--purple);
+  border: 1px solid transparent; border-radius: 8px; padding: 7px 10px; font-family: var(--font-body); font-size: .8rem; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.pipeline-custom-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pipeline-custom-btn:hover, .pipeline-custom-btn.open { background: #E4D9FB; }
+.pipeline-custom-chevron { display: flex; transition: transform .15s ease; }
+.pipeline-custom-btn.open .pipeline-custom-chevron { transform: rotate(180deg); }
+
+.pipeline-hex-readout { display: flex; align-items: center; gap: 8px; flex: none; }
+.pipeline-hex-code { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--ink-soft); }
+.pipeline-hex-swatch { width: 26px; height: 26px; border-radius: 7px; flex: none; border: 1px solid rgba(0, 0, 0, .08); }
+
+.pipeline-delete-btn {
+  flex: none; width: 34px; height: 34px; border-radius: 8px; border: 1px solid transparent; background: #FBEAEA; color: var(--bad);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color .15s;
+}
+.pipeline-delete-btn:hover { border-color: var(--bad); }
+.pipeline-delete-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.pipeline-add-source {
+  margin-top: 12px; width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+  background: var(--purple-tint); border: 1.5px dashed var(--purple); border-radius: 12px; padding: 14px 16px;
+  transition: background .15s ease;
+}
+.pipeline-add-source:hover { background: #E4D9FB; }
+.pipeline-add-source-ic {
+  flex: none; width: 36px; height: 36px; border-radius: 10px; background: #fff; color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.pipeline-add-source-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pipeline-add-source-title { display: block; font-family: var(--font-head); font-weight: 700; font-size: .9rem; color: var(--purple); }
+.pipeline-add-source-sub { display: block; font-family: var(--font-body); font-size: .78rem; color: var(--ink-soft); margin-top: 1px; }
+
+.pipeline-manager-foot { justify-content: space-between !important; align-items: center; }
+.pipeline-foot-note { display: flex; align-items: center; gap: 7px; font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
+.pipeline-foot-note svg { flex: none; width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pipeline-foot-actions { display: flex; gap: 10px; flex: none; }
+.pipeline-foot-actions .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 2px; }
+
+/* "Свій колір" popover — portaled to document.body, positioned via
+   useFloatingPosition, same open/close animation as DatePicker/Select. */
+.color-picker-pop {
+  z-index: 1000; width: 300px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 14px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35); transform-origin: top left;
+  animation: dropdownIn .16s cubic-bezier(.4, 0, .2, 1) both;
+}
+.color-picker-pop.closing { animation: dropdownOut .14s cubic-bezier(.4, 0, .2, 1) both; }
+.color-picker-pop.placement-top { transform-origin: bottom left; }
+.color-picker-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.color-picker-swatch {
+  width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center; color: #fff; transition: transform .1s ease;
+}
+.color-picker-swatch:hover { transform: scale(1.1); }
+.color-picker-swatch svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.color-picker-hint { margin: 12px 0 8px; font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
+.color-picker-custom-row { display: flex; align-items: center; gap: 8px; }
+.color-picker-eyedrop {
+  flex: none; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: #fff;
+  color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.color-picker-eyedrop svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.color-picker-eyedrop:hover:not(:disabled) { border-color: var(--purple); color: var(--purple); }
+.color-picker-eyedrop:disabled { opacity: .4; cursor: default; }
+.color-picker-custom-row input[type="text"] {
+  flex: 1; min-width: 0; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--ink);
+  padding: 8px 10px; font-family: var(--font-mono, monospace); font-size: .82rem; outline: none;
+}
+.color-picker-custom-row input[type="text"]:focus { border-color: var(--purple); }
+.color-picker-preview { flex: none; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); }
+
+/* Deals filter dropdown (Kanban toolbar) — owners / canned "smart" filters /
+   card-field filters (date range, stage, source), same portaled floating
+   panel shape as the color picker and other custom dropdowns above. */
+.deals-filter-wrap { position: relative; }
+.deals-filter-chevron { display: inline-flex; width: 12px; height: 12px; }
+.deals-filter-chevron svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.deals-filter-panel {
+  z-index: 1000; width: 320px; max-height: 80vh; overflow-y: auto;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 14px;
+  box-shadow: 0 16px 32px -16px rgba(37, 28, 48, .35); transform-origin: top right;
+  animation: dropdownIn .16s cubic-bezier(.4, 0, .2, 1) both;
+}
+.deals-filter-panel.closing { animation: dropdownOut .14s cubic-bezier(.4, 0, .2, 1) both; }
+.deals-filter-panel.placement-top { transform-origin: bottom right; }
+
+.deals-filter-search {
+  display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; margin-bottom: 10px;
+}
+.deals-filter-search svg { width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 1.8; flex: none; }
+.deals-filter-search input { border: none; outline: none; flex: 1; font-family: var(--font-body); font-size: .86rem; background: transparent; min-width: 0; }
+
+.deals-filter-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.deals-filter-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px;
+  border: none; background: none; border-bottom: 2px solid transparent; color: var(--muted);
+  font-family: var(--font-body); font-size: .68rem; text-align: center; cursor: pointer; transition: color .15s, border-color .15s;
+}
+.deals-filter-tab svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.deals-filter-tab:hover { color: var(--ink); }
+.deals-filter-tab.active { color: var(--purple); border-bottom-color: var(--purple); font-weight: 600; }
+
+.deals-filter-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.deals-filter-list-inline { max-height: 150px; }
+.deals-filter-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;
+  border: none; background: none; padding: 9px 10px; border-radius: 8px; cursor: pointer;
+  font-family: var(--font-body); font-size: .86rem; color: var(--ink);
+}
+.deals-filter-row:hover { background: var(--surface); }
+.deals-filter-row.active { background: var(--purple-tint); color: var(--purple); font-weight: 600; }
+.deals-filter-row svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.deals-filter-row-label { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.deals-filter-stage-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.deals-filter-empty { padding: 10px; color: var(--muted); font-size: .82rem; font-style: italic; }
+
+.deals-filter-fields { display: flex; flex-direction: column; }
+.deals-filter-section { padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.deals-filter-section:last-child { border-bottom: none; padding-bottom: 2px; }
+.deals-filter-section-label {
+  display: block; font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+}
+.deals-filter-date-row { display: flex; gap: 8px; }
+.deals-filter-date-row .date-picker { flex: 1; }
+
+.deals-filter-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); text-align: center; }
+.deals-filter-reset { border: none; background: none; color: var(--bad); font-family: var(--font-body); font-size: .8rem; font-weight: 600; cursor: pointer; }
+.deals-filter-reset:hover { text-decoration: underline; }
+
+/* New-task popup (deal detail's "Задача" pill) — a card per field (its own
+   icon + title + subtitle header, matching the Pipeline/Stage manager
+   modals' header treatment) rather than the compact inline wk-field-box row
+   used elsewhere, since this popup has room to spare and benefits from the
+   extra "what is this for" context. */
+.task-modal-box { max-width: 760px; width: 100%; }
+.task-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 560px) { .task-modal-grid { grid-template-columns: 1fr; } }
+
+.task-modal-section { border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.task-modal-section-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.task-modal-section-ic {
+  flex: none; width: 38px; height: 38px; border-radius: 10px; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.task-modal-section-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.task-modal-section-title { font-family: var(--font-head); font-weight: 700; font-size: .9rem; color: var(--ink); }
+.task-modal-section-sub { font-family: var(--font-body); font-size: .76rem; color: var(--muted); margin-top: 1px; }
+
+.task-modal-input-box { margin: 0; }
+.task-modal-datetime-row { display: flex; align-items: center; gap: 8px; }
+.task-modal-datetime-row .date-picker { flex: 1; min-width: 0; }
+.task-modal-time-input { flex: none; width: 92px; }
+
+.task-modal-textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 10px 12px;
+  resize: vertical; min-height: 90px; font-family: var(--font-body); font-size: .86rem; color: var(--ink);
+  outline: none; transition: border-color .15s;
+}
+.task-modal-textarea:focus { border-color: var(--purple); }
+
+.task-priority-chips { display: flex; gap: 8px; }
+.task-priority-chip {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--border); background: #fff; color: var(--ink); border-radius: 10px; padding: 10px 8px;
+  font-family: var(--font-body); font-size: .82rem; font-weight: 600; cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.task-priority-chip:hover { border-color: var(--ink-soft); }
+.task-priority-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--muted); }
+
+/* "Історія угоди" — a horizontally-switchable feed (Усе/Нотатки/Задачі/
+   Дзвінки) built from real note/task records, each row color-coded per type
+   via a CSS variable pair set inline (--history-color/--history-tint) so
+   one rule handles every type instead of a class per color. */
+.deal-history-tabs { margin-bottom: 12px; }
+.deal-history-row {
+  display: flex; align-items: center; gap: 10px; border-left: 3px solid var(--history-color, var(--purple-tint)); padding-left: 10px;
+}
+.deal-history-row.clickable { cursor: pointer; margin: -6px -8px -6px -13px; padding: 6px 8px 6px 13px; border-radius: 0 8px 8px 0; transition: background .12s ease; }
+.deal-history-row.clickable:hover { background: var(--history-tint, var(--surface)); }
+.deal-history-ic {
+  flex: none; width: 28px; height: 28px; border-radius: 10px; color: #fff;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--history-color, var(--purple)) 45%, #fff), var(--history-color, var(--purple)));
+  box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--history-color, var(--purple)) 70%, transparent);
+  display: flex; align-items: center; justify-content: center;
+}
+.deal-history-ic svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deal-history-body { flex: 1; min-width: 0; }
+.deal-history-top { display: flex; align-items: center; gap: 8px; }
+.deal-history-type { font-family: var(--font-head); font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--history-color, var(--purple)); }
+.deal-history-meta { display: flex; gap: 12px; flex-wrap: wrap; font-family: var(--font-body); font-size: .74rem; color: var(--muted); margin-top: 3px; }
+.deal-history-actions { display: flex; gap: 4px; flex: none; }
+
+/* The done/cancelled badge on a task/call row's right edge — a wash of
+   color rather than a flat pill, growing from white so it doesn't compete
+   with the row's own left-edge color coding. */
+.deal-history-status {
+  flex: none; min-width: 108px; padding: 8px 14px; border-radius: 10px; text-align: center;
+  font-family: var(--font-head); font-weight: 700; font-size: .76rem;
+}
+.deal-history-status.done { background: linear-gradient(90deg, #fff, #BBF7D0); color: #15803D; }
+.deal-history-status.cancelled { background: linear-gradient(90deg, #fff, #FECACA); color: #B91C1C; }
+
+.task-detail-box { max-width: 480px; width: 100%; }
+.task-detail-text { font-family: var(--font-body); font-size: .88rem; color: var(--ink); line-height: 1.5; white-space: pre-wrap; }
+.task-detail-meta { margin-top: 12px; }

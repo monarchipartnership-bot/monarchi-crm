@@ -1,0 +1,280 @@
+/* "Задачі" — cross-deal task/call inbox. Layout/tables/filters/pagination
+   all reuse existing shared classes (reportPage/clientsDirectory/dealsBoard);
+   only the bits specific to this page's table cells live here. */
+
+/* Replaces the old title+subtitle hero — just the tab strip (kept compact,
+   shrink-to-fit rather than stretched across the row) with "Створити
+   задачу" pushed to the far end of the same row. */
+.deal-tasks-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.deal-tasks-tabs { flex: none; margin-bottom: 0; }
+.deal-tasks-tab-count {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 100px;
+  background: var(--surface); font-size: .72rem; font-weight: 700;
+}
+.chan-tab.active .deal-tasks-tab-count { background: rgba(255, 255, 255, .25); color: #fff; }
+
+.deal-tasks-subtitle { margin-top: 2px; font-size: .78rem; color: var(--muted); }
+
+/* The task list itself — each row its own floating rounded card (soft
+   shadow, gap between rows) instead of a plain bordered table, matching
+   the "card list" look asked for. A CSS grid (not a real <table>) is what
+   makes a per-row box-shadow + border-radius actually render reliably —
+   box-shadow on a table row is inconsistently supported across browsers. */
+.deal-tasks-grid { display: flex; flex-direction: column; gap: 10px; }
+.deal-tasks-grid-header, .deal-tasks-grid-row {
+  display: grid; grid-template-columns: 2fr 1.6fr 1fr 1fr 1.15fr 1.5fr 1.25fr 24px;
+  align-items: center; gap: 16px; padding: 0 18px;
+}
+.deal-tasks-grid-header {
+  padding: 4px 18px 10px; font-family: var(--font-head); font-size: .68rem; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+}
+.deal-tasks-grid-settings {
+  border: none; background: none; color: var(--muted); cursor: pointer; display: inline-flex; padding: 2px;
+}
+.deal-tasks-grid-settings:disabled { opacity: .5; cursor: default; }
+.deal-tasks-grid-settings svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.deal-tasks-grid-row {
+  background: #fff; border-radius: 16px; padding: 14px 18px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07); cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.deal-tasks-grid-row:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(80, 30, 100, .14); }
+
+/* Задача cell — a themed rounded-square icon (same color/tint as the Тип
+   badge) to the left of the title/subtitle, vertically centered as one
+   unit rather than the text sitting on its own at the row's top edge. */
+.deal-tasks-title-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.deal-tasks-title-text { min-width: 0; }
+.deal-tasks-title-ic {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.deal-tasks-title-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.deal-tasks-date { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; color: var(--ink); white-space: nowrap; }
+.deal-tasks-date svg { flex: none; width: 14px; height: 14px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Тип/Статус chips — a soft-rectangle outline (not a full pill) so they
+   read as a bordered tag rather than a solid capsule; border color is the
+   chip's own color at reduced opacity, same `${color}4D` convention as
+   MyRequestsPanel's own type tags. */
+.deal-tasks-badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 7px;
+  font-family: var(--font-head); font-size: .74rem; font-weight: 700; white-space: nowrap;
+}
+.deal-tasks-badge svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.deal-tasks-assignee { display: inline-flex; align-items: center; gap: 7px; font-size: .84rem; color: var(--ink); }
+
+.deal-tasks-page-size {
+  display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .82rem; color: var(--muted);
+}
+.deal-tasks-page-size .ui-select { width: 70px; }
+
+/* Deal name reads as a link (the row itself already navigates to it on
+   click) — same purple-link convention as .client-file-name elsewhere,
+   not a literal blue since the app's own brand color is purple. */
+.deal-tasks-link { color: var(--purple); font-weight: 600; }
+
+/* Continuous soft pulse on "Високий" only — a slow opacity breathe (not a
+   jarring blink) so the most urgent items keep quietly drawing the eye
+   even when nothing else on the row changes. Shared .deal-tasks-badge class
+   with Тип/Статус now that Пріоритет is also an outlined chip. */
+@keyframes deal-tasks-priority-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
+}
+.deal-tasks-badge.pulse { animation: deal-tasks-priority-pulse 1.6s ease-in-out infinite; }
+
+/* Pages centered between the range hint (left) and page-size picker
+   (right) — .month-pagination-pages' own margin-left:auto (meant for a
+   2-column hint+pages layout elsewhere) is overridden here for this
+   3-column one. */
+.deal-tasks-page .month-pagination { justify-content: space-between; }
+.deal-tasks-page .month-pagination-pages { flex: 1; justify-content: center; margin-left: 0; }
+
+/* KPI cards reuse "Мої заявки"'s own card shape (.myreq-kpi-card/-spark/-bar
+   in myRequestsPage.css) — solid tinted background + a little bar-chart
+   illustration, instead of .dash-kpi's flat var(--surface) card + line
+   sparkline. One color per card's meaning, same pairing used for
+   .ti-card__icon/.delta-badge elsewhere. */
+.deal-tasks-kpi-card.purple { background: var(--purple-tint); }
+.deal-tasks-kpi-card.purple .myreq-kpi-ic, .deal-tasks-kpi-card.purple .myreq-kpi-bar { color: var(--purple); background: var(--purple); }
+.deal-tasks-kpi-card.purple .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
+
+.deal-tasks-kpi-card.yellow { background: #FCF3DA; }
+.deal-tasks-kpi-card.yellow .myreq-kpi-ic, .deal-tasks-kpi-card.yellow .myreq-kpi-bar { color: var(--warn); background: var(--warn); }
+.deal-tasks-kpi-card.yellow .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
+
+.deal-tasks-kpi-card.red { background: #FBEAEA; }
+.deal-tasks-kpi-card.red .myreq-kpi-ic, .deal-tasks-kpi-card.red .myreq-kpi-bar { color: var(--bad); background: var(--bad); }
+.deal-tasks-kpi-card.red .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
+
+.deal-tasks-kpi-card.green { background: #E9F7EF; }
+.deal-tasks-kpi-card.green .myreq-kpi-ic, .deal-tasks-kpi-card.green .myreq-kpi-bar { color: var(--ok); background: var(--ok); }
+.deal-tasks-kpi-card.green .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
+
+/* Toolbar row — every filter always visible side by side (matching "Мій
+   кабінет"'s .myreq-filters/.pf, reused as-is here) plus the view-mode
+   toggle docked to the far right. Kept to one line: fields shrink instead
+   of wrapping to a second row, with horizontal scroll as the fallback on
+   anything narrower than that (rather than silently clipping content). */
+.deal-tasks-toolbar { display: flex; align-items: flex-end; gap: 14px; flex-wrap: nowrap; margin-bottom: 18px; overflow-x: auto; padding-bottom: 2px; }
+.deal-tasks-toolbar .myreq-filters { margin-bottom: 0; flex: 1; flex-wrap: nowrap; min-width: 0; gap: 10px; }
+/* .pf's own margin-bottom (projectsPage.css, meant for a plain stacked form
+   layout) otherwise leaves a 14px gap below every field's actual content —
+   align-items:flex-end aligns to the *margin* box, so that gap sits between
+   the visible control and the row's true bottom, throwing off alignment
+   against .deal-tasks-view-toggle next to it. */
+.deal-tasks-toolbar .pf { min-width: 108px; flex: 1 1 108px; margin-bottom: 0; }
+.deal-tasks-toolbar .pf.myreq-keyword { flex: 1.6 1 150px; min-width: 150px; }
+.deal-tasks-toolbar .pf.myreq-reset-wrap { flex: none; }
+.deal-tasks-toolbar .pf .ui-select,
+.deal-tasks-toolbar .pf .date-picker { width: 100%; }
+
+/* Height matched to .myreq-reset's rendered box (35px, border-box) so the two
+   sit flush at both top and bottom under the toolbar's shared align-items:flex-end
+   — matching only the bottom left a visible height mismatch between them. */
+.deal-tasks-view-toggle { flex: none; display: flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 10px; padding: 2px; background: #fff; height: 35px; box-sizing: border-box; }
+.deal-tasks-view-toggle button {
+  width: 32px; height: 29px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 7px;
+  color: var(--muted); cursor: pointer; transition: background .15s, color .15s;
+}
+.deal-tasks-view-toggle button svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.deal-tasks-view-toggle button:hover:not(:disabled) { background: var(--surface); }
+.deal-tasks-view-toggle button.on { background: var(--purple); color: #fff; }
+.deal-tasks-view-toggle button:disabled { opacity: .4; cursor: default; }
+
+/* Task detail popup — its own widened box (default .task-detail-box/-text/
+   -meta classes stay untouched since DealDetailModal's history popup still
+   uses those; this one gets fresh deal-tasks-detail-* names throughout so
+   neither can bleed into the other). */
+.deal-tasks-detail-box { max-width: 540px; width: 100%; }
+
+.deal-tasks-detail-when { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .84rem; color: var(--muted); margin-top: 3px; }
+.deal-tasks-detail-when svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.deal-tasks-detail-close {
+  width: 34px; height: 34px; border-radius: 10px; background: var(--surface) !important; flex: none;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.deal-tasks-detail-close:hover { background: #FBEAEA !important; }
+
+/* "Open the deal" box — a bordered card with its own icon badge on the
+   left and the external-link affordance boxed on the right, not just a
+   plain link line, since it's the one action in the popup that leaves it. */
+.deal-tasks-detail-dealbox {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px;
+  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.deal-tasks-detail-dealbox:hover { border-color: var(--purple); background: var(--purple-tint); }
+.deal-tasks-detail-dealbox-ic {
+  flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--purple-tint); color: var(--purple);
+  display: flex; align-items: center; justify-content: center;
+}
+.deal-tasks-detail-dealbox-ic svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.deal-tasks-detail-dealbox-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.deal-tasks-detail-dealbox-arrow {
+  flex: none; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); background: #fff;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+}
+.deal-tasks-detail-dealbox-arrow svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.deal-tasks-detail-label {
+  display: block; font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+.deal-tasks-detail-text { font-family: var(--font-body); font-size: .9rem; color: var(--ink); line-height: 1.5; white-space: pre-wrap; }
+
+.deal-tasks-detail-meta {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.deal-tasks-detail-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-family: var(--font-body); font-size: .8rem; color: var(--muted); white-space: nowrap;
+}
+.deal-tasks-detail-pill svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.deal-tasks-detail-pill b { color: var(--ink); font-weight: 700; }
+
+.deal-tasks-detail-cancel-btn { background: #fff; border: 1px solid var(--bad); color: var(--bad); }
+.deal-tasks-detail-cancel-btn:hover { background: #FBEAEA; border-color: var(--bad); color: var(--bad); }
+
+/* Канбан за пріоритетом — reuses the Угоди board's own funnel-column chrome
+   (.deals-board/.deals-column*, dealsBoard.css) as-is via the same
+   --stage-color custom property trick, just fed a priority color instead
+   of a pipeline stage color; only the 4-wide column count is page-specific.
+   Cards stay this page's own (a task's fields don't match DealCard's). */
+.deal-tasks-priority-board { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px) { .deal-tasks-priority-board { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .deal-tasks-priority-board { grid-template-columns: 1fr; } }
+
+.deal-tasks-kanban-card {
+  background: #fff; border-radius: 12px; padding: 12px; cursor: pointer;
+  box-shadow: 0 2px 10px rgba(80, 30, 100, .06); transition: transform .15s ease, box-shadow .15s ease;
+}
+.deal-tasks-kanban-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(80, 30, 100, .12); }
+.deal-tasks-kanban-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.deal-tasks-kanban-card-ic { flex: none; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.deal-tasks-kanban-card-ic svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.deal-tasks-kanban-card-title { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); min-width: 0; }
+.deal-tasks-kanban-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.deal-tasks-kanban-status {
+  display: inline-flex; align-items: center; font-family: var(--font-head); font-weight: 700; font-size: .68rem;
+  padding: 3px 8px; border-radius: 6px; border: 1px solid transparent; white-space: nowrap;
+}
+.deal-tasks-kanban-status.done { background: linear-gradient(90deg, #fff, #BBF7D0); color: #15803D; }
+.deal-tasks-kanban-status.cancelled { background: linear-gradient(90deg, #fff, #FECACA); color: #B91C1C; }
+.deal-tasks-kanban-avatar { width: 22px; height: 22px; font-size: .55rem; }
+
+/* Календар — full 42-cell month grid (buildMonthGrid, dateHelpers.js), same
+   Monday-start/leading-trailing-days approach as DatePicker's own grid, just
+   sized for a whole page instead of a small dropdown, with task chips
+   dropped into each day instead of just a selectable number. */
+.deal-tasks-cal { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+.deal-tasks-cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.deal-tasks-cal-month-label { font-family: var(--font-head); font-weight: 700; font-size: 1rem; color: var(--ink); text-transform: capitalize; }
+.deal-tasks-cal-nav-btns { display: flex; align-items: center; gap: 6px; }
+.deal-tasks-cal-nav-btns button {
+  height: 30px; border-radius: 8px; border: none; background: var(--surface); color: var(--ink-soft);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: var(--font-head);
+}
+.deal-tasks-cal-nav-btns button:hover { background: var(--purple-tint); color: var(--purple); }
+.deal-tasks-cal-nav-btns button:not(.deal-tasks-cal-today-btn) { width: 30px; }
+.deal-tasks-cal-nav-btns button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deal-tasks-cal-today-btn { padding: 0 12px; font-size: .78rem; font-weight: 600; }
+
+.deal-tasks-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.deal-tasks-cal-dow { text-align: center; font-family: var(--font-head); font-size: .68rem; font-weight: 700; color: var(--muted); padding-bottom: 4px; text-transform: uppercase; }
+.deal-tasks-cal-cell {
+  min-height: 96px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.deal-tasks-cal-cell.out { opacity: .45; }
+.deal-tasks-cal-cell.today { border-color: var(--purple); background: var(--purple-tint); }
+.deal-tasks-cal-daynum { font-family: var(--font-head); font-weight: 700; font-size: .78rem; color: var(--ink); }
+.deal-tasks-cal-cell.today .deal-tasks-cal-daynum { color: var(--purple); }
+.deal-tasks-cal-items { display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow: hidden; }
+.deal-tasks-cal-chip {
+  width: 100%; display: flex; align-items: center; gap: 5px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px; background: #fff;
+  font-family: var(--font-body); font-size: .68rem; font-weight: 600; color: var(--ink); line-height: 1.3;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.deal-tasks-cal-chip:hover { border-color: var(--purple); box-shadow: 0 2px 8px rgba(80, 30, 100, .1); }
+.deal-tasks-cal-chip-ic {
+  flex: none; width: 16px; height: 16px; border-radius: 4px; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.deal-tasks-cal-chip-ic svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deal-tasks-cal-chip-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deal-tasks-cal-more { font-family: var(--font-body); font-size: .66rem; color: var(--muted); padding: 0 2px; }
+.deal-tasks-cal-nodate-hint { margin-top: 12px; font-size: .78rem; color: var(--muted); text-align: center; }
+
+@media (max-width: 900px) {
+  .deal-tasks-cal-grid { grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .deal-tasks-cal-cell { min-height: 64px; padding: 4px; }
+  .deal-tasks-cal-dow { font-size: .58rem; }
+}

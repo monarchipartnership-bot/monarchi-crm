@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
-import { uploadDealNoteImage } from '../../lib/api/dealNoteImages';
 import { htmlToPlainText } from '../../lib/sanitizeHtml';
 
 // `document.execCommand` is deprecated but still fully functional in
@@ -29,7 +28,11 @@ function matchMentionQuery(range) {
   return m ? { query: m[1], start: m.index } : null;
 }
 
-export default function NoteEditor({ dealId, profiles, saving, onSave }) {
+// `onUploadImage(file)` — resolves to a public URL once uploaded — is left
+// to the caller rather than hardcoded to deals, so this same editor works
+// for any entity's notes (deals, clients, ...) each with their own storage
+// path prefix.
+export default function NoteEditor({ profiles, saving, onSave, onUploadImage }) {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
   const pendingMentionsRef = useRef([]);
@@ -74,10 +77,10 @@ export default function NoteEditor({ dealId, profiles, saving, onSave }) {
   async function handleImageChange(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (!file || !onUploadImage) return;
     setUploading(true);
     try {
-      const url = await uploadDealNoteImage(dealId, file);
+      const url = await onUploadImage(file);
       if (!url) { alert('Не вдалося завантажити зображення.'); return; }
       exec('insertHTML', `<img class="deal-note-img" src="${url}" alt="">`);
     } finally {

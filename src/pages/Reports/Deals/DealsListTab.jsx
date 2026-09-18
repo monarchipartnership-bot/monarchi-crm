@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { fmtDate } from '../../../lib/dateHelpers';
+import Select from '../../../components/common/Select';
+import { stagePillStyle } from '../../../lib/stagePillStyle';
 
 const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
 const FILTER_ICON = '<svg viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8v6l-3 1.5v-7.5z"/></svg>';
@@ -73,9 +75,7 @@ export default function DealsListTab({ deals, stages, onViewDeal, mode = 'active
               <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
               <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Пошук за назвою або клієнтом..." />
             </div>
-            <select className="dash-period-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <Select className="dash-period-select" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
             <div className="task-filter-wrap" ref={filterRef}>
               <button type="button" className={'btn task-filter-btn' + (activeFilterCount ? ' has-active' : '')} onClick={() => setFilterOpen((o) => !o)}>
                 <span dangerouslySetInnerHTML={{ __html: FILTER_ICON }} />
@@ -85,17 +85,17 @@ export default function DealsListTab({ deals, stages, onViewDeal, mode = 'active
                 <div className="task-filter-popover">
                   <div className="task-filter-row">
                     <label>Стадія</label>
-                    <select value={stageFilter} onChange={(e) => { setStageFilter(e.target.value); setPage(1); }}>
-                      <option value="">Усі</option>
-                      {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
+                    <Select
+                      value={stageFilter} onChange={(v) => { setStageFilter(v); setPage(1); }}
+                      options={[{ value: '', label: 'Усі' }, ...stages.map((s) => ({ value: String(s.id), label: s.label }))]}
+                    />
                   </div>
                   <div className="task-filter-row">
                     <label>Менеджер</label>
-                    <select value={managerFilter} onChange={(e) => { setManagerFilter(e.target.value); setPage(1); }}>
-                      <option value="">Усі</option>
-                      {managerOptions.map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                    <Select
+                      value={managerFilter} onChange={(v) => { setManagerFilter(v); setPage(1); }}
+                      options={[{ value: '', label: 'Усі' }, ...managerOptions.map((m) => ({ value: m, label: m }))]}
+                    />
                   </div>
                   <button type="button" className="btn task-filter-reset" onClick={resetFilters}>Скинути</button>
                 </div>
@@ -126,7 +126,7 @@ export default function DealsListTab({ deals, stages, onViewDeal, mode = 'active
                       <tr key={d.id} className="client-row" onClick={() => onViewDeal(d)}>
                         <td className="ink">{d.clients?.company || d.clients?.name || '—'}</td>
                         <td>{d.title || '—'}</td>
-                        <td><span className="deal-stage-pill" style={{ color: stage?.color, borderColor: stage?.color }}>{stage?.label || '—'}</span></td>
+                        <td><span className="deal-stage-pill" style={stagePillStyle(stage?.color)}>{stage?.label || '—'}</span></td>
                         <td>{d.amount ? `${Number(d.amount).toLocaleString('uk-UA')} ${d.currency}` : '—'}</td>
                         <td>{d.manager || '—'}</td>
                         <td>{fmtShort(d.created_at)}</td>

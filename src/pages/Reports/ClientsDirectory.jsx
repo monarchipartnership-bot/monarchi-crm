@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchClientDirectory, updateClientDirectoryEntry } from '../../lib/api/clients';
+import { fetchClientDirectory } from '../../lib/api/clients';
+import { clientFullName } from '../../lib/clientName';
 import { fetchAllDeals } from '../../lib/api/deals';
-import { fetchPipelines } from '../../lib/api/pipelines';
-import { fetchAllProfiles, profileLabel } from '../../lib/api/profile';
-import { CLIENT_PLATFORMS, CLIENT_TYPES } from '../../lib/reportConstants';
-import { colorForTag } from '../../lib/tagColors';
-import { useAuth } from '../../contexts/AuthContext';
+import { STATUSES, STATUS_META } from '../../lib/clientStatus';
+import { platformColor, platformLogo } from '../../lib/platforms';
+import { COUNTRIES, flagClass } from '../../lib/countries';
 import ClientAvatar from '../../components/Clients/ClientAvatar';
-import ClientActivityTab from '../../components/Clients/ClientActivityTab';
-import ClientNotesTab from '../../components/Clients/ClientNotesTab';
-import ClientFilesTab from '../../components/Clients/ClientFilesTab';
-import AddDealModal from '../../components/Deals/AddDealModal';
+import PlatformPicker from '../../components/common/PlatformPicker';
+import Select from '../../components/common/Select';
+import ImportContactsModal from '../../components/Clients/ImportContactsModal';
+import CreateClientModal from '../../components/Clients/CreateClientModal';
 import { SECTION_ICONS } from '../../lib/reportIcons';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import '../../styles/reportPage.css';
@@ -23,58 +22,67 @@ import '../../styles/dealsBoard.css';
 
 const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
 const FILTER_ICON = '<svg viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8v6l-3 1.5v-7.5z"/></svg>';
-const MORE_ICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>';
+const TREND_UP_ICON = '<svg viewBox="0 0 24 24"><path d="M4 16l6-6 4 4 6-8"/><path d="M15 6h5v5"/></svg>';
 const PAGE_SIZE = 10;
 
 const KPI_ICONS = {
   total: SECTION_ICONS['Клієнти'],
   openDeal: FIELD_ICONS.repeat,
   topPlatform: FIELD_ICONS.priority,
+  newClients: TREND_UP_ICON,
 };
 
-const TABS = [
-  { key: 'info', label: 'Основна інформація' },
-  { key: 'activity', label: 'Активність' },
-  { key: 'notes', label: 'Нотатки' },
-  { key: 'files', label: 'Файли' },
-];
+// Two hand-authored decorative wave shapes (rising, distinctly different
+// curvature) — same "illustration, not a real chart" approach as the
+// KPI_WAVES bars on the Задачі page; there's no daily-granularity client
+// count to plot for real, so this is purely visual.
+const KPI_WAVE_PATHS = {
+  purple: 'M0,46 C14,42 22,30 38,32 C54,34 58,20 74,17 C90,14 100,9 120,4 L120,60 L0,60 Z',
+  green: 'M0,40 C13,45 24,48 34,39 C48,28 54,24 68,19 C84,13 96,17 120,7 L120,60 L0,60 Z',
+};
 
 const SORT_OPTIONS = [
-  { value: 'updated', label: "За оновленням" },
+  { value: 'updated', label: 'За оновленням' },
+  { value: 'created', label: 'За датою створення' },
+  { value: 'deals', label: 'За кількістю угод' },
   { value: 'name', label: "За ім'ям" },
+];
+
+const DEALS_FILTER_OPTIONS = [
+  { value: '', label: 'Усі' },
+  { value: 'with', label: 'З угодами' },
+  { value: 'without', label: 'Без угод' },
 ];
 
 export default function ClientsDirectory() {
   const navigate = useNavigate();
-  const { email } = useAuth();
   const [clients, setClients] = useState([]);
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [platformFilter, setPlatformFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
+  const [dealsFilter, setDealsFilter] = useState('');
   const [sortBy, setSortBy] = useState('updated');
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState(null);
-  const [activeTab, setActiveTab] = useState('info');
-  const [editingBasic, setEditingBasic] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [rowMenuOpenId, setRowMenuOpenId] = useState(null);
-  const [pipelines, setPipelines] = useState([]);
-  const [profiles, setProfiles] = useState([]);
-  const [addDealOpen, setAddDealOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const filterRef = useRef(null);
 
   function reloadDeals() {
     fetchAllDeals().then(setDeals);
   }
 
+  function reloadClients() {
+    fetchClientDirectory().then(setClients);
+  }
+
   useEffect(() => {
     fetchClientDirectory().then((rows) => { setClients(rows); setLoading(false); });
     reloadDeals();
-    fetchPipelines().then(setPipelines);
-    fetchAllProfiles().then((rows) => setProfiles(rows.map((p) => ({ email: p.email, label: profileLabel(p) }))));
   }, []);
 
   const dealsByClient = useMemo(() => {
@@ -86,156 +94,237 @@ export default function ClientsDirectory() {
   useEffect(() => {
     if (!filterOpen) return;
     function onDocClick(e) {
+      // Select's open menu portals straight to <body>, outside filterRef's
+      // own DOM subtree — without this check, picking an option there reads
+      // as an "outside" click and closes the whole popover before the pick
+      // registers (PlatformPicker's own menu isn't portaled, so it doesn't
+      // need the same treatment).
+      if (e.target.closest('.ui-select-menu')) return;
       if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [filterOpen]);
 
-  useEffect(() => {
-    if (rowMenuOpenId === null) return;
-    function onDocClick(e) {
-      if (!e.target.closest('.row-menu')) setRowMenuOpenId(null);
-    }
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [rowMenuOpenId]);
-
-  function openClient(c) {
-    setSelected(c);
-    setActiveTab('info');
-    setEditingBasic(false);
-  }
-
-  function patchSelected(patch) {
-    const before = selected;
-    setSelected((s) => ({ ...s, ...patch }));
-    setClients((list) => list.map((c) => (c.id === before.id ? { ...c, ...patch } : c)));
-    updateClientDirectoryEntry(before.id, patch, before, email);
-  }
-
-  function toggleRowSelected(id) {
-    setSelectedIds((set) => {
-      const next = new Set(set);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
   function resetFilters() {
-    setSearch(''); setPlatformFilter(''); setTypeFilter(''); setPage(1);
+    setSearch(''); setPlatformFilter(''); setTypeFilter(''); setSourceFilter(''); setCountryFilter(''); setDealsFilter(''); setPage(1);
   }
+
+  const sourceOptions = useMemo(() => (
+    Array.from(new Set(clients.map((c) => c.source).filter(Boolean))).sort().map((s) => ({ value: s, label: s }))
+  ), [clients]);
+
+  const countryOptions = useMemo(() => {
+    const codes = new Set(clients.map((c) => c.country).filter(Boolean));
+    return COUNTRIES.filter((c) => codes.has(c.code)).map((c) => ({ value: c.code, label: c.name, iconClassName: flagClass(c.code) }));
+  }, [clients]);
 
   const kpis = useMemo(() => {
     const total = clients.length;
+    const openDeals = clients.flatMap((c) => (dealsByClient[c.id] || []).filter((d) => !d.deal_stages?.is_won && !d.deal_stages?.is_lost));
     const withOpenDeal = clients.filter((c) => (dealsByClient[c.id] || []).some((d) => !d.deal_stages?.is_won && !d.deal_stages?.is_lost)).length;
     const byPlatform = {};
     clients.forEach((c) => { if (c.platform) byPlatform[c.platform] = (byPlatform[c.platform] || 0) + 1; });
     let topPlatform = null, topCount = 0;
     Object.entries(byPlatform).forEach(([p, n]) => { if (n > topCount) { topPlatform = p; topCount = n; } });
     const topPct = total && topPlatform ? Math.round((topCount / total) * 100) : 0;
-    return { total, withOpenDeal, topPlatform, topPct };
+
+    // "New" = created within the last 30 days — the growth-% subtext compares
+    // that against the base that was already there before those 30 days
+    // (total minus the new ones), not against the prior 30-day count, so it
+    // reads as "the client base grew by X% this month".
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const cutoff30 = now - 30 * day;
+    const newLast30 = clients.filter((c) => c.created_at && new Date(c.created_at).getTime() >= cutoff30).length;
+    const priorBase = total - newLast30;
+    const newPct = priorBase > 0 ? Math.round((newLast30 / priorBase) * 100) : (newLast30 > 0 ? 100 : 0);
+    const openDealsNew30 = openDeals.filter((d) => d.created_at && new Date(d.created_at).getTime() >= cutoff30).length;
+
+    return { total, withOpenDeal, topPlatform, topCount, topPct, newLast30, newPct, openDealsNew30 };
   }, [clients, dealsByClient]);
 
-  const activeFilterCount = [platformFilter, typeFilter].filter(Boolean).length;
+  const activeFilterCount = [platformFilter, typeFilter, sourceFilter, countryFilter, dealsFilter].filter(Boolean).length;
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = clients.filter((c) => {
       if (q) {
-        const inName = c.name?.toLowerCase().includes(q);
+        const inName = clientFullName(c).toLowerCase().includes(q);
         const inCompany = c.company?.toLowerCase().includes(q);
         const inTags = (c.tags || []).some((t) => t.toLowerCase().includes(q));
         if (!inName && !inCompany && !inTags) return false;
       }
       if (platformFilter && c.platform !== platformFilter) return false;
-      if (typeFilter && c.lead_type !== typeFilter) return false;
+      if (typeFilter && c.status !== typeFilter) return false;
+      if (sourceFilter && c.source !== sourceFilter) return false;
+      if (countryFilter && c.country !== countryFilter) return false;
+      const hasDeals = (dealsByClient[c.id] || []).length > 0;
+      if (dealsFilter === 'with' && !hasDeals) return false;
+      if (dealsFilter === 'without' && hasDeals) return false;
       return true;
     });
     list = [...list].sort((a, b) => {
-      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '', 'uk');
+      if (sortBy === 'name') return clientFullName(a).localeCompare(clientFullName(b), 'uk');
+      if (sortBy === 'created') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (sortBy === 'deals') return (dealsByClient[b.id]?.length || 0) - (dealsByClient[a.id]?.length || 0);
       return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
     });
     return list;
-  }, [clients, search, platformFilter, typeFilter, sortBy]);
+  }, [clients, search, platformFilter, typeFilter, sourceFilter, countryFilter, dealsFilter, sortBy, dealsByClient]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const clampedPage = Math.min(page, pageCount);
   const paged = filtered.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE);
   const rangeStart = filtered.length ? (clampedPage - 1) * PAGE_SIZE + 1 : 0;
   const rangeEnd = Math.min(clampedPage * PAGE_SIZE, filtered.length);
-  const allPagedSelected = paged.length > 0 && paged.every((c) => selectedIds.has(c.id));
 
   return (
     <div className="report-page">
-      <section className="rpt-hero">
-        <div className="rpt-hero-heading">
-          <span className="rpt-hero-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} />
-          <h1>База клієнтів</h1>
+      <div className="client-kpi-row">
+        <div className="client-kpi-card">
+          <div className="client-kpi-left">
+            <div className="client-kpi-head">
+              <span className="client-kpi-icon blue" dangerouslySetInnerHTML={{ __html: KPI_ICONS.total }} />
+              <span className="client-kpi-label">Всього клієнтів</span>
+            </div>
+            <div className="client-kpi-value-row">
+              <span className="client-kpi-value">{kpis.total}</span>
+              {kpis.newLast30 > 0 && <span className="client-kpi-delta">&#8599; +{kpis.newLast30}</span>}
+            </div>
+            <div className="client-kpi-sub">{kpis.newPct > 0 ? `+${kpis.newPct}% за останні 30 днів` : 'за останні 30 днів'}</div>
+          </div>
+          <svg className="client-kpi-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="clientKpiWavePurple" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#7C3AED" stopOpacity=".35" />
+                <stop offset="100%" stopColor="#7C3AED" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={KPI_WAVE_PATHS.purple} fill="url(#clientKpiWavePurple)" stroke="#7C3AED" strokeWidth="2" />
+          </svg>
         </div>
-        <p className="sub">Єдина картка на кожного клієнта — синхронізується з тим, що менеджери зберігають у Weekly Report, і не залежить від перерахунку місячних звітів.</p>
-      </section>
 
-      <div className="dash-kpi-row">
-        <div className="dash-kpi">
-          <div className="dash-kpi-head">
-            <span className="dash-kpi-icon" dangerouslySetInnerHTML={{ __html: KPI_ICONS.total }} />
-            <div className="dash-kpi-label">Всього клієнтів</div>
+        <div className="client-kpi-card">
+          <div className="client-kpi-left">
+            <div className="client-kpi-head">
+              <span className="client-kpi-icon blue" dangerouslySetInnerHTML={{ __html: KPI_ICONS.openDeal }} />
+              <span className="client-kpi-label">Активних угод</span>
+            </div>
+            <div className="client-kpi-value-row">
+              <span className="client-kpi-value">{kpis.withOpenDeal}</span>
+              {kpis.openDealsNew30 > 0 && <span className="client-kpi-delta">&#8599; +{kpis.openDealsNew30}</span>}
+            </div>
+            <div className="client-kpi-sub">В роботі зараз</div>
           </div>
-          <div className="dash-kpi-value">{kpis.total}</div>
+          <svg className="client-kpi-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="clientKpiWaveGreen" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#16A34A" stopOpacity=".35" />
+                <stop offset="100%" stopColor="#16A34A" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={KPI_WAVE_PATHS.green} fill="url(#clientKpiWaveGreen)" stroke="#16A34A" strokeWidth="2" />
+          </svg>
         </div>
-        <div className="dash-kpi">
-          <div className="dash-kpi-head">
-            <span className="dash-kpi-icon" dangerouslySetInnerHTML={{ __html: KPI_ICONS.openDeal }} />
-            <div className="dash-kpi-label">З відкритою угодою</div>
+
+        <div className="client-kpi-card">
+          <div className="client-kpi-left">
+            <div className="client-kpi-head">
+              <span className="client-kpi-icon orange" dangerouslySetInnerHTML={{ __html: KPI_ICONS.topPlatform }} />
+              <span className="client-kpi-label">Топ платформа</span>
+            </div>
+            <div className="client-kpi-value-row">
+              <span className="client-kpi-value client-kpi-value--text">{kpis.topPlatform || '—'}</span>
+              {kpis.topPlatform && <span className="client-kpi-delta">{kpis.topPct}%</span>}
+            </div>
+            <div className="client-kpi-sub">{kpis.topPlatform ? `${kpis.topCount} з ${kpis.total} клієнтів` : 'Немає даних'}</div>
           </div>
-          <div className="dash-kpi-value">{kpis.withOpenDeal}</div>
+          <div className="client-kpi-donut">
+            <svg viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="32" fill="none" stroke="#EDE7FB" strokeWidth="9" />
+              <circle
+                cx="40" cy="40" r="32" fill="none" stroke="#7C3AED" strokeWidth="9" strokeLinecap="round"
+                strokeDasharray={`${(kpis.topPct / 100) * 201.06} 201.06`}
+                transform="rotate(-90 40 40)"
+              />
+            </svg>
+            <span className="client-kpi-donut-center">{kpis.topPct}%</span>
+          </div>
         </div>
-        <div className="dash-kpi">
-          <div className="dash-kpi-head">
-            <span className="dash-kpi-icon" dangerouslySetInnerHTML={{ __html: KPI_ICONS.topPlatform }} />
-            <div className="dash-kpi-label">Топ платформа</div>
+
+        <div className="client-kpi-card">
+          <div className="client-kpi-left">
+            <div className="client-kpi-head">
+              <span className="client-kpi-icon blue" dangerouslySetInnerHTML={{ __html: KPI_ICONS.newClients }} />
+              <span className="client-kpi-label">Нові клієнти</span>
+            </div>
+            <div className="client-kpi-value-row">
+              <span className="client-kpi-value">+{kpis.newLast30}</span>
+              {kpis.newPct > 0 && <span className="client-kpi-delta">&#8599; +{kpis.newPct}%</span>}
+            </div>
+            <div className="client-kpi-sub">За останні 30 днів</div>
           </div>
-          <div className="dash-kpi-value">{kpis.topPlatform || '—'} {kpis.topPlatform && <span className="pct">{kpis.topPct}%</span>}</div>
+          <div className="client-kpi-bars">
+            {[30, 45, 40, 60, 55, 80].map((h, i) => <span key={i} className="client-kpi-bar" style={{ height: h + '%', opacity: .4 + i * 0.1 }} />)}
+          </div>
         </div>
       </div>
 
       <section className="report-section">
-        <div className="stitle">
-          <span className="stitle-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} />Клієнти
-          <div className="mc-client-toolbar stitle-filter">
-            <div className="mc-client-search">
-              <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
-              <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Пошук за іменем, компанією або тегом..." />
-            </div>
-            <select className="dash-period-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <div className="task-filter-wrap" ref={filterRef}>
-              <button type="button" className={'btn task-filter-btn' + (activeFilterCount ? ' has-active' : '')} onClick={() => setFilterOpen((o) => !o)}>
-                <span dangerouslySetInnerHTML={{ __html: FILTER_ICON }} />
-                Фільтр{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-              </button>
-              {filterOpen && (
-                <div className="task-filter-popover">
-                  <div className="task-filter-row">
-                    <label>Платформа</label>
-                    <select value={platformFilter} onChange={(e) => { setPlatformFilter(e.target.value); setPage(1); }}>
-                      <option value="">Усі</option>
-                      {CLIENT_PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </div>
-                  <div className="task-filter-row">
-                    <label>Тип клієнта</label>
-                    <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
-                      <option value="">Усі</option>
-                      {CLIENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <button type="button" className="btn task-filter-reset" onClick={resetFilters}>Скинути</button>
-                </div>
-              )}
-            </div>
+        <div className="mc-client-toolbar client-directory-toolbar">
+          <div className="mc-client-search">
+            <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Пошук за іменем, компанією або тегом..." />
           </div>
+          <Select className="dash-period-select" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
+          <div className="task-filter-wrap" ref={filterRef}>
+            <button type="button" className={'btn task-filter-btn' + (activeFilterCount ? ' has-active' : '')} onClick={() => setFilterOpen((o) => !o)}>
+              <span dangerouslySetInnerHTML={{ __html: FILTER_ICON }} />
+              Фільтр{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </button>
+            {filterOpen && (
+              <div className="task-filter-popover">
+                <div className="task-filter-row">
+                  <label>Платформа</label>
+                  <PlatformPicker
+                    value={platformFilter} onChange={(v) => { setPlatformFilter(v); setPage(1); }}
+                    allowClear clearLabel="Усі"
+                  />
+                </div>
+                <div className="task-filter-row">
+                  <label>Статус</label>
+                  <Select
+                    value={typeFilter} onChange={(v) => { setTypeFilter(v); setPage(1); }}
+                    options={[{ value: '', label: 'Усі' }, ...STATUSES.map((s) => ({ value: s, label: s }))]}
+                  />
+                </div>
+                <div className="task-filter-row">
+                  <label>Джерело</label>
+                  <Select
+                    value={sourceFilter} onChange={(v) => { setSourceFilter(v); setPage(1); }}
+                    options={[{ value: '', label: 'Усі' }, ...sourceOptions]}
+                  />
+                </div>
+                <div className="task-filter-row">
+                  <label>Країна</label>
+                  <Select
+                    searchable value={countryFilter} onChange={(v) => { setCountryFilter(v); setPage(1); }}
+                    options={[{ value: '', label: 'Усі' }, ...countryOptions]}
+                  />
+                </div>
+                <div className="task-filter-row">
+                  <label>Угоди</label>
+                  <Select
+                    value={dealsFilter} onChange={(v) => { setDealsFilter(v); setPage(1); }}
+                    options={DEALS_FILTER_OPTIONS}
+                  />
+                </div>
+                <button type="button" className="btn task-filter-reset" onClick={resetFilters}>Скинути</button>
+              </div>
+            )}
+          </div>
+          <button type="button" className="btn" onClick={() => setImportOpen(true)}>Імпортувати контакти</button>
+          <button type="button" className="btn btn-p" onClick={() => setCreateOpen(true)}>+ Створити контакт</button>
         </div>
 
         {loading ? (
@@ -243,63 +332,76 @@ export default function ClientsDirectory() {
         ) : filtered.length === 0 ? (
           <div className="placeholder"><p>{clients.length === 0 ? 'Клієнтів ще немає — вони з’являться тут після збереження Weekly Report.' : 'Немає клієнтів за цим фільтром.'}</p></div>
         ) : (
-          <div className={'clients-directory-layout' + (selected ? ' has-panel' : '')}>
+          <div className="clients-directory-layout">
             <div>
-              <div className="tbl-wrap">
-                <table className="cmp-table">
-                  <thead>
-                    <tr>
-                      <th className="client-check-col">
-                        <input
-                          type="checkbox"
-                          checked={allPagedSelected}
-                          onChange={() => setSelectedIds((set) => {
-                            const next = new Set(set);
-                            if (allPagedSelected) paged.forEach((c) => next.delete(c.id));
-                            else paged.forEach((c) => next.add(c.id));
-                            return next;
-                          })}
-                        />
-                      </th>
-                      <th>Клієнт</th>
-                      <th>Компанія</th>
-                      <th>Платформа</th>
-                      <th>Тип</th>
-                      <th>Угоди</th>
-                      <th>Оновлено</th>
-                      <th className="client-menu-col" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paged.map((c) => (
-                      <tr key={c.id} className={'client-row' + (selected?.id === c.id ? ' active' : '')} onClick={() => openClient(c)}>
-                        <td className="client-check-col" onClick={(e) => e.stopPropagation()}>
-                          <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleRowSelected(c.id)} />
-                        </td>
-                        <td className="ink client-name-cell">
-                          <ClientAvatar name={c.name} size={30} />
-                          <span>{c.name}</span>
-                        </td>
-                        <td>{c.company || '—'}</td>
-                        <td>{c.platform || '—'}</td>
-                        <td>{c.lead_type || '—'}</td>
-                        <td>{(dealsByClient[c.id] || []).length || '—'}</td>
-                        <td>{c.updated_at ? new Date(c.updated_at).toLocaleDateString('uk-UA') : '—'}</td>
-                        <td className="client-menu-col row-menu" onClick={(e) => e.stopPropagation()}>
-                          <button type="button" className="row-menu-btn" onClick={() => setRowMenuOpenId((id) => (id === c.id ? null : c.id))} aria-label="Дії">
-                            <span dangerouslySetInnerHTML={{ __html: MORE_ICON }} />
-                          </button>
-                          {rowMenuOpenId === c.id && (
-                            <div className="row-menu-popover">
-                              <button type="button" onClick={() => { setRowMenuOpenId(null); navigate(`/reports/clients-directory/${c.id}`); }}>Відкрити профіль</button>
-                              <button type="button" onClick={() => { setRowMenuOpenId(null); openClient(c); setEditingBasic(true); }}>Редагувати</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="client-grid">
+                <div className="client-grid-header">
+                  <div>Клієнт</div>
+                  <div>Статус</div>
+                  <div>Платформа</div>
+                  <div>Джерело</div>
+                  <div>Країна</div>
+                  <div>Угоди</div>
+                  <div>Оновлено</div>
+                </div>
+                {paged.map((c) => {
+                  const platformBrandColor = c.platform ? platformColor(c.platform) : null;
+                  const platformBrandLogo = c.platform ? platformLogo(c.platform) : null;
+                  const statusMeta = c.status ? STATUS_META[c.status] : null;
+                  const countryMeta = c.country ? COUNTRIES.find((cn) => cn.code === c.country) : null;
+                  return (
+                    <div key={c.id} className="client-grid-row" onClick={() => navigate(`/reports/clients-directory/${c.id}`)}>
+                      <div className="client-grid-name-cell">
+                        <ClientAvatar name={c.name} photo={c.photo} size={34} />
+                        <div className="client-grid-name-text">
+                          <div className="ink">{clientFullName(c)}</div>
+                          {c.company && <div className="client-grid-subtitle">{c.company}</div>}
+                        </div>
+                      </div>
+                      <div>
+                        {statusMeta ? (
+                          <span
+                            className="client-grid-badge client-grid-status-badge"
+                            style={{ color: statusMeta.color, background: statusMeta.tint, border: `1px solid ${statusMeta.color}4D` }}
+                          >
+                            <span className="client-grid-status-dot" style={{ background: statusMeta.color }} />
+                            {c.status}
+                          </span>
+                        ) : '—'}
+                      </div>
+                      <div>
+                        {c.platform ? (
+                          <span
+                            className="client-grid-badge client-grid-badge--platform"
+                            style={{
+                              color: platformBrandColor,
+                              background: `linear-gradient(135deg, #fff, ${platformBrandColor}26)`,
+                              border: `1px solid ${platformBrandColor}55`,
+                              boxShadow: `0 3px 8px -3px ${platformBrandColor}66`,
+                            }}
+                          >
+                            {platformBrandLogo && <img className="client-grid-badge-logo" src={platformBrandLogo} alt="" />}
+                            {c.platform}
+                          </span>
+                        ) : '—'}
+                      </div>
+                      <div className="client-grid-plain">{c.source || '—'}</div>
+                      <div className="client-grid-plain">
+                        {countryMeta ? (
+                          <span className="client-grid-country">
+                            <span className={flagClass(countryMeta.code)} />
+                            {countryMeta.name}
+                          </span>
+                        ) : '—'}
+                      </div>
+                      <div>{(dealsByClient[c.id] || []).length || '—'}</div>
+                      <div className="client-grid-date">
+                        <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
+                        {c.updated_at ? new Date(c.updated_at).toLocaleDateString('uk-UA') : '—'}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               {filtered.length > PAGE_SIZE && (
                 <div className="month-pagination">
@@ -314,98 +416,21 @@ export default function ClientsDirectory() {
                 </div>
               )}
             </div>
-
-            {selected && (
-              <div className="client-panel">
-                <button type="button" className="client-panel-close" onClick={() => setSelected(null)}>&times;</button>
-                <div className="client-panel-head">
-                  <ClientAvatar name={selected.name} size={44} />
-                  <div>
-                    <h3>{selected.name}</h3>
-                    <span className="status-dot-wrap">{(dealsByClient[selected.id] || []).length || 0} угод</span>
-                  </div>
-                </div>
-                <div className="client-panel-actions">
-                  <button type="button" className="btn" onClick={() => navigate(`/reports/clients-directory/${selected.id}`)}>Відкрити профіль</button>
-                  <button type="button" className="btn" onClick={() => setEditingBasic((v) => !v)}>{editingBasic ? 'Готово' : 'Редагувати'}</button>
-                  <button type="button" className="btn btn-p" onClick={() => setAddDealOpen(true)}>+ Створити угоду</button>
-                </div>
-
-                <div className="client-panel-tabs">
-                  {TABS.map((t) => (
-                    <button key={t.key} type="button" className={'client-panel-tab' + (activeTab === t.key ? ' active' : '')} onClick={() => setActiveTab(t.key)}>
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-
-                {activeTab === 'info' && (
-                  <div className="client-panel-info">
-                    {editingBasic ? (
-                      <>
-                        <div className="task-filter-row">
-                          <label>Ім'я</label>
-                          <input type="text" value={selected.name || ''} onChange={(e) => patchSelected({ name: e.target.value })} />
-                        </div>
-                        <div className="task-filter-row">
-                          <label>Компанія</label>
-                          <input type="text" value={selected.company || ''} onChange={(e) => patchSelected({ company: e.target.value })} />
-                        </div>
-                      </>
-                    ) : (
-                      <div className="task-filter-row"><label>Компанія</label><span>{selected.company || '—'}</span></div>
-                    )}
-                    <div className="task-filter-row">
-                      <label>Платформа</label>
-                      <select value={selected.platform || ''} onChange={(e) => patchSelected({ platform: e.target.value })}>
-                        {CLIENT_PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                    </div>
-                    <div className="task-filter-row">
-                      <label>Тип клієнта</label>
-                      <select value={selected.lead_type || ''} onChange={(e) => patchSelected({ lead_type: e.target.value })}>
-                        {CLIENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-                    {(selected.tags || []).length > 0 && (
-                      <div className="client-panel-tags">
-                        {selected.tags.map((tag) => (
-                          <span className="tag-chip" key={tag} style={{ background: colorForTag(tag) }}>{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                    <div className="client-history-label">Угоди клієнта</div>
-                    {(dealsByClient[selected.id] || []).length === 0 ? (
-                      <p className="client-history-empty">Угод ще немає.</p>
-                    ) : (
-                      <div className="client-history-list">
-                        {dealsByClient[selected.id].map((d) => (
-                          <div className="client-history-item" key={d.id}>
-                            <div className="client-history-week">{d.pipelines?.name ? `${d.pipelines.name} · ` : ''}{d.deal_stages?.label}{d.amount ? ` · ${Number(d.amount).toLocaleString('uk-UA')} ${d.currency}` : ''}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <button type="button" className="btn" onClick={() => navigate('/reports/deals')} style={{ marginTop: 10 }}>Переглянути в Угодах</button>
-                  </div>
-                )}
-                {activeTab === 'activity' && <ClientActivityTab clientId={selected.id} name={selected.name} />}
-                {activeTab === 'notes' && <ClientNotesTab notes={selected.notes} onSave={(notes) => patchSelected({ notes })} />}
-                {activeTab === 'files' && <ClientFilesTab clientId={selected.id} uploadedBy={email} />}
-              </div>
-            )}
           </div>
         )}
       </section>
 
-      {addDealOpen && selected && pipelines.length > 0 && (
-        <AddDealModal
-          pipelines={pipelines}
-          defaultPipelineId={pipelines.find((p) => p.name === selected.platform)?.id || pipelines[0]?.id}
-          presetClient={selected}
-          profiles={profiles}
-          onClose={() => setAddDealOpen(false)}
-          onCreated={reloadDeals}
+      {importOpen && (
+        <ImportContactsModal
+          onClose={() => setImportOpen(false)}
+          onImported={reloadClients}
+        />
+      )}
+
+      {createOpen && (
+        <CreateClientModal
+          onClose={() => setCreateOpen(false)}
+          onCreated={(client) => navigate(`/reports/clients-directory/${client.id}`)}
         />
       )}
     </div>

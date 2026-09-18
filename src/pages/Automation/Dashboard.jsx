@@ -6,6 +6,7 @@ import DeltaBadge from '../../components/Automation/DeltaBadge';
 import Sparkline from '../../components/Automation/Sparkline';
 import DashboardTaskCard from '../../components/Automation/DashboardTaskCard';
 import { fetchTasksSince } from '../../lib/api/tasks';
+import { fetchDepartmentIdByName } from '../../lib/api/departments';
 import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, daysInMonth, MONTH_NAMES } from '../../lib/dateHelpers';
 import { deriveTaskStatus } from '../../lib/taskStatus';
 import { SECTION_ICONS, CHANNEL_ICONS } from '../../lib/reportIcons';
@@ -87,7 +88,8 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchTasksSince(addDaysIso(todayI, -FETCH_DAYS_BACK))
+    fetchDepartmentIdByName('Відділ автоматизації')
+      .then((deptId) => fetchTasksSince(addDaysIso(todayI, -FETCH_DAYS_BACK), deptId))
       .then((rows) => { if (!cancelled) setTasks(rows); })
       .catch((e) => console.warn('fetchTasksSince failed', e))
       .finally(() => { if (!cancelled) setLoading(false); });

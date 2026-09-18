@@ -2,9 +2,23 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import LeaveCard from '../../components/Team/LeaveCard';
 import { fetchLeaveForMonth, fetchProfilesByEmails } from '../../lib/api/leaveRequests';
-import { MONTH_NAMES, daysInMonth, isoDate } from '../../lib/dateHelpers';
+import { MONTH_NAMES, daysInMonth, isoDate, todayIso } from '../../lib/dateHelpers';
+import { LEAVE_TYPES, leaveTypeInfo } from '../../lib/leaveTypes';
 import '../../styles/reportPage.css';
 import '../../styles/teamPage.css';
+
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+
+// Monday-start grid for the month — leading `null`s pad out to the first
+// real day so the weekday columns line up.
+function buildCells(year, month) {
+  const total = daysInMonth(year, month);
+  const dow = new Date(year, month - 1, 1).getDay();
+  const leading = dow === 0 ? 6 : dow - 1;
+  const cells = Array(leading).fill(null);
+  for (let d = 1; d <= total; d++) cells.push(d);
+  return cells;
+}
 
 function initialPeriod() {
   const now = new Date();
@@ -42,6 +56,22 @@ export default function TeamCalendar() {
     return () => { cancelled = true; };
   }, [period.year, period.month]);
 
+  const monthStart = isoDate(period.year, period.month, 1);
+  const monthEnd = isoDate(period.year, period.month, daysInMonth(period.year, period.month));
+  const today = todayIso();
+
+  const dotsByDay = {};
+  rows.forEach((r) => {
+    const from = r.date_start < monthStart ? monthStart : r.date_start;
+    const to = r.date_end > monthEnd ? monthEnd : r.date_end;
+    const typeKey = leaveTypeInfo(r.type).key;
+    for (let d = new Date(from); isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate()) <= to; d.setDate(d.getDate() + 1)) {
+      const day = d.getDate();
+      (dotsByDay[day] ||= new Set()).add(typeKey);
+    }
+  });
+  const usedTypes = LEAVE_TYPES.filter((t) => rows.some((r) => leaveTypeInfo(r.type).key === t.key));
+
   return (
     <div className="report-page">
       <div className="page-actions">
@@ -69,6 +99,37 @@ export default function TeamCalendar() {
               {MONTH_NAMES.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}
             </select>
           </div>
+        </div>
+
+        <div className="teamcal-grid-wrap">
+          <div className="mini-cal-grid">
+            {WEEKDAYS.map((w) => <div key={w} className="mini-cal-dow">{w}</div>)}
+            {buildCells(period.year, period.month).map((d, i) => {
+              if (d === null) return <div key={`b${i}`} className="mini-cal-cell mini-cal-cell--blank" />;
+              const iso = isoDate(period.year, period.month, d);
+              const dots = dotsByDay[d];
+              return (
+                <div key={d} className={'mini-cal-cell' + (iso === today ? ' is-today' : '')}>
+                  <span>{d}</span>
+                  {dots && (
+                    <span className="mini-cal-dots">
+                      {[...dots].map((key) => (
+                        <span key={key} className="mini-cal-dot" style={{ background: leaveTypeInfo(key).color }} />
+                      ))}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {usedTypes.length > 0 && (
+            <div className="mini-cal-legend">
+              {usedTypes.map((t) => (
+                <span key={t.key}><span className="mini-cal-dot" style={{ background: t.color }} />{t.label}</span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="leave-list">

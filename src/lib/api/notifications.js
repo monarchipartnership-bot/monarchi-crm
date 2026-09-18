@@ -36,6 +36,30 @@ export async function createMentionNotification({ recipientEmail, senderEmail, d
   if (error) console.warn('createMentionNotification failed', error);
 }
 
+// Unlike mentions, self-assignment is NOT skipped — setting a task/call on
+// yourself ("нагадай мені...") is a normal way to use this, and should still
+// leave a receipt in the notification feed alongside its later reminder
+// (which never skips self-created items either).
+// `dealTitle`/`clientLabel`/`scheduledAt` are snapshotted onto the row at
+// creation time (same as the server-side reminder writer) so the bell panel
+// can show "угода / клієнт / опис / час" without fetching deals itself.
+export async function createTaskAssignedNotification({ recipientEmail, senderEmail, dealId, taskId, noteExcerpt, dealTitle, clientLabel, scheduledAt, activityType }) {
+  if (!recipientEmail) return;
+  const { error } = await supabase.from('notifications').insert({
+    recipient_email: recipientEmail,
+    sender_email: senderEmail || null,
+    type: 'assigned',
+    deal_id: dealId || null,
+    task_id: taskId || null,
+    note_excerpt: noteExcerpt || null,
+    deal_title: dealTitle || null,
+    client_label: clientLabel || null,
+    task_scheduled_at: scheduledAt || null,
+    activity_type: activityType || null,
+  });
+  if (error) console.warn('createTaskAssignedNotification failed', error);
+}
+
 export async function markNotificationRead(id) {
   const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
   if (error) console.warn('markNotificationRead failed', error);
