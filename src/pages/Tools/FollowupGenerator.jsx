@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { DEFAULT_PROJECTS } from '../../lib/followupData';
 import { loadProjectsCache, fetchProjectsFromSheet, generateOldLeadFollowup, generateFollowupStep } from '../../lib/api/followupApi';
 import { logActivity } from '../../lib/api/activityLog';
+import { addDealNote } from '../../lib/api/dealNotes';
+import { createTask } from '../../lib/api/tasks';
+import { createTaskAssignedNotification } from '../../lib/api/notifications';
 import { copyToClipboard } from '../../lib/clipboard';
 import '../../styles/reportPage.css';
 import '../../styles/followupPage.css';
@@ -19,6 +22,13 @@ const SERIES_STEPS = [
   { step: 5, hint: 'день 12', info: 'FU5, через 5 днів після FU4. Останній контакт — коротке (2-4 речення) шанобливе повідомлення, просте так/ні питання, без тиску, двері залишаються відкритими.' },
 ];
 
+const FORMAT_LABELS = { upwork: 'Upwork chat', email: 'Email' };
+
+// Days to wait after step N before step N+1 is due — matches SERIES_STEPS'
+// own hints (день 1/2/4/7/12) exactly: 1→2 is +1 day, 2→3 is +2, 3→4 is +3,
+// 4→5 is +5. Used to auto-schedule the next step as a deal task.
+const STEP_GAP_DAYS = { 1: 1, 2: 2, 3: 3, 4: 5 };
+
 function pluralCases(n) {
   if (n % 10 === 1 && n % 100 !== 11) return 'кейс';
   if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'кейси';
@@ -28,6 +38,11 @@ function pluralCases(n) {
 export default function FollowupGenerator() {
   const navigate = useNavigate();
   const { email } = useAuth();
+  // Opened from a deal's "Follow-up" button (DealDetailModal.jsx) carries the
+  // deal's client name + a built extraContext (niche/qualification/source +
+  // recent notes) via router state — a plain refresh loses it, same as any
+  // other router-state prefill, which is fine since it's just a convenience.
+  const { state: prefill } = useLocation();
 
   const [projects, setProjects] = useState(DEFAULT_PROJECTS);
   const [dbMeta, setDbMeta] = useState(`База: ${DEFAULT_PROJECTS.length} проєктів (вбудовано за замовчуванням)`);
@@ -37,13 +52,13 @@ export default function FollowupGenerator() {
   const [casesModalOpen, setCasesModalOpen] = useState(false);
   const [draftSelected, setDraftSelected] = useState(new Set());
 
-  const [clientName, setClientName] = useState('');
+  const [clientName, setClientName] = useState(prefill?.clientName || '');
   const [language, setLanguage] = useState('English');
   const [leadType, setLeadType] = useState('old'); // 'old' — one-off follow-up; 'fresh' — 5-message series
   const [activeStep, setActiveStep] = useState(1); // which FU step is shown/generated, leadType 'fresh'
   const [format, setFormat] = useState('upwork'); // 'upwork' | 'email'
   const [chat, setChat] = useState('');
-  const [extraContext, setExtraContext] = useState('');
+  const [extraContext, setExtraContext] = useState(prefill?.extraContext || '');
 
   const [status, setStatus] = useState({ text: '', error: false });
   const [generating, setGenerating] = useState(false);
@@ -166,21 +181,70 @@ export default function FollowupGenerator() {
     setStepData({});
   }
 
+  // Opened from a deal (prefill.dealId set) — logging the copied message as
+  // a deal note is what actually closes the loop: without this, a generated
+  // follow-up lived only in the clipboard and nowhere in the deal's own
+  // history. Fire-and-forget (a failed note write shouldn't block the copy
+  // the user is actually waiting on).
+  function saveFollowupToDeal(label, text) {
+    if (!prefill?.dealId) return;
+    addDealNote(prefill.dealId, `${label}:\n${text}`, email).catch((e) => console.warn('addDealNote (follow-up) failed', e));
+  }
+
   function handleCopy() {
     if (!result) return;
     copyToClipboard(result.messagePart)
       .then(() => {
-        setCopyLabel('Скопійовано');
-        setTimeout(() => setCopyLabel('Скопіювати'), 2000);
+        saveFollowupToDeal(`Follow-up (${FORMAT_LABELS[format]}, ${language})`, result.messagePart);
+        setCopyLabel(prefill?.dealId ? 'Скопійовано і збережено в угоду' : 'Скопійовано');
+        setTimeout(() => setCopyLabel('Скопіювати'), 2500);
       })
       .catch(() => window.prompt('Скопіюйте текст вручну:', result.messagePart));
   }
 
+  // Auto-schedules the NEXT step of the 5-message series as a deal task —
+  // assigned to that deal's own manager (resolved to a real email in
+  // DealDetailModal.jsx, since deals.manager itself only stores a display
+  // name) so the reminder/notification shows up for that one person, not
+  // the whole team. department_id stays null — this is a deal-tied task,
+  // same rule as every other task created from a deal's own card, never a
+  // Task Manager department task.
+  async function scheduleNextStepTask(step) {
+    if (!prefill?.dealId || !prefill?.managerEmail) return;
+    const nextStep = step + 1;
+    const gapDays = STEP_GAP_DAYS[step];
+    if (!gapDays || nextStep > SERIES_STEPS.length) return;
+    const due = new Date();
+    due.setDate(due.getDate() + gapDays);
+    const scheduledAt = due.toISOString();
+    const text = `Написати Follow-up ${nextStep} клієнту ${prefill.clientName || ''}`.trim();
+    try {
+      const row = await createTask({
+        text, assigneeEmail: prefill.managerEmail, departmentId: null,
+        clientId: prefill.clientId || null, dealId: prefill.dealId,
+        createdByEmail: email, activityType: 'task', scheduledAt,
+      });
+      await createTaskAssignedNotification({
+        recipientEmail: prefill.managerEmail, senderEmail: email,
+        dealId: prefill.dealId, taskId: row.id, noteExcerpt: text,
+        dealTitle: prefill.dealTitle || prefill.clientName || 'Угода',
+        clientLabel: prefill.clientName || null,
+        scheduledAt, activityType: 'task',
+      });
+      setStatus({ text: `Заплановано Follow-up ${nextStep} на ${due.toLocaleDateString('uk-UA')}.`, error: false });
+    } catch (e) {
+      console.warn('scheduleNextStepTask failed', e);
+    }
+  }
+
   function handleCopyStep(step, text) {
-    setStepData((prev) => ({ ...prev, [step]: { ...prev[step], copyLabel: 'Скопійовано' } }));
+    const label = prefill?.dealId ? 'Скопійовано і збережено в угоду' : 'Скопійовано';
+    setStepData((prev) => ({ ...prev, [step]: { ...prev[step], copyLabel: label } }));
     copyToClipboard(text)
       .then(() => {
-        setTimeout(() => setStepData((prev) => ({ ...prev, [step]: { ...prev[step], copyLabel: undefined } })), 2000);
+        saveFollowupToDeal(`Follow-up ${step} (${FORMAT_LABELS[format]}, ${language})`, text);
+        scheduleNextStepTask(step);
+        setTimeout(() => setStepData((prev) => ({ ...prev, [step]: { ...prev[step], copyLabel: undefined } })), 2500);
       })
       .catch(() => window.prompt('Скопіюйте текст вручну:', text));
   }
@@ -198,6 +262,11 @@ export default function FollowupGenerator() {
       <section className="rpt-hero">
         <h1>Follow-up <span style={{ color: 'var(--purple)' }}>Generator</span></h1>
         <p className="sub">AI-генератор персоналізованих follow-up повідомлень для клієнтів Sales Department на основі переписки та кейсів агентства.</p>
+        {prefill?.clientName && (
+          <p className="sub" style={{ color: 'var(--purple)' }}>
+            Підтягнуто дані угоди «{prefill.clientName}» — залишилось вставити переписку.
+          </p>
+        )}
       </section>
 
       <div className="field full">

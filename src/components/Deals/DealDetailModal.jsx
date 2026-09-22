@@ -260,6 +260,48 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
     fetchDealNotes(deal.id).then(setDealNotes).finally(() => setNotesLoading(false));
   }
 
+  // Follow-up Generator has no verbatim chat transcript to pull from (the
+  // deal only stores a chat_link URL, not message text) — so instead of
+  // "chat", this feeds its optional "extraContext" field with everything the
+  // deal itself already knows: niche/qualification/source plus the last few
+  // notes, stripped of the notes editor's own HTML formatting.
+  function buildFollowupExtraContext() {
+    const lines = [];
+    const clientLabel = deal.clients?.company || deal.clients?.name;
+    if (clientLabel) lines.push(`Клієнт: ${clientLabel}`);
+    if (niche) lines.push(`Ніша: ${niche}`);
+    if (qualification) lines.push(`Кваліфікація: ${qualification}`);
+    if (source) lines.push(`Джерело: ${source}`);
+    const recentNotes = dealNotes.slice(0, 5)
+      .map((n) => {
+        const text = htmlToPlainText(n.text || '').trim();
+        if (!text) return null;
+        const date = n.created_at ? new Date(n.created_at).toLocaleDateString('uk-UA') : '';
+        return `- ${date ? date + ': ' : ''}${text}`;
+      })
+      .filter(Boolean);
+    if (recentNotes.length) lines.push('', 'Останні нотатки по угоді:', ...recentNotes);
+    return lines.join('\n');
+  }
+
+  function handleOpenFollowup() {
+    // deals.manager stores the owner's display LABEL (same vocabulary as the
+    // "Owner" field's own Select — value: p.label), not an email — resolve
+    // it back to a real email via the profiles list so the auto-scheduled
+    // next-step task/notification can be scoped to that one person.
+    const managerEmail = profiles.find((p) => p.label === deal.manager)?.email || '';
+    navigate('/tools/followup', {
+      state: {
+        dealId: deal.id,
+        clientId: deal.client_id,
+        clientName: deal.clients?.name || '',
+        dealTitle: deal.title || deal.clients?.company || deal.clients?.name || 'Угода',
+        managerEmail,
+        extraContext: buildFollowupExtraContext(),
+      },
+    });
+  }
+
   useEffect(() => {
     reloadTasks();
     reloadParticipants();
@@ -542,6 +584,9 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
               <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Повернути в роботу
             </button>
           )}
+          <button type="button" className="btn" onClick={handleOpenFollowup} title="Відкрити Follow-up Generator з даними цієї угоди">
+            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.megaphone }} /> Follow-up
+          </button>
           <div className="deal-kebab-wrap" ref={kebabRef}>
             <button type="button" className="btn deal-kebab-btn" title="Дії з угодою" aria-label="Дії з угодою" onClick={() => setMenuOpen((o) => !o)}>
               <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.more }} />
