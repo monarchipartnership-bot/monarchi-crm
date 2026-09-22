@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { DEFAULT_PROJECTS } from '../../lib/followupData';
-import { loadProjectsCache, fetchProjectsFromSheet, generateOldLeadFollowup, generateFollowupStep } from '../../lib/api/followupApi';
+import { generateOldLeadFollowup, generateFollowupStep } from '../../lib/api/followupApi';
+import { fetchFollowupCases, createFollowupCase, updateFollowupCase, deleteFollowupCase } from '../../lib/api/followupCases';
 import { logActivity } from '../../lib/api/activityLog';
 import { addDealNote } from '../../lib/api/dealNotes';
 import { createTask } from '../../lib/api/tasks';
@@ -44,13 +44,22 @@ export default function FollowupGenerator() {
   // other router-state prefill, which is fine since it's just a convenience.
   const { state: prefill } = useLocation();
 
-  const [projects, setProjects] = useState(DEFAULT_PROJECTS);
-  const [dbMeta, setDbMeta] = useState(`База: ${DEFAULT_PROJECTS.length} проєктів (вбудовано за замовчуванням)`);
+  // { id, name, desc } — own Supabase-backed case-study database, replacing
+  // the old Google Sheets + MCP-connector read. Selection sets hold real
+  // case ids now (not array indices), so adding/editing/deleting a case
+  // never silently shifts what's selected.
+  const [projects, setProjects] = useState([]);
+  const [casesLoading, setCasesLoading] = useState(true);
   const [selected, setSelected] = useState(new Set());
-  const [refreshing, setRefreshing] = useState(false);
 
   const [casesModalOpen, setCasesModalOpen] = useState(false);
   const [draftSelected, setDraftSelected] = useState(new Set());
+  const [newCaseName, setNewCaseName] = useState('');
+  const [newCaseDesc, setNewCaseDesc] = useState('');
+  const [savingCase, setSavingCase] = useState(false);
+  const [editingCaseId, setEditingCaseId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
 
   const [clientName, setClientName] = useState(prefill?.clientName || '');
   const [language, setLanguage] = useState('English');
@@ -70,24 +79,24 @@ export default function FollowupGenerator() {
   // { message, caseUsed, generating, error, copyLabel }.
   const [stepData, setStepData] = useState({});
 
-  // Load a previously-fetched cache of the sheet, if any (real-browser
-  // equivalent of the legacy window.storage cache).
-  useEffect(() => {
-    const cached = loadProjectsCache();
-    if (cached) {
-      setProjects(cached.projects);
-      setDbMeta(`База: ${cached.projects.length} проєктів (оновлено ${new Date(cached.updatedAt).toLocaleString('uk-UA')})`);
-    }
-  }, []);
+function reloadCases() {
+    setCasesLoading(true);
+    return fetchFollowupCases()
+      .then((rows) => setProjects(rows.map((r) => ({ id: r.id, name: r.name, desc: r.description }))))
+      .finally(() => setCasesLoading(false));
+  }
+
+  useEffect(() => { reloadCases(); }, []);
 
   function openCasesModal() {
     setDraftSelected(new Set(selected));
+    setEditingCaseId(null);
     setCasesModalOpen(true);
   }
-  function toggleDraftSelected(i) {
+  function toggleDraftSelected(id) {
     setDraftSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(i)) next.delete(i); else next.add(i);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
@@ -96,24 +105,56 @@ export default function FollowupGenerator() {
     setCasesModalOpen(false);
   }
 
-  async function handleRefresh() {
-    setRefreshing(true);
-    setDbMeta('Оновлюю базу з Google Sheets...');
+  async function handleAddCase() {
+    const name = newCaseName.trim();
+    const desc = newCaseDesc.trim();
+    if (!name || !desc) return;
+    setSavingCase(true);
     try {
-      const { projects: fresh, updatedAt } = await fetchProjectsFromSheet();
-      setProjects(fresh);
-      setSelected(new Set());
-      setDraftSelected(new Set());
-      setDbMeta(`База: ${fresh.length} проєктів (оновлено ${new Date(updatedAt).toLocaleString('uk-UA')})`);
-    } catch (err) {
-      setDbMeta('Не вдалося оновити базу: ' + err.message + '. Використовую попередню версію.');
+      await createFollowupCase({ name, description: desc });
+      await reloadCases();
+      setNewCaseName('');
+      setNewCaseDesc('');
+    } catch (e) {
+      alert('Помилка додавання кейсу: ' + (e.message || e));
     } finally {
-      setRefreshing(false);
+      setSavingCase(false);
+    }
+  }
+
+  function handleStartEditCase(p) {
+    setEditingCaseId(p.id);
+    setEditName(p.name);
+    setEditDesc(p.desc);
+  }
+
+  async function handleSaveEditCase() {
+    const name = editName.trim();
+    const desc = editDesc.trim();
+    if (!name || !desc) return;
+    try {
+      await updateFollowupCase(editingCaseId, { name, description: desc });
+      await reloadCases();
+      setEditingCaseId(null);
+    } catch (e) {
+      alert('Помилка збереження кейсу: ' + (e.message || e));
+    }
+  }
+
+  async function handleDeleteCase(id) {
+    if (!confirm('Видалити цей кейс?')) return;
+    try {
+      await deleteFollowupCase(id);
+      setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      setDraftSelected((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      await reloadCases();
+    } catch (e) {
+      alert('Помилка видалення кейсу: ' + (e.message || e));
     }
   }
 
   function buildArgs() {
-    const selectedProjects = Array.from(selected).map((i) => projects[i]);
+    const selectedProjects = Array.from(selected).map((id) => projects.find((p) => p.id === id)).filter(Boolean);
     return {
       chat: chat.trim(),
       extraContext: extraContext.trim(),
@@ -398,18 +439,42 @@ export default function FollowupGenerator() {
             <div className="caseModal-body">
               <div className="projListHead">
                 <span className="hint">AI сам обере найрелевантніший під нішу клієнта — можна обрати вручну</span>
-                <button type="button" className="refreshBtn" onClick={handleRefresh} disabled={refreshing}>
-                  {refreshing ? '...' : 'Оновити базу з Google Sheets'}
+              </div>
+              <div className="dbMeta">{casesLoading ? 'Завантаження...' : `База: ${projects.length} ${pluralCases(projects.length)}`}</div>
+
+              <div className="caseAddRow">
+                <input type="text" value={newCaseName} onChange={(e) => setNewCaseName(e.target.value)} placeholder="Назва кейсу" />
+                <input type="text" value={newCaseDesc} onChange={(e) => setNewCaseDesc(e.target.value)} placeholder="Опис результатів" />
+                <button type="button" className="btn btn-p" onClick={handleAddCase} disabled={!newCaseName.trim() || !newCaseDesc.trim() || savingCase}>
+                  {savingCase ? '...' : '+ Додати'}
                 </button>
               </div>
-              <div className="dbMeta">{dbMeta}</div>
+
               <div className="projectList">
-                {projects.map((p, i) => (
-                  <label className="projItem" key={i}>
-                    <input type="checkbox" checked={draftSelected.has(i)} onChange={() => toggleDraftSelected(i)} />
-                    <span className="pText"><span className="pName">{p.name}</span> — <span className="pDesc">{p.desc}</span></span>
-                  </label>
+                {projects.map((p) => (
+                  editingCaseId === p.id ? (
+                    <div className="projItem projItem-editing" key={p.id}>
+                      <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Назва кейсу" />
+                      <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Опис результатів" />
+                      <span className="projItemActions">
+                        <button type="button" onClick={handleSaveEditCase}>Зберегти</button>
+                        <button type="button" onClick={() => setEditingCaseId(null)}>Скасувати</button>
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="projItem" key={p.id}>
+                      <label className="pCheckLabel">
+                        <input type="checkbox" checked={draftSelected.has(p.id)} onChange={() => toggleDraftSelected(p.id)} />
+                        <span className="pText"><span className="pName">{p.name}</span> — <span className="pDesc">{p.desc}</span></span>
+                      </label>
+                      <span className="projItemActions">
+                        <button type="button" onClick={() => handleStartEditCase(p)}>Редагувати</button>
+                        <button type="button" className="danger" onClick={() => handleDeleteCase(p.id)}>Видалити</button>
+                      </span>
+                    </div>
+                  )
                 ))}
+                {!casesLoading && projects.length === 0 && <div className="dbMeta" style={{ padding: 12 }}>Ще немає жодного кейсу — додайте перший вище.</div>}
               </div>
             </div>
             <div className="caseModal-foot">

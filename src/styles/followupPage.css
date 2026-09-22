@@ -116,13 +116,28 @@ button.generate-btn:disabled { opacity: .55; cursor: not-allowed; }
 .dbMeta { font-family: var(--font-body); font-size: .72rem; color: var(--muted); margin-bottom: 9px; }
 
 .projectList { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 6px 4px; max-height: 320px; overflow-y: auto; }
-.projItem { display: flex; align-items: flex-start; gap: 10px; padding: 10px 13px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.projItem { display: flex; align-items: flex-start; gap: 10px; padding: 10px 13px; border-bottom: 1px solid var(--border); }
 .projItem:last-child { border-bottom: none; }
 .projItem:hover { background: #fff; }
 .projItem input { margin-top: 3px; accent-color: var(--purple); cursor: pointer; }
 .projItem .pText { font-family: var(--font-body); font-size: .82rem; line-height: 1.5; color: var(--ink); }
 .projItem .pName { color: var(--purple); font-weight: 600; }
 .projItem .pDesc { color: var(--muted); }
+.pCheckLabel { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
+.projItemActions { display: flex; gap: 6px; flex: none; }
+.projItemActions button { background: none; border: none; color: var(--muted); font-size: .72rem; font-family: var(--font-body); cursor: pointer; padding: 2px 4px; transition: color .15s; }
+.projItemActions button:hover { color: var(--purple); }
+.projItemActions button.danger:hover { color: var(--bad); }
+
+.caseAddRow { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.caseAddRow input { flex: 1 1 140px; font-family: var(--font-body); font-size: .82rem; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--ink); }
+.caseAddRow input:focus { outline: none; border-color: var(--purple); }
+.caseAddRow button { flex: none; }
+
+.projItem-editing { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 13px; }
+.projItem-editing input { font-family: var(--font-body); font-size: .82rem; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; color: var(--ink); }
+.projItem-editing input:focus { outline: none; border-color: var(--purple); }
+.projItem-editing .projItemActions { justify-content: flex-end; }
 
 /* Cases picker popup */
 .caseModal-overlay { position: fixed; inset: 0; background: rgba(33, 18, 40, .45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }

@@ -22,12 +22,6 @@ export default async function handler(req, res) {
     'x-api-key': apiKey,
     'anthropic-version': '2023-06-01',
   };
-  // The "оновити базу з Google Sheets" call uses a remote MCP connector,
-  // which needs this beta header — every other call omits mcp_servers and
-  // doesn't need it.
-  if (Array.isArray(body.mcp_servers) && body.mcp_servers.length) {
-    headers['anthropic-beta'] = 'mcp-client-2025-04-04';
-  }
 
   try {
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
