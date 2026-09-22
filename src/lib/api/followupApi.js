@@ -5,11 +5,11 @@ import {
 } from '../followupPrompt';
 
 // Type 1/2 — a single follow-up for a lead gone cold long ago.
-export async function generateOldLeadFollowup({ chat, extraContext, nameOverride, language, format, projects, selectedProjects }) {
+export async function generateOldLeadFollowup({ chat, extraContext, nameOverride, language, format, style, projects, selectedProjects }) {
   const projectsBlock = (selectedProjects.length ? selectedProjects : projects)
     .map((p) => `- ${p.name}: ${p.desc}`).join('\n');
 
-  const systemPrompt = buildOldLeadSystemPrompt({ language, format });
+  const systemPrompt = buildOldLeadSystemPrompt({ language, format, style });
   const userMsg = buildUserMessage({ chat, nameOverride, projectsBlock, extraContext });
 
   const response = await fetch(API_ENDPOINT, {

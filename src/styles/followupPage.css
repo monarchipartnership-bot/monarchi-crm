@@ -24,6 +24,67 @@
 .followup-page .switch button + button { border-left: 1px solid var(--border); }
 .followup-page .switch button.on + button, .followup-page .switch button.on { border-left-color: var(--purple); }
 
+/* Control row — Тип ліда / Формат / Ім'я / Мова / Кейси as one "solid white
+   card" (locked design system: box-shadow 0 4px 18px rgba(80,30,100,.07)),
+   split into 5 segments by hairline dividers instead of 5 separate boxes —
+   less dead air than one box per field, still keeps each field legible. */
+.fu-control-row {
+  display: flex; flex-wrap: wrap; margin-bottom: 18px;
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07); overflow: hidden;
+}
+.fu-control-box {
+  flex: 1 1 200px; min-width: 0; padding: 10px 16px;
+  display: flex; flex-direction: column;
+}
+.fu-control-box + .fu-control-box { border-left: 1px solid var(--border); }
+.fu-control-head { display: flex; align-items: center; gap: 8px; margin-bottom: 13px; }
+.fu-control-icon {
+  flex: none; width: 24px; height: 24px; border-radius: 7px; color: #fff;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px -3px rgba(37, 28, 48, .45);
+}
+.fu-control-icon svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fu-control-label { font-family: var(--font-head); font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+
+/* All 5 controls (switch / input / select / case-picker) share one fixed
+   height so they line up on the same horizontal band regardless of each
+   field's own content — the switch text is what used to force 2 lines and
+   throw the row out of alignment, so it's pinned to one line here too. */
+.fu-control-box .switch,
+.followup-page .fu-control-box input[type="text"],
+.followup-page .fu-control-box .ui-select--bare .ui-select-trigger,
+.fu-control-box .case-picker-field {
+  min-height: 36px; box-sizing: border-box;
+}
+.fu-control-box .switch { border: none; background: var(--purple-tint); align-items: stretch; }
+.fu-control-box .switch button { background: transparent; padding: 0 8px; font-size: .72rem; white-space: nowrap; }
+.fu-control-box .switch button + button { border-left: 1px solid rgba(124, 58, 237, .15); }
+/* .followup-page prefix added on top of .fu-control-box so this beats the
+   general .followup-page input[type=text]/select rule further down the
+   file at equal specificity otherwise (same class+attribute count). A light
+   fill (not "border: none" all the way to invisible) keeps it reading as an
+   editable field instead of static label text. Only the field itself
+   highlights on focus, not the whole segment (was .fu-control-box:focus-within
+   before, which lit up the entire cell around it). */
+.followup-page .fu-control-box input[type="text"] {
+  border: none; background: var(--surface); border-radius: 8px; padding: 0 9px; width: 100%; transition: background .15s;
+}
+.followup-page .fu-control-box input[type="text"]:focus { background: var(--purple-tint); }
+.followup-page .fu-control-box .ui-select--bare .ui-select-trigger {
+  background: var(--surface); border-radius: 8px; padding: 0 9px; transition: background .15s;
+}
+.fu-control-box .case-picker-field { border: none; background: var(--surface); padding: 0 9px; }
+@media (max-width: 560px) {
+  .fu-control-box { flex-basis: 100%; }
+  .fu-control-box + .fu-control-box { border-left: none; border-top: 1px solid var(--border); }
+}
+
+/* "Крок серії" — same white-card recipe as the row above, so switching to
+   the 5-message series doesn't drop into a plainer, unboxed look. */
+.fu-step-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-bottom: 18px; }
+.step-btn-ic { display: inline-flex; margin-right: 6px; vertical-align: -2px; }
+.step-btn-ic svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
 /* "Крок серії" — a row of 5 tab+info pairs (one per FU step). */
 .step-switch { display: flex; gap: 8px; flex-wrap: wrap; }
 .step-switch-item { flex: 1 1 160px; display: flex; align-items: stretch; gap: 5px; }
@@ -78,35 +139,127 @@
   transition: border-color .15s; width: 100%;
 }
 .followup-page textarea:focus, .followup-page input[type=text]:focus, .followup-page select:focus { border-color: var(--purple); }
-.followup-page textarea#chatInput { min-height: 320px; line-height: 1.55; }
-.followup-page textarea#resultsInput { min-height: 64px; }
+.followup-page textarea#chatInput { min-height: 320px; line-height: 1.55; padding-bottom: 28px; }
+.followup-page textarea#resultsInput { min-height: 64px; padding-bottom: 28px; }
+
+/* Numbered step blocks — "Додатковий контекст" (1) / "Діалог з клієнтом" (2)
+   — same "solid white card" recipe (locked design system: box-shadow
+   0 4px 18px rgba(80,30,100,.07)) as the control row above, so this block
+   doesn't read as a bare field sitting directly on the page background. */
+.fu-work-block {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07); padding: 18px 20px;
+  margin-bottom: 18px;
+}
+.fu-work-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.fu-work-num {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; color: #fff;
+  background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 3px 8px -3px rgba(37, 28, 48, .45);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head); font-weight: 700; font-size: .78rem;
+}
+.fu-work-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fu-work-title { font-family: var(--font-head); font-size: .84rem; font-weight: 700; color: var(--ink); }
+.fu-work-hint { font-family: var(--font-body); font-size: .76rem; color: var(--muted); }
+.fu-work-head .btn { flex: none; margin-top: 1px; padding: 7px 13px; }
+
+/* "Тон повідомлення" — scrollable row of style-module pills (block 3, old-
+   lead flow only). Active pill reuses .btn-p's own gradient so it reads as
+   "selected" the same way the rest of the app marks a selection. Scrolled
+   with the two arrow buttons or the mouse wheel — same "our style" round
+   scroll-arrow + hidden-scrollbar pattern as DailyReportHero's day strip
+   (.daily-hero-scroll-btn in reportPage.css), not a visible scrollbar. */
+.fu-style-row-wrap { display: flex; align-items: center; gap: 8px; }
+.fu-style-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; flex: 1; min-width: 0; }
+.fu-style-row::-webkit-scrollbar { display: none; }
+.fu-style-scroll-btn {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; box-shadow: 0 6px 14px -6px rgba(37, 28, 48, .25);
+  transition: border-color .15s, color .15s, transform .15s;
+}
+.fu-style-scroll-btn:hover { border-color: var(--purple); color: var(--purple); transform: scale(1.06); }
+.fu-style-scroll-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fu-style-pill {
+  flex: none; display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-head); font-weight: 600; font-size: .78rem;
+  background: #fff; border: 1px solid var(--border); color: var(--ink-soft);
+  border-radius: 999px; padding: 9px 16px; cursor: pointer; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.fu-style-pill:hover { border-color: var(--purple); color: var(--purple); }
+.fu-style-pill.on {
+  background: linear-gradient(90deg, #7430b3 0%, #68229e 100%); border-color: transparent; color: #fff;
+  box-shadow: 0 6px 16px rgba(105, 35, 159, .22);
+}
+.fu-style-pill-ic { display: inline-flex; }
+.fu-style-pill-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.fu-textarea-wrap { position: relative; }
+.fu-char-count {
+  position: absolute; right: 12px; bottom: 9px; font-family: var(--font-body); font-size: .68rem;
+  color: var(--muted); background: #fff; padding: 1px 4px; border-radius: 4px; pointer-events: none;
+}
 
 /* Діалог з клієнтом (left) + Результат (right), side by side. */
-.workGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+/* minmax(0, 1fr) not the bare 1fr shorthand — a grid track's implicit
+   minimum is auto (min-content), so a nowrap child like .fu-style-row's
+   pill list would otherwise blow the column past the grid's own width
+   instead of triggering that child's own overflow-x scroll. */
+.workGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 @media (max-width: 860px) { .workGrid { grid-template-columns: 1fr; } }
 
 .chatActionsRow { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
-button.generate-btn {
-  font-family: var(--font-head); font-weight: 600; font-size: .86rem; letter-spacing: .03em;
-  background: var(--purple); color: #fff; border: none; border-radius: 10px;
-  padding: 13px 28px; cursor: pointer; transition: background .15s, transform .1s;
-}
-button.generate-btn:hover { background: var(--purple-hover); }
-button.generate-btn:active { transform: scale(.98); }
-button.generate-btn:disabled { opacity: .55; cursor: not-allowed; }
+/* Same two canonical tiers as everywhere else (.btn secondary / .btn-p
+   primary, locked design system) — just sized up a notch since this is the
+   page's one main call-to-action, not an inline toolbar button. */
+.chatActionsRow .btn { font-size: .86rem; padding: 13px 22px; }
 .followup-status { font-family: var(--font-body); font-size: .8rem; color: var(--muted); margin-top: 10px; min-height: 1.2em; }
 .followup-status.err { color: var(--bad); }
 
 .result-col { min-height: 100%; }
-.result-box { background: #fff; border: 1.5px solid var(--purple); border-radius: 10px; padding: 24px 26px; height: 100%; }
-.result-box.result-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-family: var(--font-body); font-size: .86rem; text-align: center; min-height: 320px; }
-.result-text { white-space: pre-wrap; font-family: var(--font-body); font-size: .94rem; line-height: 1.65; color: var(--ink); }
-.result-actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
-.result-actions button { font-family: var(--font-body); font-weight: 600; background: #fff; border: 1px solid var(--border); color: var(--ink-soft); border-radius: 8px; padding: 8px 16px; font-size: .76rem; cursor: pointer; transition: border-color .15s, color .15s; }
-.result-actions button:hover { border-color: var(--purple); color: var(--purple); }
 
-.followup-meta { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--border); font-family: var(--font-body); font-size: .78rem; color: var(--muted); line-height: 1.6; }
-.followup-meta b { color: var(--purple); }
+/* "Результат" section header — icon badge + title, and (once a message
+   exists) a green "generated in Ns" pill sourced from a real timer around
+   the API call, not a made-up number. */
+.fu-result-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.fu-result-icon {
+  flex: none; width: 28px; height: 28px; border-radius: 8px; color: #fff;
+  background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 3px 8px -3px rgba(37, 28, 48, .45);
+  display: flex; align-items: center; justify-content: center;
+}
+.fu-result-icon svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fu-result-title { font-family: var(--font-head); font-size: .84rem; font-weight: 700; color: var(--ink); }
+.fu-gen-badge {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  background: #DCFCE7; color: #15803D; font-family: var(--font-head); font-weight: 700; font-size: .68rem;
+  padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+}
+.fu-gen-badge-ic { display: inline-flex; }
+.fu-gen-badge-ic svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+.result-box {
+  background: #fff; border: 1.5px solid var(--purple); border-radius: 10px; padding: 20px 22px; height: 100%;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07);
+}
+.result-box.result-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-family: var(--font-body); font-size: .86rem; text-align: center; min-height: 320px; }
+.result-box-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.result-box-icon {
+  flex: none; width: 32px; height: 32px; border-radius: 9px; color: #fff;
+  background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 3px 8px -3px rgba(37, 28, 48, .45);
+  display: flex; align-items: center; justify-content: center;
+}
+.result-box-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.result-box-head .btn { flex: none; padding: 7px 13px; }
+.result-text { white-space: pre-wrap; font-family: var(--font-body); font-size: .94rem; line-height: 1.65; color: var(--ink); }
+
+/* "Деталі генерації" — same real fields the old plain-text block showed
+   (date/tone/flow/name/essence/case/created), just as label/value rows in
+   a card instead of one dashed-border paragraph. */
+.fu-meta-card { margin-top: 18px; border-top: 1px dashed var(--border); padding-top: 4px; }
+.fu-meta-row { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.fu-meta-row:last-child { border-bottom: none; }
+.fu-meta-label { flex: none; font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.fu-meta-value { font-family: var(--font-body); font-size: .8rem; color: var(--ink); text-align: right; }
 
 .projListHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .projListHead label { margin-bottom: 0; }
