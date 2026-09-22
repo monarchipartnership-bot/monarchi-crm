@@ -111,6 +111,13 @@ export default function FollowupGenerator() {
   const [result, setResult] = useState(null); // { messagePart, date, tone, flow, name, essence, caseUsed } — leadType 'old'
   const [copyLabel, setCopyLabel] = useState('Скопіювати');
 
+  // Inline edit of the generated message, before copying — one textarea
+  // in place of the result text, saved back into `result`/`stepData` so a
+  // later copy or "save to deal" uses the edited version, not the original.
+  const [isEditingResult, setIsEditingResult] = useState(false);
+  const [editedText, setEditedText] = useState('');
+  useEffect(() => { setIsEditingResult(false); }, [leadType, activeStep]);
+
   // leadType 'fresh': per-step cache, keyed by step number, so each stage can
   // be generated on its own and switching tabs keeps what was already made —
   // { message, caseUsed, generating, error, copyLabel }.
@@ -212,6 +219,7 @@ function reloadCases() {
     setGenerating(true);
     setStatus({ text: 'Аналізую діалог...', error: false });
     setResult(null);
+    setIsEditingResult(false);
     const startedAt = Date.now();
 
     try {
@@ -233,6 +241,7 @@ function reloadCases() {
     }
     setStatus({ text: '', error: false });
     setStepData((prev) => ({ ...prev, [step]: { ...prev[step], generating: true, error: null } }));
+    setIsEditingResult(false);
     const startedAt = Date.now();
 
     const previousMessages = SERIES_STEPS
@@ -273,6 +282,23 @@ function reloadCases() {
   function saveFollowupToDeal(label, text) {
     if (!prefill?.dealId) return;
     addDealNote(prefill.dealId, `${label}:\n${text}`, email).catch((e) => console.warn('addDealNote (follow-up) failed', e));
+  }
+
+  function handleStartEditResult() {
+    const current = leadType === 'old' ? result?.messagePart : activeStepData.message;
+    setEditedText(current || '');
+    setIsEditingResult(true);
+  }
+  function handleCancelEditResult() {
+    setIsEditingResult(false);
+  }
+  function handleSaveEditResult() {
+    if (leadType === 'old') {
+      setResult((prev) => (prev ? { ...prev, messagePart: editedText } : prev));
+    } else {
+      setStepData((prev) => ({ ...prev, [activeStep]: { ...prev[activeStep], message: editedText } }));
+    }
+    setIsEditingResult(false);
   }
 
   function handleCopy() {
@@ -337,23 +363,20 @@ function reloadCases() {
   const isGenerating = leadType === 'fresh' ? !!activeStepData.generating : generating;
   const hasResult = leadType === 'fresh' ? !!activeStepData.message : !!result;
   const activeResult = leadType === 'old' ? result : activeStepData;
-  const languageLabel = LANGUAGE_OPTIONS.find((o) => o.value === language)?.label || language;
 
   // "Деталі генерації" card rows — same real fields the old plain-text
-  // .followup-meta block showed, just laid out as label/value rows instead
-  // of one paragraph. Built once here so both leadType branches below reuse it.
+  // .followup-meta block showed (minus Тип/Формат/Мова, already visible in
+  // the control row above and redundant here), each with an icon. Built once
+  // here so both leadType branches below reuse it.
   const metaRows = hasResult ? [
-    ['Тип', leadType === 'old' ? 'Follow-up старих лідів' : 'Follow-up поточних лідів'],
-    ...(leadType === 'fresh' ? [['Крок', `Follow-up ${activeStep}`]] : []),
-    ['Формат', FORMAT_LABELS[format]],
-    ['Мова', languageLabel],
-    ...(leadType === 'old' && result?.date ? [['Коли відбувалась розмова', result.date]] : []),
-    ...(leadType === 'old' && result?.tone ? [['Тон клієнта', result.tone]] : []),
-    ...(leadType === 'old' && result?.flow ? [['Хід розмови', result.flow]] : []),
-    ...(leadType === 'old' && result?.name ? [['Визначено ім\'я', result.name]] : []),
-    ...(leadType === 'old' && result?.essence ? [['Суть розмови', result.essence]] : []),
-    ...(activeResult?.caseUsed ? [['Кейс', activeResult.caseUsed]] : []),
-    ...(activeResult?.createdAt ? [['Створено', formatCreatedAt(activeResult.createdAt)]] : []),
+    ...(leadType === 'fresh' ? [{ icon: 'repeat', label: 'Крок', value: `Follow-up ${activeStep}` }] : []),
+    ...(leadType === 'old' && result?.date ? [{ icon: 'clock', label: 'Коли відбувалась розмова', value: result.date }] : []),
+    ...(leadType === 'old' && result?.tone ? [{ icon: 'meeting', label: 'Тон клієнта', value: result.tone }] : []),
+    ...(leadType === 'old' && result?.flow ? [{ icon: 'history', label: 'Хід розмови', value: result.flow }] : []),
+    ...(leadType === 'old' && result?.name ? [{ icon: 'user', label: 'Визначено ім\'я', value: result.name }] : []),
+    ...(leadType === 'old' && result?.essence ? [{ icon: 'document', label: 'Суть розмови', value: result.essence }] : []),
+    ...(activeResult?.caseUsed ? [{ icon: 'briefcase', label: 'Кейс', value: activeResult.caseUsed }] : []),
+    ...(activeResult?.createdAt ? [{ icon: 'day', label: 'Створено', value: formatCreatedAt(activeResult.createdAt) }] : []),
   ] : [];
 
   return (
@@ -370,11 +393,11 @@ function reloadCases() {
         <div className="fu-control-box">
           <div className="fu-control-head">
             <span className="fu-control-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.meeting }} />
-            <span className="fu-control-label">Тип ліда</span>
+            <span className="fu-control-label">Тип Follow-up</span>
           </div>
           <div className="switch">
-            <button type="button" className={leadType === 'old' ? 'on' : ''} onClick={() => setLeadType('old')}>Follow-up старих лідів</button>
-            <button type="button" className={leadType === 'fresh' ? 'on' : ''} onClick={() => setLeadType('fresh')}>Follow-up поточних лідів</button>
+            <button type="button" className={leadType === 'old' ? 'on' : ''} onClick={() => setLeadType('old')}>Одинарний</button>
+            <button type="button" className={leadType === 'fresh' ? 'on' : ''} onClick={() => setLeadType('fresh')}>5-ти кроковий</button>
           </div>
         </div>
 
@@ -440,7 +463,7 @@ function reloadCases() {
         </div>
       )}
 
-      <div className="field full fu-work-block">
+      <div className="fu-work-block">
         <div className="fu-work-head">
           <span className="fu-work-num">1</span>
           <div className="fu-work-head-text">
@@ -466,8 +489,8 @@ function reloadCases() {
               <button type="button" className="btn" onClick={handleClearChat}>Очистити</button>
             </div>
             <div className="fu-textarea-wrap">
-              <textarea id="chatInput" maxLength={4000} value={chat} onChange={(e) => setChat(e.target.value)} placeholder="Вставте сюди історію переписки з клієнтом..." />
-              <span className="fu-char-count">{chat.length}/4000</span>
+              <textarea id="chatInput" value={chat} onChange={(e) => setChat(e.target.value)} placeholder="Вставте сюди історію переписки з клієнтом..." />
+              {chat.length > 0 && <span className="fu-char-count">{chat.length} символів</span>}
             </div>
           </div>
 
@@ -515,6 +538,7 @@ function reloadCases() {
         </div>
 
         <div className="field result-col">
+          <div className="fu-work-block fu-result-block">
           <div className="fu-result-head">
             <span className="fu-result-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.megaphone }} />
             <span className="fu-result-title">Результат</span>
@@ -530,15 +554,40 @@ function reloadCases() {
               <div className="result-box">
                 <div className="result-box-head">
                   <span className="result-box-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[format === 'email' ? 'email' : 'chatLink'] }} />
-                  <button type="button" className="btn" onClick={handleCopy}>{copyLabel}</button>
+                  <div className="result-box-actions">
+                    {isEditingResult ? (
+                      <>
+                        <button type="button" className="btn" onClick={handleCancelEditResult}>Скасувати</button>
+                        <button type="button" className="btn btn-p" onClick={handleSaveEditResult}>Зберегти</button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="btn" onClick={handleStartEditResult}>
+                          <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }} />
+                          Редагувати
+                        </button>
+                        <button type="button" className="btn" onClick={handleCopy}>
+                          <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.copy }} />
+                          {copyLabel}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="result-text">{result.messagePart}</div>
+                {isEditingResult ? (
+                  <textarea className="fu-result-edit" value={editedText} onChange={(e) => setEditedText(e.target.value)} />
+                ) : (
+                  <div className="result-text">{result.messagePart}</div>
+                )}
                 {metaRows.length > 0 && (
                   <div className="fu-meta-card">
-                    {metaRows.map(([label, value]) => (
-                      <div className="fu-meta-row" key={label}>
-                        <span className="fu-meta-label">{label}</span>
-                        <span className="fu-meta-value">{value}</span>
+                    {metaRows.map((row) => (
+                      <div className="fu-meta-row" key={row.label}>
+                        <div className="fu-meta-label-col">
+                          <span className="fu-meta-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[row.icon] }} />
+                          <span className="fu-meta-label">{row.label}</span>
+                        </div>
+                        <span className="fu-meta-value">{row.value}</span>
                       </div>
                     ))}
                   </div>
@@ -551,15 +600,40 @@ function reloadCases() {
             <div className="result-box">
               <div className="result-box-head">
                 <span className="result-box-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[format === 'email' ? 'email' : 'chatLink'] }} />
-                <button type="button" className="btn" onClick={() => handleCopyStep(activeStep, activeStepData.message)}>{activeStepData.copyLabel || 'Скопіювати'}</button>
+                <div className="result-box-actions">
+                  {isEditingResult ? (
+                    <>
+                      <button type="button" className="btn" onClick={handleCancelEditResult}>Скасувати</button>
+                      <button type="button" className="btn btn-p" onClick={handleSaveEditResult}>Зберегти</button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className="btn" onClick={handleStartEditResult}>
+                        <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }} />
+                        Редагувати
+                      </button>
+                      <button type="button" className="btn" onClick={() => handleCopyStep(activeStep, activeStepData.message)}>
+                        <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.copy }} />
+                        {activeStepData.copyLabel || 'Скопіювати'}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="result-text">{activeStepData.message}</div>
+              {isEditingResult ? (
+                <textarea className="fu-result-edit" value={editedText} onChange={(e) => setEditedText(e.target.value)} />
+              ) : (
+                <div className="result-text">{activeStepData.message}</div>
+              )}
               {metaRows.length > 0 && (
                 <div className="fu-meta-card">
-                  {metaRows.map(([label, value]) => (
-                    <div className="fu-meta-row" key={label}>
-                      <span className="fu-meta-label">{label}</span>
-                      <span className="fu-meta-value">{value}</span>
+                  {metaRows.map((row) => (
+                    <div className="fu-meta-row" key={row.label}>
+                      <div className="fu-meta-label-col">
+                        <span className="fu-meta-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[row.icon] }} />
+                        <span className="fu-meta-label">{row.label}</span>
+                      </div>
+                      <span className="fu-meta-value">{row.value}</span>
                     </div>
                   ))}
                 </div>
@@ -570,6 +644,7 @@ function reloadCases() {
               {activeStepData.error ? <span className="followup-status err">Помилка: {activeStepData.error}</span> : `Тут з'явиться Follow-up ${activeStep}.`}
             </div>
           )}
+          </div>
         </div>
       </div>
 

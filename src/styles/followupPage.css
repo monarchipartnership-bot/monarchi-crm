@@ -13,7 +13,13 @@
 .grid4col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
 @media (max-width: 1080px) { .grid4col { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .grid4col { grid-template-columns: 1fr; } }
-.field { display: flex; flex-direction: column; margin-bottom: 18px; }
+/* .followup-page prefix beats imageStudioPage.css's own bare `.field` rule
+   (background/border/padding, meant only for its own page) at equal
+   specificity otherwise — a recurring unscoped-classname leak in this repo,
+   see memory migration_complete_clients_report.md. Without it, .field here
+   picked up a second card-like box wrapping the already-boxed numbered
+   blocks below (double nesting). */
+.followup-page .field { display: flex; flex-direction: column; margin-bottom: 18px; background: none; border: none; padding: 0; border-radius: 0; }
 .field.full { grid-column: 1/-1; }
 .field label { font-family: var(--font-head); font-size: .72rem; font-weight: 600; letter-spacing: .03em; color: var(--muted); margin-bottom: 7px; text-transform: uppercase; }
 .field label .hint { text-transform: none; font-weight: 400; color: var(--purple); opacity: .85; font-size: .72rem; margin-left: 6px; letter-spacing: 0; }
@@ -218,6 +224,16 @@
 
 .result-col { min-height: 100%; }
 
+/* Right column now gets the same "solid white card" wrapper (.fu-work-block,
+   reused as-is) as the numbered blocks on the left, so it doesn't read as
+   a bare header floating above a separately-boxed result — same fix as the
+   left column blocks getting their own card. .result-box's purple border
+   stays as an inner accent marking the actual generated text, but its own
+   shadow is dropped so there's only one shadow (the outer card's), not two
+   stacked ones. */
+.fu-result-block { display: flex; flex-direction: column; }
+.fu-result-block .result-box { box-shadow: none; padding: 16px 18px; }
+
 /* "Результат" section header — icon badge + title, and (once a message
    exists) a green "generated in Ns" pill sourced from a real timer around
    the API call, not a made-up number. */
@@ -250,16 +266,36 @@
 }
 .result-box-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .result-box-head .btn { flex: none; padding: 7px 13px; }
+.result-box-actions { display: flex; gap: 8px; }
+.result-box-actions .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .result-text { white-space: pre-wrap; font-family: var(--font-body); font-size: .94rem; line-height: 1.65; color: var(--ink); }
+.fu-result-edit { min-height: 220px; font-size: .94rem; line-height: 1.65; }
 
 /* "Деталі генерації" — same real fields the old plain-text block showed
-   (date/tone/flow/name/essence/case/created), just as label/value rows in
-   a card instead of one dashed-border paragraph. */
+   (date/tone/flow/name/essence/case/created), as icon+label/value rows in
+   a card. Label column is right-aligned so both columns hug the divider
+   between them (border-right on the label column) instead of the value
+   trailing off on its own on the right. */
 .fu-meta-card { margin-top: 18px; border-top: 1px dashed var(--border); padding-top: 4px; }
-.fu-meta-row { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.fu-meta-row { display: flex; align-items: flex-start; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .fu-meta-row:last-child { border-bottom: none; }
-.fu-meta-label { flex: none; font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.fu-meta-value { font-family: var(--font-body); font-size: .8rem; color: var(--ink); text-align: right; }
+.fu-meta-label-col {
+  flex: none; width: 190px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  border-right: 1px solid var(--border); padding-right: 14px;
+}
+.fu-meta-icon {
+  flex: none; width: 20px; height: 20px; border-radius: 6px; color: #fff;
+  background: linear-gradient(135deg, #A78BFA, #7C3AED); box-shadow: 0 2px 6px -2px rgba(37, 28, 48, .45);
+  display: flex; align-items: center; justify-content: center;
+}
+.fu-meta-icon svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fu-meta-label { font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); text-align: right; }
+.fu-meta-value { flex: 1; min-width: 0; font-family: var(--font-body); font-size: .8rem; color: var(--ink); text-align: left; }
+@media (max-width: 560px) {
+  .fu-meta-row { flex-direction: column; gap: 4px; }
+  .fu-meta-label-col { width: auto; justify-content: flex-start; border-right: none; padding-right: 0; }
+  .fu-meta-label { text-align: left; }
+}
 
 .projListHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .projListHead label { margin-bottom: 0; }
