@@ -16,9 +16,10 @@ export const DEFAULT_PROJECTS = [
 export const SHEET_ID = '1Yew_2fkbXp33WsaATGSLi52Vv2GkakaVKENnMMhc0MU';
 
 // Real browsers cannot call api.anthropic.com directly (no CORS, requires a
-// secret key). Point this at a backend proxy (e.g. a Cloudflare Worker) that
-// forwards the request and attaches the API key server-side before this tool
-// works in production.
-export const API_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+// secret key) — this hits our own Vercel serverless function instead
+// (api/anthropic.js), which attaches the real key server-side and forwards
+// the request. Requires ANTHROPIC_API_KEY set in the Vercel project's
+// environment variables.
+export const API_ENDPOINT = '/api/anthropic';
 
 export const PROJECTS_CACHE_KEY = 'mon-archi-projects-cache';
