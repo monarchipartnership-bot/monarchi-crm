@@ -34,13 +34,13 @@ export async function generateOldLeadFollowup({ chat, extraContext, nameOverride
 // Type 3 — a single step (FU1..FU5) of the 5-message series for a lead that
 // just recently went quiet. Generated one step at a time so each stage can be
 // triggered separately, whenever it's actually due — not all 5 upfront.
-// `previousMessages` (optional) is [{ step, message }] for steps already
-// generated, so this step doesn't literally repeat them.
-export async function generateFollowupStep({ chat, extraContext, nameOverride, language, format, projects, selectedProjects, step, previousMessages }) {
+// `previousMessages` (optional) is [{ step, message, caseUsed }] for steps
+// already generated, so this step doesn't literally repeat them or their case.
+export async function generateFollowupStep({ chat, extraContext, nameOverride, language, format, style, projects, selectedProjects, step, previousMessages }) {
   const projectsBlock = (selectedProjects.length ? selectedProjects : projects)
     .map((p) => `- ${p.name}: ${p.desc}`).join('\n');
 
-  const systemPrompt = buildSeriesStepSystemPrompt({ language, format, step });
+  const systemPrompt = buildSeriesStepSystemPrompt({ language, format, step, style });
   const userMsg = appendPreviousStepsContext(
     buildUserMessage({ chat, nameOverride, projectsBlock, extraContext }),
     previousMessages,

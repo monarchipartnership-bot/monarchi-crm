@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { generateOldLeadFollowup, generateFollowupStep } from '../../lib/api/followupApi';
 import { STYLE_OPTIONS, DEFAULT_STYLE_ID } from '../../lib/followupPrompt';
 import { fetchFollowupCases, createFollowupCase, updateFollowupCase, deleteFollowupCase } from '../../lib/api/followupCases';
+import { fetchFollowupSteps, saveFollowupStep } from '../../lib/api/followupSteps';
 import { logActivity } from '../../lib/api/activityLog';
 import { addDealNote } from '../../lib/api/dealNotes';
 import { createTask } from '../../lib/api/tasks';
@@ -122,6 +123,19 @@ export default function FollowupGenerator() {
   // be generated on its own and switching tabs keeps what was already made —
   // { message, caseUsed, generating, error, copyLabel }.
   const [stepData, setStepData] = useState({});
+
+  // Steps generated on earlier days (a different browser tab entirely, once
+  // the manager comes back to write FU2..FU5) live in deal_followup_steps,
+  // not React state — pull them in on mount so "don't repeat the same
+  // case/opening" actually has history to check against. Only possible when
+  // opened from a deal (prefill.dealId set); without one there's nowhere to
+  // persist to, same limitation saveFollowupToDeal already has below.
+  useEffect(() => {
+    if (!prefill?.dealId) return;
+    fetchFollowupSteps(prefill.dealId).then((saved) => {
+      if (Object.keys(saved).length) setStepData((prev) => ({ ...saved, ...prev }));
+    });
+  }, [prefill?.dealId]);
 
 function reloadCases() {
     setCasesLoading(true);
@@ -246,7 +260,7 @@ function reloadCases() {
 
     const previousMessages = SERIES_STEPS
       .filter((s) => s.step < step && stepData[s.step]?.message)
-      .map((s) => ({ step: s.step, message: stepData[s.step].message }));
+      .map((s) => ({ step: s.step, message: stepData[s.step].message, caseUsed: stepData[s.step].caseUsed }));
 
     try {
       const stepResult = await generateFollowupStep({ ...buildArgs(), step, previousMessages });
@@ -258,6 +272,7 @@ function reloadCases() {
         },
       }));
       logActivity('followup', 'fresh_step', { format, language, step, caseUsed: stepResult.caseUsed }, email);
+      saveFollowupStep(prefill?.dealId, step, stepResult.message, stepResult.caseUsed);
     } catch (err) {
       setStepData((prev) => ({ ...prev, [step]: { ...prev[step], generating: false, error: err.message } }));
     }
@@ -297,6 +312,7 @@ function reloadCases() {
       setResult((prev) => (prev ? { ...prev, messagePart: editedText } : prev));
     } else {
       setStepData((prev) => ({ ...prev, [activeStep]: { ...prev[activeStep], message: editedText } }));
+      saveFollowupStep(prefill?.dealId, activeStep, editedText, activeStepData.caseUsed);
     }
     setIsEditingResult(false);
   }

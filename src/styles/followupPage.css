@@ -280,7 +280,7 @@
 .fu-meta-row { display: flex; align-items: flex-start; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .fu-meta-row:last-child { border-bottom: none; }
 .fu-meta-label-col {
-  flex: none; width: 190px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  flex: none; width: 190px; display: flex; align-items: center; justify-content: flex-start; gap: 8px;
   border-right: 1px solid var(--border); padding-right: 14px;
 }
 .fu-meta-icon {
@@ -289,11 +289,11 @@
   display: flex; align-items: center; justify-content: center;
 }
 .fu-meta-icon svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.fu-meta-label { font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); text-align: right; }
+.fu-meta-label { font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); text-align: left; }
 .fu-meta-value { flex: 1; min-width: 0; font-family: var(--font-body); font-size: .8rem; color: var(--ink); text-align: left; }
 @media (max-width: 560px) {
   .fu-meta-row { flex-direction: column; gap: 4px; }
-  .fu-meta-label-col { width: auto; justify-content: flex-start; border-right: none; padding-right: 0; }
+  .fu-meta-label-col { width: auto; border-right: none; padding-right: 0; }
   .fu-meta-label { text-align: left; }
 }
 
