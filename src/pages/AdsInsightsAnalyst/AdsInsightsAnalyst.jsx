@@ -15,6 +15,20 @@ const ENV_LABELS = {
   GOOGLE_ADS_LOGIN_CUSTOMER_ID: 'GOOGLE_ADS_LOGIN_CUSTOMER_ID',
 };
 
+// One-click canned questions — each just sends its `prompt` through the
+// same chat pipeline as manual typing, so there's no separate code path
+// to keep in sync with what the backend tool can actually answer.
+const HOTKEYS = [
+  { label: 'Витрати', prompt: 'Скільки витрачено за останні 30 днів?' },
+  { label: 'Конверсії та ROAS', prompt: 'Скільки конверсій, яка їх цінність і ROAS за останні 30 днів?' },
+  { label: 'Ціна за конверсію', prompt: 'Яка ціна за конверсію (CPA) за останні 30 днів?' },
+  { label: 'Всі показники', prompt: 'Покажи всі показники по кабінету за останні 30 днів' },
+  { label: 'По кампаніях', prompt: 'Покажи розбивку по кампаніях за останні 30 днів' },
+  { label: 'По пристроях', prompt: 'Покажи розбивку по пристроях (mobile/desktop/tablet) за останні 30 днів' },
+  { label: 'Impression share', prompt: 'Який impression share за останні 30 днів?' },
+  { label: 'Порівняти з минулим періодом', prompt: 'Порівняй останні 30 днів з попередніми 30 днями' },
+];
+
 // Lives only inside the AI Agents map (ConstellationTest.jsx's
 // ads-insights-analyst node) — same near-fullscreen overlay pattern as
 // KnowledgeBase, opened via `agentToolOpen` rather than a routed page.
@@ -45,8 +59,8 @@ export default function AdsInsightsAnalyst({ onClose }) {
 
   const selectedClient = clients?.find((c) => String(c.id) === String(clientId)) || null;
 
-  async function sendMessage() {
-    const text = input.trim();
+  async function sendMessage(presetText) {
+    const text = (typeof presetText === 'string' ? presetText : input).trim();
     if (!text || !selectedClient || sending) return;
     setError(null);
     const nextMessages = [...messages, { role: 'user', content: text }];
@@ -124,36 +138,49 @@ export default function AdsInsightsAnalyst({ onClose }) {
               <span className="aia-client-id">{selectedClient?.google_ads_customer_id}</span>
             </div>
 
-            <div className="aia-thread" ref={threadRef}>
-              {!messages.length && (
-                <div className="aia-thread-hint">
-                  Запитайте природною мовою, наприклад: «Скільки витрачено за останні 30 днів?»
-                  або «Покажи розбивку по кампаніях за цей місяць».
+            <div className="aia-body">
+              <div className="aia-chat-col">
+                <div className="aia-thread" ref={threadRef}>
+                  {!messages.length && (
+                    <div className="aia-thread-hint">
+                      Запитайте природною мовою, наприклад: «Скільки витрачено за останні 30 днів?»
+                      або «Покажи розбивку по кампаніях за цей місяць» — або скористайтесь швидкими командами праворуч.
+                    </div>
+                  )}
+                  {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)}
+                  {sending && (
+                    <div className="aia-msg aia-msg-assistant">
+                      <div className="aia-msg-bubble aia-msg-typing">Аналізую дані кабінету…</div>
+                    </div>
+                  )}
+                  {configError && (
+                    <div className="aia-config-error">
+                      Google Ads ще не підключено на сервері. Потрібно додати в налаштуваннях Vercel:
+                      <ul>{configError.map((k) => <li key={k}><code>{ENV_LABELS[k] || k}</code></li>)}</ul>
+                    </div>
+                  )}
+                  {error && <div className="aia-config-error">{error}</div>}
                 </div>
-              )}
-              {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)}
-              {sending && (
-                <div className="aia-msg aia-msg-assistant">
-                  <div className="aia-msg-bubble aia-msg-typing">Аналізую дані кабінету…</div>
-                </div>
-              )}
-              {configError && (
-                <div className="aia-config-error">
-                  Google Ads ще не підключено на сервері. Потрібно додати в налаштуваннях Vercel:
-                  <ul>{configError.map((k) => <li key={k}><code>{ENV_LABELS[k] || k}</code></li>)}</ul>
-                </div>
-              )}
-              {error && <div className="aia-config-error">{error}</div>}
-            </div>
 
-            <div className="aia-input-row">
-              <textarea
-                value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                placeholder="Запитайте про показники цього кабінету…" rows={1} disabled={sending}
-              />
-              <button type="button" className="aia-send-btn" onClick={sendMessage} disabled={sending || !input.trim()} aria-label="Надіслати">
-                <span dangerouslySetInnerHTML={{ __html: SEND_ICON }} />
-              </button>
+                <div className="aia-input-row">
+                  <textarea
+                    value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                    placeholder="Запитайте про показники цього кабінету…" rows={1} disabled={sending}
+                  />
+                  <button type="button" className="aia-send-btn" onClick={() => sendMessage()} disabled={sending || !input.trim()} aria-label="Надіслати">
+                    <span dangerouslySetInnerHTML={{ __html: SEND_ICON }} />
+                  </button>
+                </div>
+              </div>
+
+              <aside className="aia-hotkeys">
+                <div className="aia-hotkeys-title">Швидкі команди</div>
+                {HOTKEYS.map((hk) => (
+                  <button key={hk.label} type="button" className="aia-hotkey-btn" onClick={() => sendMessage(hk.prompt)} disabled={sending}>
+                    {hk.label}
+                  </button>
+                ))}
+              </aside>
             </div>
           </>
         )}

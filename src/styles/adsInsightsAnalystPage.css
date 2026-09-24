@@ -19,7 +19,7 @@
 .aia-nav-pill svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 .aia-panel {
-  position: relative; width: 100%; max-width: 900px; height: 100%; display: flex; flex-direction: column;
+  position: relative; width: 100%; max-width: 1120px; height: 100%; display: flex; flex-direction: column;
   gap: 16px; padding: 30px 34px; border-radius: 26px; overflow: hidden;
   background: rgba(11, 16, 34, .86); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(122, 105, 200, .32);
@@ -51,6 +51,23 @@
   background: rgba(20, 18, 40, .55); color: #EDEBFA; font-family: var(--font-body); font-size: .84rem; outline: none;
 }
 .aia-client-id { font-family: var(--font-body); font-size: .74rem; color: #7A76A3; }
+
+.aia-body { display: flex; gap: 18px; flex: 1; min-height: 0; }
+.aia-chat-col { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 0; }
+
+.aia-hotkeys {
+  flex: 0 0 190px; display: flex; flex-direction: column; gap: 7px; padding: 12px; overflow-y: auto;
+  background: rgba(7, 12, 28, .45); border: 1px solid rgba(110, 100, 190, .25); border-radius: 16px;
+  scrollbar-width: thin; scrollbar-color: rgba(130, 110, 170, .35) transparent;
+}
+.aia-hotkeys-title { font-family: var(--font-head); font-weight: 700; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: #7A76A3; padding: 2px 4px 4px; }
+.aia-hotkey-btn {
+  text-align: left; padding: 9px 11px; border-radius: 10px; border: 1px solid rgba(122, 105, 200, .22);
+  background: rgba(122, 105, 200, .08); color: #D8D4F0; font-family: var(--font-body); font-size: .8rem; line-height: 1.35;
+  cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+}
+.aia-hotkey-btn:hover:not(:disabled) { background: rgba(122, 105, 200, .2); border-color: rgba(164, 98, 255, .5); color: #fff; }
+.aia-hotkey-btn:disabled { opacity: .5; cursor: default; }
 
 .aia-thread {
   flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 6px 4px;
@@ -99,4 +116,7 @@
   .aia-overlay { padding: 70px 16px 16px; }
   .aia-panel { padding: 22px; }
   .aia-msg-bubble { max-width: 90%; }
+  .aia-body { flex-direction: column; overflow-y: auto; }
+  .aia-hotkeys { flex: none; flex-direction: row; flex-wrap: wrap; max-height: none; }
+  .aia-hotkey-btn { flex: 1 1 auto; }
 }

@@ -15,16 +15,19 @@ const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
 
 const MODEL = 'claude-sonnet-5';
-const MAX_TOOL_ROUNDS = 4;
+const MAX_TOOL_ROUNDS = 6;
 
 const REPORT_TOOL = {
   name: 'get_google_ads_report',
-  description: 'Отримати реальні показники ефективності Google Ads клієнта за вказаний період (покази, кліки, витрати, конверсії, CTR, середня ціна за клік).',
+  description: 'Отримати реальні показники ефективності Google Ads клієнта за вказаний період: покази, кліки, витрати, конверсії, цінність конверсій, ROAS, CTR, середня ціна за клік, ціна за конверсію, конверсія кліків у дію, impression share (тільки для Search-кампаній, може бути відсутній для інших типів).',
   input_schema: {
     type: 'object',
     properties: {
       dateRange: { type: 'string', enum: ['LAST_7_DAYS', 'LAST_30_DAYS', 'THIS_MONTH', 'LAST_MONTH'], description: 'Період, за який потрібні дані.' },
-      level: { type: 'string', enum: ['account', 'campaign'], description: '"account" — сумарно по всьому кабінету, "campaign" — розбивка по кожній кампанії.' },
+      level: {
+        type: 'string', enum: ['account', 'campaign', 'device'],
+        description: '"account" — сумарно по всьому кабінету, "campaign" — розбивка по кожній кампанії, "device" — розбивка по типу пристрою (mobile/desktop/tablet).',
+      },
     },
     required: ['dateRange', 'level'],
   },
@@ -52,19 +55,42 @@ function dateRangeToBounds(dateRange) {
   return { from_date: fmt(lastMonthStart), to_date: fmt(lastMonthEnd) };
 }
 
-const METRICS = ['metrics.impressions', 'metrics.clicks', 'metrics.cost_micros', 'metrics.conversions', 'metrics.ctr', 'metrics.average_cpc'];
+const METRICS = [
+  'metrics.impressions', 'metrics.clicks', 'metrics.cost_micros', 'metrics.conversions',
+  'metrics.conversions_value', 'metrics.cost_per_conversion', 'metrics.ctr', 'metrics.average_cpc',
+  'metrics.search_impression_share',
+];
+
+function round2(n) { return Math.round(n * 100) / 100; }
 
 function formatRow(row) {
   const m = row.metrics || {};
+  const clicks = m.clicks ?? 0;
+  const conversions = m.conversions ?? 0;
+  const cost = m.cost_micros != null ? round2(m.cost_micros / 1e6) : 0;
+  const conversions_value = m.conversions_value != null ? round2(m.conversions_value) : 0;
   return {
     impressions: m.impressions ?? 0,
-    clicks: m.clicks ?? 0,
-    cost: m.cost_micros != null ? Math.round(m.cost_micros / 1e6 * 100) / 100 : 0,
-    conversions: m.conversions ?? 0,
-    ctr: m.ctr != null ? Math.round(m.ctr * 10000) / 100 : 0,
-    avg_cpc: m.average_cpc != null ? Math.round(m.average_cpc / 1e6 * 100) / 100 : 0,
+    clicks,
+    cost,
+    conversions,
+    conversions_value,
+    // ROAS/conversion rate computed here rather than trusted from a raw API
+    // field, so they're always internally consistent with the other numbers
+    // in this same row (and simply absent, not a wrong 0, when undefined).
+    roas: cost > 0 ? round2(conversions_value / cost) : null,
+    conversion_rate_pct: clicks > 0 ? round2((conversions / clicks) * 100) : null,
+    cost_per_conversion: m.cost_per_conversion != null ? round2(m.cost_per_conversion / 1e6) : null,
+    ctr_pct: m.ctr != null ? round2(m.ctr * 100) : null,
+    avg_cpc: m.average_cpc != null ? round2(m.average_cpc / 1e6) : null,
+    // Search-only metric — absent (not zero) for non-Search campaign types.
+    search_impression_share_pct: m.search_impression_share != null ? round2(m.search_impression_share * 100) : null,
   };
 }
+
+const DEVICE_LABEL = {
+  MOBILE: 'мобільні', DESKTOP: 'десктоп', TABLET: 'планшети', CONNECTED_TV: 'Connected TV', OTHER: 'інше',
+};
 
 async function runGoogleAdsReport(customerId, { dateRange, level }) {
   const { from_date, to_date } = dateRangeToBounds(dateRange);
@@ -90,20 +116,29 @@ async function runGoogleAdsReport(customerId, { dateRange, level }) {
     return { period: { from_date, to_date }, campaigns: rows.map((r) => ({ name: r.campaign?.name, ...formatRow(r) })) };
   }
 
+  if (level === 'device') {
+    const rows = await customer.report({
+      entity: 'customer',
+      metrics: METRICS,
+      segments: ['segments.device'],
+      from_date,
+      to_date,
+    });
+    return {
+      period: { from_date, to_date },
+      devices: rows.map((r) => ({ device: DEVICE_LABEL[r.segments?.device] || r.segments?.device, ...formatRow(r) })),
+    };
+  }
+
   const rows = await customer.report({
     entity: 'customer',
     metrics: METRICS,
     from_date,
     to_date,
   });
-  const total = rows.reduce((acc, r) => {
-    const f = formatRow(r);
-    return {
-      impressions: acc.impressions + f.impressions, clicks: acc.clicks + f.clicks, cost: acc.cost + f.cost,
-      conversions: acc.conversions + f.conversions, ctr: acc.ctr, avg_cpc: acc.avg_cpc,
-    };
-  }, { impressions: 0, clicks: 0, cost: 0, conversions: 0, ctr: rows[0] ? formatRow(rows[0]).ctr : 0, avg_cpc: rows[0] ? formatRow(rows[0]).avg_cpc : 0 });
-  return { period: { from_date, to_date }, account: total };
+  // A `customer` entity report with no segments is always exactly one row.
+  const empty = { impressions: 0, clicks: 0, cost: 0, conversions: 0, conversions_value: 0, roas: null, conversion_rate_pct: null, cost_per_conversion: null, ctr_pct: null, avg_cpc: null, search_impression_share_pct: null };
+  return { period: { from_date, to_date }, account: rows[0] ? formatRow(rows[0]) : empty };
 }
 
 export default async function handler(req, res) {
@@ -148,7 +183,9 @@ export default async function handler(req, res) {
 Правила:
 - Перед тим як відповідати на будь-яке питання про показники, ЗАВЖДИ викликай get_google_ads_report — ніколи не вигадуй і не оцінюй цифри самостійно.
 - Відповідай коротко, по суті, конкретними цифрами з відповіді інструменту.
-- Витрати вказуй у валюті кабінету без символу (просто число), CTR — у відсотках.
+- Витрати вказуй у валюті кабінету без символу (просто число), CTR/conversion_rate_pct/search_impression_share_pct — у відсотках.
+- Якщо якесь поле в відповіді інструменту null (наприклад search_impression_share_pct для не-Search кампанії, або roas коли витрат ще нема) — так і скажи, що воно недоступне, не підставляй 0 і не вигадуй причину.
+- Якщо треба порівняти два періоди — виклич інструмент двічі (по одному на кожен період) і сам зведи різницю.
 - Якщо дані порожні (немає показів/кліків за період) — так і скажи, не вигадуй пояснень.`;
 
   const anthropicMessages = messages.map((m) => ({ role: m.role, content: m.content }));
