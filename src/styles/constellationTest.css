@@ -21,8 +21,13 @@
    (darken + welcome) now plays before the route even changes, in
    IntroTransition.jsx, rendered from Layout. */
 
+.constellation-topright {
+  position: absolute; top: 20px; right: 20px; z-index: 6;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
+  max-width: calc(100vw - 40px);
+}
 .constellation-exit {
-  position: absolute; top: 20px; right: 20px; z-index: 5;
+  flex-shrink: 0;
   display: flex; align-items: center; gap: 8px;
   font-family: var(--font-body); font-size: .82rem; font-weight: 600; color: #C9BAD9; text-decoration: none;
   background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
@@ -31,6 +36,48 @@
 }
 .constellation-exit:hover { color: #fff; border-color: rgba(255, 255, 255, .22); }
 .constellation-exit svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Agent search — same matte pill look as .constellation-exit, sits to its
+   left in the same top-right cluster. Results dropdown is its own
+   absolutely-positioned panel below the pill, not a native <select>, so it
+   can show each match's department color/name alongside the agent name. */
+.agent-search {
+  position: relative; flex-shrink: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px;
+  padding: 9px 14px;
+  transition: border-color .15s ease;
+}
+.agent-search:focus-within { border-color: rgba(255, 255, 255, .22); }
+.agent-search-icon { width: 15px; height: 15px; stroke: #C9BAD9; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.agent-search-input {
+  background: none; border: none; outline: none; color: #EDE7F5;
+  font-family: var(--font-body); font-size: .82rem; font-weight: 500;
+  width: 160px; max-width: 40vw; min-width: 0;
+}
+.agent-search-input::placeholder { color: #7A6E92; }
+
+.agent-search-results {
+  position: absolute; top: calc(100% + 8px); right: 0; width: 280px; max-width: 75vw;
+  max-height: 340px; overflow-y: auto;
+  background: rgba(15, 11, 28, .95); backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px;
+  padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+}
+.agent-search-result {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: none; text-align: left; cursor: pointer;
+  padding: 8px 10px; border-radius: 9px;
+  font-family: var(--font-body); color: #EDE7F5;
+  transition: background .12s ease;
+}
+.agent-search-result:hover, .agent-search-result:focus-visible { background: rgba(255, 255, 255, .08); outline: none; }
+.agent-search-result-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+.agent-search-result-name { font-size: .84rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-search-result-dept { font-size: .7rem; color: #9C8FB3; flex-shrink: 0; max-width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-search-empty { padding: 14px; font-size: .8rem; color: #9C8FB3; text-align: center; }
 
 .constellation-overlay {
   position: absolute; top: 20px; left: 20px; z-index: 5;

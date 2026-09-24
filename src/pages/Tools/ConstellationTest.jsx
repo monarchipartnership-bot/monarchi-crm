@@ -637,6 +637,41 @@ export default function ConstellationTest() {
 
   const deptKeys = Object.keys(AGENT_DEPTS);
 
+  // Flat, department-agnostic agent list for the top-right search box —
+  // built once (AGENT_DEPTS is static data, not state) rather than per
+  // keystroke. Each entry carries the same deptKey/deptLabel/color/
+  // subcatLabel context openAgent()/the agent modal already expect, so a
+  // search result can be opened exactly like any other agent click.
+  const allAgents = useMemo(() => {
+    const list = [];
+    Object.entries(AGENT_DEPTS).forEach(([deptKey, dept]) => {
+      (dept.subcategories || []).forEach((sc) => {
+        sc.agents.forEach((ag) => {
+          list.push({ ...ag, deptKey, deptLabel: dept.label, color: dept.color, subcatLabel: sc.label });
+        });
+      });
+    });
+    return list;
+  }, []);
+  const [agentSearch, setAgentSearch] = useState('');
+  const searchResults = useMemo(() => {
+    const q = agentSearch.trim().toLowerCase();
+    if (!q) return [];
+    return allAgents.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [agentSearch, allAgents]);
+  // Jumps straight to the agent's department (only if it isn't already the
+  // focused one — focusDept() itself toggles, which would unfocus if we
+  // called it unconditionally) and opens the same modal/workspace a normal
+  // click would.
+  function selectSearchResult(agent) {
+    if (focusedDept !== agent.deptKey) {
+      setFocusedDept(agent.deptKey);
+      setView({ scale: 1.08, x: 40, y: 20 });
+    }
+    openAgent(agent);
+    setAgentSearch('');
+  }
+
   // Re-show the department overview panel every time a (different)
   // department comes into focus — closing it is per-visit, not permanent.
   // CHART is per-visit too: entering a (different) department always starts
@@ -738,10 +773,35 @@ export default function ConstellationTest() {
 
   return (
     <div className="constellation-page" style={{ '--ui-scale': UI_SCALE }}>
-      <Link to="/" className="constellation-exit">
-        <svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8" /><path d="M5 10v10h14V10" /></svg>
-        CRM
-      </Link>
+      <div className="constellation-topright">
+        <div className="agent-search">
+          <svg className="agent-search-icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="m21 21-5.2-5.2" /></svg>
+          <input
+            type="text" className="agent-search-input" placeholder="Пошук агента…"
+            value={agentSearch} onChange={(e) => setAgentSearch(e.target.value)}
+          />
+          {agentSearch.trim() && (
+            <div className="agent-search-results">
+              {searchResults.length > 0 ? searchResults.map((r) => (
+                <button
+                  key={r.key} type="button" className="agent-search-result"
+                  onClick={() => selectSearchResult(r)}
+                >
+                  <span className="agent-search-result-dot" style={{ background: r.color }} />
+                  <span className="agent-search-result-name">{r.name}</span>
+                  <span className="agent-search-result-dept">{r.deptLabel}</span>
+                </button>
+              )) : (
+                <div className="agent-search-empty">Нічого не знайдено</div>
+              )}
+            </div>
+          )}
+        </div>
+        <Link to="/" className="constellation-exit">
+          <svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8" /><path d="M5 10v10h14V10" /></svg>
+          CRM
+        </Link>
+      </div>
 
       <div className="constellation-overlay">
         {focused && (
