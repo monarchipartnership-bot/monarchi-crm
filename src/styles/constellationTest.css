@@ -248,6 +248,12 @@
 .core-hit-area { fill: transparent; }
 .constellation-core-btn:hover, .constellation-core-btn:focus-visible { filter: brightness(1.15); outline: none; }
 .constellation-core-btn.lit:hover { transform: scale(1.04); transition: transform .25s ease; }
+/* Inactive while a department is focused — its own graph renders as a
+   sibling layer that can visually overlap the core, so the core must stop
+   accepting clicks/hover there instead of opening the Knowledge Base
+   underneath whatever the user actually meant to click. */
+.constellation-core-btn.inactive { pointer-events: none; opacity: .28; filter: grayscale(.6); }
+.constellation-core-btn.inactive:hover { transform: none; filter: grayscale(.6); }
 
 /* Department branches fly out from the core once the intro's second stage
    reaches them — pivoted at the world origin (0,0) with transform-box:

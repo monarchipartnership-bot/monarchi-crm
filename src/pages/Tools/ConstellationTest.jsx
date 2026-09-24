@@ -858,10 +858,11 @@ export default function ConstellationTest() {
             <circle r={HUB_RADIUS} className={'orbit-ring' + (introPhase === 'hubs' || introDone ? ' visible' : '')} />
 
             <g
-              className={'constellation-core-btn' + (introPhase !== 'start' ? ' lit' : '')}
-              onClick={() => setCoreOpen(true)}
+              className={'constellation-core-btn' + (introPhase !== 'start' ? ' lit' : '') + (focusedDept ? ' inactive' : '')}
+              onClick={() => { if (!focusedDept) setCoreOpen(true); }}
               role="button"
-              tabIndex={0}
+              tabIndex={focusedDept ? -1 : 0}
+              aria-disabled={!!focusedDept}
               aria-label="Інформаційна база"
             >
               <circle r={140 * UI_SCALE} className="core-hit-area" />
