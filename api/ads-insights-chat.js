@@ -16,6 +16,11 @@ const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
 
 const MODEL = 'claude-sonnet-5';
 const MAX_TOOL_ROUNDS = 6;
+// A full audit is many get_google_ads_report calls (current period, prior
+// period, per-campaign, per-device, per-keyword, ...) chained into one
+// reply — the default budget above is deliberately small/cheap for normal
+// chat, this one is only used when the request carries `auditInstructions`.
+const MAX_AUDIT_ROUNDS = 25;
 
 const REPORT_TOOL = {
   name: 'get_google_ads_report',
@@ -25,8 +30,8 @@ const REPORT_TOOL = {
     properties: {
       dateRange: { type: 'string', enum: ['LAST_7_DAYS', 'LAST_30_DAYS', 'THIS_MONTH', 'LAST_MONTH'], description: 'Період, за який потрібні дані.' },
       level: {
-        type: 'string', enum: ['account', 'campaign', 'device'],
-        description: '"account" — сумарно по всьому кабінету, "campaign" — розбивка по кожній кампанії, "device" — розбивка по типу пристрою (mobile/desktop/tablet).',
+        type: 'string', enum: ['account', 'campaign', 'device', 'keyword', 'ad', 'network'],
+        description: '"account" — сумарно по кабінету, "campaign" — по кожній кампанії, "device" — по типу пристрою (mobile/desktop/tablet), "keyword" — по ключових словах (включно з Quality Score), "ad" — по оголошеннях, "network" — по рекламній мережі (Search/Display/...).',
       },
     },
     required: ['dateRange', 'level'],
@@ -126,6 +131,10 @@ function formatRow(row) {
 const DEVICE_LABEL = {
   MOBILE: 'мобільні', DESKTOP: 'десктоп', TABLET: 'планшети', CONNECTED_TV: 'Connected TV', OTHER: 'інше',
 };
+const NETWORK_LABEL = {
+  SEARCH: 'Search', SEARCH_PARTNERS: 'Search Partners', CONTENT: 'Display', YOUTUBE_SEARCH: 'YouTube Search',
+  YOUTUBE_WATCH: 'YouTube Watch', MIXED: 'Mixed',
+};
 
 async function runGoogleAdsReport(customerId, { dateRange, level }) {
   const { from_date, to_date } = dateRangeToBounds(dateRange);
@@ -165,6 +174,53 @@ async function runGoogleAdsReport(customerId, { dateRange, level }) {
     };
   }
 
+  if (level === 'network') {
+    const rows = await customer.report({
+      entity: 'customer',
+      metrics: METRICS,
+      segments: ['segments.ad_network_type'],
+      from_date,
+      to_date,
+    });
+    return {
+      period: { from_date, to_date },
+      networks: rows.map((r) => ({ network: NETWORK_LABEL[r.segments?.ad_network_type] || r.segments?.ad_network_type, ...formatRow(r) })),
+    };
+  }
+
+  if (level === 'keyword') {
+    const rows = await customer.report({
+      entity: 'keyword_view',
+      attributes: ['ad_group_criterion.keyword.text', 'ad_group_criterion.keyword.match_type', 'ad_group_criterion.quality_info.quality_score'],
+      metrics: METRICS,
+      from_date,
+      to_date,
+    });
+    return {
+      period: { from_date, to_date },
+      keywords: rows.map((r) => ({
+        keyword: r.ad_group_criterion?.keyword?.text,
+        match_type: r.ad_group_criterion?.keyword?.match_type,
+        quality_score: r.ad_group_criterion?.quality_info?.quality_score ?? null,
+        ...formatRow(r),
+      })),
+    };
+  }
+
+  if (level === 'ad') {
+    const rows = await customer.report({
+      entity: 'ad_group_ad',
+      attributes: ['ad_group.name', 'ad_group_ad.ad.id'],
+      metrics: METRICS,
+      from_date,
+      to_date,
+    });
+    return {
+      period: { from_date, to_date },
+      ads: rows.map((r) => ({ ad_group: r.ad_group?.name, ad_id: r.ad_group_ad?.ad?.id, ...formatRow(r) })),
+    };
+  }
+
   const rows = await customer.report({
     entity: 'customer',
     metrics: METRICS,
@@ -195,7 +251,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { customerId, messages } = req.body || {};
+  const { customerId, messages, auditInstructions } = req.body || {};
   if (!customerId || !Array.isArray(messages) || !messages.length) {
     res.status(400).json({ error: 'customerId і messages обовʼязкові' });
     return;
@@ -222,20 +278,22 @@ export default async function handler(req, res) {
 - Якщо якесь поле в відповіді інструменту null (наприклад search_impression_share_pct для не-Search кампанії, або roas коли витрат ще нема) — так і скажи, що воно недоступне, не підставляй 0 і не вигадуй причину.
 - Якщо треба порівняти два періоди — виклич інструмент двічі (по одному на кожен період) і сам зведи різницю.
 - Якщо дані порожні (немає показів/кліків за період) — так і скажи, не вигадуй пояснень.
-- Для розбивки по кампаніях/пристроях або порівняння періодів — використай present_table замість тексту з рисками. Якщо просять графік/діаграму, або йдеться про тренд/динаміку — використай present_chart. Для одного простого числа (просто "скільки витрачено") таблиця не потрібна, відповідай текстом. І table, і chart будуй лише з цифр, які реально повернув get_google_ads_report у цій розмові — ніколи не вигадуй рядки.`;
+- Для розбивки по кампаніях/пристроях/ключових словах/оголошеннях/мережах або порівняння періодів — використай present_table замість тексту з рисками. Якщо просять графік/діаграму, або йдеться про тренд/динаміку — використай present_chart. Для одного простого числа (просто "скільки витрачено") таблиця не потрібна, відповідай текстом. І table, і chart будуй лише з цифр, які реально повернув get_google_ads_report у цій розмові — ніколи не вигадуй рядки.`
+    + (auditInstructions ? `\n\nФРЕЙМВОРК АУДИТУ — дотримуйся його структури й порядку, виклич get_google_ads_report стільки разів, скільки потрібно для всіх його пунктів:\n${auditInstructions}` : '');
 
   const anthropicMessages = messages.map((m) => ({ role: m.role, content: m.content }));
+  const maxRounds = auditInstructions ? MAX_AUDIT_ROUNDS : MAX_TOOL_ROUNDS;
 
   try {
     let round = 0;
-    while (round < MAX_TOOL_ROUNDS) {
+    while (round < maxRounds) {
       round += 1;
       const upstream = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({
           model: MODEL,
-          max_tokens: 1200,
+          max_tokens: auditInstructions ? 4000 : 1200,
           system: systemPrompt,
           tools: [REPORT_TOOL, PRESENT_TABLE_TOOL, PRESENT_CHART_TOOL],
           messages: anthropicMessages,

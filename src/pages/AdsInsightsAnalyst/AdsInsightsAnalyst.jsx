@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { fetchConversations, fetchConversationMessages, createConversation, appendMessages } from '../../lib/api/aiConversations';
+import { fetchFrameworks, createFramework, updateFramework, deleteFramework } from '../../lib/api/aiAuditFrameworks';
 import { AGENT_ICONS } from '../../data/aiAgentsData';
 import ChatMessage from './ChatMessage';
+import AiaFrameworks from './AiaFrameworks';
 import '../../styles/adsInsightsAnalystPage.css';
 
 const AGENT_KEY = 'ads-insights-analyst';
@@ -54,6 +56,8 @@ export default function AdsInsightsAnalyst({ onClose }) {
   const [sidebarTab, setSidebarTab] = useState('commands');
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
+  const [frameworks, setFrameworks] = useState([]);
+  const [selectedFrameworkId, setSelectedFrameworkId] = useState(null);
   const threadRef = useRef(null);
 
   useEffect(() => {
@@ -65,6 +69,15 @@ export default function AdsInsightsAnalyst({ onClose }) {
       if (withAds.length) setClientId(String(withAds[0].id));
     });
     return () => { alive = false; };
+  }, []);
+
+  // Frameworks are global to the agent (not per-client) — fetched once.
+  useEffect(() => {
+    fetchFrameworks(AGENT_KEY).then((data) => {
+      setFrameworks(data);
+      if (data.length && !selectedFrameworkId) setSelectedFrameworkId(data[0].id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -99,7 +112,7 @@ export default function AdsInsightsAnalyst({ onClose }) {
     setError(null);
   }
 
-  async function sendMessage(presetText) {
+  async function sendMessage(presetText, auditInstructions) {
     const text = (typeof presetText === 'string' ? presetText : input).trim();
     if (!text || !selectedClient || sending) return;
     setError(null);
@@ -114,7 +127,7 @@ export default function AdsInsightsAnalyst({ onClose }) {
       const res = await fetch('/api/ads-insights-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
-        body: JSON.stringify({ customerId: selectedClient.google_ads_customer_id, messages: nextMessages }),
+        body: JSON.stringify({ customerId: selectedClient.google_ads_customer_id, messages: nextMessages, auditInstructions }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Помилка запиту');
@@ -156,6 +169,35 @@ export default function AdsInsightsAnalyst({ onClose }) {
       e.preventDefault();
       sendMessage();
     }
+  }
+
+  const selectedFramework = frameworks.find((f) => f.id === selectedFrameworkId) || null;
+
+  // An audit is a one-shot deep dive, not a continuation of whatever
+  // ad-hoc chat happened to be open — always starts a fresh conversation.
+  function runAudit() {
+    if (!selectedFramework || sending) return;
+    setMessages([]);
+    setActiveConversationId(null);
+    sendMessage(`Провести аудит за фреймворком «${selectedFramework.name}»`, selectedFramework.instructions);
+  }
+
+  async function handleCreateFramework({ name, instructions }) {
+    const created = await createFramework(AGENT_KEY, { name, instructions });
+    setFrameworks((fs) => [...fs, created]);
+    setSelectedFrameworkId(created.id);
+  }
+
+  async function handleUpdateFramework(id, { name, instructions }) {
+    const updated = await updateFramework(id, { name, instructions });
+    setFrameworks((fs) => fs.map((f) => (f.id === id ? updated : f)));
+  }
+
+  async function handleDeleteFramework(id) {
+    if (!confirm('Видалити цей фреймворк аудиту?')) return;
+    await deleteFramework(id);
+    setFrameworks((fs) => fs.filter((f) => f.id !== id));
+    if (selectedFrameworkId === id) setSelectedFrameworkId(null);
   }
 
   const loading = clients === null;
@@ -234,18 +276,27 @@ export default function AdsInsightsAnalyst({ onClose }) {
               </div>
 
               <aside className="aia-hotkeys">
+                <button
+                  type="button" className="aia-audit-btn" onClick={runAudit}
+                  disabled={sending || !selectedFramework}
+                  title={selectedFramework ? `Фреймворк: ${selectedFramework.name}` : 'Оберіть фреймворк у вкладці "Фреймворки"'}
+                >
+                  Провести аудит{selectedFramework ? ` — ${selectedFramework.name}` : ''}
+                </button>
+
                 <div className="aia-sidebar-tabs">
                   <button type="button" className={'aia-sidebar-tab' + (sidebarTab === 'commands' ? ' active' : '')} onClick={() => setSidebarTab('commands')}>Команди</button>
                   <button type="button" className={'aia-sidebar-tab' + (sidebarTab === 'history' ? ' active' : '')} onClick={() => setSidebarTab('history')}>Історія</button>
+                  <button type="button" className={'aia-sidebar-tab' + (sidebarTab === 'frameworks' ? ' active' : '')} onClick={() => setSidebarTab('frameworks')}>Фреймворки</button>
                 </div>
 
-                {sidebarTab === 'commands' ? (
-                  HOTKEYS.map((hk) => (
-                    <button key={hk.label} type="button" className="aia-hotkey-btn" onClick={() => sendMessage(hk.prompt)} disabled={sending}>
-                      {hk.label}
-                    </button>
-                  ))
-                ) : (
+                {sidebarTab === 'commands' && HOTKEYS.map((hk) => (
+                  <button key={hk.label} type="button" className="aia-hotkey-btn" onClick={() => sendMessage(hk.prompt)} disabled={sending}>
+                    {hk.label}
+                  </button>
+                ))}
+
+                {sidebarTab === 'history' && (
                   <>
                     <button type="button" className="aia-new-convo-btn" onClick={startNewConversation}>
                       <span dangerouslySetInnerHTML={{ __html: PLUS_ICON }} /> Нова розмова
@@ -262,6 +313,13 @@ export default function AdsInsightsAnalyst({ onClose }) {
                       </button>
                     ))}
                   </>
+                )}
+
+                {sidebarTab === 'frameworks' && (
+                  <AiaFrameworks
+                    frameworks={frameworks} selectedId={selectedFrameworkId} onSelect={setSelectedFrameworkId}
+                    onCreate={handleCreateFramework} onUpdate={handleUpdateFramework} onDelete={handleDeleteFramework}
+                  />
                 )}
               </aside>
             </div>
