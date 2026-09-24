@@ -65,7 +65,17 @@
   border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px;
   padding: 6px; display: flex; flex-direction: column; gap: 2px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  /* Same thin, floating scrollbar used elsewhere in the app (knowledge
+     base, ads-insights chat) instead of the browser's default full-height
+     track — that default track paints its own rectangular background,
+     which squared off this panel's top/bottom-right corners despite its
+     own border-radius. */
+  scrollbar-width: thin; scrollbar-color: rgba(121, 103, 190, .35) transparent;
 }
+.agent-search-results::-webkit-scrollbar { width: 5px; }
+.agent-search-results::-webkit-scrollbar-track { background: transparent; }
+.agent-search-results::-webkit-scrollbar-thumb { background: rgba(121, 103, 190, .35); border-radius: 999px; }
+.agent-search-results::-webkit-scrollbar-thumb:hover { background: rgba(144, 112, 230, .6); }
 .agent-search-result {
   display: flex; align-items: flex-start; gap: 10px;
   background: none; border: none; text-align: left; cursor: pointer;
