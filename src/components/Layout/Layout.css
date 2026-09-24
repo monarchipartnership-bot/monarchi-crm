@@ -14,6 +14,24 @@
 .view { opacity: 0; animation: viewIn .28s ease forwards; }
 @keyframes viewIn { to { opacity: 1; } }
 
+/* CRM "losing cohesion" during the AI Agents transition (crm-to-ai spec
+   phase 2/3) — a coarse whole-page dissolve rather than per-element
+   staggering, applied here so it works on whatever CRM page the transition
+   was triggered from, not just Home. No `forwards`: the keyframe returns
+   to normal on its own by ~1.5s, well before the transition overlay (which
+   is fully opaque by ~1.0s) reveals anything again — no JS cleanup needed,
+   and it can never get stuck showing a blurred real page. */
+.view.crm-dissolving { animation: crmDissolve 1500ms cubic-bezier(.4, 0, .2, 1); }
+@keyframes crmDissolve {
+  0% { filter: none; opacity: 1; }
+  45% { filter: saturate(.62) blur(1.3px); opacity: .56; }
+  75% { filter: saturate(.62) blur(1.3px); opacity: .56; }
+  100% { filter: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view.crm-dissolving { animation: none; }
+}
+
 .crumbs {
   display: flex;
   flex-wrap: wrap;

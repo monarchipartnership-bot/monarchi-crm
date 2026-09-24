@@ -16,17 +16,32 @@
   overflow: hidden;
 }
 
-/* Stage 2 of the AI Agents entrance (core ignite + branches flying out)
-   lives on the graph elements themselves, further down this file — stage 1
-   (darken + welcome) now plays before the route even changes, in
-   IntroTransition.jsx, rendered from Layout. */
+/* The AI Agents entrance (core ignite + branches flying out) lives on the
+   graph elements themselves, further down this file. On a direct URL load
+   it times itself from this page's own mount (REVEAL_TIMELINE in
+   ConstellationTest.jsx); mid-transition from the CRM sidebar it's synced
+   to the shared crm-to-ai timeline instead — see TransitionPortal, which
+   owns everything before this page becomes visible. */
 
 .constellation-topright {
   position: absolute; top: 20px; right: 20px; z-index: 6;
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
   max-width: calc(100vw - 40px);
+  /* Search box + CRM button appear last (crm-to-ai spec phase 15,
+     "controls reveal"), once the map itself is already interactive —
+     applies on every load (direct or transitioned), not just the
+     transition, since introPhase/introDone already exist either way. */
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+}
+.constellation-topright.revealed {
+  opacity: 1; transform: translateY(0); pointer-events: auto;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .constellation-topright { opacity: 1; transform: none; pointer-events: auto; }
 }
 .constellation-exit {
+  cursor: pointer;
   flex-shrink: 0;
   display: flex; align-items: center; gap: 8px;
   font-family: var(--font-body); font-size: .82rem; font-weight: 600; color: #C9BAD9; text-decoration: none;
@@ -283,6 +298,41 @@
 .constellation-core-btn.inactive { pointer-events: none; opacity: .28; filter: grayscale(.6); }
 .constellation-core-btn.inactive:hover { transform: none; filter: grayscale(.6); }
 
+/* Echoes the transition overlay's own energy-burst pulse (crm-to-ai spec
+   phase 7) right as departments start flying out, so that beat still
+   reads once the overlay itself has already faded away. */
+.constellation-core-btn.burst-echo { animation: coreBurstEcho 250ms ease-out; }
+@keyframes coreBurstEcho { 0% { filter: brightness(1); } 40% { filter: brightness(1.7); } 100% { filter: brightness(1); } }
+
+/* Reverse transition (AI -> CRM, crm-to-ai spec section 18/04) — collapses
+   the real departments/core back toward the center instead of playing the
+   forward reveal backwards. Scoped to .constellation-branch itself (never
+   its hub/leaf children, which already carry their own translate()
+   *attributes* from JSX — a CSS `transform` on THOSE would replace that
+   attribute instead of composing with it, same trap documented above for
+   hover). Scaling the whole branch group down is enough: it carries every
+   hub/leaf/label with it, exactly like .pre-reveal already does. */
+.constellation-stage.collapsing .constellation-branch {
+  /* `.revealed`'s branchFlyIn animation ends with `both`, which holds its
+     final keyframe (opacity:1) forever afterward — a held CSS animation
+     overrides a plain `opacity`/`transform` declaration for the same
+     property regardless of selector specificity, so it has to be
+     cancelled here first or this whole rule would silently do nothing. */
+  animation: none;
+  transition: opacity 300ms ease, transform 300ms cubic-bezier(.4, 0, .2, 1);
+  opacity: 0; transform: scale(.05);
+  transform-box: view-box; transform-origin: 0px 0px;
+}
+.constellation-stage.collapsing .constellation-core-btn {
+  transition: transform 180ms ease .26s, filter 180ms ease .26s;
+  transform: scale(.6); filter: brightness(2.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .constellation-stage.collapsing .constellation-branch,
+  .constellation-stage.collapsing .constellation-core-btn { transition: none; }
+  .constellation-stage.collapsing .constellation-branch { opacity: 0; }
+}
+
 /* Department branches fly out from the core once the intro's second stage
    reaches them — pivoted at the world origin (0,0) with transform-box:
    view-box, so scaling the whole branch group down to ~0 naturally pulls
@@ -295,6 +345,16 @@
   animation-delay: var(--fly-delay, 0s);
 }
 @keyframes branchFlyIn { 0% { opacity: 0; transform: scale(.05); } 45% { opacity: 1; } 100% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  /* Applies to any load, transitioned or direct — the map just appears
+     fully formed instead of flying/igniting in (crm-to-ai spec section
+     23 / crm-to-ai/specs/05_responsive_performance.md). */
+  .constellation-branch.pre-reveal { opacity: 1; transform: none; }
+  .constellation-branch.revealed { animation: none; opacity: 1; transform: none; }
+  .constellation-core-btn.lit { animation: none; }
+  .hub-circle.breathing { animation: none; }
+  .flow-dot { animation: none; opacity: 0; }
+}
 .constellation-branch.dimmed { opacity: .16; }
 /* A department in focus hides every other branch outright (not just
    dimmed) — no faint neighboring hubs/webs peeking in around the edges. */

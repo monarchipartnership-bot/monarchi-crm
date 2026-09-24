@@ -13,26 +13,36 @@ import '../../styles/comparePage.css';
 import '../../styles/automationDashboard.css';
 import '../../styles/homeDashboard.css';
 
+// data-transition-fragment marks the blocks the CRM->AI transition uses as
+// visual "sources" for its particle fragments (see FragmentCanvas.jsx) —
+// just a hook for that overlay to read via getBoundingClientRect(), no
+// effect on layout/behavior. Tagged directly on GreetingBanner/TodayImportant/
+// ActivityFeedCard's own existing wrapper (`display:flex` on the tag,
+// matching what .home-page's column stretch already expects from a direct
+// child) and on the two .pulse-row containers themselves, rather than
+// wrapping each individual card — .pulse-row--3/--4's `> *` sizing rule
+// only reaches direct children, so wrapping the cards one-by-one would've
+// silently broken their equal-height stretch.
 export default function Home() {
   return (
     <div className="home-page">
-      <GreetingBanner />
-      <TodayImportant />
+      <div data-transition-fragment="greeting" style={{ display: 'flex' }}><GreetingBanner /></div>
+      <div data-transition-fragment="today" style={{ display: 'flex' }}><TodayImportant /></div>
 
-      <div className="pulse-row pulse-row--3">
+      <div className="pulse-row pulse-row--3" data-transition-fragment="pulse-row-3">
         <SalesFunnelCard />
         <ProjectHealthCard />
         <TeamTodayCard />
       </div>
 
-      <div className="pulse-row pulse-row--4">
+      <div className="pulse-row pulse-row--4" data-transition-fragment="pulse-row-4">
         <OverdueReportsCard />
         <UrgentTasksCard />
         <MeetingsSoonCard />
         <AiToolsCard />
       </div>
 
-      <ActivityFeedCard />
+      <div data-transition-fragment="activity-feed" style={{ display: 'flex' }}><ActivityFeedCard /></div>
     </div>
   );
 }

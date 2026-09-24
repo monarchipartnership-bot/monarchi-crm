@@ -107,6 +107,18 @@
 .side-node.active:hover { background: rgba(255, 255, 255, .16); transform: translateX(2px); }
 .side-node.active .side-ic-box { background: rgba(255, 255, 255, .24); }
 
+/* CRM->AI transition trigger click (crm-to-ai spec phase 1) — scale pulse
+   + a brief violet glow, independent of hover/active states above. */
+.side-node.trigger-pulse { animation: sideNodeTriggerPulse 200ms cubic-bezier(.2, .8, .2, 1); }
+@keyframes sideNodeTriggerPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(155, 92, 255, 0); }
+  40% { transform: scale(.96); box-shadow: 0 0 14px rgba(155, 92, 255, .55); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(155, 92, 255, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .side-node.trigger-pulse { animation: none; }
+}
+
 .side-children { overflow: hidden; max-height: 0; transition: max-height .25s ease; }
 .side-children.open { max-height: 900px; }
 .side-children .side-node { padding-left: 29px; font-size: 13px; }
