@@ -731,10 +731,18 @@ export default function ConstellationTest() {
     const next = focusedDept === key ? null : key;
     setFocusedDept(next);
     setView(next ? { scale: 1.08, x: 40, y: 20 } : { scale: 1, x: 0, y: 0 });
+    // Focusing a department unmounts its hub <g> (see `!isFocused &&`
+    // below) without the mouse ever actually leaving it, so its own
+    // onMouseLeave never fires — without this, hoveredDept stays stuck on
+    // that key, and isDimmed() keeps treating every OTHER department as
+    // hovered-away-from (dimmed) even back on the full overview, instead
+    // of all of them lighting back up together.
+    setHoveredDept(null);
   }
   function resetView() {
     setFocusedDept(null);
     setView({ scale: 1, x: 0, y: 0 });
+    setHoveredDept(null);
   }
   function cycleDept(dir) {
     if (!focusedDept) return;
@@ -742,6 +750,7 @@ export default function ConstellationTest() {
     const nextKey = deptKeys[(idx + dir + deptKeys.length) % deptKeys.length];
     setFocusedDept(nextKey);
     setView({ scale: 1.08, x: 40, y: 20 });
+    setHoveredDept(null);
   }
 
   // Mouse wheel cycles departments while one is focused — same action as
