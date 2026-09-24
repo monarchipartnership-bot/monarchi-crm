@@ -788,8 +788,10 @@ export default function ConstellationTest() {
                   onClick={() => selectSearchResult(r)}
                 >
                   <span className="agent-search-result-dot" style={{ background: r.color }} />
-                  <span className="agent-search-result-name">{r.name}</span>
-                  <span className="agent-search-result-dept">{r.deptLabel}</span>
+                  <span className="agent-search-result-text">
+                    <span className="agent-search-result-name">{r.name}</span>
+                    <span className="agent-search-result-dept">{r.deptLabel}</span>
+                  </span>
                 </button>
               )) : (
                 <div className="agent-search-empty">Нічого не знайдено</div>
