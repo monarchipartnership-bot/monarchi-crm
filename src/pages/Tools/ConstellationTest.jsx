@@ -1058,7 +1058,6 @@ export default function ConstellationTest() {
                     <span dangerouslySetInnerHTML={{ __html: focused.dept.icon }} />
                   </foreignObject>
                 )}
-                <text y={16 * UI_SCALE} textAnchor="middle" className="dept-graph-root-label">{focused.dept.label}</text>
               </g>
             </g>
           )}

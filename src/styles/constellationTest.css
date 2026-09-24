@@ -123,26 +123,33 @@
 
 /* Department switcher — carries the department name itself (previously a
    giant faint watermark floating mid-screen, moved down here per feedback:
-   it's the same information the switcher needs anyway). */
+   it's the same information the switcher needs anyway). No box of its
+   own — sits directly on the map's background, full width, the name set
+   large enough to read as a banner rather than a small pill label. */
 .constellation-carousel {
-  position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 5;
-  display: flex; align-items: center; gap: 22px;
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 10px 26px;
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 5; height: 120px;
+  display: flex; align-items: center; justify-content: center;
 }
 .constellation-carousel button {
-  width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(255, 255, 255, .06); flex: none;
-  color: #EDE7F5; font-size: 1.3rem; line-height: 1; cursor: pointer;
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
+  width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255, 255, 255, .06); flex: none;
+  color: #EDE7F5; font-size: 1.4rem; line-height: 1; cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: background .15s ease;
 }
 .constellation-carousel button:hover { background: rgba(255, 255, 255, .16); }
-.constellation-carousel-info { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 140px; }
+.constellation-carousel button:first-of-type { left: 28px; }
+.constellation-carousel button:last-of-type { right: 28px; }
+.constellation-carousel-info {
+  width: 100%; height: 100%; padding: 0 80px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+}
 .constellation-carousel-name {
-  font-family: var(--font-head); font-size: 1.15rem; font-weight: 700; color: #F1EAF6; letter-spacing: .02em;
-  text-transform: uppercase; white-space: nowrap;
+  font-family: var(--font-head); font-weight: 800; color: var(--dept-color); letter-spacing: .01em;
+  text-transform: uppercase; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%; font-size: clamp(1.8rem, 4.4vw, 3.4rem); text-shadow: none; -webkit-text-stroke: 0;
 }
 .constellation-carousel-tagline {
-  font-family: var(--font-body); font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  font-family: var(--font-body); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
   color: var(--dept-color); white-space: nowrap;
 }
 
@@ -424,10 +431,6 @@
   display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--dept-color); pointer-events: none;
 }
 .dept-graph-root foreignObject svg { width: calc(24px * var(--ui-scale, 1)); height: calc(24px * var(--ui-scale, 1)); }
-.dept-graph-root-label {
-  fill: #F1EAF6; font-family: 'Inter', var(--font-body); font-size: calc(15px * var(--ui-scale, 1)); font-weight: 800; letter-spacing: .02em;
-  text-anchor: middle; text-transform: uppercase; pointer-events: none;
-}
 
 /* full agent spec modal */
 .agent-modal-backdrop {
