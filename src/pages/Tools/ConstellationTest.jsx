@@ -86,9 +86,40 @@ const LABEL_BASE_GAP = 40;
 // handing every department the worst case and pushing top/bottom labels
 // needlessly far out.
 const LABEL_TEXT_MARGIN = 100;
-function labelRadius(deptAngleDeg) {
-  const horizontalness = Math.abs(Math.cos((deptAngleDeg * Math.PI) / 180));
-  return CHAIN_MAX_RADIUS + LABEL_BASE_GAP + LABEL_TEXT_MARGIN * horizontalness;
+// Long department names wrap onto two lines (see wrapDeptLabel) instead of
+// running past the network graph as one long line. A wrapped label only
+// grows in HEIGHT, not width, so it's the top/bottom-ish departments (whose
+// margin above was already ~0, since only a single line's height mattered
+// there) that need extra push-out — scaled by verticalness the same way
+// LABEL_TEXT_MARGIN scales by horizontalness.
+const LABEL_WRAP_THRESHOLD = 20;
+const LABEL_WRAP_MARGIN = 34;
+function labelRadius(deptAngleDeg, label) {
+  const rad = (deptAngleDeg * Math.PI) / 180;
+  const horizontalness = Math.abs(Math.cos(rad));
+  const verticalness = Math.abs(Math.sin(rad));
+  const wrapped = (label?.length || 0) > LABEL_WRAP_THRESHOLD;
+  const wrapExtra = wrapped ? LABEL_WRAP_MARGIN * verticalness : 0;
+  return CHAIN_MAX_RADIUS + LABEL_BASE_GAP + LABEL_TEXT_MARGIN * horizontalness + wrapExtra;
+}
+// Splits a long department name into two roughly-balanced lines at a word
+// boundary (never mid-word) — tries every split point and keeps the one
+// whose two line lengths are closest, so "Робота з клієнтами та
+// акаунт-менеджмент" breaks near its middle rather than leaving one huge
+// line and one tiny word dangling.
+function wrapDeptLabel(text) {
+  if (!text || text.length <= LABEL_WRAP_THRESHOLD) return [text];
+  const words = text.split(' ');
+  if (words.length < 2) return [text];
+  let bestSplit = 1;
+  let bestDiff = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const line1 = words.slice(0, i).join(' ');
+    const line2 = words.slice(i).join(' ');
+    const diff = Math.abs(line1.length - line2.length);
+    if (diff < bestDiff) { bestDiff = diff; bestSplit = i; }
+  }
+  return [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')];
 }
 // Half-size of the graph SVG's own viewBox — content must stay within this
 // radius from center or risk being clipped by the stage container on some
@@ -853,7 +884,8 @@ export default function ConstellationTest() {
               const color = dept.color;
               const [outerDotX, outerDotY] = toXY(deptAngle, 30 * UI_SCALE);
               const [innerDotX, innerDotY] = toXY(deptAngle + 180, 30 * UI_SCALE);
-              const [labelX, labelY] = toXY(deptAngle, labelRadius(deptAngle));
+              const [labelX, labelY] = toXY(deptAngle, labelRadius(deptAngle, dept.label));
+              const labelLines = wrapDeptLabel(dept.label);
               // Core's approximate visible radius (ParticleSphere's own
               // r=92 core glow, scaled by the 0.38*UI_SCALE it's mounted
               // at) and the hub ring's own radius (30*UI_SCALE) — trims the
@@ -974,8 +1006,14 @@ export default function ConstellationTest() {
                           carousel instead. */}
                       {!focusedDept && (
                         <g transform={`translate(${labelX} ${labelY})`} className="constellation-dept-label">
-                          <text y="0" textAnchor="middle" className="hub-label">{dept.label}</text>
-                          {dept.comingSoon && <text y={16 * UI_SCALE} textAnchor="middle" className="hub-soon-badge">СКОРО</text>}
+                          <text textAnchor="middle" className="hub-label">
+                            {labelLines.map((line, i) => (
+                              <tspan key={i} x={0} dy={i === 0 ? (labelLines.length > 1 ? '-0.6em' : '0') : '1.2em'}>{line}</tspan>
+                            ))}
+                          </text>
+                          {dept.comingSoon && (
+                            <text y={(labelLines.length > 1 ? 32 : 16) * UI_SCALE} textAnchor="middle" className="hub-soon-badge">СКОРО</text>
+                          )}
                         </g>
                       )}
                     </>
