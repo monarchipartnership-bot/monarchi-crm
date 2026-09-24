@@ -1,14 +1,26 @@
-/* Ads Insights Analyst — chat overlay for the ads-insights-analyst agent,
-   same dark "AI command center" chrome as knowledgeBasePage.css (new class
-   prefix so neither stylesheet has to touch the other's working rules).
-   Lives only inside the AI Agents map, floating over its starfield. */
+/* Ads Insights Analyst — full workspace. Opens only from the AI Agents
+   map's agent modal, but is visually a completely separate, fully opaque
+   application surface: the map (nodes/lines/labels/particles) must be
+   invisible behind it — never a translucent modal over the map. */
 
 .aia-overlay {
   position: fixed; inset: 0; z-index: 65; display: flex; flex-direction: column;
-  align-items: center; padding: 78px 26px 26px; overflow: hidden;
+  align-items: center; justify-content: center; padding: 40px; overflow: hidden;
+  background: #080C1A;
+  animation: aia-fade-in .2s ease-out;
+}
+.aia-overlay::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 12% -5%, rgba(124, 58, 237, .10), transparent 60%),
+    radial-gradient(700px 500px at 100% 100%, rgba(56, 130, 246, .07), transparent 60%);
+}
+@keyframes aia-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.aia-nav { position: absolute; top: 20px; left: 20px; z-index: 2; display: flex; align-items: center; gap: 10px; }
+.aia-topbar { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 2; display: flex; align-items: center; justify-content: space-between; }
 .aia-nav-pill {
   display: flex; align-items: center; gap: 7px; padding: 9px 16px 9px 12px; border-radius: 999px;
   border: 1px solid rgba(140, 130, 200, .28); background: rgba(18, 16, 34, .62); backdrop-filter: blur(10px);
@@ -17,13 +29,21 @@
 }
 .aia-nav-pill:hover { background: rgba(122, 105, 200, .22); border-color: rgba(164, 98, 255, .5); color: #fff; }
 .aia-nav-pill svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.aia-close-btn {
+  width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(140, 130, 200, .28); background: rgba(18, 16, 34, .62); backdrop-filter: blur(10px);
+  color: #D8D4F0; cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+}
+.aia-close-btn:hover { background: rgba(244, 63, 94, .16); border-color: rgba(244, 63, 94, .4); color: #FCA5B1; }
+.aia-close-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.aia-close-btn:focus-visible, .aia-nav-pill:focus-visible { outline: 2px solid rgba(164, 98, 255, .7); outline-offset: 2px; }
 
 .aia-panel {
-  position: relative; width: 100%; max-width: 1120px; height: 100%; display: flex; flex-direction: column;
-  gap: 16px; padding: 30px 34px; border-radius: 26px; overflow: hidden;
-  background: rgba(11, 16, 34, .86); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  position: relative; width: calc(100vw - 100px); max-width: 1600px; height: calc(100vh - 80px);
+  display: flex; flex-direction: column; gap: 18px; padding: 34px 38px; border-radius: 26px; overflow: hidden;
+  background: rgba(11, 16, 34, .96); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(122, 105, 200, .32);
-  box-shadow: 0 0 40px rgba(96, 70, 255, .10), inset 0 0 60px rgba(60, 80, 180, .03), 0 40px 90px -30px rgba(0, 0, 0, .6);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, .42), 0 0 50px rgba(91, 52, 255, .08);
 }
 .aia-panel-glow {
   position: absolute; inset: 0; z-index: 0; pointer-events: none;
@@ -33,125 +53,149 @@
 }
 .aia-panel > * { position: relative; z-index: 1; }
 
-.aia-header { display: flex; align-items: center; gap: 16px; flex: none; }
-.aia-header-icon {
-  flex: none; width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #8B5CF6, #4C1D95); color: #fff; box-shadow: 0 8px 22px -8px rgba(139, 92, 246, .7);
-}
-.aia-header-icon svg { width: 26px; height: 26px; stroke: currentColor; fill: none; }
-.aia-kicker { font-family: var(--font-head); font-weight: 700; font-size: .66rem; letter-spacing: .16em; text-transform: uppercase; color: #B879FF; margin-bottom: 4px; }
-.aia-header-text h1 { font-family: var(--font-head); font-weight: 800; font-size: 1.3rem; color: #F3F1FF; letter-spacing: -.2px; }
+.aia-header { display: flex; align-items: center; gap: 20px; flex: none; }
+.aia-header-text { min-width: 0; }
+.aia-kicker { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: #B879FF; margin-bottom: 4px; }
+.aia-header-text h1 { font-family: var(--font-head); font-weight: 700; font-size: 1.7rem; color: #F5F2FF; letter-spacing: -.3px; margin-bottom: 6px; }
+.aia-header-desc { font-family: var(--font-body); font-size: .84rem; line-height: 1.55; color: #938CA8; max-width: 640px; }
 
 .aia-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: #8983B5; font-family: var(--font-body); font-size: .88rem; padding: 40px; line-height: 1.5; }
 
 .aia-client-row { display: flex; align-items: center; gap: 10px; flex: none; }
-.aia-client-row label { font-family: var(--font-body); font-size: .8rem; color: #918CBB; }
+.aia-client-row label { font-family: var(--font-body); font-size: .8rem; color: #938CA8; }
 .aia-client-row select {
-  flex: 1; max-width: 320px; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(122, 105, 200, .3);
-  background: rgba(20, 18, 40, .55); color: #EDEBFA; font-family: var(--font-body); font-size: .84rem; outline: none;
+  height: 44px; min-width: 280px; max-width: 330px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(128, 105, 220, .35);
+  background: #10162D; color: #F5F2FF; font-family: var(--font-body); font-size: .84rem; outline: none; transition: border-color .15s, box-shadow .15s;
 }
-.aia-client-id { font-family: var(--font-body); font-size: .74rem; color: #7A76A3; }
+.aia-client-row select:focus { border-color: #9B5CFF; box-shadow: 0 0 0 3px rgba(155, 92, 255, .15); }
+.aia-client-id { font-family: var(--font-body); font-size: .74rem; color: #6F6885; }
 
-.aia-body { display: flex; gap: 18px; flex: 1; min-height: 0; }
+.aia-body { display: flex; gap: 14px; flex: 1; min-height: 0; }
 .aia-chat-col { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 0; }
 
 .aia-hotkeys {
-  flex: 0 0 220px; display: flex; flex-direction: column; gap: 7px; padding: 12px; overflow-y: auto;
-  background: rgba(7, 12, 28, .45); border: 1px solid rgba(110, 100, 190, .25); border-radius: 16px;
-  scrollbar-width: thin; scrollbar-color: rgba(130, 110, 170, .35) transparent;
+  flex: 0 0 390px; display: flex; flex-direction: column; gap: 8px; padding: 16px; overflow: hidden;
+  background: rgba(7, 12, 28, .65); border: 1px solid rgba(95, 86, 190, .28); border-radius: 20px;
 }
 
 .aia-audit-btn {
-  padding: 11px 12px; margin-bottom: 6px; border-radius: 12px; border: 1px solid rgba(164, 98, 255, .5);
-  background: linear-gradient(135deg, #8B5CF6, #4C1D95); color: #fff; font-family: var(--font-body); font-weight: 700;
-  font-size: .8rem; line-height: 1.3; cursor: pointer; text-align: left; box-shadow: 0 6px 18px -8px rgba(139, 92, 246, .7);
+  display: flex; align-items: center; gap: 8px; height: 60px; padding: 0 16px; margin-bottom: 2px; flex: none;
+  border-radius: 14px; border: 1px solid rgba(178, 128, 255, .45);
+  background: linear-gradient(135deg, #7C3AED, #5B21B6); color: #fff; font-family: var(--font-body); font-weight: 700;
+  font-size: .88rem; line-height: 1.3; cursor: pointer; text-align: left; box-shadow: 0 10px 26px -10px rgba(124, 58, 237, .7);
   transition: filter .15s, opacity .15s;
 }
 .aia-audit-btn:hover:not(:disabled) { filter: brightness(1.08); }
-.aia-audit-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
-.aia-hotkeys-title { font-family: var(--font-head); font-weight: 700; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: #7A76A3; padding: 2px 4px 4px; }
-.aia-hotkey-btn {
-  text-align: left; padding: 9px 11px; border-radius: 10px; border: 1px solid rgba(122, 105, 200, .22);
-  background: rgba(122, 105, 200, .08); color: #D8D4F0; font-family: var(--font-body); font-size: .8rem; line-height: 1.35;
-  cursor: pointer; transition: background .15s, border-color .15s, color .15s;
-}
-.aia-hotkey-btn:hover:not(:disabled) { background: rgba(122, 105, 200, .2); border-color: rgba(164, 98, 255, .5); color: #fff; }
-.aia-hotkey-btn:disabled { opacity: .5; cursor: default; }
+.aia-audit-btn:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.aia-audit-btn svg { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.aia-audit-btn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.aia-sidebar-tabs { display: flex; gap: 4px; padding: 2px; margin-bottom: 4px; background: rgba(0, 0, 0, .18); border-radius: 10px; }
+.aia-sidebar-tabs { display: flex; gap: 4px; padding: 3px; flex: none; background: rgba(0, 0, 0, .22); border-radius: 12px; height: 46px; }
 .aia-sidebar-tab {
-  flex: 1; padding: 6px 8px; border: none; border-radius: 8px; background: none; cursor: pointer;
-  font-family: var(--font-body); font-weight: 600; font-size: .74rem; color: #8983B5; transition: background .15s, color .15s;
+  flex: 1; border: none; border-radius: 9px; background: none; cursor: pointer;
+  font-family: var(--font-body); font-weight: 600; font-size: .78rem; color: #938CA8; transition: background .16s, color .16s;
 }
-.aia-sidebar-tab.active { background: rgba(122, 105, 200, .3); color: #fff; }
+.aia-sidebar-tab.active { background: linear-gradient(135deg, rgba(114, 63, 210, .9), rgba(81, 47, 160, .88)); border: 1px solid rgba(161, 110, 255, .5); color: #fff; }
+.aia-sidebar-tab:focus-visible { outline: 2px solid rgba(164, 98, 255, .7); outline-offset: -2px; }
+
+.aia-sidebar-content { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; overflow-y: auto; padding-right: 2px; animation: aia-fade-in .15s ease-out; }
+
+.aia-hotkey-btn {
+  display: flex; align-items: center; gap: 11px; text-align: left; height: 54px; padding: 0 13px; flex: none;
+  border-radius: 13px; border: 1px solid rgba(112, 95, 210, .28); background: rgba(18, 24, 52, .68);
+  color: #F5F2FF; font-family: var(--font-body); font-size: .82rem; font-weight: 600; line-height: 1.3;
+  cursor: pointer; transition: background .15s, border-color .15s, transform .15s;
+}
+.aia-hotkey-btn:hover:not(:disabled) { background: rgba(112, 95, 210, .16); border-color: rgba(112, 95, 210, .5); transform: translateX(2px); }
+.aia-hotkey-btn:disabled { opacity: .5; cursor: default; transform: none; }
+.aia-hotkey-icon { flex: none; width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--hk-color, #7C3AED) 22%, transparent); color: var(--hk-color, #7C3AED); }
+.aia-hotkey-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.aia-hotkey-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aia-hotkey-chevron { flex: none; width: 14px; height: 14px; stroke: #6F6885; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .aia-new-convo-btn {
-  display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 11px; margin-bottom: 4px;
-  border-radius: 10px; border: 1px dashed rgba(164, 98, 255, .45); background: rgba(139, 92, 246, .1);
+  display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; flex: none;
+  border-radius: 11px; border: 1px solid rgba(164, 98, 255, .5); background: rgba(139, 92, 246, .1);
   color: #C9B6FF; font-family: var(--font-body); font-weight: 600; font-size: .78rem; cursor: pointer; transition: background .15s;
 }
 .aia-new-convo-btn:hover { background: rgba(139, 92, 246, .2); }
 
-.aia-history-empty { padding: 10px 6px; color: #7A76A3; font-family: var(--font-body); font-size: .78rem; line-height: 1.5; }
+.aia-panel-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 30px 14px; color: #6F6885; }
+.aia-panel-empty-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(122, 105, 200, .12); color: #938CA8; }
+.aia-panel-empty-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.aia-panel-empty-title { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: #E4E1F5; }
+.aia-panel-empty-text { font-family: var(--font-body); font-size: .78rem; line-height: 1.5; }
+
 .aia-history-item {
-  display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 9px 11px; border-radius: 10px;
+  display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; flex: none; border-radius: 11px;
   border: 1px solid transparent; background: rgba(122, 105, 200, .06); cursor: pointer; transition: background .15s, border-color .15s;
 }
 .aia-history-item:hover { background: rgba(122, 105, 200, .16); }
 .aia-history-item.active { background: rgba(122, 105, 200, .22); border-color: rgba(164, 98, 255, .5); }
-.aia-history-item-title { font-family: var(--font-body); font-weight: 600; font-size: .78rem; color: #E4E1F5; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.aia-history-item-date { font-family: var(--font-body); font-size: .68rem; color: #7A76A3; }
+.aia-history-item-title { font-family: var(--font-body); font-weight: 600; font-size: .8rem; color: #E4E1F5; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aia-history-item-date { font-family: var(--font-body); font-size: .68rem; color: #6F6885; }
 
 .aia-framework-item {
-  display: flex; align-items: center; gap: 4px; border-radius: 10px; border: 1px solid transparent;
+  display: flex; align-items: center; gap: 4px; flex: none; border-radius: 11px; border: 1px solid transparent;
   background: rgba(122, 105, 200, .06); transition: background .15s, border-color .15s;
 }
 .aia-framework-item:hover { background: rgba(122, 105, 200, .16); }
 .aia-framework-item.active { background: rgba(122, 105, 200, .22); border-color: rgba(164, 98, 255, .5); }
 .aia-framework-item-main {
-  flex: 1; min-width: 0; text-align: left; padding: 9px 4px 9px 11px; border: none; background: none; cursor: pointer;
-  font-family: var(--font-body); font-weight: 600; font-size: .78rem; color: #E4E1F5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; min-width: 0; text-align: left; padding: 10px 4px 10px 12px; border: none; background: none; cursor: pointer;
+  font-family: var(--font-body); font-weight: 600; font-size: .8rem; color: #E4E1F5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .aia-framework-item-actions { display: flex; gap: 2px; padding-right: 6px; flex: none; }
 .aia-framework-item-actions button {
-  width: 24px; height: 24px; border: none; background: none; color: #8983B5; cursor: pointer; border-radius: 6px;
+  width: 26px; height: 26px; border: none; background: none; color: #938CA8; cursor: pointer; border-radius: 6px;
   display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s;
 }
 .aia-framework-item-actions button:hover { background: rgba(122, 105, 200, .25); color: #fff; }
 .aia-framework-item-actions svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-.aia-framework-form { display: flex; flex-direction: column; gap: 8px; }
+.aia-framework-form { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
 .aia-framework-form input, .aia-framework-form textarea {
-  padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(122, 105, 200, .3); background: rgba(20, 18, 40, .55);
-  color: #EDEBFA; font-family: var(--font-body); font-size: .8rem; outline: none; transition: border-color .15s;
+  padding: 9px 11px; border-radius: 9px; border: 1px solid rgba(128, 105, 220, .35); background: #10162D;
+  color: #F5F2FF; font-family: var(--font-body); font-size: .8rem; outline: none; transition: border-color .15s, box-shadow .15s;
 }
-.aia-framework-form input:focus, .aia-framework-form textarea:focus { border-color: rgba(164, 98, 255, .65); }
-.aia-framework-form textarea { min-height: 220px; resize: vertical; line-height: 1.5; }
-.aia-framework-form-actions { display: flex; gap: 8px; }
-.aia-framework-form-actions .aia-hotkey-btn { flex: 1; text-align: center; }
-.aia-framework-form-actions .aia-new-convo-btn { flex: 1; margin-bottom: 0; }
+.aia-framework-form input:focus, .aia-framework-form textarea:focus { border-color: #9B5CFF; box-shadow: 0 0 0 3px rgba(155, 92, 255, .15); }
+.aia-framework-form textarea { flex: 1; min-height: 160px; resize: vertical; line-height: 1.5; }
+.aia-framework-form-actions { display: flex; gap: 8px; flex: none; }
+.aia-framework-form-actions .aia-hotkey-btn { flex: 1; height: 44px; justify-content: center; }
+.aia-framework-form-actions .aia-new-convo-btn { flex: 1; }
+
+/* Custom thin scrollbars everywhere in the right panel + chat thread. */
+.aia-sidebar-content, .aia-thread {
+  scrollbar-width: thin; scrollbar-color: rgba(121, 103, 190, .35) transparent;
+}
+.aia-sidebar-content::-webkit-scrollbar, .aia-thread::-webkit-scrollbar { width: 4px; }
+.aia-sidebar-content::-webkit-scrollbar-thumb, .aia-thread::-webkit-scrollbar-thumb { background: rgba(121, 103, 190, .35); border-radius: 999px; }
+.aia-sidebar-content::-webkit-scrollbar-thumb:hover, .aia-thread::-webkit-scrollbar-thumb:hover { background: rgba(144, 112, 230, .6); }
 
 .aia-thread {
-  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 6px 4px;
-  scrollbar-width: thin; scrollbar-color: rgba(130, 110, 170, .35) transparent;
+  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 16px;
+  background: rgba(7, 12, 29, .45); border: 1px solid rgba(92, 104, 180, .20); border-radius: 18px;
 }
-.aia-thread::-webkit-scrollbar { width: 5px; }
-.aia-thread::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
-.aia-thread-hint { font-family: var(--font-body); font-size: .84rem; color: #7A76A3; line-height: 1.6; padding: 10px 4px; }
+.aia-thread-hint-block { display: flex; align-items: flex-start; gap: 12px; padding: 10px 4px; max-width: 620px; }
+.aia-thread-hint-icon { flex: none; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(122, 105, 200, .16); color: #B879FF; }
+.aia-thread-hint-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.aia-thread-hint { font-family: var(--font-body); font-size: .84rem; color: #938CA8; line-height: 1.6; padding-top: 6px; }
 
-.aia-msg { display: flex; }
+.aia-msg { display: flex; gap: 10px; }
 .aia-msg-user { justify-content: flex-end; }
 .aia-msg-assistant { justify-content: flex-start; }
-.aia-msg-col { display: flex; flex-direction: column; gap: 10px; max-width: 82%; }
-.aia-msg-user .aia-msg-col { align-items: flex-end; }
+.aia-msg-avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(122, 105, 200, .18); color: #C9B6FF; margin-top: 2px; }
+.aia-msg-avatar svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.aia-msg-col { display: flex; flex-direction: column; gap: 10px; max-width: 70%; }
+.aia-msg-user .aia-msg-col { align-items: flex-end; max-width: 68%; }
 .aia-msg-assistant .aia-msg-col { align-items: flex-start; }
 .aia-msg-bubble {
   padding: 12px 15px; border-radius: 14px; font-family: var(--font-body); font-size: .88rem;
   line-height: 1.55; white-space: pre-wrap;
 }
-.aia-msg-user .aia-msg-bubble { background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; border-bottom-right-radius: 4px; }
-.aia-msg-assistant .aia-msg-bubble { background: rgba(122, 105, 200, .12); border: 1px solid rgba(122, 105, 200, .25); color: #E4E1F5; border-bottom-left-radius: 4px; }
-.aia-msg-typing { color: #918CBB; font-style: italic; }
+.aia-msg-user .aia-msg-bubble { background: linear-gradient(135deg, rgba(93, 52, 190, .75), rgba(71, 45, 145, .72)); border: 1px solid rgba(157, 104, 255, .32); color: #fff; border-bottom-right-radius: 4px; }
+.aia-msg-assistant .aia-msg-bubble { background: rgba(25, 31, 63, .78); border: 1px solid rgba(103, 111, 190, .26); color: #E4E1F5; border-bottom-left-radius: 4px; }
+.aia-msg-typing { color: #938CA8; font-style: italic; }
 
 .aia-visual {
   width: 100%; padding: 14px; border-radius: 14px; background: rgba(20, 18, 40, .5); border: 1px solid rgba(122, 105, 200, .25);
@@ -167,7 +211,7 @@
 .aia-table-scroll { overflow-x: auto; scrollbar-width: thin; }
 .aia-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: .8rem; }
 .aia-table th, .aia-table td { padding: 7px 12px; text-align: left; white-space: nowrap; }
-.aia-table th { color: #918CBB; font-weight: 600; font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid rgba(122, 105, 200, .28); }
+.aia-table th { color: #938CA8; font-weight: 600; font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid rgba(122, 105, 200, .28); }
 .aia-table td { color: #E4E1F5; border-bottom: 1px solid rgba(122, 105, 200, .12); }
 .aia-table tr:last-child td { border-bottom: none; }
 
@@ -182,26 +226,33 @@
 
 .aia-input-row { display: flex; align-items: flex-end; gap: 10px; flex: none; }
 .aia-input-row textarea {
-  flex: 1; resize: none; max-height: 120px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(122, 105, 200, .3);
-  background: rgba(20, 18, 40, .55); color: #EDEBFA; font-family: var(--font-body); font-size: .88rem; line-height: 1.5; outline: none;
-  transition: border-color .15s;
+  flex: 1; resize: none; max-height: 120px; padding: 13px 15px; border-radius: 13px; border: 1px solid rgba(128, 105, 220, .35);
+  background: #10162D; color: #F5F2FF; font-family: var(--font-body); font-size: .88rem; line-height: 1.5; outline: none;
+  transition: border-color .15s, box-shadow .15s;
 }
-.aia-input-row textarea::placeholder { color: #746F99; }
-.aia-input-row textarea:focus { border-color: rgba(164, 98, 255, .65); }
+.aia-input-row textarea::placeholder { color: #6F6885; }
+.aia-input-row textarea:focus { border-color: #9B5CFF; box-shadow: 0 0 0 3px rgba(155, 92, 255, .15); }
 .aia-send-btn {
-  flex: none; width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer;
-  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; display: flex; align-items: center; justify-content: center;
+  flex: none; width: 50px; height: 50px; border-radius: 14px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #7C3AED, #5B21B6); color: #fff; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6); transition: filter .15s, opacity .15s;
 }
 .aia-send-btn:hover:not(:disabled) { filter: brightness(1.08); }
 .aia-send-btn:disabled { opacity: .5; cursor: default; }
-.aia-send-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.aia-send-btn svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 1279px) {
+  .aia-hotkeys { flex-basis: 320px; }
+}
 
 @media (max-width: 860px) {
-  .aia-overlay { padding: 70px 16px 16px; }
-  .aia-panel { padding: 22px; }
-  .aia-msg-col { max-width: 90%; }
+  .aia-overlay { padding: 16px; }
+  .aia-topbar { top: 16px; left: 16px; right: 16px; }
+  .aia-panel { width: 100%; height: 100%; padding: 70px 18px 18px; }
+  .aia-msg-col, .aia-msg-user .aia-msg-col { max-width: 90%; }
+  .aia-client-row { flex-wrap: wrap; }
+  .aia-client-row select { min-width: 0; flex: 1 1 200px; }
   .aia-body { flex-direction: column; overflow-y: auto; }
-  .aia-hotkeys { flex: none; flex-direction: row; flex-wrap: wrap; max-height: none; }
-  .aia-hotkey-btn { flex: 1 1 auto; }
+  .aia-hotkeys { flex: none; flex-basis: auto; }
+  .aia-header { flex-wrap: wrap; }
 }

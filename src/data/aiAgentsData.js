@@ -567,3 +567,17 @@ export const AGENT_DEPTS = {
     ],
   },
 };
+
+// Flattens AGENT_DEPTS to look an agent up by its own `key` — used where a
+// specific agent's real data (name/description/icon) is needed outside the
+// map itself, e.g. an agent's own workspace header, so that text is never
+// duplicated/invented a second time.
+export function findAgentByKey(agentKey) {
+  for (const dept of Object.values(AGENT_DEPTS)) {
+    for (const subcat of dept.subcategories) {
+      const agent = subcat.agents.find((a) => a.key === agentKey);
+      if (agent) return agent;
+    }
+  }
+  return null;
+}

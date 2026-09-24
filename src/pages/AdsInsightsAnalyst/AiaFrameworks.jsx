@@ -8,7 +8,7 @@ const PLUS_ICON = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
 // (name + instructions), selectable, editable, deletable. CRUD calls and
 // the `frameworks`/`selectedId` state live in AdsInsightsAnalyst.jsx; this
 // component only owns the create/edit form's local draft state.
-export default function AiaFrameworks({ frameworks, selectedId, onSelect, onCreate, onUpdate, onDelete }) {
+export default function AiaFrameworks({ frameworks, selectedId, onSelect, onCreate, onUpdate, onDelete, emptyIcon }) {
   const [editing, setEditing] = useState(null); // null | 'new' | frameworkId
   const [draftName, setDraftName] = useState('');
   const [draftInstructions, setDraftInstructions] = useState('');
@@ -63,7 +63,13 @@ export default function AiaFrameworks({ frameworks, selectedId, onSelect, onCrea
       <button type="button" className="aia-new-convo-btn" onClick={startCreate}>
         <span dangerouslySetInnerHTML={{ __html: PLUS_ICON }} /> Новий фреймворк
       </button>
-      {!frameworks.length && <div className="aia-history-empty">Ще немає збережених фреймворків аудиту.</div>}
+      {!frameworks.length && (
+        <div className="aia-panel-empty">
+          {emptyIcon && <span className="aia-panel-empty-icon" dangerouslySetInnerHTML={{ __html: emptyIcon }} />}
+          <div className="aia-panel-empty-title">Ще немає фреймворків</div>
+          <div className="aia-panel-empty-text">Ще немає збережених фреймворків аудиту.</div>
+        </div>
+      )}
       {frameworks.map((fw) => (
         <div key={fw.id} className={'aia-framework-item' + (selectedId === fw.id ? ' active' : '')}>
           <button type="button" className="aia-framework-item-main" onClick={() => onSelect(fw.id)}>

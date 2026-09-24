@@ -3,15 +3,22 @@ import { supabase } from '../../lib/supabaseClient';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { fetchConversations, fetchConversationMessages, createConversation, appendMessages } from '../../lib/api/aiConversations';
 import { fetchFrameworks, createFramework, updateFramework, deleteFramework } from '../../lib/api/aiAuditFrameworks';
-import { AGENT_ICONS } from '../../data/aiAgentsData';
+import { AGENT_ICONS, findAgentByKey } from '../../data/aiAgentsData';
+import AgentOrb from '../../components/AgentOrb/AgentOrb';
 import ChatMessage from './ChatMessage';
 import AiaFrameworks from './AiaFrameworks';
 import '../../styles/adsInsightsAnalystPage.css';
 
 const AGENT_KEY = 'ads-insights-analyst';
+const AGENT_COLOR = '#8B5CF6';
 const BACK_ICON = '<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>';
+const CLOSE_ICON = '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 const SEND_ICON = '<svg viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>';
 const PLUS_ICON = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+const SPARKLE_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg>';
+const CHEVRON_ICON = '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>';
+const HISTORY_EMPTY_ICON = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>';
+const FRAMEWORK_EMPTY_ICON = '<svg viewBox="0 0 24 24"><path d="M9 3h6l3 5-6 13L3 8z"/><path d="M3 8h18M9 3l3 5 3-5"/></svg>';
 
 const ENV_LABELS = {
   GOOGLE_ADS_CLIENT_ID: 'GOOGLE_ADS_CLIENT_ID',
@@ -22,16 +29,23 @@ const ENV_LABELS = {
 
 // One-click canned questions — each just sends its `prompt` through the
 // same chat pipeline as manual typing, so there's no separate code path
-// to keep in sync with what the backend tool can actually answer.
+// to keep in sync with what the backend tool can actually answer. `color`
+// is a per-command accent for its icon chip only, purely decorative.
 const HOTKEYS = [
-  { label: 'Витрати', prompt: 'Скільки витрачено за останні 30 днів?' },
-  { label: 'Конверсії та ROAS', prompt: 'Скільки конверсій, яка їх цінність і ROAS за останні 30 днів?' },
-  { label: 'Ціна за конверсію', prompt: 'Яка ціна за конверсію (CPA) за останні 30 днів?' },
-  { label: 'Всі показники', prompt: 'Покажи всі показники по кабінету за останні 30 днів' },
-  { label: 'По кампаніях', prompt: 'Покажи розбивку по кампаніях за останні 30 днів' },
-  { label: 'По пристроях', prompt: 'Покажи розбивку по пристроях (mobile/desktop/tablet) за останні 30 днів' },
-  { label: 'Impression share', prompt: 'Який impression share за останні 30 днів?' },
-  { label: 'Порівняти з минулим періодом', prompt: 'Порівняй останні 30 днів з попередніми 30 днями' },
+  { label: 'Витрати', prompt: 'Скільки витрачено за останні 30 днів?', color: '#4F7CFF', icon: '<svg viewBox="0 0 24 24"><path d="M4 20V10m6 10V4m6 16v-7"/></svg>' },
+  { label: 'Конверсії та ROAS', prompt: 'Скільки конверсій, яка їх цінність і ROAS за останні 30 днів?', color: '#EC4899', icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>' },
+  { label: 'Ціна за конверсію', prompt: 'Яка ціна за конверсію (CPA) за останні 30 днів?', color: '#38D9FF', icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v12M15 9.5c0-1.4-1.3-2.5-3-2.5s-3 1-3 2.3c0 3.2 6 1.6 6 4.7 0 1.4-1.3 2.5-3 2.5s-3-1.1-3-2.5"/></svg>' },
+  { label: 'Всі показники', prompt: 'Покажи всі показники по кабінету за останні 30 днів', color: '#9B5CFF', icon: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>' },
+  { label: 'По кампаніях', prompt: 'Покажи розбивку по кампаніях за останні 30 днів', color: '#7C3AED', icon: '<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>' },
+  { label: 'По пристроях', prompt: 'Покажи розбивку по пристроях (mobile/desktop/tablet) за останні 30 днів', color: '#4F7CFF', icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="14" height="10" rx="1.5"/><path d="M8 20h6"/><rect x="18" y="8" width="4" height="9" rx="1"/></svg>' },
+  { label: 'Impression share', prompt: 'Який impression share за останні 30 днів?', color: '#B879FF', icon: '<svg viewBox="0 0 24 24"><path d="M12 12V3a9 9 0 1 1-9 9z"/><path d="M12 12 21 8"/></svg>' },
+  { label: 'Порівняти з минулим періодом', prompt: 'Порівняй останні 30 днів з попередніми 30 днями', color: '#9B5CFF', icon: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' },
+];
+
+const SIDEBAR_TABS = [
+  { key: 'commands', label: 'Команди' },
+  { key: 'history', label: 'Історія' },
+  { key: 'frameworks', label: 'Фреймворк' },
 ];
 
 function formatHistoryDate(iso) {
@@ -43,8 +57,12 @@ function formatHistoryDate(iso) {
 }
 
 // Lives only inside the AI Agents map (ConstellationTest.jsx's
-// ads-insights-analyst node) — same near-fullscreen overlay pattern as
-// KnowledgeBase, opened via `agentToolOpen` rather than a routed page.
+// ads-insights-analyst node), opened via `agentToolOpen` rather than a
+// routed page. Renders as a fully opaque full-viewport workspace — never a
+// translucent modal — so nothing of the map behind it is visible; closing
+// (Back, X, or Escape — the last already handled by ConstellationTest)
+// just unmounts this overlay, and the map underneath was never touched,
+// so its focused department/view come back exactly as they were.
 export default function AdsInsightsAnalyst({ onClose }) {
   const [clients, setClients] = useState(null);
   const [clientId, setClientId] = useState('');
@@ -59,6 +77,8 @@ export default function AdsInsightsAnalyst({ onClose }) {
   const [frameworks, setFrameworks] = useState([]);
   const [selectedFrameworkId, setSelectedFrameworkId] = useState(null);
   const threadRef = useRef(null);
+
+  const agentData = findAgentByKey(AGENT_KEY);
 
   useEffect(() => {
     let alive = true;
@@ -204,9 +224,12 @@ export default function AdsInsightsAnalyst({ onClose }) {
 
   return (
     <div className="aia-overlay">
-      <div className="aia-nav">
+      <div className="aia-topbar">
         <button type="button" className="aia-nav-pill" onClick={onClose}>
           <span dangerouslySetInnerHTML={{ __html: BACK_ICON }} /> До карти системи
+        </button>
+        <button type="button" className="aia-close-btn" onClick={onClose} aria-label="Закрити">
+          <span dangerouslySetInnerHTML={{ __html: CLOSE_ICON }} />
         </button>
       </div>
 
@@ -214,10 +237,11 @@ export default function AdsInsightsAnalyst({ onClose }) {
         <div className="aia-panel-glow" />
 
         <div className="aia-header">
-          <span className="aia-header-icon" dangerouslySetInnerHTML={{ __html: AGENT_ICONS.ads }} />
+          <AgentOrb color={AGENT_COLOR} icon={AGENT_ICONS.ads} size={112} />
           <div className="aia-header-text">
             <div className="aia-kicker">AI-АГЕНТ · РЕКЛАМНА ЕФЕКТИВНІСТЬ</div>
             <h1>Аналітик рекламних даних та інсайтів</h1>
+            {agentData?.description && <p className="aia-header-desc">{agentData.description}</p>}
           </div>
         </div>
 
@@ -244,15 +268,23 @@ export default function AdsInsightsAnalyst({ onClose }) {
               <div className="aia-chat-col">
                 <div className="aia-thread" ref={threadRef}>
                   {!messages.length && (
-                    <div className="aia-thread-hint">
-                      Запитайте природною мовою, наприклад: «Скільки витрачено за останні 30 днів?»
-                      або «Покажи розбивку по кампаніях за цей місяць» — або скористайтесь швидкими командами праворуч.
+                    <div className="aia-thread-hint-block">
+                      <span className="aia-thread-hint-icon" dangerouslySetInnerHTML={{ __html: AGENT_ICONS.ads }} />
+                      <div className="aia-thread-hint">
+                        Запитайте природною мовою, наприклад: «Скільки витрачено за останні 30 днів?»
+                        або «Покажи розбивку по кампаніях за цей місяць» — або скористайтесь швидкими командами праворуч.
+                      </div>
                     </div>
                   )}
-                  {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} visual={m.visual} />)}
+                  {messages.map((m, i) => (
+                    <ChatMessage key={i} role={m.role} content={m.content} visual={m.visual} agentIcon={m.role === 'assistant' ? AGENT_ICONS.ads : undefined} />
+                  ))}
                   {sending && (
                     <div className="aia-msg aia-msg-assistant">
-                      <div className="aia-msg-bubble aia-msg-typing">Аналізую дані кабінету…</div>
+                      <span className="aia-msg-avatar" dangerouslySetInnerHTML={{ __html: AGENT_ICONS.ads }} />
+                      <div className="aia-msg-col">
+                        <div className="aia-msg-bubble aia-msg-typing">Аналізую дані кабінету…</div>
+                      </div>
                     </div>
                   )}
                   {configError && (
@@ -279,48 +311,66 @@ export default function AdsInsightsAnalyst({ onClose }) {
                 <button
                   type="button" className="aia-audit-btn" onClick={runAudit}
                   disabled={sending || !selectedFramework}
-                  title={selectedFramework ? `Фреймворк: ${selectedFramework.name}` : 'Оберіть фреймворк у вкладці "Фреймворки"'}
+                  title={selectedFramework ? `Фреймворк: ${selectedFramework.name}` : 'Оберіть фреймворк у вкладці "Фреймворк"'}
                 >
-                  Провести аудит{selectedFramework ? ` — ${selectedFramework.name}` : ''}
+                  <span dangerouslySetInnerHTML={{ __html: SPARKLE_ICON }} />
+                  <span className="aia-audit-btn-label">Провести аудит{selectedFramework ? ` — ${selectedFramework.name}` : ''}</span>
                 </button>
 
-                <div className="aia-sidebar-tabs">
-                  <button type="button" className={'aia-sidebar-tab' + (sidebarTab === 'commands' ? ' active' : '')} onClick={() => setSidebarTab('commands')}>Команди</button>
-                  <button type="button" className={'aia-sidebar-tab' + (sidebarTab === 'history' ? ' active' : '')} onClick={() => setSidebarTab('history')}>Історія</button>
-                  <button type="button" className={'aia-sidebar-tab' + (sidebarTab === 'frameworks' ? ' active' : '')} onClick={() => setSidebarTab('frameworks')}>Фреймворки</button>
+                <div className="aia-sidebar-tabs" role="tablist">
+                  {SIDEBAR_TABS.map((t) => (
+                    <button
+                      key={t.key} type="button" role="tab" aria-selected={sidebarTab === t.key}
+                      className={'aia-sidebar-tab' + (sidebarTab === t.key ? ' active' : '')}
+                      onClick={() => setSidebarTab(t.key)}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
 
-                {sidebarTab === 'commands' && HOTKEYS.map((hk) => (
-                  <button key={hk.label} type="button" className="aia-hotkey-btn" onClick={() => sendMessage(hk.prompt)} disabled={sending}>
-                    {hk.label}
-                  </button>
-                ))}
-
-                {sidebarTab === 'history' && (
-                  <>
-                    <button type="button" className="aia-new-convo-btn" onClick={startNewConversation}>
-                      <span dangerouslySetInnerHTML={{ __html: PLUS_ICON }} /> Нова розмова
+                <div className="aia-sidebar-content" role="tabpanel">
+                  {sidebarTab === 'commands' && HOTKEYS.map((hk) => (
+                    <button key={hk.label} type="button" className="aia-hotkey-btn" style={{ '--hk-color': hk.color }} onClick={() => sendMessage(hk.prompt)} disabled={sending}>
+                      <span className="aia-hotkey-icon" dangerouslySetInnerHTML={{ __html: hk.icon }} />
+                      <span className="aia-hotkey-label">{hk.label}</span>
+                      <span className="aia-hotkey-chevron" dangerouslySetInnerHTML={{ __html: CHEVRON_ICON }} />
                     </button>
-                    {!conversations.length && <div className="aia-history-empty">Ще немає збережених розмов з цим клієнтом.</div>}
-                    {conversations.map((c) => (
-                      <button
-                        key={c.id} type="button"
-                        className={'aia-history-item' + (activeConversationId === c.id ? ' active' : '')}
-                        onClick={() => openConversation(c)}
-                      >
-                        <span className="aia-history-item-title">{c.title || 'Розмова'}</span>
-                        <span className="aia-history-item-date">{formatHistoryDate(c.updated_at)}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
+                  ))}
 
-                {sidebarTab === 'frameworks' && (
-                  <AiaFrameworks
-                    frameworks={frameworks} selectedId={selectedFrameworkId} onSelect={setSelectedFrameworkId}
-                    onCreate={handleCreateFramework} onUpdate={handleUpdateFramework} onDelete={handleDeleteFramework}
-                  />
-                )}
+                  {sidebarTab === 'history' && (
+                    <>
+                      <button type="button" className="aia-new-convo-btn" onClick={startNewConversation}>
+                        <span dangerouslySetInnerHTML={{ __html: PLUS_ICON }} /> Нова розмова
+                      </button>
+                      {!conversations.length && (
+                        <div className="aia-panel-empty">
+                          <span className="aia-panel-empty-icon" dangerouslySetInnerHTML={{ __html: HISTORY_EMPTY_ICON }} />
+                          <div className="aia-panel-empty-title">Ще немає розмов</div>
+                          <div className="aia-panel-empty-text">Ще немає збережених розмов з цим клієнтом.</div>
+                        </div>
+                      )}
+                      {conversations.map((c) => (
+                        <button
+                          key={c.id} type="button"
+                          className={'aia-history-item' + (activeConversationId === c.id ? ' active' : '')}
+                          onClick={() => openConversation(c)}
+                        >
+                          <span className="aia-history-item-title">{c.title || 'Розмова'}</span>
+                          <span className="aia-history-item-date">{formatHistoryDate(c.updated_at)}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {sidebarTab === 'frameworks' && (
+                    <AiaFrameworks
+                      frameworks={frameworks} selectedId={selectedFrameworkId} onSelect={setSelectedFrameworkId}
+                      onCreate={handleCreateFramework} onUpdate={handleUpdateFramework} onDelete={handleDeleteFramework}
+                      emptyIcon={FRAMEWORK_EMPTY_ICON}
+                    />
+                  )}
+                </div>
               </aside>
             </div>
           </>
