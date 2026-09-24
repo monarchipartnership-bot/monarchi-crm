@@ -33,6 +33,41 @@ const REPORT_TOOL = {
   },
 };
 
+// Terminal tools — unlike REPORT_TOOL these fetch nothing, they just
+// package numbers Claude already pulled via get_google_ads_report earlier
+// in this same turn into a shape the frontend can render as a real table
+// or chart. Seeing one of these ends the loop immediately (see below).
+const PRESENT_TABLE_TOOL = {
+  name: 'present_table',
+  description: 'Показати результат як таблицю в чаті (для розбивок по кампаніях/пристроях, порівняння періодів тощо) — тільки з цифр, які вже отримано через get_google_ads_report.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      columns: { type: 'array', items: { type: 'string' } },
+      rows: { type: 'array', items: { type: 'array', items: { type: ['string', 'number'] } } },
+    },
+    required: ['columns', 'rows'],
+  },
+};
+const PRESENT_CHART_TOOL = {
+  name: 'present_chart',
+  description: 'Показати результат як графік у чаті (для порівнянь чи трендів, коли користувач просить графік/діаграму) — тільки з цифр, які вже отримано через get_google_ads_report.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      type: { type: 'string', enum: ['bar', 'line'] },
+      labels: { type: 'array', items: { type: 'string' } },
+      datasets: {
+        type: 'array',
+        items: { type: 'object', properties: { label: { type: 'string' }, values: { type: 'array', items: { type: 'number' } } }, required: ['label', 'values'] },
+      },
+    },
+    required: ['type', 'labels', 'datasets'],
+  },
+};
+
 function dateRangeToBounds(dateRange) {
   const fmt = (d) => d.toISOString().slice(0, 10);
   const today = new Date();
@@ -186,7 +221,8 @@ export default async function handler(req, res) {
 - Витрати вказуй у валюті кабінету без символу (просто число), CTR/conversion_rate_pct/search_impression_share_pct — у відсотках.
 - Якщо якесь поле в відповіді інструменту null (наприклад search_impression_share_pct для не-Search кампанії, або roas коли витрат ще нема) — так і скажи, що воно недоступне, не підставляй 0 і не вигадуй причину.
 - Якщо треба порівняти два періоди — виклич інструмент двічі (по одному на кожен період) і сам зведи різницю.
-- Якщо дані порожні (немає показів/кліків за період) — так і скажи, не вигадуй пояснень.`;
+- Якщо дані порожні (немає показів/кліків за період) — так і скажи, не вигадуй пояснень.
+- Для розбивки по кампаніях/пристроях або порівняння періодів — використай present_table замість тексту з рисками. Якщо просять графік/діаграму, або йдеться про тренд/динаміку — використай present_chart. Для одного простого числа (просто "скільки витрачено") таблиця не потрібна, відповідай текстом. І table, і chart будуй лише з цифр, які реально повернув get_google_ads_report у цій розмові — ніколи не вигадуй рядки.`;
 
   const anthropicMessages = messages.map((m) => ({ role: m.role, content: m.content }));
 
@@ -201,7 +237,7 @@ export default async function handler(req, res) {
           model: MODEL,
           max_tokens: 1200,
           system: systemPrompt,
-          tools: [REPORT_TOOL],
+          tools: [REPORT_TOOL, PRESENT_TABLE_TOOL, PRESENT_CHART_TOOL],
           messages: anthropicMessages,
         }),
       });
@@ -218,8 +254,20 @@ export default async function handler(req, res) {
         return;
       }
 
-      anthropicMessages.push({ role: 'assistant', content: data.content });
       const toolUseBlocks = data.content.filter((b) => b.type === 'tool_use');
+
+      const presentBlock = toolUseBlocks.find((b) => b.name === 'present_table' || b.name === 'present_chart');
+      if (presentBlock) {
+        const textBlock = data.content.find((b) => b.type === 'text');
+        // `kind` (not `type`) is the table/chart discriminator, deliberately —
+        // present_chart's own input already has a `type` field ('bar'/'line'),
+        // spreading it after a `type` wrapper key would silently clobber it.
+        const visual = { kind: presentBlock.name === 'present_table' ? 'table' : 'chart', ...presentBlock.input };
+        res.status(200).json({ reply: textBlock ? textBlock.text : '', visual });
+        return;
+      }
+
+      anthropicMessages.push({ role: 'assistant', content: data.content });
       const toolResults = [];
       for (const block of toolUseBlocks) {
         try {

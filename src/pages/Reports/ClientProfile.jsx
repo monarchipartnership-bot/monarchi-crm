@@ -23,6 +23,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ClientAvatar from '../../components/Clients/ClientAvatar';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import ClientFilesTab from '../../components/Clients/ClientFilesTab';
+import AiHistoryTab from '../../components/ClientProfile/AiHistoryTab';
 import NoteEditor from '../../components/Deals/NoteEditor';
 import TagInput from '../../components/Automation/TagInput';
 import AddDealModal from '../../components/Deals/AddDealModal';
@@ -208,9 +209,10 @@ function describeActivity(e) {
 
 
 // Confirmed final tab order (from the full dashboard mockup discussion).
-// "Компанії"/"Проекти"/"Задачі" are placeholders for features whose content
-// hasn't been designed yet, same "Скоро" convention as Bot communication/AI
-// Team work history — `soon` renders them disabled instead of a working tab.
+// "Компанії"/"Проекти"/"Задачі"/"Bot communication" are placeholders for
+// features whose content hasn't been designed yet — `soon` renders them
+// disabled instead of a working tab. "AI Team work history" used to be one
+// of these too but is now a real tab (see AiHistoryTab.jsx).
 const TABS = [
   { key: 'info', label: 'Основна інформація' },
   { key: 'companies', label: 'Компанії', soon: true },
@@ -221,7 +223,7 @@ const TABS = [
   { key: 'tasks', label: 'Задачі', soon: true },
   { key: 'files', label: 'Файли' },
   { key: 'bot', label: 'Bot communication', soon: true },
-  { key: 'ai', label: 'AI Team work history', soon: true },
+  { key: 'ai', label: 'AI Team work history' },
 ];
 
 export default function ClientProfile() {
@@ -1277,6 +1279,7 @@ export default function ClientProfile() {
           </div>
         )}
         {activeTab === 'files' && <ClientFilesTab clientId={client.id} uploadedBy={email} />}
+        {activeTab === 'ai' && <AiHistoryTab clientId={client.id} />}
       </section>
 
       {addDealOpen && pipelines.length > 0 && (

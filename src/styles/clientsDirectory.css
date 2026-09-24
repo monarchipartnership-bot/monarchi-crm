@@ -176,6 +176,21 @@
 .client-file-del { border: none; background: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; line-height: 1; }
 .client-file-del:hover { color: var(--bad); }
 
+/* "AI Team work history" tab — read-only log of AI-agent conversations
+   (ai_agent_conversations/ai_agent_messages), list + transcript layout. */
+.ai-history-tab { display: flex; gap: 18px; align-items: flex-start; }
+.ai-history-list { flex: 0 0 260px; display: flex; flex-direction: column; gap: 6px; }
+.ai-history-row {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: #fff; cursor: pointer; transition: background .15s, border-color .15s;
+}
+.ai-history-row:hover { background: var(--surface); }
+.ai-history-row.active { border-color: var(--purple); background: var(--purple-tint); }
+.ai-history-row-agent { font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--purple); }
+.ai-history-row-title { font-family: var(--font-body); font-size: .84rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-history-row-date { font-family: var(--font-body); font-size: .72rem; color: var(--muted); }
+.ai-history-transcript { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 4px; }
+
 @media (max-width: 900px) {
   .clients-directory-layout.has-panel { grid-template-columns: 1fr; }
 }
