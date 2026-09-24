@@ -2,6 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENT_DEPTS, AUTONOMY_LABEL, STATUS_LABEL, WAVE_LABEL } from '../../data/aiAgentsData';
 import ParticleSphere from '../../components/ParticleSphere/ParticleSphere';
+import CosmicBackground from '../../components/SystemMap/CosmicBackground';
+import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import '../../styles/constellationTest.css';
@@ -148,42 +150,10 @@ const AGENT_MIN_DIST = 130;
 // no access to the real rendered text width.
 const GRAPH_LABEL_FONT = 13 * UI_SCALE;
 
-// Deterministic star-field — seeded, not Math.random(), so the scatter
-// doesn't reshuffle on every render (same trick as jitter() below).
-function mulberry32(seed) {
-  let a = seed;
-  return () => {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-// Star field lives in its own full-bleed SVG (see constellation-starfield-svg
-// below), sized to the stage's real aspect ratio every resize (STAGE_ASPECT
-// clamp below) so preserveAspectRatio can stay the default "meet" — stars
-// reach every corner on a wide screen without ever stretching into ellipses,
-// which is what a fixed square viewBox + preserveAspectRatio="none" did.
-// The data range (x: ±960, y: ±480) is generous enough to fully cover the
-// widest clamped aspect ratio the viewBox can take. About a quarter of the
-// stars get a slow pulsing glow on top of the plain twinkle; the rest stay
-// as plain dim points.
-function buildStarField(count) {
-  const rand = mulberry32(20260908);
-  return Array.from({ length: count }, (_, i) => ({
-    key: i,
-    x: (rand() - 0.5) * 1920,
-    y: (rand() - 0.5) * 960,
-    r: 0.5 + rand() * 1,
-    baseOpacity: 0.08 + rand() * 0.18,
-    twinkle: 2.5 + rand() * 3.5,
-    delay: rand() * 5,
-    glow: rand() < 0.25,
-    glowDuration: 3 + rand() * 3,
-    glowDelay: rand() * 4,
-  }));
-}
-const STAR_FIELD = buildStarField(190);
+// Deterministic star field + nebula/dot-grid background now lives in
+// CosmicBackground.jsx (its own mulberry32-seeded RNG, same algorithm as
+// jitter() below just for a different purpose) — moved out as part of
+// splitting the scene into background/particle/network layers.
 
 // CHART tab: matrix view of a single department's own agents — rows are
 // the autonomy ladder, columns are the rollout stage (see the `stage`
@@ -260,6 +230,27 @@ function DeptChartView({ dept, deptKey, onSelectAgent }) {
 function toXY(angleDeg, r) {
   const rad = (angleDeg * Math.PI) / 180;
   return [Math.cos(rad) * r, Math.sin(rad) * r];
+}
+
+// Trims a straight line's two endpoints back to the edge of each circle
+// (radius r1 at the start, r2 at the end) instead of their centers — so a
+// spoke visibly starts at the core's rim and ends at the hub's rim, not
+// underneath either one.
+function trimLineToEdges(x1, y1, x2, y2, r1, r2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  return [x1 + ux * r1, y1 + uy * r1, x2 - ux * r2, y2 - uy * r2];
+}
+
+// N small dots evenly spaced around a circle of radius `r`, centered on
+// whatever local origin the caller places them at — replaces a plain
+// stroke-dasharray ring with a real ring of discrete points.
+function ringDots(r, count) {
+  return Array.from({ length: count }, (_, i) => {
+    const [x, y] = toXY((360 / count) * i, r);
+    return { x, y, key: i };
+  });
 }
 
 function jitter(seed) {
@@ -603,12 +594,9 @@ export default function ConstellationTest() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const starHalfH = 480;
-  const starHalfW = starHalfH * stageAspect;
-  const starViewBox = `${-starHalfW} ${-starHalfH} ${starHalfW * 2} ${starHalfH * 2}`;
-
-  // The main graph's own viewBox widens the same way (see starViewBox
-  // above) so the focused department's graph has real width to spread
+  // The main graph's own viewBox widens the same way as the background
+  // star field's (see CosmicBackground) so the focused department's graph
+  // has real width to spread
   // into instead of being letterboxed into a square in the middle of a
   // wide window — the overview wheel is unaffected, since every overview
   // position is a fixed radius from center regardless of how much extra
@@ -822,24 +810,8 @@ export default function ConstellationTest() {
         className="constellation-stage" ref={stageRef}
         style={{ pointerEvents: introDone && viewMode === 'map' ? 'auto' : 'none' }}
       >
-        <div className="constellation-grid" style={{ transform: gridTransform, transition: transitionCss }} />
-        <div className="constellation-fog fog-1" />
-        <div className="constellation-fog fog-2" />
-        <div className="constellation-fog fog-3" />
-
-        <svg viewBox={starViewBox} className="constellation-starfield-svg">
-          {STAR_FIELD.map((s) => (
-            <circle
-              key={s.key} cx={s.x} cy={s.y} r={s.r} className="bg-star"
-              style={{
-                '--base-o': s.baseOpacity,
-                animation: s.glow
-                  ? `starTwinkle ${s.twinkle}s ease-in-out ${s.delay}s infinite, starGlowPulse ${s.glowDuration}s ease-in-out ${s.glowDelay}s infinite`
-                  : `starTwinkle ${s.twinkle}s ease-in-out ${s.delay}s infinite`,
-              }}
-            />
-          ))}
-        </svg>
+        <CosmicBackground stageAspect={stageAspect} gridTransform={gridTransform} transitionCss={transitionCss} />
+        <ParticleFieldCanvas />
 
         <svg viewBox={`${-graphHalfW} ${-graphHalfH} ${graphHalfW * 2} ${graphHalfH * 2}`} className="constellation-svg">
           <defs>
@@ -882,6 +854,12 @@ export default function ConstellationTest() {
               const [outerDotX, outerDotY] = toXY(deptAngle, 30 * UI_SCALE);
               const [innerDotX, innerDotY] = toXY(deptAngle + 180, 30 * UI_SCALE);
               const [labelX, labelY] = toXY(deptAngle, labelRadius(deptAngle));
+              // Core's approximate visible radius (ParticleSphere's own
+              // r=92 core glow, scaled by the 0.38*UI_SCALE it's mounted
+              // at) and the hub ring's own radius (30*UI_SCALE) — trims the
+              // spoke to run rim-to-rim instead of center-to-center.
+              const [spokeX1, spokeY1, spokeX2, spokeY2] = trimLineToEdges(0, 0, hx, hy, 92 * 0.38 * UI_SCALE, 30 * UI_SCALE);
+              const hubRing = ringDots(30 * UI_SCALE, 22);
               return (
                 <g
                   key={key}
@@ -897,13 +875,31 @@ export default function ConstellationTest() {
                       just hidden via .focus-hidden while one is focused. */}
                   {!isFocused && (
                     <>
-                      <line x1={0} y1={0} x2={hx} y2={hy} className="constellation-edge spoke" filter="url(#edgeGlow)" />
+                      {/* Spoke runs edge-to-edge (core's visible rim to the
+                          hub's ring), not center-to-center — trimLineToEdges
+                          keeps it from visibly starting/ending underneath
+                          either node. Colored via a small local gradient,
+                          core-violet fading into this department's own
+                          color, instead of one flat stroke color. */}
+                      <defs>
+                        <linearGradient
+                          id={`spokeGradient-${key}`} gradientUnits="userSpaceOnUse"
+                          x1={spokeX1} y1={spokeY1} x2={spokeX2} y2={spokeY2}
+                        >
+                          <stop offset="0%" stopColor="#8B5CF6" stopOpacity=".55" />
+                          <stop offset="100%" stopColor={color} stopOpacity=".9" />
+                        </linearGradient>
+                      </defs>
+                      <line
+                        x1={spokeX1} y1={spokeY1} x2={spokeX2} y2={spokeY2}
+                        className="constellation-edge spoke" stroke={`url(#spokeGradient-${key})`} filter="url(#edgeGlow)"
+                      />
 
                       {/* Data "flowing" from each department into the shared
                           core — everything the agents produce converges into
                           one knowledge base at the center. */}
-                      <circle r={2.2 * UI_SCALE} className="flow-dot" style={{ '--sx': `${hx}px`, '--sy': `${hy}px`, animationDelay: `${(deptIdx % 8) * 0.35}s` }} />
-                      <circle r={2.2 * UI_SCALE} className="flow-dot" style={{ '--sx': `${hx}px`, '--sy': `${hy}px`, animationDelay: `${(deptIdx % 8) * 0.35 + 1.6}s` }} />
+                      <circle r={2.2 * UI_SCALE} className="flow-dot" style={{ '--sx': `${spokeX2}px`, '--sy': `${spokeY2}px`, animationDelay: `${(deptIdx % 8) * 0.35}s` }} />
+                      <circle r={2.2 * UI_SCALE} className="flow-dot" style={{ '--sx': `${spokeX2}px`, '--sy': `${spokeY2}px`, animationDelay: `${(deptIdx % 8) * 0.35 + 1.6}s` }} />
 
                       {subcats.map((sc) => (
                         <g key={sc.key}>
@@ -959,6 +955,12 @@ export default function ConstellationTest() {
                       >
                         <circle r={42 * UI_SCALE} className="hub-glow-outer" />
                         <circle r={30 * UI_SCALE} className={'hub-circle' + (!focusedDept && !dimmed ? ' breathing' : '')} />
+                        {hubRing.map((d, i) => (
+                          <circle
+                            key={d.key} cx={d.x} cy={d.y} r={1.6 * UI_SCALE} className="hub-ring-dot"
+                            style={{ opacity: 0.55 + 0.45 * ((i * 7) % hubRing.length) / hubRing.length }}
+                          />
+                        ))}
                         <circle cx={outerDotX} cy={outerDotY} r={2.6 * UI_SCALE} className="hub-marker-dot" />
                         <circle cx={innerDotX} cy={innerDotY} r={2.6 * UI_SCALE} className="hub-marker-dot" />
                         {dept.icon && <foreignObject x={-13 * UI_SCALE} y={-13 * UI_SCALE} width={26 * UI_SCALE} height={26 * UI_SCALE}><span dangerouslySetInnerHTML={{ __html: dept.icon }} /></foreignObject>}

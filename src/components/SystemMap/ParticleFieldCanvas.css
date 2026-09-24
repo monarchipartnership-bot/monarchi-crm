@@ -1,0 +1,2 @@
+.particle-field-container { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.particle-field-container canvas { display: block; width: 100%; height: 100%; }

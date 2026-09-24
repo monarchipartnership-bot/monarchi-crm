@@ -1,0 +1,54 @@
+.cosmic-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+
+.cosmic-bg-gradient {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, #070A18 0%, #040713 100%);
+}
+/* A handful of very large, very soft radial blobs — kept faint enough that
+   most of the viewport reads as flat dark space, per spec. */
+.cosmic-bg-gradient::before {
+  content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 48% 50%, rgba(92, 45, 190, .10), transparent 30%),
+    radial-gradient(circle at 20% 48%, rgba(71, 48, 180, .07), transparent 25%),
+    radial-gradient(circle at 80% 42%, rgba(55, 30, 140, .08), transparent 26%);
+}
+
+/* Near-invisible dot grid — only ever gets a small fraction of the real
+   zoom/pan (see gridTransform in ConstellationTest.jsx), so the dots stay
+   reliably fine at any zoom level instead of ballooning with the graph.
+   Oversized (inset -20%) so a settle/drift shift never reveals a bare edge. */
+.constellation-grid {
+  position: absolute; inset: -20%;
+  background-image: radial-gradient(rgba(130, 140, 180, .10) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  opacity: .35;
+  transform-origin: center;
+}
+
+.bg-star { fill: #fff; opacity: var(--base-o); transform-origin: center; }
+@keyframes starTwinkle { 0%, 100% { opacity: var(--base-o); } 50% { opacity: calc(var(--base-o) * 2.4); } }
+@keyframes starGlowPulse {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
+  50% { filter: drop-shadow(0 0 2.5px rgba(255, 255, 255, .75)); }
+}
+
+/* Light drifting mist — three oversized soft-edged blobs, barely tinted,
+   screen-blended so they lighten the scene like a thin haze passing in
+   front of the stars rather than painting flat color over it. */
+.constellation-fog { position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none; mix-blend-mode: screen; }
+.fog-1 { width: 62vw; height: 38vh; top: 6%; left: -18%; background: radial-gradient(ellipse, rgba(190, 200, 255, .16), transparent 70%); animation: fogDrift1 55s ease-in-out infinite; }
+.fog-2 { width: 56vw; height: 34vh; bottom: -8%; right: -14%; background: radial-gradient(ellipse, rgba(210, 215, 255, .13), transparent 70%); animation: fogDrift2 64s ease-in-out infinite; }
+.fog-3 { width: 46vw; height: 28vh; top: 36%; left: 22%; background: radial-gradient(ellipse, rgba(255, 255, 255, .09), transparent 70%); animation: fogDrift3 46s ease-in-out infinite; }
+@keyframes fogDrift1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(9%, 4%); } }
+@keyframes fogDrift2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-7%, -5%); } }
+@keyframes fogDrift3 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6%, -6%); } }
+
+/* preserveAspectRatio="none" isn't used here — the viewBox itself widens to
+   match the stage's real aspect (see starViewBox), so stars reach every
+   corner without ever stretching into ellipses. */
+.constellation-starfield-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .constellation-fog, .bg-star { animation: none !important; }
+}

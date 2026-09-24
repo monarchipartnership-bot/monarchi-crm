@@ -191,49 +191,12 @@
 
 .constellation-stage {
   position: relative; width: 100%; height: 100%;
-  background: #20242c;
+  background: #040713; /* fallback only — CosmicBackground supplies the real gradient */
   overflow: hidden;
 }
-.constellation-svg { position: relative; z-index: 1; width: 100%; height: 100%; overflow: visible; }
-/* preserveAspectRatio="none" stretches its own wide viewBox to exactly
-   fill the rectangular stage, so stars reach every corner instead of
-   being letterboxed into the square the graph SVG keeps for itself. */
-.constellation-starfield-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-
-/* Dot-grid backdrop. It only ever gets a small fraction of the real
-   zoom/pan (see gridTransform in the component), so the dots stay reliably
-   fine at any zoom level instead of ballooning with the graph — the
-   dampened transform still gives it a subtle settle/drift on every zoom
-   move instead of sitting dead still. Oversized (inset -20%) so that
-   small shift never reveals a bare edge. */
-.constellation-grid {
-  position: absolute; inset: -20%;
-  background-image: radial-gradient(rgba(255, 255, 255, .035) 1px, transparent 1.4px);
-  background-size: 17px 17px;
-  transform-origin: center;
-  pointer-events: none;
-}
-
-.bg-star { fill: #fff; opacity: var(--base-o); transform-origin: center; }
-@keyframes starTwinkle { 0%, 100% { opacity: var(--base-o); } 50% { opacity: calc(var(--base-o) * 2.4); } }
-/* ~25% of stars (see buildStarField's `glow` flag) also get a slow pulsing
-   halo layered on top of the plain twinkle, via a second comma-separated
-   animation set inline per star. */
-@keyframes starGlowPulse {
-  0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
-  50% { filter: drop-shadow(0 0 2.5px rgba(255, 255, 255, .75)); }
-}
-
-/* Light drifting mist — three oversized soft-edged blobs, barely tinted,
-   screen-blended so they lighten the scene like a thin haze passing in
-   front of the stars rather than painting flat color over it. */
-.constellation-fog { position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none; mix-blend-mode: screen; }
-.fog-1 { width: 62vw; height: 38vh; top: 6%; left: -18%; background: radial-gradient(ellipse, rgba(190, 200, 255, .16), transparent 70%); animation: fogDrift1 55s ease-in-out infinite; }
-.fog-2 { width: 56vw; height: 34vh; bottom: -8%; right: -14%; background: radial-gradient(ellipse, rgba(210, 215, 255, .13), transparent 70%); animation: fogDrift2 64s ease-in-out infinite; }
-.fog-3 { width: 46vw; height: 28vh; top: 36%; left: 22%; background: radial-gradient(ellipse, rgba(255, 255, 255, .09), transparent 70%); animation: fogDrift3 46s ease-in-out infinite; }
-@keyframes fogDrift1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(9%, 4%); } }
-@keyframes fogDrift2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-7%, -5%); } }
-@keyframes fogDrift3 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6%, -6%); } }
+/* z-index stack: CosmicBackground (0) < ParticleFieldCanvas (1) < the
+   network graph itself (2) < existing UI chrome (4-5, unchanged above). */
+.constellation-svg { position: relative; z-index: 2; width: 100%; height: 100%; overflow: visible; }
 
 .orbit-ring {
   fill: none; stroke: rgba(255, 255, 255, .16); stroke-width: 1; stroke-dasharray: 1 9;
@@ -306,15 +269,24 @@
    label/tagline/badge sit well outside it, so leaving them clickable made
    the hit area bigger than what you actually see, and on tightly-spaced
    hubs could even catch a neighboring department. */
-.hub-glow-outer { fill: var(--dept-color); opacity: .16; filter: blur(11px); pointer-events: none; }
+.hub-glow-outer { fill: var(--dept-color); opacity: .16; filter: blur(11px); pointer-events: none; transition: opacity .2s ease; }
 .hub-circle {
-  fill: color-mix(in srgb, var(--dept-color) 22%, transparent); stroke: var(--dept-color);
-  stroke-width: calc(1.8px * var(--ui-scale, 1)); stroke-dasharray: calc(2px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
+  fill: color-mix(in srgb, var(--dept-color) 22%, transparent); stroke: color-mix(in srgb, var(--dept-color) 45%, transparent);
+  stroke-width: calc(1px * var(--ui-scale, 1));
   transition: r .2s ease, stroke-width .2s ease;
 }
 .hub-circle.breathing { animation: hubBreathe 3.4s ease-in-out infinite; animation-delay: var(--pulse-delay, 0s); }
 @keyframes hubBreathe { 0%, 100% { opacity: .85; } 50% { opacity: 1; } }
-.constellation-hub:hover .hub-circle { r: calc(34px * var(--ui-scale, 1)); }
+/* Ring of small dots around the hub (see ringDots() in ConstellationTest.jsx)
+   — replaces a stroke-dasharray approximation with actual discrete points. */
+.hub-ring-dot { fill: var(--dept-color); pointer-events: none; transition: opacity .2s ease; }
+/* NOTE: hover "scale" is done by growing .hub-circle's r (below), not a
+   CSS `transform: scale()` on .constellation-hub itself — that element
+   already gets its translate(hx,hy) position from an SVG `transform`
+   *attribute* (set in JSX), and a CSS `transform` property on the same
+   element replaces the attribute entirely rather than composing with it,
+   which would snap the hub back to the SVG origin on every hover. */
+.constellation-hub:hover .hub-glow-outer { opacity: .21; }
 .hub-marker-dot { fill: var(--dept-color); filter: drop-shadow(0 0 3px var(--dept-color)); pointer-events: none; }
 .hub-label {
   fill: #EDE7F5; font-family: 'Inter', var(--font-body); font-size: calc(16px * var(--ui-scale, 1)); font-weight: 700; letter-spacing: .02em;
