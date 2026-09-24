@@ -748,7 +748,6 @@ export default function ConstellationTest() {
           <button type="button" aria-label="Попередній відділ" onClick={() => cycleDept(-1)}>&lsaquo;</button>
           <div className="constellation-carousel-info">
             <div className="constellation-carousel-name">{focused.dept.label}</div>
-            {focused.dept.tagline && <div className="constellation-carousel-tagline">{focused.dept.tagline}</div>}
           </div>
           <button type="button" aria-label="Наступний відділ" onClick={() => cycleDept(1)}>&rsaquo;</button>
         </div>
@@ -974,8 +973,7 @@ export default function ConstellationTest() {
                       {!focusedDept && (
                         <g transform={`translate(${labelX} ${labelY})`} className="constellation-dept-label">
                           <text y="0" textAnchor="middle" className="hub-label">{dept.label}</text>
-                          {dept.tagline && <text y={16 * UI_SCALE} textAnchor="middle" className="hub-tagline">{dept.tagline}</text>}
-                          {dept.comingSoon && <text y={30 * UI_SCALE} textAnchor="middle" className="hub-soon-badge">СКОРО</text>}
+                          {dept.comingSoon && <text y={16 * UI_SCALE} textAnchor="middle" className="hub-soon-badge">СКОРО</text>}
                         </g>
                       )}
                     </>

@@ -148,10 +148,6 @@
   text-transform: uppercase; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   max-width: 100%; font-size: clamp(1.8rem, 4.4vw, 3.4rem); text-shadow: none; -webkit-text-stroke: 0;
 }
-.constellation-carousel-tagline {
-  font-family: var(--font-body); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--dept-color); white-space: nowrap;
-}
 
 /* Department overview panel — shown once per visit to a department, before
    any single agent is picked. Floating left rail, independent of the
@@ -325,18 +321,12 @@
   transition: fill .2s ease; pointer-events: none;
   paint-order: stroke fill; stroke: #0B0817; stroke-width: calc(4px * var(--ui-scale, 1)); stroke-linejoin: round;
 }
-.hub-tagline {
-  fill: var(--dept-color); font-family: 'Inter', var(--font-body); font-size: calc(9.5px * var(--ui-scale, 1)); font-weight: 700; letter-spacing: .08em; opacity: .9;
-  pointer-events: none; paint-order: stroke fill; stroke: #0B0817; stroke-width: calc(3px * var(--ui-scale, 1)); stroke-linejoin: round;
-}
-
 /* Departments agreed with the team but not started yet — same graph, same
    click-to-open transition, just visually quieter and clearly labeled so
    the full org chart reads honestly (planned vs. actually built). */
 .constellation-hub.coming-soon .hub-circle { stroke-dasharray: 2 4; fill: transparent; opacity: .55; }
 .constellation-hub.coming-soon .hub-glow-outer { opacity: .07; }
 .constellation-hub.coming-soon .hub-label { opacity: .7; }
-.constellation-hub.coming-soon .hub-tagline { opacity: .5; }
 .hub-soon-badge {
   fill: var(--dept-color); font-family: 'Inter', var(--font-body); font-size: calc(7px * var(--ui-scale, 1)); font-weight: 800; letter-spacing: .1em;
   text-anchor: middle; opacity: .8; pointer-events: none;
