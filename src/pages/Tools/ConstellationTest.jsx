@@ -654,6 +654,20 @@ export default function ConstellationTest() {
     return list;
   }, []);
   const [agentSearch, setAgentSearch] = useState('');
+  // Separate from whether there's query text — lets a click outside the
+  // search box collapse the results panel while leaving whatever was typed
+  // in place, same as every other dropdown in the app (ClientPicker,
+  // DealPicker, Select, etc.).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef(null);
+  useEffect(() => {
+    if (!searchOpen) return undefined;
+    function onDocClick(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [searchOpen]);
   const searchResults = useMemo(() => {
     const q = agentSearch.trim().toLowerCase();
     if (!q) return [];
@@ -664,6 +678,7 @@ export default function ConstellationTest() {
   // called it unconditionally) and opens the same modal/workspace a normal
   // click would.
   function selectSearchResult(agent) {
+    setSearchOpen(false);
     if (focusedDept !== agent.deptKey) {
       setFocusedDept(agent.deptKey);
       setView({ scale: 1.08, x: 40, y: 20 });
@@ -774,13 +789,15 @@ export default function ConstellationTest() {
   return (
     <div className="constellation-page" style={{ '--ui-scale': UI_SCALE }}>
       <div className="constellation-topright">
-        <div className="agent-search">
+        <div className="agent-search" ref={searchRef}>
           <svg className="agent-search-icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="m21 21-5.2-5.2" /></svg>
           <input
             type="text" className="agent-search-input" placeholder="Пошук агента…"
-            value={agentSearch} onChange={(e) => setAgentSearch(e.target.value)}
+            value={agentSearch}
+            onChange={(e) => { setAgentSearch(e.target.value); setSearchOpen(true); }}
+            onFocus={() => setSearchOpen(true)}
           />
-          {agentSearch.trim() && (
+          {searchOpen && agentSearch.trim() && (
             <div className="agent-search-results">
               {searchResults.length > 0 ? searchResults.map((r) => (
                 <button
