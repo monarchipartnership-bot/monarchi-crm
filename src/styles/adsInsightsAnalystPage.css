@@ -1,0 +1,102 @@
+/* Ads Insights Analyst — chat overlay for the ads-insights-analyst agent,
+   same dark "AI command center" chrome as knowledgeBasePage.css (new class
+   prefix so neither stylesheet has to touch the other's working rules).
+   Lives only inside the AI Agents map, floating over its starfield. */
+
+.aia-overlay {
+  position: fixed; inset: 0; z-index: 65; display: flex; flex-direction: column;
+  align-items: center; padding: 78px 26px 26px; overflow: hidden;
+}
+
+.aia-nav { position: absolute; top: 20px; left: 20px; z-index: 2; display: flex; align-items: center; gap: 10px; }
+.aia-nav-pill {
+  display: flex; align-items: center; gap: 7px; padding: 9px 16px 9px 12px; border-radius: 999px;
+  border: 1px solid rgba(140, 130, 200, .28); background: rgba(18, 16, 34, .62); backdrop-filter: blur(10px);
+  font-family: var(--font-body); font-weight: 600; font-size: .8rem; color: #D8D4F0; cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.aia-nav-pill:hover { background: rgba(122, 105, 200, .22); border-color: rgba(164, 98, 255, .5); color: #fff; }
+.aia-nav-pill svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.aia-panel {
+  position: relative; width: 100%; max-width: 900px; height: 100%; display: flex; flex-direction: column;
+  gap: 16px; padding: 30px 34px; border-radius: 26px; overflow: hidden;
+  background: rgba(11, 16, 34, .86); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(122, 105, 200, .32);
+  box-shadow: 0 0 40px rgba(96, 70, 255, .10), inset 0 0 60px rgba(60, 80, 180, .03), 0 40px 90px -30px rgba(0, 0, 0, .6);
+}
+.aia-panel-glow {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(420px 260px at 8% 0%, rgba(139, 92, 246, .16), transparent 70%),
+    radial-gradient(360px 260px at 96% 100%, rgba(59, 130, 246, .12), transparent 70%);
+}
+.aia-panel > * { position: relative; z-index: 1; }
+
+.aia-header { display: flex; align-items: center; gap: 16px; flex: none; }
+.aia-header-icon {
+  flex: none; width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #8B5CF6, #4C1D95); color: #fff; box-shadow: 0 8px 22px -8px rgba(139, 92, 246, .7);
+}
+.aia-header-icon svg { width: 26px; height: 26px; stroke: currentColor; fill: none; }
+.aia-kicker { font-family: var(--font-head); font-weight: 700; font-size: .66rem; letter-spacing: .16em; text-transform: uppercase; color: #B879FF; margin-bottom: 4px; }
+.aia-header-text h1 { font-family: var(--font-head); font-weight: 800; font-size: 1.3rem; color: #F3F1FF; letter-spacing: -.2px; }
+
+.aia-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: #8983B5; font-family: var(--font-body); font-size: .88rem; padding: 40px; line-height: 1.5; }
+
+.aia-client-row { display: flex; align-items: center; gap: 10px; flex: none; }
+.aia-client-row label { font-family: var(--font-body); font-size: .8rem; color: #918CBB; }
+.aia-client-row select {
+  flex: 1; max-width: 320px; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(122, 105, 200, .3);
+  background: rgba(20, 18, 40, .55); color: #EDEBFA; font-family: var(--font-body); font-size: .84rem; outline: none;
+}
+.aia-client-id { font-family: var(--font-body); font-size: .74rem; color: #7A76A3; }
+
+.aia-thread {
+  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 6px 4px;
+  scrollbar-width: thin; scrollbar-color: rgba(130, 110, 170, .35) transparent;
+}
+.aia-thread::-webkit-scrollbar { width: 5px; }
+.aia-thread::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
+.aia-thread-hint { font-family: var(--font-body); font-size: .84rem; color: #7A76A3; line-height: 1.6; padding: 10px 4px; }
+
+.aia-msg { display: flex; }
+.aia-msg-user { justify-content: flex-end; }
+.aia-msg-assistant { justify-content: flex-start; }
+.aia-msg-bubble {
+  max-width: 78%; padding: 12px 15px; border-radius: 14px; font-family: var(--font-body); font-size: .88rem;
+  line-height: 1.55; white-space: pre-wrap;
+}
+.aia-msg-user .aia-msg-bubble { background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; border-bottom-right-radius: 4px; }
+.aia-msg-assistant .aia-msg-bubble { background: rgba(122, 105, 200, .12); border: 1px solid rgba(122, 105, 200, .25); color: #E4E1F5; border-bottom-left-radius: 4px; }
+.aia-msg-typing { color: #918CBB; font-style: italic; }
+
+.aia-config-error {
+  margin: 4px; padding: 12px 14px; border-radius: 10px; background: rgba(244, 63, 94, .1); border: 1px solid rgba(244, 63, 94, .3);
+  color: #FCA5B1; font-family: var(--font-body); font-size: .82rem; line-height: 1.6;
+}
+.aia-config-error ul { margin: 6px 0 0 18px; }
+.aia-config-error code { color: #FDA4AF; }
+
+.aia-input-row { display: flex; align-items: flex-end; gap: 10px; flex: none; }
+.aia-input-row textarea {
+  flex: 1; resize: none; max-height: 120px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(122, 105, 200, .3);
+  background: rgba(20, 18, 40, .55); color: #EDEBFA; font-family: var(--font-body); font-size: .88rem; line-height: 1.5; outline: none;
+  transition: border-color .15s;
+}
+.aia-input-row textarea::placeholder { color: #746F99; }
+.aia-input-row textarea:focus { border-color: rgba(164, 98, 255, .65); }
+.aia-send-btn {
+  flex: none; width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6); transition: filter .15s, opacity .15s;
+}
+.aia-send-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.aia-send-btn:disabled { opacity: .5; cursor: default; }
+.aia-send-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 860px) {
+  .aia-overlay { padding: 70px 16px 16px; }
+  .aia-panel { padding: 22px; }
+  .aia-msg-bubble { max-width: 90%; }
+}

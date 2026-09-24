@@ -148,7 +148,7 @@ const ACTIVITY_FIELD_LABELS = {
   monthly_budget: 'Який місячний бюджет на маркетинг ви закладаєте?', ad_campaign: 'Ad campaign',
   facebook_lead_id: 'Facebook Lead ID', agency_experience: 'Досвід співпраці з агентствами', start_timing: 'Коли плануєте почати?',
   phone: 'Телефон', email: 'Email', telegram: 'Telegram', whatsapp: 'WhatsApp', linkedin: 'LinkedIn', instagram: 'Instagram',
-  nethunt_id: 'NetHunt ID',
+  nethunt_id: 'NetHunt ID', google_ads_customer_id: 'Google Ads Customer ID',
 };
 const ACTIVITY_CONTACT_FIELDS = ['name', 'last_name', 'phone', 'email', 'telegram', 'whatsapp', 'linkedin', 'instagram'];
 // `color` is the plain hex used for the "Активність" tab's Було/Стало value
@@ -791,6 +791,9 @@ export default function ClientProfile() {
                 </InfoRow>
                 <InfoRow icon={FIELD_ICONS.megaphone} label="Ad campaign" value={client.ad_campaign || '—'} editing={editMode}>
                   <input type="text" value={client.ad_campaign || ''} onChange={(e) => patch({ ad_campaign: e.target.value })} />
+                </InfoRow>
+                <InfoRow icon={FIELD_ICONS.target} label="Google Ads Customer ID" value={client.google_ads_customer_id || '—'} editing={editMode}>
+                  <input type="text" placeholder="123-456-7890" value={client.google_ads_customer_id || ''} onChange={(e) => patch({ google_ads_customer_id: e.target.value })} />
                 </InfoRow>
                 <InfoRow icon={FIELD_ICONS.at} label="Facebook Lead ID" value={client.facebook_lead_id || '—'} editing={editMode}>
                   <input type="text" value={client.facebook_lead_id || ''} onChange={(e) => patch({ facebook_lead_id: e.target.value })} />
