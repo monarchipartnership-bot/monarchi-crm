@@ -224,15 +224,6 @@ export default function AdsInsightsAnalyst({ onClose }) {
 
   return (
     <div className="aia-overlay">
-      <div className="aia-topbar">
-        <button type="button" className="aia-nav-pill" onClick={onClose}>
-          <span dangerouslySetInnerHTML={{ __html: BACK_ICON }} /> До карти системи
-        </button>
-        <button type="button" className="aia-close-btn" onClick={onClose} aria-label="Закрити">
-          <span dangerouslySetInnerHTML={{ __html: CLOSE_ICON }} />
-        </button>
-      </div>
-
       <div className="aia-panel">
         <div className="aia-panel-glow" />
 
@@ -242,6 +233,14 @@ export default function AdsInsightsAnalyst({ onClose }) {
             <div className="aia-kicker">AI-АГЕНТ · РЕКЛАМНА ЕФЕКТИВНІСТЬ</div>
             <h1>Аналітик рекламних даних та інсайтів</h1>
             {agentData?.description && <p className="aia-header-desc">{agentData.description}</p>}
+          </div>
+          <div className="aia-header-actions">
+            <button type="button" className="aia-nav-pill" onClick={onClose}>
+              <span dangerouslySetInnerHTML={{ __html: BACK_ICON }} /> До карти системи
+            </button>
+            <button type="button" className="aia-close-btn" onClick={onClose} aria-label="Закрити">
+              <span dangerouslySetInnerHTML={{ __html: CLOSE_ICON }} />
+            </button>
           </div>
         </div>
 

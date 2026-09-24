@@ -20,7 +20,6 @@
   to { opacity: 1; }
 }
 
-.aia-topbar { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 2; display: flex; align-items: center; justify-content: space-between; }
 .aia-nav-pill {
   display: flex; align-items: center; gap: 7px; padding: 9px 16px 9px 12px; border-radius: 999px;
   border: 1px solid rgba(140, 130, 200, .28); background: rgba(18, 16, 34, .62); backdrop-filter: blur(10px);
@@ -54,7 +53,8 @@
 .aia-panel > * { position: relative; z-index: 1; }
 
 .aia-header { display: flex; align-items: center; gap: 20px; flex: none; }
-.aia-header-text { min-width: 0; }
+.aia-header-text { min-width: 0; flex: 1; }
+.aia-header-actions { display: flex; align-items: center; gap: 10px; flex: none; }
 .aia-kicker { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: #B879FF; margin-bottom: 4px; }
 .aia-header-text h1 { font-family: var(--font-head); font-weight: 700; font-size: 1.7rem; color: #F5F2FF; letter-spacing: -.3px; margin-bottom: 6px; }
 .aia-header-desc { font-family: var(--font-body); font-size: .84rem; line-height: 1.55; color: #938CA8; max-width: 640px; }
@@ -247,12 +247,12 @@
 
 @media (max-width: 860px) {
   .aia-overlay { padding: 16px; }
-  .aia-topbar { top: 16px; left: 16px; right: 16px; }
-  .aia-panel { width: 100%; height: 100%; padding: 70px 18px 18px; }
+  .aia-panel { width: 100%; height: 100%; padding: 18px; }
+  .aia-header { flex-wrap: wrap; }
+  .aia-header-actions { flex-basis: 100%; justify-content: flex-end; order: -1; }
   .aia-msg-col, .aia-msg-user .aia-msg-col { max-width: 90%; }
   .aia-client-row { flex-wrap: wrap; }
   .aia-client-row select { min-width: 0; flex: 1 1 200px; }
   .aia-body { flex-direction: column; overflow-y: auto; }
   .aia-hotkeys { flex: none; flex-basis: auto; }
-  .aia-header { flex-wrap: wrap; }
 }
