@@ -974,6 +974,16 @@ export default function ConstellationTest() {
               const [innerDotX, innerDotY] = toXY(deptAngle + 180, 30 * UI_SCALE);
               const [labelX, labelY] = toXY(deptAngle, labelRadius(deptAngle, dept.label));
               const labelLines = wrapDeptLabel(dept.label);
+              // Generous invisible hit-rect behind the label text — SVG
+              // hit-testing on glyphs alone would only catch the actual
+              // painted letters (not the gaps/whitespace between words or
+              // between the two wrapped lines), making the click target
+              // annoyingly finicky. Sized from the longest line's rough
+              // character width, same estimate approxLabelBBox() uses for
+              // the focused-view labels below.
+              const labelLongestLine = Math.max(...labelLines.map((l) => l.length));
+              const labelHitW = labelLongestLine * 16 * UI_SCALE * 0.6 + 24 * UI_SCALE;
+              const labelHitH = (labelLines.length > 1 ? 40 : 24) * UI_SCALE;
               // Core's approximate visible radius (ParticleSphere's own
               // r=92 core glow, scaled by the 0.38*UI_SCALE it's mounted
               // at) and the hub ring's own radius (30*UI_SCALE) — trims the
@@ -1093,7 +1103,18 @@ export default function ConstellationTest() {
                           name is already shown in the breadcrumb/panel/
                           carousel instead. */}
                       {!focusedDept && (
-                        <g transform={`translate(${labelX} ${labelY})`} className="constellation-dept-label">
+                        <g
+                          transform={`translate(${labelX} ${labelY})`} className="constellation-dept-label"
+                          onClick={() => focusDept(key)}
+                          onMouseEnter={() => setHoveredDept(key)}
+                          onMouseLeave={() => setHoveredDept(null)}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <rect
+                            x={-labelHitW / 2} y={-labelHitH / 2} width={labelHitW} height={labelHitH}
+                            fill="transparent" className="dept-label-hit"
+                          />
                           <text textAnchor="middle" className="hub-label">
                             {labelLines.map((line, i) => (
                               <tspan key={i} x={0} dy={i === 0 ? (labelLines.length > 1 ? '-0.6em' : '0') : '1.2em'}>{line}</tspan>

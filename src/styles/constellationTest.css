@@ -306,7 +306,10 @@
 .constellation-edge.agent-edge { stroke-width: calc(.8px * var(--ui-scale, 1)); opacity: .22; transition: opacity .3s ease; }
 .constellation-edge.agent-edge.focused { opacity: .5; }
 
-.constellation-dept-label { pointer-events: none; }
+.constellation-dept-label { cursor: pointer; }
+.constellation-dept-label:focus, .constellation-dept-label:focus-visible { outline: none; }
+.dept-label-hit { pointer-events: all; }
+.constellation-dept-label:hover .hub-label, .constellation-dept-label:focus-visible .hub-label { fill: #fff; }
 
 /* Traveling dot per spoke, animating from the hub down to the shared core
    at (0,0) — a constant little stream of "data" feeding the knowledge
