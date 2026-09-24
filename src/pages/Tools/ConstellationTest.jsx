@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AGENT_DEPTS } from '../../data/aiAgentsData';
+import { AGENT_DEPTS, AUTONOMY_LABEL, STATUS_LABEL, WAVE_LABEL } from '../../data/aiAgentsData';
 import ParticleSphere from '../../components/ParticleSphere/ParticleSphere';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
@@ -184,18 +184,6 @@ function buildStarField(count) {
   }));
 }
 const STAR_FIELD = buildStarField(190);
-
-const AUTONOMY_LABEL = {
-  'human-led': 'HUMAN-LED',
-  'human-assisted': 'HUMAN-ASSISTED',
-  'fully-autonomous': 'FULLY AUTONOMOUS',
-};
-const STATUS_LABEL = {
-  not_started: 'Not started',
-  in_development: 'In development',
-  live: 'Live',
-};
-const WAVE_LABEL = { 1: 'WAVE 1', 2: 'WAVE 2', 3: 'WAVE 3' };
 
 // CHART tab: matrix view of a single department's own agents — rows are
 // the autonomy ladder, columns are the rollout stage (see the `stage`
@@ -577,6 +565,16 @@ export default function ConstellationTest() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [coreOpen, setCoreOpen] = useState(false);
   const [agentToolOpen, setAgentToolOpen] = useState(null);
+
+  // Agents with a real tool (AGENT_TOOLS) skip the generic read-only info
+  // modal entirely and open straight into their own workspace — that
+  // modal's content (badges/breaks-into/ladder/etc.) is still reachable
+  // from inside the workspace itself via its own "?" button.
+  function openAgent(agentWithContext) {
+    if (AGENT_TOOLS[agentWithContext.tool]) setAgentToolOpen(agentWithContext.tool);
+    else setSelectedAgent(agentWithContext);
+  }
+
   const [deptPanelClosed, setDeptPanelClosed] = useState(false);
   const [viewMode, setViewMode] = useState('map');
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
@@ -803,7 +801,7 @@ export default function ConstellationTest() {
                 <h4>З чого почати</h4>
                 <button
                   type="button" className="dept-panel-starthere"
-                  onClick={() => setSelectedAgent({ ...startHereAgent, deptKey: focused.key, deptLabel: dept.label, color: dept.color })}
+                  onClick={() => openAgent({ ...startHereAgent, deptKey: focused.key, deptLabel: dept.label, color: dept.color })}
                 >
                   {startHereAgent.name} &rarr;
                 </button>
@@ -1030,7 +1028,7 @@ export default function ConstellationTest() {
                   key={ag.key}
                   className={'dept-graph-agent' + (selectedAgent?.key === ag.key ? ' active' : '')}
                   transform={`translate(${ag.x} ${ag.y})`}
-                  onClick={() => setSelectedAgent({ ...ag, deptKey: focused.key, deptLabel: focused.dept.label, color: focused.dept.color })}
+                  onClick={() => openAgent({ ...ag, deptKey: focused.key, deptLabel: focused.dept.label, color: focused.dept.color })}
                   role="button"
                   tabIndex={0}
                 >
@@ -1144,11 +1142,7 @@ export default function ConstellationTest() {
             )}
 
             <div className="agent-modal-cta">
-              {AGENT_TOOLS[selectedAgent.tool] ? (
-                <button type="button" className="btn btn-p" onClick={() => { setAgentToolOpen(selectedAgent.tool); setSelectedAgent(null); }}>
-                  Відкрити чат &rarr;
-                </button>
-              ) : selectedAgent.cta ? (
+              {selectedAgent.cta ? (
                 <Link to={selectedAgent.cta.to} className="btn btn-p">{selectedAgent.cta.label} &rarr;</Link>
               ) : (
                 <button type="button" className="btn" disabled title="Ще не реалізовано">Запустити (скоро)</button>

@@ -56,8 +56,15 @@
 .aia-header-text { min-width: 0; flex: 1; }
 .aia-header-actions { display: flex; align-items: center; gap: 10px; flex: none; }
 .aia-kicker { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: #B879FF; margin-bottom: 4px; }
-.aia-header-text h1 { font-family: var(--font-head); font-weight: 700; font-size: 1.7rem; color: #F5F2FF; letter-spacing: -.3px; margin-bottom: 6px; }
+.aia-header-text h1 { display: flex; align-items: center; gap: 9px; font-family: var(--font-head); font-weight: 700; font-size: 1.7rem; color: #F5F2FF; letter-spacing: -.3px; margin-bottom: 6px; }
 .aia-header-desc { font-family: var(--font-body); font-size: .84rem; line-height: 1.55; color: #938CA8; max-width: 640px; }
+.aia-info-btn {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(140, 130, 200, .35); background: rgba(122, 105, 200, .12); color: #938CA8; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.aia-info-btn:hover { background: rgba(122, 105, 200, .28); border-color: rgba(164, 98, 255, .5); color: #fff; }
+.aia-info-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .aia-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: #8983B5; font-family: var(--font-body); font-size: .88rem; padding: 40px; line-height: 1.5; }
 

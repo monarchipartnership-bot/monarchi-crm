@@ -569,15 +569,33 @@ export const AGENT_DEPTS = {
 };
 
 // Flattens AGENT_DEPTS to look an agent up by its own `key` — used where a
-// specific agent's real data (name/description/icon) is needed outside the
-// map itself, e.g. an agent's own workspace header, so that text is never
-// duplicated/invented a second time.
+// specific agent's real data (name/description/icon/breaksInto/etc.) is
+// needed outside the map itself, e.g. an agent's own workspace header or
+// its info popover, so that text is never duplicated/invented a second
+// time. Merges in the department/subcategory context the same way the map
+// itself does at click time (deptLabel/subcatLabel/color), so a consumer
+// gets the exact same shape ConstellationTest.jsx's agent-modal uses.
 export function findAgentByKey(agentKey) {
   for (const dept of Object.values(AGENT_DEPTS)) {
     for (const subcat of dept.subcategories) {
       const agent = subcat.agents.find((a) => a.key === agentKey);
-      if (agent) return agent;
+      if (agent) return { ...agent, deptLabel: dept.label, subcatLabel: subcat.label, color: dept.color };
     }
   }
   return null;
 }
+
+// Shared label maps for an agent's metadata badges (autonomy/status/wave) —
+// used by both the map's own agent-info modal (ConstellationTest.jsx) and
+// any agent workspace's own info popover built from findAgentByKey().
+export const AUTONOMY_LABEL = {
+  'human-led': 'HUMAN-LED',
+  'human-assisted': 'HUMAN-ASSISTED',
+  'fully-autonomous': 'FULLY AUTONOMOUS',
+};
+export const STATUS_LABEL = {
+  not_started: 'Not started',
+  in_development: 'In development',
+  live: 'Live',
+};
+export const WAVE_LABEL = { 1: 'WAVE 1', 2: 'WAVE 2', 3: 'WAVE 3' };

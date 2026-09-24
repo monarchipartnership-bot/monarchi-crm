@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { fetchConversations, fetchConversationMessages, createConversation, appendMessages } from '../../lib/api/aiConversations';
 import { fetchFrameworks, createFramework, updateFramework, deleteFramework } from '../../lib/api/aiAuditFrameworks';
-import { AGENT_ICONS, findAgentByKey } from '../../data/aiAgentsData';
+import { AGENT_ICONS, findAgentByKey, AUTONOMY_LABEL, STATUS_LABEL, WAVE_LABEL } from '../../data/aiAgentsData';
 import AgentOrb from '../../components/AgentOrb/AgentOrb';
 import ChatMessage from './ChatMessage';
 import AiaFrameworks from './AiaFrameworks';
@@ -19,6 +19,7 @@ const SPARKLE_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M1
 const CHEVRON_ICON = '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>';
 const HISTORY_EMPTY_ICON = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>';
 const FRAMEWORK_EMPTY_ICON = '<svg viewBox="0 0 24 24"><path d="M9 3h6l3 5-6 13L3 8z"/><path d="M3 8h18M9 3l3 5 3-5"/></svg>';
+const INFO_ICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>';
 
 const ENV_LABELS = {
   GOOGLE_ADS_CLIENT_ID: 'GOOGLE_ADS_CLIENT_ID',
@@ -76,6 +77,7 @@ export default function AdsInsightsAnalyst({ onClose }) {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [frameworks, setFrameworks] = useState([]);
   const [selectedFrameworkId, setSelectedFrameworkId] = useState(null);
+  const [showInfo, setShowInfo] = useState(false);
   const threadRef = useRef(null);
 
   const agentData = findAgentByKey(AGENT_KEY);
@@ -231,7 +233,14 @@ export default function AdsInsightsAnalyst({ onClose }) {
           <AgentOrb color={AGENT_COLOR} icon={AGENT_ICONS.ads} size={112} />
           <div className="aia-header-text">
             <div className="aia-kicker">AI-АГЕНТ · РЕКЛАМНА ЕФЕКТИВНІСТЬ</div>
-            <h1>Аналітик рекламних даних та інсайтів</h1>
+            <h1>
+              Аналітик рекламних даних та інсайтів
+              {agentData && (
+                <button type="button" className="aia-info-btn" onClick={() => setShowInfo(true)} aria-label="Детальніше про агента">
+                  <span dangerouslySetInnerHTML={{ __html: INFO_ICON }} />
+                </button>
+              )}
+            </h1>
             {agentData?.description && <p className="aia-header-desc">{agentData.description}</p>}
           </div>
           <div className="aia-header-actions">
@@ -375,6 +384,78 @@ export default function AdsInsightsAnalyst({ onClose }) {
           </>
         )}
       </div>
+
+      {showInfo && agentData && (
+        <div className="agent-modal-backdrop" style={{ zIndex: 70 }} onClick={() => setShowInfo(false)}>
+          <div className="agent-modal" onClick={(e) => e.stopPropagation()} style={{ '--dept-color': agentData.color }}>
+            <button type="button" className="agent-modal-close" onClick={() => setShowInfo(false)}>&times;</button>
+
+            <div className="agent-modal-badges">
+              <span className="agent-badge autonomy">{AUTONOMY_LABEL[agentData.autonomyLevel]}</span>
+              <span className={'agent-badge status status-' + agentData.status}>{STATUS_LABEL[agentData.status]}</span>
+              {agentData.wave && <span className={'agent-badge wave wave-' + agentData.wave}>{WAVE_LABEL[agentData.wave]}</span>}
+            </div>
+            <div className="agent-modal-breadcrumb">{agentData.deptLabel} · {agentData.subcatLabel}</div>
+            <h2>{agentData.name}</h2>
+
+            {agentData.breaksInto?.length > 0 && (
+              <div className="agent-modal-section">
+                <h4>BREAKS INTO</h4>
+                <div className="agent-pills">{agentData.breaksInto.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
+              </div>
+            )}
+            {agentData.wiredInto?.length > 0 && (
+              <div className="agent-modal-section">
+                <h4>WIRED INTO</h4>
+                <div className="agent-pills">{agentData.wiredInto.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
+              </div>
+            )}
+            {agentData.buildsOn?.length > 0 && (
+              <div className="agent-modal-section">
+                <h4>BUILDS ON</h4>
+                <div className="agent-pills">{agentData.buildsOn.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
+              </div>
+            )}
+            {agentData.whatItReplaces && (
+              <div className="agent-modal-section">
+                <h4>WHAT IT REPLACES</h4>
+                <p>{agentData.whatItReplaces}</p>
+              </div>
+            )}
+
+            {agentData.ladder && (
+              <div className="agent-modal-section">
+                <h4>THE LADDER</h4>
+                <div className="agent-ladder">
+                  {[
+                    ['human-led', 'Human-led', agentData.ladder.humanLed],
+                    ['human-assisted', 'Human-assisted', agentData.ladder.humanAssisted],
+                    ['fully-autonomous', 'Fully autonomous', agentData.ladder.fullyAutonomous],
+                  ].map(([lvl, label, text]) => (
+                    <div key={lvl} className={'ladder-row' + (agentData.autonomyLevel === lvl ? ' current' : '')}>
+                      <div className="ladder-row-label">{label}</div>
+                      <div className="ladder-row-text">{text}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {agentData.theHuman && (
+              <div className="agent-modal-section">
+                <h4>THE HUMAN</h4>
+                <p>{agentData.theHuman}</p>
+              </div>
+            )}
+            {agentData.buildNotes && (
+              <div className="agent-modal-section">
+                <h4>BUILD NOTES</h4>
+                <p>{agentData.buildNotes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
