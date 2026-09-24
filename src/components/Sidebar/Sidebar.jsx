@@ -12,7 +12,7 @@ function pathMatches(pathname, base) {
   return pathname === base || pathname.startsWith(base + '/');
 }
 
-export default function Sidebar({ mobileOpen, onCloseMobile }) {
+export default function Sidebar({ mobileOpen, onCloseMobile, onIntroLink }) {
   const { pathname } = useLocation();
 
   return (
@@ -29,6 +29,19 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
             {!d.items.length && <div className="side-soon">Незабаром</div>}
             {d.items.map((it) => {
               const extraActive = it.activeMatch?.some((p) => pathMatches(pathname, p));
+              if (it.introTransition) {
+                return (
+                  <button
+                    key={it.key}
+                    type="button"
+                    className={'side-node' + (pathMatches(pathname, it.to) || extraActive ? ' active' : '')}
+                    onClick={() => { onCloseMobile?.(); onIntroLink?.(it.to); }}
+                  >
+                    <Icon svg={it.icon} />
+                    {it.name}
+                  </button>
+                );
+              }
               return (
                 <NavLink
                   key={it.key}

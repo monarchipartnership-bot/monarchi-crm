@@ -18,6 +18,7 @@ export const IC = {
   deptPM: '<svg class="side-ic" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M8 11h8M8 15h5"/></svg>',
   deptTools: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#64748B"><path d="M14.7 6.3a4 4 0 0 0-5-5l2.1 2.1-2.8 2.8L6.9 4.1a4 4 0 0 0 5 5L20 17.2a2 2 0 1 1-2.8 2.8L9.1 11.9"/><path d="m5 13-3 3 6 6 3-3"/></svg>',
   deptAutomation: '<svg class="side-ic" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  constellation: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#A855F7"><circle cx="12" cy="12" r="2.2"/><circle cx="4" cy="6" r="1.6"/><circle cx="20" cy="6" r="1.6"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="18" r="1.6"/><path d="M12 12 4 6M12 12l16-6M12 12 4 18M12 12l8 6"/></svg>',
   followup: '<svg class="side-ic" viewBox="0 0 24 24" style="color:#D946EF"><path d="M4 5h11a4 4 0 0 1 4 4v4"/><path d="m16 10 3 3 3-3"/><path d="M4 9v8a2 2 0 0 0 2 2h9"/><path d="m9 12 .6 1.4 1.4.6-1.4.6L9 16l-.6-1.4L7 14l1.4-.6L9 12z"/></svg>',
   funnel: '<svg class="side-ic" viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8v6l-3 1.5v-7.5z"/></svg>',
 

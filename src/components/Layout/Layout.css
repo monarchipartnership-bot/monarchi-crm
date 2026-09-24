@@ -2,6 +2,7 @@
 .shell.show { display: flex; }
 
 .main { flex: 1; min-width: 0; padding: 28px clamp(14px, 1.5vw, 24px) 70px; }
+.main.immersive { padding: 0; }
 /* No max-width here — every page fills the full working area (this used to
    cap at 1120px; individual pages had been overriding it back to none one
    by one via `.view:has(.some-page)`, which is now just redundant but

@@ -1,0 +1,49 @@
+/* Ported from the supplied ParticleSphere.module.css, de-scoped to plain
+   global class names (ps- prefixed) since this project doesn't use CSS
+   Modules — safe as long as nothing else defines .ps-*. */
+
+/* Line (ellipse/path) elements vs. dot (circle) elements use separate
+   compound selectors so a shared color modifier class never leaks a fill
+   onto the wireframe lines — the source .module.css set both stroke AND
+   fill on the same bare `.primary` etc. class, which a line element also
+   carrying `.line` picked up too (last rule in the cascade wins on equal
+   specificity), turning every ellipse into a solid filled blob instead of
+   a thin stroked line. */
+.ps-line { fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.ps-line.ps-primary { stroke: var(--sphere-primary); }
+.ps-line.ps-secondary { stroke: var(--sphere-secondary); }
+.ps-line.ps-accent { stroke: var(--sphere-accent); }
+.ps-line.ps-cyan { stroke: var(--sphere-cyan); }
+.ps-line.ps-soft { stroke: var(--sphere-soft); }
+
+.ps-dot.ps-primary { fill: var(--sphere-primary); }
+.ps-dot.ps-secondary { fill: var(--sphere-secondary); }
+.ps-dot.ps-accent { fill: var(--sphere-accent); }
+.ps-dot.ps-cyan { fill: var(--sphere-cyan); }
+.ps-dot.ps-soft { fill: var(--sphere-soft); }
+.ps-coreDot { fill: var(--sphere-core); }
+
+.ps-outerShell, .ps-innerShell, .ps-orbits, .ps-core {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.ps-animated .ps-outerShell { animation: ps-spin 78s linear infinite; }
+.ps-animated .ps-innerShell { animation: ps-spin-reverse 52s linear infinite; }
+.ps-animated .ps-orbits { animation: ps-orbit-drift 66s linear infinite; }
+.ps-animated .ps-core { animation: ps-core-breathe 6s ease-in-out infinite; }
+
+@keyframes ps-spin { to { transform: rotate(360deg); } }
+@keyframes ps-spin-reverse { to { transform: rotate(-360deg); } }
+@keyframes ps-orbit-drift { to { transform: rotate(360deg); } }
+@keyframes ps-core-breathe {
+  0%, 100% { opacity: .86; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-animated .ps-outerShell,
+  .ps-animated .ps-innerShell,
+  .ps-animated .ps-orbits,
+  .ps-animated .ps-core { animation: none !important; }
+}

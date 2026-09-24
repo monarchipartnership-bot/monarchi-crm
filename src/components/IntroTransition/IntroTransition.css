@@ -1,0 +1,30 @@
+/* Stage 1 of the AI Agents entrance — fixed over the entire viewport (not
+   just the routed page), so it can start darkening while the user is still
+   looking at whatever page they clicked from. No fade-out on the black
+   background itself: Layout navigates the instant the welcome text has
+   faded out, and the Constellation page's own background is the same
+   near-black, so the cut is invisible — one less animation to choreograph. */
+.intro-transition-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #030209;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; animation: introDarken 6000ms cubic-bezier(.4, 0, .2, 1) forwards;
+}
+@keyframes introDarken { from { opacity: 0; } to { opacity: 1; } }
+
+.intro-welcome {
+  display: flex; flex-direction: column; align-items: center; gap: 3vw;
+  width: 100%; padding: 0 3vw;
+  opacity: 0; animation: introWelcomeIn 3000ms ease-out forwards;
+}
+.intro-welcome.intro-welcome-out { animation: introWelcomeOut 3000ms ease-in forwards; }
+@keyframes introWelcomeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes introWelcomeOut { from { opacity: 1; } to { opacity: 0; } }
+.intro-welcome-title {
+  font-family: var(--font-head); font-weight: 700; color: #F1EAF6;
+  letter-spacing: .005em; text-align: center; white-space: nowrap;
+  font-size: clamp(1.4rem, 4.3vw, 5.2rem);
+  width: 100%;
+}
+.intro-welcome-logo { width: clamp(140px, 14vw, 230px); }
+.intro-welcome-logo svg { display: block; width: 100%; height: auto; }
