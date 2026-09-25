@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../Sidebar/Sidebar';
 import TopBar from './TopBar';
 import CrackTransition from '../CrackTransition/CrackTransition';
@@ -14,17 +14,33 @@ const IMMERSIVE_PREFIXES = ['/tools/constellation-test'];
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const immersive = IMMERSIVE_PREFIXES.some((p) => pathname.startsWith(p));
 
-  // Step 1 of the new CRM->AI Agents transition, being built from scratch:
-  // cracks -> crumble -> black screen. Nothing beyond the black screen is
-  // wired up yet (no navigation), so this is a dead end by design for now
-  // — later steps will decide what happens from there.
+  // The new CRM->AI Agents transition, built from scratch: cracks (radiating
+  // from wherever the AI Agents item actually sits) -> crumble -> black
+  // screen -> the real AI Map. Navigate() fires the instant black screen is
+  // reached; the overlay itself stays up ~400ms longer as a safety margin
+  // so the route swap underneath is never visible, then unmounts, revealing
+  // the AI Map already a little way into its own (unrelated, pre-existing)
+  // mount-time reveal.
   const [crackActive, setCrackActive] = useState(false);
+  const [crackOrigin, setCrackOrigin] = useState(null);
+
+  function handleAiAgentsClick(buttonEl) {
+    const rect = buttonEl?.getBoundingClientRect?.();
+    setCrackOrigin(rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null);
+    setCrackActive(true);
+  }
+
+  function handleBlackScreen() {
+    navigate('/tools/constellation-test');
+    setTimeout(() => setCrackActive(false), 400);
+  }
 
   return (
     <>
-      {crackActive && <CrackTransition onBlackScreen={() => {}} />}
+      {crackActive && <CrackTransition origin={crackOrigin} onBlackScreen={handleBlackScreen} />}
 
       {!immersive && (
         <button className="menu-btn" aria-label="Menu" onClick={() => setMobileOpen(true)}>
@@ -37,7 +53,7 @@ export default function Layout() {
         {!immersive && (
           <Sidebar
             mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)}
-            onAiAgentsClick={() => setCrackActive(true)}
+            onAiAgentsClick={handleAiAgentsClick}
           />
         )}
         <main className={'main' + (immersive ? ' immersive' : '')}>

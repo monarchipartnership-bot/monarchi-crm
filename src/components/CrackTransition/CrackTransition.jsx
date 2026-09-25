@@ -3,27 +3,34 @@ import html2canvas from 'html2canvas';
 import { generateCracks } from './crackGenerator';
 import './CrackTransition.css';
 
-// Step 1 of the new (from-scratch) CRM -> AI Agents transition:
-// 1. cracks spread across the whole platform over 5s;
-// 2. the cracked view crumbles apart, tile by tile, bottom row first,
-//    over another 5s;
-// 3. a plain black screen remains.
-// Nothing past the black screen is wired up yet — later steps decide what
-// happens from there (this component just calls onBlackScreen() once it
-// arrives, so Layout can react later without this file needing to know
-// what "later" means yet).
+// The new (from-scratch) CRM -> AI Agents transition:
+// 1. a spiderweb of cracks radiates from the impact point (`origin` —
+//    wherever the AI Agents sidebar item actually sits) across the whole
+//    platform over 5s;
+// 2. the cracked view crumbles apart, tile by tile, bottom row first, over
+//    another 5s;
+// 3. a plain black screen remains — this component's own job ends here; it
+//    calls onBlackScreen() and leaves what happens next entirely up to the
+//    caller (Layout navigates to the AI Map and holds the overlay a little
+//    longer as a safety margin — see Layout.jsx).
 const CRACK_PHASE_MS = 5000;
 const CRUMBLE_PHASE_MS = 5000;
 const TILE_COLS = 12;
 const TILE_ROWS = 8;
 const TILE_FALL_MS = 900;
 
-export default function CrackTransition({ onBlackScreen }) {
+export default function CrackTransition({ onBlackScreen, origin }) {
   const [phase, setPhase] = useState('cracks'); // 'cracks' | 'crumble' | 'black'
   const [screenshot, setScreenshot] = useState(null);
   const capturedRef = useRef(false);
+  // Impact point the whole spiderweb radiates from — defaults to roughly
+  // where the AI Agents sidebar item sits if the caller didn't measure it,
+  // rather than dead center, so it still reads as "something hit the
+  // screen from over there" even without a captured rect.
   const [cracks] = useState(() => generateCracks(
-    Date.now() | 0, window.innerWidth, window.innerHeight, 16, CRACK_PHASE_MS * 0.6,
+    Date.now() | 0, window.innerWidth, window.innerHeight,
+    origin?.x ?? window.innerWidth * 0.12, origin?.y ?? window.innerHeight * 0.55,
+    CRACK_PHASE_MS * 0.6,
   ));
 
   // Captured immediately, in the background — ready well before the

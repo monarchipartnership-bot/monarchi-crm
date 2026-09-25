@@ -35,7 +35,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile, onAiAgentsClick }) 
                     key={it.key}
                     type="button"
                     className={'side-node' + (pathMatches(pathname, it.to) || extraActive ? ' active' : '')}
-                    onClick={() => { onCloseMobile?.(); onAiAgentsClick?.(); }}
+                    onClick={(e) => { onCloseMobile?.(); onAiAgentsClick?.(e.currentTarget); }}
                   >
                     <Icon svg={it.icon} />
                     {it.name}
