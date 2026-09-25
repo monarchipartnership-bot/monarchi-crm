@@ -4,41 +4,9 @@
   overflow: hidden;
 }
 
-.crack-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-
-/* Bright flash right at the impact point, like light catching the crater —
-   real broken glass is noticeably paler near where the rock hit. Fades in
-   fast, ahead of most crack lines, then settles. */
-.crack-impact-glow {
-  opacity: 0;
-  animation: crackGlow 900ms ease-out forwards;
-}
-@keyframes crackGlow {
-  0% { opacity: 0; }
-  30% { opacity: 1; }
-  100% { opacity: .55; }
-}
-
-.crack-line {
-  fill: none; stroke: #100d16; stroke-linecap: round; stroke-linejoin: round;
-  stroke-dasharray: 1; stroke-dashoffset: 1;
-  /* Crisp bright core + soft halo — sells "glass edge catching light"
-     rather than a flat drawn line. */
-  filter: drop-shadow(0 0 .5px rgba(255, 255, 255, .95)) drop-shadow(0 0 2px rgba(255, 255, 255, .4));
-  animation-name: crackDraw;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-@keyframes crackDraw { to { stroke-dashoffset: 0; } }
-
-/* Fine dust/grit speckle scattered across the shattered area — appears
-   almost instantly, subtle, just texture noise rather than a drawn line. */
-.crack-dust {
-  fill: #1c1824;
-  opacity: 0;
-  animation: crackDustIn 220ms ease-out forwards;
-}
-@keyframes crackDustIn { to { opacity: var(--dust-op, .25); } }
+/* Crack-phase visuals (the fixed purple crack pattern itself) live in
+   src/effects/screen-crack/ScreenCrackOverlay.module.css — this file only
+   owns the overlay shell and the crumble/black phases below. */
 
 .crumble-stage { position: absolute; inset: 0; background: #000; }
 /* Resting state has NO animation attached at all — only .falling does.
@@ -59,6 +27,5 @@
 .crack-final-black { position: absolute; inset: 0; background: #000; }
 
 @media (prefers-reduced-motion: reduce) {
-  .crack-line { animation: none; stroke-dashoffset: 0; }
   .crumble-tile.falling { animation: none; opacity: 0; }
 }

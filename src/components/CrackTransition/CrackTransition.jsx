@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
-import { generateCracks } from './crackGenerator';
+import ScreenCrackOverlay from '../../effects/screen-crack/ScreenCrackOverlay';
 import './CrackTransition.css';
 
-// The new (from-scratch) CRM -> AI Agents transition:
-// 1. a spiderweb of cracks radiates from the impact point (`origin` —
-//    wherever the AI Agents sidebar item actually sits) across the whole
-//    platform over 5s;
+// The CRM -> AI Agents transition:
+// 1. a fixed, deterministic crack pattern (see effects/screen-crack/) draws
+//    in across the whole platform over 5s — always the same geometry, not
+//    anchored to where the AI Agents item was clicked (`origin` is accepted
+//    for backward compatibility but no longer used — see ScreenCrackOverlay);
 // 2. the cracked view crumbles apart, tile by tile, bottom row first, over
 //    another 5s;
 // 3. a plain black screen remains — this component's own job ends here; it
@@ -19,21 +20,10 @@ const TILE_COLS = 12;
 const TILE_ROWS = 8;
 const TILE_FALL_MS = 900;
 
-export default function CrackTransition({ onBlackScreen, origin }) {
+export default function CrackTransition({ onBlackScreen }) {
   const [phase, setPhase] = useState('cracks'); // 'cracks' | 'crumble' | 'black'
   const [screenshot, setScreenshot] = useState(null);
   const capturedRef = useRef(false);
-  // Impact point the whole spiderweb radiates from — defaults to roughly
-  // where the AI Agents sidebar item sits if the caller didn't measure it,
-  // rather than dead center, so it still reads as "something hit the
-  // screen from over there" even without a captured rect.
-  const originX = origin?.x ?? window.innerWidth * 0.12;
-  const originY = origin?.y ?? window.innerHeight * 0.55;
-  const [{ cracks, dust }] = useState(() => generateCracks(
-    Date.now() | 0, window.innerWidth, window.innerHeight,
-    originX, originY,
-    CRACK_PHASE_MS * 0.6,
-  ));
 
   // Captured immediately, in the background — ready well before the
   // crumble phase needs it, rather than triggering a live (possibly slow)
@@ -119,30 +109,7 @@ export default function CrackTransition({ onBlackScreen, origin }) {
 
   return (
     <div className="crack-transition-overlay" aria-busy="true">
-      {phase === 'cracks' && (
-        <svg className="crack-svg" viewBox={`0 0 ${vw} ${vh}`} preserveAspectRatio="none">
-          <defs>
-            <radialGradient id="crackImpactGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#fff" stopOpacity="0.85" />
-              <stop offset="45%" stopColor="#fff" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <circle className="crack-impact-glow" cx={originX} cy={originY} r={Math.max(vw, vh) * 0.22} fill="url(#crackImpactGlow)" />
-          {cracks.map((c, i) => (
-            <path
-              key={i} d={c.d} pathLength="1" className="crack-line"
-              style={{ strokeWidth: c.width, animationDelay: `${c.delay}ms`, animationDuration: `${c.duration}ms` }}
-            />
-          ))}
-          {dust.map((d, i) => (
-            <circle
-              key={i} className="crack-dust" cx={d.x} cy={d.y} r={d.r}
-              style={{ '--dust-op': d.opacity, animationDelay: `${60 + (i % 20) * 12}ms` }}
-            />
-          ))}
-        </svg>
-      )}
+      {phase === 'cracks' && <ScreenCrackOverlay />}
 
       {phase === 'crumble' && (
         <div className="crumble-stage">
