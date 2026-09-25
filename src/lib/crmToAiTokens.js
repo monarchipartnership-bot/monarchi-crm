@@ -30,12 +30,6 @@ export const PHASE = {
 // covered by the backdrop) — see TransitionContext's navigate call.
 export const NAVIGATE_AT_S = 1.05;
 
-// The single handoff moment: temporary network (built inside the overlay)
-// fades out and the real, already-mounted-but-invisible AI Map fades in, at
-// the exact same instant — see CrmToAiTransitionContext's destinationVisible
-// and crm-to-ai spec section 14 ("Handoff transition -> real map").
-export const HANDOFF_AT_S = 3.2;
-
 export const EASING = {
   standard: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
   softOut: 'cubic-bezier(0.16, 1, 0.3, 1)',

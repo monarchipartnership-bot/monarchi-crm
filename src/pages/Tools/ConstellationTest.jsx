@@ -5,7 +5,6 @@ import ParticleSphere from '../../components/ParticleSphere/ParticleSphere';
 import CosmicBackground from '../../components/SystemMap/CosmicBackground';
 import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas';
 import { useCrmToAiTransition } from '../../contexts/CrmToAiTransitionContext';
-import { computeOverviewHubs } from '../../lib/aiMapOverviewLayout';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import '../../styles/constellationTest.css';
@@ -18,13 +17,13 @@ const AGENT_TOOLS = {
   'ads-insights-chat': AdsInsightsAnalyst,
 };
 
-// Reveal for a direct URL load/refresh only (no active CRM->AI transition)
-// — the core lights up, then every department flies out from it,
-// clockwise, staggered by `deptIdx`. When mounted mid-transition instead,
-// this timeline is skipped entirely (introPhase starts at 'hubs' — see
-// below): the transition overlay's TemporaryNetworkLayer already played
-// the whole "core forms, departments build" show with real data, so this
-// page just renders complete and waits for `destinationVisible`.
+// Default reveal for a direct URL load/refresh (no active CRM->AI
+// transition) — the core lights up, then every department flies out from
+// it, clockwise, staggered by `deptIdx`. When mounted mid-transition
+// instead, these offsets are recomputed against the shared timeline (see
+// the revealTimeline useState below) so departments fly out exactly when
+// the transition overlay's energy burst says they should, instead of
+// timing themselves from this component's own mount.
 const REVEAL_TIMELINE = {
   core: 250,
   hubs: 650,
@@ -604,34 +603,33 @@ export default function ConstellationTest() {
   const [deptPanelClosed, setDeptPanelClosed] = useState(false);
   const [viewMode, setViewMode] = useState('map');
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
+  const [introPhase, setIntroPhase] = useState('start');
 
-  const { mode: transitionMode, startedAt: transitionStartedAt, destinationVisible, startReverse } = useCrmToAiTransition();
-  // Mounted mid-CRM->AI transition: navigate() already fired while the
-  // portal overlay's TemporaryNetworkLayer was doing the entire visible
-  // "core forms -> departments build" show (real data/colors, positions
-  // shared with this page via aiMapOverviewLayout.js) — by the time this
-  // component exists, that spectacle already happened, so it renders fully
-  // formed immediately (introPhase starts at 'hubs', not 'start' — no
-  // second, redundant fly-in animation) and just sits at opacity:0 until
-  // `destinationVisible` (the ONE shared handoff signal — see
-  // CrmToAiTransitionContext) says it's time to be revealed. A direct URL
-  // load/refresh (transitionMode is 'idle') is completely unaffected: own
-  // REVEAL_TIMELINE, own animated entrance, exactly as before.
-  const [introPhase, setIntroPhase] = useState(() => (transitionMode === 'direct' ? 'hubs' : 'start'));
+  const { mode: transitionMode, startedAt: transitionStartedAt, startReverse } = useCrmToAiTransition();
+  // Mounted mid-CRM->AI transition (navigate() fired while the portal
+  // overlay was still covering the screen, see CrmToAiTransitionContext) —
+  // reuse this page's own existing reveal, just told to fire at the shared
+  // timeline's global moments instead of this component's own mount+delay
+  // defaults, so departments fly out exactly when the overlay's energy
+  // burst says they should. A direct URL load/refresh has no active
+  // transition (mode is 'idle'), so it falls back to REVEAL_TIMELINE
+  // completely unchanged from before.
+  const [revealTimeline] = useState(() => {
+    if (transitionMode !== 'direct') return REVEAL_TIMELINE;
+    const elapsedAtMount = performance.now() - transitionStartedAt;
+    return {
+      core: Math.max(0, 1150 - elapsedAtMount),
+      hubs: Math.max(0, 2200 - elapsedAtMount),
+      done: Math.max(0, 3800 - elapsedAtMount),
+    };
+  });
 
   useEffect(() => {
-    if (transitionMode === 'direct') return undefined; // driven by destinationVisible below instead
-    const timers = Object.entries(REVEAL_TIMELINE).map(([phase, delay]) => setTimeout(() => setIntroPhase(phase), delay));
+    const timers = Object.entries(revealTimeline).map(([phase, delay]) => setTimeout(() => setIntroPhase(phase), delay));
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // True whenever this page should be visible/interactive: always, except
-  // while actively arriving via a direct transition that hasn't handed off
-  // yet (covers the direct-load case, the idle/settled case, and staying
-  // visible through the reverse collapse on the way out).
-  const mapVisible = !(transitionMode === 'direct' && !destinationVisible);
-  const introDone = transitionMode === 'direct' ? destinationVisible : introPhase === 'done';
+  const introDone = introPhase === 'done';
 
   // One short brightness echo on the core right as departments start flying
   // out — the real-page equivalent of the transition overlay's own energy
@@ -741,11 +739,11 @@ export default function ConstellationTest() {
   useEffect(() => { setDeptPanelClosed(false); setViewMode('map'); }, [focusedDept]);
 
   const layout = useMemo(() => {
-    // Hub angle/position formula lives in aiMapOverviewLayout.js — shared
-    // with the CRM->AI transition's temporary network so its hub dots land
-    // in the exact same screen position as these real ones (no jump at the
-    // handoff crossfade). Same values as before this was extracted.
-    return computeOverviewHubs(deptKeys, AGENT_DEPTS).map(({ key, dept, deptAngle, hx, hy }, i) => {
+    const n = deptKeys.length;
+    return deptKeys.map((key, i) => {
+      const dept = AGENT_DEPTS[key];
+      const deptAngle = -90 + (360 / n) * i;
+      const [hx, hy] = toXY(deptAngle, HUB_RADIUS);
       const subcats = buildSubcats(dept, deptAngle, hx, hy, i, OVERVIEW_PARAMS);
       return { key, dept, deptAngle, hx, hy, subcats };
     });
@@ -843,10 +841,7 @@ export default function ConstellationTest() {
   const gridTransform = `scale(${1 + (view.scale - 1) * 0.045}) translate(${-view.x * 0.14}px, ${-view.y * 0.14}px)`;
 
   return (
-    <div
-      className={'constellation-page' + (transitionMode === 'direct' ? ' transition-gated' : '')}
-      style={{ '--ui-scale': UI_SCALE, opacity: mapVisible ? 1 : 0 }}
-    >
+    <div className="constellation-page" style={{ '--ui-scale': UI_SCALE }}>
       <div className={'constellation-topright' + (introDone ? ' revealed' : '')}>
         <div className="agent-search" ref={searchRef}>
           <svg className="agent-search-icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="m21 21-5.2-5.2" /></svg>
@@ -885,7 +880,7 @@ export default function ConstellationTest() {
         {focused && (
           <div className="constellation-breadcrumb-pill">
             <span className="constellation-focus-dot" style={{ background: focused.dept.color }} />
-            <b>{focused.dept.label}</b><span className="sep">·</span><span className="constellation-breadcrumb-subtitle">{focused.dept.subtitle}</span>
+            <b>{focused.dept.label}</b><span className="sep">·</span>{focused.dept.subtitle}
           </div>
         )}
         {focused && (

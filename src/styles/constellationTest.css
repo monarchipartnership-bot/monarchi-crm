@@ -15,12 +15,6 @@
      page just quietly scroll". */
   overflow: hidden;
 }
-/* Only applied when arriving via the CRM->AI transition — the page sits at
-   opacity:0 (set inline, driven by destinationVisible/mapVisible in
-   ConstellationTest.jsx) until the single shared handoff signal reveals
-   it. A direct URL load never gets this class, so it has no opacity
-   transition at all and just renders normally at opacity:1. */
-.constellation-page.transition-gated { transition: opacity 150ms ease; }
 
 /* The AI Agents entrance (core ignite + branches flying out) lives on the
    graph elements themselves, further down this file. On a direct URL load
@@ -118,26 +112,17 @@
 .constellation-overlay {
   position: absolute; top: 20px; left: 20px; z-index: 5;
   display: flex; align-items: center; gap: 10px;
-  /* Capped so a long breadcrumb subtitle can't push the reset button
-     under the centered .view-tabs pill (same top offset, same z-index,
-     later in the DOM — it would otherwise paint over the button and eat
-     its clicks). The pill truncates its subtitle instead of growing past
-     this width; clamp() keeps a usable floor on narrow viewports and a
-     ceiling on very wide ones. */
-  max-width: clamp(150px, calc(50vw - 160px), 520px);
 }
 .constellation-breadcrumb-pill {
-  display: flex; align-items: center; gap: 8px; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
   font-family: var(--font-body); font-size: .84rem; color: #C9BAD9;
   background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 9px 16px 9px 12px;
 }
-.constellation-breadcrumb-pill b { color: #F1EAF6; font-weight: 700; flex-shrink: 0; }
-.constellation-breadcrumb-pill .sep { opacity: .4; flex-shrink: 0; }
-.constellation-breadcrumb-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.constellation-breadcrumb-pill b { color: #F1EAF6; font-weight: 700; }
+.constellation-breadcrumb-pill .sep { opacity: .4; }
 .constellation-focus-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 8px 1px currentColor; }
 .constellation-reset {
-  flex-shrink: 0;
   background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px); color: #C9BAD9;
   border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 9px 16px;
   font-family: var(--font-body); font-size: .82rem; font-weight: 600; cursor: pointer; transition: color .15s ease, border-color .15s ease;

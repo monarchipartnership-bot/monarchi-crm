@@ -1,8 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { CrmToAiTransitionProvider, useCrmToAiTransition } from './contexts/CrmToAiTransitionContext';
-import TransitionPortal from './components/CrmToAiTransition/TransitionPortal';
-import TransitionDebugHud from './components/CrmToAiTransition/TransitionDebugHud';
 import Login from './pages/Login/Login';
 import SetPassword from './pages/Login/SetPassword';
 import Layout from './components/Layout/Layout';
@@ -89,27 +86,10 @@ function AuthGate() {
   );
 }
 
-// The transition overlay's own persistence — CrmToAiTransitionProvider
-// wraps AuthGate (not just its <Routes>), so the overlay survives ANY
-// state change below it: a route swap between two CRM/AI pages, but also
-// an auth hiccup that would otherwise swap AuthGate's own branch to the
-// loading screen or <Login/> mid-transition and unmount everything under
-// it. TransitionPortal is rendered as AuthGate's sibling here, inside the
-// same provider, so it's never a descendant of anything that could unmount
-// out from under it.
-function TransitionPortalGate() {
-  const { mode } = useCrmToAiTransition();
-  return mode !== 'idle' ? <TransitionPortal /> : null;
-}
-
 export default function App() {
   return (
     <AuthProvider>
-      <CrmToAiTransitionProvider>
-        <AuthGate />
-        <TransitionPortalGate />
-        <TransitionDebugHud />
-      </CrmToAiTransitionProvider>
+      <AuthGate />
     </AuthProvider>
   );
 }

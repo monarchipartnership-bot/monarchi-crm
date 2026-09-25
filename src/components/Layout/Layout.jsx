@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../Sidebar/Sidebar';
 import TopBar from './TopBar';
-import { useCrmToAiTransition } from '../../contexts/CrmToAiTransitionContext';
+import TransitionPortal from '../CrmToAiTransition/TransitionPortal';
+import { CrmToAiTransitionProvider, useCrmToAiTransition } from '../../contexts/CrmToAiTransitionContext';
 import './Layout.css';
 
 // Routes that take over the full viewport — sidebar and topbar collapse so
@@ -11,14 +12,20 @@ import './Layout.css';
 // CRM page).
 const IMMERSIVE_PREFIXES = ['/tools/constellation-test'];
 
-// CrmToAiTransitionProvider/TransitionPortal are mounted from App.jsx, above
-// AuthGate — not here. Layout is already the single shared parent route
-// element for every CRM/AI route (so it never unmounted between Home<->Map
-// on its own), but it WOULD unmount if AuthGate swapped to its loading/
-// <Login/> branch mid-transition, which would orphan the overlay. Mounting
-// the provider above AuthGate makes that impossible regardless of route or
-// auth-state churn. Layout only *consumes* the context here.
+// The provider needs to sit above both TransitionPortal and <Outlet/>
+// (ConstellationTest reads the same context to sync its own reveal), so
+// the actual shell markup lives in a child component that can call
+// useCrmToAiTransition() — the provider component itself can't consume
+// its own context.
 export default function Layout() {
+  return (
+    <CrmToAiTransitionProvider>
+      <LayoutShell />
+    </CrmToAiTransitionProvider>
+  );
+}
+
+function LayoutShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
   const { mode, startDirect } = useCrmToAiTransition();
@@ -26,6 +33,8 @@ export default function Layout() {
 
   return (
     <>
+      {mode !== 'idle' && <TransitionPortal />}
+
       {!immersive && (
         <button className="menu-btn" aria-label="Menu" onClick={() => setMobileOpen(true)}>
           <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" /></svg>

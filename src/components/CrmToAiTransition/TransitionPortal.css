@@ -2,27 +2,22 @@
   position: fixed; inset: 0; z-index: 9999;
   overflow: hidden; pointer-events: auto;
 }
-/* Driven by destinationVisible (context) — kept fast and in lockstep with
-   TemporaryNetworkLayer's own .crossfade-out (150ms), not the old
-   380ms guess, since both now fire off the exact same signal. */
-.crm-to-ai-portal.fading-out { transition: opacity 160ms ease; opacity: 0; }
+.crm-to-ai-portal.fading-out { transition: opacity 380ms ease; opacity: 0; }
 
-/* White -> violet -> navy -> cosmic, per crm-to-ai/specs/01 phase 4 — but
-   compressed to reach non-white MUCH sooner than a literal reading of the
-   phase percentages would (was ~300-500ms before going visibly dark,
-   which read as "just a white screen" against CRM's own light theme).
-   Fully opaque and dark by ~450ms, well before ~1.05s when the route
-   actually swaps underneath (CrmToAiTransitionContext's navigateAtMs). */
+/* White -> violet -> navy -> cosmic, per crm-to-ai/specs/01 phase 4. Timed
+   to be reading as fully opaque well before ~1.05s, when Layout actually
+   swaps the route underneath (see CrmToAiTransitionContext's navigateAtMs)
+   — the DOM swap itself is always hidden. */
 .transition-backdrop {
   position: absolute; inset: 0;
-  animation: crmToAiBackdrop 1100ms cubic-bezier(.2, .8, .2, 1) forwards;
+  animation: crmToAiBackdrop 1450ms cubic-bezier(.2, .8, .2, 1) forwards;
 }
 @keyframes crmToAiBackdrop {
   0% { opacity: 0; background-color: #FFFFFF; }
-  10% { opacity: .55; background-color: #FFFFFF; }
-  25% { opacity: .85; background-color: #EDE7FF; }
-  40% { opacity: .97; background-color: #3A2B62; }
-  60% { opacity: 1; background-color: #11172B; }
+  8% { opacity: .35; background-color: #FFFFFF; }
+  22% { opacity: .68; background-color: #EDE7FF; }
+  50% { opacity: .92; background-color: #3A2B62; }
+  70% { opacity: 1; background-color: #11172B; }
   100% { opacity: 1; background-color: #050817; }
 }
 
@@ -74,9 +69,25 @@
 }
 @keyframes crmToAiFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* One short radial pulse (crm-to-ai spec phase 7) — fires right as
-   TemporaryNetworkLayer's core finishes forming, and is what visually
-   triggers its department network build-out immediately after. */
+/* Soft central glow bridging into the real page's own core-ignite
+   animation (ConstellationTest's .constellation-core-btn.lit), which is
+   already running underneath by this point. */
+.transition-core-bloom {
+  position: absolute; left: 50%; top: 50%; width: 260px; height: 260px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(155, 92, 255, .55) 0%, rgba(124, 58, 237, .25) 45%, transparent 72%);
+  animation: crmToAiBloom 900ms cubic-bezier(.2, .8, .2, 1) forwards;
+}
+@keyframes crmToAiBloom {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* One short radial pulse (crm-to-ai spec phase 7) — the visual trigger for
+   the real map's department branches, which start flying out at the same
+   global moment (see ConstellationTest's transition-aware reveal timing). */
 .transition-energy-burst {
   position: absolute; left: 50%; top: 50%;
   transform: translate(-50%, -50%);
@@ -90,5 +101,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .crm-to-ai-portal.fading-out { transition: none; }
-  .transition-trigger-ring, .transition-cosmic-layer, .transition-energy-burst { display: none; }
+  .transition-trigger-ring, .transition-cosmic-layer, .transition-core-bloom, .transition-energy-burst { display: none; }
 }

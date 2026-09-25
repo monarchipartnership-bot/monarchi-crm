@@ -60,12 +60,8 @@ function buildParticles(zones, centerX, centerY, countTarget) {
         radius: isGlyph ? 6 + rand(4) * 4 : 0.8 + rand(4) * (rand(5) < 0.25 ? 2.2 : 0.9),
         isGlyph,
         color: PARTICLE_COLORS[Math.floor(rand(6) * PARTICLE_COLORS.length)],
-        // Tight delay spread (was 0.55s) — particles need to read as an
-        // immediate, prominent burst the instant fragmentation starts, not
-        // a slow gradual trickle; a wide spread was part of why the CRM
-        // looked like it was just fading rather than visibly transforming.
-        delay: rand(7) * 0.22,
-        duration: 0.5 + rand(8) * 0.5,
+        delay: rand(7) * 0.55,
+        duration: 0.55 + rand(8) * 0.55,
       });
       idx++;
     }
@@ -119,8 +115,8 @@ export default function FragmentCanvas({ startedAt }) {
         const u = 1 - t;
         const x = u * u * p.sx + 2 * u * t * p.cx + t * t * p.tx;
         const y = u * u * p.sy + 2 * u * t * p.cy + t * t * p.ty;
-        const alpha = t < 0.08 ? t / 0.08 : 1 - t ** 2.2;
-        ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * (p.isGlyph ? 0.4 : 1);
+        const alpha = t < 0.15 ? t / 0.15 : 1 - t ** 2.2;
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * (p.isGlyph ? 0.35 : 0.9);
         ctx.fillStyle = p.color;
         if (p.isGlyph) {
           ctx.fillRect(x - p.radius, y - p.radius * 0.6, p.radius * 2, p.radius * 1.2);

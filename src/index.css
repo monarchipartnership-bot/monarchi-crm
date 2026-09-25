@@ -29,17 +29,6 @@ body {
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
 }
-/* Dark fallback for the CRM<->AI transition (crm-to-ai master prompt
-   section 2: "absolute requirement — no white frame, ever") — scoped to a
-   class the transition context toggles on <body> only while a transition
-   is actually active (CrmToAiTransitionContext), NOT a permanent override:
-   several CRM surfaces (e.g. .pulse-card's translucent glass look) are
-   semi-transparent white by design and rely on a LIGHT background showing
-   through in normal use, so making this permanent visibly muddied the
-   whole light theme. Scoped like this it only ever matters for a gap the
-   transition overlay itself might not be covering; insurance only — the
-   overlay's own fixed-position coverage is the real fix. */
-body.crm-to-ai-transitioning, body.crm-to-ai-transitioning #root { background: #050817; }
 a { color: inherit; }
 button { font: inherit; }
 ::selection { background: var(--purple-tint); color: var(--purple-deep); }
