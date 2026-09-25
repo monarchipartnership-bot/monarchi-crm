@@ -1,0 +1,39 @@
+.crack-transition-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.crack-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.crack-line {
+  fill: none; stroke: #17141d; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, .65));
+  animation-name: crackDraw;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes crackDraw { to { stroke-dashoffset: 0; } }
+
+.crumble-stage { position: absolute; inset: 0; background: #000; }
+/* Resting state has NO animation attached at all — only .falling does.
+   (Previously this had animation-delay driving the fall, with fill-mode
+   forwards; Chromium in this environment rendered the whole grid fully
+   transparent for its entire pre-fall delay regardless of what every
+   computed style reported. Not attaching the animation until the tile is
+   actually meant to move sidesteps that outright — see CrackTransition.jsx.) */
+.crumble-tile { position: absolute; background-repeat: no-repeat; background-color: #d8d3e0; transform-origin: center; }
+.crumble-tile.falling {
+  animation: tileFall 900ms cubic-bezier(.5, 0, .85, 1) forwards;
+}
+@keyframes tileFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(65vh) rotate(9deg); opacity: 0; }
+}
+
+.crack-final-black { position: absolute; inset: 0; background: #000; }
+
+@media (prefers-reduced-motion: reduce) {
+  .crack-line { animation: none; stroke-dashoffset: 0; }
+  .crumble-tile.falling { animation: none; opacity: 0; }
+}
