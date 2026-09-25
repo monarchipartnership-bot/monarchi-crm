@@ -1,0 +1,89 @@
+.temp-network-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.temp-network-svg.crossfade-out { animation: tempNetworkFadeOut 150ms ease forwards; }
+@keyframes tempNetworkFadeOut { to { opacity: 0; } }
+
+/* Core formation (crm-to-ai spec phase 6): bright halo -> ParticleSphere
+   scale-in -> Mon'Archi mark flashes on top, then fades again (see
+   .temp-core-mark) -> settles. transform-box/origin needed since this <g>
+   has no JSX transform attribute of its own (safe to animate via CSS). */
+.temp-core-group {
+  transform-box: view-box; transform-origin: 0px 0px;
+  animation: tempCoreForm 500ms cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes tempCoreForm {
+  0% { opacity: 0; transform: scale(.4); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+.temp-core-halo { fill: rgba(155, 92, 255, .35); filter: blur(14px); }
+.temp-core-mark {
+  animation: tempMarkFlash 900ms ease both;
+  pointer-events: none;
+}
+.temp-core-mark > div { width: 100%; height: 100%; }
+@keyframes tempMarkFlash {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  65% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Connection draw — pathLength="1" normalizes dash units to a 0..1
+   fraction of the line regardless of its actual pixel length, so one
+   keyframe works for every department without measuring each line. */
+.temp-connection {
+  fill: none; stroke: var(--dept-color); stroke-width: 1.6px; opacity: 0;
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: tempConnDraw 280ms ease-out forwards;
+}
+@keyframes tempConnDraw { 0% { opacity: .75; stroke-dashoffset: 1; } 100% { opacity: .75; stroke-dashoffset: 0; } }
+
+/* Energy dot travelling core->hub along the same trimmed straight line —
+   transform-box: view-box lets a plain translate() keyframe move it in
+   world coordinates, same technique as the real map's own .flow-dot. */
+.temp-energy-dot {
+  fill: var(--dept-color); filter: drop-shadow(0 0 3px var(--dept-color));
+  opacity: 0; transform-box: view-box; transform-origin: 0px 0px;
+  animation: tempEnergyDot 260ms linear forwards;
+}
+@keyframes tempEnergyDot {
+  0% { transform: translate(var(--sx), var(--sy)); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate(var(--ex), var(--ey)); opacity: 0; }
+}
+
+/* Hub node pop-in — nested inside an outer <g transform="translate(hx hy)">
+   (position only, JSX attribute) so this inner <g>'s own CSS `transform`
+   never conflicts with it (the attribute-vs-property trap: a CSS transform
+   on the SAME element that already carries a transform attribute replaces
+   it outright instead of composing). */
+.temp-hub-node {
+  transform-box: view-box; transform-origin: 0px 0px;
+  opacity: 0; transform: scale(.4);
+  animation: tempHubPop 320ms cubic-bezier(.2, .8, .3, 1) forwards;
+}
+@keyframes tempHubPop {
+  0% { opacity: 0; transform: scale(.4); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+.temp-hub-glow { fill: var(--dept-color); opacity: .18; filter: blur(10px); }
+.temp-hub-circle { fill: color-mix(in srgb, var(--dept-color) 24%, transparent); stroke: var(--dept-color); stroke-width: 1.2px; }
+
+.temp-child-group { opacity: 0; animation: tempChildFade 240ms ease forwards; }
+@keyframes tempChildFade { to { opacity: 1; } }
+.temp-child-line { stroke: var(--dept-color); stroke-width: .9px; opacity: .35; }
+.temp-child-dot { fill: var(--dept-color); opacity: .8; }
+
+.temp-hub-label {
+  fill: #EDE7F5; font-family: 'Inter', var(--font-body); font-size: calc(15px * 1.667); font-weight: 700;
+  paint-order: stroke fill; stroke: #0B0817; stroke-width: 4px; stroke-linejoin: round;
+  opacity: 0; transform: translateY(5px);
+  animation: tempLabelIn 180ms ease forwards;
+}
+@keyframes tempLabelIn { to { opacity: 1; transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .temp-network-svg { display: none; }
+}
