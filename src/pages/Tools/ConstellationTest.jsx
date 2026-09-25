@@ -4,7 +4,6 @@ import { AGENT_DEPTS, AUTONOMY_LABEL, STATUS_LABEL, WAVE_LABEL } from '../../dat
 import ParticleSphere from '../../components/ParticleSphere/ParticleSphere';
 import CosmicBackground from '../../components/SystemMap/CosmicBackground';
 import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas';
-import { useCrmToAiTransition } from '../../contexts/CrmToAiTransitionContext';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import '../../styles/constellationTest.css';
@@ -17,13 +16,10 @@ const AGENT_TOOLS = {
   'ads-insights-chat': AdsInsightsAnalyst,
 };
 
-// Default reveal for a direct URL load/refresh (no active CRM->AI
-// transition) — the core lights up, then every department flies out from
-// it, clockwise, staggered by `deptIdx`. When mounted mid-transition
-// instead, these offsets are recomputed against the shared timeline (see
-// the revealTimeline useState below) so departments fly out exactly when
-// the transition overlay's energy burst says they should, instead of
-// timing themselves from this component's own mount.
+// This page's own mount-time reveal: the core lights up, then every
+// department flies out from it, clockwise, staggered by `deptIdx`. Plays
+// the same way whether reached via a normal sidebar click or a direct URL
+// load — no separate transition/intro screen before it.
 const REVEAL_TIMELINE = {
   core: 250,
   hubs: 650,
@@ -605,53 +601,11 @@ export default function ConstellationTest() {
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
   const [introPhase, setIntroPhase] = useState('start');
 
-  const { mode: transitionMode, startedAt: transitionStartedAt, startReverse } = useCrmToAiTransition();
-  // Mounted mid-CRM->AI transition (navigate() fired while the portal
-  // overlay was still covering the screen, see CrmToAiTransitionContext) —
-  // reuse this page's own existing reveal, just told to fire at the shared
-  // timeline's global moments instead of this component's own mount+delay
-  // defaults, so departments fly out exactly when the overlay's energy
-  // burst says they should. A direct URL load/refresh has no active
-  // transition (mode is 'idle'), so it falls back to REVEAL_TIMELINE
-  // completely unchanged from before.
-  const [revealTimeline] = useState(() => {
-    if (transitionMode !== 'direct') return REVEAL_TIMELINE;
-    const elapsedAtMount = performance.now() - transitionStartedAt;
-    return {
-      core: Math.max(0, 1150 - elapsedAtMount),
-      hubs: Math.max(0, 2200 - elapsedAtMount),
-      done: Math.max(0, 3800 - elapsedAtMount),
-    };
-  });
-
   useEffect(() => {
-    const timers = Object.entries(revealTimeline).map(([phase, delay]) => setTimeout(() => setIntroPhase(phase), delay));
+    const timers = Object.entries(REVEAL_TIMELINE).map(([phase, delay]) => setTimeout(() => setIntroPhase(phase), delay));
     return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const introDone = introPhase === 'done';
-
-  // One short brightness echo on the core right as departments start flying
-  // out — the real-page equivalent of the transition overlay's own energy
-  // burst (crm-to-ai spec phase 7), so the beat still reads even once the
-  // overlay has already faded away.
-  const [burstEcho, setBurstEcho] = useState(false);
-  useEffect(() => {
-    if (introPhase !== 'hubs') return undefined;
-    setBurstEcho(true);
-    const t = setTimeout(() => setBurstEcho(false), 260);
-    return () => clearTimeout(t);
-  }, [introPhase]);
-
-  // Short reverse transition back to CRM (crm-to-ai spec section 18) — the
-  // real department/label/core "power down" happens right here on the real
-  // DOM via the .collapsing CSS below; the portal only adds a brief
-  // violet-flash crossfade on top (see TransitionPortal's reverse mode).
-  const [collapsing, setCollapsing] = useState(false);
-  function handleExit() {
-    setCollapsing(true);
-    startReverse('/');
-  }
 
   const stageRef = useRef(null);
 
@@ -842,7 +796,7 @@ export default function ConstellationTest() {
 
   return (
     <div className="constellation-page" style={{ '--ui-scale': UI_SCALE }}>
-      <div className={'constellation-topright' + (introDone ? ' revealed' : '')}>
+      <div className="constellation-topright">
         <div className="agent-search" ref={searchRef}>
           <svg className="agent-search-icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="m21 21-5.2-5.2" /></svg>
           <input
@@ -870,10 +824,10 @@ export default function ConstellationTest() {
             </div>
           )}
         </div>
-        <button type="button" className="constellation-exit" onClick={handleExit}>
+        <Link to="/" className="constellation-exit">
           <svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8" /><path d="M5 10v10h14V10" /></svg>
           CRM
-        </button>
+        </Link>
       </div>
 
       <div className="constellation-overlay">
@@ -971,8 +925,8 @@ export default function ConstellationTest() {
       )}
 
       <div
-        className={'constellation-stage' + (collapsing ? ' collapsing' : '')} ref={stageRef}
-        style={{ pointerEvents: introDone && viewMode === 'map' && !collapsing ? 'auto' : 'none' }}
+        className="constellation-stage" ref={stageRef}
+        style={{ pointerEvents: introDone && viewMode === 'map' ? 'auto' : 'none' }}
       >
         <CosmicBackground stageAspect={stageAspect} gridTransform={gridTransform} transitionCss={transitionCss} />
         <ParticleFieldCanvas />
@@ -993,7 +947,7 @@ export default function ConstellationTest() {
             <circle r={HUB_RADIUS} className={'orbit-ring' + (introPhase === 'hubs' || introDone ? ' visible' : '')} />
 
             <g
-              className={'constellation-core-btn' + (introPhase !== 'start' ? ' lit' : '') + (focusedDept ? ' inactive' : '') + (burstEcho ? ' burst-echo' : '')}
+              className={'constellation-core-btn' + (introPhase !== 'start' ? ' lit' : '') + (focusedDept ? ' inactive' : '')}
               onClick={() => { if (!focusedDept) setCoreOpen(true); }}
               role="button"
               tabIndex={focusedDept ? -1 : 0}

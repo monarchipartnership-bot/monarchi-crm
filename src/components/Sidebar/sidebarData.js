@@ -39,7 +39,7 @@ export const DEPTS = {
     icon: IC.deptAutomation,
     items: [
       { key: 'dashboard', name: 'Dashboard', desc: 'Загальна картина по задачах: сьогодні, вчора, тижні та місяці.', icon: IC.dashboard, type: 'link', to: '/automation/dashboard' },
-      { key: 'constellation', name: 'AI Agents', desc: 'Карта реальних AI-агентів CRM за відділами — від живих (Follow-up Generator) до запланованих.', icon: IC.constellation, type: 'link', to: '/tools/constellation-test', introTransition: true },
+      { key: 'constellation', name: 'AI Agents', desc: 'Карта реальних AI-агентів CRM за відділами — від живих (Follow-up Generator) до запланованих.', icon: IC.constellation, type: 'link', to: '/tools/constellation-test' },
     ],
   },
   team: {
