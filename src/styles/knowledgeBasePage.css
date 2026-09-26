@@ -1,22 +1,27 @@
 /* Knowledge Base ("Спільна база знань") — dark "AI command center" panel,
-   styled the same way as this section's other overlay (.agent-modal-backdrop
-   / .agent-modal): a solid dimmed backdrop with a fully opaque card on top,
-   not a translucent panel over the Constellation page's live starfield.
-   That translucent-over-live-background approach used to let the map's own
-   focused-department carousel/breadcrumb (and its animated "data flowing
-   into the core" dots) bleed through the overlay's transparent top strip in
-   some timing races right after the intro reveal — read as a stray
-   "floating square" glitch. A solid backdrop makes that impossible
-   regardless of whatever state the map underneath is in. Opens only from
-   the map's core sphere, as a near-fullscreen overlay, not a routed CRM
-   page — every class below is scoped under .kb-overlay or is a fresh,
-   uniquely-prefixed name (see project memory re: unscoped classnames like
-   .field/.sec-label leaking across pages). */
+   styled the same family as this section's other overlay (.agent-modal-
+   backdrop / .agent-modal): a dimmed backdrop with a fully opaque card on
+   top, not a translucent panel over the Constellation page's live
+   starfield.
+
+   Unlike the agent modal — which only ever opens over an already-focused,
+   single-department view — the Knowledge Base opens from the core sphere
+   over the full, unfocused overview: all 8 department hubs, each with its
+   own "breathing" pulse animation and label, still mounted and animating
+   underneath. The agent modal's translucent rgba(...,.68) backdrop reads
+   as calm dimming there; over the busier overview it let an animated hub
+   label bleed through legibly, reading as a stray "moving square". Fully
+   opaque here instead — nothing behind can ever show through, regardless
+   of the map's state. Opens only from the map's core sphere, as a
+   near-fullscreen overlay, not a routed CRM page — every class below is
+   scoped under .kb-overlay or is a fresh, uniquely-prefixed name (see
+   project memory re: unscoped classnames like .field/.sec-label leaking
+   across pages). */
 
 .kb-overlay {
   position: fixed; inset: 0; z-index: 65; display: flex; flex-direction: column;
   align-items: center; padding: 78px 26px 26px; overflow: hidden;
-  background: rgba(10, 6, 18, .68);
+  background: #0A0612;
 }
 
 .kb-nav {
