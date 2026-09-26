@@ -7,6 +7,7 @@ import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas'
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
+import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
 import '../../styles/constellationTest.css';
 
@@ -589,6 +590,7 @@ function calculateDepartmentGraphLayout(dept, halfW, halfH) {
 // sidebar/routing, however tempting that'd be for e.g. deep-linking.
 const SECTIONS = [
   { key: 'map', label: 'Мапа' },
+  { key: 'agents', label: 'Агенти' },
   { key: 'activity', label: 'Задачі агентів' },
 ];
 
@@ -864,6 +866,8 @@ export default function ConstellationTest() {
           CRM
         </Link>
       </div>
+
+      {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
 
       {section === 'activity' && <AiAgentActivity />}
 
@@ -1248,7 +1252,13 @@ export default function ConstellationTest() {
           )}
         </svg>
       </div>
+      </>
+      )}
 
+      {/* Knowledge Base / an agent's own workspace / the read-only agent
+          info modal all render regardless of `section` — opening one from
+          the Агенти catalog (or, later, anywhere else) must work the same
+          as opening it from the map itself. */}
       {coreOpen && <KnowledgeBase onClose={() => setCoreOpen(false)} />}
 
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {
@@ -1335,8 +1345,6 @@ export default function ConstellationTest() {
             </div>
           </div>
         </div>
-      )}
-      </>
       )}
     </div>
   );

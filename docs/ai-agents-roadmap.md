@@ -130,14 +130,21 @@ touches the main CRM's navigation)
   Налаштування   — permissions, per-agent config/data-access (later phase)
 ```
 
-### 4.1 Agent Catalog (list/grid view)
-The radial map doesn't scale for "find agent X" or "review all 44 at
-once." A flat, filterable table next to it:
-- Columns: name, department, function, autonomy level, status, wave,
-  last updated.
-- Filter by department / status / autonomy / wave; search; sort.
-- Bulk status view answers "what's actually live today" in one glance,
-  instead of clicking into 8 departments one at a time.
+### 4.1 Agent Catalog (list/grid view) — BUILT (2026-09-27)
+`src/pages/AgentCatalog/AgentCatalog.jsx`, the section's "Агенти" tab.
+- The exact same flattened agent list `ConstellationTest.jsx` already
+  builds for its own search (`allAgents`) — passed in as a prop rather
+  than recomputed, one source of truth.
+- Search (name/department/function) + status pills (Live/In development/
+  Not started) + wave pills (1/2/3); a summary line ("N агентів усього ·
+  N live · N у розробці · N заплановано") answers "what's live today" at
+  a glance.
+- Clicking a row calls the same `openAgent()` the map itself uses — opens
+  the real tool if the agent has one, the read-only info modal otherwise.
+  (Department/autonomy filters and "last updated" were dropped from the
+  original sketch below — no per-agent `updated_at` exists in the data
+  yet, and status+wave+search already cover the "find X" / "review all"
+  cases without an 8-option department filter's clutter.)
 
 ### 4.2 Agent Workspace template
 The single highest-leverage piece of infrastructure missing. Instead of
@@ -224,10 +231,18 @@ fit that table's recipient-targeted model.
   before adding more agents on top of an untracked foundation.
 
 **Phase 2 — Foundations for scale**
-- Agent Workspace template (4.2)
-- Agent Catalog list view (4.1)
+- **Built (2026-09-27):** Agent Catalog list view (4.1) — see §4.1. Also
+  fixed a real bug found while wiring it up: the KB/agent-tool/agent-modal
+  overlays were accidentally nested inside the map's own `section ===
+  'map'` gate, so opening an agent from anywhere other than the map (e.g.
+  a search result, or this catalog) silently did nothing — moved them to
+  render unconditionally, keyed off their own state instead.
+- Agent Workspace template (4.2) — next up.
 - Ship 2–3 more Wave 1 agents using the template — each wired into the
   Phase 1 activity feed/review queue from day one, not bolted on after.
+  **Needs the user to pick which agents** (which real data source/logic
+  each one gets) before this can start — not a UI-only task like the
+  catalog.
 
 **Phase 3 — Orchestration & scale**
 - Scheduled/event-triggered runs, agent handoffs (4.5)
