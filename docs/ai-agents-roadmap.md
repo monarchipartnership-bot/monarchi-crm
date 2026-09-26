@@ -146,19 +146,41 @@ touches the main CRM's navigation)
   yet, and status+wave+search already cover the "find X" / "review all"
   cases without an 8-option department filter's clutter.)
 
-### 4.2 Agent Workspace template
+### 4.2 Agent Workspace template — PARTIALLY BUILT (2026-09-27)
 The single highest-leverage piece of infrastructure missing. Instead of
 building each agent's UI from scratch (as `AdsInsightsAnalyst` was),
-extract a reusable shell:
-- Header: description, connected data sources, owner, status badge.
-- Body: chat or input-form area (agent-specific), depending on agent type.
-- Run history / output log.
-- Linked Knowledge Base articles (traceability — which agent reads which
-  KB content).
-- "Запустити" action wired to a consistent run/status lifecycle.
+extract a reusable shell. Extracted so far, grounded in the one real agent
+that exists rather than built speculatively for agents that don't exist
+yet:
+- **`AgentInfoModal`** (`src/components/AgentWorkspace/AgentInfoModal.jsx`)
+  — the read-only "what is this agent" modal (badges, breaks-into/wired-
+  into/builds-on pills, autonomy ladder, build notes) was copy-pasted
+  identically in `ConstellationTest.jsx` and `AdsInsightsAnalyst.jsx`; now
+  one component, `showCta`/`showDescription` props covering the two
+  contexts' real differences (map/catalog show both, an agent's own
+  workspace shows neither since it's redundant there).
+- **`AgentOrb`** (`src/components/AgentOrb/AgentOrb.jsx`) already existed
+  as a shared, agent-agnostic icon component — not new, just confirmed as
+  the right piece for a workspace header's icon (vs. `.ai-section-icon`'s
+  plain gradient square, which fits list/feed pages better).
 
-Shipping this template is what turns "1 of 44 built" into "each new agent
-takes days, not a redesign."
+Still not extracted (deferred until a second real agent exists to validate
+against — building this now would be guessing at shape from a sample size
+of one):
+- The header *layout* (kicker/title/description/nav actions) — currently
+  still bespoke JSX in `AdsInsightsAnalyst.jsx` (`.aia-header`).
+- Body: chat or input-form area, depending on agent type — genuinely
+  agent-specific, may never fully templatize.
+- Run history / output log — `AdsInsightsAnalyst` is a live chat, so its
+  "history" already means something different (past conversations) than
+  a batch/audit agent's run log would. Needs a second, differently-shaped
+  agent to know what's actually shared.
+- Linked Knowledge Base articles (traceability).
+- "Запустити" action wired to a consistent run/status lifecycle — doesn't
+  apply to a chat agent (sending a message already *is* the run action).
+
+Shipping the rest of this is what turns "1 of 44 built" into "each new
+agent takes days, not a redesign" — but needs the next agent picked first.
 
 ### 4.3 Agent activity & task tracking — PRIORITY (Phase 1)
 Currently invisible. Needs:

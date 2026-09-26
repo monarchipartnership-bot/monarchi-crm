@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AGENT_DEPTS, AUTONOMY_LABEL, STATUS_LABEL, WAVE_LABEL } from '../../data/aiAgentsData';
+import { AGENT_DEPTS } from '../../data/aiAgentsData';
 import ParticleSphere from '../../components/ParticleSphere/ParticleSphere';
 import CosmicBackground from '../../components/SystemMap/CosmicBackground';
 import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas';
@@ -8,6 +8,7 @@ import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
+import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
 import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
 import '../../styles/constellationTest.css';
 
@@ -1266,86 +1267,7 @@ export default function ConstellationTest() {
         return <AgentTool onClose={() => setAgentToolOpen(null)} />;
       })()}
 
-      {selectedAgent && (
-        <div className="agent-modal-backdrop" onClick={() => setSelectedAgent(null)}>
-          <div className="agent-modal" onClick={(e) => e.stopPropagation()} style={{ '--dept-color': selectedAgent.color }}>
-            <button type="button" className="agent-modal-close" onClick={() => setSelectedAgent(null)}>&times;</button>
-
-            <div className="agent-modal-badges">
-              <span className="agent-badge autonomy">{AUTONOMY_LABEL[selectedAgent.autonomyLevel]}</span>
-              <span className={'agent-badge status status-' + selectedAgent.status}>{STATUS_LABEL[selectedAgent.status]}</span>
-              {selectedAgent.wave && <span className={'agent-badge wave wave-' + selectedAgent.wave}>{WAVE_LABEL[selectedAgent.wave]}</span>}
-            </div>
-            <div className="agent-modal-breadcrumb">{selectedAgent.deptLabel} · {selectedAgent.subcatLabel}</div>
-            <h2>{selectedAgent.name}</h2>
-            <p className="agent-modal-desc">{selectedAgent.description}</p>
-
-            {selectedAgent.breaksInto?.length > 0 && (
-              <div className="agent-modal-section">
-                <h4>BREAKS INTO</h4>
-                <div className="agent-pills">{selectedAgent.breaksInto.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
-              </div>
-            )}
-            {selectedAgent.wiredInto?.length > 0 && (
-              <div className="agent-modal-section">
-                <h4>WIRED INTO</h4>
-                <div className="agent-pills">{selectedAgent.wiredInto.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
-              </div>
-            )}
-            {selectedAgent.buildsOn?.length > 0 && (
-              <div className="agent-modal-section">
-                <h4>BUILDS ON</h4>
-                <div className="agent-pills">{selectedAgent.buildsOn.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
-              </div>
-            )}
-            {selectedAgent.whatItReplaces && (
-              <div className="agent-modal-section">
-                <h4>WHAT IT REPLACES</h4>
-                <p>{selectedAgent.whatItReplaces}</p>
-              </div>
-            )}
-
-            {selectedAgent.ladder && (
-              <div className="agent-modal-section">
-                <h4>THE LADDER</h4>
-                <div className="agent-ladder">
-                  {[
-                    ['human-led', 'Human-led', selectedAgent.ladder.humanLed],
-                    ['human-assisted', 'Human-assisted', selectedAgent.ladder.humanAssisted],
-                    ['fully-autonomous', 'Fully autonomous', selectedAgent.ladder.fullyAutonomous],
-                  ].map(([lvl, label, text]) => (
-                    <div key={lvl} className={'ladder-row' + (selectedAgent.autonomyLevel === lvl ? ' current' : '')}>
-                      <div className="ladder-row-label">{label}</div>
-                      <div className="ladder-row-text">{text}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedAgent.theHuman && (
-              <div className="agent-modal-section">
-                <h4>THE HUMAN</h4>
-                <p>{selectedAgent.theHuman}</p>
-              </div>
-            )}
-            {selectedAgent.buildNotes && (
-              <div className="agent-modal-section">
-                <h4>BUILD NOTES</h4>
-                <p>{selectedAgent.buildNotes}</p>
-              </div>
-            )}
-
-            <div className="agent-modal-cta">
-              {selectedAgent.cta ? (
-                <Link to={selectedAgent.cta.to} className="btn btn-p">{selectedAgent.cta.label} &rarr;</Link>
-              ) : (
-                <button type="button" className="btn" disabled title="Ще не реалізовано">Запустити (скоро)</button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {selectedAgent && <AgentInfoModal agent={selectedAgent} onClose={() => setSelectedAgent(null)} />}
     </div>
   );
 }

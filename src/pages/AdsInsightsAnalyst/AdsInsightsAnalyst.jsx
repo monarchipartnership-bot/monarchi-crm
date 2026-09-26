@@ -4,8 +4,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { fetchConversations, fetchConversationMessages, createConversation, appendMessages } from '../../lib/api/aiConversations';
 import { fetchFrameworks, createFramework, updateFramework, deleteFramework } from '../../lib/api/aiAuditFrameworks';
-import { AGENT_ICONS, findAgentByKey, AUTONOMY_LABEL, STATUS_LABEL, WAVE_LABEL } from '../../data/aiAgentsData';
+import { AGENT_ICONS, findAgentByKey } from '../../data/aiAgentsData';
 import AgentOrb from '../../components/AgentOrb/AgentOrb';
+import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
 import ChatMessage from './ChatMessage';
 import AiaFrameworks from './AiaFrameworks';
 import '../../styles/adsInsightsAnalystPage.css';
@@ -390,75 +391,10 @@ export default function AdsInsightsAnalyst({ onClose }) {
       </div>
 
       {showInfo && agentData && (
-        <div className="agent-modal-backdrop" style={{ zIndex: 70 }} onClick={() => setShowInfo(false)}>
-          <div className="agent-modal" onClick={(e) => e.stopPropagation()} style={{ '--dept-color': agentData.color }}>
-            <button type="button" className="agent-modal-close" onClick={() => setShowInfo(false)}>&times;</button>
-
-            <div className="agent-modal-badges">
-              <span className="agent-badge autonomy">{AUTONOMY_LABEL[agentData.autonomyLevel]}</span>
-              <span className={'agent-badge status status-' + agentData.status}>{STATUS_LABEL[agentData.status]}</span>
-              {agentData.wave && <span className={'agent-badge wave wave-' + agentData.wave}>{WAVE_LABEL[agentData.wave]}</span>}
-            </div>
-            <div className="agent-modal-breadcrumb">{agentData.deptLabel} · {agentData.subcatLabel}</div>
-            <h2>{agentData.name}</h2>
-
-            {agentData.breaksInto?.length > 0 && (
-              <div className="agent-modal-section">
-                <h4>BREAKS INTO</h4>
-                <div className="agent-pills">{agentData.breaksInto.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
-              </div>
-            )}
-            {agentData.wiredInto?.length > 0 && (
-              <div className="agent-modal-section">
-                <h4>WIRED INTO</h4>
-                <div className="agent-pills">{agentData.wiredInto.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
-              </div>
-            )}
-            {agentData.buildsOn?.length > 0 && (
-              <div className="agent-modal-section">
-                <h4>BUILDS ON</h4>
-                <div className="agent-pills">{agentData.buildsOn.map((p) => <span key={p} className="agent-pill">{p}</span>)}</div>
-              </div>
-            )}
-            {agentData.whatItReplaces && (
-              <div className="agent-modal-section">
-                <h4>WHAT IT REPLACES</h4>
-                <p>{agentData.whatItReplaces}</p>
-              </div>
-            )}
-
-            {agentData.ladder && (
-              <div className="agent-modal-section">
-                <h4>THE LADDER</h4>
-                <div className="agent-ladder">
-                  {[
-                    ['human-led', 'Human-led', agentData.ladder.humanLed],
-                    ['human-assisted', 'Human-assisted', agentData.ladder.humanAssisted],
-                    ['fully-autonomous', 'Fully autonomous', agentData.ladder.fullyAutonomous],
-                  ].map(([lvl, label, text]) => (
-                    <div key={lvl} className={'ladder-row' + (agentData.autonomyLevel === lvl ? ' current' : '')}>
-                      <div className="ladder-row-label">{label}</div>
-                      <div className="ladder-row-text">{text}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {agentData.theHuman && (
-              <div className="agent-modal-section">
-                <h4>THE HUMAN</h4>
-                <p>{agentData.theHuman}</p>
-              </div>
-            )}
-            {agentData.buildNotes && (
-              <div className="agent-modal-section">
-                <h4>BUILD NOTES</h4>
-                <p>{agentData.buildNotes}</p>
-              </div>
-            )}
-          </div>
-        </div>
+        <AgentInfoModal
+          agent={agentData} onClose={() => setShowInfo(false)}
+          showCta={false} showDescription={false} style={{ zIndex: 70 }}
+        />
       )}
     </div>
   );
