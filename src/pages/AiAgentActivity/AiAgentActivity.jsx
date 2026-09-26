@@ -30,9 +30,17 @@ function fmtDate(iso) {
 // "Історія" tab and ClientProfile's "AI Team work history" read), plus a
 // review queue for audits (kind:'audit' conversations are flagged
 // needs_review on creation — see AdsInsightsAnalyst.jsx's runAudit()).
-// Deliberately its own page, not folded into the existing human Task
+// Deliberately its own view, not folded into the existing human Task
 // Manager — an agent run's lifecycle (queued/running/needs-review/
 // reviewed) doesn't map onto human task statuses.
+//
+// Lives only inside the AI Agents section (ConstellationTest.jsx), reached
+// via that section's own horizontal top-center nav, not a routed CRM page
+// or a sidebar entry — everything AI-agents-related stays inside this one
+// section rather than spreading into the main CRM's navigation. Renders as
+// a plain scrollable light-CRM view filling the stage (the map underneath
+// isn't mounted while this is showing — see the `section` switch in
+// ConstellationTest.jsx), not a dark cosmic overlay.
 export default function AiAgentActivity() {
   const { email } = useAuth();
   const [activity, setActivity] = useState(null);
@@ -77,11 +85,11 @@ export default function AiAgentActivity() {
   const loading = activity === null;
 
   return (
-    <div>
+    <div className="aia-activity-page">
       <div className="aia-activity-head-row">
         <span className="aia-activity-head-icon" dangerouslySetInnerHTML={{ __html: TASKS_ICON }} />
         <div className="page-head" style={{ marginBottom: 0 }}>
-          <div className="page-kicker">AUTOMATION</div>
+          <div className="page-kicker">AI AGENTS</div>
           <h1>Задачі агентів</h1>
         </div>
       </div>

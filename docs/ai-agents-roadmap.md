@@ -6,7 +6,29 @@ source of truth, not a snapshot from one conversation.
 
 Last updated: 2026-09-26.
 
-## 1. Current state (as of this writing)
+## 1. LOCKED — navigation model (do not revisit without being asked)
+
+**Everything AI-agents-related lives inside the AI Agents section itself,
+switched by a horizontal nav at top-center of that section (right where
+the circle of agents is) — never as new CRM sidebar entries or new top-
+level routes.** Confirmed 2026-09-26 after the activity feed was first
+built as a separate sidebar link + routed page (`/automation/ai-agent-
+activity`) — wrong, corrected the same day.
+
+- Implementation: `ConstellationTest.jsx`'s own `section` state
+  (`'map' | 'activity' | …`) plus `.constellation-section-nav`, a pill tab
+  bar — not React Router. Adding a new AI-agents view means adding another
+  `section` entry and tab, not a new `<Route>` or `sidebarData.js` item.
+- The one exception, and the only necessary link to the general CRM: the
+  "CRM" exit pill (top-right) that leaves the section entirely. Nothing
+  else about AI Agents should assume or require the main CRM's sidebar/
+  routing.
+- The department-focus MAP/CHART toggle (`.view-tabs`) is a level *below*
+  this section nav (only meaningful once you've focused a department on
+  the Мапа view) — it sits just underneath the section nav, not
+  competing with it.
+
+## 2. Current state (as of this writing)
 
 **Built and working:**
 - Constellation map (`ConstellationTest.jsx`): 8-department radial overview,
@@ -39,7 +61,7 @@ Last updated: 2026-09-26.
   box. The agent modal's own translucency is fine because it only ever
   opens over an already-focused, calmer view.
 
-## 2. The core gap
+## 3. The core gap
 
 The map is a strong front door, but almost nothing exists **behind** it:
 - No standard template for building a new agent — the 1 real agent was
@@ -63,26 +85,28 @@ The map is a strong front door, but almost nothing exists **behind** it:
 Make the existing agent(s) trackable first — activity feed + human-review
 queue as a dedicated surface, not merged into the existing Task Manager
 (agent run lifecycle — retry, failure states — doesn't fit that model).
-This reorders §4 below: tracking is Phase 1, not Phase 2.
+This reorders §5 below: tracking is Phase 1, not Phase 2.
 
-## 3. Proposed structure
+## 4. Proposed structure
 
 Keep the constellation map as the flagship overview (it's already well
 built and a good pitch/demo surface) but stop treating it as the *only*
-surface. Turn "AI Agents" into a proper section with sub-navigation,
-similar to how Reports or Team already work:
+surface. Turn "AI Agents" into a proper section with its own internal
+sub-navigation — see §1: a horizontal tab bar top-center of the section
+itself, NOT a CRM sidebar group and NOT separate routes:
 
 ```
-AI Agents (sidebar group, not a single link)
-├── Мапа          — existing constellation map (default view)
-├── Агенти        — flat catalog: table/grid of all 44 agent slots
-├── Задачі агентів — activity feed + human-review queue
-├── База знань    — already built; also reachable directly, not only via the core sphere
-├── Аналітика     — adoption/ROI, aggregate autonomy, wave rollout timeline
-└── Налаштування  — permissions, per-agent config/data-access (later phase)
+AI Agents section (one sidebar link in, "CRM" pill out — nothing else
+touches the main CRM's navigation)
+  Мапа           — existing constellation map (default view) — BUILT
+  Задачі агентів — activity feed + human-review queue — BUILT (2026-09-26)
+  Агенти         — flat catalog: table/grid of all 44 agent slots
+  База знань     — already built; opened from the map's core sphere
+  Аналітика      — adoption/ROI, aggregate autonomy, wave rollout timeline
+  Налаштування   — permissions, per-agent config/data-access (later phase)
 ```
 
-### 3.1 Agent Catalog (list/grid view)
+### 4.1 Agent Catalog (list/grid view)
 The radial map doesn't scale for "find agent X" or "review all 44 at
 once." A flat, filterable table next to it:
 - Columns: name, department, function, autonomy level, status, wave,
@@ -91,7 +115,7 @@ once." A flat, filterable table next to it:
 - Bulk status view answers "what's actually live today" in one glance,
   instead of clicking into 8 departments one at a time.
 
-### 3.2 Agent Workspace template
+### 4.2 Agent Workspace template
 The single highest-leverage piece of infrastructure missing. Instead of
 building each agent's UI from scratch (as `AdsInsightsAnalyst` was),
 extract a reusable shell:
@@ -105,7 +129,7 @@ extract a reusable shell:
 Shipping this template is what turns "1 of 44 built" into "each new agent
 takes days, not a redesign."
 
-### 3.3 Agent activity & task tracking — PRIORITY (Phase 1)
+### 4.3 Agent activity & task tracking — PRIORITY (Phase 1)
 Currently invisible. Needs:
 - **Activity feed** — what ran, when, on which record (deal/client/task),
   success or failure.
@@ -119,13 +143,13 @@ Currently invisible. Needs:
   doesn't map cleanly onto human task statuses, and mixing them risks
   distorting both views.
 
-### 3.4 Notifications
+### 4.4 Notifications
 Nothing currently tells anyone an agent finished a job or needs input.
 Even a minimal version (a badge/count on the sidebar "AI Agents" entry, or
 reuse of whatever notification pattern the rest of the CRM ends up with)
 closes a real gap.
 
-### 3.5 Orchestration & triggers
+### 4.5 Orchestration & triggers
 - Manual trigger (exists, informally, via the modal).
 - Scheduled runs (cron-style) and event-triggered runs (e.g., new lead →
   qualification agent runs automatically).
@@ -133,74 +157,86 @@ closes a real gap.
   Orchestrate stages already encoded in the data — right now those stages
   are descriptive labels only, not a real pipeline.
 
-### 3.6 Analytics / ROI
+### 4.6 Analytics / ROI
 - Aggregate autonomy chart (company-wide, not just per department).
 - Adoption over time, estimated hours/cost saved.
 - Wave rollout as a visual timeline (Wave 1/2/3 tags already exist in
   `aiAgentsData.js` — currently invisible as a roadmap view).
 
-### 3.7 Governance (later)
+### 4.7 Governance (later)
 - Permissions: who can trigger/configure which agents.
 - Per-agent data access scope.
 - Prompt/config version history + changelog.
 
-### 3.8 Change management (later)
+### 4.8 Change management (later)
 - Surface a "what's new" moment when an agent flips
   not_started → in_development → live, instead of the team discovering it
   by clicking around.
 - Lightweight per-agent onboarding/tour when it first goes live.
 
-## 4. Phased roadmap
+## 5. Phased roadmap
 
 **Phase 1 — Tracking & accountability** ← current focus
-- **Built (2026-09-26):** Activity feed + human-review queue, dedicated
-  page ("Задачі агентів", sidebar → Automation), built on
+- **Built (2026-09-26):** Activity feed + human-review queue — "Задачі
+  агентів" tab inside the AI Agents section itself (see §1; originally
+  built as a sidebar link + routed page, corrected same day), built on
   `ai_agent_conversations` (kind/created_by/needs_review/reviewed_by/
   reviewed_at columns — `2026-09-26_ai_agent_activity_tracking.sql`).
   Audits (`runAudit()` in AdsInsightsAnalyst.jsx) are tagged
   `kind:'audit', needs_review:true`; ordinary chat stays `kind:'chat'`.
-  **Blocked on a DB migration the user needs to run** — see §6.
-- Notifications (3.4) — not started yet.
+  **Blocked on one more DB migration** — see §6 (a schema bug, not
+  something new to build).
+- Notifications (4.4) — not started yet.
 - Covers the 1 agent that exists today (Ads Insights Analyst) properly
   before adding more agents on top of an untracked foundation.
 
 **Phase 2 — Foundations for scale**
-- Agent Workspace template (3.2)
-- Agent Catalog list view (3.1)
+- Agent Workspace template (4.2)
+- Agent Catalog list view (4.1)
 - Ship 2–3 more Wave 1 agents using the template — each wired into the
   Phase 1 activity feed/review queue from day one, not bolted on after.
 
 **Phase 3 — Orchestration & scale**
-- Scheduled/event-triggered runs, agent handoffs (3.5)
-- Analytics/ROI dashboard, aggregate autonomy view (3.6)
+- Scheduled/event-triggered runs, agent handoffs (4.5)
+- Analytics/ROI dashboard, aggregate autonomy view (4.6)
 
 **Phase 4 — Governance & polish**
-- Permissions, config/prompt versioning (3.7)
-- Onboarding/changelog surfacing (3.8)
+- Permissions, config/prompt versioning (4.7)
+- Onboarding/changelog surfacing (4.8)
 
-## 5. Action needed — DB migrations not applied
+## 6. Action needed — DB migrations
 
-Testing the new activity feed surfaced that **`ai_agent_conversations` /
-`ai_agent_messages` (2026-09-25_ai_agent_conversations.sql) were never
-actually run in Supabase** — the table doesn't exist. Every read/write
-against it has been silently failing and falling back to empty results
-this whole time (each call already catches its own error), so this isn't
-new breakage — it just means the agent's own "Історія" tab and
-ClientProfile's "AI Team work history" tab have never actually persisted
-anything either, until now.
+Two issues surfaced while verifying the activity feed, in this order:
 
-**Run both, in order, in the Supabase SQL editor:**
+1. **`ai_agent_conversations`/`ai_agent_messages` were never applied** —
+   the tables didn't exist at all; every read/write had been silently
+   failing to `[]` (each call already catches its own error). Not new
+   breakage — it meant the agent's own "Історія" tab and ClientProfile's
+   "AI Team work history" tab had never actually persisted anything
+   either. **Fixed 2026-09-26** — user ran the migration, confirmed the
+   tables + new columns exist.
+2. **`ai_agent_conversations.client_id` was declared `bigint`, but
+   `clients.id` is `uuid`** — a real bug in the original 2026-09-25
+   migration (pre-existing, not introduced this cycle). Every insert that
+   references a real client fails with `invalid input syntax for type
+   bigint: <uuid>` — caught by the same silent error handling. Confirmed
+   via a live test insert during Phase 1 verification. Fix migration
+   written: `2026-09-26_ai_agent_conversations_client_id_uuid_fix.sql`
+   (safe — table was still empty, `alter column ... type uuid`).
+
+**Run, in order, in the Supabase SQL editor (if not already):**
 1. `supabase/migrations/2026-09-25_ai_agent_conversations.sql`
 2. `supabase/migrations/2026-09-26_ai_agent_activity_tracking.sql`
+3. `supabase/migrations/2026-09-26_ai_agent_conversations_client_id_uuid_fix.sql`
 
-Until then, the activity feed page will just show "Ще немає активності
-агентів" regardless of real usage.
+Until #3 is run, real chat/audit conversations still fail to save (the
+activity feed page will look empty even with real usage happening).
 
-## 6. Explicitly out of scope for now
+## 7. Explicitly out of scope for now
 
 - The crack/shatter transition effect (removed; not being rebuilt unless
   asked again).
 - Anything not tied to the AI Agents section itself (Task Manager, Deals,
   Reports etc. already exist independently). Agent activity/review is a
-  dedicated surface (§3.3, decided) — explicitly not merged into Task
+  dedicated surface (§4.3, decided) — explicitly not merged into Task
   Manager.

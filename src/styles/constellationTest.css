@@ -26,6 +26,26 @@
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
   max-width: calc(100vw - 40px);
 }
+
+/* This section's own top-center nav (Мапа / Задачі агентів / …) — the AI
+   Agents section's internal navigation lives here instead of the CRM
+   sidebar or a routed URL (see ConstellationTest.jsx's `section` state).
+   Always visible regardless of department focus, so .view-tabs (the
+   MAP/CHART toggle for a *focused department*, a level below this one) is
+   pushed down to sit just underneath it rather than colliding. */
+.constellation-section-nav {
+  position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 7;
+  display: flex; gap: 4px;
+  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 4px;
+}
+.constellation-section-tab {
+  border: none; background: none; color: #A79BC7; cursor: pointer;
+  font-family: var(--font-body); font-size: .82rem; font-weight: 600;
+  padding: 8px 16px; border-radius: 999px; transition: background .15s ease, color .15s ease;
+}
+.constellation-section-tab:hover { color: #EDE7F5; }
+.constellation-section-tab.active { background: #fff; color: #170F2B; }
 .constellation-exit {
   flex-shrink: 0;
   display: flex; align-items: center; gap: 8px;
@@ -115,7 +135,10 @@
 .constellation-reset:hover { color: #fff; border-color: rgba(255, 255, 255, .22); }
 
 .view-tabs {
-  position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 5;
+  /* top:68px, not 20px — sits just below .constellation-section-nav
+     (this section's own top-level Мапа/Задачі агентів switcher) instead
+     of colliding with it. */
+  position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 5;
   display: flex; gap: 4px;
   background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 4px;

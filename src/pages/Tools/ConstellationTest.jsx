@@ -6,6 +6,7 @@ import CosmicBackground from '../../components/SystemMap/CosmicBackground';
 import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
+import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import '../../styles/constellationTest.css';
 
 // Agents with a real interactive tool (as opposed to the generic read-only
@@ -580,7 +581,18 @@ function calculateDepartmentGraphLayout(dept, halfW, halfH) {
   return { x: deptX, y: deptY, functions };
 }
 
+// Top-level views inside the AI Agents section, switched via its own
+// horizontal nav (see .constellation-section-nav below) — not routes, not
+// sidebar entries. Per explicit direction: anything AI-agents-related
+// stays inside this one section rather than spreading into the main CRM's
+// sidebar/routing, however tempting that'd be for e.g. deep-linking.
+const SECTIONS = [
+  { key: 'map', label: 'Мапа' },
+  { key: 'activity', label: 'Задачі агентів' },
+];
+
 export default function ConstellationTest() {
+  const [section, setSection] = useState('map');
   const [focusedDept, setFocusedDept] = useState(null);
   const [hoveredDept, setHoveredDept] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -796,40 +808,62 @@ export default function ConstellationTest() {
 
   return (
     <div className="constellation-page" style={{ '--ui-scale': UI_SCALE }}>
+      {/* This section's own horizontal nav — everything AI-agents-related
+          (map, activity feed, and whatever's added later per
+          docs/ai-agents-roadmap.md) is switched here, inside the section
+          itself, rather than as separate CRM sidebar entries/routes. */}
+      <div className="constellation-section-nav" role="tablist">
+        {SECTIONS.map((s) => (
+          <button
+            key={s.key} type="button" role="tab" aria-selected={section === s.key}
+            className={'constellation-section-tab' + (section === s.key ? ' active' : '')}
+            onClick={() => setSection(s.key)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       <div className="constellation-topright">
-        <div className="agent-search" ref={searchRef}>
-          <svg className="agent-search-icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="m21 21-5.2-5.2" /></svg>
-          <input
-            type="text" className="agent-search-input" placeholder="Пошук агента…"
-            value={agentSearch}
-            onChange={(e) => { setAgentSearch(e.target.value); setSearchOpen(true); }}
-            onFocus={() => setSearchOpen(true)}
-          />
-          {searchOpen && agentSearch.trim() && (
-            <div className="agent-search-results">
-              {searchResults.length > 0 ? searchResults.map((r) => (
-                <button
-                  key={r.key} type="button" className="agent-search-result"
-                  onClick={() => selectSearchResult(r)}
-                >
-                  <span className="agent-search-result-dot" style={{ background: r.color }} />
-                  <span className="agent-search-result-text">
-                    <span className="agent-search-result-name">{r.name}</span>
-                    <span className="agent-search-result-dept">{r.deptLabel}</span>
-                  </span>
-                </button>
-              )) : (
-                <div className="agent-search-empty">Нічого не знайдено</div>
-              )}
-            </div>
-          )}
-        </div>
+        {section === 'map' && (
+          <div className="agent-search" ref={searchRef}>
+            <svg className="agent-search-icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="m21 21-5.2-5.2" /></svg>
+            <input
+              type="text" className="agent-search-input" placeholder="Пошук агента…"
+              value={agentSearch}
+              onChange={(e) => { setAgentSearch(e.target.value); setSearchOpen(true); }}
+              onFocus={() => setSearchOpen(true)}
+            />
+            {searchOpen && agentSearch.trim() && (
+              <div className="agent-search-results">
+                {searchResults.length > 0 ? searchResults.map((r) => (
+                  <button
+                    key={r.key} type="button" className="agent-search-result"
+                    onClick={() => selectSearchResult(r)}
+                  >
+                    <span className="agent-search-result-dot" style={{ background: r.color }} />
+                    <span className="agent-search-result-text">
+                      <span className="agent-search-result-name">{r.name}</span>
+                      <span className="agent-search-result-dept">{r.deptLabel}</span>
+                    </span>
+                  </button>
+                )) : (
+                  <div className="agent-search-empty">Нічого не знайдено</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <Link to="/" className="constellation-exit">
           <svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8" /><path d="M5 10v10h14V10" /></svg>
           CRM
         </Link>
       </div>
 
+      {section === 'activity' && <AiAgentActivity />}
+
+      {section === 'map' && (
+      <>
       <div className="constellation-overlay">
         {focused && (
           <div className="constellation-breadcrumb-pill">
@@ -1296,6 +1330,8 @@ export default function ConstellationTest() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
