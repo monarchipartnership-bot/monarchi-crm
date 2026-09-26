@@ -121,10 +121,6 @@ export default function KnowledgeBase({ onClose }) {
         <button type="button" className="kb-nav-pill" onClick={onClose}>
           <span dangerouslySetInnerHTML={{ __html: BACK_ICON }} /> До карти системи
         </button>
-        {/* No duplicate "CRM" pill here — the map's own top-right exit link
-            (ConstellationTest.jsx's .constellation-exit) stays rendered and
-            clickable behind this overlay's transparent top band, so it
-            shows through in the same corner instead of stacking two. */}
       </div>
 
       <div className="kb-panel">
