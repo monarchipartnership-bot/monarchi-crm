@@ -278,6 +278,13 @@
   position: relative; width: 100%; height: 100%;
   background: #040713; /* fallback only — CosmicBackground supplies the real gradient */
   overflow: hidden;
+  /* Reserves clearance under .constellation-section-nav so the overview's
+     topmost department label/hub never sits under it (CosmicBackground/
+     ParticleFieldCanvas are absolutely positioned to the padding box, so
+     they still cover the full stage — only the graph itself, sized off
+     this element's own content box via stageAspect's ResizeObserver,
+     shifts down). */
+  padding-top: 78px;
 }
 /* z-index stack: CosmicBackground (0) < ParticleFieldCanvas (1) < the
    network graph itself (2) < existing UI chrome (4-5, unchanged above). */

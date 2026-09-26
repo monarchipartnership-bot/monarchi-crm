@@ -4,14 +4,13 @@ import { fetchAgentActivity, markReviewed } from '../../lib/api/agentActivity';
 import { fetchConversationMessages } from '../../lib/api/aiConversations';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { findAgentByKey } from '../../data/aiAgentsData';
-import Select from '../../components/common/Select';
 import ChatMessage from '../AdsInsightsAnalyst/ChatMessage';
-import '../../styles/reportPage.css';
+import '../../styles/aiAgentsSection.css';
 import '../../styles/aiAgentActivityPage.css';
 
 const TASKS_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h.01M8 12h.01M8 16h.01"/><path d="M11.5 8h5M11.5 12h5M11.5 16h5"/></svg>';
 const KIND_LABEL = { chat: 'Чат', audit: 'Аудит' };
-const KIND_OPTIONS = [
+const KIND_FILTERS = [
   { value: '', label: 'Усі типи' },
   { value: 'chat', label: 'Чат' },
   { value: 'audit', label: 'Аудит' },
@@ -37,10 +36,10 @@ function fmtDate(iso) {
 // Lives only inside the AI Agents section (ConstellationTest.jsx), reached
 // via that section's own horizontal top-center nav, not a routed CRM page
 // or a sidebar entry — everything AI-agents-related stays inside this one
-// section rather than spreading into the main CRM's navigation. Renders as
-// a plain scrollable light-CRM view filling the stage (the map underneath
-// isn't mounted while this is showing — see the `section` switch in
-// ConstellationTest.jsx), not a dark cosmic overlay.
+// section rather than spreading into the main CRM's navigation. Styled on
+// the shared aiAgentsSection.css foundation (same dark palette as the
+// Knowledge Base, LOCKED for every AI Agents section) — a full-bleed page,
+// not a floating window like the Knowledge Base itself.
 export default function AiAgentActivity() {
   const { email } = useAuth();
   const [activity, setActivity] = useState(null);
@@ -85,34 +84,40 @@ export default function AiAgentActivity() {
   const loading = activity === null;
 
   return (
-    <div className="aia-activity-page">
-      <div className="aia-activity-head-row">
-        <span className="aia-activity-head-icon" dangerouslySetInnerHTML={{ __html: TASKS_ICON }} />
-        <div className="page-head" style={{ marginBottom: 0 }}>
-          <div className="page-kicker">AI AGENTS</div>
+    <div className="ai-section">
+      <div className="ai-section-head">
+        <span className="ai-section-icon" dangerouslySetInnerHTML={{ __html: TASKS_ICON }} />
+        <div>
+          <div className="ai-section-kicker">AI AGENTS</div>
           <h1>Задачі агентів</h1>
+          <p>Хто з AI-агентів що робив і що ще чекає на перевірку людиною.</p>
         </div>
       </div>
-      <p style={{ color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: '.88rem', margin: '0 0 20px' }}>
-        Хто з AI-агентів що робив і що ще чекає на перевірку людиною.
-      </p>
 
-      <div className="aia-activity-filters">
-        <Select value={kindFilter} onChange={setKindFilter} options={KIND_OPTIONS} />
-        <button type="button" className={'btn' + (reviewOnly ? ' btn-p' : '')} onClick={() => setReviewOnly((v) => !v)}>
+      <div className="ai-section-pills">
+        {KIND_FILTERS.map((f) => (
+          <button
+            key={f.value} type="button"
+            className={'ai-section-pill' + (kindFilter === f.value ? ' active' : '')}
+            onClick={() => setKindFilter(f.value)}
+          >
+            {f.label}
+          </button>
+        ))}
+        <button type="button" className={'ai-section-pill' + (reviewOnly ? ' active' : '')} onClick={() => setReviewOnly((v) => !v)}>
           На перевірку{needsReviewCount ? ` (${needsReviewCount})` : ''}
         </button>
       </div>
 
-      {loading && <div className="aia-activity-empty">Завантаження…</div>}
-      {!loading && !activity.length && <div className="aia-activity-empty">Ще немає активності агентів.</div>}
+      {loading && <div className="ai-section-empty">Завантаження…</div>}
+      {!loading && !activity.length && <div className="ai-section-empty">Ще немає активності агентів.</div>}
 
-      <div className="aia-activity-list">
+      <div className="ai-section-list">
         {activity?.map((conv) => {
           const agent = findAgentByKey(conv.agent_key);
           const expanded = expandedId === conv.id;
           return (
-            <div key={conv.id} className={'aia-activity-card' + (conv.needs_review ? ' needs-review' : '')}>
+            <div key={conv.id} className={'ai-section-card' + (conv.needs_review ? ' accent' : '')}>
               <button type="button" className="aia-activity-row" onClick={() => toggleExpand(conv)}>
                 <span className={'aia-activity-kind aia-activity-kind--' + conv.kind}>{KIND_LABEL[conv.kind] || conv.kind}</span>
                 <span className="aia-activity-main">
@@ -121,18 +126,18 @@ export default function AiAgentActivity() {
                 </span>
                 <span className="aia-activity-client">{clientLabel(conv.client_id)}</span>
                 <span className="aia-activity-meta">{conv.created_by || '—'} · {fmtDate(conv.updated_at)}</span>
-                {conv.needs_review && <span className="aia-activity-badge">На перевірку</span>}
+                {conv.needs_review && <span className="ai-section-badge warn">На перевірку</span>}
                 {!conv.needs_review && conv.reviewed_by && <span className="aia-activity-reviewed">Перевірено · {conv.reviewed_by}</span>}
               </button>
 
               {expanded && (
                 <div className="aia-activity-transcript">
-                  {!messagesByConv[conv.id] && <div className="aia-activity-empty">Завантаження…</div>}
+                  {!messagesByConv[conv.id] && <div className="ai-section-empty">Завантаження…</div>}
                   {messagesByConv[conv.id]?.map((m, i) => (
                     <ChatMessage key={i} role={m.role} content={m.content} visual={m.visual} />
                   ))}
                   {conv.needs_review && (
-                    <button type="button" className="btn btn-p" onClick={() => handleMarkReviewed(conv)}>
+                    <button type="button" className="ai-section-btn ai-section-btn-primary" onClick={() => handleMarkReviewed(conv)}>
                       Позначити переглянутим
                     </button>
                   )}

@@ -1,0 +1,77 @@
+/* Shared visual foundation for every full-page view inside the AI Agents
+   section (ConstellationTest.jsx's `section` switcher — see
+   .constellation-section-nav) OTHER than the map itself: same dark "AI
+   command center" palette/typography/components as the Knowledge Base
+   (knowledgeBasePage.css's .kb-* — kept as its own file since it's a
+   floating "window" over the map), but laid out as a true full-bleed
+   section filling the whole stage edge-to-edge, not a rounded/bordered
+   panel floating over a darker margin. LOCKED (2026-09-26, see
+   docs/ai-agents-roadmap.md §1) — every new AI Agents section reuses these
+   classes rather than the light CRM design system or a one-off palette. */
+
+.ai-section {
+  position: absolute; inset: 0; overflow-y: auto;
+  background: #0A0612;
+  padding: 100px clamp(20px, 4vw, 48px) 48px;
+}
+.ai-section, .ai-section * { box-sizing: border-box; }
+
+.ai-section-head { display: flex; align-items: center; gap: 22px; margin-bottom: 26px; }
+.ai-section-icon {
+  width: 56px; height: 56px; border-radius: 16px; flex: none; color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+  box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6);
+  display: flex; align-items: center; justify-content: center;
+}
+.ai-section-icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ai-section-kicker { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .18em; text-transform: uppercase; color: #B879FF; }
+.ai-section-head h1 { font-family: var(--font-head); font-weight: 800; font-size: 1.6rem; color: #F3F1FF; letter-spacing: -.3px; margin: 2px 0 6px; }
+.ai-section-head p { font-family: var(--font-body); font-size: .86rem; line-height: 1.55; color: #A9A3C7; max-width: 620px; margin: 0; }
+
+.ai-section-empty {
+  padding: 34px 20px; text-align: center; color: #8983B5; font-family: var(--font-body); font-size: .88rem;
+  background: rgba(7, 13, 30, .36); border: 1px solid rgba(100, 125, 210, .30); border-radius: 16px;
+}
+
+/* ---- Buttons — same recipe as .kb-btn, shared prefix so any AI Agents
+   section can use them without depending on Knowledge Base's file. ---- */
+.ai-section-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 10px; border: 1px solid transparent;
+  font-family: var(--font-body); font-weight: 600; font-size: .82rem; cursor: pointer;
+  background: rgba(122, 105, 200, .1); border-color: rgba(140, 130, 200, .28); color: #D8D4F0;
+  transition: background .15s, border-color .15s, color .15s, opacity .15s;
+}
+.ai-section-btn:hover:not(:disabled) { background: rgba(122, 105, 200, .2); }
+.ai-section-btn:disabled { opacity: .55; cursor: default; }
+.ai-section-btn-primary {
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); border-color: transparent; color: #fff;
+  box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6);
+}
+.ai-section-btn-primary:hover:not(:disabled) { filter: brightness(1.08); background: linear-gradient(135deg, #8B5CF6, #6D28D9); }
+
+/* ---- Pill toggle group — filters, kind switches, etc. ---- */
+.ai-section-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.ai-section-pill {
+  border: 1px solid rgba(140, 130, 200, .28); background: rgba(122, 105, 200, .08); color: #B4AFD6;
+  font-family: var(--font-body); font-weight: 600; font-size: .8rem; padding: 8px 15px; border-radius: 999px; cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.ai-section-pill:hover { background: rgba(122, 105, 200, .18); color: #EDEBFA; }
+.ai-section-pill.active {
+  background: linear-gradient(90deg, rgba(107, 50, 190, .5), rgba(83, 50, 150, .32));
+  border-color: rgba(164, 98, 255, .65); color: #fff; box-shadow: 0 0 18px rgba(126, 68, 255, .18);
+}
+
+/* ---- List cards — same tinted-row language as .kb-tree-item/.kb-search-item ---- */
+.ai-section-list { display: flex; flex-direction: column; gap: 10px; }
+.ai-section-card {
+  background: rgba(7, 13, 30, .36); border: 1px solid rgba(100, 125, 210, .30); border-radius: 16px; overflow: hidden;
+}
+.ai-section-card.accent { border-color: rgba(217, 119, 6, .4); }
+
+.ai-section-badge {
+  font-family: var(--font-head); font-size: .64rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  border-radius: 999px; padding: 4px 10px; flex: none;
+}
+.ai-section-badge.warn { color: #FBBF66; background: rgba(217, 119, 6, .18); border: 1px solid rgba(217, 119, 6, .4); }
+.ai-section-badge.muted { color: #8983B5; background: rgba(122, 105, 200, .1); }

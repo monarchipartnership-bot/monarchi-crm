@@ -27,6 +27,30 @@ activity`) — wrong, corrected the same day.
   this section nav (only meaningful once you've focused a department on
   the Мапа view) — it sits just underneath the section nav, not
   competing with it.
+- `.constellation-stage` reserves `padding-top: 78px` so the overview's
+  topmost department label/hub never sits under the section nav — if the
+  nav's own height ever changes, this offset needs to move with it.
+
+## 1b. LOCKED — visual style for every non-map AI Agents section
+
+**Every full-page view inside the AI Agents section (other than the map
+itself) uses the shared dark palette in `src/styles/aiAgentsSection.css`
+(`.ai-section*`) — same colors/typography/components as the Knowledge
+Base (`knowledgeBasePage.css`'s `.kb-*`), but laid out full-bleed edge-to-
+edge, never a floating rounded "window" card like the Knowledge Base
+itself.** Confirmed 2026-09-26 after "Задачі агентів" was first built with
+the light CRM design system (white cards, `.btn`) — wrong, corrected the
+same day to the dark full-bleed treatment.
+
+- Background `#0A0612`, header icon badge (`.ai-section-icon`, purple
+  gradient) + kicker + title + description (`.ai-section-head`), pill
+  filters (`.ai-section-pill`), tinted list cards (`.ai-section-card`),
+  buttons (`.ai-section-btn`/`.ai-section-btn-primary`) — reuse these
+  classes for the next section (Агенти, Аналітика, Налаштування) rather
+  than inventing a new palette or falling back to the light CRM system.
+- The Knowledge Base itself stays as its own floating-window component
+  (`.kb-*`, opened from the core sphere) — it predates this convention and
+  isn't being migrated to `.ai-section*` unless asked.
 
 ## 2. Current state (as of this writing)
 
