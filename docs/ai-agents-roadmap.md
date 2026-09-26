@@ -4,7 +4,25 @@ Living plan for the "AI Agents" section of Monarchi CRM (sidebar → AI Agents,
 `/tools/constellation-test`). Updated as decisions are made — this is the
 source of truth, not a snapshot from one conversation.
 
-Last updated: 2026-09-26.
+Last updated: 2026-09-27.
+
+## STOPPED HERE (2026-09-27) — read this first when picking work back up
+
+Phase 1 (tracking/accountability) and most of Phase 2 (foundations for
+scale) are built — see §5 for the full phase breakdown. Concretely:
+
+- **Done:** Agent activity feed + review queue + notification badges
+  (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
+  (§4.2), and 2 real agents (Ads Insights Analyst, Deal Health Check).
+- **Next action, when resumed:** pick 1-2 more Wave 1 agents to ship (ask
+  the user which — this is a business decision, not something to pick
+  autonomously; see §5's Phase 2 entry).
+- **Outstanding blocker, unrelated to what to build next:** migration #3
+  (`2026-09-26_ai_agent_conversations_client_id_uuid_fix.sql`) — confirm
+  with the user whether it's been run before assuming real chat/audit
+  conversations persist. See §6.
+- Nothing is mid-edit or uncommitted — every change through this point is
+  committed and pushed to `master`.
 
 ## 1. LOCKED — navigation model (do not revisit without being asked)
 
