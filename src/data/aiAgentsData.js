@@ -109,7 +109,7 @@ export const AGENT_DEPTS = {
     tagline: 'DRIVE GROWTH',
     icon: DEPT_ICONS.barChart,
     narrative: 'Закриває шлях від нової можливості до якісного наступного кроку в pipeline. Більшість ролей працює в режимі research/draft, а не автономної відправки — саме тому Account Enrichment і Deal Health Check вже в пріоритеті на розробку.',
-    startHere: 'account-enrichment',
+    startHere: 'deal-health-check',
     subcategories: [
       {
         key: 'lead-generation',
@@ -220,10 +220,11 @@ export const AGENT_DEPTS = {
             autonomyLevel: 'human-assisted',
             stage: 'capture',
             wave: 1,
-            status: 'not_started',
+            status: 'in_development',
+            tool: 'deal-health-check',
             description: 'Переглядає угоди без активності N днів і пропонує менеджеру список «потребують уваги» з коротким поясненням чому.',
             breaksInto: ['Пошук застояних угод', 'Пояснення причини застою'],
-            wiredInto: ['Планується: deals, tasks'],
+            wiredInto: ['deals'],
             buildsOn: [],
             whatItReplaces: 'Ручний перегляд усіх угод, щоб не пропустити застояну.',
             ladder: {
@@ -232,7 +233,7 @@ export const AGENT_DEPTS = {
               fullyAutonomous: 'Агент сам створює задачу «зв\'язатись» на застояну угоду.',
             },
             theHuman: 'Менеджер вирішує, що робити з кожною угодою зі списку.',
-            buildNotes: 'Частково перетинається з Automation Dashboard — тут стає явним іменованим агентом.',
+            buildNotes: 'Частково перетинається з Automation Dashboard — тут стає явним іменованим агентом. V1 використовує лише updated_at угоди (tasks-крос-референс — наступний крок).',
           },
           {
             key: 'sales-automation-slot',

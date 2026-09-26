@@ -146,41 +146,42 @@ touches the main CRM's navigation)
   yet, and status+wave+search already cover the "find X" / "review all"
   cases without an 8-option department filter's clutter.)
 
-### 4.2 Agent Workspace template — PARTIALLY BUILT (2026-09-27)
+### 4.2 Agent Workspace template — BUILT (2026-09-27)
 The single highest-leverage piece of infrastructure missing. Instead of
 building each agent's UI from scratch (as `AdsInsightsAnalyst` was),
-extract a reusable shell. Extracted so far, grounded in the one real agent
-that exists rather than built speculatively for agents that don't exist
-yet:
-- **`AgentInfoModal`** (`src/components/AgentWorkspace/AgentInfoModal.jsx`)
-  — the read-only "what is this agent" modal (badges, breaks-into/wired-
-  into/builds-on pills, autonomy ladder, build notes) was copy-pasted
-  identically in `ConstellationTest.jsx` and `AdsInsightsAnalyst.jsx`; now
-  one component, `showCta`/`showDescription` props covering the two
-  contexts' real differences (map/catalog show both, an agent's own
-  workspace shows neither since it's redundant there).
-- **`AgentOrb`** (`src/components/AgentOrb/AgentOrb.jsx`) already existed
-  as a shared, agent-agnostic icon component — not new, just confirmed as
-  the right piece for a workspace header's icon (vs. `.ai-section-icon`'s
-  plain gradient square, which fits list/feed pages better).
+extracted a reusable shell — validated against two real, differently-
+shaped agents (a live chat tool and a run-and-review report) rather than
+designed speculatively from one sample:
+- **`AgentWorkspaceShell`** (`src/components/AgentWorkspace/
+  AgentWorkspaceShell.jsx`) — the overlay/panel/glow/header/info-modal
+  wrapper every agent workspace opens inside. Takes just `agentKey` +
+  `onClose` + `children`; everything about the header (orb color/icon,
+  kicker, name, description) comes straight off `findAgentByKey()`, so a
+  new agent's workspace never repeats data already in `aiAgentsData.js`.
+- **`AgentWorkspaceHeader`** (same folder) — the icon/kicker/title/info-
+  button/description/nav-actions row, used by the shell.
+- **`AgentInfoModal`** (same folder) — the read-only "what is this agent"
+  modal, was copy-pasted identically in `ConstellationTest.jsx` and
+  `AdsInsightsAnalyst.jsx`; now one component.
+- Shared CSS: `src/styles/agentWorkspace.css` (renamed from
+  `AdsInsightsAnalyst`'s own `.aia-*` classes to `.agent-workspace-*`,
+  zero visual change — confirmed by screenshot before/after).
+- `AdsInsightsAnalyst.jsx` refactored onto the shell (proof it doesn't
+  regress a real, working agent); `DealHealthCheck.jsx` (§4's second
+  agent) built on it from scratch.
 
-Still not extracted (deferred until a second real agent exists to validate
-against — building this now would be guessing at shape from a sample size
-of one):
-- The header *layout* (kicker/title/description/nav actions) — currently
-  still bespoke JSX in `AdsInsightsAnalyst.jsx` (`.aia-header`).
-- Body: chat or input-form area, depending on agent type — genuinely
-  agent-specific, may never fully templatize.
-- Run history / output log — `AdsInsightsAnalyst` is a live chat, so its
-  "history" already means something different (past conversations) than
-  a batch/audit agent's run log would. Needs a second, differently-shaped
-  agent to know what's actually shared.
-- Linked Knowledge Base articles (traceability).
-- "Запустити" action wired to a consistent run/status lifecycle — doesn't
-  apply to a chat agent (sending a message already *is* the run action).
-
-Shipping the rest of this is what turns "1 of 44 built" into "each new
-agent takes days, not a redesign" — but needs the next agent picked first.
+Confirmed NOT generalizable from two data points (left agent-specific,
+not templatized):
+- Body content — chat thread vs. a stale-deal list are genuinely
+  different shapes; may never fully templatize.
+- Run history / output log — a chat's "history" (past conversations) and
+  a report agent's "history" (past runs) aren't obviously the same shape
+  yet. Revisit with a third agent.
+- Linked Knowledge Base articles (traceability) — still nobody's built
+  this.
+- "Запустити" as a tracked run/status lifecycle — `DealHealthCheck` has a
+  refresh button but doesn't log runs to the Phase 1 activity feed (see
+  §4.3's note on why, and §6 for the schema blocker if this changes).
 
 ### 4.3 Agent activity & task tracking — PRIORITY (Phase 1)
 Currently invisible. Needs:
@@ -195,6 +196,16 @@ Currently invisible. Needs:
   lifecycle (queued/running/success/failed/needs-review/retried) that
   doesn't map cleanly onto human task statuses, and mixing them risks
   distorting both views.
+- **`DealHealthCheck` (§4.2) deliberately does NOT log into this feed
+  yet**, even though the intent was "every new agent wired in from day
+  one." Two real blockers, not an oversight: (1) `ai_agent_conversations.
+  client_id` is `not null` and this agent isn't scoped to one client —
+  every run spans all open deals; (2) its "runs" are a live, instantly-
+  recomputed view (adjust the day threshold, get a new list on the spot),
+  not a discrete auditable event the way a chat exchange or an audit is —
+  logging every threshold click would spam the feed with near-duplicate
+  rows. Revisit if/when a third agent needs cross-client run logging too;
+  don't force this one in just to satisfy the original intent.
 
 ### 4.4 Notifications — BUILT (2026-09-26)
 Minimal version, deliberately not the personal per-recipient `notifications`
@@ -259,12 +270,19 @@ fit that table's recipient-targeted model.
   'map'` gate, so opening an agent from anywhere other than the map (e.g.
   a search result, or this catalog) silently did nothing — moved them to
   render unconditionally, keyed off their own state instead.
-- Agent Workspace template (4.2) — next up.
-- Ship 2–3 more Wave 1 agents using the template — each wired into the
-  Phase 1 activity feed/review queue from day one, not bolted on after.
-  **Needs the user to pick which agents** (which real data source/logic
-  each one gets) before this can start — not a UI-only task like the
-  catalog.
+- **Built (2026-09-27):** Agent Workspace template (4.2) — extracted while
+  building the first of the "2-3 more agents" below (see §4.2 detail).
+- **Built (2026-09-27):** `DealHealthCheck` — 1 of the 2-3 target agents,
+  user-picked (`deal-health-check`, sales/pipeline). Lists open deals with
+  no activity in N days (7/14/30 toggle), a computed reason per deal, and
+  a deep link to the real deal (`/reports/deals?open=<id>`, reusing the
+  same convention notifications already use there). Status flipped
+  `not_started` → `in_development` in `aiAgentsData.js`; is now the sales
+  department's `startHere` (was `account-enrichment`, which still needs an
+  external search API decision — this one needed none, only data already
+  in the CRM). Not wired into the Phase 1 activity feed — see §4.3's note
+  on why.
+- 1-2 more Wave 1 agents still to pick and build.
 
 **Phase 3 — Orchestration & scale**
 - Scheduled/event-triggered runs, agent handoffs (4.5)

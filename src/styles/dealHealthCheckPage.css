@@ -1,0 +1,59 @@
+/* Агент контролю стану угод — second real agent, built on the shared
+   AgentWorkspaceShell (see styles/agentWorkspace.css). Only this agent's
+   own content (threshold controls, the stale-deal list) lives here. */
+
+.dhc-controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex: none; margin-top: 4px; }
+.dhc-thresholds { display: flex; gap: 8px; }
+.dhc-threshold-btn {
+  border: 1px solid rgba(140, 130, 200, .28); background: rgba(122, 105, 200, .08); color: #B4AFD6;
+  font-family: var(--font-body); font-weight: 600; font-size: .8rem; padding: 8px 15px; border-radius: 999px; cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.dhc-threshold-btn:hover { background: rgba(122, 105, 200, .18); color: #EDEBFA; }
+.dhc-threshold-btn.active {
+  background: linear-gradient(90deg, rgba(107, 50, 190, .5), rgba(83, 50, 150, .32));
+  border-color: rgba(164, 98, 255, .65); color: #fff;
+}
+
+.dhc-refresh-btn {
+  display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; font-family: var(--font-body); font-weight: 600; font-size: .82rem;
+  cursor: pointer; box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6); transition: filter .15s, opacity .15s;
+}
+.dhc-refresh-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.dhc-refresh-btn:disabled { opacity: .6; cursor: default; }
+.dhc-refresh-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.dhc-summary { font-family: var(--font-body); font-size: .8rem; color: #918CBB; flex: none; margin: 12px 0 4px; }
+
+.dhc-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+.dhc-list::-webkit-scrollbar { width: 5px; }
+.dhc-list::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
+
+.dhc-card {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px;
+  background: rgba(7, 13, 30, .5); border: 1px solid rgba(100, 125, 210, .28);
+}
+.dhc-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.dhc-card-title-row { display: flex; align-items: center; gap: 9px; }
+.dhc-card-stage-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--stage-color); box-shadow: 0 0 7px 1px var(--stage-color); }
+.dhc-card-title { font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: #F3F1FF; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dhc-card-days {
+  margin-left: auto; flex: none; font-family: var(--font-head); font-size: .64rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase;
+  color: #FBBF66; background: rgba(217, 119, 6, .16); border-radius: 999px; padding: 4px 10px;
+}
+.dhc-card-meta { font-family: var(--font-body); font-size: .8rem; color: #A9A3C7; }
+.dhc-card-reason { font-family: var(--font-body); font-size: .78rem; color: #7A76A3; }
+
+.dhc-card-open {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px;
+  border: 1px solid rgba(140, 130, 200, .28); background: rgba(122, 105, 200, .1); color: #D8D4F0;
+  font-family: var(--font-body); font-weight: 600; font-size: .78rem; text-decoration: none; transition: background .15s;
+}
+.dhc-card-open:hover { background: rgba(122, 105, 200, .2); }
+.dhc-card-open svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 860px) {
+  .dhc-controls { flex-direction: column; align-items: flex-start; }
+  .dhc-card { flex-direction: column; align-items: flex-start; }
+}

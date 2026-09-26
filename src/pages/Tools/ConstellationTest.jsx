@@ -6,6 +6,7 @@ import CosmicBackground from '../../components/SystemMap/CosmicBackground';
 import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
+import DealHealthCheck from '../DealHealthCheck/DealHealthCheck';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
@@ -14,10 +15,11 @@ import '../../styles/constellationTest.css';
 
 // Agents with a real interactive tool (as opposed to the generic read-only
 // info modal) register here by their aiAgentsData.js `tool` key — see
-// `agentToolOpen` below. One entry so far; the next priority agents plug in
-// the same way instead of hardcoding another agent key into the JSX.
+// `agentToolOpen` below. Next priority agents plug in the same way instead
+// of hardcoding another agent key into the JSX.
 const AGENT_TOOLS = {
   'ads-insights-chat': AdsInsightsAnalyst,
+  'deal-health-check': DealHealthCheck,
 };
 
 // This page's own mount-time reveal: the core lights up, then every

@@ -1,0 +1,73 @@
+/* Shared shell for every agent's own full-viewport workspace (opened from
+   the AI Agents map/catalog via AGENT_TOOLS — see ConstellationTest.jsx),
+   extracted from AdsInsightsAnalyst.jsx once a second real agent
+   (DealHealthCheck) existed to confirm what's actually generic vs.
+   agent-specific. Phase 2 of docs/ai-agents-roadmap.md (§4.2).
+
+   Always a fully opaque application surface, never a translucent modal —
+   the map underneath must be completely invisible behind it. */
+
+.agent-workspace-overlay {
+  position: fixed; inset: 0; z-index: 65; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 40px; overflow: hidden;
+  background: #080C1A;
+  animation: agent-workspace-fade-in .2s ease-out;
+}
+.agent-workspace-overlay::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 12% -5%, rgba(124, 58, 237, .10), transparent 60%),
+    radial-gradient(700px 500px at 100% 100%, rgba(56, 130, 246, .07), transparent 60%);
+}
+@keyframes agent-workspace-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.agent-workspace-nav-pill {
+  display: flex; align-items: center; gap: 7px; padding: 9px 16px 9px 12px; border-radius: 999px;
+  border: 1px solid rgba(140, 130, 200, .28); background: rgba(18, 16, 34, .62); backdrop-filter: blur(10px);
+  font-family: var(--font-body); font-weight: 600; font-size: .8rem; color: #D8D4F0; cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.agent-workspace-nav-pill:hover { background: rgba(122, 105, 200, .22); border-color: rgba(164, 98, 255, .5); color: #fff; }
+.agent-workspace-nav-pill svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.agent-workspace-close-btn {
+  width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(140, 130, 200, .28); background: rgba(18, 16, 34, .62); backdrop-filter: blur(10px);
+  color: #D8D4F0; cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+}
+.agent-workspace-close-btn:hover { background: rgba(244, 63, 94, .16); border-color: rgba(244, 63, 94, .4); color: #FCA5B1; }
+.agent-workspace-close-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.agent-workspace-close-btn:focus-visible, .agent-workspace-nav-pill:focus-visible { outline: 2px solid rgba(164, 98, 255, .7); outline-offset: 2px; }
+
+.agent-workspace-panel {
+  position: relative; width: calc(100vw - 100px); max-width: 1600px; height: calc(100vh - 80px);
+  display: flex; flex-direction: column; gap: 18px; padding: 34px 38px; border-radius: 26px; overflow: hidden;
+  background: rgba(11, 16, 34, .96); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(122, 105, 200, .32);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, .42), 0 0 50px rgba(91, 52, 255, .08);
+}
+.agent-workspace-panel-glow {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(420px 260px at 8% 0%, rgba(139, 92, 246, .16), transparent 70%),
+    radial-gradient(360px 260px at 96% 100%, rgba(59, 130, 246, .12), transparent 70%);
+}
+.agent-workspace-panel > * { position: relative; z-index: 1; }
+
+.agent-workspace-header { display: flex; align-items: center; gap: 20px; flex: none; }
+.agent-workspace-header-text { min-width: 0; flex: 1; }
+.agent-workspace-header-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.agent-workspace-kicker { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: #B879FF; margin-bottom: 4px; }
+.agent-workspace-header-text h1 { display: flex; align-items: center; gap: 9px; font-family: var(--font-head); font-weight: 700; font-size: 1.7rem; color: #F5F2FF; letter-spacing: -.3px; margin-bottom: 6px; }
+.agent-workspace-header-desc { font-family: var(--font-body); font-size: .84rem; line-height: 1.55; color: #938CA8; max-width: 640px; }
+.agent-workspace-info-btn {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(140, 130, 200, .35); background: rgba(122, 105, 200, .12); color: #938CA8; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.agent-workspace-info-btn:hover { background: rgba(122, 105, 200, .28); border-color: rgba(164, 98, 255, .5); color: #fff; }
+.agent-workspace-info-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.agent-workspace-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: #8983B5; font-family: var(--font-body); font-size: .88rem; padding: 40px; line-height: 1.5; }
