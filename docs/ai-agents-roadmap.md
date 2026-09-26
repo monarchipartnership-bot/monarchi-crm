@@ -153,8 +153,14 @@ closes a real gap.
 ## 4. Phased roadmap
 
 **Phase 1 — Tracking & accountability** ← current focus
-- Activity feed + human-review queue (3.3), dedicated surface (not Task Manager)
-- Notifications (3.4)
+- **Built (2026-09-26):** Activity feed + human-review queue, dedicated
+  page ("Задачі агентів", sidebar → Automation), built on
+  `ai_agent_conversations` (kind/created_by/needs_review/reviewed_by/
+  reviewed_at columns — `2026-09-26_ai_agent_activity_tracking.sql`).
+  Audits (`runAudit()` in AdsInsightsAnalyst.jsx) are tagged
+  `kind:'audit', needs_review:true`; ordinary chat stays `kind:'chat'`.
+  **Blocked on a DB migration the user needs to run** — see §6.
+- Notifications (3.4) — not started yet.
 - Covers the 1 agent that exists today (Ads Insights Analyst) properly
   before adding more agents on top of an untracked foundation.
 
@@ -172,7 +178,25 @@ closes a real gap.
 - Permissions, config/prompt versioning (3.7)
 - Onboarding/changelog surfacing (3.8)
 
-## 5. Explicitly out of scope for now
+## 5. Action needed — DB migrations not applied
+
+Testing the new activity feed surfaced that **`ai_agent_conversations` /
+`ai_agent_messages` (2026-09-25_ai_agent_conversations.sql) were never
+actually run in Supabase** — the table doesn't exist. Every read/write
+against it has been silently failing and falling back to empty results
+this whole time (each call already catches its own error), so this isn't
+new breakage — it just means the agent's own "Історія" tab and
+ClientProfile's "AI Team work history" tab have never actually persisted
+anything either, until now.
+
+**Run both, in order, in the Supabase SQL editor:**
+1. `supabase/migrations/2026-09-25_ai_agent_conversations.sql`
+2. `supabase/migrations/2026-09-26_ai_agent_activity_tracking.sql`
+
+Until then, the activity feed page will just show "Ще немає активності
+агентів" regardless of real usage.
+
+## 6. Explicitly out of scope for now
 
 - The crack/shatter transition effect (removed; not being rebuilt unless
   asked again).
