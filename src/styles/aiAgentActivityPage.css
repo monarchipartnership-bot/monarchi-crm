@@ -1,0 +1,72 @@
+/* "Задачі агентів" — Phase 1 of docs/ai-agents-roadmap.md: a cross-client,
+   cross-agent activity feed + human-review queue, kept fully separate from
+   the human Task Manager (an agent run's own lifecycle doesn't map onto
+   human task statuses — see the roadmap doc's decision log).
+
+   Plain light-CRM page (locked design system: solid white cards, gradient
+   icon badge, .btn/.btn-p) — NOT the dark cosmic theme the constellation
+   map and AdsInsightsAnalyst use. The one deliberate exception is the
+   expanded transcript, which reuses ChatMessage's own dark bubbles as a
+   small dark card inside this light page, same precedent as
+   ClientProfile's "AI Team work history" tab (.ai-history-transcript). */
+
+.aia-activity-head-icon {
+  width: 44px; height: 44px; border-radius: 12px; color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+  box-shadow: 0 6px 16px -5px rgba(109, 40, 217, .55);
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.aia-activity-head-icon svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.aia-activity-head-row { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+
+.aia-activity-filters { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.aia-activity-filters .ui-select-trigger { min-width: 160px; }
+
+.aia-activity-empty {
+  padding: 34px 20px; text-align: center; color: var(--muted); font-family: var(--font-body); font-size: .88rem;
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+}
+
+.aia-activity-list { display: flex; flex-direction: column; gap: 10px; }
+
+.aia-activity-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(80, 30, 100, .07); overflow: hidden;
+}
+.aia-activity-card.needs-review { border-color: rgba(217, 119, 6, .35); }
+
+.aia-activity-row {
+  width: 100%; display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 14px;
+  padding: 14px 18px; border: none; background: none; cursor: pointer; text-align: left;
+  font-family: var(--font-body);
+}
+.aia-activity-row:hover { background: var(--surface); }
+
+.aia-activity-kind {
+  font-family: var(--font-head); font-size: .66rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px; flex: none;
+}
+.aia-activity-kind--chat { color: var(--purple); background: var(--purple-tint); }
+.aia-activity-kind--audit { color: #7C3AED; background: color-mix(in srgb, #7C3AED 12%, #fff); }
+
+.aia-activity-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aia-activity-agent { font-size: .68rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.aia-activity-title { font-size: .9rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.aia-activity-client { font-size: .82rem; color: var(--ink); flex: none; }
+.aia-activity-meta { font-size: .76rem; color: var(--muted); flex: none; white-space: nowrap; }
+
+.aia-activity-badge {
+  font-family: var(--font-head); font-size: .64rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: #B45309; background: #FEF3E2; border: 1px solid rgba(217, 119, 6, .3); border-radius: 999px; padding: 4px 10px; flex: none;
+}
+.aia-activity-reviewed { font-size: .74rem; color: var(--muted); flex: none; }
+
+.aia-activity-transcript {
+  display: flex; flex-direction: column; gap: 12px; padding: 4px 18px 18px; border-top: 1px solid var(--border);
+}
+.aia-activity-transcript .btn-p { align-self: flex-start; }
+
+@media (max-width: 860px) {
+  .aia-activity-row { grid-template-columns: 1fr; align-items: flex-start; gap: 6px; }
+}

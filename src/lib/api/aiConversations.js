@@ -22,10 +22,15 @@ export async function fetchConversationMessages(conversationId) {
   return data ?? [];
 }
 
-export async function createConversation(clientId, agentKey, firstUserMessage) {
+export async function createConversation(clientId, agentKey, firstUserMessage, { kind, createdBy, needsReview } = {}) {
   const title = (firstUserMessage || '').trim().slice(0, 60) || 'Нова розмова';
   const { data, error } = await supabase
-    .from('ai_agent_conversations').insert({ client_id: clientId, agent_key: agentKey, title }).select().single();
+    .from('ai_agent_conversations')
+    .insert({
+      client_id: clientId, agent_key: agentKey, title,
+      kind: kind || 'chat', created_by: createdBy ?? null, needs_review: !!needsReview,
+    })
+    .select().single();
   if (error) throw error;
   return data;
 }

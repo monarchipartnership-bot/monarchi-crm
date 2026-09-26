@@ -29,6 +29,7 @@ import Calculator from './pages/Tools/Calculator';
 import ImageStudio from './pages/Tools/ImageStudio';
 import FollowupGenerator from './pages/Tools/FollowupGenerator';
 import ConstellationTest from './pages/Tools/ConstellationTest';
+import AiAgentActivity from './pages/AiAgentActivity/AiAgentActivity';
 import ClientsReport from './pages/ClientsReport/ClientsReport';
 import AutomationDashboard from './pages/Automation/Dashboard';
 import './styles/pages.css';
@@ -76,6 +77,7 @@ function AuthGate() {
         <Route path="/tools/image-studio" element={<ImageStudio />} />
         <Route path="/tools/followup" element={<FollowupGenerator />} />
         <Route path="/tools/constellation-test" element={<ConstellationTest />} />
+        <Route path="/automation/ai-agent-activity" element={<AiAgentActivity />} />
         <Route path="/clients" element={<ClientsReport />} />
         <Route path="/automation/dashboard" element={<AutomationDashboard />} />
         <Route path="/tasks" element={<TaskManagerPage />} />

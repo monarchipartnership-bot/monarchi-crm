@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { fetchConversations, fetchConversationMessages, createConversation, appendMessages } from '../../lib/api/aiConversations';
 import { fetchFrameworks, createFramework, updateFramework, deleteFramework } from '../../lib/api/aiAuditFrameworks';
@@ -65,6 +66,7 @@ function formatHistoryDate(iso) {
 // just unmounts this overlay, and the map underneath was never touched,
 // so its focused department/view come back exactly as they were.
 export default function AdsInsightsAnalyst({ onClose }) {
+  const { email } = useAuth();
   const [clients, setClients] = useState(null);
   const [clientId, setClientId] = useState('');
   const [messages, setMessages] = useState([]);
@@ -134,7 +136,7 @@ export default function AdsInsightsAnalyst({ onClose }) {
     setError(null);
   }
 
-  async function sendMessage(presetText, auditInstructions) {
+  async function sendMessage(presetText, auditInstructions, kind = 'chat') {
     const text = (typeof presetText === 'string' ? presetText : input).trim();
     if (!text || !selectedClient || sending) return;
     setError(null);
@@ -167,7 +169,9 @@ export default function AdsInsightsAnalyst({ onClose }) {
       try {
         let conversationId = activeConversationId;
         if (!conversationId) {
-          const created = await createConversation(clientId, AGENT_KEY, text);
+          const created = await createConversation(clientId, AGENT_KEY, text, {
+            kind, createdBy: email, needsReview: kind === 'audit',
+          });
           conversationId = created.id;
           setActiveConversationId(conversationId);
           setConversations((cs) => [{ ...created }, ...cs]);
@@ -201,7 +205,7 @@ export default function AdsInsightsAnalyst({ onClose }) {
     if (!selectedFramework || sending) return;
     setMessages([]);
     setActiveConversationId(null);
-    sendMessage(`Провести аудит за фреймворком «${selectedFramework.name}»`, selectedFramework.instructions);
+    sendMessage(`Провести аудит за фреймворком «${selectedFramework.name}»`, selectedFramework.instructions, 'audit');
   }
 
   async function handleCreateFramework({ name, instructions }) {
