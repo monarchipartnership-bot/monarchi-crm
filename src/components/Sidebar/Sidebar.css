@@ -103,6 +103,14 @@
   flex: none;
 }
 .side-node[aria-expanded="true"] .chev { transform: rotate(90deg); }
+
+/* Needs-review count — the AI Agents entry's own heads-up (see
+   useAgentReviewCount.js); only ever shown when > 0. */
+.side-node-badge {
+  margin-left: auto; flex: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: #F59E0B; color: #1a1200; font-family: var(--font-head); font-weight: 800; font-size: 10.5px;
+  display: flex; align-items: center; justify-content: center;
+}
 .side-node.active { background: rgba(255, 255, 255, .16); color: #fff; box-shadow: 0 4px 14px -6px rgba(0, 0, 0, .4); }
 .side-node.active:hover { background: rgba(255, 255, 255, .16); transform: translateX(2px); }
 .side-node.active .side-ic-box { background: rgba(255, 255, 255, .24); }

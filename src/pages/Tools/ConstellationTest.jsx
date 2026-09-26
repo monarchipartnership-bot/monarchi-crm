@@ -7,6 +7,7 @@ import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas'
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
+import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
 import '../../styles/constellationTest.css';
 
 // Agents with a real interactive tool (as opposed to the generic read-only
@@ -593,6 +594,7 @@ const SECTIONS = [
 
 export default function ConstellationTest() {
   const [section, setSection] = useState('map');
+  const agentReviewCount = useAgentReviewCount();
   const [focusedDept, setFocusedDept] = useState(null);
   const [hoveredDept, setHoveredDept] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -820,6 +822,9 @@ export default function ConstellationTest() {
             onClick={() => setSection(s.key)}
           >
             {s.label}
+            {s.key === 'activity' && agentReviewCount > 0 && (
+              <span className="constellation-section-tab-badge">{agentReviewCount}</span>
+            )}
           </button>
         ))}
       </div>

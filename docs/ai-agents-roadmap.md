@@ -167,11 +167,17 @@ Currently invisible. Needs:
   doesn't map cleanly onto human task statuses, and mixing them risks
   distorting both views.
 
-### 4.4 Notifications
-Nothing currently tells anyone an agent finished a job or needs input.
-Even a minimal version (a badge/count on the sidebar "AI Agents" entry, or
-reuse of whatever notification pattern the rest of the CRM ends up with)
-closes a real gap.
+### 4.4 Notifications — BUILT (2026-09-26)
+Minimal version, deliberately not the personal per-recipient `notifications`
+table (task reminders etc.) — a needs-review item isn't addressed to one
+person, it's a shared queue anyone on the team can clear, which doesn't
+fit that table's recipient-targeted model.
+- `useAgentReviewCount()` (`src/lib/useAgentReviewCount.js`) — polls
+  `fetchNeedsReviewCount()` every 45s.
+- Badge on the sidebar "AI Agents" entry (the one sanctioned link to the
+  general CRM, per §1) — a count, shown only when > 0.
+- Badge on the section's own "Задачі агентів" tab, visible from the Мапа
+  view too without switching tabs first.
 
 ### 4.5 Orchestration & triggers
 - Manual trigger (exists, informally, via the modal).
@@ -210,7 +216,10 @@ closes a real gap.
   `kind:'audit', needs_review:true`; ordinary chat stays `kind:'chat'`.
   **Blocked on one more DB migration** — see §6 (a schema bug, not
   something new to build).
-- Notifications (4.4) — not started yet.
+- **Built (2026-09-26):** Notifications (4.4) — sidebar + section-nav-tab
+  badge counts, see §4.4 for detail.
+- Phase 1 is now functionally complete pending migration #3 (§6) —
+  everything above is built; only real data flowing through it is blocked.
 - Covers the 1 agent that exists today (Ads Insights Analyst) properly
   before adding more agents on top of an untracked foundation.
 

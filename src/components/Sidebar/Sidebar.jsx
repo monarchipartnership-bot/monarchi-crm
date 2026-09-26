@@ -1,6 +1,7 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { WordmarkWhite } from '../Logo/Logo';
 import { DEPTS } from './sidebarData';
+import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
 import './Sidebar.css';
 
 function Icon({ svg }) {
@@ -14,6 +15,10 @@ function pathMatches(pathname, base) {
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
+  // The only "necessary link to the general CRM" the AI Agents section's
+  // locked navigation model allows (docs/ai-agents-roadmap.md §1) — a
+  // heads-up badge on its one sidebar entry, not a new page/route.
+  const agentReviewCount = useAgentReviewCount();
 
   return (
     <aside className={'sidebar' + (mobileOpen ? ' open' : '')}>
@@ -38,6 +43,9 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
                 >
                   <Icon svg={it.icon} />
                   {it.name}
+                  {it.key === 'constellation' && agentReviewCount > 0 && (
+                    <span className="side-node-badge">{agentReviewCount}</span>
+                  )}
                 </NavLink>
               );
             })}

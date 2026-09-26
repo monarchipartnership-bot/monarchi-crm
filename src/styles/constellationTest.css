@@ -46,6 +46,11 @@
 }
 .constellation-section-tab:hover { color: #EDE7F5; }
 .constellation-section-tab.active { background: #fff; color: #170F2B; }
+.constellation-section-tab-badge {
+  display: inline-flex; align-items: center; justify-content: center; margin-left: 7px;
+  min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px;
+  background: #F59E0B; color: #1a1200; font-family: var(--font-head); font-weight: 800; font-size: 10px;
+}
 .constellation-exit {
   flex-shrink: 0;
   display: flex; align-items: center; gap: 8px;

@@ -17,6 +17,19 @@ export async function fetchAgentActivity({ agentKey, kind, needsReviewOnly } = {
   return data ?? [];
 }
 
+// Lightweight count-only query backing the notification badges (sidebar
+// "AI Agents" entry + the section's own "Задачі агентів" tab — see
+// useAgentReviewCount.js) — no need to pull full rows just to show a
+// number.
+export async function fetchNeedsReviewCount() {
+  const { count, error } = await supabase
+    .from('ai_agent_conversations')
+    .select('id', { count: 'exact', head: true })
+    .eq('needs_review', true);
+  if (error) { console.warn('fetchNeedsReviewCount failed', error); return 0; }
+  return count ?? 0;
+}
+
 export async function markReviewed(conversationId, reviewerEmail) {
   const { data, error } = await supabase
     .from('ai_agent_conversations')
