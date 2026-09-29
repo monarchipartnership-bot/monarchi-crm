@@ -17,18 +17,23 @@ started:
   Letter Agent), and Phase 3's first scheduled agent run (§4.5) —
   `deal-health-check` now also runs automatically once a day via pg_cron,
   not just on manual click.
-- **2 new DB migrations NOT YET CONFIRMED APPLIED** — sent to the user,
-  waiting on confirmation (same "sent → user runs in Supabase SQL editor
-  → confirm" flow as every previous migration in this project):
-  `2026-09-29_ai_agent_conversations_client_id_nullable.sql` and
-  `2026-09-29_deal_health_check_scheduled_run.sql`. See §6. Until these
-  run, the daily cron job doesn't exist yet in Supabase — the code/docs
-  are ready but the schedule isn't live.
-- **Next action, when resumed:** confirm the 2 migrations ran (verify
-  `cron.job` has a `deal-health-check-daily` row, and/or wait for the
-  next 06:00 UTC run to show up in "Задачі агентів"). After that, the
-  next candidate is the Analytics/ROI dashboard (§4.6, new "Аналітика"
-  tab) — or ask the user again if priorities changed.
+- **Both migrations confirmed applied (2026-09-29)** — verified live, not
+  just taken on the user's word: called `run_deal_health_check(7)` via
+  `supabase.rpc()` directly from the browser console and confirmed a real
+  row landed in `ai_agent_conversations` (`client_id: null`, `kind:
+  'audit'`, `needs_review: true`, title "175 угод потребують уваги") with
+  a matching `ai_agent_messages` body listing real stale deals — proves
+  both the function exists and `client_id` now accepts null. The
+  `cron.schedule(...)` call is the second statement in the same migration
+  file the user ran, right after the function definition that's now
+  confirmed live — not independently re-checkable from the app itself
+  (`cron.job` lives in the `cron` schema, not exposed over the REST API),
+  so if there's ever doubt, `select * from cron.job where jobname =
+  'deal-health-check-daily';` in the Supabase SQL editor confirms it
+  directly.
+- **Next action, when resumed:** the next candidate is the Analytics/ROI
+  dashboard (§4.6, new "Аналітика" tab) — or ask the user again if
+  priorities changed.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master` (the 2 new migrations are committed as
   files too, same as every past migration — only their *execution* in
@@ -423,8 +428,9 @@ them.
    daily at 06:00 UTC, reusing the same `pg_cron` extension the
    notifications weekly cleanup already uses.
 
-**Migrations #3 and #4 sent to the user 2026-09-29, not yet confirmed
-run** — see the STOPPED HERE note at the top of this file.
+**Migrations #3 and #4 confirmed applied 2026-09-29** — see the STOPPED
+HERE note at the top of this file for how this was verified (a live RPC
+test call, not just the user's say-so).
 
 ## 7. Explicitly out of scope for now
 
