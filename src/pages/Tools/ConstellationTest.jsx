@@ -7,6 +7,7 @@ import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas'
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import DealHealthCheck from '../DealHealthCheck/DealHealthCheck';
+import CoverLetterAgent from '../CoverLetterAgent/CoverLetterAgent';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
@@ -20,6 +21,7 @@ import '../../styles/constellationTest.css';
 const AGENT_TOOLS = {
   'ads-insights-chat': AdsInsightsAnalyst,
   'deal-health-check': DealHealthCheck,
+  'cover-letter-agent': CoverLetterAgent,
 };
 
 // This page's own mount-time reveal: the core lights up, then every

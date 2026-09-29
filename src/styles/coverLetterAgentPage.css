@@ -1,0 +1,64 @@
+/* Агент написання супровідних листів — third real agent, built on the shared
+   AgentWorkspaceShell (see styles/agentWorkspace.css). Only this agent's own
+   content (language/style/case pickers, job-post input, generated result)
+   lives here. */
+
+.cla-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
+.cla-body::-webkit-scrollbar { width: 5px; }
+.cla-body::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
+
+.cla-field { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.cla-field-grow { flex: 1; min-height: 160px; }
+.cla-label { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #9891C4; }
+.cla-label-hint { font-family: var(--font-body); font-weight: 500; font-size: .74rem; letter-spacing: 0; text-transform: none; color: #7A76A3; }
+
+.cla-lang-pills { display: flex; gap: 8px; }
+.cla-lang-pill, .cla-style-pill, .cla-case-chip {
+  display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(140, 130, 200, .28); background: rgba(122, 105, 200, .08);
+  color: #B4AFD6; font-family: var(--font-body); font-weight: 600; font-size: .8rem; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s; white-space: nowrap;
+}
+.cla-lang-pill:hover, .cla-style-pill:hover, .cla-case-chip:hover { background: rgba(122, 105, 200, .18); color: #EDEBFA; }
+.cla-lang-pill.on, .cla-style-pill.on, .cla-case-chip.on {
+  background: linear-gradient(90deg, rgba(107, 50, 190, .5), rgba(83, 50, 150, .32));
+  border-color: rgba(164, 98, 255, .65); color: #fff;
+}
+
+.cla-style-row, .cla-cases-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.cla-style-pill-ic { display: inline-flex; }
+.cla-style-pill-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.cla-cases-loading { font-family: var(--font-body); font-size: .82rem; color: #7A76A3; }
+
+.cla-textarea {
+  width: 100%; resize: vertical; border-radius: 14px; border: 1px solid rgba(100, 125, 210, .28); background: rgba(7, 13, 30, .5);
+  color: #F3F1FF; font-family: var(--font-body); font-size: .86rem; line-height: 1.55; padding: 14px 16px;
+}
+.cla-textarea::placeholder { color: #7A76A3; }
+.cla-textarea:focus { outline: none; border-color: rgba(164, 98, 255, .55); }
+.cla-textarea-job { flex: 1; min-height: 140px; }
+.cla-textarea-context { min-height: 72px; }
+
+.cla-actions { display: flex; align-items: center; gap: 14px; flex: none; }
+.cla-generate-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; font-family: var(--font-body); font-weight: 600; font-size: .84rem;
+  cursor: pointer; box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6); transition: filter .15s, opacity .15s;
+}
+.cla-generate-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.cla-generate-btn:disabled { opacity: .6; cursor: default; }
+.cla-status { font-family: var(--font-body); font-size: .8rem; color: #918CBB; }
+.cla-status.error { color: #FCA5B1; }
+
+.cla-result { flex: none; display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 14px; background: rgba(7, 13, 30, .5); border: 1px solid rgba(100, 125, 210, .28); }
+.cla-result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cla-result-case { font-family: var(--font-head); font-size: .7rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: #B879FF; }
+.cla-copy-btn {
+  flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(140, 130, 200, .28); background: rgba(122, 105, 200, .1);
+  color: #D8D4F0; font-family: var(--font-body); font-weight: 600; font-size: .76rem; cursor: pointer; transition: background .15s;
+}
+.cla-copy-btn:hover { background: rgba(122, 105, 200, .2); }
+.cla-result-text { font-family: var(--font-body); font-size: .86rem; line-height: 1.6; color: #E4E1F5; white-space: pre-wrap; }
+
+@media (max-width: 860px) {
+  .cla-actions { flex-direction: column; align-items: flex-start; }
+}

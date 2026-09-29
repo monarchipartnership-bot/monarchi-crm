@@ -25,7 +25,7 @@ export function appendSignatureIfEmail(messageText, format) {
 // instructions (oldLeadStructureBlock/SERIES_* below) > user's own
 // extraContext. ---
 
-const CORE_WRITING_RULES_BLOCK = `БАЗОВІ ПРАВИЛА ПИСЬМА. CORE діють завжди, жоден стиль чи задача нижче не може їх скасувати:
+export const CORE_WRITING_RULES_BLOCK = `БАЗОВІ ПРАВИЛА ПИСЬМА. CORE діють завжди, жоден стиль чи задача нижче не може їх скасувати:
 1. Кожне речення повинне нести зміст: новий факт, пояснення, приклад, уточнення чи потрібне питання. Якщо речення нічого не додає, прибери його. Не розтягуй текст заради обсягу, не повторюй одну думку різними словами.
 2. Обирай просте формулювання замість складного, якщо зміст той самий. Уникай канцеляриту.
 3. Конкретика важливіша за абстракцію: факти, дії, терміни, цифри краще за фрази на кшталт "відіграє важливу роль" чи "має велике значення".
@@ -282,7 +282,7 @@ export const STYLE_OPTIONS = [
 
 export const DEFAULT_STYLE_ID = 'friendly';
 
-function getStyleBlock(styleId) {
+export function getStyleBlock(styleId) {
   const found = STYLE_OPTIONS.find((s) => s.id === styleId);
   return (found || STYLE_OPTIONS.find((s) => s.id === DEFAULT_STYLE_ID)).block;
 }
