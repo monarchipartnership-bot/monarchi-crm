@@ -8,23 +8,31 @@ Last updated: 2026-09-29.
 
 ## STOPPED HERE (2026-09-29) — read this first when picking work back up
 
-Phase 1 (tracking/accountability) and Phase 2 (foundations for scale) are
-both built — see §5 for the full phase breakdown. Concretely:
+Phase 1 and Phase 2 are both fully built (see §5). Phase 3 has just
+started:
 
 - **Done:** Agent activity feed + review queue + notification badges
   (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
-  (§4.2), and 3 real agents (Ads Insights Analyst, Deal Health Check,
-  Cover Letter Agent).
-- **All 3 DB migrations confirmed applied (2026-09-29)** — verified live
-  (`client_id` accepts uuid without error). Real chat/audit conversations
-  now actually persist — the activity feed and "Історія" tab are no
-  longer blocked. See §6.
-- **Next action, when resumed:** Phase 2's "1-2 more Wave 1 agents" target
-  is met (3 shipped). Ask the user whether to keep shipping Wave 1 agents
-  or move into Phase 3 (orchestration/scale, §5) — business decision, not
-  something to pick autonomously.
+  (§4.2), 3 real agents (Ads Insights Analyst, Deal Health Check, Cover
+  Letter Agent), and Phase 3's first scheduled agent run (§4.5) —
+  `deal-health-check` now also runs automatically once a day via pg_cron,
+  not just on manual click.
+- **2 new DB migrations NOT YET CONFIRMED APPLIED** — sent to the user,
+  waiting on confirmation (same "sent → user runs in Supabase SQL editor
+  → confirm" flow as every previous migration in this project):
+  `2026-09-29_ai_agent_conversations_client_id_nullable.sql` and
+  `2026-09-29_deal_health_check_scheduled_run.sql`. See §6. Until these
+  run, the daily cron job doesn't exist yet in Supabase — the code/docs
+  are ready but the schedule isn't live.
+- **Next action, when resumed:** confirm the 2 migrations ran (verify
+  `cron.job` has a `deal-health-check-daily` row, and/or wait for the
+  next 06:00 UTC run to show up in "Задачі агентів"). After that, the
+  next candidate is the Analytics/ROI dashboard (§4.6, new "Аналітика"
+  tab) — or ask the user again if priorities changed.
 - Nothing is mid-edit or uncommitted — every change through this point is
-  committed and pushed to `master`.
+  committed and pushed to `master` (the 2 new migrations are committed as
+  files too, same as every past migration — only their *execution* in
+  Supabase is pending).
 
 ## 1. LOCKED — navigation model (do not revisit without being asked)
 
@@ -227,24 +235,30 @@ Currently invisible. Needs:
   lifecycle (queued/running/success/failed/needs-review/retried) that
   doesn't map cleanly onto human task statuses, and mixing them risks
   distorting both views.
-- **`DealHealthCheck` (§4.2) deliberately does NOT log into this feed
-  yet**, even though the intent was "every new agent wired in from day
-  one." Two real blockers, not an oversight: (1) `ai_agent_conversations.
-  client_id` is `not null` and this agent isn't scoped to one client —
-  every run spans all open deals; (2) its "runs" are a live, instantly-
-  recomputed view (adjust the day threshold, get a new list on the spot),
-  not a discrete auditable event the way a chat exchange or an audit is —
-  logging every threshold click would spam the feed with near-duplicate
-  rows.
-- **`CoverLetterAgent` (built 2026-09-29) also deliberately does NOT log
-  into this feed**, for the same underlying reason as `DealHealthCheck`:
-  no `client_id` to attach to. A cover letter replies to a fresh Upwork
-  job post, before any CRM client/deal record exists for that lead — same
-  shape as the pre-existing Follow-up Generator tool, which also runs
-  standalone with no required client_id. Two agents now share this
-  pattern (not-yet-a-client input), so it's a real pattern, not a one-off
-  excuse — worth solving properly (e.g. an optional/nullable `client_id`,
-  or a separate non-client-scoped log) if a fourth such agent shows up.
+- **`DealHealthCheck`'s manual "Оновити" button (§4.2) still does NOT log
+  into this feed** — clicking the threshold pills or refresh in the UI is
+  a live, instantly-recomputed view (adjust the day threshold, get a new
+  list on the spot), not a discrete auditable event the way a chat
+  exchange or an audit is; logging every threshold click would spam the
+  feed with near-duplicate rows. **Its once-a-day scheduled run (§4.5,
+  built 2026-09-29) DOES log into this feed** — exactly one row per day,
+  a genuinely discrete event, which is what made logging it make sense
+  where logging every manual click didn't. This also resolved the other
+  original blocker (`ai_agent_conversations.client_id` being `not null`
+  for a cross-client agent) via
+  `2026-09-29_ai_agent_conversations_client_id_nullable.sql`.
+- **`CoverLetterAgent` (built 2026-09-29) deliberately does NOT log into
+  this feed**, for the same underlying reason `DealHealthCheck`'s manual
+  button doesn't: no `client_id` to attach to, and every generation is a
+  one-off manual action, not a scheduled/recurring one — there's no
+  "daily digest" framing available here the way there was for
+  deal-health-check. A cover letter replies to a fresh Upwork job post,
+  before any CRM client/deal record exists for that lead — same shape as
+  the pre-existing Follow-up Generator tool, which also runs standalone
+  with no required client_id. Client_id being nullable now (see above)
+  removes the schema blocker if this is ever revisited, but the "every
+  manual click would spam the feed" reasoning still applies unless/until
+  this agent also gets a scheduled, digest-shaped trigger.
 
 ### 4.4 Notifications — BUILT (2026-09-26)
 Minimal version, deliberately not the personal per-recipient `notifications`
@@ -260,11 +274,29 @@ fit that table's recipient-targeted model.
 
 ### 4.5 Orchestration & triggers
 - Manual trigger (exists, informally, via the modal).
-- Scheduled runs (cron-style) and event-triggered runs (e.g., new lead →
-  qualification agent runs automatically).
+- **Scheduled runs — first one BUILT (2026-09-29):** `deal-health-check`
+  now also runs automatically once a day (`run_deal_health_check()`,
+  scheduled via pg_cron — same mechanism as
+  `2026-09-17_notifications_weekly_cleanup.sql`, no new infra) and logs a
+  discrete `ai_agent_conversations` row (`kind:'audit'`), `needs_review`
+  only when it actually finds stale deals. This is deliberately plain SQL,
+  not a new Vercel cron + serverless round trip — the agent's own logic
+  (open deals, stage neither won nor lost, `updated_at` older than N days)
+  is fully deterministic and needs no LLM call, so porting it to a
+  `plpgsql` function ported the *exact* rule from
+  `src/lib/api/dealHealthCheck.js` with nothing new to keep in sync except
+  by hand if that file's logic ever changes. See migrations
+  `2026-09-29_ai_agent_conversations_client_id_nullable.sql` (client_id
+  had to become nullable — a cross-client scan has no single client to
+  attach to, see §4.3) and
+  `2026-09-29_deal_health_check_scheduled_run.sql`.
+- Event-triggered runs (e.g., new lead → qualification agent runs
+  automatically) — not started; the scheduled-run plumbing above (cron →
+  deterministic SQL → `ai_agent_conversations` row) is the template to
+  reuse once there's a second candidate agent for this.
 - Handoffs between agents matching the Foundation → Capture → Generate →
   Orchestrate stages already encoded in the data — right now those stages
-  are descriptive labels only, not a real pipeline.
+  are descriptive labels only, not a real pipeline. Not started.
 
 ### 4.6 Analytics / ROI
 - Aggregate autonomy chart (company-wide, not just per department).
@@ -337,9 +369,15 @@ fit that table's recipient-targeted model.
   the section). Next agent, if/when picked, is extra beyond the original
   Phase 2 scope.
 
-**Phase 3 — Orchestration & scale**
-- Scheduled/event-triggered runs, agent handoffs (4.5)
-- Analytics/ROI dashboard, aggregate autonomy view (4.6)
+**Phase 3 — Orchestration & scale** ← current focus (started 2026-09-29)
+- **Built (2026-09-29):** first scheduled agent run — `deal-health-check`
+  now runs automatically once a day via pg_cron and logs into the Phase 1
+  activity feed as a discrete audit. See §4.5 for detail. This also
+  resolves the "not client-scoped" blocker that kept it out of the feed —
+  `ai_agent_conversations.client_id` is now nullable.
+- Event-triggered runs, agent handoffs (4.5) — not started.
+- Analytics/ROI dashboard, aggregate autonomy view (4.6) — not started,
+  next candidate for this phase.
 
 **Phase 4 — Governance & polish**
 - Permissions, config/prompt versioning (4.7)
@@ -368,9 +406,25 @@ both resolved, kept here as the historical record:
    a uuid filter/insert with no type error; the only remaining rejection
    is RLS on an unauthenticated test write, which is expected).
 
-All 3 migrations are applied. Real chat/audit conversations now persist —
-the activity feed, "Задачі агентів" review queue, and AdsInsightsAnalyst's
-own "Історія" tab all have real data flowing through them.
+All 3 migrations above are applied. Real chat/audit conversations now
+persist — the activity feed, "Задачі агентів" review queue, and
+AdsInsightsAnalyst's own "Історія" tab all have real data flowing through
+them.
+
+3. **`ai_agent_conversations.client_id` needed to become nullable** — the
+   first scheduled/cross-client agent run (deal-health-check, §4.5) has
+   no single client to attach to. Fix migration:
+   `2026-09-29_ai_agent_conversations_client_id_nullable.sql` (safe — a
+   pure widening, every existing reader already tolerates a missing
+   client_id).
+4. **New `run_deal_health_check()` function + `pg_cron` schedule** —
+   `2026-09-29_deal_health_check_scheduled_run.sql`. Ports
+   `dealHealthCheck.js`'s exact stale-deal rule to SQL and schedules it
+   daily at 06:00 UTC, reusing the same `pg_cron` extension the
+   notifications weekly cleanup already uses.
+
+**Migrations #3 and #4 sent to the user 2026-09-29, not yet confirmed
+run** — see the STOPPED HERE note at the top of this file.
 
 ## 7. Explicitly out of scope for now
 
