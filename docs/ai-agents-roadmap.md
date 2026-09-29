@@ -4,9 +4,9 @@ Living plan for the "AI Agents" section of Monarchi CRM (sidebar → AI Agents,
 `/tools/constellation-test`). Updated as decisions are made — this is the
 source of truth, not a snapshot from one conversation.
 
-Last updated: 2026-09-27.
+Last updated: 2026-09-29.
 
-## STOPPED HERE (2026-09-27) — read this first when picking work back up
+## STOPPED HERE (2026-09-29) — read this first when picking work back up
 
 Phase 1 (tracking/accountability) and most of Phase 2 (foundations for
 scale) are built — see §5 for the full phase breakdown. Concretely:
@@ -14,13 +14,13 @@ scale) are built — see §5 for the full phase breakdown. Concretely:
 - **Done:** Agent activity feed + review queue + notification badges
   (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
   (§4.2), and 2 real agents (Ads Insights Analyst, Deal Health Check).
+- **All 3 DB migrations confirmed applied (2026-09-29)** — verified live
+  (`client_id` accepts uuid without error). Real chat/audit conversations
+  now actually persist — the activity feed and "Історія" tab are no
+  longer blocked. See §6.
 - **Next action, when resumed:** pick 1-2 more Wave 1 agents to ship (ask
   the user which — this is a business decision, not something to pick
   autonomously; see §5's Phase 2 entry).
-- **Outstanding blocker, unrelated to what to build next:** migration #3
-  (`2026-09-26_ai_agent_conversations_client_id_uuid_fix.sql`) — confirm
-  with the user whether it's been run before assuming real chat/audit
-  conversations persist. See §6.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master`.
 
@@ -310,9 +310,10 @@ fit that table's recipient-targeted model.
 - Permissions, config/prompt versioning (4.7)
 - Onboarding/changelog surfacing (4.8)
 
-## 6. Action needed — DB migrations
+## 6. DB migrations — ALL APPLIED (confirmed 2026-09-29)
 
-Two issues surfaced while verifying the activity feed, in this order:
+Two issues surfaced while verifying the activity feed, in this order —
+both resolved, kept here as the historical record:
 
 1. **`ai_agent_conversations`/`ai_agent_messages` were never applied** —
    the tables didn't exist at all; every read/write had been silently
@@ -324,19 +325,17 @@ Two issues surfaced while verifying the activity feed, in this order:
 2. **`ai_agent_conversations.client_id` was declared `bigint`, but
    `clients.id` is `uuid`** — a real bug in the original 2026-09-25
    migration (pre-existing, not introduced this cycle). Every insert that
-   references a real client fails with `invalid input syntax for type
-   bigint: <uuid>` — caught by the same silent error handling. Confirmed
-   via a live test insert during Phase 1 verification. Fix migration
-   written: `2026-09-26_ai_agent_conversations_client_id_uuid_fix.sql`
+   references a real client failed with `invalid input syntax for type
+   bigint: <uuid>` — caught by the same silent error handling. Fix
+   migration: `2026-09-26_ai_agent_conversations_client_id_uuid_fix.sql`
    (safe — table was still empty, `alter column ... type uuid`).
+   **Confirmed run 2026-09-29** — verified live (`client_id` now accepts
+   a uuid filter/insert with no type error; the only remaining rejection
+   is RLS on an unauthenticated test write, which is expected).
 
-**Run, in order, in the Supabase SQL editor (if not already):**
-1. `supabase/migrations/2026-09-25_ai_agent_conversations.sql`
-2. `supabase/migrations/2026-09-26_ai_agent_activity_tracking.sql`
-3. `supabase/migrations/2026-09-26_ai_agent_conversations_client_id_uuid_fix.sql`
-
-Until #3 is run, real chat/audit conversations still fail to save (the
-activity feed page will look empty even with real usage happening).
+All 3 migrations are applied. Real chat/audit conversations now persist —
+the activity feed, "Задачі агентів" review queue, and AdsInsightsAnalyst's
+own "Історія" tab all have real data flowing through them.
 
 ## 7. Explicitly out of scope for now
 
