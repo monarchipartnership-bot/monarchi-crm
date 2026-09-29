@@ -10,6 +10,7 @@ import DealHealthCheck from '../DealHealthCheck/DealHealthCheck';
 import CoverLetterAgent from '../CoverLetterAgent/CoverLetterAgent';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
+import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
 import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
 import '../../styles/constellationTest.css';
@@ -597,6 +598,7 @@ const SECTIONS = [
   { key: 'map', label: 'Мапа' },
   { key: 'agents', label: 'Агенти' },
   { key: 'activity', label: 'Задачі агентів' },
+  { key: 'analytics', label: 'Аналітика' },
 ];
 
 export default function ConstellationTest() {
@@ -873,6 +875,7 @@ export default function ConstellationTest() {
       </div>
 
       {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
+      {section === 'analytics' && <AgentAnalytics agents={allAgents} />}
 
       {section === 'activity' && <AiAgentActivity />}
 

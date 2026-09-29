@@ -8,15 +8,15 @@ Last updated: 2026-09-29.
 
 ## STOPPED HERE (2026-09-29) — read this first when picking work back up
 
-Phase 1 and Phase 2 are both fully built (see §5). Phase 3 has just
-started:
+Phase 1 and Phase 2 are both fully built (see §5). Phase 3 is underway:
 
 - **Done:** Agent activity feed + review queue + notification badges
   (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
   (§4.2), 3 real agents (Ads Insights Analyst, Deal Health Check, Cover
-  Letter Agent), and Phase 3's first scheduled agent run (§4.5) —
+  Letter Agent), Phase 3's first scheduled agent run (§4.5) —
   `deal-health-check` now also runs automatically once a day via pg_cron,
-  not just on manual click.
+  not just on manual click — and Phase 3's Analytics/ROI dashboard (§4.6)
+  — new "Аналітика" section tab.
 - **Both migrations confirmed applied (2026-09-29)** — verified live, not
   just taken on the user's word: called `run_deal_health_check(7)` via
   `supabase.rpc()` directly from the browser console and confirmed a real
@@ -31,8 +31,8 @@ started:
   so if there's ever doubt, `select * from cron.job where jobname =
   'deal-health-check-daily';` in the Supabase SQL editor confirms it
   directly.
-- **Next action, when resumed:** the next candidate is the Analytics/ROI
-  dashboard (§4.6, new "Аналітика" tab) — or ask the user again if
+- **Next action, when resumed:** the next candidate is event-triggered
+  runs / agent handoffs (§4.5, not started) — or ask the user again if
   priorities changed.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master` (the 2 new migrations are committed as
@@ -303,11 +303,28 @@ fit that table's recipient-targeted model.
   Orchestrate stages already encoded in the data — right now those stages
   are descriptive labels only, not a real pipeline. Not started.
 
-### 4.6 Analytics / ROI
-- Aggregate autonomy chart (company-wide, not just per department).
-- Adoption over time, estimated hours/cost saved.
-- Wave rollout as a visual timeline (Wave 1/2/3 tags already exist in
-  `aiAgentsData.js` — currently invisible as a roadmap view).
+### 4.6 Analytics / ROI — BUILT (2026-09-29)
+`src/pages/AgentAnalytics/AgentAnalytics.jsx`, the section's "Аналітика"
+tab. Deliberately scoped to numbers that are actually real, not invented:
+- **Aggregate autonomy × stage matrix (company-wide)** — the exact same
+  matrix idea as the map's own per-department CHART view
+  (`DeptChartView`), rolled up across all 8 departments instead of one at
+  a time. Cell intensity (background tint) scales with count; hovering a
+  cell lists the agent names via `title`.
+- **Wave rollout** — a stacked bar per wave (Wave 1/2/3), segmented
+  live/in_development/not_started, same status colors as the Agent
+  Catalog (`agentCatalogPage.css`'s `--live`/`--in_development` greens/
+  blues) so the two views read as one system.
+- **Real activity** — pulled live from `ai_agent_conversations` (same
+  `fetchAgentActivity()` the "Задачі агентів" tab uses): total runs
+  logged, runs in the last 7 days, needs-review count, and a per-agent
+  bar breakdown (`findAgentByKey(conv.agent_key)` for the label).
+- **Deliberately NOT built: estimated hours/cost saved.** There is no
+  agreed-on way to estimate this per agent anywhere in this project —
+  showing a number here would mean inventing one and presenting it as if
+  it were real. The page says so explicitly instead of a fake tile. Add
+  this once the business defines a real per-agent estimate to plug in,
+  not before.
 
 ### 4.7 Governance (later)
 - Permissions: who can trigger/configure which agents.
@@ -380,9 +397,12 @@ fit that table's recipient-targeted model.
   activity feed as a discrete audit. See §4.5 for detail. This also
   resolves the "not client-scoped" blocker that kept it out of the feed —
   `ai_agent_conversations.client_id` is now nullable.
-- Event-triggered runs, agent handoffs (4.5) — not started.
-- Analytics/ROI dashboard, aggregate autonomy view (4.6) — not started,
-  next candidate for this phase.
+- **Built (2026-09-29):** Analytics/ROI dashboard (4.6) — new "Аналітика"
+  section tab: company-wide autonomy×stage matrix, wave rollout bars, and
+  real activity-feed numbers. Explicitly does not fabricate a saved-
+  hours/cost number — see §4.6 for why.
+- Event-triggered runs, agent handoffs (4.5) — not started, next
+  candidate for this phase.
 
 **Phase 4 — Governance & polish**
 - Permissions, config/prompt versioning (4.7)

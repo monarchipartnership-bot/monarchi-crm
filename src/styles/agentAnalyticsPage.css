@@ -1,0 +1,78 @@
+/* Аналітика — Phase 3 (§4.6) company-wide rollup. Built on the shared
+   .ai-section* foundation (aiAgentsSection.css); only this page's own
+   content (stat tiles, autonomy matrix, wave bars, activity bars) lives
+   here. Status colors (live/in_development/not_started) match
+   agentCatalogPage.css exactly, not a new palette. */
+
+.analytics-stats { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 30px; }
+.analytics-stats-secondary { margin-bottom: 18px; }
+.analytics-stat {
+  flex: 1; min-width: 130px; display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 16px;
+  background: rgba(7, 13, 30, .36); border: 1px solid rgba(100, 125, 210, .30);
+}
+.analytics-stat-value { font-family: var(--font-head); font-weight: 800; font-size: 1.6rem; color: #F3F1FF; }
+.analytics-stat-label { font-family: var(--font-body); font-size: .76rem; color: #A9A3C7; }
+
+.analytics-section { margin-bottom: 32px; }
+.analytics-section-title {
+  font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: #EDEBFA; margin: 0 0 14px;
+}
+
+/* ---- Autonomy × stage matrix ---- */
+.analytics-matrix {
+  display: grid; grid-template-columns: 150px repeat(var(--stage-cols), 1fr); gap: 8px; max-width: 900px;
+}
+.analytics-matrix-corner { background: transparent; }
+.analytics-matrix-col-header {
+  font-family: var(--font-body); font-size: .64rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  color: #8983B5; text-align: center; padding-bottom: 6px; border-bottom: 1px solid rgba(100, 125, 210, .2);
+}
+.analytics-matrix-row-label {
+  font-family: var(--font-body); font-size: .78rem; font-weight: 700; color: #D8D4F0; display: flex; align-items: center;
+}
+.analytics-matrix-cell {
+  min-height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head); font-weight: 800; font-size: 1rem; color: #F3F1FF;
+  background: rgba(139, 92, 246, calc(.06 + var(--intensity) * .34));
+  border: 1px solid rgba(139, 92, 246, calc(.16 + var(--intensity) * .4));
+}
+.analytics-matrix-cell-empty { color: #4B4160; font-weight: 400; font-size: .8rem; }
+
+/* ---- Wave rollout bars ---- */
+.analytics-waves { display: flex; flex-direction: column; gap: 12px; max-width: 700px; }
+.analytics-wave-row { display: flex; align-items: center; gap: 14px; }
+.analytics-wave-label { flex: none; width: 56px; font-family: var(--font-head); font-weight: 700; font-size: .82rem; color: #EDEBFA; }
+.analytics-wave-bar {
+  flex: 1; height: 14px; border-radius: 999px; overflow: hidden; display: flex;
+  background: rgba(122, 105, 200, .1); border: 1px solid rgba(100, 125, 210, .25);
+}
+.analytics-wave-seg { display: block; height: 100%; width: calc(var(--seg-pct) * 100%); }
+.seg-live { background: #10B981; }
+.seg-indev { background: #3B82F6; }
+.seg-notstarted { background: rgba(122, 105, 200, .35); }
+.analytics-wave-count { flex: none; font-family: var(--font-body); font-size: .74rem; color: #A9A3C7; }
+
+.analytics-legend { display: flex; gap: 18px; margin-top: 12px; font-family: var(--font-body); font-size: .76rem; color: #A9A3C7; }
+.analytics-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.analytics-legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* ---- Real activity bars ---- */
+.analytics-agent-bars { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
+.analytics-agent-bar-row { display: flex; align-items: center; gap: 12px; }
+.analytics-agent-bar-label {
+  flex: none; width: 220px; font-family: var(--font-body); font-size: .8rem; color: #D8D4F0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.analytics-agent-bar-track {
+  flex: 1; height: 10px; border-radius: 999px; overflow: hidden;
+  background: rgba(122, 105, 200, .1); border: 1px solid rgba(100, 125, 210, .25);
+}
+.analytics-agent-bar-fill { display: block; height: 100%; width: calc(var(--fill-pct) * 100%); background: linear-gradient(90deg, #8B5CF6, #6D28D9); }
+.analytics-agent-bar-count { flex: none; font-family: var(--font-head); font-weight: 700; font-size: .8rem; color: #EDEBFA; min-width: 20px; text-align: right; }
+
+.analytics-note { font-family: var(--font-body); font-size: .76rem; color: #7A76A3; margin: 16px 0 0; max-width: 620px; line-height: 1.5; }
+
+@media (max-width: 860px) {
+  .analytics-matrix { grid-template-columns: 100px repeat(var(--stage-cols), 1fr); }
+  .analytics-agent-bar-label { width: 140px; }
+}
