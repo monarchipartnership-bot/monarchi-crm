@@ -8,11 +8,11 @@ Last updated: 2026-09-30.
 
 ## STOPPED HERE (2026-09-30) — read this first when picking work back up
 
-Phase 1, Phase 2, and Phase 3 are all fully built (see §5). **15 real
-agents exist, all of Wave 1 and Wave 2 are done** (every Wave 1 slot
-except `sales-automation-slot`, deliberately TBD by its own design; both
-Wave 2 items skipped were skipped deliberately, not left unbuilt — see
-§4.9).
+Phase 1, Phase 2, and Phase 3 are all fully built (see §5). **18 real
+agents exist, all of Wave 1 and Wave 2 are done, Wave 3's three research
+agents are done too** (every Wave 1 slot except `sales-automation-slot`,
+deliberately TBD by its own design; both Wave 2 items skipped were
+skipped deliberately, not left unbuilt — see §4.9).
 
 - **STANDING RULE (locked 2026-09-30, see `feedback_agent_build_order`
   memory): building every remaining agent in sequence, Claude's own
@@ -63,11 +63,23 @@ Wave 2 items skipped were skipped deliberately, not left unbuilt — see
   always work; writes work *inconsistently* (no pattern found for which
   do/don't) — don't assume one will go through, have a fallback ready,
   don't retry a blocked write through a different command.
+- **Also done (2026-09-30, same continuation):** the three Wave 3
+  research agents, all paste-mode v1s per their own `ladder.humanLed`→
+  `humanAssisted` rung (manager pastes research already gathered, agent
+  structures it — no live autonomous web research): `business-research-
+  agent` (business profile: model/niche, market/scale, value prop,
+  relevant pains, gaps — deeper than account-enrichment's short context
+  paragraph), `competitor-research-agent` (per-competitor breakdown plus
+  a differentiation-opportunity summary), `audience-research-agent`
+  (2-4 pain/motivation/trigger/message segments, not padded to 4 if the
+  input doesn't justify it). All three verified live via curl before
+  the UI was built, all render/wire correctly in a devPreview browser
+  check with no unexpected console errors.
 - **Next action, when resumed:** continue the §4.9 queue from wherever
-  the "BUILT" markers leave off — currently Wave 3 items 13-15, the
-  three research agents (`business-research-agent` /
-  `competitor-research-agent` / `audience-research-agent`), as
-  paste-mode v1s.
+  the "BUILT" markers leave off — currently item 16,
+  `client-onboarding-meeting-coordinator`. Check whether
+  `TeamCalendar.jsx`'s existing internal calendar data is reusable
+  before assuming a new external calendar API is needed.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master`, and every migration in
   `supabase/migrations/` is confirmed actually applied to the live
@@ -511,13 +523,12 @@ agents total now.
    no-fabricated-numbers rule (two escalating passes needed), and
    finally a `---`-delimiter structural split to stop preamble-comment
    leakage after two pure-prompt attempts failed.
-13-15. `business-research-agent` / `competitor-research-agent` /
-    `audience-research-agent` (W3, strategy-research) — build as
-    human-assisted v1s that structure research the manager already did
-    (pasted notes/links), not live autonomous web research — matches
-    each agent's own `ladder.humanLed`→`humanAssisted` distinction
-    already in the data model. A live-web-research version is a later,
-    higher-autonomy rung, not this pass.
+~~13-15. `business-research-agent` / `competitor-research-agent` /
+    `audience-research-agent` (W3, strategy-research)~~ — BUILT, all
+    three as paste-mode v1s (manager pastes research already gathered,
+    agent structures it — matches each agent's own `ladder.humanLed`→
+    `humanAssisted` rung, not live autonomous web research). Verified
+    live via curl for all three before the UI was built.
 16. `client-onboarding-meeting-coordinator` (W3, client-success) — check
     whether `TeamCalendar.jsx`'s existing internal calendar data is
     reusable before assuming this needs a new external calendar API.
