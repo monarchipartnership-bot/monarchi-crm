@@ -1,0 +1,40 @@
+/* Координатор AI-процесів — ninth real agent, built on the shared
+   AgentWorkspaceShell (see styles/agentWorkspace.css). */
+
+.to-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 4px; }
+.to-body::-webkit-scrollbar { width: 5px; }
+.to-body::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
+
+.to-field { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.to-field-grow { flex: 1; min-height: 160px; }
+.to-label { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #9891C4; }
+
+.to-textarea {
+  flex: 1; width: 100%; resize: vertical; min-height: 140px; border-radius: 14px; border: 1px solid rgba(100, 125, 210, .28);
+  background: rgba(7, 13, 30, .5); color: #F3F1FF; font-family: var(--font-body); font-size: .86rem; line-height: 1.55; padding: 14px 16px;
+}
+.to-textarea::placeholder { color: #7A76A3; }
+.to-textarea:focus { outline: none; border-color: rgba(164, 98, 255, .55); }
+
+.to-actions { display: flex; align-items: center; gap: 14px; flex: none; }
+.to-run-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; font-family: var(--font-body); font-weight: 600; font-size: .84rem;
+  cursor: pointer; box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6); transition: filter .15s, opacity .15s;
+}
+.to-run-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.to-run-btn:disabled { opacity: .6; cursor: default; }
+.to-status { font-family: var(--font-body); font-size: .8rem; color: #918CBB; }
+.to-status.error { color: #FCA5B1; }
+
+.to-result { flex: none; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; border-radius: 14px; background: rgba(7, 13, 30, .5); border: 1px solid rgba(100, 125, 210, .28); }
+.to-steps { display: flex; flex-direction: column; gap: 10px; }
+.to-step { display: flex; align-items: flex-start; gap: 12px; }
+.to-step-num {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; font-family: var(--font-head); font-weight: 800; font-size: .74rem;
+}
+.to-step-body { display: flex; flex-direction: column; gap: 2px; }
+.to-step-task { font-family: var(--font-body); font-size: .86rem; color: #E4E1F5; }
+.to-step-agent { font-family: var(--font-body); font-size: .8rem; font-weight: 600; color: #B879FF; }
+.to-summary { margin: 0; font-family: var(--font-body); font-size: .86rem; line-height: 1.6; color: #E4E1F5; padding-top: 10px; border-top: 1px solid rgba(100, 125, 210, .2); }

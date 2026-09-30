@@ -13,6 +13,7 @@ import DataIntegrityCheck from '../DataIntegrityCheck/DataIntegrityCheck';
 import AccountEnrichment from '../AccountEnrichment/AccountEnrichment';
 import CaseSelector from '../CaseSelector/CaseSelector';
 import QualityController from '../QualityController/QualityController';
+import TaskOrchestrator from '../TaskOrchestrator/TaskOrchestrator';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -33,6 +34,7 @@ const AGENT_TOOLS = {
   'account-enrichment': AccountEnrichment,
   'portfolio-case-selector': CaseSelector,
   'ai-quality-controller': QualityController,
+  'task-orchestrator': TaskOrchestrator,
 };
 
 // This page's own mount-time reveal: the core lights up, then every
