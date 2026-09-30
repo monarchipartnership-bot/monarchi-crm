@@ -18,6 +18,7 @@ import GoogleOptimizationAgent from '../GoogleOptimizationAgent/GoogleOptimizati
 import MarketingStrategist from '../MarketingStrategist/MarketingStrategist';
 import AiAccountManager from '../AiAccountManager/AiAccountManager';
 import LeadQualificationAgent from '../LeadQualificationAgent/LeadQualificationAgent';
+import ReplyAnalyzer from '../ReplyAnalyzer/ReplyAnalyzer';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -43,6 +44,7 @@ const AGENT_TOOLS = {
   'marketing-strategist': MarketingStrategist,
   'ai-account-manager': AiAccountManager,
   'lead-qualification-agent': LeadQualificationAgent,
+  'reply-analyzer': ReplyAnalyzer,
 };
 
 // This page's own mount-time reveal: the core lights up, then every
