@@ -11,6 +11,7 @@ import CoverLetterAgent from '../CoverLetterAgent/CoverLetterAgent';
 import JobPostAnalyzer from '../JobPostAnalyzer/JobPostAnalyzer';
 import DataIntegrityCheck from '../DataIntegrityCheck/DataIntegrityCheck';
 import AccountEnrichment from '../AccountEnrichment/AccountEnrichment';
+import CaseSelector from '../CaseSelector/CaseSelector';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -29,6 +30,7 @@ const AGENT_TOOLS = {
   'job-post-analyzer': JobPostAnalyzer,
   'data-integrity-check': DataIntegrityCheck,
   'account-enrichment': AccountEnrichment,
+  'portfolio-case-selector': CaseSelector,
 };
 
 // This page's own mount-time reveal: the core lights up, then every
