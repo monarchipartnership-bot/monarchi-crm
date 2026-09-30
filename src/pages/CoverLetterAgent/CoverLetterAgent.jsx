@@ -22,7 +22,13 @@ const LANGUAGE_OPTIONS = [
 // pasted job post: no client_id, no conversation to log, so — same as
 // DealHealthCheck — deliberately not wired into the ai_agent_conversations
 // activity feed.
-export default function CoverLetterAgent({ onClose }) {
+//
+// `initialPayload` (optional) is set only by a handoff from another agent
+// tool (§4.5 of the roadmap — JobPostAnalyzer's "Написати cover letter"
+// button, see ConstellationTest.jsx's handoffToAgentTool) — a normal open
+// from the map/catalog/search always passes null, same blank slate as
+// before this existed.
+export default function CoverLetterAgent({ onClose, initialPayload }) {
   const [language, setLanguage] = useState('English');
   const [style, setStyle] = useState(DEFAULT_STYLE_ID);
 
@@ -30,8 +36,8 @@ export default function CoverLetterAgent({ onClose }) {
   const [casesLoading, setCasesLoading] = useState(true);
   const [selectedCases, setSelectedCases] = useState(new Set());
 
-  const [jobPost, setJobPost] = useState('');
-  const [extraContext, setExtraContext] = useState('');
+  const [jobPost, setJobPost] = useState(initialPayload?.jobPost || '');
+  const [extraContext, setExtraContext] = useState(initialPayload?.extraContext || '');
 
   const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState({ text: '', error: false });
@@ -129,7 +135,10 @@ export default function CoverLetterAgent({ onClose }) {
         </div>
 
         <div className="cla-field cla-field-grow">
-          <label className="cla-label">Job post клієнта (Upwork)</label>
+          <label className="cla-label">
+            Job post клієнта (Upwork)
+            {initialPayload?.jobPost && <span className="cla-label-hint"> — підставлено з Агента аналізу оголошень</span>}
+          </label>
           <textarea className="cla-textarea cla-textarea-job" value={jobPost} onChange={(e) => setJobPost(e.target.value)} placeholder="Встав текст вакансії з Upwork…" />
         </div>
 

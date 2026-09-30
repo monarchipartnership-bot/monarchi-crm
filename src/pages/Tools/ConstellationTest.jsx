@@ -611,14 +611,29 @@ export default function ConstellationTest() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [coreOpen, setCoreOpen] = useState(false);
   const [agentToolOpen, setAgentToolOpen] = useState(null);
+  // Set only by a handoff from another agent tool (§4.5 of the roadmap —
+  // e.g. JobPostAnalyzer → CoverLetterAgent) — never by a normal map/
+  // catalog/search open, which always starts an agent with a blank slate.
+  const [agentToolPayload, setAgentToolPayload] = useState(null);
 
   // Agents with a real tool (AGENT_TOOLS) skip the generic read-only info
   // modal entirely and open straight into their own workspace — that
   // modal's content (badges/breaks-into/ladder/etc.) is still reachable
   // from inside the workspace itself via its own "?" button.
   function openAgent(agentWithContext) {
-    if (AGENT_TOOLS[agentWithContext.tool]) setAgentToolOpen(agentWithContext.tool);
+    if (AGENT_TOOLS[agentWithContext.tool]) { setAgentToolOpen(agentWithContext.tool); setAgentToolPayload(null); }
     else setSelectedAgent(agentWithContext);
+  }
+
+  // First event-triggered handoff between two agent tools (§4.5): one
+  // agent's own result hands off straight into another agent's workspace,
+  // pre-filled, instead of the human re-typing/re-pasting the same input.
+  // `payload` shape is whatever the target tool component itself expects
+  // via its own `initialPayload` prop — this function is deliberately
+  // generic, not aware of any specific agent's payload shape.
+  function handoffToAgentTool(toolKey, payload) {
+    setAgentToolOpen(toolKey);
+    setAgentToolPayload(payload || null);
   }
 
   const [deptPanelClosed, setDeptPanelClosed] = useState(false);
@@ -803,7 +818,7 @@ export default function ConstellationTest() {
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key !== 'Escape') return;
-      if (agentToolOpen) { setAgentToolOpen(null); return; }
+      if (agentToolOpen) { setAgentToolOpen(null); setAgentToolPayload(null); return; }
       if (selectedAgent) { setSelectedAgent(null); return; }
       if (coreOpen) { setCoreOpen(false); return; }
       if (focusedDept) resetView();
@@ -1273,7 +1288,13 @@ export default function ConstellationTest() {
 
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {
         const AgentTool = AGENT_TOOLS[agentToolOpen];
-        return <AgentTool onClose={() => setAgentToolOpen(null)} />;
+        return (
+          <AgentTool
+            onClose={() => { setAgentToolOpen(null); setAgentToolPayload(null); }}
+            initialPayload={agentToolPayload}
+            onHandoff={handoffToAgentTool}
+          />
+        );
       })()}
 
       {selectedAgent && <AgentInfoModal agent={selectedAgent} onClose={() => setSelectedAgent(null)} />}

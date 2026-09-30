@@ -13,32 +13,35 @@ Phase 1 and Phase 2 are both fully built (see §5). Phase 3 is underway:
 - **Done:** Agent activity feed + review queue + notification badges
   (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
   (§4.2), 4 real agents (Ads Insights Analyst, Deal Health Check, Cover
-  Letter Agent, Job Post Analyzer), Phase 3's first scheduled agent run
-  (§4.5) — `deal-health-check` runs automatically once a day via pg_cron
-  and is confirmed actually firing in production (real audit rows showing
-  up daily in "Задачі агентів", not just a one-off test) — and Phase 3's
-  Analytics/ROI dashboard (§4.6).
+  Letter Agent, Job Post Analyzer), Phase 3's scheduled agent run (§4.5)
+  — `deal-health-check` runs automatically once a day via pg_cron and is
+  confirmed actually firing in production — Phase 3's Analytics/ROI
+  dashboard (§4.6), and Phase 3's first agent handoff (§4.5) —
+  `job-post-analyzer` → `cover-letter-agent`, human-clicked, pre-filled.
 - **Infra change worth knowing about:** GitHub (`gh`), Vercel, and
   Supabase CLIs are now authenticated on the dev machine and linked to
   the real project (see `project_supabase_cli_access` memory) — direct
-  read access to the live Supabase DB is always available now
-  (`supabase db query --linked`), and direct writes work too as long as
+  read AND write access to the live Supabase DB now works
+  (`supabase db query --linked "<sql>"`), as long as
   `app/.claude/settings.local.json` has `Bash(supabase:*)` allowed (it
   does, as of 2026-09-30, but it's a machine-local/gitignored file so
-  don't assume it's present on a different machine). This is how a real,
-  previously-undocumented security bug got found and fixed this cycle —
-  see §6a.
-- **Next action, when resumed:** the next candidate is event-triggered
-  runs / agent handoffs (§4.5, not started) — or ask the user again if
-  priorities changed. Wave 1 still has 2 open, currently-unblocked slots
-  worth asking about too: the account/company-data enrichment agent
-  (blocked pending an external search API decision) and the case-selector
-  agent (largely redundant with what Cover Letter/Follow-up already do
-  internally — see the note on it in §4.2).
+  don't assume it's present on a different machine — a fresh session
+  picks the rule up correctly even if the session where the file was
+  created did not). This is how a real, previously-undocumented critical
+  security bug got found AND fixed this cycle — see §6a, fully confirmed
+  applied.
+- **Next action, when resumed:** only unbuilt Phase 3 item left is
+  *automatic* event-triggered runs (no human click) — §4.5. Wave 1 also
+  still has 2 open, currently-unblocked agent slots if another agent is
+  wanted instead: account/company-data enrichment (blocked pending an
+  external search API decision) and the case-selector agent (largely
+  redundant with what Cover Letter/Follow-up already do internally — see
+  §4.2). Ask the user rather than picking autonomously, as has been the
+  pattern throughout this project.
 - Nothing is mid-edit or uncommitted — every change through this point is
-  committed and pushed to `master` (the 2 new migrations are committed as
-  files too, same as every past migration — only their *execution* in
-  Supabase is pending).
+  committed and pushed to `master`, and every migration in
+  `supabase/migrations/` is confirmed actually applied to the live
+  database (not just written).
 
 ## 1. LOCKED — navigation model (do not revisit without being asked)
 
@@ -306,9 +309,24 @@ fit that table's recipient-targeted model.
   automatically) — not started; the scheduled-run plumbing above (cron →
   deterministic SQL → `ai_agent_conversations` row) is the template to
   reuse once there's a second candidate agent for this.
-- Handoffs between agents matching the Foundation → Capture → Generate →
-  Orchestrate stages already encoded in the data — right now those stages
-  are descriptive labels only, not a real pipeline. Not started.
+- **Handoffs between agents — first one BUILT (2026-09-30):**
+  `job-post-analyzer` (foundation stage) → `cover-letter-agent` (generate
+  stage) — the exact Foundation→Generate pipeline the stages already
+  encoded in `aiAgentsData.js` implied but nothing wired up yet. A
+  "Написати cover letter на основі цього job post →" button on the
+  analyzer's result calls `onHandoff(toolKey, payload)`
+  (`ConstellationTest.jsx`'s `handoffToAgentTool`, threaded to every
+  `AGENT_TOOLS` component alongside `onClose`) — opens Cover Letter Agent
+  pre-filled with the same job post plus the analyzer's structured
+  findings (niche/services/budget/flags) folded into "extraContext", so
+  the LLM call doesn't have to re-derive what's already known. Purely a
+  same-tab UI handoff (human still clicks the button) — not an automatic
+  event trigger, that's still the unbuilt item above. `initialPayload` is
+  the generic contract any agent tool can accept for this; `onHandoff` is
+  passed to every tool whether or not it uses it, so wiring a second
+  handoff pair later needs no ConstellationTest.jsx changes, only the
+  source agent calling `onHandoff` and the target agent reading
+  `initialPayload`.
 
 ### 4.6 Analytics / ROI — BUILT (2026-09-29)
 `src/pages/AgentAnalytics/AgentAnalytics.jsx`, the section's "Аналітика"
@@ -431,8 +449,10 @@ tab. Deliberately scoped to numbers that are actually real, not invented:
   `src/lib/api/jobPostAnalyzerApi.js`,
   `src/pages/JobPostAnalyzer/JobPostAnalyzer.jsx` +
   `src/styles/jobPostAnalyzerPage.css`.
-- Event-triggered runs, agent handoffs (4.5) — not started, next
-  candidate for this phase (or ask the user — see STOPPED HERE above).
+- **Built (2026-09-30):** first agent handoff (4.5) — `job-post-analyzer`
+  → `cover-letter-agent`, human-clicked, pre-filled. See §4.5 for detail.
+- Event-triggered *automatic* runs (no human click) still not started —
+  only remaining unbuilt item in Phase 3.
 
 **Phase 4 — Governance & polish**
 - Permissions, config/prompt versioning (4.7)

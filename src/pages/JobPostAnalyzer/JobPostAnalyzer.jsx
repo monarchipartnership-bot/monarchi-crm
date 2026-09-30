@@ -21,6 +21,19 @@ function briefAsText(result) {
   ].join('\n');
 }
 
+// Compact version of the brief for handing off into another agent's
+// "extraContext" field (see onHandoff below) — the target agent doesn't
+// need the summary paragraph, just the structured hints.
+function briefAsExtraContext(result) {
+  return [
+    'Аналіз job post (від Агента аналізу оголошень):',
+    `Ніша: ${result.niche || '—'}`,
+    `Потрібні послуги: ${result.services || '—'}`,
+    `Бюджет/терміни: ${result.budget || '—'}`,
+    `Червоні прапорці: ${result.flags || '—'}`,
+  ].join('\n');
+}
+
 // Fourth real agent — reads a pasted job post / inbound message and
 // produces a structured sales brief for the manager deciding whether and
 // how to respond. Purely an internal-facing extraction task (not
@@ -28,7 +41,14 @@ function briefAsText(result) {
 // architecture Cover Letter/Follow-up share — see jobPostAnalyzerPrompt.js.
 // Same "no client_id yet" shape as Cover Letter Agent: not wired into the
 // activity feed, for the same reason.
-export default function JobPostAnalyzer({ onClose }) {
+//
+// `onHandoff` (optional, passed by ConstellationTest for every agent tool
+// — see handoffToAgentTool there) opens another agent tool pre-filled
+// with this one's output — first real use of §4.5's event-triggered
+// handoff concept: job-post-analyzer (foundation stage) → cover-letter-
+// agent (generate stage) is exactly the Foundation→Generate pipeline the
+// roadmap describes as not real yet.
+export default function JobPostAnalyzer({ onClose, onHandoff }) {
   const [jobPost, setJobPost] = useState('');
   const [extraContext, setExtraContext] = useState('');
 
@@ -109,6 +129,15 @@ export default function JobPostAnalyzer({ onClose }) {
             </div>
 
             <div className="jpa-summary">{result.summary}</div>
+
+            {onHandoff && (
+              <button
+                type="button" className="jpa-handoff-btn"
+                onClick={() => onHandoff('cover-letter-agent', { jobPost, extraContext: briefAsExtraContext(result) })}
+              >
+                Написати cover letter на основі цього job post →
+              </button>
+            )}
           </div>
         )}
       </div>
