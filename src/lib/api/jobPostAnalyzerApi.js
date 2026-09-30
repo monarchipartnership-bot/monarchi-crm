@@ -10,7 +10,7 @@ export async function analyzeJobPost({ jobPost, extraContext }) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 800,
+      max_tokens: 1000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMsg }],
     }),
