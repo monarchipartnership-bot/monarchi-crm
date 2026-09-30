@@ -14,6 +14,10 @@
 
 .tm-avatar--lg { width: 64px; height: 64px; font-size: 1.6rem; }
 
+/* §4.7 manager-only role control on a teammate's own profile page. */
+.tm-role-edit { display: flex; align-items: center; gap: 10px; }
+.tm-role-msg { font-family: var(--font-body); font-size: .78rem; color: var(--muted); }
+
 .tm-edit-btn { margin-left: auto; text-decoration: none; flex: none; }
 
 @media (max-width: 640px) {

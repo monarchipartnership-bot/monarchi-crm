@@ -61,3 +61,13 @@ export async function reviewLeaveRequest(id, status, reviewedBy) {
   const { error } = await supabase.from('leave_requests').update({ status, reviewed_by: reviewedBy, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw error;
 }
+
+// §4.7 (docs/ai-agents-roadmap.md) — a targeted `update`, not `saveProfile`'s
+// upsert, so changing someone else's role can never accidentally blank out
+// the rest of their row. Only takes effect once
+// 20260930020000_harden_profiles_leave_requests_rls.sql is applied — before
+// that, `profiles_update` still lets any signed-in user change any role.
+export async function updateProfileRole(email, role) {
+  const { error } = await supabase.from('profiles').update({ role, updated_at: new Date().toISOString() }).eq('email', email);
+  if (error) throw error;
+}

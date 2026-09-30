@@ -355,13 +355,10 @@ export default function Account() {
                   <div className="pf"><label>Посада</label><input type="text" value={form.position} onChange={(e) => setField('position', e.target.value)} placeholder="напр. Sales Manager" /></div>
                   <div className="pf">
                     <label>Роль</label>
-                    <select value={form.role} onChange={(e) => setField('role', e.target.value)}>
-                      <option value="member">Член команди</option>
-                      <option value="ops_manager">Операційний менеджер</option>
-                    </select>
+                    <span>{form.role === 'ops_manager' ? 'Операційний менеджер' : 'Член команди'}</span>
                   </div>
                   <div className="pf pf-full">
-                    <div className="role-note">Роль поки що впливає лише на інтерфейс (хто бачить заявки на розгляд) — без окремої перевірки прав доступу це ще не є повноцінним захистом.</div>
+                    <div className="role-note">Роль призначає операційний менеджер зі сторінки профілю учасника в «Команда» — самостійно змінити її тут більше не можна (захищено на рівні бази даних).</div>
                   </div>
                 </div>
                 <div className="acp-divider" />
