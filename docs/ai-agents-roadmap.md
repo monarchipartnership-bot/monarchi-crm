@@ -433,16 +433,46 @@ tab. Deliberately scoped to numbers that are actually real, not invented:
   this once the business defines a real per-agent estimate to plug in,
   not before.
 
-### 4.7 Governance (later)
-- Permissions: who can trigger/configure which agents.
-- Per-agent data access scope.
-- Prompt/config version history + changelog.
+### 4.7 Governance (later — blocked on a real decision, not just code)
+Investigated 2026-09-30 before starting §4.8: this CRM has **no roles/
+permissions system at all** — `AuthContext.jsx` has no `role`/`isAdmin`
+field, every authenticated user has identical access everywhere.
+- Permissions: who can trigger/configure which agents. — Building this
+  for real means inventing a whole new access-control layer for the
+  CRM (who counts as admin, what else it gates), not a small addition.
+  A genuine product decision, not something to design and ship silently
+  — surfaced to the user rather than guessed. Not started.
+- Per-agent data access scope. — Largely already covered transitively:
+  every agent reads through the same Supabase client as the rest of the
+  app, so existing per-table RLS (see `project_rls_everywhere` memory)
+  already scopes what any signed-in user's agent calls can reach. A
+  distinct *per-agent* scope on top of that inherits the same "need a
+  roles system first" blocker as the item above.
+- Prompt/config version history + changelog. — Assumes prompts are
+  DB-backed and editable; they're not, they're hardcoded in source
+  files per agent (e.g. `src/lib/performanceCopywriterPrompt.js`).
+  Making them versioned-and-editable would mean turning static prompt
+  files into a runtime config system — a real architecture decision.
+  Until/unless that happens, `git log` on each agent's own prompt file
+  already **is** its real version history, same as any other code.
 
-### 4.8 Change management (later)
-- Surface a "what's new" moment when an agent flips
-  not_started → in_development → live, instead of the team discovering it
-  by clicking around.
-- Lightweight per-agent onboarding/tour when it first goes live.
+### 4.8 Change management — BUILT (2026-09-30)
+- **"What's new" banner** — a dismissible pill on the Мапа tab showing
+  how many agents changed status since this viewer last dismissed it,
+  expandable into a dated list (clicking an item opens its workspace).
+  Backed by a new `statusChangedAt` field per `in_development` agent in
+  `aiAgentsData.js`, populated from each agent's own real first-commit
+  date (`git log --follow --diff-filter=A`), not guessed. Dismiss state
+  is per-viewer `localStorage` (`aiAgentsWhatsNewSeenAt`).
+- **Lightweight first-time per-agent info popup** — `AgentWorkspaceShell`
+  auto-opens the existing `AgentInfoModal` (no new modal built — it
+  already covers autonomy/status/ladder/build notes, exactly what a
+  first-time tour would want to say) the first time any given agent's
+  workspace opens on a browser, then marks it seen
+  (`aiAgentSeen:<key>` in `localStorage`) so it doesn't repeat.
+- Verified live in a devPreview browser check: correct count/plural
+  form, correct sorted dates, expand/collapse/dismiss persist across
+  reload, first-time popup fires once and not again on a second open.
 
 ## 4.9 Agent build queue (LOCKED 2026-09-30 — see feedback_agent_build_order memory)
 
