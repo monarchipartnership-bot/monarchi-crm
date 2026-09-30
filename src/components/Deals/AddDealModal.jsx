@@ -5,6 +5,7 @@ import DatePicker from '../common/DatePicker';
 import { createDeal } from '../../lib/api/deals';
 import { updateClientDirectoryEntry } from '../../lib/api/clients';
 import { fetchDealStages } from '../../lib/api/dealStages';
+import { runJobPostAnalysisForDeal } from '../../lib/api/jobPostAnalyzerActivity';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 
 // `defaultPipelineId` seeds the form's own Pipeline field from whatever
@@ -24,6 +25,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
   const [title, setTitle] = useState('');
   const [source, setSource] = useState('');
   const [chatLink, setChatLink] = useState('');
+  const [jobPostText, setJobPostText] = useState('');
   const [company, setCompany] = useState(presetClient?.company || '');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('USD');
@@ -59,6 +61,17 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
       if (deal) {
         if (company.trim() !== (client.company || '')) {
           updateClientDirectoryEntry(client.id, { company: company.trim() || null }, client).catch(() => {});
+        }
+        // Phase 3 (§4.5) — first automatic, event-triggered agent run: if
+        // a job post/inbound text was pasted, the deal's own creation is
+        // the event, no human opens the AI Agents section for this. Fire-
+        // and-forget — the LLM call takes a few seconds and shouldn't
+        // block closing the modal; a failure here shouldn't undo the
+        // already-created deal.
+        if (jobPostText.trim()) {
+          runJobPostAnalysisForDeal({ clientId: client.id, jobPost: jobPostText }).catch((e) => {
+            console.warn('runJobPostAnalysisForDeal failed', e);
+          });
         }
         onCreated(deal);
       }
@@ -116,6 +129,18 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
 
             {expanded && (
               <>
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.document }} />
+                  <div className="wk-field-body">
+                    <label>Job post / вхідне звернення (необов&apos;язково)</label>
+                    <textarea
+                      className="add-deal-jobpost-textarea" value={jobPostText} onChange={(e) => setJobPostText(e.target.value)}
+                      placeholder="Встав текст job post чи вхідного звернення — після створення угоди AI-агент сам розбере його на sales brief"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
                 <div className="wk-field-box wk-field-box-wide">
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
                   <div className="wk-field-body">

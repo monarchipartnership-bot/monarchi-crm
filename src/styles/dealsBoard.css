@@ -17,6 +17,11 @@
   background: transparent; border: none; color: var(--ink); padding: 0;
   font-size: .82rem; font-family: var(--font-body); outline: none; width: 100%;
 }
+.add-deal-jobpost-textarea {
+  background: transparent; border: none; color: var(--ink); padding: 0; margin-top: 2px;
+  font-size: .82rem; font-family: var(--font-body); outline: none; width: 100%; resize: vertical;
+}
+.add-deal-jobpost-textarea::placeholder { color: var(--muted); }
 .wk-field-box .client-picker input[type="text"] {
   background: transparent; border: none; padding: 0;
 }

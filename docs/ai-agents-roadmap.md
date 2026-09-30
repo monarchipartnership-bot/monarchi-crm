@@ -8,7 +8,8 @@ Last updated: 2026-09-30.
 
 ## STOPPED HERE (2026-09-30) — read this first when picking work back up
 
-Phase 1 and Phase 2 are both fully built (see §5). Phase 3 is underway:
+Phase 1, Phase 2, and Phase 3 are all fully built (see §5) — every item
+in §4.1 through §4.6 has at least one real implementation now.
 
 - **Done:** Agent activity feed + review queue + notification badges
   (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
@@ -16,28 +17,34 @@ Phase 1 and Phase 2 are both fully built (see §5). Phase 3 is underway:
   Letter Agent, Job Post Analyzer), Phase 3's scheduled agent run (§4.5)
   — `deal-health-check` runs automatically once a day via pg_cron and is
   confirmed actually firing in production — Phase 3's Analytics/ROI
-  dashboard (§4.6), and Phase 3's first agent handoff (§4.5) —
-  `job-post-analyzer` → `cover-letter-agent`, human-clicked, pre-filled.
+  dashboard (§4.6), Phase 3's first agent handoff (§4.5) —
+  `job-post-analyzer` → `cover-letter-agent`, human-clicked, pre-filled —
+  and Phase 3's first *automatic* event-triggered run (§4.5) —
+  `job-post-analyzer` also fires with zero human click whenever a new
+  deal is created with job-post/inbound text pasted into its optional
+  field, logging straight into the activity feed against that deal's real
+  client_id (see §4.5 for why this is the one place `job-post-analyzer`
+  *can* log there, unlike its manual/standalone use).
 - **Infra change worth knowing about:** GitHub (`gh`), Vercel, and
   Supabase CLIs are now authenticated on the dev machine and linked to
   the real project (see `project_supabase_cli_access` memory) — direct
-  read AND write access to the live Supabase DB now works
-  (`supabase db query --linked "<sql>"`), as long as
-  `app/.claude/settings.local.json` has `Bash(supabase:*)` allowed (it
-  does, as of 2026-09-30, but it's a machine-local/gitignored file so
-  don't assume it's present on a different machine — a fresh session
-  picks the rule up correctly even if the session where the file was
-  created did not). This is how a real, previously-undocumented critical
-  security bug got found AND fixed this cycle — see §6a, fully confirmed
-  applied.
-- **Next action, when resumed:** only unbuilt Phase 3 item left is
-  *automatic* event-triggered runs (no human click) — §4.5. Wave 1 also
-  still has 2 open, currently-unblocked agent slots if another agent is
-  wanted instead: account/company-data enrichment (blocked pending an
-  external search API decision) and the case-selector agent (largely
-  redundant with what Cover Letter/Follow-up already do internally — see
-  §4.2). Ask the user rather than picking autonomously, as has been the
-  pattern throughout this project.
+  read access to the live Supabase DB always works
+  (`supabase db query --linked "<sql>"`). Direct **writes** work
+  *sometimes* — confirmed working for a security-fix REVOKE/migration
+  repair earlier in this cycle, then confirmed BLOCKED for a plain test
+  INSERT later the same day, no clear pattern found for which is which.
+  Don't assume a write will go through; have the fallback (present it as
+  a migration file for the user to run, or verify via code review + a
+  read-only check instead of a live insert) ready before attempting one.
+- **Next action, when resumed:** every roadmapped item through Phase 3 is
+  built. Ask the user what's next — more Wave 1 agents (2 open,
+  currently-unblocked slots: account/company-data enrichment, blocked
+  pending an external search API decision; and the case-selector agent,
+  largely redundant with what Cover Letter/Follow-up already do
+  internally — see §4.2), Phase 4 (governance/polish, §4.7-4.8), or
+  something else entirely. Don't pick autonomously — every agent and
+  every phase-priority decision in this project so far has been the
+  user's call, not something to infer.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master`, and every migration in
   `supabase/migrations/` is confirmed actually applied to the live
@@ -270,10 +277,14 @@ Currently invisible. Needs:
   removes the schema blocker if this is ever revisited, but the "every
   manual click would spam the feed" reasoning still applies unless/until
   this agent also gets a scheduled, digest-shaped trigger.
-- **`JobPostAnalyzer` (built 2026-09-30) also deliberately does NOT log
-  into this feed**, exact same reasoning as `CoverLetterAgent` — one-off
-  manual paste-and-analyze on a job post with no client_id yet, no
-  scheduled/digest framing available.
+- **`JobPostAnalyzer`'s manual/standalone tool (opened from the map/
+  catalog) still deliberately does NOT log into this feed**, exact same
+  reasoning as `CoverLetterAgent` — one-off manual paste-and-analyze on a
+  job post with no client_id yet, no scheduled/digest framing available.
+  **Its event-triggered path DOES log into this feed** (built 2026-09-30,
+  see §4.5) — when it's `AddDealModal` firing it right after a new deal is
+  created, a real client_id already exists, closing exactly the gap that
+  keeps the manual tool out.
 
 ### 4.4 Notifications — BUILT (2026-09-26)
 Minimal version, deliberately not the personal per-recipient `notifications`
@@ -305,10 +316,46 @@ fit that table's recipient-targeted model.
   had to become nullable — a cross-client scan has no single client to
   attach to, see §4.3) and
   `2026-09-29_deal_health_check_scheduled_run.sql`.
-- Event-triggered runs (e.g., new lead → qualification agent runs
-  automatically) — not started; the scheduled-run plumbing above (cron →
-  deterministic SQL → `ai_agent_conversations` row) is the template to
-  reuse once there's a second candidate agent for this.
+- **Event-triggered runs — first one BUILT (2026-09-30):** a new deal
+  being created is the event — no cron, no human opening the AI Agents
+  section. `AddDealModal.jsx` got one new optional field ("Job post /
+  вхідне звернення") right in the existing Add Deal form; if a manager
+  pastes text there, `handleSave()` fires
+  `runJobPostAnalysisForDeal({ clientId, jobPost })`
+  (`src/lib/api/jobPostAnalyzerActivity.js`) fire-and-forget right after
+  the deal itself is created — doesn't block the modal closing, a failure
+  here doesn't undo the deal. Reuses `job-post-analyzer`'s exact
+  prompt/parser (`analyzeJobPost()`, no new LLM logic) and logs straight
+  into `ai_agent_conversations`/`ai_agent_messages` via the same
+  `createConversation`/`appendMessages` helpers `AdsInsightsAnalyst.jsx`'s
+  `runAudit()` already uses (`src/lib/api/aiConversations.js`) — `kind:
+  'audit'`, `needs_review: true`, `created_by: 'Автоматично (нова
+  угода)'`.
+  This is deliberately NOT a Postgres trigger calling the LLM directly —
+  Postgres/pg_cron can run deterministic SQL (see deal-health-check
+  above) but can't reasonably call an external HTTPS API like
+  `/api/anthropic` without a lot of new plumbing (`pg_net`, async
+  webhooks, retry handling) for one agent; firing this from the React
+  form that already creates the deal is far simpler and already proven
+  reliable via the exact same helpers other agents use.
+  This is also the one place `job-post-analyzer` output legitimately
+  lands in the activity feed: unlike its manual/standalone use (see
+  §4.3's note — no client_id exists yet when someone just pastes a job
+  post to try the tool), a brand-new deal already has a real client_id by
+  the time this fires.
+  **Verified (2026-09-30):** the prompt+parser were run for real against
+  the deployed `/api/anthropic` twice (via `curl` + actual Node execution
+  of the real JS, not a text-only simulation) and produced correctly-
+  shaped results both times; the `createConversation`/`appendMessages`
+  call path is the exact pre-existing, already-in-production code
+  `AdsInsightsAnalyst` uses, not new risky logic. A live insert-and-
+  verify-then-clean-up test on a real (test) client was attempted but
+  blocked by this session's Bash auto-mode classifier partway through
+  (inconsistent — a very similar write had succeeded earlier the same
+  day, see the STOPPED HERE infra note) — not retried further per that
+  denial's own instructions. The one piece confirmed only by code review
+  rather than a live run is the exact DB write; everything upstream of it
+  is confirmed live.
 - **Handoffs between agents — first one BUILT (2026-09-30):**
   `job-post-analyzer` (foundation stage) → `cover-letter-agent` (generate
   stage) — the exact Foundation→Generate pipeline the stages already
@@ -451,8 +498,14 @@ tab. Deliberately scoped to numbers that are actually real, not invented:
   `src/styles/jobPostAnalyzerPage.css`.
 - **Built (2026-09-30):** first agent handoff (4.5) — `job-post-analyzer`
   → `cover-letter-agent`, human-clicked, pre-filled. See §4.5 for detail.
-- Event-triggered *automatic* runs (no human click) still not started —
-  only remaining unbuilt item in Phase 3.
+- **Built (2026-09-30):** first automatic event-triggered run (4.5) —
+  creating a new deal with job-post/inbound text pasted into
+  `AddDealModal`'s new optional field auto-runs `job-post-analyzer` with
+  zero human click, logging into the activity feed. See §4.5 for detail
+  including what's verified live vs. by code review only.
+- **Phase 3 is now fully built** — every §4.1-§4.6 item has at least one
+  real implementation. Next is Phase 4, more Wave 1 agents, or whatever
+  the user prioritizes next — ask, don't assume.
 
 **Phase 4 — Governance & polish**
 - Permissions, config/prompt versioning (4.7)
