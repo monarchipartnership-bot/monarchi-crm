@@ -23,6 +23,7 @@ import PerformanceCopywriter from '../PerformanceCopywriter/PerformanceCopywrite
 import BusinessResearchAgent from '../BusinessResearchAgent/BusinessResearchAgent';
 import CompetitorResearchAgent from '../CompetitorResearchAgent/CompetitorResearchAgent';
 import AudienceResearchAgent from '../AudienceResearchAgent/AudienceResearchAgent';
+import OnboardingMeetingCoordinator from '../OnboardingMeetingCoordinator/OnboardingMeetingCoordinator';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -53,6 +54,7 @@ const AGENT_TOOLS = {
   'business-research-agent': BusinessResearchAgent,
   'competitor-research-agent': CompetitorResearchAgent,
   'audience-research-agent': AudienceResearchAgent,
+  'client-onboarding-meeting-coordinator': OnboardingMeetingCoordinator,
 };
 
 // This page's own mount-time reveal: the core lights up, then every
