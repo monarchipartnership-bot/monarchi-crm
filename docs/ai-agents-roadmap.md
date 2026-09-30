@@ -421,6 +421,89 @@ tab. Deliberately scoped to numbers that are actually real, not invented:
   by clicking around.
 - Lightweight per-agent onboarding/tour when it first goes live.
 
+## 4.9 Agent build queue (LOCKED 2026-09-30 — see feedback_agent_build_order memory)
+
+User: "делаем всех агентов по очереди, порядок выбери сам" — standing
+instruction, don't ask which agent is next, just work through this queue
+in order, one at a time, each still built/verified to the same bar as
+the first 5. Only 29 real agent slots total (not the "44" older notes
+guessed at — that number was never right; `AgentCatalog`'s own summary
+line is the source of truth). 5 done, 24 left: 18 queued below, 6
+explicitly flagged as blocked on something only the user can decide (not
+in the queue — don't build a fake/mocked version of these).
+
+**Queue (build in this order):**
+1. `account-enrichment` (W1, sales/qualification) — reinterpreted to
+   avoid the original paid-enrichment-API blocker: fetch the client's own
+   website (already have `deals.website`/similar fields) server-side and
+   have an LLM summarize niche/size/positioning into "Додатковий
+   контекст" — no new vendor needed, just a fetch + summarize.
+2. `portfolio-case-selector` (W1, sales/proposal) — standalone "which
+   Mon'Archi case fits this client/task" tool over the existing
+   `followup_cases` table, usable outside the Cover Letter/Follow-up
+   flows (e.g. for a live sales call).
+3. `ai-quality-controller` (W1, quality-control) — second-opinion review
+   over another agent's already-generated output; worth building now
+   that 5 real agents produce real output to review.
+4. `task-orchestrator` (W1, management) — "which agent should handle
+   this" router; more useful with a bigger roster, so last of Wave 1.
+5. `google-ads-analyst` (W2, performance-delivery) — reuses the exact
+   `GoogleAdsApi` client/credentials `AdsInsightsAnalyst`/
+   `api/ads-insights-chat.js` already has proven working — NOT blocked,
+   despite living in Wave 2.
+6. `google-optimization-agent` (W2) — natural pair with #5 (diagnosis →
+   plan); consider a handoff between them like job-post-analyzer→cover-
+   letter-agent.
+7. `cross-channel-reporting-insights-agent` (W2, data-tracking-reporting)
+   — "what changed and why" over the existing `daily_reports`/
+   `weekly_reports`/`monthly_reports` tables — no new API needed.
+8. `marketing-strategist` (W2, strategy-research) — standalone strategy-
+   brief generator from manually-described business context/goals
+   (doesn't need the not-yet-built research agents' output as input).
+9. `ai-account-manager` (W2, client-success) — aggregates a client's
+   existing data (deals, notes, tasks, `ai_agent_conversations`) into one
+   briefing; deterministic aggregation + one LLM summary pass, no new API.
+10. `lead-qualification-agent` (W3, sales) — ICP-fit check over existing
+    deal/client data.
+11. `reply-analyzer` (W3, sales) — parses an inbound reply, suggests next
+    step; same shape as job-post-analyzer.
+12. `performance-copywriter` (W3, performance-creative) — standalone ad
+    copy from a manually-described angle/hypothesis (doesn't need
+    creative-strategist's output, which isn't built and may never be —
+    see the flagged-blocked list below).
+13-15. `business-research-agent` / `competitor-research-agent` /
+    `audience-research-agent` (W3, strategy-research) — build as
+    human-assisted v1s that structure research the manager already did
+    (pasted notes/links), not live autonomous web research — matches
+    each agent's own `ladder.humanLed`→`humanAssisted` distinction
+    already in the data model. A live-web-research version is a later,
+    higher-autonomy rung, not this pass.
+16. `client-onboarding-meeting-coordinator` (W3, client-success) — check
+    whether `TeamCalendar.jsx`'s existing internal calendar data is
+    reusable before assuming this needs a new external calendar API.
+17. `job-lead-finder` (W3, sales) — likely needs a real lead-sourcing
+    decision (which job boards/APIs); assess when reached, may end up
+    flagged-blocked instead of built.
+18. `ai-chief-of-staff` (W3, management) — top-level cross-department
+    router; build last, it's the one that benefits most from the fullest
+    possible roster underneath it.
+
+**Explicitly flagged as blocked — do NOT build a fake/mocked version,
+skip and ask the user only if/when actually reached:**
+- `meta-ads-analyst`, `meta-optimization-agent` — Meta Marketing API
+  needs its own app + business verification + credentials, nothing this
+  project has today (confirmed: `api/ads-insights-chat.js` only ever
+  implemented Google Ads, despite the parent agent's own description
+  namedropping Meta too).
+- `tiktok-ads-analyst` — same shape of blocker, TikTok Ads API.
+- `creative-strategist`, `creative-performance-analyst` — need a
+  creative-asset/performance-per-creative data model that doesn't exist
+  anywhere in this CRM yet; this is a product decision (whether/how to
+  even track that data) before it's an agent-build task.
+- `sales-automation-slot` — explicitly, per its own `aiAgentsData.js`
+  description, "TBD only after a mini-audit of the Sales team" — the
+  slot exists specifically to NOT be pre-guessed.
+
 ## 5. Phased roadmap
 
 **Phase 1 — Tracking & accountability** ← current focus
