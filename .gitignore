@@ -25,3 +25,6 @@ dist-ssr
 
 .vercel
 supabase/.temp
+
+# Personal, machine-local Claude Code permission overrides — never shared/committed
+.claude/settings.local.json
