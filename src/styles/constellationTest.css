@@ -62,6 +62,51 @@
 .constellation-exit:hover { color: #fff; border-color: rgba(255, 255, 255, .22); }
 .constellation-exit svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
+/* "What's new" banner (§4.8 docs/ai-agents-roadmap.md) — sits centered
+   just below .constellation-section-nav, only on the Мапа tab. Dismissing
+   it writes a per-viewer localStorage timestamp (see WHATS_NEW_SEEN_KEY in
+   ConstellationTest.jsx) so it only reappears once something newer ships,
+   not on every reload. */
+.whats-new-banner {
+  position: absolute; top: 66px; left: 50%; transform: translateX(-50%); z-index: 7;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  max-width: min(560px, calc(100vw - 40px));
+}
+.whats-new-summary {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
+  border: 1px solid rgba(245, 158, 11, .35); border-radius: 999px; padding: 8px 10px 8px 8px;
+  font-family: var(--font-body); font-size: .8rem; color: #EDE7F5; cursor: pointer;
+}
+.whats-new-badge {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 10px; border-radius: 999px; background: #F59E0B; color: #1a1200;
+  font-family: var(--font-head); font-weight: 800; font-size: 10px; letter-spacing: .04em;
+}
+.whats-new-text { font-weight: 600; }
+.whats-new-chevron { width: 14px; height: 14px; stroke: #C9BAD9; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+.whats-new-chevron.open { transform: rotate(180deg); }
+.whats-new-list {
+  width: 100%; margin-top: 6px; max-height: 220px; overflow-y: auto;
+  background: rgba(23, 17, 42, .88); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, .08); border-radius: 14px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.whats-new-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  border: none; background: none; border-radius: 9px; padding: 8px 10px; cursor: pointer;
+  color: #EDE7F5; font-family: var(--font-body); font-size: .8rem;
+}
+.whats-new-item:hover, .whats-new-item:focus-visible { background: rgba(255, 255, 255, .08); outline: none; }
+.whats-new-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+.whats-new-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whats-new-date { flex-shrink: 0; font-size: .7rem; color: #9C8FB3; }
+.whats-new-dismiss {
+  margin-top: 6px; border: none; background: none; color: #9C8FB3;
+  font-family: var(--font-body); font-size: .74rem; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.whats-new-dismiss:hover { color: #EDE7F5; }
+
 /* Agent search — same matte pill look as .constellation-exit, sits to its
    left in the same top-right cluster. Results dropdown is its own
    absolutely-positioned panel below the pill, not a native <select>, so it

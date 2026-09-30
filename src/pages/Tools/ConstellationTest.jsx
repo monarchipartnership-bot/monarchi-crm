@@ -635,6 +635,16 @@ const SECTIONS = [
   { key: 'analytics', label: 'Аналітика' },
 ];
 
+const WHATS_NEW_SEEN_KEY = 'aiAgentsWhatsNewSeenAt';
+
+function pluralAgents(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'агент';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'агенти';
+  return 'агентів';
+}
+
 export default function ConstellationTest() {
   const [section, setSection] = useState('map');
   const agentReviewCount = useAgentReviewCount();
@@ -724,6 +734,28 @@ export default function ConstellationTest() {
     });
     return list;
   }, []);
+  // §4.8 "what's new" (docs/ai-agents-roadmap.md) — surfaces agents whose
+  // statusChangedAt is newer than the last time this viewer dismissed the
+  // banner, instead of the team discovering a newly-built agent by
+  // clicking around. Per-viewer convenience state only (not synced data),
+  // so localStorage is the right place for it, same as this app's other
+  // remembered-preference uses.
+  const [whatsNewSeenAt, setWhatsNewSeenAt] = useState(() => {
+    try { return localStorage.getItem(WHATS_NEW_SEEN_KEY); } catch { return null; }
+  });
+  const [whatsNewExpanded, setWhatsNewExpanded] = useState(false);
+  const recentlyChangedAgents = useMemo(() => (
+    allAgents
+      .filter((a) => a.statusChangedAt && (!whatsNewSeenAt || a.statusChangedAt > whatsNewSeenAt))
+      .sort((a, b) => (b.statusChangedAt || '').localeCompare(a.statusChangedAt || ''))
+  ), [allAgents, whatsNewSeenAt]);
+  function dismissWhatsNew() {
+    const now = new Date().toISOString().slice(0, 10);
+    try { localStorage.setItem(WHATS_NEW_SEEN_KEY, now); } catch { /* per-viewer convenience only, fine if it fails */ }
+    setWhatsNewSeenAt(now);
+    setWhatsNewExpanded(false);
+  }
+
   const [agentSearch, setAgentSearch] = useState('');
   // Separate from whether there's query text — lets a click outside the
   // search box collapse the results panel while leaving whatever was typed
@@ -922,6 +954,30 @@ export default function ConstellationTest() {
           CRM
         </Link>
       </div>
+
+      {section === 'map' && recentlyChangedAgents.length > 0 && (
+        <div className="whats-new-banner">
+          <button type="button" className="whats-new-summary" onClick={() => setWhatsNewExpanded((v) => !v)}>
+            <span className="whats-new-badge">Нове</span>
+            <span className="whats-new-text">
+              {recentlyChangedAgents.length} {pluralAgents(recentlyChangedAgents.length)} нещодавно з&apos;явились або оновились
+            </span>
+            <svg className={'whats-new-chevron' + (whatsNewExpanded ? ' open' : '')} viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          {whatsNewExpanded && (
+            <div className="whats-new-list">
+              {recentlyChangedAgents.map((a) => (
+                <button key={a.key} type="button" className="whats-new-item" onClick={() => openAgent(a)}>
+                  <span className="whats-new-dot" style={{ background: a.color }} />
+                  <span className="whats-new-name">{a.name}</span>
+                  <span className="whats-new-date">{a.statusChangedAt}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" className="whats-new-dismiss" onClick={dismissWhatsNew}>Приховати</button>
+        </div>
+      )}
 
       {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
       {section === 'analytics' && <AgentAnalytics agents={allAgents} />}
