@@ -16,6 +16,7 @@ import QualityController from '../QualityController/QualityController';
 import TaskOrchestrator from '../TaskOrchestrator/TaskOrchestrator';
 import GoogleOptimizationAgent from '../GoogleOptimizationAgent/GoogleOptimizationAgent';
 import MarketingStrategist from '../MarketingStrategist/MarketingStrategist';
+import AiAccountManager from '../AiAccountManager/AiAccountManager';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -39,6 +40,7 @@ const AGENT_TOOLS = {
   'task-orchestrator': TaskOrchestrator,
   'google-optimization-agent': GoogleOptimizationAgent,
   'marketing-strategist': MarketingStrategist,
+  'ai-account-manager': AiAccountManager,
 };
 
 // This page's own mount-time reveal: the core lights up, then every
