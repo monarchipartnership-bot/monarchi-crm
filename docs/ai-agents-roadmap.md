@@ -8,41 +8,47 @@ Last updated: 2026-09-30.
 
 ## STOPPED HERE (2026-09-30) — read this first when picking work back up
 
-Phase 1, Phase 2, and Phase 3 are all fully built (see §5). **18 real
-agents exist, all of Wave 1 and Wave 2 are done, Wave 3's three research
-agents are done too** (every Wave 1 slot except `sales-automation-slot`,
-deliberately TBD by its own design; both Wave 2 items skipped were
-skipped deliberately, not left unbuilt — see §4.9).
+Phase 1, Phase 2, and Phase 3 are all fully built (see §5). **The §4.9
+locked build queue is now fully worked through — 20 real agents exist.**
+Every buildable queue item is built; every skipped item is skipped with
+a documented reason in its `aiAgentsData.js` `buildNotes`, never faked.
 
 - **STANDING RULE (locked 2026-09-30, see `feedback_agent_build_order`
-  memory): building every remaining agent in sequence, Claude's own
-  order, no per-agent confirmation question.** The queue is §4.9 below —
-  read that first, it's the actual source of truth for "what's next,"
-  not this section. Only stop the sequence to ask if an agent is
-  genuinely blocked on something only the user can decide (see §4.9's
-  explicitly-flagged-blocked list) — skip that one, don't fake/mock it,
-  keep going with the next queued item.
-- **Done, in order:** Ads Insights Analyst, Deal Health Check, Cover
-  Letter Agent, Job Post Analyzer, Data Integrity Check (5th, picked
-  autonomously once by explicit one-off request — see git history if the
-  reasoning is needed, not repeated here), Account Enrichment, Portfolio
-  Case Selector, AI Quality Controller, Task Orchestrator (completes
-  Wave 1), Google Optimization Agent, Marketing Strategist, AI Account
-  Manager, Lead Qualification Agent, Reply Analyzer, Performance
-  Copywriter (completes Wave 3's sales/creative slots plus Wave 2's
-  strategy/account-management slots — see queue numbering in §4.9, waves
-  were interleaved slightly since #10 `google-optimization-agent` is W2
-  but #13-15 research agents are W3 and not yet built). Every one
-  verified live against production (real API calls, not just code
-  review) before moving to the next — see §4.9 and each agent's own
-  `buildNotes` in `aiAgentsData.js` for specifics. Two queue items were
-  deliberately skipped-not-built after real investigation found them
-  redundant/mismatched, documented in `buildNotes` rather than faked:
-  `google-ads-analyst` (redundant with `ads-insights-analyst`) and
-  `cross-channel-reporting-insights-agent` (the `daily/weekly/monthly_
-  reports` tables hold sales-activity data, not ad-platform metrics; the
-  true cross-channel version is blocked on the same missing Meta/TikTok
-  API as other flagged agents).
+  memory): build every remaining agent in sequence, Claude's own order,
+  no per-agent confirmation question.** Still in force for anything new
+  added to the queue later. Only stop to ask if an agent is genuinely
+  blocked on something only the user can decide (vendor/API choice,
+  budget call, ambiguous business rule) — skip that one, don't fake it,
+  keep going.
+- **All 20 agents, in build order:** Ads Insights Analyst, Deal Health
+  Check, Cover Letter Agent, Job Post Analyzer, Data Integrity Check
+  (5th, picked autonomously once by explicit one-off request), Account
+  Enrichment, Portfolio Case Selector, AI Quality Controller, Task
+  Orchestrator (closes Wave 1) — then Google Optimization Agent,
+  Marketing Strategist, AI Account Manager (Wave 2) — then Lead
+  Qualification Agent, Reply Analyzer, Performance Copywriter, Business
+  Research Agent, Competitor Research Agent, Audience Research Agent,
+  Client Onboarding & Meeting Coordinator (V1), AI Chief of Staff (Wave
+  3, closes the queue). Every one verified live against production
+  (real API calls via curl, not just code review) before moving to the
+  next, plus a devPreview browser UI check — see each agent's own
+  `buildNotes` in `aiAgentsData.js` for specifics.
+- **Queue items skipped-not-built, with real reasons (not faked):**
+  `google-ads-analyst` (redundant with `ads-insights-analyst`'s existing
+  tool), `cross-channel-reporting-insights-agent` (the `daily/weekly/
+  monthly_reports` tables hold sales-activity data, not ad-platform
+  metrics — the true cross-channel version needs the same missing Meta/
+  TikTok API as other flagged agents), `job-lead-finder` (its own
+  description requires sourcing genuinely NEW leads, not structuring
+  ones the manager already found — needs a real lead-data vendor
+  decision, e.g. Upwork API / LinkedIn Sales Navigator / an Apollo-Clay-
+  style provider, that nobody has made; a fake "AI searches the web"
+  version would hallucinate, and a paste-mode filter version would just
+  duplicate job-post-analyzer/lead-qualification-agent).
+  `client-onboarding-meeting-coordinator` was built but deliberately
+  scoped down to V1 — see its own `buildNotes` for why persistent
+  meeting logging is deferred (no meeting/event data model exists in
+  the CRM yet; TeamCalendar.jsx only tracks team leave).
 - **Recurring bug patterns worth knowing before writing a new agent's
   parser:** (1) models reliably wrap structured single-line fields in
   markdown `**bold**`/`-` list markers despite a plain instruction not
@@ -63,23 +69,15 @@ skipped deliberately, not left unbuilt — see §4.9).
   always work; writes work *inconsistently* (no pattern found for which
   do/don't) — don't assume one will go through, have a fallback ready,
   don't retry a blocked write through a different command.
-- **Also done (2026-09-30, same continuation):** the three Wave 3
-  research agents, all paste-mode v1s per their own `ladder.humanLed`→
-  `humanAssisted` rung (manager pastes research already gathered, agent
-  structures it — no live autonomous web research): `business-research-
-  agent` (business profile: model/niche, market/scale, value prop,
-  relevant pains, gaps — deeper than account-enrichment's short context
-  paragraph), `competitor-research-agent` (per-competitor breakdown plus
-  a differentiation-opportunity summary), `audience-research-agent`
-  (2-4 pain/motivation/trigger/message segments, not padded to 4 if the
-  input doesn't justify it). All three verified live via curl before
-  the UI was built, all render/wire correctly in a devPreview browser
-  check with no unexpected console errors.
-- **Next action, when resumed:** continue the §4.9 queue from wherever
-  the "BUILT" markers leave off — currently item 16,
-  `client-onboarding-meeting-coordinator`. Check whether
-  `TeamCalendar.jsx`'s existing internal calendar data is reusable
-  before assuming a new external calendar API is needed.
+- **Next action, when resumed:** no queued agent work remains. If asked
+  to keep going in this section without other direction, good next
+  candidates (not yet decided/locked) are: revisiting `job-lead-finder`
+  if a lead-data vendor gets picked, adding persistent meeting logging
+  to `client-onboarding-meeting-coordinator` if a meetings table gets
+  designed, or Phase 4 (governance/polish, §4.7-4.8, never started).
+  Otherwise ask the user what's next rather than guessing a new
+  initiative — the "don't ask" standing rule was specifically about
+  *queue order*, not about inventing new scope once the queue is empty.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master`, and every migration in
   `supabase/migrations/` is confirmed actually applied to the live
@@ -529,15 +527,44 @@ agents total now.
     agent structures it — matches each agent's own `ladder.humanLed`→
     `humanAssisted` rung, not live autonomous web research). Verified
     live via curl for all three before the UI was built.
-16. `client-onboarding-meeting-coordinator` (W3, client-success) — check
-    whether `TeamCalendar.jsx`'s existing internal calendar data is
-    reusable before assuming this needs a new external calendar API.
-17. `job-lead-finder` (W3, sales) — likely needs a real lead-sourcing
-    decision (which job boards/APIs); assess when reached, may end up
-    flagged-blocked instead of built.
-18. `ai-chief-of-staff` (W3, management) — top-level cross-department
-    router; build last, it's the one that benefits most from the fullest
-    possible roster underneath it.
+~~16. `client-onboarding-meeting-coordinator` (W3, client-success)~~ —
+    BUILT, deliberately scoped to V1. Confirmed by reading the real
+    code: `TeamCalendar.jsx` only tracks team leave/vacation
+    (`leave_requests` table), not client meetings — not reusable here.
+    `MeetingsSoonCard.jsx` already documents that no "meeting" entity
+    exists in the system yet. Persistent meeting logging would need a
+    new DB table + migration + RLS — a real schema decision, not
+    something to add quietly inside one agent's build — so V1 covers
+    only the advisory half: an onboarding checklist plus a meeting-prep
+    brief, both from pasted context. The "фіксація" (logging) half is
+    documented as deferred in `aiAgentsData.js` `buildNotes`.
+~~17. `job-lead-finder` (W3, sales)~~ — **SKIPPED, not built.** Assessed
+    on reaching it: unlike every paste-mode agent above, its own
+    description requires sourcing genuinely NEW leads the manager
+    hasn't already found, not structuring ones they have — that needs a
+    real lead-data vendor decision (Upwork API / LinkedIn Sales
+    Navigator / an Apollo-Clay-style B2B data provider), none of which
+    exist in this project, and picking one is a vendor/budget call for
+    the user, not something to guess. A fake "AI searches the web"
+    version would hallucinate stale/invented leads under the guise of a
+    live search; a paste-mode filter version would just duplicate
+    `job-post-analyzer`/`lead-qualification-agent`. Documented in
+    `aiAgentsData.js` `buildNotes`. Remains in the queue, not struck
+    from the roadmap entirely — unblocks once a lead source is chosen.
+~~18. `ai-chief-of-staff` (W3, management)~~ — BUILT last, on purpose —
+    the one that benefits most from the fullest possible roster
+    underneath it (20 agents by the time it was built). Distinct from
+    `task-orchestrator` (which only plans steps→agents and never sees
+    actual output): takes results the manager already gathered from
+    individual agents/departments and synthesizes them into one
+    leadership-level answer, naming which agent (built or not) would
+    fill any remaining gap. Reuses the same live-`AGENT_DEPTS`-roster
+    pattern as `task-orchestrator`. Verified live via curl with a
+    realistic two-source budget-scaling scenario.
+
+**Queue complete as of 2026-09-30.** Every buildable item (1-4, 6, 8-16,
+18) is built and verified live; every skipped item (5, 7, 17) has a
+documented, investigated reason in its own `buildNotes` — none faked.
 
 **Explicitly flagged as blocked — do NOT build a fake/mocked version,
 skip and ask the user only if/when actually reached:**
