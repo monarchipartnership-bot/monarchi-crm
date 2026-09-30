@@ -8,9 +8,11 @@ Last updated: 2026-09-30.
 
 ## STOPPED HERE (2026-09-30) — read this first when picking work back up
 
-Phase 1, Phase 2, and Phase 3 are all fully built (see §5). **9 real
-agents exist, all of Wave 1 is done** (every slot except
-`sales-automation-slot`, deliberately TBD by its own design).
+Phase 1, Phase 2, and Phase 3 are all fully built (see §5). **15 real
+agents exist, all of Wave 1 and Wave 2 are done** (every Wave 1 slot
+except `sales-automation-slot`, deliberately TBD by its own design; both
+Wave 2 items skipped were skipped deliberately, not left unbuilt — see
+§4.9).
 
 - **STANDING RULE (locked 2026-09-30, see `feedback_agent_build_order`
   memory): building every remaining agent in sequence, Claude's own
@@ -24,18 +26,48 @@ agents exist, all of Wave 1 is done** (every slot except
   Letter Agent, Job Post Analyzer, Data Integrity Check (5th, picked
   autonomously once by explicit one-off request — see git history if the
   reasoning is needed, not repeated here), Account Enrichment, Portfolio
-  Case Selector, AI Quality Controller, Task Orchestrator. Every one
+  Case Selector, AI Quality Controller, Task Orchestrator (completes
+  Wave 1), Google Optimization Agent, Marketing Strategist, AI Account
+  Manager, Lead Qualification Agent, Reply Analyzer, Performance
+  Copywriter (completes Wave 3's sales/creative slots plus Wave 2's
+  strategy/account-management slots — see queue numbering in §4.9, waves
+  were interleaved slightly since #10 `google-optimization-agent` is W2
+  but #13-15 research agents are W3 and not yet built). Every one
   verified live against production (real API calls, not just code
   review) before moving to the next — see §4.9 and each agent's own
-  `buildNotes` in `aiAgentsData.js` for specifics.
+  `buildNotes` in `aiAgentsData.js` for specifics. Two queue items were
+  deliberately skipped-not-built after real investigation found them
+  redundant/mismatched, documented in `buildNotes` rather than faked:
+  `google-ads-analyst` (redundant with `ads-insights-analyst`) and
+  `cross-channel-reporting-insights-agent` (the `daily/weekly/monthly_
+  reports` tables hold sales-activity data, not ad-platform metrics; the
+  true cross-channel version is blocked on the same missing Meta/TikTok
+  API as other flagged agents).
+- **Recurring bug patterns worth knowing before writing a new agent's
+  parser:** (1) models reliably wrap structured single-line fields in
+  markdown `**bold**`/`-` list markers despite a plain instruction not
+  to — fix with an explicit "no markdown" prompt line AND a defensive
+  regex strip in the parser itself, don't rely on prompt compliance
+  alone (hit on `ai-account-manager` and `lead-qualification-agent`).
+  (2) a model asked not to comment/add preamble will still do it — the
+  reliable fix is the same `---`-delimiter structural split most agents
+  in this codebase already use (self-notes before `---`, real content
+  after, parser keeps only the part after), not a stronger instruction
+  (hit on `performance-copywriter`, two prompt-only attempts failed
+  before switching to `---`). (3) always verify `max_tokens` against a
+  real, verbose test case via curl — three agents
+  (`google-optimization-agent`, `marketing-strategist`, plus proactive
+  bumps on others) hit real truncation at first-guess token limits.
 - **Infra note:** GitHub (`gh`)/Vercel/Supabase CLIs authenticated on the
   dev machine (see `project_supabase_cli_access` memory). Supabase reads
   always work; writes work *inconsistently* (no pattern found for which
   do/don't) — don't assume one will go through, have a fallback ready,
   don't retry a blocked write through a different command.
 - **Next action, when resumed:** continue the §4.9 queue from wherever
-  the "BUILT" markers leave off — currently Wave 2, starting with
-  `google-ads-analyst`.
+  the "BUILT" markers leave off — currently Wave 3 items 13-15, the
+  three research agents (`business-research-agent` /
+  `competitor-research-agent` / `audience-research-agent`), as
+  paste-mode v1s.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master`, and every migration in
   `supabase/migrations/` is confirmed actually applied to the live
@@ -424,39 +456,61 @@ correctly flagging a deliberately bad test cover letter as КРИТИЧНО with
 accurate hallucination-risk detection), `task-orchestrator` (confirmed
 producing a coherent 5-step real-agent pipeline for a realistic task,
 including correctly flagging a not-yet-built agent in its own summary).
-9 real agents total now. Every Wave 1 slot except `sales-automation-
-slot` (deliberately TBD by design) has a real tool. Continuing with
-Wave 2 below.
+Every Wave 1 slot except `sales-automation-slot` (deliberately TBD by
+design) has a real tool.
+
+**Wave 2/3 continuation (2026-09-30, same day):** items 5 and 7 were
+investigated and deliberately skipped rather than built — see notes
+below each. Items 6, 8-12 were all built and verified live. 15 real
+agents total now.
 
 **Queue (build in this order):**
 ~~1. `account-enrichment` (W1, sales/qualification)~~ — BUILT.
 ~~2. `portfolio-case-selector` (W1, sales/proposal)~~ — BUILT.
 ~~3. `ai-quality-controller` (W1, quality-control)~~ — BUILT.
 ~~4. `task-orchestrator` (W1, management)~~ — BUILT.
-5. `google-ads-analyst` (W2, performance-delivery) — reuses the exact
-   `GoogleAdsApi` client/credentials `AdsInsightsAnalyst`/
-   `api/ads-insights-chat.js` already has proven working — NOT blocked,
-   despite living in Wave 2.
-6. `google-optimization-agent` (W2) — natural pair with #5 (diagnosis →
-   plan); consider a handoff between them like job-post-analyzer→cover-
-   letter-agent.
-7. `cross-channel-reporting-insights-agent` (W2, data-tracking-reporting)
-   — "what changed and why" over the existing `daily_reports`/
-   `weekly_reports`/`monthly_reports` tables — no new API needed.
-8. `marketing-strategist` (W2, strategy-research) — standalone strategy-
-   brief generator from manually-described business context/goals
-   (doesn't need the not-yet-built research agents' output as input).
-9. `ai-account-manager` (W2, client-success) — aggregates a client's
-   existing data (deals, notes, tasks, `ai_agent_conversations`) into one
-   briefing; deterministic aggregation + one LLM summary pass, no new API.
-10. `lead-qualification-agent` (W3, sales) — ICP-fit check over existing
-    deal/client data.
-11. `reply-analyzer` (W3, sales) — parses an inbound reply, suggests next
-    step; same shape as job-post-analyzer.
-12. `performance-copywriter` (W3, performance-creative) — standalone ad
-    copy from a manually-described angle/hypothesis (doesn't need
-    creative-strategist's output, which isn't built and may never be —
-    see the flagged-blocked list below).
+~~5. `google-ads-analyst` (W2, performance-delivery)~~ — **SKIPPED, not
+   built.** Confirmed by reading the real code: `ads-insights-analyst`'s
+   `get_google_ads_report` tool already supports campaign/device/
+   keyword-with-Quality-Score/ad/network breakdowns plus its own audit
+   framework — a separate agent would be a redundant duplicate, not a
+   distinct capability. Documented in `aiAgentsData.js` `buildNotes`.
+~~6. `google-optimization-agent` (W2)~~ — BUILT. Takes a pasted diagnosis
+   (e.g. from Ads Insights Analyst) and produces a prioritized action
+   plan. `max_tokens` bumped 800→1400 after live truncation.
+~~7. `cross-channel-reporting-insights-agent` (W2, data-tracking-
+   reporting)~~ — **SKIPPED, not built.** Confirmed by a real schema
+   check (`select data from weekly_reports...`): the `daily/weekly/
+   monthly_reports` tables hold sales-team activity data (leads,
+   outreach), not ad-platform metrics as originally assumed. A true
+   cross-channel version is blocked on the same missing Meta/TikTok API
+   as other flagged agents; a Google-only subset would just duplicate
+   `ads-insights-analyst`. Documented in `aiAgentsData.js` `buildNotes`.
+~~8. `marketing-strategist` (W2, strategy-research)~~ — BUILT. One long
+   6-section strategy document from manually-described business
+   context/goals. `max_tokens` bumped 1800→3200 plus a conciseness/no-
+   markdown-tables instruction after live truncation on a verbose test.
+~~9. `ai-account-manager` (W2, client-success)~~ — BUILT. Aggregates a
+   client's deals/tasks/conversations (`fetchClientBriefingData`, pure
+   parallel aggregation, no new API) into one LLM-summarized briefing.
+   Reuses `ClientPicker`. Fixed a markdown-leakage bug with an explicit
+   no-markdown instruction + defensive strip in the parser.
+~~10. `lead-qualification-agent` (W3, sales)~~ — BUILT. ICP-fit check
+   over a real deal, ICP criteria supplied manually each run (none
+   hardcoded — no ICP is defined anywhere in the project). Reuses
+   `DealPicker`. Same markdown-leakage bug, fixed the same way.
+~~11. `reply-analyzer` (W3, sales)~~ — BUILT. Parses an inbound client
+   reply (objection type + suggested next step), same shape as job-
+   post-analyzer. Built with the no-markdown/defensive-strip pattern
+   from the start this time.
+~~12. `performance-copywriter` (W3, performance-creative)~~ — BUILT.
+   Standalone ad copy (Google Search/Meta Ads/TikTok script) from a
+   manually-described niche/audience/hypothesis. Needed three real fixes
+   found via live curl testing: `max_tokens`, a hard character-limit
+   self-check for Google Search headlines/descriptions, an absolute
+   no-fabricated-numbers rule (two escalating passes needed), and
+   finally a `---`-delimiter structural split to stop preamble-comment
+   leakage after two pure-prompt attempts failed.
 13-15. `business-research-agent` / `competitor-research-agent` /
     `audience-research-agent` (W3, strategy-research) — build as
     human-assisted v1s that structure research the manager already did
