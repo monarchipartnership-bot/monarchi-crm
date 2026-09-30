@@ -10,6 +10,7 @@ import DealHealthCheck from '../DealHealthCheck/DealHealthCheck';
 import CoverLetterAgent from '../CoverLetterAgent/CoverLetterAgent';
 import JobPostAnalyzer from '../JobPostAnalyzer/JobPostAnalyzer';
 import DataIntegrityCheck from '../DataIntegrityCheck/DataIntegrityCheck';
+import AccountEnrichment from '../AccountEnrichment/AccountEnrichment';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -27,6 +28,7 @@ const AGENT_TOOLS = {
   'cover-letter-agent': CoverLetterAgent,
   'job-post-analyzer': JobPostAnalyzer,
   'data-integrity-check': DataIntegrityCheck,
+  'account-enrichment': AccountEnrichment,
 };
 
 // This page's own mount-time reveal: the core lights up, then every
