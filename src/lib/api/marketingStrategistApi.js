@@ -10,7 +10,7 @@ export async function buildStrategy({ businessDescription, goals, budget, audien
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1800,
+      max_tokens: 3200,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMsg }],
     }),
