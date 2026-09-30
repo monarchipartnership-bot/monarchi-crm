@@ -1,5 +1,5 @@
 import { API_ENDPOINT } from '../followupData';
-import { buildPerformanceCopywriterSystemPrompt, buildPerformanceCopywriterUserMessage } from '../performanceCopywriterPrompt';
+import { buildPerformanceCopywriterSystemPrompt, buildPerformanceCopywriterUserMessage, parsePerformanceCopywriterReply } from '../performanceCopywriterPrompt';
 
 export async function writeAdCopy({ platform, productDescription, audience, hypothesis }) {
   const systemPrompt = buildPerformanceCopywriterSystemPrompt(platform);
@@ -19,5 +19,6 @@ export async function writeAdCopy({ platform, productDescription, audience, hypo
 
   const data = await response.json();
   const textBlock = data.content.find((b) => b.type === 'text');
-  return textBlock ? textBlock.text.trim() : '';
+  const fullText = textBlock ? textBlock.text : '';
+  return parsePerformanceCopywriterReply(fullText);
 }

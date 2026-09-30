@@ -37,7 +37,21 @@ ${PLATFORM_FORMAT_BLOCK[platform] || PLATFORM_FORMAT_BLOCK.meta_ads}
 2. КАТЕГОРИЧНО заборонено вигадувати БУДЬ-ЯКІ числа, відсотки чи статистику (кількість клієнтів, час економії, відсоток приросту тощо), яких дослівно немає в наданому описі продукту. Це стосується навіть "правдоподібних" чи "типових для індустрії" цифр — якщо число не було прямо надано в описі продукту, використовувати його заборонено, без винятків. Перед тим як написати будь-яке число в тексті, перевір: чи це число дослівно є в наданому описі продукту? Якщо ні — не пиши жодного числа на цьому місці, сформулюй якісно, без цифри (напр. "Trusted by online stores" замість "Trusted by 2,000+ stores"; "Save time on inventory" замість "Save 5 Hours/Week", якщо конкретної цифри економії часу немає в описі).
 3. Якщо для формату потрібна кількість елементів (напр. 5 заголовків) — дай рівно стільки, кожен відповідає ліміту символів.
 
-Відповідай СУВОРО у форматі, що відповідає обраній платформі вище. Перша ж строка відповіді — вже сам рекламний текст (заголовок/primary text/HOOK, залежно від платформи). НЕ пиши жодних пояснень, коментарів, посилань на правила чи вступних фраз ні до, ні після тексту — навіть коротких на кшталт "Відповідно до правила...". Видай тільки готовий рекламний матеріал.`;
+Відповідай у двох частинах, розділених рядком "---":
+1. До "---": за потреби, будь-які нотатки для себе (напр. чому не використав якесь число) — це НЕ буде показано менеджеру.
+2. Після "---": ТІЛЬКИ готовий рекламний матеріал у форматі платформи вище, без жодних заголовків розділів, пояснень чи коментарів — саме це буде показано і скопійовано як є.`;
+}
+
+// The model reliably puts self-notes before "---" despite instructions
+// not to comment at all (confirmed via live testing — two attempts at a
+// stricter "no preamble" instruction still leaked reasoning text). Same
+// "---" split every other agent in this codebase already uses
+// successfully — structural separation instead of relying on the model
+// simply not commenting.
+export function parsePerformanceCopywriterReply(fullText) {
+  const parts = fullText.split('---');
+  if (parts.length < 2) return fullText.trim();
+  return parts.slice(1).join('---').trim();
 }
 
 export function buildPerformanceCopywriterUserMessage({ productDescription, audience, hypothesis }) {
