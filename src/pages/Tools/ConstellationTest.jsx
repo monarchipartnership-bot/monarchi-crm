@@ -8,6 +8,7 @@ import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import DealHealthCheck from '../DealHealthCheck/DealHealthCheck';
 import CoverLetterAgent from '../CoverLetterAgent/CoverLetterAgent';
+import JobPostAnalyzer from '../JobPostAnalyzer/JobPostAnalyzer';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -23,6 +24,7 @@ const AGENT_TOOLS = {
   'ads-insights-chat': AdsInsightsAnalyst,
   'deal-health-check': DealHealthCheck,
   'cover-letter-agent': CoverLetterAgent,
+  'job-post-analyzer': JobPostAnalyzer,
 };
 
 // This page's own mount-time reveal: the core lights up, then every

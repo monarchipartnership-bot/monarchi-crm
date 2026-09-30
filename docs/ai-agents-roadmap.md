@@ -4,36 +4,37 @@ Living plan for the "AI Agents" section of Monarchi CRM (sidebar → AI Agents,
 `/tools/constellation-test`). Updated as decisions are made — this is the
 source of truth, not a snapshot from one conversation.
 
-Last updated: 2026-09-29.
+Last updated: 2026-09-30.
 
-## STOPPED HERE (2026-09-29) — read this first when picking work back up
+## STOPPED HERE (2026-09-30) — read this first when picking work back up
 
 Phase 1 and Phase 2 are both fully built (see §5). Phase 3 is underway:
 
 - **Done:** Agent activity feed + review queue + notification badges
   (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
-  (§4.2), 3 real agents (Ads Insights Analyst, Deal Health Check, Cover
-  Letter Agent), Phase 3's first scheduled agent run (§4.5) —
-  `deal-health-check` now also runs automatically once a day via pg_cron,
-  not just on manual click — and Phase 3's Analytics/ROI dashboard (§4.6)
-  — new "Аналітика" section tab.
-- **Both migrations confirmed applied (2026-09-29)** — verified live, not
-  just taken on the user's word: called `run_deal_health_check(7)` via
-  `supabase.rpc()` directly from the browser console and confirmed a real
-  row landed in `ai_agent_conversations` (`client_id: null`, `kind:
-  'audit'`, `needs_review: true`, title "175 угод потребують уваги") with
-  a matching `ai_agent_messages` body listing real stale deals — proves
-  both the function exists and `client_id` now accepts null. The
-  `cron.schedule(...)` call is the second statement in the same migration
-  file the user ran, right after the function definition that's now
-  confirmed live — not independently re-checkable from the app itself
-  (`cron.job` lives in the `cron` schema, not exposed over the REST API),
-  so if there's ever doubt, `select * from cron.job where jobname =
-  'deal-health-check-daily';` in the Supabase SQL editor confirms it
-  directly.
+  (§4.2), 4 real agents (Ads Insights Analyst, Deal Health Check, Cover
+  Letter Agent, Job Post Analyzer), Phase 3's first scheduled agent run
+  (§4.5) — `deal-health-check` runs automatically once a day via pg_cron
+  and is confirmed actually firing in production (real audit rows showing
+  up daily in "Задачі агентів", not just a one-off test) — and Phase 3's
+  Analytics/ROI dashboard (§4.6).
+- **Infra change worth knowing about:** GitHub (`gh`), Vercel, and
+  Supabase CLIs are now authenticated on the dev machine and linked to
+  the real project (see `project_supabase_cli_access` memory) — direct
+  read access to the live Supabase DB is always available now
+  (`supabase db query --linked`), and direct writes work too as long as
+  `app/.claude/settings.local.json` has `Bash(supabase:*)` allowed (it
+  does, as of 2026-09-30, but it's a machine-local/gitignored file so
+  don't assume it's present on a different machine). This is how a real,
+  previously-undocumented security bug got found and fixed this cycle —
+  see §6a.
 - **Next action, when resumed:** the next candidate is event-triggered
   runs / agent handoffs (§4.5, not started) — or ask the user again if
-  priorities changed.
+  priorities changed. Wave 1 still has 2 open, currently-unblocked slots
+  worth asking about too: the account/company-data enrichment agent
+  (blocked pending an external search API decision) and the case-selector
+  agent (largely redundant with what Cover Letter/Follow-up already do
+  internally — see the note on it in §4.2).
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master` (the 2 new migrations are committed as
   files too, same as every past migration — only their *execution* in
@@ -94,10 +95,12 @@ same day to the dark full-bleed treatment.
   / Fully autonomous × Foundation / Capture / Generate / Orchestrate stages).
 - Agent detail modal: description, autonomy/status/wave badges. Falls back
   to read-only info unless the agent has a registered real tool.
-- **3 of 44** agent slots have a real, working tool: "Аналітик рекламних
+- **4 of 44** agent slots have a real, working tool: "Аналітик рекламних
   даних та інсайтів" (Cross-Channel) → `AdsInsightsAnalyst`, "Агент
   контролю стану угод" (Pipeline) → `DealHealthCheck`, "Агент написання
-  супровідних листів" (Proposal) → `CoverLetterAgent`. Everything else is
+  супровідних листів" (Proposal) → `CoverLetterAgent`, "Агент аналізу
+  оголошень про проєкти" (Lead Generation) → `JobPostAnalyzer`.
+  Everything else is
   `status: not_started` — data-only placeholders with a disabled
   "Запустити (скоро)" button.
 - Agent search (⌘K-style).
@@ -264,6 +267,10 @@ Currently invisible. Needs:
   removes the schema blocker if this is ever revisited, but the "every
   manual click would spam the feed" reasoning still applies unless/until
   this agent also gets a scheduled, digest-shaped trigger.
+- **`JobPostAnalyzer` (built 2026-09-30) also deliberately does NOT log
+  into this feed**, exact same reasoning as `CoverLetterAgent` — one-off
+  manual paste-and-analyze on a job post with no client_id yet, no
+  scheduled/digest framing available.
 
 ### 4.4 Notifications — BUILT (2026-09-26)
 Minimal version, deliberately not the personal per-recipient `notifications`
@@ -396,13 +403,36 @@ tab. Deliberately scoped to numbers that are actually real, not invented:
   now runs automatically once a day via pg_cron and logs into the Phase 1
   activity feed as a discrete audit. See §4.5 for detail. This also
   resolves the "not client-scoped" blocker that kept it out of the feed —
-  `ai_agent_conversations.client_id` is now nullable.
+  `ai_agent_conversations.client_id` is now nullable. **Confirmed actually
+  running in production 2026-09-30**: real daily audit rows visible in
+  "Задачі агентів" (e.g. "176 угод потребують уваги" at 09:00), not just
+  the one manual test run from the day before.
 - **Built (2026-09-29):** Analytics/ROI dashboard (4.6) — new "Аналітика"
   section tab: company-wide autonomy×stage matrix, wave rollout bars, and
   real activity-feed numbers. Explicitly does not fabricate a saved-
   hours/cost number — see §4.6 for why.
+- **Built (2026-09-30):** `JobPostAnalyzer` — 4th real agent, user-picked
+  (`job-post-analyzer`, Sales/Lead Generation). Reads a pasted job post or
+  inbound message and produces a structured sales brief (niche, task
+  essence, which Mon'Archi services actually apply, budget/timeline
+  mentions, ICP-fit red flags, HIGH/MEDIUM/LOW response priority) plus a
+  short manager-facing recommendation paragraph. Unlike Cover Letter/
+  Follow-up, this is an internal-facing extraction task, not client-facing
+  prose — deliberately does NOT reuse the CORE+STYLE writing-rules
+  architecture, it has its own focused prompt
+  (`src/lib/jobPostAnalyzerPrompt.js`). Verified end-to-end against the
+  real deployed `/api/anthropic` (via `curl` against
+  `crm.monarchi.agency`, now possible because of the Vercel CLI access set
+  up this cycle — see the infra note above) since local Vite dev can't
+  reach it, same limitation every LLM-backed agent here has. Status
+  flipped `not_started` → `in_development`. Not wired into the activity
+  feed, same reasoning as Cover Letter Agent (no client_id yet). New
+  files: `src/lib/jobPostAnalyzerPrompt.js`,
+  `src/lib/api/jobPostAnalyzerApi.js`,
+  `src/pages/JobPostAnalyzer/JobPostAnalyzer.jsx` +
+  `src/styles/jobPostAnalyzerPage.css`.
 - Event-triggered runs, agent handoffs (4.5) — not started, next
-  candidate for this phase.
+  candidate for this phase (or ask the user — see STOPPED HERE above).
 
 **Phase 4 — Governance & polish**
 - Permissions, config/prompt versioning (4.7)
@@ -451,6 +481,37 @@ them.
 **Migrations #3 and #4 confirmed applied 2026-09-29** — see the STOPPED
 HERE note at the top of this file for how this was verified (a live RPC
 test call, not just the user's say-so).
+
+## 6a. Supabase-wide security audit (2026-09-30) — not AI-Agents-specific, tracked here since it landed in the same migrations folder
+
+While setting up direct Supabase CLI access (see the infra note in
+STOPPED HERE), ran a full audit of the live database (not just this
+section's own tables) and found a real, previously-undocumented critical
+bug: 10 tables (`clients`, `deals`, `deal_notes`, `deal_activity`,
+`deal_participants`, `deal_stages`, `notifications`, `pipelines`,
+`client_changes`, `client_files`) carried leftover blanket RLS policies
+(`<table>_all_anon` / `_all_authenticated`, `for all using (true)`) that
+no migration in this repo ever created — `2026-09-19_enable_rls_everywhere.sql`
+only ever creates the correct granular per-action policies, confirmed by
+reading its actual SQL. Someone must have added the blanket ones by hand
+in Supabase Studio at some point. Since RLS policies OR together, this
+meant the public anon key alone could insert/update/delete freely in all
+10 tables, completely bypassing the "write requires authenticated" rule
+every migration since assumed was in force.
+
+Fixed and confirmed applied same day:
+`20260930000000_drop_redundant_anon_all_policies.sql` — drops the 10
+tables' blanket policies (confirmed every table already had working
+granular replacements first), revokes public RPC `EXECUTE` on 4
+`SECURITY DEFINER` functions that were incidentally callable by anyone
+with just the anon key (`cleanup_old_notifications`,
+`send_task_reminders`, `run_deal_health_check`, `enforce_corporate_email`
+— note revoking from `anon`/`authenticated` alone wasn't enough, Postgres
+grants `EXECUTE` to the `PUBLIC` pseudo-role by default on function
+creation, so `revoke ... from public` is the statement that actually
+matters), and pins `enforce_corporate_email`'s previously-mutable
+`search_path`. See `project_rls_everywhere` / `project_supabase_cli_access`
+memory for the full story of how this was found and fixed.
 
 ## 7. Explicitly out of scope for now
 
