@@ -19,6 +19,7 @@ import MarketingStrategist from '../MarketingStrategist/MarketingStrategist';
 import AiAccountManager from '../AiAccountManager/AiAccountManager';
 import LeadQualificationAgent from '../LeadQualificationAgent/LeadQualificationAgent';
 import ReplyAnalyzer from '../ReplyAnalyzer/ReplyAnalyzer';
+import PerformanceCopywriter from '../PerformanceCopywriter/PerformanceCopywriter';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -45,6 +46,7 @@ const AGENT_TOOLS = {
   'ai-account-manager': AiAccountManager,
   'lead-qualification-agent': LeadQualificationAgent,
   'reply-analyzer': ReplyAnalyzer,
+  'performance-copywriter': PerformanceCopywriter,
 };
 
 // This page's own mount-time reveal: the core lights up, then every
