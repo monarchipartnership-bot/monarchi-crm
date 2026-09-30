@@ -17,9 +17,9 @@ export function buildLeadQualificationSystemPrompt() {
 3. Онови вердикт: КВАЛІФІКОВАНО (добре відповідає більшості критеріїв), ПІД ПИТАННЯМ (відповідає частково або бракує даних для впевненості), НЕ КВАЛІФІКОВАНО (явно не відповідає одному чи більше критеріям).
 4. Для кожного критерію коротко напиши, відповідає угода чи ні (або невідомо) і чому.
 
-Відповідай СУВОРО у цьому форматі:
+Відповідай СУВОРО у цьому форматі, без markdown-форматування (без зірочок, без **жирного**):
 ВЕРДИКТ: [КВАЛІФІКОВАНО / ПІД ПИТАННЯМ / НЕ КВАЛІФІКОВАНО]
-ОЦІНКА ЗА КРИТЕРІЯМИ: [по одному критерію на рядок: критерій — відповідність — коротке пояснення]
+ОЦІНКА ЗА КРИТЕРІЯМИ: [по одному критерію на рядок, без маркерів списку "-": критерій — відповідність — коротке пояснення]
 ---
 [короткий підсумок для менеджера, 2-3 речення: чи варто витрачати час на цю угоду і чому]`;
 }
@@ -55,10 +55,14 @@ export function parseLeadQualificationReply(fullText) {
 
   const verdictMatch = headerPart.match(/ВЕРДИКТ:\s*(.+)/);
   const criteriaMatch = headerPart.match(/ОЦІНКА ЗА КРИТЕРІЯМИ:\s*([\s\S]+)/);
+  // Defensive strip in case the model uses markdown bold/asterisks anyway —
+  // don't rely solely on prompt compliance for formatting (see the same
+  // fix in accountManagerPrompt.js).
+  const stripMarkdown = (s) => s?.trim().replace(/^\*+|\*+$/g, '').trim() ?? null;
 
   return {
-    verdict: verdictMatch?.[1]?.trim()?.toUpperCase() ?? null,
-    criteriaAssessment: criteriaMatch?.[1]?.trim() ?? null,
-    summary,
+    verdict: stripMarkdown(verdictMatch?.[1]),
+    criteriaAssessment: criteriaMatch?.[1]?.trim().replace(/^[-*]\s*/gm, '').replace(/\*\*/g, '') ?? null,
+    summary: summary.replace(/\*\*/g, ''),
   };
 }
