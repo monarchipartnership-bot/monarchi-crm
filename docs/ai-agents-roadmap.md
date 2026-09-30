@@ -8,53 +8,34 @@ Last updated: 2026-09-30.
 
 ## STOPPED HERE (2026-09-30) — read this first when picking work back up
 
-Phase 1, Phase 2, and Phase 3 are all fully built (see §5) — every item
-in §4.1 through §4.6 has at least one real implementation now.
+Phase 1, Phase 2, and Phase 3 are all fully built (see §5). **9 real
+agents exist, all of Wave 1 is done** (every slot except
+`sales-automation-slot`, deliberately TBD by its own design).
 
-- **Done:** Agent activity feed + review queue + notification badges
-  (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
-  (§4.2), 5 real agents (Ads Insights Analyst, Deal Health Check, Cover
-  Letter Agent, Job Post Analyzer, Data Integrity Check), Phase 3's
-  scheduled agent run (§4.5) — `deal-health-check` runs automatically
-  once a day via pg_cron and is confirmed actually firing in production —
-  Phase 3's Analytics/ROI dashboard (§4.6), Phase 3's first agent handoff
-  (§4.5) — `job-post-analyzer` → `cover-letter-agent`, human-clicked,
-  pre-filled — and Phase 3's first *automatic* event-triggered run (§4.5)
-  — `job-post-analyzer` also fires with zero human click whenever a new
-  deal is created with job-post/inbound text pasted into its optional
-  field, logging straight into the activity feed against that deal's real
-  client_id (see §4.5 for why this is the one place `job-post-analyzer`
-  *can* log there, unlike its manual/standalone use).
-- **5th agent (2026-09-30) was picked autonomously, not asked** —
-  explicit exception this once: the user said "move along whatever path
-  you think is best," so `tracking-data-integrity-agent` (Wave 1, Data &
-  Reporting — "Перевіряє, чи можна довіряти даним, на яких працюють інші
-  агенти") got built without a confirmation question, reasoned through in
-  §4.3 below. Every other agent/phase choice in this project has been the
-  user's explicit call — that's still the default; this was a one-off,
-  not a new standing license to pick autonomously going forward.
-- **Infra change worth knowing about:** GitHub (`gh`), Vercel, and
-  Supabase CLIs are now authenticated on the dev machine and linked to
-  the real project (see `project_supabase_cli_access` memory) — direct
-  read access to the live Supabase DB always works
-  (`supabase db query --linked "<sql>"`). Direct **writes** work
-  *inconsistently* — confirmed working three separate times this cycle
-  (a security-fix REVOKE/migration repair, and the data-integrity-check
-  migration+function+cron below), and confirmed BLOCKED once (a plain
-  test INSERT for the event-trigger feature) — no clear pattern found for
-  which is which. Don't assume a write will go through; have the
-  fallback (present it as a migration file for the user to run, or verify
-  via code review + a read-only check instead of a live insert) ready
-  before attempting one, and don't retry a blocked write through a
-  different command — that's explicitly against the classifier's own
-  instructions.
-- **Next action, when resumed:** every roadmapped item through Phase 3 is
-  built, plus a 5th agent. Ask the user what's next — more Wave 1 agents
-  (2 open, currently-unblocked slots: account/company-data enrichment,
-  blocked pending an external search API decision; and the case-selector
-  agent, largely redundant with what Cover Letter/Follow-up already do
-  internally — see §4.2), Phase 4 (governance/polish, §4.7-4.8), or
-  something else entirely.
+- **STANDING RULE (locked 2026-09-30, see `feedback_agent_build_order`
+  memory): building every remaining agent in sequence, Claude's own
+  order, no per-agent confirmation question.** The queue is §4.9 below —
+  read that first, it's the actual source of truth for "what's next,"
+  not this section. Only stop the sequence to ask if an agent is
+  genuinely blocked on something only the user can decide (see §4.9's
+  explicitly-flagged-blocked list) — skip that one, don't fake/mock it,
+  keep going with the next queued item.
+- **Done, in order:** Ads Insights Analyst, Deal Health Check, Cover
+  Letter Agent, Job Post Analyzer, Data Integrity Check (5th, picked
+  autonomously once by explicit one-off request — see git history if the
+  reasoning is needed, not repeated here), Account Enrichment, Portfolio
+  Case Selector, AI Quality Controller, Task Orchestrator. Every one
+  verified live against production (real API calls, not just code
+  review) before moving to the next — see §4.9 and each agent's own
+  `buildNotes` in `aiAgentsData.js` for specifics.
+- **Infra note:** GitHub (`gh`)/Vercel/Supabase CLIs authenticated on the
+  dev machine (see `project_supabase_cli_access` memory). Supabase reads
+  always work; writes work *inconsistently* (no pattern found for which
+  do/don't) — don't assume one will go through, have a fallback ready,
+  don't retry a blocked write through a different command.
+- **Next action, when resumed:** continue the §4.9 queue from wherever
+  the "BUILT" markers leave off — currently Wave 2, starting with
+  `google-ads-analyst`.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master`, and every migration in
   `supabase/migrations/` is confirmed actually applied to the live
@@ -428,25 +409,30 @@ instruction, don't ask which agent is next, just work through this queue
 in order, one at a time, each still built/verified to the same bar as
 the first 5. Only 29 real agent slots total (not the "44" older notes
 guessed at — that number was never right; `AgentCatalog`'s own summary
-line is the source of truth). 5 done, 24 left: 18 queued below, 6
-explicitly flagged as blocked on something only the user can decide (not
-in the queue — don't build a fake/mocked version of these).
+line is the source of truth). 6 explicitly flagged as blocked on
+something only the user can decide (not in the queue — don't build a
+fake/mocked version of these).
+
+**Progress: Wave 1 fully done (2026-09-30)** — items 1-4 below shipped
+same day as this queue was locked, all verified live against production
+(not just code review): `account-enrichment` (website fetch + SSRF
+hardening confirmed blocking cloud-metadata/localhost/private-IP,
+real extraction+summary confirmed on a real site), `portfolio-case-
+selector` (confirmed correctly picking the more-relevant of two similar
+SEO cases with real reasoning), `ai-quality-controller` (confirmed
+correctly flagging a deliberately bad test cover letter as КРИТИЧНО with
+accurate hallucination-risk detection), `task-orchestrator` (confirmed
+producing a coherent 5-step real-agent pipeline for a realistic task,
+including correctly flagging a not-yet-built agent in its own summary).
+9 real agents total now. Every Wave 1 slot except `sales-automation-
+slot` (deliberately TBD by design) has a real tool. Continuing with
+Wave 2 below.
 
 **Queue (build in this order):**
-1. `account-enrichment` (W1, sales/qualification) — reinterpreted to
-   avoid the original paid-enrichment-API blocker: fetch the client's own
-   website (already have `deals.website`/similar fields) server-side and
-   have an LLM summarize niche/size/positioning into "Додатковий
-   контекст" — no new vendor needed, just a fetch + summarize.
-2. `portfolio-case-selector` (W1, sales/proposal) — standalone "which
-   Mon'Archi case fits this client/task" tool over the existing
-   `followup_cases` table, usable outside the Cover Letter/Follow-up
-   flows (e.g. for a live sales call).
-3. `ai-quality-controller` (W1, quality-control) — second-opinion review
-   over another agent's already-generated output; worth building now
-   that 5 real agents produce real output to review.
-4. `task-orchestrator` (W1, management) — "which agent should handle
-   this" router; more useful with a bigger roster, so last of Wave 1.
+~~1. `account-enrichment` (W1, sales/qualification)~~ — BUILT.
+~~2. `portfolio-case-selector` (W1, sales/proposal)~~ — BUILT.
+~~3. `ai-quality-controller` (W1, quality-control)~~ — BUILT.
+~~4. `task-orchestrator` (W1, management)~~ — BUILT.
 5. `google-ads-analyst` (W2, performance-delivery) — reuses the exact
    `GoogleAdsApi` client/credentials `AdsInsightsAnalyst`/
    `api/ads-insights-chat.js` already has proven working — NOT blocked,
