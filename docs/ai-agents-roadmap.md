@@ -13,38 +13,48 @@ in §4.1 through §4.6 has at least one real implementation now.
 
 - **Done:** Agent activity feed + review queue + notification badges
   (Phase 1, §4.3/§4.4), Agent Catalog (§4.1), Agent Workspace template
-  (§4.2), 4 real agents (Ads Insights Analyst, Deal Health Check, Cover
-  Letter Agent, Job Post Analyzer), Phase 3's scheduled agent run (§4.5)
-  — `deal-health-check` runs automatically once a day via pg_cron and is
-  confirmed actually firing in production — Phase 3's Analytics/ROI
-  dashboard (§4.6), Phase 3's first agent handoff (§4.5) —
-  `job-post-analyzer` → `cover-letter-agent`, human-clicked, pre-filled —
-  and Phase 3's first *automatic* event-triggered run (§4.5) —
-  `job-post-analyzer` also fires with zero human click whenever a new
+  (§4.2), 5 real agents (Ads Insights Analyst, Deal Health Check, Cover
+  Letter Agent, Job Post Analyzer, Data Integrity Check), Phase 3's
+  scheduled agent run (§4.5) — `deal-health-check` runs automatically
+  once a day via pg_cron and is confirmed actually firing in production —
+  Phase 3's Analytics/ROI dashboard (§4.6), Phase 3's first agent handoff
+  (§4.5) — `job-post-analyzer` → `cover-letter-agent`, human-clicked,
+  pre-filled — and Phase 3's first *automatic* event-triggered run (§4.5)
+  — `job-post-analyzer` also fires with zero human click whenever a new
   deal is created with job-post/inbound text pasted into its optional
   field, logging straight into the activity feed against that deal's real
   client_id (see §4.5 for why this is the one place `job-post-analyzer`
   *can* log there, unlike its manual/standalone use).
+- **5th agent (2026-09-30) was picked autonomously, not asked** —
+  explicit exception this once: the user said "move along whatever path
+  you think is best," so `tracking-data-integrity-agent` (Wave 1, Data &
+  Reporting — "Перевіряє, чи можна довіряти даним, на яких працюють інші
+  агенти") got built without a confirmation question, reasoned through in
+  §4.3 below. Every other agent/phase choice in this project has been the
+  user's explicit call — that's still the default; this was a one-off,
+  not a new standing license to pick autonomously going forward.
 - **Infra change worth knowing about:** GitHub (`gh`), Vercel, and
   Supabase CLIs are now authenticated on the dev machine and linked to
   the real project (see `project_supabase_cli_access` memory) — direct
   read access to the live Supabase DB always works
   (`supabase db query --linked "<sql>"`). Direct **writes** work
-  *sometimes* — confirmed working for a security-fix REVOKE/migration
-  repair earlier in this cycle, then confirmed BLOCKED for a plain test
-  INSERT later the same day, no clear pattern found for which is which.
-  Don't assume a write will go through; have the fallback (present it as
-  a migration file for the user to run, or verify via code review + a
-  read-only check instead of a live insert) ready before attempting one.
+  *inconsistently* — confirmed working three separate times this cycle
+  (a security-fix REVOKE/migration repair, and the data-integrity-check
+  migration+function+cron below), and confirmed BLOCKED once (a plain
+  test INSERT for the event-trigger feature) — no clear pattern found for
+  which is which. Don't assume a write will go through; have the
+  fallback (present it as a migration file for the user to run, or verify
+  via code review + a read-only check instead of a live insert) ready
+  before attempting one, and don't retry a blocked write through a
+  different command — that's explicitly against the classifier's own
+  instructions.
 - **Next action, when resumed:** every roadmapped item through Phase 3 is
-  built. Ask the user what's next — more Wave 1 agents (2 open,
-  currently-unblocked slots: account/company-data enrichment, blocked
-  pending an external search API decision; and the case-selector agent,
-  largely redundant with what Cover Letter/Follow-up already do
+  built, plus a 5th agent. Ask the user what's next — more Wave 1 agents
+  (2 open, currently-unblocked slots: account/company-data enrichment,
+  blocked pending an external search API decision; and the case-selector
+  agent, largely redundant with what Cover Letter/Follow-up already do
   internally — see §4.2), Phase 4 (governance/polish, §4.7-4.8), or
-  something else entirely. Don't pick autonomously — every agent and
-  every phase-priority decision in this project so far has been the
-  user's call, not something to infer.
+  something else entirely.
 - Nothing is mid-edit or uncommitted — every change through this point is
   committed and pushed to `master`, and every migration in
   `supabase/migrations/` is confirmed actually applied to the live
@@ -105,11 +115,13 @@ same day to the dark full-bleed treatment.
   / Fully autonomous × Foundation / Capture / Generate / Orchestrate stages).
 - Agent detail modal: description, autonomy/status/wave badges. Falls back
   to read-only info unless the agent has a registered real tool.
-- **4 of 44** agent slots have a real, working tool: "Аналітик рекламних
+- **5 of 44** agent slots have a real, working tool: "Аналітик рекламних
   даних та інсайтів" (Cross-Channel) → `AdsInsightsAnalyst`, "Агент
   контролю стану угод" (Pipeline) → `DealHealthCheck`, "Агент написання
   супровідних листів" (Proposal) → `CoverLetterAgent`, "Агент аналізу
-  оголошень про проєкти" (Lead Generation) → `JobPostAnalyzer`.
+  оголошень про проєкти" (Lead Generation) → `JobPostAnalyzer`, "Агент
+  контролю трекінгу та цілісності даних" (Data & Reporting) →
+  `DataIntegrityCheck`.
   Everything else is
   `status: not_started` — data-only placeholders with a disabled
   "Запустити (скоро)" button.
@@ -504,8 +516,47 @@ tab. Deliberately scoped to numbers that are actually real, not invented:
   zero human click, logging into the activity feed. See §4.5 for detail
   including what's verified live vs. by code review only.
 - **Phase 3 is now fully built** — every §4.1-§4.6 item has at least one
-  real implementation. Next is Phase 4, more Wave 1 agents, or whatever
-  the user prioritizes next — ask, don't assume.
+  real implementation.
+
+**5th agent (2026-09-30), picked without asking** — the user explicitly
+said "move along whatever path you think is best" this once, so the pick
+itself is reasoned through here rather than confirmed beforehand:
+- **Built:** `tracking-data-integrity-agent` (Wave 1, Data & Reporting,
+  `DataIntegrityCheck.jsx`) — three fully deterministic checks, no LLM,
+  run once a day via `run_data_integrity_check()` (pg_cron, same pattern
+  as `run_deal_health_check()`): (1) RLS blanket-policy regression —
+  literally re-checks for the exact vulnerability found and fixed this
+  same day (§6a); (2) any of the 3 registered pg_cron jobs failed a run
+  in the last 48h; (3) any `needs_review` conversation older than 3 days
+  still unreviewed. Migration:
+  `20260930010000_data_integrity_check_scheduled_run.sql`.
+- **Why this one over the alternatives:** account/company-data enrichment
+  needs an external API vendor decision (not mine to make); the
+  case-selector agent mostly duplicates logic Cover Letter/Follow-up
+  already have inline; a new orchestrator meta-agent is premature with
+  only 4 (now 5) real agents to coordinate; Phase 4 governance
+  (permissions, prompt versioning) matters more once there are many users
+  and many agents, neither of which is true yet. Data integrity closes
+  the exact gap §3 ("The core gap") called out from the start — "no
+  error/failure state" — and turns today's one-off manual security audit
+  into an ongoing automated check, which is the single highest-leverage
+  thing to verify keeps working now that 2 other agents run
+  unsupervised on a schedule.
+- **Deliberately no manual "check now" button** — 2 of the 3 checks read
+  `pg_catalog`/`cron` schema tables not exposed over PostgREST at all; a
+  browser-triggered re-check would mean either duplicating the logic
+  client-side or granting RPC `EXECUTE` to `authenticated` on a
+  `SECURITY DEFINER` function — reopening exactly the kind of public-RPC
+  exposure finding #2 of the same-day security fix (§6a) just closed. The
+  workspace page is read-only, surfacing the latest daily result.
+- **Verified live, not just by code review:** ran
+  `select run_data_integrity_check();` directly via
+  `supabase db query --linked` (this write went through with no
+  classifier denial — see the infra note above on inconsistency) and
+  confirmed a correct all-clear row landed in `ai_agent_conversations`/
+  `ai_agent_messages`; confirmed the `data-integrity-check-daily` cron
+  job is registered and active in `cron.job`; confirmed the workspace
+  page renders the real result correctly in-browser.
 
 **Phase 4 — Governance & polish**
 - Permissions, config/prompt versioning (4.7)
