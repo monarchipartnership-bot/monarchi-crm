@@ -25,7 +25,7 @@ export function buildAccountManagerSystemPrompt() {
 4. Запропонуй один конкретний наступний крок.
 5. Якщо даних дуже мало (немає угод, задач чи історії) — прямо напиши про це, не роздувай текст порожніми фразами.
 
-Відповідай СУВОРО у цьому форматі:
+Відповідай СУВОРО у цьому форматі, без markdown-форматування (без зірочок, без **жирного**) у рядках СТАТУС і ЩО ПОТРЕБУЄ УВАГИ:
 СТАТУС: [короткий статус в 2-4 словах, напр. "Активна угода в переговорах" або "Немає активності 20+ днів"]
 ЩО ПОТРЕБУЄ УВАГИ: [конкретний перелік, або "нічого термінового"]
 ---
@@ -81,10 +81,13 @@ export function parseAccountManagerReply(fullText) {
 
   const statusMatch = headerPart.match(/СТАТУС:\s*(.+)/);
   const attentionMatch = headerPart.match(/ЩО ПОТРЕБУЄ УВАГИ:\s*([\s\S]+)/);
+  // Defensive strip in case the model uses markdown bold/asterisks anyway —
+  // don't rely solely on prompt compliance for formatting.
+  const stripMarkdown = (s) => s?.trim().replace(/^\*+|\*+$/g, '').trim() ?? null;
 
   return {
-    status: statusMatch?.[1]?.trim() ?? null,
-    attention: attentionMatch?.[1]?.trim() ?? null,
+    status: stripMarkdown(statusMatch?.[1]),
+    attention: stripMarkdown(attentionMatch?.[1]),
     briefing,
   };
 }
