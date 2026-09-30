@@ -20,6 +20,9 @@ import AiAccountManager from '../AiAccountManager/AiAccountManager';
 import LeadQualificationAgent from '../LeadQualificationAgent/LeadQualificationAgent';
 import ReplyAnalyzer from '../ReplyAnalyzer/ReplyAnalyzer';
 import PerformanceCopywriter from '../PerformanceCopywriter/PerformanceCopywriter';
+import BusinessResearchAgent from '../BusinessResearchAgent/BusinessResearchAgent';
+import CompetitorResearchAgent from '../CompetitorResearchAgent/CompetitorResearchAgent';
+import AudienceResearchAgent from '../AudienceResearchAgent/AudienceResearchAgent';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
@@ -47,6 +50,9 @@ const AGENT_TOOLS = {
   'lead-qualification-agent': LeadQualificationAgent,
   'reply-analyzer': ReplyAnalyzer,
   'performance-copywriter': PerformanceCopywriter,
+  'business-research-agent': BusinessResearchAgent,
+  'competitor-research-agent': CompetitorResearchAgent,
+  'audience-research-agent': AudienceResearchAgent,
 };
 
 // This page's own mount-time reveal: the core lights up, then every

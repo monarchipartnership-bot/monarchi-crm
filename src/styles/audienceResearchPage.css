@@ -1,0 +1,40 @@
+/* Агент дослідження аудиторії — eighteenth real agent, built on the
+   shared AgentWorkspaceShell (see styles/agentWorkspace.css). */
+
+.arr-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
+.arr-body::-webkit-scrollbar { width: 5px; }
+.arr-body::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
+
+.arr-field { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.arr-field-grow { flex: 1; min-height: 120px; }
+.arr-label { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #9891C4; }
+
+.arr-textarea {
+  width: 100%; resize: vertical; border-radius: 14px; border: 1px solid rgba(100, 125, 210, .28); background: rgba(7, 13, 30, .5);
+  color: #F3F1FF; font-family: var(--font-body); font-size: .86rem; line-height: 1.55; padding: 14px 16px;
+}
+.arr-textarea::placeholder { color: #7A76A3; }
+.arr-textarea:focus { outline: none; border-color: rgba(164, 98, 255, .55); }
+.arr-textarea-main { flex: 1; min-height: 100px; }
+.arr-textarea-small { min-height: 64px; }
+
+.arr-actions { display: flex; align-items: center; gap: 14px; flex: none; }
+.arr-run-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; font-family: var(--font-body); font-weight: 600; font-size: .84rem;
+  cursor: pointer; box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6); transition: filter .15s, opacity .15s;
+}
+.arr-run-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.arr-run-btn:disabled { opacity: .6; cursor: default; }
+.arr-status { font-family: var(--font-body); font-size: .8rem; color: #918CBB; }
+.arr-status.error { color: #FCA5B1; }
+
+.arr-result { flex: none; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: 14px; background: rgba(7, 13, 30, .5); border: 1px solid rgba(100, 125, 210, .28); }
+.arr-result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.arr-result-title { font-family: var(--font-head); font-weight: 800; font-size: .92rem; color: #F3F1FF; }
+.arr-copy-btn {
+  flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(140, 130, 200, .28); background: rgba(122, 105, 200, .1);
+  color: #D8D4F0; font-family: var(--font-body); font-weight: 600; font-size: .76rem; cursor: pointer; transition: background .15s;
+}
+.arr-copy-btn:hover { background: rgba(122, 105, 200, .2); }
+.arr-result-text { font-family: var(--font-body); font-size: .86rem; line-height: 1.65; color: #E4E1F5; white-space: pre-wrap; }
