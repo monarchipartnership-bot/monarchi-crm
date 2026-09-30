@@ -1,0 +1,43 @@
+/* Контролер якості AI — eighth real agent, built on the shared
+   AgentWorkspaceShell (see styles/agentWorkspace.css). */
+
+.qc-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 4px; }
+.qc-body::-webkit-scrollbar { width: 5px; }
+.qc-body::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
+
+.qc-field { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.qc-field-grow { flex: 1; min-height: 140px; }
+.qc-label { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #9891C4; }
+
+.qc-textarea {
+  width: 100%; resize: vertical; border-radius: 14px; border: 1px solid rgba(100, 125, 210, .28); background: rgba(7, 13, 30, .5);
+  color: #F3F1FF; font-family: var(--font-body); font-size: .86rem; line-height: 1.55; padding: 14px 16px;
+}
+.qc-textarea::placeholder { color: #7A76A3; }
+.qc-textarea:focus { outline: none; border-color: rgba(164, 98, 255, .55); }
+.qc-textarea-main { flex: 1; min-height: 120px; }
+.qc-textarea-context { min-height: 80px; }
+
+.qc-actions { display: flex; align-items: center; gap: 14px; flex: none; }
+.qc-run-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: #fff; font-family: var(--font-body); font-weight: 600; font-size: .84rem;
+  cursor: pointer; box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6); transition: filter .15s, opacity .15s;
+}
+.qc-run-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.qc-run-btn:disabled { opacity: .6; cursor: default; }
+.qc-status { font-family: var(--font-body); font-size: .8rem; color: #918CBB; }
+.qc-status.error { color: #FCA5B1; }
+
+.qc-result { flex: none; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: 14px; background: rgba(7, 13, 30, .5); border: 1px solid rgba(100, 125, 210, .28); }
+.qc-verdict {
+  align-self: flex-start; font-family: var(--font-head); font-size: .7rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase;
+  border-radius: 999px; padding: 5px 14px;
+}
+.qc-verdict--ok { color: #6EE7B7; background: rgba(16, 185, 129, .16); }
+.qc-verdict--warn { color: #FBBF66; background: rgba(217, 119, 6, .16); }
+.qc-verdict--bad { color: #FCA5B1; background: rgba(244, 63, 94, .16); }
+
+.qc-issues-title { display: block; font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: #8983B5; margin-bottom: 4px; }
+.qc-issues-text { margin: 0; font-family: var(--font-body); font-size: .84rem; line-height: 1.55; color: #E4E1F5; white-space: pre-wrap; }
+.qc-summary { margin: 0; font-family: var(--font-body); font-size: .86rem; line-height: 1.6; color: #E4E1F5; padding-top: 8px; border-top: 1px solid rgba(100, 125, 210, .2); }
