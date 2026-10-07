@@ -3,8 +3,8 @@ import { moveDealStage } from '../../../lib/api/deals';
 import DealCard from '../../../components/Deals/DealCard';
 import Select from '../../../components/common/Select';
 import DealsFilterMenu from '../../../components/Deals/DealsFilterMenu';
+import ActionIcon from '../../../components/common/ActionIcon';
 
-const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
 const DAY_MS = 86400000;
 
 export default function DealsKanbanTab({ deals, stages, reload, onAddDeal, onManageStages, onViewDeal }) {
@@ -108,8 +108,8 @@ export default function DealsKanbanTab({ deals, stages, reload, onAddDeal, onMan
     <>
       <div className="deals-kanban-toolbar">
         <div className="mc-client-search">
-          <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Пошук за назвою або клієнтом..." />
+          <ActionIcon name="search" size={16} />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Пошук за назвою або клієнтом..." aria-label="Пошук угод" />
         </div>
         <Select
           className="dash-period-select" value={managerFilter} onChange={setManagerFilter}
@@ -156,13 +156,13 @@ export default function DealsKanbanTab({ deals, stages, reload, onAddDeal, onMan
                 />
               ))}
             </div>
-            <button type="button" className="wk-add-task-btn" onClick={() => onAddDeal(stage.id)}>+ Додати угоду</button>
+            <button type="button" className="wk-add-task-btn" onClick={() => onAddDeal(stage.id)}><ActionIcon name="create" size={16} /> Додати угоду</button>
           </div>
         ))}
       </div>
 
       {lostModal && (
-        <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setLostModal(null); }}>
+        <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) setLostModal(null); }}>
           <div className="tmodal-box">
             <div className="tmodal-head">
               <h3>Причина програшу</h3>

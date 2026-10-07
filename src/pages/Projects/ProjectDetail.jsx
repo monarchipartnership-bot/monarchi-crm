@@ -4,6 +4,7 @@ import AutoResizeTextarea from '../../components/Reports/AutoResizeTextarea';
 import AdReportForm from '../../components/Projects/AdReportForm';
 import { fetchProjectById, updateProject, deleteProject } from '../../lib/api/projects';
 import { STATUS_LABEL, SERVICES, fmtIsoDate } from '../../lib/projectConstants';
+import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload, fmtCost } from '../../lib/projectFields';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
 import '../../styles/projectReportPage.css';
@@ -81,6 +82,7 @@ export default function ProjectDetail() {
       end_date: project.end_date || '',
       status: project.status || 'active',
       services: project.services || [],
+      ...extraFieldsForm(project),
     });
     setEditMode(true);
   }
@@ -111,6 +113,7 @@ export default function ProjectDetail() {
         end_date: editForm.end_date || null,
         status: editForm.status,
         services: editForm.services,
+        ...extraFieldsPayload(editForm),
       });
       setEditMode(false);
       setEditForm(null);
@@ -223,7 +226,7 @@ export default function ProjectDetail() {
 
             <div className="ov-field-grid">
               <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="manager" />Менеджер</div>
+                <div className="ov-field-label"><FieldIcon name="manager" />Продакт (менеджер)</div>
                 {editMode
                   ? <input type="text" value={editForm.manager} onChange={(e) => setEditField('manager', e.target.value)} placeholder="Ім'я менеджера" />
                   : <div className="ov-field-value">{project.manager || '—'}</div>}
@@ -237,7 +240,7 @@ export default function ProjectDetail() {
               </div>
 
               <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="country" />Країна</div>
+                <div className="ov-field-label"><FieldIcon name="country" />Гео (країна)</div>
                 {editMode
                   ? <input type="text" value={editForm.country} onChange={(e) => setEditField('country', e.target.value)} placeholder="напр. USA" />
                   : <div className="ov-field-value">{project.country || '—'}</div>}
@@ -262,7 +265,7 @@ export default function ProjectDetail() {
               </div>
 
               <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="period" />Період</div>
+                <div className="ov-field-label"><FieldIcon name="period" />Початок роботи над стратегією – завершення співпраці</div>
                 {editMode ? (
                   <div className="ov-date-row">
                     <input
@@ -304,8 +307,35 @@ export default function ProjectDetail() {
                 )}
               </div>
 
+              {EXTRA_PROJECT_FIELDS.map((f) => (
+                <div className="ov-field-box" key={f.key}>
+                  <div className="ov-field-label">{f.label}</div>
+                  {editMode ? (
+                    f.type === 'select' ? (
+                      <select value={editForm[f.key]} onChange={(e) => setEditField(f.key, e.target.value)}>
+                        <option value="">Не вказано</option>
+                        {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type={f.type === 'url' ? 'text' : f.type} value={editForm[f.key]} placeholder={f.placeholder}
+                        step={f.type === 'number' ? '0.01' : undefined}
+                        onChange={(e) => setEditField(f.key, e.target.value)}
+                        onClick={f.type === 'date' ? (e) => e.currentTarget.showPicker?.() : undefined}
+                      />
+                    )
+                  ) : f.key === 'worksection_link' && project[f.key] ? (
+                    <a className="ov-field-value ov-link" href={project[f.key]} target="_blank" rel="noreferrer">Відкрити в Worksection</a>
+                  ) : (
+                    <div className="ov-field-value">
+                      {f.key === 'cost' ? fmtCost(project.cost) : f.type === 'date' ? (fmtIsoDate(project[f.key]) || '—') : (project[f.key] || '—')}
+                    </div>
+                  )}
+                </div>
+              ))}
+
               <div className="ov-field-box ov-field-box-wide">
-                <div className="ov-field-label"><FieldIcon name="services" />Послуги</div>
+                <div className="ov-field-label"><FieldIcon name="services" />Послуги (канал роботи)</div>
                 {editMode ? (
                   <div className="svc-picker">
                     {SERVICES.map((s) => (
@@ -334,7 +364,7 @@ export default function ProjectDetail() {
 
           <section className="report-section">
             <div className="ov-field-box ov-notes-box">
-              <div className="ov-field-label"><FieldIcon name="notes" />Заметки по клієнту</div>
+              <div className="ov-field-label"><FieldIcon name="notes" />Особливості роботи з клієнтом</div>
               <AutoResizeTextarea value={notesValue} onChange={setNotesValue} placeholder="Нотатки по клієнту..." />
               {notesDirty && (
                 <button type="button" className="btn btn-p ov-notes-save" onClick={saveNotes} disabled={notesSaving}>

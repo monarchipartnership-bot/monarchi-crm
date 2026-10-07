@@ -5,6 +5,8 @@ import { STATUSES } from '../../lib/clientStatus';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { clientFullName } from '../../lib/clientName';
 import PlatformPicker from '../common/PlatformPicker';
+import { LeadChannelSelect, UpworkChannelSelect } from './LeadChannelFields';
+import { UPWORK_CHANNELS, needsUpworkChannel } from '../../lib/upworkChannels';
 
 const FIELD_ICONS = {
   platform: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>',
@@ -56,6 +58,22 @@ export default function EditableClientList({ items, onChange, onAdd, onRemove, c
                   <div className="capture-text">{item.platform}</div>
                 ) : (
                   <PlatformPicker value={item.platform} onChange={(v) => setField(item.id, 'platform', v)} />
+                )}
+              </ClientField>
+              {item.platform === 'Upwork' && (
+                <ClientField iconBoxed={iconBoxed} icon={FIELD_ICONS.platform} label={needsUpworkChannel(item) ? 'Канал Upwork * (обов’язково)' : 'Канал Upwork *'}>
+                  {capturing ? (
+                    <div className="capture-text">{UPWORK_CHANNELS.find((c) => c.key === item.upworkChannel)?.label || '—'}</div>
+                  ) : (
+                    <UpworkChannelSelect bare={iconBoxed} value={item.upworkChannel} onChange={(v) => setField(item.id, 'upworkChannel', v)} />
+                  )}
+                </ClientField>
+              )}
+              <ClientField iconBoxed={iconBoxed} icon={FIELD_ICONS.platform} label="Канал (Source)">
+                {capturing ? (
+                  <div className="capture-text">{item.channel || '—'}</div>
+                ) : (
+                  <LeadChannelSelect bare={iconBoxed} value={item.channel} onChange={(v) => setField(item.id, 'channel', v)} />
                 )}
               </ClientField>
               <ClientField iconBoxed={iconBoxed} icon={FIELD_ICONS.leadType} label="Статус">

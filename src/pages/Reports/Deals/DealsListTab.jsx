@@ -2,8 +2,9 @@ import { useMemo, useRef, useState } from 'react';
 import { fmtDate } from '../../../lib/dateHelpers';
 import Select from '../../../components/common/Select';
 import { stagePillStyle } from '../../../lib/stagePillStyle';
+import ActionIcon from '../../../components/common/ActionIcon';
+import ClientAvatar from '../../../components/Clients/ClientAvatar';
 
-const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
 const FILTER_ICON = '<svg viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8v6l-3 1.5v-7.5z"/></svg>';
 const PAGE_SIZE = 15;
 
@@ -72,8 +73,8 @@ export default function DealsListTab({ deals, stages, onViewDeal, mode = 'active
           <span>{mode === 'archive' ? 'Архів угод' : 'Усі угоди'}</span>
           <div className="mc-client-toolbar stitle-filter">
             <div className="mc-client-search">
-              <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
-              <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Пошук за назвою або клієнтом..." />
+              <ActionIcon name="search" size={16} />
+              <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Пошук за назвою або клієнтом..." aria-label="Пошук угод" />
             </div>
             <Select className="dash-period-select" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
             <div className="task-filter-wrap" ref={filterRef}>
@@ -124,14 +125,19 @@ export default function DealsListTab({ deals, stages, onViewDeal, mode = 'active
                     const stage = stagesById[d.stage_id];
                     return (
                       <tr key={d.id} className="client-row" onClick={() => onViewDeal(d)}>
-                        <td className="ink">{d.clients?.company || d.clients?.name || '—'}</td>
+                        <td className="ink">
+                          <span className="deals-client-cell">
+                            {(d.clients?.company || d.clients?.name) && <ClientAvatar name={d.clients?.company || d.clients?.name} size={32} />}
+                            <span>{d.clients?.company || d.clients?.name || '—'}</span>
+                          </span>
+                        </td>
                         <td>{d.title || '—'}</td>
                         <td><span className="deal-stage-pill" style={stagePillStyle(stage?.color)}>{stage?.label || '—'}</span></td>
                         <td>{d.amount ? `${Number(d.amount).toLocaleString('uk-UA')} ${d.currency}` : '—'}</td>
-                        <td>{d.manager || '—'}</td>
+                        <td>{d.manager ? <span className="deals-client-cell"><ClientAvatar name={d.manager} size={28} /><span>{d.manager}</span></span> : '—'}</td>
                         <td>{fmtShort(d.created_at)}</td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <button type="button" className="btn" onClick={() => onViewDeal(d)}>Відкрити</button>
+                          <button type="button" className="btn deals-open-btn" onClick={() => onViewDeal(d)}>Відкрити <ActionIcon name="chevron" size={16} /></button>
                         </td>
                       </tr>
                     );

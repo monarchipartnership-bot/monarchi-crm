@@ -1,3 +1,4 @@
+import ActionIcon from '../common/ActionIcon';
 import { useRef, useState } from 'react';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { htmlToPlainText } from '../../lib/sanitizeHtml';
@@ -173,9 +174,9 @@ export default function NoteEditor({ profiles, saving, onSave, onUploadImage }) 
           ))}
         </div>
         <div className="deal-note-toolbar-actions">
-          <button type="button" className="btn" onClick={handleClear} disabled={isEmpty}>Очистити</button>
+          <button type="button" className="btn" onClick={handleClear} disabled={isEmpty}><ActionIcon name="clear" size={16} /> Очистити</button>
           <button type="button" className="btn btn-p" onClick={handleSave} disabled={isEmpty || saving}>
-            {saving ? 'Зберігаємо…' : 'Зберегти'}
+            <ActionIcon name="save" size={16} /> {saving ? 'Зберігаємо…' : 'Зберегти'}
           </button>
         </div>
       </div>

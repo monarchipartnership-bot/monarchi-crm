@@ -1,0 +1,119 @@
+/* Image Studio covers — each cover is a fixed 1000x750 DOM block laid out in
+   its own pixel space (flow + absolute anchors), scaled for preview/thumbnails
+   with a CSS transform and exported straight from this DOM. All selectors are
+   .cv-scoped; the palette arrives as --bgA/--bgB/--glow/--gold/--mag. */
+
+.cv-stage { position: relative; width: 100%; overflow: hidden; border-radius: 12px; background: #1c0a1c; }
+.cv-scaler { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+.cv {
+  --text: #ffffff; --mut: #CBA6CB; --stroke: rgba(255, 255, 255, 0.16);
+  position: relative; width: 1000px; height: 750px; overflow: hidden;
+  font-family: 'Space Grotesk', 'Inter', sans-serif; color: var(--text);
+}
+.cv *, .cv *::before, .cv *::after { box-sizing: border-box; }
+.cv p, .cv span, .cv b, .cv div { margin: 0; }
+
+.cv-bg { position: absolute; inset: 0; background: linear-gradient(135deg, var(--bgA), var(--bgB)); }
+.cv-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle 640px at 820px 120px, var(--glow), transparent); opacity: .55; }
+
+.cv-logo { display: block; width: auto; align-self: flex-start; flex: none; }
+.cv-kicker {
+  align-self: flex-start; display: inline-flex; align-items: center; height: 26px; padding: 0 14px; border-radius: 13px;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid var(--stroke); color: var(--gold);
+  font: 700 11px 'Space Mono', monospace; letter-spacing: 2px; text-transform: uppercase; white-space: nowrap;
+}
+.cv-title { font-weight: 700; line-height: 1.05; letter-spacing: -.01em; }
+.cv-title-a { display: block; color: var(--text); }
+.cv-title-b { display: block; color: var(--gold); }
+.cv-sub {
+  color: var(--mut); font: 400 calc(19px * var(--k-sub, 1)) / calc(27px * var(--k-sub, 1)) 'Space Grotesk', sans-serif;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.cv-metrics { display: flex; gap: 12px; }
+.cv-metrics--chips .cv-metric {
+  height: 58px; padding: 0 15px; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--stroke);
+}
+.cv-metric b { color: var(--gold); font: 700 calc(20px * var(--k-num, 1)) / 1.1 'Space Grotesk', sans-serif; white-space: nowrap; }
+.cv-metric span { color: var(--mut); font: 400 calc(10px * var(--k-num, 1)) / 1.25 'Space Mono', monospace; letter-spacing: 1.2px; text-transform: uppercase; white-space: nowrap; }
+
+/* cut-out portrait standing directly on the cover */
+.cv-person { position: absolute; display: flex; align-items: flex-end; justify-content: flex-end; }
+.cv-person-glow { position: absolute; inset: -60px; background: radial-gradient(closest-side, var(--glow), transparent); opacity: .5; }
+.cv-person img { position: relative; display: block; max-width: 100%; max-height: 100%; object-fit: contain; object-position: bottom right; }
+.cv-person-ph { position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.cv-person-ph svg { width: 100%; height: 100%; fill: rgba(255, 255, 255, 0.09); }
+.cv-person-ph span { position: absolute; left: 0; right: 0; top: 80%; text-align: center; color: var(--mut); font: 400 14px 'Space Mono', monospace; letter-spacing: 3px; }
+
+/* decorative chat bubbles */
+.cv-bubble { position: absolute; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 13px; --tone: var(--mag); --op: .5; }
+.cv-bubble--mag2 { --op: .38; }
+.cv-bubble--gold { --tone: var(--gold); --op: .28; }
+.cv-bubble::before { content: ""; position: absolute; inset: 0; border-radius: 16px; background: var(--tone); opacity: var(--op); }
+.cv-bubble::after { content: ""; position: absolute; top: 100%; width: 26px; height: 16px; background: var(--tone); opacity: var(--op); }
+.cv-bubble--l::after { left: 16px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.cv-bubble--r::after { right: 16px; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.cv-bubble u { position: absolute; left: 16px; top: 30%; width: 62%; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.55); text-decoration: none; }
+.cv-bubble u.s { top: 58%; width: 40%; }
+.cv-bubble i { position: relative; width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); }
+
+/* ---- Service Portrait ---- */
+.cv-sp-col { position: absolute; left: 64px; top: 52px; width: 450px; display: flex; flex-direction: column; }
+.cv-sp-col .cv-kicker { margin-top: 30px; }
+.cv-sp-col .cv-title { margin-top: 24px; }
+.cv-sp-col .cv-sub { margin-top: 14px; }
+.cv-sp-person { right: 0; bottom: 0; width: 480px; height: 654px; }
+.cv-sp-deco { position: absolute; left: 64px; top: 500px; width: 380px; height: 150px; }
+.cv-sp-metrics { position: absolute; left: 64px; bottom: 24px; }
+
+/* ---- tags, cards, mocks shared by the web / mobile covers ---- */
+.cv-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.cv-tag {
+  display: inline-flex; align-items: center; height: calc(32px * var(--k-tags, 1)); padding: 0 calc(13px * var(--k-tags, 1)); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--stroke); color: var(--mut);
+  font: 700 calc(11px * var(--k-tags, 1)) 'Space Mono', monospace; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+}
+.cv-tag.is-accent { color: var(--gold); border-color: var(--gold); background: rgba(255, 255, 255, 0.1); }
+
+.cv-metrics--cards { width: 100%; gap: 16px; }
+.cv-metrics--cards .cv-metric {
+  flex: 1; min-width: 0; padding: 16px 18px; border-radius: 14px; display: flex; flex-direction: column; gap: 6px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--stroke);
+}
+.cv-metrics--cards .cv-metric b { font-size: calc(38px * var(--k-num, 1)); line-height: 1.05; }
+.cv-metrics--cards .cv-metric span { white-space: normal; font-size: calc(11px * var(--k-num, 1)); line-height: 1.35; }
+
+.cv-ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 100%; color: var(--mut); }
+.cv-ph span { font: 400 12px 'Space Mono', monospace; letter-spacing: 2.5px; text-transform: uppercase; }
+
+.cv-browser { position: absolute; display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; background: rgba(255, 255, 255, 0.07); border: 1.5px solid var(--stroke); }
+.cv-browser-bar { flex: none; height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 16px; background: rgba(24, 8, 26, 0.82); }
+.cv-browser-bar i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.32); }
+.cv-browser-url { margin-left: 10px; flex: 1; min-width: 0; height: 22px; line-height: 22px; padding: 0 12px; border-radius: 11px; background: rgba(255, 255, 255, 0.08); color: var(--mut); font: 400 11px/22px 'Space Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-browser-body { flex: 1; min-height: 0; }
+.cv-browser-body img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+
+.cv-phone { position: relative; width: 150px; height: 312px; border-radius: 26px; padding: 7px; background: rgba(255, 255, 255, 0.07); border: 1.5px solid var(--stroke); }
+.cv-phone-screen { width: 100%; height: 100%; border-radius: 20px; overflow: hidden; background: rgba(0, 0, 0, 0.25); }
+.cv-phone-screen img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.cv-phone-notch { position: absolute; left: 50%; top: 14px; width: 48px; height: 13px; margin-left: -24px; border-radius: 7px; background: #0b030c; }
+.cv-phone-home { position: absolute; left: 50%; bottom: 14px; width: 60px; height: 4px; margin-left: -30px; border-radius: 2px; background: rgba(255, 255, 255, 0.6); }
+.cv-sq { position: absolute; width: 14px; height: 14px; border-radius: 3px; background: var(--gold); }
+
+/* ---- Web Editorial ---- */
+.cv-we-col { position: absolute; left: 64px; top: 52px; width: 470px; display: flex; flex-direction: column; }
+.cv-we-col .cv-kicker { margin-top: 28px; }
+.cv-we-col .cv-title { margin-top: 22px; }
+.cv-we-col .cv-sub { margin-top: 14px; font-size: calc(17px * var(--k-sub, 1)); line-height: calc(24px * var(--k-sub, 1)); }
+.cv-we-browser { left: 548px; top: 96px; width: 388px; height: 352px; }
+.cv-we-nums { position: absolute; left: 64px; right: 64px; bottom: 44px; }
+
+/* ---- Phone Trio ---- */
+.cv-pt-col { position: absolute; left: 64px; top: 52px; width: 470px; display: flex; flex-direction: column; }
+.cv-pt-col .cv-kicker { margin-top: 28px; }
+.cv-pt-col .cv-title { margin-top: 22px; }
+.cv-pt-col .cv-sub { margin-top: 12px; -webkit-line-clamp: 2; }
+.cv-pt-person { right: 0; bottom: 0; width: 390px; height: 560px; }
+.cv-pt-phones { position: absolute; left: 64px; top: 404px; display: flex; gap: 20px; }

@@ -1,585 +1,402 @@
-/* Constellation test page — experimental only, not part of the real
-   product surface. Dark stage on purpose (reads better for a node graph
-   than the app's usual light surface), everything else stays self-contained
-   in this file so it can be deleted along with the page with no residue. */
+/* AI Agents — immersive system inside Hub ("update ai agents" kit,
+   approved-reference.png). Full-screen plum shell without the CRM sidebar or
+   light toolbar; this file styles the page chrome, the live SVG map, the
+   focused department, panels and the agent info modal. The decorative
+   environment (nebula, planets, particles) is AiEnvironment.css. The shared
+   tokens below are inherited by every overlay opened from here (agent
+   workspaces, Knowledge Base, catalog/tasks/analytics). */
 
-.constellation-page {
-  position: relative;
-  height: 100vh;
-  /* Belt-and-suspenders alongside .constellation-stage's own overflow:
-     hidden — without this, a wide-enough focused fan could make the page
-     itself scrollable (some browsers count CSS-transformed SVG content
-     toward the page's scrollable area even past overflow:visible), which
-     breaks the fixed-viewport feel this whole page is built around and
-     made "is anything actually clipped" hard to tell apart from "did the
-     page just quietly scroll". */
-  overflow: hidden;
+.constellation-page.ai-immersive {
+  --ai-base: #17051c; --ai-plum: #270827; --ai-panel: #35113f;
+  --ai-text: #f9edf9; --ai-secondary: #d5a9dc; --ai-accent: #ae40ae;
+  --ai-active: linear-gradient(88deg, #b544b5, #661466);
+  --ai-border: rgba(235, 156, 239, .3);
+  --ai-pill: rgba(39, 8, 39, .74);
+  --ai-lilac: #eb9cef;
+  --ai-st-live: #b07ce0; --ai-st-dev: #f59b5b; --ai-st-plan: #7c8cf8;
+  --dept-color: #eb9cef;
+  position: relative; height: 100vh; height: 100dvh; overflow: hidden;
+  color: var(--ai-text); background: var(--ai-base); isolation: isolate;
+  font-family: var(--font-body);
 }
+.constellation-page.ai-immersive *, .constellation-page.ai-immersive *::before, .constellation-page.ai-immersive *::after { box-sizing: border-box; }
+.ai-immersive :focus-visible { outline: 2px solid #edb5f0; outline-offset: 3px; }
+/* SVG controls get a round ring instead of the browser's rectangular outline */
+.ai-immersive .ai-node:focus-visible, .ai-immersive .ai-sat:focus-visible, .ai-immersive .dept-graph-agent:focus-visible, .ai-immersive .dept-graph-root:focus-visible { outline: none; }
+.ai-focus-ring { fill: none; stroke: #edb5f0; stroke-width: 2px; vector-effect: non-scaling-stroke; opacity: 0; pointer-events: none; }
+.ai-node:focus-visible .ai-focus-ring, .ai-sat:focus-visible .ai-focus-ring, .dept-graph-agent:focus-visible .ai-focus-ring, .dept-graph-root:focus-visible .ai-focus-ring { opacity: 1; }
 
-/* AI Agents is a plain sidebar link — no transition overlay/darken/welcome
-   screen. The core-ignite + branches-flying-out entrance below is this
-   page's own mount-time reveal, always plays the same way regardless of
-   how the route was reached (direct URL load or a normal click). */
-
-.constellation-topright {
-  position: absolute; top: 20px; right: 20px; z-index: 6;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
-  max-width: calc(100vw - 40px);
+.ai-pill {
+  background: var(--ai-pill); border: 1px solid var(--ai-border); border-radius: 999px; color: var(--ai-text);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
+.ai-panel { background: rgba(39, 8, 39, .95); border: 1px solid var(--ai-border); border-radius: 20px; color: var(--ai-text); }
 
-/* This section's own top-center nav (Мапа / Задачі агентів / …) — the AI
-   Agents section's internal navigation lives here instead of the CRM
-   sidebar or a routed URL (see ConstellationTest.jsx's `section` state).
-   Always visible regardless of department focus, so .view-tabs (the
-   MAP/CHART toggle for a *focused department*, a level below this one) is
-   pushed down to sit just underneath it rather than colliding. */
+/* ---------------- header: brand / section capsule / back to Hub ---------------- */
+.ai-brand { position: absolute; top: 20px; left: 28px; z-index: 6; display: flex; align-items: center; gap: 12px; }
+.ai-brand-icon { width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(174, 64, 174, .45)); }
+.ai-brand-text { display: flex; flex-direction: column; gap: 2px; }
+.ai-brand h1 { margin: 0; font-family: var(--font-head); font-size: 26px; line-height: 28px; font-weight: 700; color: var(--ai-text); letter-spacing: -.2px; }
+.ai-brand-text span { font-size: 14px; line-height: 18px; color: var(--ai-secondary); }
+
 .constellation-section-nav {
   position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 7;
-  display: flex; gap: 4px;
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 4px;
+  display: flex; align-items: center; height: 52px; padding: 4px;
+  background: rgba(39, 8, 39, .86); border: 1px solid rgba(181, 68, 181, .7); border-radius: 999px;
+  box-shadow: 0 0 22px rgba(174, 64, 174, .22), inset 0 0 14px rgba(174, 64, 174, .12);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); max-width: calc(100vw - 32px);
 }
 .constellation-section-tab {
-  border: none; background: none; color: #A79BC7; cursor: pointer;
-  font-family: var(--font-body); font-size: .82rem; font-weight: 600;
-  padding: 8px 16px; border-radius: 999px; transition: background .15s ease, color .15s ease;
+  position: relative; display: inline-flex; align-items: center; height: 100%; padding: 0 22px; border: none; background: none; cursor: pointer;
+  color: var(--ai-text); font-family: var(--font-body); font-size: 16px; font-weight: 500; white-space: nowrap; border-radius: 999px;
+  transition: background .16s ease, color .16s ease;
 }
-.constellation-section-tab:hover { color: #EDE7F5; }
-.constellation-section-tab.active { background: #fff; color: #170F2B; }
+.constellation-section-tab + .constellation-section-tab::before {
+  content: ""; position: absolute; left: 0; top: 28%; bottom: 28%; width: 1px; background: rgba(235, 156, 239, .22);
+}
+.constellation-section-tab.active { background: var(--ai-active); color: #fff; font-weight: 600; box-shadow: inset 0 1px rgba(255, 255, 255, .28), 0 0 16px rgba(174, 64, 174, .45); }
+.constellation-section-tab.active::before, .constellation-section-tab.active + .constellation-section-tab::before { display: none; }
 .constellation-section-tab-badge {
-  display: inline-flex; align-items: center; justify-content: center; margin-left: 7px;
-  min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px;
-  background: #F59E0B; color: #1a1200; font-family: var(--font-head); font-weight: 800; font-size: 10px;
+  display: inline-flex; align-items: center; justify-content: center; margin-left: 9px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px;
+  background: linear-gradient(180deg, #d070d8, #b544b5); color: #fff; font-family: var(--font-head); font-weight: 700; font-size: 13px;
+  box-shadow: 0 0 10px rgba(235, 156, 239, .5);
 }
+
 .constellation-exit {
-  flex-shrink: 0;
-  display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-body); font-size: .82rem; font-weight: 600; color: #C9BAD9; text-decoration: none;
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 9px 16px;
-  transition: color .15s ease, border-color .15s ease;
+  position: absolute; top: 24px; right: 24px; z-index: 6; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px;
+  font-size: 15px; font-weight: 600; text-decoration: none; transition: border-color .16s ease, background .16s ease;
 }
-.constellation-exit:hover { color: #fff; border-color: rgba(255, 255, 255, .22); }
-.constellation-exit svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.constellation-exit:hover { border-color: rgba(235, 156, 239, .6); }
 
-/* "What's new" banner (§4.8 docs/ai-agents-roadmap.md) — sits centered
-   just below .constellation-section-nav, only on the Мапа tab. Dismissing
-   it writes a per-viewer localStorage timestamp (see WHATS_NEW_SEEN_KEY in
-   ConstellationTest.jsx) so it only reappears once something newer ships,
-   not on every reload. */
-.whats-new-banner {
-  position: absolute; top: 66px; left: 50%; transform: translateX(-50%); z-index: 7;
-  display: flex; flex-direction: column; align-items: center; gap: 0;
-  max-width: min(560px, calc(100vw - 40px));
-}
-.whats-new-summary {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
-  border: 1px solid rgba(245, 158, 11, .35); border-radius: 999px; padding: 8px 10px 8px 8px;
-  font-family: var(--font-body); font-size: .8rem; color: #EDE7F5; cursor: pointer;
-}
-.whats-new-badge {
-  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
-  padding: 3px 10px; border-radius: 999px; background: #F59E0B; color: #1a1200;
-  font-family: var(--font-head); font-weight: 800; font-size: 10px; letter-spacing: .04em;
-}
-.whats-new-text { font-weight: 600; }
-.whats-new-chevron { width: 14px; height: 14px; stroke: #C9BAD9; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
-.whats-new-chevron.open { transform: rotate(180deg); }
-.whats-new-list {
-  width: 100%; margin-top: 6px; max-height: 220px; overflow-y: auto;
-  background: rgba(23, 17, 42, .88); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 14px; padding: 6px;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.whats-new-item {
-  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-  border: none; background: none; border-radius: 9px; padding: 8px 10px; cursor: pointer;
-  color: #EDE7F5; font-family: var(--font-body); font-size: .8rem;
-}
-.whats-new-item:hover, .whats-new-item:focus-visible { background: rgba(255, 255, 255, .08); outline: none; }
-.whats-new-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
-.whats-new-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.whats-new-date { flex-shrink: 0; font-size: .7rem; color: #9C8FB3; }
-.whats-new-dismiss {
-  margin-top: 6px; border: none; background: none; color: #9C8FB3;
-  font-family: var(--font-body); font-size: .74rem; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
-}
-.whats-new-dismiss:hover { color: #EDE7F5; }
-
-/* Agent search — same matte pill look as .constellation-exit, sits to its
-   left in the same top-right cluster. Results dropdown is its own
-   absolutely-positioned panel below the pill, not a native <select>, so it
-   can show each match's department color/name alongside the agent name. */
 .agent-search {
-  position: relative; flex-shrink: 1; min-width: 0;
-  display: flex; align-items: center; gap: 8px;
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px;
-  padding: 9px 14px;
-  transition: border-color .15s ease;
+  position: absolute; top: 88px; right: 24px; z-index: 6; width: min(320px, calc(100vw - 48px)); height: 44px;
+  display: flex; align-items: center; gap: 10px; padding: 0 16px; transition: border-color .16s ease;
 }
-.agent-search:focus-within { border-color: rgba(255, 255, 255, .22); }
-.agent-search-icon { width: 15px; height: 15px; stroke: #C9BAD9; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.agent-search:focus-within { border-color: rgba(235, 156, 239, .65); }
+.agent-search-icon { flex: none; color: var(--ai-text); }
 .agent-search-input {
-  background: none; border: none; outline: none; color: #EDE7F5;
-  font-family: var(--font-body); font-size: .82rem; font-weight: 500;
-  width: 160px; max-width: 40vw; min-width: 0;
+  flex: 1; min-width: 0; height: 100%; background: none; border: none; outline: none; color: var(--ai-text);
+  font-family: var(--font-body); font-size: 15px;
 }
-.agent-search-input::placeholder { color: #7A6E92; }
-
+.agent-search-input::placeholder { color: rgba(213, 169, 220, .75); opacity: 1; }
 .agent-search-results {
-  position: absolute; top: calc(100% + 8px); right: 0; width: 280px; max-width: 75vw;
-  max-height: 340px; overflow-y: auto;
-  background: rgba(15, 11, 28, .95); backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px;
-  padding: 6px; display: flex; flex-direction: column; gap: 2px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
-  /* Same thin, floating scrollbar used elsewhere in the app (knowledge
-     base, ads-insights chat) instead of the browser's default full-height
-     track — that default track paints its own rectangular background,
-     which squared off this panel's top/bottom-right corners despite its
-     own border-radius. */
-  scrollbar-width: thin; scrollbar-color: rgba(121, 103, 190, .35) transparent;
+  position: absolute; top: calc(100% + 8px); right: 0; width: min(340px, calc(100vw - 32px)); max-height: 340px; overflow-y: auto;
+  padding: 6px; display: flex; flex-direction: column; gap: 2px; box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
+  scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .35) transparent;
 }
-.agent-search-results::-webkit-scrollbar { width: 5px; }
-.agent-search-results::-webkit-scrollbar-track { background: transparent; }
-.agent-search-results::-webkit-scrollbar-thumb { background: rgba(121, 103, 190, .35); border-radius: 999px; }
-.agent-search-results::-webkit-scrollbar-thumb:hover { background: rgba(144, 112, 230, .6); }
-.agent-search-result {
-  display: flex; align-items: flex-start; gap: 10px;
-  background: none; border: none; text-align: left; cursor: pointer;
-  padding: 8px 10px; border-radius: 9px;
-  font-family: var(--font-body); color: #EDE7F5;
-  transition: background .12s ease;
-}
-.agent-search-result:hover, .agent-search-result:focus-visible { background: rgba(255, 255, 255, .08); outline: none; }
-.agent-search-result-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; box-shadow: 0 0 6px currentColor; }
-/* Name and department stack instead of sharing one row — a long agent
-   name (the common case, Ukrainian role titles run long) always reads in
-   full, wrapping onto a second line if needed, rather than competing for
-   width with the department label and getting ellipsis-cut. */
+.agent-search-result { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; background: none; border: none; text-align: left; cursor: pointer; padding: 8px 10px; border-radius: 12px; color: var(--ai-text); font-family: var(--font-body); }
+.agent-search-result:hover, .agent-search-result:focus-visible { background: rgba(174, 64, 174, .22); outline: none; }
+.agent-search-result-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; margin-top: 6px; background: radial-gradient(circle at 30% 25%, #f5c3f6, #b544b5); box-shadow: 0 0 8px rgba(235, 156, 239, .7); }
 .agent-search-result-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.agent-search-result-name { font-size: .84rem; font-weight: 600; line-height: 1.3; }
-.agent-search-result-dept { font-size: .7rem; color: #9C8FB3; }
-.agent-search-empty { padding: 14px; font-size: .8rem; color: #9C8FB3; text-align: center; }
+.agent-search-result-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.agent-search-result-dept { font-size: 12px; color: var(--ai-secondary); }
+.agent-search-empty { padding: 14px; font-size: 13px; color: var(--ai-secondary); text-align: center; }
 
-.constellation-overlay {
-  position: absolute; top: 20px; left: 20px; z-index: 5;
-  display: flex; align-items: center; gap: 10px;
+/* "what's new" banner (§4.8) — compact pill under the brand */
+.whats-new-banner { position: absolute; top: 90px; left: 28px; z-index: 7; display: flex; flex-direction: column; align-items: flex-start; max-width: min(380px, calc(100vw - 56px)); }
+.whats-new-summary { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; font-family: var(--font-body); font-size: 15px; color: var(--ai-text); cursor: pointer; }
+.whats-new-dot-live { width: 12px; height: 12px; border-radius: 50%; flex: none; background: radial-gradient(circle at 30% 25%, #fff, #eb9cef 60%, #ae40ae); box-shadow: 0 0 10px rgba(235, 156, 239, .8); }
+.whats-new-text { font-weight: 500; }
+.whats-new-chevron { transform: rotate(90deg); transition: transform .16s ease; color: var(--ai-secondary); }
+.whats-new-chevron.open { transform: rotate(-90deg); }
+.whats-new-list { width: 100%; margin-top: 8px; max-height: 280px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .35) transparent; }
+.whats-new-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; text-align: left; border: none; background: none; border-radius: 12px; padding: 8px 10px; cursor: pointer; color: var(--ai-text); font-family: var(--font-body); font-size: 13px; }
+.whats-new-item:hover, .whats-new-item:focus-visible { background: rgba(174, 64, 174, .22); }
+.whats-new-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #eb9cef; box-shadow: 0 0 6px #eb9cef; }
+.whats-new-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whats-new-date { flex: none; font-size: 12px; color: var(--ai-secondary); }
+.whats-new-dismiss { position: sticky; top: -6px; z-index: 1; padding: 6px 10px; margin: -6px -6px 2px; background: rgba(39, 8, 39, .98); text-align: left; align-self: stretch; border: none; background: none; color: var(--ai-secondary); font-family: var(--font-body); font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---------------- stage: energy core + live SVG map ---------------- */
+.constellation-stage { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
+.ai-core {
+  position: absolute; left: 50%; top: calc(50% + var(--core-dy, 0px)); width: clamp(120px, 18vh, 190px); height: auto; object-fit: contain; pointer-events: none; user-select: none;
+  transform: translate(-50%, -50%); animation: aiCoreIn .5s cubic-bezier(.22, 1, .36, 1) .1s both, aiCoreBreath 5s ease-in-out .7s infinite;
+  transition: opacity .65s cubic-bezier(.22, 1, .36, 1);
 }
-.constellation-breadcrumb-pill {
-  display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-body); font-size: .84rem; color: #C9BAD9;
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 9px 16px 9px 12px;
+.ai-core.is-quiet { opacity: .22 !important; animation: none; }
+@keyframes aiCoreIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.82); } to { opacity: .94; transform: translate(-50%, -50%) scale(1); } }
+@keyframes aiCoreBreath {
+  0%, 100% { opacity: .9; transform: translate(-50%, -50%) scale(1); filter: brightness(.96); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.035); filter: brightness(1.14); }
 }
-.constellation-breadcrumb-pill b { color: #F1EAF6; font-weight: 700; }
-.constellation-breadcrumb-pill .sep { opacity: .4; }
-.constellation-focus-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 8px 1px currentColor; }
-.constellation-reset {
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px); color: #C9BAD9;
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 9px 16px;
-  font-family: var(--font-body); font-size: .82rem; font-weight: 600; cursor: pointer; transition: color .15s ease, border-color .15s ease;
+.constellation-stage.is-chart .constellation-svg, .constellation-stage.is-chart .ai-core { opacity: 0; pointer-events: none; }
+.constellation-svg { position: relative; z-index: 2; width: 100%; height: 100%; overflow: visible; display: block; }
+
+/* overview group: leaves the scene softly when a department takes focus */
+.ai-overview { transform-box: view-box; transform-origin: 0px 0px; transition: opacity .45s cubic-bezier(.22, 1, .36, 1), transform .65s cubic-bezier(.22, 1, .36, 1); }
+.ai-overview.is-focused { opacity: 0; transform: scale(1.1); pointer-events: none; }
+
+/* rings, spokes, orbits (decorative guides; thin 0.75-1px, selected 1.5px) */
+.ai-ring { fill: none; stroke: #eb9cef; stroke-width: .9px; vector-effect: non-scaling-stroke; }
+.ai-ring-nodes { stroke-opacity: .4; stroke-width: 1.2px; stroke-dasharray: 1 7; stroke-linecap: round; }
+.ai-ring-solid { stroke-opacity: .24; }
+.ai-ring-faint { stroke-opacity: .15; }
+.ai-ring-dotted { stroke-opacity: .3; stroke-dasharray: 1 6; stroke-linecap: round; }
+.ai-ring-orbit { stroke: #f0b2f0; stroke-opacity: .36; }
+.ai-spoke { stroke: #eb9cef; stroke-opacity: .5; stroke-width: 1px; stroke-dasharray: 1 5; stroke-linecap: round; vector-effect: non-scaling-stroke; transition: stroke-opacity .16s ease, stroke-width .16s ease; }
+.ai-spoke.is-on { stroke-opacity: .88; stroke-width: 1.5px; stroke-dasharray: none; }
+.ai-spoke.is-dim { stroke-opacity: .16; }
+.ai-orbit-light circle { filter: drop-shadow(0 0 5px rgba(235, 156, 239, .9)); }
+
+/* department node: glossy sphere + canonical icon + count badge */
+.ai-dept { transition: opacity .16s ease; }
+.ai-dept.is-dim { opacity: .42; }
+.ai-dept-inner { animation: aiDeptIn .32s cubic-bezier(.22, 1, .36, 1) both; animation-delay: calc(250ms + var(--i, 0) * 60ms); }
+.ai-sat, .ai-sat-line, .ai-dept-label { animation: aiFadeIn .23s ease-out both; animation-delay: calc(420ms + var(--i, 0) * 50ms); }
+@keyframes aiDeptIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes aiFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.ai-node { cursor: pointer; outline: none; }
+.ai-node-hit { fill: transparent; }
+.ai-node-halo { fill: url(#ai-g-halo); opacity: .55; transition: opacity .16s ease; pointer-events: none; }
+.ai-node:hover .ai-node-halo, .ai-dept.is-on .ai-node-halo, .ai-node:focus-visible .ai-node-halo { opacity: 1; }
+.ai-node-sphere { fill: url(#ai-g-sphere); stroke: #facbfa; stroke-width: 1.2px; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 10px rgba(174, 64, 174, .6)); pointer-events: none; }
+.ai-node:focus-visible .ai-node-sphere { stroke: #fff; stroke-width: 3px; }
+.ai-node-spec { fill: rgba(255, 255, 255, .26); pointer-events: none; }
+.ai-node-icon { pointer-events: none; filter: drop-shadow(0 2px 4px rgba(39, 8, 39, .45)); }
+.ai-node-badge circle { fill: #682768; stroke: #f9edf9; stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.ai-node-badge text { fill: #f9edf9; font-family: var(--font-head); font-weight: 700; pointer-events: none; }
+
+.ai-dept-label { cursor: pointer; }
+.ai-dept-label-hit { fill: transparent; pointer-events: all; }
+.ai-dept-title { fill: var(--ai-text); font-family: var(--font-head); font-weight: 700; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 6px; stroke-linejoin: round; pointer-events: none; }
+.ai-dept-count { fill: #d07be0; font-family: var(--font-body); font-weight: 600; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
+
+/* agent satellites: one shared glossy sphere + separate label */
+.ai-sat { cursor: pointer; outline: none; }
+.ai-sat-hit { fill: transparent; }
+.ai-sat-glow { fill: url(#ai-g-halo); opacity: .5; pointer-events: none; transition: opacity .16s ease; }
+.ai-sat-body { fill: url(#ai-g-sat); stroke: #fadcfb; stroke-width: 1px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.ai-sat-spec { fill: rgba(255, 255, 255, .4); pointer-events: none; }
+.ai-sat-label { fill: #f0d9f3; font-family: var(--font-body); font-weight: 500; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; transition: fill .16s ease; }
+.ai-sat-line { stroke: #eb9cef; stroke-opacity: .32; stroke-width: .8px; vector-effect: non-scaling-stroke; }
+.ai-sat:hover .ai-sat-glow, .ai-sat:focus-visible .ai-sat-glow, .ai-sat.is-selected .ai-sat-glow { opacity: 1; }
+.ai-sat:hover .ai-sat-label, .ai-sat:focus-visible .ai-sat-label, .ai-sat.is-selected .ai-sat-label { fill: #fff; }
+.ai-sat:focus-visible .ai-sat-body, .ai-sat.is-selected .ai-sat-body { stroke: #fff; stroke-width: 2.2px; }
+.ai-sat.is-more .ai-sat-label { fill: #d07be0; }
+
+/* ---------------- bottom chrome (overview only) ---------------- */
+.ai-kb-btn {
+  position: absolute; left: 28px; bottom: 24px; z-index: 6; display: inline-flex; align-items: center; gap: 12px; height: 48px; padding: 0 22px;
+  font-family: var(--font-body); font-size: 15px; font-weight: 500; cursor: pointer; transition: border-color .16s ease;
 }
-.constellation-reset:hover { color: #fff; border-color: rgba(255, 255, 255, .22); }
+.ai-kb-btn:hover { border-color: rgba(235, 156, 239, .6); }
+.ai-kb-icon { display: inline-flex; color: var(--ai-text); }
+.ai-kb-icon svg { width: 22px; height: 22px; }
+.ai-footer {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 18px; height: 44px; padding: 0 24px;
+  font-size: 15px; white-space: nowrap; max-width: calc(100vw - 32px);
+}
+.ai-footer-total { font-weight: 600; }
+.ai-footer-item { display: inline-flex; align-items: center; gap: 8px; color: var(--ai-text); }
+.ai-footer-item::before, .ai-footer-total::after { content: "·"; color: var(--ai-secondary); margin-right: 8px; }
+.ai-footer-total::after { margin: 0 0 0 18px; display: none; }
+.ai-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.ai-dot-live { background: var(--ai-st-live); box-shadow: 0 0 8px var(--ai-st-live); }
+.ai-dot-dev { background: var(--ai-st-dev); box-shadow: 0 0 8px rgba(245, 155, 91, .8); }
+.ai-dot-plan { background: var(--ai-st-plan); box-shadow: 0 0 8px rgba(124, 140, 248, .8); }
+
+/* ---------------- focused department chrome ---------------- */
+.constellation-overlay { position: absolute; top: 90px; left: 28px; z-index: 6; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: calc(100vw - 56px); }
+.constellation-reset { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; font-family: var(--font-body); font-size: 15px; font-weight: 600; cursor: pointer; transition: border-color .16s ease; }
+.constellation-reset:hover { border-color: rgba(235, 156, 239, .6); }
 
 .view-tabs {
-  /* top:68px, not 20px — sits just below .constellation-section-nav
-     (this section's own top-level Мапа/Задачі агентів switcher) instead
-     of colliding with it. */
-  position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 5;
-  display: flex; gap: 4px;
-  background: rgba(23, 17, 42, .72); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 999px; padding: 4px;
+  position: absolute; top: 86px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 4px; height: 44px; padding: 4px;
+  background: rgba(39, 8, 39, .86); border: 1px solid var(--ai-border); border-radius: 999px; backdrop-filter: blur(8px);
 }
-.view-tab {
-  font-family: var(--font-body); font-size: .78rem; font-weight: 700; letter-spacing: .03em;
-  color: #8B7A9E; background: none; border: none; border-radius: 999px; padding: 7px 16px; cursor: pointer;
-  transition: color .15s ease, background .15s ease;
-}
-.view-tab:hover { color: #EDE7F5; }
-.view-tab.active { color: #fff; background: rgba(255, 255, 255, .14); }
+.view-tab { padding: 0 20px; border: none; border-radius: 999px; background: none; cursor: pointer; color: var(--ai-secondary); font-family: var(--font-body); font-size: 14px; font-weight: 600; letter-spacing: .04em; transition: color .16s ease, background .16s ease; }
+.view-tab.active { background: var(--ai-active); color: #fff; box-shadow: inset 0 1px rgba(255, 255, 255, .25); }
 
-/* CHART tab — dept-scoped autonomy × rollout-stage matrix, replaces the
-   graph stage while active (see viewMode in ConstellationTest.jsx). */
-.chart-view {
-  position: absolute; inset: 0; z-index: 3;
-  background: #20242c; overflow-y: auto;
-  padding: 100px 40px 120px;
-}
-.chart-header { max-width: 1000px; margin: 0 auto 28px; }
-.chart-header h2 { font-family: var(--font-head); font-size: 1.4rem; color: #F1EAF6; margin: 4px 0 8px; }
-.chart-stats { font-family: var(--font-body); font-size: .86rem; color: #C9BAD9; margin: 0; }
-.chart-grid {
-  display: grid; grid-template-columns: 160px repeat(var(--stage-cols), 1fr);
-  gap: 10px; max-width: 1000px; margin: 0 auto;
-}
-.chart-col-header {
-  font-family: var(--font-body); font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
-  color: #8B7A9E; text-align: center; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, .08);
-}
-.chart-row-label {
-  font-family: var(--font-body); font-size: .8rem; font-weight: 700; color: #EDE7F5;
-  display: flex; align-items: center; padding-right: 10px;
-}
-.chart-cell {
-  background: rgba(255, 255, 255, .03); border: 1px solid rgba(255, 255, 255, .06); border-radius: 12px;
-  padding: 10px; min-height: 64px; display: flex; flex-direction: column; gap: 8px; justify-content: center;
-}
-.chart-cell-empty { color: #4B4160; font-size: .78rem; margin: 0 auto; }
-.chart-card {
-  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .08); border-radius: 9px;
-  padding: 8px 10px; cursor: pointer; transition: background .15s ease, border-color .15s ease;
-  font-family: var(--font-body); color: #EDE7F5;
-}
-.chart-card:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .2); }
-.chart-card-ic { flex: none; display: flex; }
-.chart-card-ic svg { width: 16px; height: 16px; stroke: var(--dept-color, #C9BAD9); }
-.chart-card-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.chart-card-name { font-size: .8rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chart-card-sub { font-size: .68rem; color: #8B7A9E; }
-.chart-card-wave {
-  flex: none; font-family: var(--font-body); font-size: .58rem; font-weight: 800; letter-spacing: .03em;
-  padding: 2px 6px; border-radius: 999px;
-}
-.chart-card-wave.wave-1 { background: #123424; color: #4ADE80; }
-.chart-card-wave.wave-2 { background: #1E293B; color: #7DD3FC; }
-.chart-card-wave.wave-3 { background: #241d33; color: #A78BFA; }
-.chart-card-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #4B4160; }
-.chart-card-dot.status-live { background: #4ADE80; box-shadow: 0 0 6px 1px rgba(74, 222, 128, .5); }
-.chart-card-dot.status-in_development { background: #FBBF24; }
-
-@media (max-width: 720px) {
-  .chart-grid { grid-template-columns: 110px repeat(var(--stage-cols), 1fr); }
-  .chart-view { padding: 100px 16px 100px; }
-}
-
-/* Department switcher — carries the department name itself (previously a
-   giant faint watermark floating mid-screen, moved down here per feedback:
-   it's the same information the switcher needs anyway). No box of its
-   own — sits directly on the map's background, full width, the name set
-   large enough to read as a banner rather than a small pill label. */
-.constellation-carousel {
-  position: absolute; bottom: 0; left: 0; right: 0; z-index: 5; height: 120px;
-  display: flex; align-items: center; justify-content: center;
-}
+.constellation-carousel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; height: 120px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .constellation-carousel button {
-  position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
-  width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255, 255, 255, .06); flex: none;
-  color: #EDE7F5; font-size: 1.4rem; line-height: 1; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; transition: background .15s ease;
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; pointer-events: auto;
+  background: var(--ai-pill); border: 1px solid var(--ai-border); color: var(--ai-text); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px);
+  transition: border-color .16s ease;
 }
-.constellation-carousel button:hover { background: rgba(255, 255, 255, .16); }
+.constellation-carousel button:hover { border-color: rgba(235, 156, 239, .65); }
 .constellation-carousel button:first-of-type { left: 28px; }
 .constellation-carousel button:last-of-type { right: 28px; }
-.constellation-carousel-info {
-  width: 100%; height: 100%; padding: 0 80px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 4px;
-}
+.chev-prev { transform: rotate(180deg); }
+.constellation-carousel-info { width: 100%; height: 100%; padding: 0 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .constellation-carousel-name {
-  font-family: var(--font-head); font-weight: 800; color: var(--dept-color); letter-spacing: .01em;
-  text-transform: uppercase; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 100%; font-size: clamp(1.8rem, 4.4vw, 3.4rem); text-shadow: none; -webkit-text-stroke: 0;
+  font-family: var(--font-head); font-weight: 700; color: var(--ai-text); letter-spacing: .01em; line-height: 1.1; text-align: center;
+  max-width: 100%; font-size: clamp(1.5rem, 3.4vw, 2.6rem); text-shadow: 0 0 24px rgba(174, 64, 174, .7);
 }
 
-/* Department overview panel — shown once per visit to a department, before
-   any single agent is picked. Floating left rail, independent of the
-   agent-detail modal (which still centers over everything). */
-.dept-panel {
-  position: absolute; top: 76px; left: 20px; z-index: 4;
-  width: 290px; max-height: calc(100% - 160px); overflow-y: auto;
-  background: rgba(23, 17, 42, .82); backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, .08); border-radius: 18px; padding: 20px 20px 18px;
-}
-.dept-panel-close { position: absolute; top: 14px; right: 14px; border: none; background: none; color: #8B7A9E; font-size: 1.3rem; cursor: pointer; line-height: 1; }
-.dept-panel-close:hover { color: #F1EAF6; }
-.dept-panel-eyebrow { font-family: var(--font-body); font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--dept-color); margin-bottom: 4px; }
-.dept-panel h2 { font-family: var(--font-head); font-size: 1.2rem; color: #F1EAF6; margin: 0 0 4px; }
-.dept-panel-subtitle { font-family: var(--font-body); font-size: .8rem; color: #8B7A9E; margin-bottom: 12px; }
-.dept-panel-narrative { font-family: var(--font-body); font-size: .84rem; color: #C9BAD9; line-height: 1.55; margin: 0 0 16px; }
+/* department info panel — left, 280-320px */
+.dept-panel { position: absolute; top: 150px; left: 28px; z-index: 5; width: 300px; max-height: calc(100% - 290px); overflow-y: auto; padding: 22px 22px 20px; scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .35) transparent; }
+.dept-panel-close { position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: none; background: none; color: var(--ai-secondary); border-radius: 12px; cursor: pointer; }
+.dept-panel-close:hover { color: var(--ai-text); }
+.dept-panel-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ai-lilac); margin-bottom: 6px; }
+.dept-panel h2 { font-family: var(--font-head); font-size: 20px; line-height: 26px; color: var(--ai-text); margin: 0 36px 4px 0; }
+.dept-panel-subtitle { font-size: 13px; color: var(--ai-secondary); margin-bottom: 12px; }
+.dept-panel-narrative { font-size: 14px; color: #ecd3ef; line-height: 1.55; margin: 0 0 16px; }
 .dept-panel-section { margin-bottom: 14px; }
-.dept-panel-section h4 { font-family: var(--font-body); font-size: .64rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--dept-color); margin: 0 0 8px; }
+.dept-panel-section h4 { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ai-lilac); margin: 0 0 8px; }
 .dept-panel-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-.dept-panel-pill { font-family: var(--font-body); font-size: .74rem; color: #EDE7F5; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1); border-radius: 999px; padding: 4px 11px; }
+.dept-panel-pill { font-size: 12px; color: var(--ai-text); background: rgba(174, 64, 174, .16); border: 1px solid var(--ai-border); border-radius: 999px; padding: 4px 11px; }
 .dept-panel-functions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.dept-panel-functions li { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-body); font-size: .8rem; color: #C9BAD9; }
-.dept-panel-count { color: #8B7A9E; font-size: .74rem; flex: none; }
+.dept-panel-functions li { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: #ecd3ef; }
+.dept-panel-count { color: var(--ai-secondary); font-size: 12px; flex: none; }
 .dept-panel-starthere {
-  width: 100%; text-align: left; font-family: var(--font-body); font-size: .84rem; font-weight: 700; color: var(--dept-color);
-  background: color-mix(in srgb, var(--dept-color) 14%, transparent); border: 1px solid color-mix(in srgb, var(--dept-color) 35%, transparent);
-  border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: background .15s ease;
+  width: 100%; min-height: 44px; text-align: left; font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--ai-text);
+  background: rgba(174, 64, 174, .2); border: 1px solid rgba(235, 156, 239, .4); border-radius: 12px; padding: 10px 12px; cursor: pointer;
 }
-.dept-panel-starthere:hover { background: color-mix(in srgb, var(--dept-color) 24%, transparent); }
-.dept-panel-numbers { font-family: var(--font-body); font-size: .74rem; color: #8B7A9E; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.dept-panel-starthere:hover { background: rgba(174, 64, 174, .32); }
+.dept-panel-numbers { font-size: 12px; color: var(--ai-secondary); padding-top: 12px; border-top: 1px solid var(--ai-border); }
+.dept-panel-soon-note { font-size: 12px; color: var(--ai-lilac); font-weight: 600; background: rgba(174, 64, 174, .14); border: 1px solid var(--ai-border); border-radius: 12px; padding: 10px 12px; margin-top: 4px; }
 
-.dept-panel-soon-note {
-  font-family: var(--font-body); font-size: .74rem; color: var(--dept-color); font-weight: 600;
-  background: color-mix(in srgb, var(--dept-color) 12%, transparent); border: 1px solid color-mix(in srgb, var(--dept-color) 30%, transparent);
-  border-radius: 10px; padding: 10px 12px; margin-top: 4px;
-}
+/* touch list that replaces the focused SVG graph on narrow screens */
+.dept-sheet { position: relative; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.dept-sheet-head h2 { margin: 0 0 4px; font-family: var(--font-head); font-size: 18px; line-height: 24px; color: var(--ai-text); }
+.dept-sheet-group h4 { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ai-lilac); }
+.dept-sheet-agent { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 10px; text-align: left; border: none; border-radius: 12px; background: rgba(53, 17, 63, .7); color: var(--ai-text); font-family: var(--font-body); font-size: 14px; cursor: pointer; margin-bottom: 6px; }
+.dept-sheet-dot { width: 22px; height: 22px; flex: none; border-radius: 50%; background: radial-gradient(circle at 32% 24%, #f5c3f6, #b544b5 55%, #682768); box-shadow: 0 0 10px rgba(174, 64, 174, .6); }
+.dept-sheet-name { flex: 1; min-width: 0; font-weight: 500; line-height: 1.3; }
+.dept-sheet-status { flex: none; font-size: 11px; color: var(--ai-secondary); }
 
-@media (max-width: 720px) {
-  .dept-panel { display: none; }
-}
-
-.constellation-stage {
-  position: relative; width: 100%; height: 100%;
-  background: #040713; /* fallback only — CosmicBackground supplies the real gradient */
-  overflow: hidden;
-  /* Reserves clearance under .constellation-section-nav so the overview's
-     topmost department label/hub never sits under it (CosmicBackground/
-     ParticleFieldCanvas are absolutely positioned to the padding box, so
-     they still cover the full stage — only the graph itself, sized off
-     this element's own content box via stageAspect's ResizeObserver,
-     shifts down). */
-  padding-top: 78px;
-}
-/* z-index stack: CosmicBackground (0) < ParticleFieldCanvas (1) < the
-   network graph itself (2) < existing UI chrome (4-5, unchanged above). */
-.constellation-svg { position: relative; z-index: 2; width: 100%; height: 100%; overflow: visible; }
-
-.orbit-ring {
-  fill: none; stroke: rgba(255, 255, 255, .16); stroke-width: 1; stroke-dasharray: 1 9;
-  opacity: 0; transition: opacity 1.1s ease;
-}
-.orbit-ring.visible { opacity: 1; }
-
-/* The core sphere doubles as a button — opens the shared knowledge-base
-   panel. Invisible oversized hit area since the sphere's own wireframe
-   lines are too thin/sparse to reliably catch clicks on their own. Stays
-   dark/hidden until the intro's second stage explicitly "lights" it. */
-.constellation-core-btn { cursor: pointer; opacity: 0; transform-box: view-box; transform-origin: 0px 0px; }
-.constellation-core-btn.lit { opacity: 1; animation: coreIgnite 600ms ease-out; }
-@keyframes coreIgnite { 0% { opacity: 0; transform: scale(.4); filter: brightness(.4); } 55% { filter: brightness(1.8); } 100% { opacity: 1; transform: scale(1); filter: brightness(1); } }
-.core-hit-area { fill: transparent; }
-.constellation-core-btn:hover, .constellation-core-btn:focus-visible { filter: brightness(1.15); outline: none; }
-.constellation-core-btn.lit:hover { transform: scale(1.04); transition: transform .25s ease; }
-/* Inactive while a department is focused — its own graph renders as a
-   sibling layer that can visually overlap the core, so the core must stop
-   accepting clicks/hover there instead of opening the Knowledge Base
-   underneath whatever the user actually meant to click. */
-.constellation-core-btn.inactive { pointer-events: none; opacity: .28; filter: grayscale(.6); }
-.constellation-core-btn.inactive:hover { transform: none; filter: grayscale(.6); }
-
-/* Department branches fly out from the core once the intro's second stage
-   reaches them — pivoted at the world origin (0,0) with transform-box:
-   view-box, so scaling the whole branch group down to ~0 naturally pulls
-   every point on it (hub, spokes, everything) in toward the center. */
-.constellation-branch { transition: opacity .35s ease; }
-.constellation-branch.pre-reveal { opacity: 0; transform: scale(.05); transform-box: view-box; transform-origin: 0px 0px; }
-.constellation-branch.revealed {
-  transform-box: view-box; transform-origin: 0px 0px;
-  animation: branchFlyIn 700ms cubic-bezier(.2, .8, .3, 1) both;
-  animation-delay: var(--fly-delay, 0s);
-}
-@keyframes branchFlyIn { 0% { opacity: 0; transform: scale(.05); } 45% { opacity: 1; } 100% { opacity: 1; transform: scale(1); } }
-.constellation-branch.dimmed { opacity: .16; }
-/* A department in focus hides every other branch outright (not just
-   dimmed) — no faint neighboring hubs/webs peeking in around the edges. */
-.constellation-branch.focus-hidden { opacity: 0; pointer-events: none; }
-
-.constellation-edge { stroke: var(--dept-color); stroke-width: calc(1.4px * var(--ui-scale, 1)); opacity: .55; }
-.constellation-edge.spoke { stroke-dasharray: 1 7; stroke-linecap: round; opacity: .4; }
-.constellation-edge.leaf { stroke-width: calc(1px * var(--ui-scale, 1)); opacity: .35; }
-.constellation-edge.agent-edge { stroke-width: calc(.8px * var(--ui-scale, 1)); opacity: .22; transition: opacity .3s ease; }
-.constellation-edge.agent-edge.focused { opacity: .5; }
-
-.constellation-dept-label { cursor: pointer; }
-.constellation-dept-label:focus, .constellation-dept-label:focus-visible { outline: none; }
-.dept-label-hit { pointer-events: all; }
-.constellation-dept-label:hover .hub-label, .constellation-dept-label:focus-visible .hub-label { fill: #fff; }
-
-/* Traveling dot per spoke, animating from the hub down to the shared core
-   at (0,0) — a constant little stream of "data" feeding the knowledge
-   base, on a loop. transform-origin left at 0,0 so translate() is exact. */
-.flow-dot {
-  fill: var(--dept-color); opacity: 0; filter: drop-shadow(0 0 3px var(--dept-color));
-  transform-box: view-box; transform-origin: 0px 0px;
-  animation: flowToCenter 3.2s linear infinite;
-}
-@keyframes flowToCenter {
-  0% { transform: translate(var(--sx), var(--sy)); opacity: 0; }
-  8% { opacity: 1; }
-  85% { opacity: 1; }
-  100% { transform: translate(0px, 0px); opacity: 0; }
-}
-
-.constellation-hub, .constellation-leaf { cursor: pointer; }
-.constellation-hub:focus, .constellation-leaf:focus, .constellation-hub:focus-visible, .constellation-leaf:focus-visible { outline: none; }
-.constellation-hub:focus-visible .hub-circle, .constellation-leaf:focus-visible .leaf-circle { stroke-width: calc(3px * var(--ui-scale, 1)); }
-/* Only the visible ring (+ its icon/marker dots) should open the department
-   — the blurred glow behind it is bigger than the ring (r 42 vs 30) and the
-   label/tagline/badge sit well outside it, so leaving them clickable made
-   the hit area bigger than what you actually see, and on tightly-spaced
-   hubs could even catch a neighboring department. */
-.hub-glow-outer { fill: var(--dept-color); opacity: .16; filter: blur(11px); pointer-events: none; transition: opacity .2s ease; }
-.hub-circle {
-  fill: color-mix(in srgb, var(--dept-color) 22%, transparent); stroke: color-mix(in srgb, var(--dept-color) 45%, transparent);
-  stroke-width: calc(1px * var(--ui-scale, 1));
-  transition: r .2s ease, stroke-width .2s ease;
-}
-.hub-circle.breathing { animation: hubBreathe 3.4s ease-in-out infinite; animation-delay: var(--pulse-delay, 0s); }
-@keyframes hubBreathe { 0%, 100% { opacity: .85; } 50% { opacity: 1; } }
-/* Ring of small dots around the hub (see ringDots() in ConstellationTest.jsx)
-   — replaces a stroke-dasharray approximation with actual discrete points. */
-.hub-ring-dot { fill: var(--dept-color); pointer-events: none; transition: opacity .2s ease; }
-/* NOTE: hover "scale" is done by growing .hub-circle's r (below), not a
-   CSS `transform: scale()` on .constellation-hub itself — that element
-   already gets its translate(hx,hy) position from an SVG `transform`
-   *attribute* (set in JSX), and a CSS `transform` property on the same
-   element replaces the attribute entirely rather than composing with it,
-   which would snap the hub back to the SVG origin on every hover. */
-.constellation-hub:hover .hub-glow-outer { opacity: .21; }
-.hub-marker-dot { fill: var(--dept-color); filter: drop-shadow(0 0 3px var(--dept-color)); pointer-events: none; }
-.hub-label {
-  fill: #EDE7F5; font-family: 'Inter', var(--font-body); font-size: calc(16px * var(--ui-scale, 1)); font-weight: 700; letter-spacing: .02em;
-  transition: fill .2s ease; pointer-events: none;
-  paint-order: stroke fill; stroke: #0B0817; stroke-width: calc(4px * var(--ui-scale, 1)); stroke-linejoin: round;
-}
-/* Departments agreed with the team but not started yet — same graph, same
-   click-to-open transition, just visually quieter and clearly labeled so
-   the full org chart reads honestly (planned vs. actually built). */
-.constellation-hub.coming-soon .hub-circle { stroke-dasharray: 2 4; fill: transparent; opacity: .55; }
-.constellation-hub.coming-soon .hub-glow-outer { opacity: .07; }
-.constellation-hub.coming-soon .hub-label { opacity: .7; }
-.hub-soon-badge {
-  fill: var(--dept-color); font-family: 'Inter', var(--font-body); font-size: calc(7px * var(--ui-scale, 1)); font-weight: 800; letter-spacing: .1em;
-  text-anchor: middle; opacity: .8; pointer-events: none;
-}
-
-.constellation-subcat { opacity: .55; pointer-events: none; transition: opacity .3s ease; }
-.constellation-subcat.focused { opacity: 1; }
-.subcat-circle { fill: var(--dept-color); opacity: .5; }
-.subcat-label {
-  fill: var(--dept-color); font-family: 'Inter', var(--font-body); font-size: calc(15px * var(--ui-scale, 1)); font-weight: 800; letter-spacing: .04em;
-  text-transform: uppercase; opacity: 0; transition: opacity .2s ease;
-}
-.constellation-subcat.focused .subcat-label { opacity: 1; }
-
-/* Leaves stay visible (dimmer) at all times now — like the reference's
-   full dot-tree overview — only their name label and click target wait for
-   focus, so the unfocused view doesn't turn into 29 overlapping text tags. */
-.constellation-leaf { opacity: .55; pointer-events: none; transition: opacity .3s ease; }
-.constellation-leaf.focused { opacity: 1; pointer-events: auto; }
-.leaf-circle { fill: #1D1730; stroke: var(--dept-color); stroke-width: calc(1.3px * var(--ui-scale, 1)); opacity: .9; transition: r .15s ease, opacity .15s ease; }
-.constellation-leaf:hover .leaf-circle, .constellation-leaf.active .leaf-circle { r: calc(19px * var(--ui-scale, 1) * var(--icon-scale, 1)); opacity: 1; }
-.leaf-live-dot { fill: #4ADE80; }
-.leaf-label { fill: #B7ADCB; font-family: 'Inter', var(--font-body); font-size: calc(14px * var(--ui-scale, 1)); opacity: 0; transition: opacity .2s ease; }
-.constellation-leaf.focused .leaf-label { opacity: .85; }
-.constellation-leaf:hover .leaf-label, .constellation-leaf.active .leaf-label { fill: #EDE7F5; opacity: 1; }
-
-.constellation-hub foreignObject span, .constellation-leaf foreignObject span {
-  display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--dept-color);
-}
-.constellation-leaf foreignObject svg { width: calc(11px * var(--ui-scale, 1) * var(--icon-scale, 1)); height: calc(11px * var(--ui-scale, 1) * var(--icon-scale, 1)); }
-.constellation-hub foreignObject svg { width: calc(24px * var(--ui-scale, 1)); height: calc(24px * var(--ui-scale, 1)); }
-
-/* ---------------------------------------------------------------------
-   Focused-department graph (Department → Function → Agent) — see
-   calculateDepartmentGraphLayout in ConstellationTest.jsx. A separate
-   visual language from the overview wheel above so it can read as a
-   proper "network map": a big Department root, small Function hubs, and
-   Agent nodes further out, all in the current --dept-color. */
-.dept-graph { animation: deptGraphIn .5s cubic-bezier(.16,1,.3,1) both; }
-@keyframes deptGraphIn { from { opacity: 0; } to { opacity: 1; } }
-
-.dept-graph-orbit {
-  fill: none; stroke: var(--dept-color); stroke-width: 1; stroke-dasharray: 1 10;
-  opacity: .12; pointer-events: none;
-}
-
-.dept-graph-edge { fill: none; stroke: var(--dept-color); }
-.dept-graph-edge-fn { stroke-width: calc(1.6px * var(--ui-scale, 1)); opacity: .5; }
-.dept-graph-edge-agent { stroke-width: calc(1px * var(--ui-scale, 1)); opacity: .32; }
-
-.dept-graph-dot { fill: var(--dept-color); opacity: .6; filter: drop-shadow(0 0 3px var(--dept-color)); pointer-events: none; }
-.dept-graph-dot-small { opacity: .4; filter: none; }
+/* ---------------- focused department graph (Department -> Function -> Agent) ---------------- */
+.dept-graph { animation: aiFadeIn .5s cubic-bezier(.22, 1, .36, 1) .12s both; }
+.dept-graph-orbit { fill: none; stroke: #eb9cef; stroke-width: 1px; stroke-dasharray: 1 10; opacity: .16; pointer-events: none; vector-effect: non-scaling-stroke; }
+.dept-graph-edge { fill: none; stroke: #eb9cef; vector-effect: non-scaling-stroke; }
+.dept-graph-edge-fn { stroke-width: 1.2px; opacity: .5; }
+.dept-graph-edge-agent { stroke-width: .8px; opacity: .3; }
+.dept-graph-edge-agent.is-on { stroke-width: 1.5px; opacity: .9; }
+.dept-graph-dot { fill: #f9edf9; opacity: .6; filter: drop-shadow(0 0 3px #eb9cef); pointer-events: none; }
+.dept-graph-dot-small { opacity: .38; filter: none; }
 
 .dept-graph-fn { pointer-events: none; }
-.dept-graph-fn-halo { fill: var(--dept-color); opacity: .14; filter: blur(6px); }
-.dept-graph-fn-circle { fill: color-mix(in srgb, var(--dept-color) 30%, transparent); stroke: var(--dept-color); stroke-width: calc(1.6px * var(--ui-scale, 1)); }
-.dept-graph-fn-label {
-  fill: var(--dept-color); font-family: 'Inter', var(--font-body); font-size: calc(13px * var(--ui-scale, 1)); font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase;
-}
+.dept-graph-fn-halo { fill: url(#ai-g-halo); opacity: .8; }
+.dept-graph-fn-circle { fill: url(#ai-g-sat); stroke: #fadcfb; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.dept-graph-fn-label { fill: #eb9cef; font-family: var(--font-body); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 5px; stroke-linejoin: round; }
 
-.dept-graph-agent { cursor: pointer; }
-.dept-graph-agent:focus, .dept-graph-agent:focus-visible { outline: none; }
-.dept-graph-agent:focus-visible .dept-graph-agent-circle { stroke-width: calc(3px * var(--ui-scale, 1)); }
-.dept-graph-agent-glow { fill: var(--dept-color); opacity: .12; filter: blur(8px); pointer-events: none; transition: opacity .2s ease; }
-.dept-graph-agent-circle {
-  fill: #1D1730; stroke: var(--dept-color); stroke-width: calc(1.4px * var(--ui-scale, 1));
-  transition: r .2s ease, stroke-width .2s ease;
-}
-.dept-graph-agent:hover .dept-graph-agent-circle, .dept-graph-agent.active .dept-graph-agent-circle {
-  r: calc(23px * var(--ui-scale, 1)); stroke-width: calc(2px * var(--ui-scale, 1));
-}
-.dept-graph-agent:hover .dept-graph-agent-glow, .dept-graph-agent.active .dept-graph-agent-glow { opacity: .28; }
-.dept-graph-agent-label {
-  fill: #B7ADCB; font-family: 'Inter', var(--font-body); font-size: calc(13px * var(--ui-scale, 1)); transition: fill .2s ease;
-}
-.dept-graph-agent:hover .dept-graph-agent-label, .dept-graph-agent.active .dept-graph-agent-label { fill: #EDE7F5; }
-.dept-graph-agent foreignObject span {
-  display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--dept-color); pointer-events: none;
-}
+.dept-graph-agent { cursor: pointer; outline: none; }
+.dept-graph-agent-hit { fill: transparent; }
+.dept-graph-agent-glow { fill: url(#ai-g-halo); opacity: .5; pointer-events: none; transition: opacity .16s ease; }
+.dept-graph-agent-circle { fill: url(#ai-g-sat); stroke: #fadcfb; stroke-width: 1.1px; vector-effect: non-scaling-stroke; transition: r .16s ease; filter: drop-shadow(0 0 8px rgba(174, 64, 174, .5)); }
+.dept-graph-agent-spec { fill: rgba(255, 255, 255, .34); pointer-events: none; }
+.dept-graph-agent:hover .dept-graph-agent-glow, .dept-graph-agent.active .dept-graph-agent-glow, .dept-graph-agent:focus-visible .dept-graph-agent-glow { opacity: 1; }
+.dept-graph-agent:focus-visible .dept-graph-agent-circle, .dept-graph-agent.active .dept-graph-agent-circle { stroke: #fff; stroke-width: 2.2px; }
+.dept-graph-agent-label { fill: #f0d9f3; font-family: var(--font-body); font-weight: 500; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; transition: fill .16s ease; }
+.dept-graph-agent:hover .dept-graph-agent-label, .dept-graph-agent.active .dept-graph-agent-label, .dept-graph-agent:focus-visible .dept-graph-agent-label { fill: #fff; }
+.dept-graph-agent-status { fill: #d07be0; font-size: .82em; font-weight: 600; opacity: 0; transition: opacity .16s ease; }
+.dept-graph-agent:hover .dept-graph-agent-status, .dept-graph-agent.active .dept-graph-agent-status, .dept-graph-agent:focus-visible .dept-graph-agent-status { opacity: 1; }
+.dept-graph-agent foreignObject span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: #f9edf9; pointer-events: none; }
 .dept-graph-agent foreignObject svg { width: calc(14px * var(--ui-scale, 1)); height: calc(14px * var(--ui-scale, 1)); }
 
-.dept-graph-root { cursor: pointer; }
-.dept-graph-root:focus, .dept-graph-root:focus-visible { outline: none; }
-.dept-graph-root-glow { fill: var(--dept-color); opacity: .18; filter: blur(14px); pointer-events: none; }
-.dept-graph-root-circle {
-  fill: color-mix(in srgb, var(--dept-color) 22%, transparent); stroke: var(--dept-color);
-  stroke-width: calc(1.8px * var(--ui-scale, 1)); stroke-dasharray: calc(2px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
-  animation: hubBreathe 3.4s ease-in-out infinite;
-}
-.dept-graph-root foreignObject span {
-  display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--dept-color); pointer-events: none;
-}
-.dept-graph-root foreignObject svg { width: calc(24px * var(--ui-scale, 1)); height: calc(24px * var(--ui-scale, 1)); }
+.dept-graph-root { cursor: pointer; outline: none; }
+.dept-graph-root-halo { fill: url(#ai-g-halo); opacity: .9; pointer-events: none; }
+.dept-graph-root-circle { fill: url(#ai-g-sphere); stroke: #facbfa; stroke-width: 1.4px; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 12px rgba(174, 64, 174, .6)); }
+.dept-graph-root:focus-visible .dept-graph-root-circle { stroke: #fff; stroke-width: 3px; }
 
-/* full agent spec modal */
-.agent-modal-backdrop {
-  position: fixed; inset: 0; background: rgba(10, 6, 18, .68); z-index: 60;
-  display: flex; align-items: center; justify-content: center; padding: 24px;
-}
-.agent-modal {
-  width: min(620px, 100%); max-height: 86vh; overflow-y: auto; position: relative;
-  background: #170F2B; border: 1px solid #33284A; border-radius: 20px; padding: 30px 32px;
-  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, .6);
-}
-.agent-modal-close { position: absolute; top: 16px; right: 18px; border: none; background: none; color: #8B7A9E; font-size: 1.4rem; cursor: pointer; line-height: 1; }
-.agent-modal-close:hover { color: #F1EAF6; }
-.agent-modal-badges { display: flex; gap: 8px; margin-bottom: 14px; }
-.agent-badge { font-family: var(--font-body); font-size: .66rem; font-weight: 800; letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; }
-.agent-badge.autonomy { background: color-mix(in srgb, var(--dept-color) 20%, transparent); color: var(--dept-color); }
-.agent-badge.status-live { background: #123424; color: #4ADE80; }
-.agent-badge.status-not_started { background: #241d33; color: #8B7A9E; }
-.agent-badge.status-in_development { background: #3A2A12; color: #FBBF24; }
-/* Wave 1/2/3 mirrors the doc's own recommended rollout order — greener
-   reads "sooner", cooler/greyer reads "later", same logic as the status
-   badges just on a build-order axis instead of a built/not-built one. */
-.agent-badge.wave-1 { background: #123424; color: #4ADE80; }
-.agent-badge.wave-2 { background: #1E293B; color: #7DD3FC; }
-.agent-badge.wave-3 { background: #241d33; color: #A78BFA; }
-.agent-modal-breadcrumb { font-family: var(--font-body); font-size: .74rem; color: #8B7A9E; margin-bottom: 6px; }
-.agent-modal h2 { font-family: var(--font-head); font-size: 1.3rem; color: #F1EAF6; margin: 0 0 10px; }
-.agent-modal-desc { font-family: var(--font-body); font-size: .9rem; color: #C9BAD9; line-height: 1.55; margin: 0 0 18px; }
+/* ---------------- CHART view ---------------- */
+.chart-view { position: absolute; inset: 0; z-index: 4; background: rgba(23, 5, 28, .92); overflow-y: auto; padding: 150px 40px 130px; }
+.chart-header { max-width: 1000px; margin: 0 auto 28px; }
+.chart-header h2 { font-family: var(--font-head); font-size: 1.5rem; color: var(--ai-text); margin: 4px 0 8px; }
+.chart-stats { font-size: 14px; color: var(--ai-secondary); margin: 0; }
+.chart-grid { display: grid; grid-template-columns: 160px repeat(var(--stage-cols), 1fr); gap: 10px; max-width: 1000px; margin: 0 auto; }
+.chart-col-header { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ai-lilac); text-align: center; padding-bottom: 8px; border-bottom: 1px solid var(--ai-border); }
+.chart-row-label { font-size: 13px; font-weight: 700; color: var(--ai-text); display: flex; align-items: center; padding-right: 10px; }
+.chart-cell { background: rgba(53, 17, 63, .5); border: 1px solid var(--ai-border); border-radius: 14px; padding: 10px; min-height: 64px; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.chart-cell-empty { color: rgba(213, 169, 220, .45); font-size: 13px; margin: 0 auto; }
+.chart-card { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; text-align: left; background: rgba(174, 64, 174, .16); border: 1px solid var(--ai-border); border-radius: 12px; padding: 8px 10px; cursor: pointer; font-family: var(--font-body); color: var(--ai-text); transition: background .16s ease, border-color .16s ease; }
+.chart-card:hover { background: rgba(174, 64, 174, .3); border-color: rgba(235, 156, 239, .55); }
+.chart-card-ic { flex: none; display: flex; color: var(--ai-lilac); }
+.chart-card-ic svg { width: 16px; height: 16px; stroke: currentColor; }
+.chart-card-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.chart-card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart-card-sub { font-size: 11px; color: var(--ai-secondary); }
+.chart-card-wave { flex: none; font-size: 10px; font-weight: 800; letter-spacing: .03em; padding: 2px 6px; border-radius: 999px; }
+.chart-card-wave.wave-1 { background: rgba(74, 222, 128, .16); color: #86efac; }
+.chart-card-wave.wave-2 { background: rgba(125, 211, 252, .16); color: #7dd3fc; }
+.chart-card-wave.wave-3 { background: rgba(235, 156, 239, .18); color: var(--ai-lilac); }
+.chart-card-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--ai-st-plan); }
+.chart-card-dot.status-live { background: var(--ai-st-live); box-shadow: 0 0 6px 1px rgba(176, 124, 224, .5); }
+.chart-card-dot.status-in_development { background: var(--ai-st-dev); }
+
+/* ---------------- agent info modal (read-only spec) ---------------- */
+.agent-modal-backdrop { position: fixed; inset: 0; background: rgba(23, 5, 28, .6); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; animation: aiFadeIn .24s ease-out; }
+.agent-modal { width: min(640px, 100%); max-height: 88vh; overflow-y: auto; position: relative; background: rgba(39, 8, 39, .97); border: 1px solid var(--ai-border); border-radius: 22px; padding: 30px 32px; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, .7); color: var(--ai-text); scrollbar-width: thin; }
+.agent-modal-close { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: none; background: none; color: var(--ai-secondary); border-radius: 12px; cursor: pointer; }
+.agent-modal-close:hover { color: var(--ai-text); }
+.agent-modal-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; padding-right: 40px; }
+.agent-badge { font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; }
+.agent-badge.autonomy { background: rgba(174, 64, 174, .24); color: var(--ai-text); }
+.agent-badge.status-live { background: rgba(176, 124, 224, .2); color: #d9bdf6; }
+.agent-badge.status-not_started { background: rgba(124, 140, 248, .16); color: #aab4fb; }
+.agent-badge.status-in_development { background: rgba(245, 155, 91, .16); color: #f8b684; }
+.agent-badge.wave-1 { background: rgba(74, 222, 128, .16); color: #86efac; }
+.agent-badge.wave-2 { background: rgba(125, 211, 252, .16); color: #7dd3fc; }
+.agent-badge.wave-3 { background: rgba(235, 156, 239, .18); color: var(--ai-lilac); }
+.agent-modal-breadcrumb { font-size: 12px; color: var(--ai-secondary); margin-bottom: 6px; }
+.agent-modal h2 { font-family: var(--font-head); font-size: 1.35rem; color: var(--ai-text); margin: 0 0 10px; }
+.agent-modal-desc { font-size: 14px; color: #ecd3ef; line-height: 1.55; margin: 0 0 18px; }
 .agent-modal-section { margin-bottom: 16px; }
-.agent-modal-section h4 { font-family: var(--font-body); font-size: .66rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--dept-color); margin: 0 0 8px; }
-.agent-modal-section p { font-family: var(--font-body); font-size: .84rem; color: #C9BAD9; line-height: 1.55; margin: 0; }
+.agent-modal-section h4 { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ai-lilac); margin: 0 0 8px; }
+.agent-modal-section p { font-size: 14px; color: #ecd3ef; line-height: 1.55; margin: 0; }
 .agent-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-.agent-pill { font-family: var(--font-body); font-size: .76rem; color: #EDE7F5; background: #1C1530; border: 1px solid #33284A; border-radius: 999px; padding: 5px 12px; }
+.agent-pill { font-size: 12px; color: var(--ai-text); background: rgba(174, 64, 174, .16); border: 1px solid var(--ai-border); border-radius: 999px; padding: 5px 12px; }
 .agent-ladder { display: flex; flex-direction: column; gap: 8px; }
-.ladder-row { display: flex; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #1C1530; border: 1px solid #33284A; }
-.ladder-row.current { border-color: var(--dept-color); background: color-mix(in srgb, var(--dept-color) 12%, #1C1530); }
-.ladder-row-label { flex: none; width: 130px; font-family: var(--font-body); font-size: .74rem; font-weight: 800; color: #EDE7F5; }
-.ladder-row-text { font-family: var(--font-body); font-size: .8rem; color: #C9BAD9; line-height: 1.45; }
-.agent-modal-cta { margin-top: 22px; padding-top: 18px; border-top: 1px solid #33284A; }
+.ladder-row { display: flex; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(53, 17, 63, .6); border: 1px solid var(--ai-border); }
+.ladder-row.current { border-color: rgba(235, 156, 239, .7); background: rgba(174, 64, 174, .22); }
+.ladder-row-label { flex: none; width: 130px; font-size: 12px; font-weight: 800; color: var(--ai-text); }
+.ladder-row-text { font-size: 13px; color: #ecd3ef; line-height: 1.45; }
+.agent-modal-cta { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--ai-border); }
 
-@media (max-width: 640px) {
-  .agent-modal { padding: 24px 20px; }
-  .ladder-row { flex-direction: column; gap: 4px; }
-  .ladder-row-label { width: auto; }
+/* ---------------- phones / narrow windows (JS-driven: .is-compact) ----------------
+   The header (brand / section capsule / back) stays fixed; everything else
+   flows in one scrollable column under it — search, banner, the map, the
+   Knowledge Base button and the footer — so nothing can overlap on a short
+   phone screen, and the map never shrinks to unreadable text. */
+.ai-flow { display: contents; }
+.constellation-page.is-compact .ai-core { width: clamp(96px, 13vh, 140px); }
+.constellation-page.is-compact .ai-brand { top: 12px; left: 16px; gap: 10px; }
+.constellation-page.is-compact .ai-brand-icon { width: 40px; height: 40px; }
+.constellation-page.is-compact .ai-brand h1 { font-size: 20px; line-height: 22px; }
+.constellation-page.is-compact .ai-brand-text span { font-size: 12px; line-height: 14px; }
+.constellation-page.is-compact .constellation-exit { top: 14px; right: 16px; height: 44px; padding: 0 16px; font-size: 14px; }
+.constellation-page.is-compact .constellation-section-nav { top: 66px; height: 48px; width: calc(100% - 24px); left: 12px; transform: none; justify-content: space-between; padding: 3px; }
+.constellation-page.is-compact .constellation-section-tab { flex: 1 1 auto; justify-content: center; padding: 0 8px; font-size: 13px; }
+.constellation-page.is-compact .constellation-section-tab-badge { min-width: 20px; height: 20px; margin-left: 5px; font-size: 11px; }
+.constellation-page.is-compact .ai-section { padding-top: 128px; }
+
+.constellation-page.is-compact .ai-flow {
+  position: absolute; top: 124px; left: 0; right: 0; bottom: 0; z-index: 3; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 10px; padding: 0 12px 14px; scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .35) transparent;
 }
+.constellation-page.is-compact .ai-flow > * { position: relative !important; inset: auto !important; transform: none !important; margin: 0; width: auto; max-width: none; flex: none; }
+.constellation-page.is-compact .agent-search { order: 1; width: auto; }
+.constellation-page.is-compact .whats-new-banner { order: 2; align-items: stretch; }
+.constellation-page.is-compact .whats-new-summary { height: 40px; font-size: 13px; padding: 0 14px; width: 100%; }
+.constellation-page.is-compact .constellation-overlay { order: 3; }
+.constellation-page.is-compact .constellation-page.is-compact .view-tabs { order: 4; align-self: flex-start; }
+.constellation-page.is-compact .dept-sheet { order: 5; max-height: none; overflow: visible; }
+.constellation-page.is-compact .chart-view { order: 6; padding: 8px 0 12px; background: none; overflow: visible; }
+.constellation-page.is-compact .constellation-stage { order: 7; height: clamp(480px, calc(100dvh - 300px), 720px); }
+.constellation-page.is-compact .ai-kb-btn { order: 8; align-self: flex-start; height: 44px; padding: 0 18px; font-size: 14px; }
+.constellation-page.is-compact .ai-footer { order: 9; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; padding: 8px 14px; font-size: 13px; height: auto; min-height: 50px; border-radius: 22px; }
+.constellation-page.is-compact .ai-footer-total { flex-basis: 100%; text-align: center; }
+.constellation-page.is-compact .ai-footer-item::before { display: none; }
+.constellation-page.is-compact .dept-panel { display: none; }
+.constellation-page.is-compact .constellation-carousel { order: 10; position: sticky !important; bottom: 0 !important; height: 76px; background: linear-gradient(180deg, rgba(23, 5, 28, 0), rgba(23, 5, 28, .92) 40%); }
+.constellation-page.is-compact .constellation-carousel button { width: 44px; height: 44px; }
+.constellation-page.is-compact .constellation-carousel button:first-of-type { left: 0; }
+.constellation-page.is-compact .constellation-carousel button:last-of-type { right: 0; }
+.constellation-page.is-compact .constellation-carousel-info { padding: 0 52px; }
+.constellation-page.is-compact .constellation-carousel-name { font-size: 1.1rem; }
+.constellation-page.is-compact .chart-grid { grid-template-columns: 110px repeat(var(--stage-cols), 1fr); }
+.constellation-page.is-compact .agent-modal { padding: 24px 20px; }
+.constellation-page.is-compact .ladder-row { flex-direction: column; gap: 4px; }
+.constellation-page.is-compact .ladder-row-label { width: auto; }
+
+/* ---------------- reduced motion ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .ai-core { animation: aiCoreIn .1s linear both !important; }
+  .ai-overview, .ai-dept, .ai-spoke, .ai-node-halo, .ai-sat-glow, .dept-graph-agent-glow { transition: opacity .1s linear !important; }
+  .ai-overview.is-focused { transform: none; }
+  .ai-dept-inner, .ai-sat, .ai-sat-line, .ai-dept-label, .dept-graph { animation: none !important; }
+  .constellation-section-tab, .constellation-carousel button, .view-tab { transition: none; }
+}
+.constellation-page.is-still .ai-core { animation: aiCoreIn .1s linear both; }

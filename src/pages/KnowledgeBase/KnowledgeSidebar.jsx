@@ -1,4 +1,5 @@
-const PLUS_ICON = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+// canonical action-create symbol (public/icons/action-icons.svg) — the same plus the rest of the app uses
+const PLUS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons/action-icons.svg#action-create"/></svg>';
 
 // One small line icon per category `key` (from kb_categories.key, seeded by
 // the migration) — purely decorative, keyed off real DB data, never guessed

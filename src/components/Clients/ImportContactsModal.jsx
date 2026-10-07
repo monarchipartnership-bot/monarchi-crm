@@ -249,7 +249,7 @@ export default function ImportContactsModal({ onClose, onImported }) {
   }
 
   return (
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
+    <div className="tmodal-overlay contacts-design" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
       <div className="tmodal-box import-contacts-modal">
         <div className="tmodal-head">
           <h3>Імпорт контактів з CSV</h3>

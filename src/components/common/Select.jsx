@@ -13,7 +13,7 @@ const CHEVRON_ICON = '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
 // with the rest of the app's UI. `searchable` adds a text filter at the top
 // of the menu — for long lists (e.g. the deal's Country field) where
 // scrolling to find one option by eye isn't practical.
-export default function Select({ value, onChange, options, placeholder, bare, className, style, searchable, disabled, side }) {
+export default function Select({ value, onChange, options, placeholder, bare, className, style, searchable, disabled, side, ariaLabel, onCreate }) {
   const containerRef = useRef(null);
   const menuRef = useRef(null);
   const searchRef = useRef(null);
@@ -55,13 +55,17 @@ export default function Select({ value, onChange, options, placeholder, bare, cl
   }, [open, searchable]);
 
   const current = options.find((o) => o.value === value);
+  // `onCreate` (needs `searchable`): offers to add whatever was typed as a new
+  // option when it doesn't match an existing one exactly.
+  const typed = query.trim();
+  const canCreate = !!onCreate && searchable && typed && !options.some((o) => o.label.toLowerCase() === typed.toLowerCase());
   const shown = searchable && query.trim()
     ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
     : options;
 
   return (
     <div className={'ui-select' + (bare ? ' ui-select--bare' : '') + (disabled ? ' ui-select--disabled' : '') + (className ? ' ' + className : '')} style={style} ref={containerRef}>
-      <button type="button" className="ui-select-trigger" onClick={() => setOpen((o) => !o)} disabled={disabled}>
+      <button type="button" className="ui-select-trigger" onClick={() => setOpen((o) => !o)} disabled={disabled} aria-label={ariaLabel} aria-expanded={open}>
         <span className={'ui-select-current' + (current ? '' : ' ui-select-placeholder')}>
           {current?.iconClassName && <span className={'ui-select-icon ' + current.iconClassName} />}
           {current ? current.label : (placeholder || '')}
@@ -92,7 +96,15 @@ export default function Select({ value, onChange, options, placeholder, bare, cl
                 {o.label}
               </button>
             ))}
-            {searchable && !shown.length && <p className="ui-select-empty">Нічого не знайдено</p>}
+            {canCreate && (
+              <button
+                type="button" className="ui-select-row ui-select-create"
+                onClick={async () => { const v = await onCreate(typed); if (v) onChange(v); setOpen(false); }}
+              >
+                + Додати «{typed}»
+              </button>
+            )}
+            {searchable && !shown.length && !canCreate && <p className="ui-select-empty">Нічого не знайдено</p>}
           </div>
         </div>,
         document.body

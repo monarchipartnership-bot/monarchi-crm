@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import ActionIcon from '../common/ActionIcon';
 import PlatformPicker from '../common/PlatformPicker';
 import Select from '../common/Select';
 import ClientNameField from './ClientNameField';
@@ -6,6 +7,8 @@ import AutoResizeTextarea from './AutoResizeTextarea';
 import { fetchClientDirectory } from '../../lib/api/clients';
 import { clientFullName } from '../../lib/clientName';
 import { STATUSES } from '../../lib/clientStatus';
+import { LeadChannelSelect, UpworkChannelSelect } from './LeadChannelFields';
+import { needsUpworkChannel } from '../../lib/upworkChannels';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { SECTION_ICONS } from '../../lib/reportIcons';
 
@@ -34,28 +37,57 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
   const [clientId, setClientId] = useState(initial?.clientId || null);
   const [title, setTitle] = useState(initial?.title || '');
   const [text, setText] = useState(initial?.text || '');
+  const [channel, setChannel] = useState(initial?.channel || '');
+  const [upworkChannel, setUpworkChannel] = useState(initial?.upworkChannel || '');
   const [directory, setDirectory] = useState([]);
+  const boxRef = useRef(null);
 
   useEffect(() => { fetchClientDirectory().then(setDirectory); }, []);
 
+  // Keyboard + focus: Escape closes, Tab stays inside the dialog, focus goes
+  // back to whatever opened it, and the page underneath doesn't scroll.
+  useEffect(() => {
+    const opener = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        // A open dropdown (Select / PlatformPicker) closes first; its own handler runs on the same key.
+        if (document.querySelector('.ui-select-menu, .platform-picker-menu:not(.closing)')) return;
+        e.stopPropagation(); onClose(); return;
+      }
+      if (e.key !== 'Tab' || !boxRef.current) return;
+      const f = [...boxRef.current.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => !el.disabled && el.offsetParent !== null);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    return () => { document.removeEventListener('keydown', onKey, true); document.body.style.overflow = prevOverflow; opener?.focus?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleSave() {
     const trimmed = name.trim();
-    if (!trimmed) return;
-    onSave({ platform, leadType, name: trimmed, clientId, title: title.trim(), text });
+    if (!trimmed || needsUpworkChannel({ platform, upworkChannel })) return;
+    onSave({ platform, leadType, name: trimmed, clientId, title: title.trim(), text, channel, upworkChannel: platform === 'Upwork' ? upworkChannel : '' });
   }
 
+  const missingUpworkChannel = needsUpworkChannel({ platform, upworkChannel });
+
   return (
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tmodal-box">
+    <div className="tmodal-overlay daily-report-design" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="tmodal-box" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="add-client-title">
         <div className="tmodal-head">
           <div className="tmodal-head-left">
             <span className="tmodal-head-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} />
             <div className="tmodal-head-text">
-              <h3>{initial ? 'Редагувати клієнта' : 'Додати клієнта'}</h3>
+              <h3 id="add-client-title">{initial ? 'Редагувати клієнта' : 'Додати клієнта'}</h3>
               <p>{initial ? 'Оновіть інформацію про клієнта' : 'Додайте нового клієнта, щоб почати роботу'}</p>
             </div>
           </div>
-          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>
+          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
         </div>
         <div className="tmodal-body">
           <div className="modal-field">
@@ -68,6 +100,34 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
             </div>
             <div className="modal-field-control">
               <PlatformPicker value={platform} onChange={setPlatform} />
+            </div>
+          </div>
+
+          {platform === 'Upwork' && (
+            <div className="modal-field">
+              <div className="modal-field-head">
+                <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #60A5FA, #2563EB)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
+                <div>
+                  <label>Канал Upwork *</label>
+                  <p>Обов'язково для лідів з Upwork — за ним рахуються тижневі та місячні цифри</p>
+                </div>
+              </div>
+              <div className="modal-field-control">
+                <UpworkChannelSelect value={upworkChannel} onChange={setUpworkChannel} />
+              </div>
+            </div>
+          )}
+
+          <div className="modal-field">
+            <div className="modal-field-head">
+              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
+              <div>
+                <label>Канал (Source)</label>
+                <p>Звідки прийшов лід; потрібного каналу немає — додайте його в списку</p>
+              </div>
+            </div>
+            <div className="modal-field-control">
+              <LeadChannelSelect value={channel} onChange={setChannel} />
             </div>
           </div>
 
@@ -136,10 +196,10 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
         </div>
         <div className="tmodal-foot">
           <button type="button" className="btn" onClick={onClose}>
-            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Скасувати
+            Скасувати
           </button>
-          <button type="button" className="btn btn-p" onClick={handleSave} disabled={!name.trim()}>
-            <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> {initial ? 'Зберегти' : 'Додати'}
+          <button type="button" className="btn btn-p" onClick={handleSave} disabled={!name.trim() || missingUpworkChannel} title={missingUpworkChannel ? 'Оберіть канал Upwork' : undefined}>
+            {initial ? <ActionIcon name="save" size={18} /> : <ActionIcon name="create" size={18} />} {initial ? 'Зберегти' : 'Додати'}
           </button>
         </div>
       </div>

@@ -10,7 +10,7 @@ const PARTICLES = [
 // any agent's workspace can use with its own color, so this doesn't need
 // rebuilding per agent. `color` drives the rings/particles/core/glow via a
 // single CSS custom property.
-export default function AgentOrb({ color = '#8B5CF6', icon, size = 88 }) {
+export default function AgentOrb({ color = '#B544B5', icon, size = 88 }) {
   return (
     <div className="agent-orb" style={{ width: size, height: size, '--orb-color': color }}>
       <div className="agent-orb-glow" />

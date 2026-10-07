@@ -4,6 +4,7 @@ import BarChart from '../../components/Reports/Weekly/BarChart';
 import LineChart from '../../components/Reports/Annual/LineChart';
 import DonutChart from '../../components/Automation/DonutChart';
 import DeltaBadge from '../../components/Automation/DeltaBadge';
+import ProjectsRegistry from '../../components/Projects/ProjectsRegistry';
 import { fetchProjects } from '../../lib/api/projects';
 import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween } from '../../lib/api/projectReports';
 import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, MONTH_NAMES } from '../../lib/dateHelpers';
@@ -192,6 +193,11 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="report-section">
+            <div className="stitle">Реєстр проєктів</div>
+            <ProjectsRegistry projects={projects} />
           </section>
 
           <section className="report-section">

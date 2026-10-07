@@ -793,3 +793,7 @@ button.deal-btn-soft:disabled { opacity: .7; cursor: default; }
 .task-detail-box { max-width: 480px; width: 100%; }
 .task-detail-text { font-family: var(--font-body); font-size: .88rem; color: var(--ink); line-height: 1.5; white-space: pre-wrap; }
 .task-detail-meta { margin-top: 12px; }
+.deal-param-textarea {
+  background: transparent; border: none; color: var(--ink); padding: 0; margin-top: 2px;
+  font-size: .82rem; font-family: var(--font-body); outline: none; width: 100%; resize: vertical; min-height: 36px;
+}

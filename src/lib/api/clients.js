@@ -2,12 +2,25 @@ import { supabase } from '../supabaseClient';
 import { normText } from '../monthlyAggregation';
 import { fetchWeeklyRowsBetween } from './weeklyReports';
 import { splitClientName } from '../clientName';
+import { mirrorClientPatchToOpenDeals } from '../businessProfile';
 
 // Canonical client directory — a synced index on top of what Weekly Report
 // already saves into weekly_reports.data.clients, not a replacement of it.
 // Matched by the same normalized-name rule Monthly's own aggregation
 // already uses (see monthlyAggregation.js's normText/aggregateClientsFromWeeks),
 // so "the same client" means the same thing everywhere in the app.
+
+// Optional extra columns (phone, email, country, company, source, contact_type)
+// from the create-contact form. Blank values are dropped so an upsert onto an
+// existing client never wipes what's already stored.
+function cleanExtra(extra) {
+  const out = {};
+  for (const [k, v] of Object.entries(extra || {})) {
+    const t = typeof v === 'string' ? v.trim() : v;
+    if (t) out[k] = t;
+  }
+  return out;
+}
 
 // Fire-and-forget from WeeklyCreate.jsx's autosave — never throws, just warns,
 // so a directory hiccup never blocks the week's own save from completing.
@@ -24,7 +37,7 @@ import { splitClientName } from '../clientName';
 // (WeeklyCreate/DailyCreate/MonthlyCreate autosave, ClientPicker's inline
 // quick-add, ImportDealsModal, CreateClientModal) passes it now — there is
 // no separate "lead type" concept any more.
-export async function upsertClientDirectoryEntry({ name, platform, status, manager }) {
+export async function upsertClientDirectoryEntry({ name, platform, status, manager, extra }) {
   const trimmed = (name || '').trim();
   const key = normText(trimmed);
   if (!trimmed || !key) return null;
@@ -32,7 +45,7 @@ export async function upsertClientDirectoryEntry({ name, platform, status, manag
   // it so the profile's separate Ім'я/Прізвище columns come pre-filled.
   const { name: firstName, lastName } = splitClientName(trimmed);
   const { data, error } = await supabase.from('clients').upsert(
-    { name: firstName, last_name: lastName || null, name_key: key, platform, status, manager: manager || null, updated_at: new Date().toISOString() },
+    { name: firstName, last_name: lastName || null, name_key: key, platform, status, manager: manager || null, ...cleanExtra(extra), updated_at: new Date().toISOString() },
     { onConflict: 'name_key' },
   ).select().single();
   if (error) { console.warn('upsertClientDirectoryEntry failed', error); return null; }
@@ -79,6 +92,8 @@ export async function fetchClientById(id) {
 export async function updateClientDirectoryEntry(id, patch, before, changedBy) {
   const { error } = await supabase.from('clients').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) { console.warn('updateClientDirectoryEntry failed', error); return; }
+  // Business-profile fields are mirrored onto the contact's open deals.
+  mirrorClientPatchToOpenDeals(id, patch);
   if (!before) return;
   const changes = Object.keys(patch)
     .filter((field) => before[field] !== patch[field])

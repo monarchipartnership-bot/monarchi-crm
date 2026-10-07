@@ -97,7 +97,6 @@ export default function AgentCatalog({ agents, onSelectAgent }) {
         {filtered.map((agent) => (
           <button
             key={agent.key} type="button" className="agent-catalog-row"
-            style={{ '--dept-color': agent.color }}
             onClick={() => onSelectAgent(agent)}
           >
             <span className="agent-catalog-dot" />

@@ -836,3 +836,30 @@ memory for the full story of how this was found and fixed.
   Reports etc. already exist independently). Agent activity/review is a
   dedicated surface (§4.3, decided) — explicitly not merged into Task
   Manager.
+
+## 8. Visual redesign — "update ai agents" kit (2026-10-06)
+
+The whole AI Agents surface now follows `Updates/update ai agents/` (approved-reference.png,
+component-design.md, motion-prompt.md, motion-config.json). This **supersedes the blue-violet
+palette from §1b** — the layout rules in §1b still hold (full-bleed dark section, navigation only
+via the section's own tab capsule, no CRM sidebar entries).
+
+- Tokens: base `#17051C` -> `#270827`, panel `#35113F`, text `#F9EDF9`, secondary `#D5A9DC`,
+  accent `#AE40AE`, active gradient `#B544B5 -> #661466`, border `rgba(235,156,239,.3)`.
+  Scoped under `.constellation-page.ai-immersive` (constellationTest.css) and inherited by every
+  overlay opened from it. Statuses: Live `#B07CE0`, in development `#F59B5B`, planned `#7C8CF8`
+  (`--ai-st-*`). Department colours from `aiAgentsData.js` are no longer drawn.
+- Environment (decoration only, never clickable/meaningful): `components/AiEnvironment/` —
+  nebula bitmap, readability mask, <=3 CSS planets, one particle canvas (dust/stars/foreground,
+  parameters straight from `motionConfig.json`), `assets/ai/*.webp` + `lib/aiAgentsAssets.js`
+  (core image, department icon registry with the two new symbols quality/advertising).
+- Map: `pages/Tools/aiMap/` — `overviewLayout.js` (pure geometry from the reference),
+  `OverviewMap.jsx` (live SVG: 8 department spheres on an ellipse, <=3 agent satellites + "+N",
+  decorative orbit lights/pulses), `FocusedGraph.jsx` + `graphLayout.js` (department focus, label
+  collision avoidance, clamped to the free area), `DeptChartView.jsx`. Counters (agents / Live /
+  in development / planned / new / review badge) are computed from real data.
+- Phones/narrow windows (`is-compact`): header fixed, everything else flows in one scrollable
+  column; focused department becomes a touch list.
+- Workspaces: shared shell is now a 720-840px dark-plum overlay over the dimmed (.5) scene;
+  info/close/back/create use the canonical action icon sprite.
+- QA screenshots: `docs/ai-agents-redesign-qa/`.

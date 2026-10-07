@@ -1,0 +1,241 @@
+/* Sales Reports Manager → Daily Report — Soft Volume update ("update daily
+   report" kit). Visual layer only: every rule is scoped under
+   .daily-report-design (the page and the client dialog's overlay). The two
+   dropdown menus the dialog uses are portaled to <body>, so they are styled
+   through `body:has(.daily-report-design)` — i.e. only while this page (or its
+   dialog) is on screen, never on other pages. Calendar / status / platform
+   colours keep their existing semantics; text always accompanies colour. */
+
+.main:has(.daily-report-design) { background: linear-gradient(180deg, #fbf9ff 0%, #f8f5ff 45%, #f6f1ff 100%); padding-bottom: 28px; }
+.view:has(.daily-report-design) { max-width: none; opacity: 1; transform: none; animation: none; margin-left: 0; margin-right: 0; width: auto; }
+
+.daily-report-design {
+  --daily-bg: #f8f5ff;
+  --daily-surface: linear-gradient(145deg, #fff, #fcfaff 65%, #f5efff);
+  --daily-text: #241337;
+  --daily-muted: #746387;
+  --daily-border: #e7dcf6;
+  --daily-field: #f5f0fc;
+  --daily-primary: linear-gradient(135deg, #b83ed4, #9225bd 55%, #702094);
+  --daily-shadow: 0 6px 22px rgba(83, 30, 116, .07), inset 0 1px 0 rgba(255, 255, 255, .9);
+  --daily-field-shadow: inset 0 1px 3px rgba(78, 30, 109, .05);
+  --daily-primary-shadow: 0 4px 12px rgba(133, 36, 171, .19), inset 0 1px 0 rgba(255, 255, 255, .38);
+  --daily-dialog-shadow: 0 24px 80px rgba(39, 12, 55, .22);
+  --daily-backdrop: rgba(39, 12, 55, .28);
+  --daily-focus: #8e39bd;
+  --daily-radius-panel: 18px;
+  --daily-radius-dialog: 20px;
+  --daily-radius-control: 11px;
+  --daily-transition: 160ms ease;
+  color: var(--daily-text);
+}
+.report-page.daily-report-design {
+  /* 24px content padding on desktop (16px on mobile) from the screen edge —
+     .main already contributes clamp(14px, 1.5vw, 24px). */
+  padding-inline: calc(24px - clamp(14px, 1.5vw, 24px));
+  min-width: 0;
+}
+@media (max-width: 640px) { .report-page.daily-report-design { padding-inline: calc(16px - clamp(14px, 1.5vw, 24px)); } }
+.daily-report-design *, .daily-report-design *::before, .daily-report-design *::after { box-sizing: border-box; }
+.daily-report-design :is(button, a, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid var(--daily-focus); outline-offset: 2px; }
+
+/* ---------- buttons ---------- */
+.daily-report-design .btn {
+  min-height: 42px; padding: 0 16px; border-radius: var(--daily-radius-control); gap: 8px; font: 600 14px/1 var(--font-head); letter-spacing: 0;
+  background: linear-gradient(180deg, #fff, #faf6ff); border: 1px solid var(--daily-border); color: #6c1f8c;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 2px 6px rgba(83, 30, 116, .05);
+  transition: background var(--daily-transition), border-color var(--daily-transition);
+}
+.daily-report-design .btn:hover { background: linear-gradient(180deg, #fff, #f3eafd); border-color: #d6c3ee; color: #6c1f8c; }
+.daily-report-design .btn:disabled { opacity: .55; }
+.daily-report-design .btn-p, .daily-report-design .btn-p:hover { background: var(--daily-primary); border-color: transparent; color: #fff; box-shadow: var(--daily-primary-shadow); filter: none; }
+.daily-report-design .btn-p:hover { filter: brightness(1.05); }
+.daily-report-design .btn .action-icon, .daily-report-design button .action-icon { flex: none; }
+
+/* ---------- report type switcher: 4 cards, Compare as its own wide row ---------- */
+.daily-report-design .report-type-switcher { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.daily-report-design .report-type-card {
+  position: relative; min-height: 72px; padding: 12px 40px 12px 16px; gap: 12px; border-radius: var(--daily-radius-panel);
+  background: var(--daily-surface); border: 1px solid var(--daily-border); box-shadow: var(--daily-shadow);
+  transition: border-color var(--daily-transition), background var(--daily-transition), box-shadow var(--daily-transition);
+}
+.daily-report-design .report-type-card::after {
+  content: '\203A'; position: absolute; right: 16px; top: 50%; transform: translateY(-52%); font: 400 26px/1 var(--font-head); color: var(--daily-muted);
+}
+.daily-report-design .report-type-card:hover { transform: none; border-color: #d6c3ee; box-shadow: 0 8px 20px -10px rgba(83, 30, 116, .22); }
+.daily-report-design .report-type-card.active { background: linear-gradient(145deg, #f7edfc, #efe0fa); border-color: #c98bd9; box-shadow: var(--daily-shadow); }
+.daily-report-design .report-type-card.active::after { color: #8e2c8e; }
+.daily-report-design .report-type-card-icon { width: 44px; height: 44px; border-radius: 13px; }
+.daily-report-design .report-type-card-label { font-size: 1rem; }
+.daily-report-design .report-type-card:last-child { grid-column: 1 / -1; min-height: 60px; }
+@media (max-width: 1000px) { .daily-report-design .report-type-switcher { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .daily-report-design .report-type-switcher { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- date panel ---------- */
+.daily-report-design .daily-hero {
+  margin-bottom: 14px; padding: 16px 20px; gap: 20px; background: var(--daily-surface); border: 1px solid var(--daily-border);
+  border-radius: var(--daily-radius-panel); box-shadow: var(--daily-shadow);
+}
+.daily-report-design .daily-hero-icon, .daily-report-design .daily-hero-season-ic { display: none; }
+.daily-report-design .daily-hero-title h1 { font-size: 1.6rem; line-height: 1.15; color: var(--daily-text); }
+.daily-report-design .daily-hero-title p { font-size: .88rem; color: var(--daily-muted); }
+.daily-report-design .daily-hero-calendar { border-left-color: var(--daily-border); gap: 12px; }
+.daily-report-design .daily-hero, .daily-report-design .daily-hero-title, .daily-report-design .daily-hero-calendar, .daily-report-design .daily-hero-days-wrap { min-width: 0; max-width: 100%; }
+.daily-report-design .daily-hero-days { flex: 1; min-width: 0; }
+.daily-report-design .daily-hero-nav { gap: 8px; }
+.daily-report-design .daily-hero-nav-btn, .daily-report-design .daily-hero-scroll-btn {
+  width: 40px; height: 40px; border-radius: var(--daily-radius-control); border-color: var(--daily-border); background: #fff; color: #6c1f8c;
+  transition: border-color var(--daily-transition), background var(--daily-transition);
+}
+.daily-report-design .daily-hero-nav-btn:hover, .daily-report-design .daily-hero-scroll-btn:hover { border-color: #c98bd9; background: #f7edfc; transform: none; color: #6c1f8c; }
+.daily-report-design .daily-hero-nav-label { min-width: 140px; justify-content: center; font-size: 1rem; }
+.daily-report-design .daily-hero-days { gap: 8px; padding: 6px 2px; }
+.daily-report-design .daily-hero-day { min-width: 48px; min-height: 52px; border-radius: 12px; transition: border-color var(--daily-transition), box-shadow var(--daily-transition); }
+.daily-report-design .daily-hero-day:hover { transform: none; border-color: #c98bd9; }
+.daily-report-design .daily-hero-day-num { font-size: .98rem; }
+.daily-report-design .daily-hero-day-wd { font-size: .66rem; }
+.daily-report-design .daily-hero-day.cur { background: var(--daily-primary); box-shadow: var(--daily-primary-shadow); }
+
+/* ---------- main grid: clients + tasks | manager, export, summary ---------- */
+.daily-report-design .rpt-layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
+@media (max-width: 1100px) { .daily-report-design .rpt-layout { grid-template-columns: minmax(0, 1fr); } }
+.daily-report-design .report-section {
+  margin: 0 0 16px; padding: 18px 20px; background: var(--daily-surface); border: 1px solid var(--daily-border);
+  border-radius: var(--daily-radius-panel); box-shadow: var(--daily-shadow);
+}
+.daily-report-design .stitle { margin: 0 0 14px; font-size: 1.3rem; gap: 10px; align-items: center; flex-wrap: wrap; }
+.daily-report-design .stitle-icon { display: none; }
+.daily-report-design .stitle-filter { margin-left: auto; font-size: 14px; }
+.daily-report-design .empty-hint {
+  padding: 22px 16px; text-align: center; font-style: normal; font-size: .92rem; color: var(--daily-muted);
+  background: #faf6ff; border: 1px dashed #d9c9ee; border-radius: 14px;
+}
+
+/* rows: outer tint holds the hidden quick actions, inner card is the visible row */
+.daily-report-design .client-grid { gap: 8px; }
+.daily-report-design .client-grid-header { padding: 4px 18px 6px; font: 700 12px/1.2 var(--font-head); letter-spacing: .04em; color: var(--daily-muted); }
+.daily-report-design .daily-client-grid .client-grid-row, .daily-report-design .daily-task-grid .client-grid-row {
+  background: #f1e8fb; border: 1px solid var(--daily-border); border-radius: 15px; box-shadow: 0 3px 12px rgba(83, 30, 116, .05);
+}
+.daily-report-design .daily-client-grid .client-grid-row:hover, .daily-report-design .daily-task-grid .client-grid-row:hover { transform: none; box-shadow: 0 8px 20px -10px rgba(83, 30, 116, .22); }
+.daily-report-design .daily-list-row-main {
+  min-height: 60px; padding: 10px 18px; border-radius: 14px; background: var(--daily-surface); box-shadow: inset 0 1px 0 #fff; transition: margin-right 220ms ease;
+}
+.daily-report-design .daily-task-grid .client-grid-row.overdue { background: #fbe9ec; border-color: #f2c7cc; box-shadow: 0 3px 12px rgba(179, 38, 30, .06); }
+.daily-report-design .client-grid-name-text .ink { font-size: .96rem; font-weight: 600; overflow-wrap: anywhere; }
+.daily-report-design .client-grid-badge { font-size: .78rem; }
+.daily-report-design .client-grid-plain { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.3; }
+.daily-report-design .daily-client-grid .del-btn {
+  display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid #f2cfcb; border-radius: 10px; background: #fff; color: #b3261e; cursor: pointer;
+}
+.daily-report-design .daily-client-grid .del-btn:focus-visible { opacity: 1; }
+.daily-report-design .daily-list-row-actions { gap: 6px; transition: width 220ms ease; }
+.daily-report-design .daily-client-grid .client-grid-row.expanded .daily-list-row-actions { width: 150px; }
+.daily-report-design .daily-task-grid .client-grid-row.expanded .daily-list-row-actions { width: 190px; }
+.daily-report-design .deal-field-icon-btn {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--daily-border); background: #fff; color: #6c1f8c;
+  transition: border-color var(--daily-transition), color var(--daily-transition);
+}
+.daily-report-design .deal-field-icon-btn svg { width: 17px; height: 17px; }
+.daily-report-design .deal-field-icon-btn:hover:not(:disabled) { border-color: #c98bd9; color: #8e2c8e; }
+
+/* right column panels */
+.daily-report-design .wk-sidebar { gap: 14px; }
+.daily-report-design .wk-side-panel { padding: 18px 20px; background: var(--daily-surface); border: 1px solid var(--daily-border); border-radius: var(--daily-radius-panel); box-shadow: var(--daily-shadow); }
+.daily-report-design .wk-side-panel .deal-section-icon { display: none; }
+.daily-report-design .wk-side-panel .deal-section-text h4 { font-size: 1.15rem; color: var(--daily-text); }
+.daily-report-design .wk-side-panel .deal-section-text p { font-size: .88rem; color: var(--daily-muted); }
+.daily-report-design .wk-side-panel .deal-section-body { margin-top: 12px; }
+.daily-report-design .ui-select-trigger {
+  min-height: 44px; border-radius: var(--daily-radius-control); border-color: var(--daily-border); background: var(--daily-field); box-shadow: var(--daily-field-shadow); font-size: 14px;
+}
+.daily-report-design .wk-dl-row { gap: 10px; }
+.daily-report-design button.deal-btn-soft, .daily-report-design button.deal-btn-soft:hover {
+  min-height: 44px; border-radius: var(--daily-radius-control); border: 1px solid #d6c3ee; box-shadow: none; filter: none;
+  background: linear-gradient(180deg, #f9f1fe, #f1e3fb); color: #6c1f8c; font: 600 14px/1 var(--font-head);
+}
+.daily-report-design button.deal-btn-soft:hover { background: linear-gradient(180deg, #f3e6fc, #ebd8f8); }
+.daily-report-design .save-state { font-size: .84rem; color: var(--daily-muted); }
+/* "Сьогодні": ring + legend, then the three compact counters inside the same card */
+.daily-report-design .wk-side-panel .deal-section-body:has(.wk-side-stat) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
+.daily-report-design .wk-progress-chart { grid-column: 1 / -1; margin-bottom: 8px; min-width: 0; width: 100%; position: relative; overflow: hidden; }
+.daily-report-design .wk-side-stat {
+  flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 0 0; border: 0; border-top: 1px solid var(--daily-border); font-size: .78rem; line-height: 1.25; color: var(--daily-muted);
+}
+.daily-report-design .wk-side-stat-ic { display: none; }
+.daily-report-design .wk-side-stat > span:not(.wk-side-stat-ic) { flex: none; }
+.daily-report-design .wk-side-stat b { font-size: 1.7rem; line-height: 1; color: var(--daily-text); }
+
+/* ---------- Додати / Редагувати клієнта ---------- */
+.daily-report-design.tmodal-overlay { background: var(--daily-backdrop); backdrop-filter: blur(2px); padding: 16px; z-index: 1000; }
+.daily-report-design .tmodal-box {
+  width: 100%; max-width: 540px; max-height: calc(100dvh - 32px); border: 1px solid var(--daily-border); border-radius: var(--daily-radius-dialog);
+  background: linear-gradient(145deg, #fff 0%, #fcfaff 70%, #f7f1ff 100%); box-shadow: var(--daily-dialog-shadow), inset 0 1px 0 #fff;
+  animation: daily-dialog-in 200ms ease both;
+}
+@keyframes daily-dialog-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.daily-report-design .tmodal-head { padding: 20px 24px 14px; border-bottom: 1px solid var(--daily-border); align-items: flex-start; }
+.daily-report-design .tmodal-head-left { align-items: flex-start; gap: 0; }
+.daily-report-design .tmodal-head-icon { display: none; }
+.daily-report-design .tmodal-head h3 { font-size: 1.35rem; color: var(--daily-text); }
+.daily-report-design .tmodal-head-text p { margin: 4px 0 0; font-size: .9rem; color: var(--daily-muted); }
+.daily-report-design .tmodal-close {
+  flex: none; width: 40px; height: 40px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--daily-border); border-radius: var(--daily-radius-control); background: #fff; color: var(--daily-text);
+}
+.daily-report-design .tmodal-close:hover { color: #6c1f8c; border-color: #c98bd9; }
+.daily-report-design .tmodal-body { padding: 18px 24px; gap: 16px; overscroll-behavior: contain; }
+.daily-report-design .tmodal-foot { padding: 14px 24px; border-top: 1px solid var(--daily-border); gap: 10px; }
+.daily-report-design .tmodal-foot .btn { min-width: 120px; justify-content: center; }
+
+/* field = label, control, then its help text (the markup keeps help under the label; this reorders it visually) */
+.daily-report-design .modal-field { display: flex; flex-direction: column; margin: 0; }
+.daily-report-design .modal-field-head, .daily-report-design .modal-field-head > div { display: contents; }
+.daily-report-design .modal-field-icon { display: none; }
+.daily-report-design .modal-field-head label { order: 1; margin-bottom: 6px; font: 600 14px/1.3 var(--font-body); color: var(--daily-text); }
+.daily-report-design .modal-field-control { order: 2; }
+.daily-report-design .modal-field-head p { order: 3; margin: 6px 0 0; font: 400 12.5px/1.4 var(--font-body); color: var(--daily-muted); }
+.daily-report-design .modal-field-control input[type="text"], .daily-report-design .modal-field-control textarea {
+  width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--daily-border); border-radius: var(--daily-radius-control);
+  background: var(--daily-field); box-shadow: var(--daily-field-shadow); font: 500 14px/1.4 var(--font-body); color: var(--daily-text);
+}
+.daily-report-design .modal-field-control textarea { min-height: 76px; }
+.daily-report-design .modal-field-control input:focus, .daily-report-design .modal-field-control textarea:focus { border-color: var(--daily-focus); background: #fff; outline: none; }
+.daily-report-design .modal-field-control .platform-picker-trigger { min-height: 44px; border-radius: var(--daily-radius-control); border-color: var(--daily-border); background: var(--daily-field); box-shadow: var(--daily-field-shadow); }
+
+/* ---------- dropdown menus (portaled to <body>) ---------- */
+body:has(.daily-report-design) .ui-select-menu, body:has(.daily-report-design) .platform-picker-menu {
+  border: 1px solid #e7dcf6; border-radius: 12px; padding: 6px; background: linear-gradient(145deg, #fff, #fcfaff);
+  box-shadow: 0 18px 40px -14px rgba(83, 30, 116, .32), inset 0 1px 0 #fff; max-height: min(320px, 50vh); overflow-y: auto;
+}
+body:has(.daily-report-design) .ui-select-row, body:has(.daily-report-design) .platform-picker-row {
+  min-height: 40px; border-radius: 9px; padding: 0 12px; font: 500 14px/1.2 var(--font-body); color: #241337;
+}
+body:has(.daily-report-design) .ui-select-row:hover, body:has(.daily-report-design) .platform-picker-row:hover { background: #f5eefc; }
+body:has(.daily-report-design) .ui-select-row:focus-visible, body:has(.daily-report-design) .platform-picker-row:focus-visible { outline: 2px solid #8e39bd; outline-offset: -2px; }
+body:has(.daily-report-design) .ui-select-row.active, body:has(.daily-report-design) .platform-picker-row.active { background: #f1e3fb; color: #6c1f8c; font-weight: 600; }
+body:has(.daily-report-design) .ui-select-row.active::after, body:has(.daily-report-design) .platform-picker-row.active::after { content: '\2713'; margin-left: auto; font-weight: 700; }
+body:has(.daily-report-design) .ui-select-search { border-radius: 10px; border-color: #e7dcf6; background: #f5f0fc; min-height: 38px; }
+
+/* ---------- export + print: no screen-only chrome ---------- */
+body.capturing .daily-report-design, body.capturing .daily-report-design * { transition: none !important; animation: none !important; }
+@media print {
+  .daily-report-design .report-section, .daily-report-design .wk-side-panel, .daily-report-design .daily-hero { box-shadow: none !important; background: #fff !important; }
+}
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .daily-report-design, .daily-report-design * { transition: none !important; animation: none !important; }
+}
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 900px) {
+  .daily-report-design .daily-hero-calendar { border-left: 0; padding-left: 0; }
+}
+@media (max-width: 640px) {
+  .daily-report-design .report-section, .daily-report-design .wk-side-panel { padding: 14px; }
+  .daily-report-design .daily-client-grid, .daily-report-design .daily-task-grid { overflow-x: auto; }
+  .daily-report-design .daily-client-grid .client-grid-row, .daily-report-design .daily-client-grid .client-grid-header { min-width: 560px; }
+  .daily-report-design.tmodal-overlay { padding: 8px; }
+  .daily-report-design .tmodal-head, .daily-report-design .tmodal-body, .daily-report-design .tmodal-foot { padding-left: 16px; padding-right: 16px; }
+  .daily-report-design .tmodal-foot .btn { flex: 1; min-width: 0; }
+}

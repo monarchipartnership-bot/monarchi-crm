@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import ActionIcon from '../../components/common/ActionIcon';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchClientById, updateClientDirectoryEntry, deleteClientDirectoryEntry, fetchClientHistory, fetchClientChangeLog } from '../../lib/api/clients';
 import { fetchClientFiles } from '../../lib/api/clientFiles';
@@ -17,8 +18,11 @@ import { uploadClientNoteImage } from '../../lib/api/clientNoteImages';
 import { createMentionNotification } from '../../lib/api/notifications';
 import { sanitizeHtml, htmlToPlainText } from '../../lib/sanitizeHtml';
 import { COUNTRIES, flagClass } from '../../lib/countries';
-import { BUSINESS_NICHES } from '../../lib/businessNiches';
-import { CONTACT_TYPES, SOURCES } from '../../lib/clientTypeAndSource';
+import { CATEGORY_OPTIONS, NICHES_BY_CATEGORY, nicheOptionsFor } from '../../lib/businessNiches';
+import MultiCountryField from '../../components/common/MultiCountryField';
+import { fetchServiceTags } from '../../lib/api/dealServiceTags';
+import { CONTACT_TYPES } from '../../lib/clientTypeAndSource';
+import { useLeadChannels } from '../../lib/leadChannels';
 import { useAuth } from '../../contexts/AuthContext';
 import ClientAvatar from '../../components/Clients/ClientAvatar';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
@@ -36,6 +40,7 @@ import '../../styles/automationTasksPage.css';
 import '../../styles/comparePage.css';
 import '../../styles/clientsDirectory.css';
 import '../../styles/clientProfile.css';
+import '../../styles/contactsDesign.css';
 import '../../styles/dealsBoard.css';
 
 const CAMERA_ICON = '<svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.5"/></svg>';
@@ -72,9 +77,6 @@ const STAT_WAVE_PATH = smoothWavePath(STAT_WAVE_POINTS);
 // Bar heights (% of the chart's own height) for the Задачі card — a rising,
 // slightly uneven run rather than a perfectly straight staircase.
 const STAT_BAR_HEIGHTS = [30, 48, 40, 62, 52, 74, 64, 92, 100];
-const BACK_ICON = '<svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>';
-const PENCIL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
-const TRASH_ICON = '<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
 const CHEVRON_ICON = '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
 const SORT_ICON = '<svg viewBox="0 0 24 24"><path d="M7 4v16M7 4l-3 3M7 4l3 3"/><path d="M17 20V4M17 20l-3-3M17 20l3-3"/></svg>';
 
@@ -103,9 +105,7 @@ function daysUntilLabel(n) {
 const TAG_CONTEXT = 'client_tags';
 
 const CONTACT_TYPE_OPTIONS = CONTACT_TYPES.map((t) => ({ value: t, label: t }));
-const SOURCE_OPTIONS = SOURCES.map((s) => ({ value: s, label: s }));
 const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.code, label: c.name, iconClassName: flagClass(c.code) }));
-const NICHE_OPTIONS = BUSINESS_NICHES.map((n) => ({ value: n, label: n }));
 
 // One row inside a collapsible info card — a small muted icon, a label, and
 // either the plain read-only value (view mode) or the real editable control
@@ -150,6 +150,8 @@ const ACTIVITY_FIELD_LABELS = {
   facebook_lead_id: 'Facebook Lead ID', agency_experience: 'Досвід співпраці з агентствами', start_timing: 'Коли плануєте почати?',
   phone: 'Телефон', email: 'Email', telegram: 'Telegram', whatsapp: 'WhatsApp', linkedin: 'LinkedIn', instagram: 'Instagram',
   nethunt_id: 'NetHunt ID', google_ads_customer_id: 'Google Ads Customer ID',
+  business_category: 'Категорія бізнесу', service_tag_ids: 'Канал просування', promo_geo: 'ГЕО просування',
+  goals: 'Цілі', previous_results: 'Що вже працювало, які результати', other_notes: 'Інше',
 };
 const ACTIVITY_CONTACT_FIELDS = ['name', 'last_name', 'phone', 'email', 'telegram', 'whatsapp', 'linkedin', 'instagram'];
 // `color` is the plain hex used for the "Активність" tab's Було/Стало value
@@ -230,6 +232,9 @@ export default function ClientProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { email } = useAuth();
+  const { options: sourceOptions, addChannel } = useLeadChannels();
+  const [channelTags, setChannelTags] = useState([]);
+  useEffect(() => { fetchServiceTags().then(setChannelTags); }, []);
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('info');
@@ -505,34 +510,34 @@ export default function ClientProfile() {
   });
 
   return (
-    <div className="report-page">
+    <div className="report-page contacts-design">
       <div className="client-profile-top-row">
         <button type="button" className="btn client-profile-back" onClick={() => navigate('/reports/clients-directory')}>
-          <span className="client-profile-action-ic" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: BACK_ICON }} />
+          <ActionIcon name="back" size={18} />
           Назад до контактів
         </button>
         <div className="client-profile-top-actions">
           {editMode ? (
             <>
               <button type="button" className="btn" onClick={cancelEdit}>Скасувати</button>
-              <button type="button" className="btn btn-p" onClick={saveEdit}>Зберегти</button>
+              <button type="button" className="btn btn-p" onClick={saveEdit}><ActionIcon name="save" size={18} /> Зберегти</button>
             </>
           ) : (
             <button type="button" className="btn" onClick={startEdit}>
-              <span className="client-profile-action-ic" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: PENCIL_ICON }} />
+              <ActionIcon name="edit" size={18} />
               Редагувати
             </button>
           )}
           <button type="button" className="btn" disabled title="Скоро">
-            <span className="client-profile-action-ic" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.company }} />
+            <span className="contacts-btn-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.company }} />
             Створити компанію
           </button>
           <button type="button" className="btn btn-p" onClick={() => setAddDealOpen(true)}>
-            <span className="client-profile-action-ic client-profile-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
+            <ActionIcon name="create" size={18} />
             Створити угоду
           </button>
           <button type="button" className="btn client-profile-btn-danger" onClick={handleDeleteClient}>
-            <span className="client-profile-action-ic" style={{ background: 'linear-gradient(135deg, #F87171, #DC2626)' }} dangerouslySetInnerHTML={{ __html: TRASH_ICON }} />
+            <ActionIcon name="delete" size={18} />
             Видалити контакт
           </button>
         </div>
@@ -602,7 +607,7 @@ export default function ClientProfile() {
             <span className="client-profile-quick-ic" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
             <div className="client-profile-quick-body">
               <label>Джерело</label>
-              <Select bare value={client.source || ''} onChange={(v) => patch({ source: v || null })} options={SOURCE_OPTIONS} placeholder="Не вказано" disabled={!editMode} />
+              <Select bare searchable onCreate={addChannel} value={client.source || ''} onChange={(v) => patch({ source: v || null })} options={sourceOptions} placeholder="Не вказано" disabled={!editMode} />
             </div>
           </div>
           <div className="client-profile-quick-field">
@@ -744,7 +749,7 @@ export default function ClientProfile() {
                   <Select value={client.contact_type || ''} onChange={(v) => patch({ contact_type: v || null })} options={CONTACT_TYPE_OPTIONS} placeholder="Не вказано" />
                 </InfoRow>
                 <InfoRow icon={FIELD_ICONS.source} label="Source" value={client.source || 'Не вказано'} editing={editMode}>
-                  <Select value={client.source || ''} onChange={(v) => patch({ source: v || null })} options={SOURCE_OPTIONS} placeholder="Не вказано" />
+                  <Select searchable onCreate={addChannel} value={client.source || ''} onChange={(v) => patch({ source: v || null })} options={sourceOptions} placeholder="Не вказано" />
                 </InfoRow>
                 <InfoRow icon={FIELD_ICONS.briefcase} label="Посада" value={client.job_title || '—'} editing={editMode}>
                   <input type="text" value={client.job_title || ''} onChange={(e) => patch({ job_title: e.target.value })} />
@@ -773,38 +778,52 @@ export default function ClientProfile() {
                 <InfoRow icon={FIELD_ICONS.link} label="Соц. мережі" value={(client.socials || []).filter(Boolean).join(', ') || '—'} editing={editMode}>
                   <MultiTextField values={client.socials || []} onChange={(socials) => patch({ socials })} placeholder="https://..." />
                 </InfoRow>
+                <InfoRow icon={FIELD_ICONS.briefcase} label="Категорія бізнесу" value={client.business_category || 'Не вказано'} editing={editMode}>
+                  <Select
+                    value={client.business_category || ''} placeholder="Не вказано" options={CATEGORY_OPTIONS}
+                    onChange={(v) => {
+                      // A niche that doesn't belong to the new category is cleared.
+                      const keep = !v || (NICHES_BY_CATEGORY[v] || []).includes(client.niche);
+                      patch(keep ? { business_category: v || null } : { business_category: v || null, niche: null });
+                    }}
+                  />
+                </InfoRow>
                 <InfoRow icon={FIELD_ICONS.target} label="Ніша бізнесу" value={client.niche || 'Не вказано'} editing={editMode}>
-                  <Select value={client.niche || ''} onChange={(v) => patch({ niche: v || null })} options={NICHE_OPTIONS} placeholder="Не вказано" />
+                  <Select searchable value={client.niche || ''} onChange={(v) => patch({ niche: v || null })} options={nicheOptionsFor(client.business_category, client.niche)} placeholder="Не вказано" />
                 </InfoRow>
-                <InfoRow icon={FIELD_ICONS.target} label="Які основні цілі запуску?" value={client.goal_launch || '—'} editing={editMode}>
-                  <input type="text" value={client.goal_launch || ''} onChange={(e) => patch({ goal_launch: e.target.value })} />
+                <InfoRow
+                  icon={FIELD_ICONS.megaphone} label="Канал просування" editing={editMode}
+                  value={(client.service_tag_ids || []).map((id) => channelTags.find((t) => t.id === id)?.label).filter(Boolean).join(', ') || 'Не вказано'}
+                >
+                  <div className="client-channel-chips">
+                    {channelTags.map((t) => {
+                      const on = (client.service_tag_ids || []).includes(t.id);
+                      return (
+                        <button
+                          type="button" key={t.id} className={'client-channel-chip' + (on ? ' on' : '')} aria-pressed={on}
+                          onClick={() => patch({ service_tag_ids: on ? client.service_tag_ids.filter((x) => x !== t.id) : [...(client.service_tag_ids || []), t.id] })}
+                        >{t.label}</button>
+                      );
+                    })}
+                  </div>
                 </InfoRow>
-                <InfoRow icon={FIELD_ICONS.megaphone} label="Які на разі канали реклами у вас вже працюють?" value={client.current_ad_channels || '—'} editing={editMode}>
-                  <input type="text" value={client.current_ad_channels || ''} onChange={(e) => patch({ current_ad_channels: e.target.value })} />
+                <InfoRow
+                  icon={FIELD_ICONS.mapPin} label="ГЕО просування" editing={editMode}
+                  value={(client.promo_geo || []).map((c) => COUNTRIES.find((x) => x.code === c)?.name || c).join(', ') || 'Не вказано'}
+                >
+                  <MultiCountryField value={client.promo_geo || []} onChange={(promo_geo) => patch({ promo_geo })} />
                 </InfoRow>
-                <InfoRow icon={FIELD_ICONS.briefcase} label="Яка маркетингова послуга вас цікавить?" value={client.service_interest || '—'} editing={editMode}>
-                  <input type="text" value={client.service_interest || ''} onChange={(e) => patch({ service_interest: e.target.value })} />
+                <InfoRow icon={FIELD_ICONS.target} label="Цілі" value={client.goals || '—'} editing={editMode}>
+                  <textarea rows={2} value={client.goals || ''} onChange={(e) => patch({ goals: e.target.value })} />
                 </InfoRow>
-                <InfoRow icon={FIELD_ICONS.tag} label="Яка назва вашого бренду та в якій ніші ви працюєте?" value={client.brand_name_niche || '—'} editing={editMode}>
-                  <input type="text" value={client.brand_name_niche || ''} onChange={(e) => patch({ brand_name_niche: e.target.value })} />
+                <InfoRow icon={FIELD_ICONS.history} label="Що вже працювало, які результати" value={client.previous_results || '—'} editing={editMode}>
+                  <textarea rows={2} value={client.previous_results || ''} onChange={(e) => patch({ previous_results: e.target.value })} />
                 </InfoRow>
-                <InfoRow icon={FIELD_ICONS.currency} label="Який місячний бюджет на маркетинг ви закладаєте?" value={client.monthly_budget || '—'} editing={editMode}>
-                  <input type="text" value={client.monthly_budget || ''} onChange={(e) => patch({ monthly_budget: e.target.value })} />
-                </InfoRow>
-                <InfoRow icon={FIELD_ICONS.megaphone} label="Ad campaign" value={client.ad_campaign || '—'} editing={editMode}>
-                  <input type="text" value={client.ad_campaign || ''} onChange={(e) => patch({ ad_campaign: e.target.value })} />
+                <InfoRow icon={FIELD_ICONS.tag} label="Інше" value={client.other_notes || '—'} editing={editMode}>
+                  <textarea rows={2} value={client.other_notes || ''} onChange={(e) => patch({ other_notes: e.target.value })} />
                 </InfoRow>
                 <InfoRow icon={FIELD_ICONS.target} label="Google Ads Customer ID" value={client.google_ads_customer_id || '—'} editing={editMode}>
                   <input type="text" placeholder="123-456-7890" value={client.google_ads_customer_id || ''} onChange={(e) => patch({ google_ads_customer_id: e.target.value })} />
-                </InfoRow>
-                <InfoRow icon={FIELD_ICONS.at} label="Facebook Lead ID" value={client.facebook_lead_id || '—'} editing={editMode}>
-                  <input type="text" value={client.facebook_lead_id || ''} onChange={(e) => patch({ facebook_lead_id: e.target.value })} />
-                </InfoRow>
-                <InfoRow icon={FIELD_ICONS.history} label="Досвід співпраці з агентствами" value={client.agency_experience || '—'} editing={editMode}>
-                  <input type="text" value={client.agency_experience || ''} onChange={(e) => patch({ agency_experience: e.target.value })} />
-                </InfoRow>
-                <InfoRow icon={FIELD_ICONS.deadline} label="Коли плануєте почати?" value={client.start_timing || '—'} editing={editMode}>
-                  <input type="text" value={client.start_timing || ''} onChange={(e) => patch({ start_timing: e.target.value })} />
                 </InfoRow>
               </SectionCard>
 
@@ -887,20 +906,20 @@ export default function ClientProfile() {
               <div className="client-profile-side-card">
                 <span className="client-profile-side-title">Швидкі дії</span>
                 <div className="client-profile-quick-actions">
-                  <button type="button" className="client-profile-quick-action" style={{ background: '#EDE7FB' }} onClick={startEdit}>
-                    <span className="client-profile-quick-action-ic" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: PENCIL_ICON }} />
+                  <button type="button" className="client-profile-quick-action" onClick={startEdit}>
+                    <ActionIcon name="edit" size={20} />
                     Редагувати контакт
                   </button>
-                  <button type="button" className="client-profile-quick-action" style={{ background: '#DCFCE7' }} onClick={() => setAddDealOpen(true)}>
-                    <span className="client-profile-quick-action-ic" style={{ background: 'linear-gradient(135deg, #4ADE80, #16A34A)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.currency }} />
+                  <button type="button" className="client-profile-quick-action" onClick={() => setAddDealOpen(true)}>
+                    <ActionIcon name="create" size={20} />
                     Створити угоду
                   </button>
-                  <button type="button" className="client-profile-quick-action" disabled title="Скоро" style={{ background: '#FFEDD5' }}>
-                    <span className="client-profile-quick-action-ic" style={{ background: 'linear-gradient(135deg, #FDBA74, #EA580C)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} />
+                  <button type="button" className="client-profile-quick-action" disabled title="Скоро">
+                    <ActionIcon name="create" size={20} />
                     Створити задачу
                   </button>
-                  <button type="button" className="client-profile-quick-action" style={{ background: '#E0F2FE' }} onClick={() => setActiveTab('notes')}>
-                    <span className="client-profile-quick-action-ic" style={{ background: 'linear-gradient(135deg, #60A5FA, #2563EB)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.document }} />
+                  <button type="button" className="client-profile-quick-action" onClick={() => setActiveTab('notes')}>
+                    <ActionIcon name="create" size={20} />
                     Додати нотатку
                   </button>
                 </div>
@@ -922,7 +941,7 @@ export default function ClientProfile() {
                       <span className="client-profile-side-empty-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.document }} />
                       <p className="client-profile-side-empty-title">Ще немає угод</p>
                       <p className="client-profile-side-empty-sub">Створіть першу угоду для цього клієнта, щоб відстежувати прогрес</p>
-                      <button type="button" className="btn btn-p" onClick={() => setAddDealOpen(true)}>+ Створити угоду</button>
+                      <button type="button" className="btn btn-p" onClick={() => setAddDealOpen(true)}><ActionIcon name="create" size={18} /> Створити угоду</button>
                     </div>
                   ) : (
                     <div className="client-profile-mini-list">

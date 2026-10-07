@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ActionIcon from '../common/ActionIcon';
 import { AUTONOMY_LABEL, STATUS_LABEL, WAVE_LABEL } from '../../data/aiAgentsData';
 
 // The read-only "what is this agent" modal — badges, breaks-into/wired-
@@ -22,7 +23,7 @@ export default function AgentInfoModal({ agent, onClose, showCta = true, showDes
   return (
     <div className="agent-modal-backdrop" style={style} onClick={onClose}>
       <div className="agent-modal" onClick={(e) => e.stopPropagation()} style={{ '--dept-color': agent.color }}>
-        <button type="button" className="agent-modal-close" onClick={onClose}>&times;</button>
+        <button type="button" className="agent-modal-close" onClick={onClose} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
 
         <div className="agent-modal-badges">
           <span className="agent-badge autonomy">{AUTONOMY_LABEL[agent.autonomyLevel]}</span>

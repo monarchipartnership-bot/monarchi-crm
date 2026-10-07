@@ -13,14 +13,15 @@ import ImportContactsModal from '../../components/Clients/ImportContactsModal';
 import CreateClientModal from '../../components/Clients/CreateClientModal';
 import { SECTION_ICONS } from '../../lib/reportIcons';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
+import ActionIcon from '../../components/common/ActionIcon';
 import '../../styles/reportPage.css';
 import '../../styles/automationTasksPage.css';
 import '../../styles/automationDashboard.css';
 import '../../styles/comparePage.css';
 import '../../styles/clientsDirectory.css';
+import '../../styles/contactsDesign.css';
 import '../../styles/dealsBoard.css';
 
-const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
 const FILTER_ICON = '<svg viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8v6l-3 1.5v-7.5z"/></svg>';
 const TREND_UP_ICON = '<svg viewBox="0 0 24 24"><path d="M4 16l6-6 4 4 6-8"/><path d="M15 6h5v5"/></svg>';
 const PAGE_SIZE = 10;
@@ -179,7 +180,7 @@ export default function ClientsDirectory() {
   const rangeEnd = Math.min(clampedPage * PAGE_SIZE, filtered.length);
 
   return (
-    <div className="report-page">
+    <div className="report-page contacts-design">
       <div className="client-kpi-row">
         <div className="client-kpi-card">
           <div className="client-kpi-left">
@@ -273,8 +274,8 @@ export default function ClientsDirectory() {
       <section className="report-section">
         <div className="mc-client-toolbar client-directory-toolbar">
           <div className="mc-client-search">
-            <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
-            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Пошук за іменем, компанією або тегом..." />
+            <ActionIcon name="search" size={16} />
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Пошук за іменем, компанією або тегом..." aria-label="Пошук контактів" />
           </div>
           <Select className="dash-period-select" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
           <div className="task-filter-wrap" ref={filterRef}>
@@ -323,8 +324,8 @@ export default function ClientsDirectory() {
               </div>
             )}
           </div>
-          <button type="button" className="btn" onClick={() => setImportOpen(true)}>Імпортувати контакти</button>
-          <button type="button" className="btn btn-p" onClick={() => setCreateOpen(true)}>+ Створити контакт</button>
+          <button type="button" className="btn" onClick={() => setImportOpen(true)}><span className="contacts-btn-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.upload }} /> Імпортувати контакти</button>
+          <button type="button" className="btn btn-p" onClick={() => setCreateOpen(true)}><ActionIcon name="create" size={18} /> Створити контакт</button>
         </div>
 
         {loading ? (
@@ -350,7 +351,11 @@ export default function ClientsDirectory() {
                   const statusMeta = c.status ? STATUS_META[c.status] : null;
                   const countryMeta = c.country ? COUNTRIES.find((cn) => cn.code === c.country) : null;
                   return (
-                    <div key={c.id} className="client-grid-row" onClick={() => navigate(`/reports/clients-directory/${c.id}`)}>
+                    <div
+                      key={c.id} className="client-grid-row" tabIndex={0}
+                      onClick={() => navigate(`/reports/clients-directory/${c.id}`)}
+                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); navigate(`/reports/clients-directory/${c.id}`); } }}
+                    >
                       <div className="client-grid-name-cell">
                         <ClientAvatar name={c.name} photo={c.photo} size={34} />
                         <div className="client-grid-name-text">

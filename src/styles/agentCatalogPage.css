@@ -4,40 +4,40 @@
    pill separator, the per-row layout, status-color badges) live here. */
 
 .agent-catalog-search { position: relative; max-width: 480px; margin-bottom: 16px; }
-.agent-catalog-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: #8983B5; fill: none; stroke-width: 2; stroke-linecap: round; }
+.agent-catalog-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: #C193CA; fill: none; stroke-width: 2; stroke-linecap: round; }
 .agent-catalog-search input {
   width: 100%; height: 42px; padding: 0 16px 0 40px; border-radius: 10px;
-  border: 1px solid rgba(122, 105, 200, .28); background: rgba(20, 18, 40, .55);
-  font-family: var(--font-body); font-size: .86rem; color: #EDEBFA; outline: none;
+  border: 1px solid rgba(235, 156, 239, 0.28); background: rgba(53, 17, 63, 0.825);
+  font-family: var(--font-body); font-size: .86rem; color: #F9EDF9; outline: none;
   transition: border-color .15s, background .15s;
 }
-.agent-catalog-search input::placeholder { color: #746F99; }
-.agent-catalog-search input:focus { border-color: rgba(164, 98, 255, .65); background: rgba(26, 22, 50, .7); }
+.agent-catalog-search input::placeholder { color: #A878B1; }
+.agent-catalog-search input:focus { border-color: rgba(235, 156, 239, 0.65); background: rgba(39, 8, 39, 0.7); }
 
-.agent-catalog-pill-sep { width: 1px; height: 20px; background: rgba(140, 130, 200, .28); margin: 0 2px; }
+.agent-catalog-pill-sep { width: 1px; height: 20px; background: rgba(235, 156, 239, 0.28); margin: 0 2px; }
 
 .agent-catalog-row {
   width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
   padding: 14px 18px; border: none; background: none; cursor: pointer; text-align: left;
   font-family: var(--font-body);
 }
-.agent-catalog-row:hover { background: rgba(122, 105, 200, .1); }
+.agent-catalog-row:hover { background: rgba(174, 64, 174, 0.21); }
 
-.agent-catalog-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--dept-color, #8B5CF6); box-shadow: 0 0 8px 1px var(--dept-color, #8B5CF6); }
+.agent-catalog-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: #B544B5; box-shadow: 0 0 8px 1px #B544B5; }
 
 .agent-catalog-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.agent-catalog-breadcrumb { font-size: .68rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--dept-color, #8983B5); }
-.agent-catalog-name { font-size: .92rem; font-weight: 700; color: #EDEBFA; }
-.agent-catalog-desc { font-size: .8rem; color: #918CBB; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 640px; }
+.agent-catalog-breadcrumb { font-size: .68rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #EB9CEF; }
+.agent-catalog-name { font-size: .92rem; font-weight: 700; color: #F9EDF9; }
+.agent-catalog-desc { font-size: .8rem; color: #C193CA; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 640px; }
 
 .agent-catalog-badges { display: flex; align-items: center; gap: 8px; flex: none; }
 .agent-catalog-status {
   font-family: var(--font-head); font-size: .64rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
   border-radius: 999px; padding: 4px 10px; flex: none;
 }
-.agent-catalog-status--live { color: #6EE7B7; background: rgba(16, 185, 129, .16); }
-.agent-catalog-status--in_development { color: #93C5FD; background: rgba(59, 130, 246, .16); }
-.agent-catalog-status--not_started { color: #8983B5; background: rgba(122, 105, 200, .1); }
+.agent-catalog-status--live { color: #d9bdf6; background: rgba(176, 124, 224, .2); }
+.agent-catalog-status--in_development { color: #f8b684; background: rgba(245, 155, 91, .16); }
+.agent-catalog-status--not_started { color: #aab4fb; background: rgba(124, 140, 248, .16); }
 
 @media (max-width: 860px) {
   .agent-catalog-row { grid-template-columns: 1fr; }

@@ -12,7 +12,8 @@ import '../../styles/adsInsightsAnalystPage.css';
 
 const AGENT_KEY = 'ads-insights-analyst';
 const SEND_ICON = '<svg viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>';
-const PLUS_ICON = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+// canonical action-create symbol (public/icons/action-icons.svg) — the same plus the rest of the app uses
+const PLUS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons/action-icons.svg#action-create"/></svg>';
 const SPARKLE_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg>';
 const CHEVRON_ICON = '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>';
 const HISTORY_EMPTY_ICON = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>';

@@ -10,8 +10,8 @@
    classes rather than the light CRM design system or a one-off palette. */
 
 .ai-section {
-  position: absolute; inset: 0; overflow-y: auto;
-  background: #0A0612;
+  position: absolute; inset: 0; overflow-y: auto; z-index: 3;
+  background: rgba(23, 5, 28, .8); /* the plum environment stays visible behind forms/lists */
   padding: 100px clamp(20px, 4vw, 48px) 48px;
 }
 .ai-section, .ai-section * { box-sizing: border-box; }
@@ -19,18 +19,18 @@
 .ai-section-head { display: flex; align-items: center; gap: 22px; margin-bottom: 26px; }
 .ai-section-icon {
   width: 56px; height: 56px; border-radius: 16px; flex: none; color: #fff;
-  background: linear-gradient(135deg, #8B5CF6, #6D28D9);
-  box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6);
+  background: linear-gradient(135deg, #B544B5, #661466);
+  box-shadow: 0 6px 18px -6px rgba(181, 68, 181, 0.6);
   display: flex; align-items: center; justify-content: center;
 }
 .ai-section-icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.ai-section-kicker { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .18em; text-transform: uppercase; color: #B879FF; }
-.ai-section-head h1 { font-family: var(--font-head); font-weight: 800; font-size: 1.6rem; color: #F3F1FF; letter-spacing: -.3px; margin: 2px 0 6px; }
-.ai-section-head p { font-family: var(--font-body); font-size: .86rem; line-height: 1.55; color: #A9A3C7; max-width: 620px; margin: 0; }
+.ai-section-kicker { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .18em; text-transform: uppercase; color: #EB9CEF; }
+.ai-section-head h1 { font-family: var(--font-head); font-weight: 800; font-size: 1.6rem; color: #F9EDF9; letter-spacing: -.3px; margin: 2px 0 6px; }
+.ai-section-head p { font-family: var(--font-body); font-size: .86rem; line-height: 1.55; color: #D5A9DC; max-width: 620px; margin: 0; }
 
 .ai-section-empty {
-  padding: 34px 20px; text-align: center; color: #8983B5; font-family: var(--font-body); font-size: .88rem;
-  background: rgba(7, 13, 30, .36); border: 1px solid rgba(100, 125, 210, .30); border-radius: 16px;
+  padding: 34px 20px; text-align: center; color: #C193CA; font-family: var(--font-body); font-size: .88rem;
+  background: rgba(53, 17, 63, 0.54); border: 1px solid rgba(235, 156, 239, 0.3); border-radius: 16px;
 }
 
 /* ---- Buttons — same recipe as .kb-btn, shared prefix so any AI Agents
@@ -38,34 +38,34 @@
 .ai-section-btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 10px; border: 1px solid transparent;
   font-family: var(--font-body); font-weight: 600; font-size: .82rem; cursor: pointer;
-  background: rgba(122, 105, 200, .1); border-color: rgba(140, 130, 200, .28); color: #D8D4F0;
+  background: rgba(174, 64, 174, 0.21); border-color: rgba(235, 156, 239, 0.28); color: #F2DDF4;
   transition: background .15s, border-color .15s, color .15s, opacity .15s;
 }
-.ai-section-btn:hover:not(:disabled) { background: rgba(122, 105, 200, .2); }
+.ai-section-btn:hover:not(:disabled) { background: rgba(235, 156, 239, 0.2); }
 .ai-section-btn:disabled { opacity: .55; cursor: default; }
 .ai-section-btn-primary {
-  background: linear-gradient(135deg, #8B5CF6, #6D28D9); border-color: transparent; color: #fff;
-  box-shadow: 0 6px 18px -6px rgba(139, 92, 246, .6);
+  background: linear-gradient(135deg, #B544B5, #661466); border-color: transparent; color: #fff;
+  box-shadow: 0 6px 18px -6px rgba(181, 68, 181, 0.6);
 }
-.ai-section-btn-primary:hover:not(:disabled) { filter: brightness(1.08); background: linear-gradient(135deg, #8B5CF6, #6D28D9); }
+.ai-section-btn-primary:hover:not(:disabled) { filter: brightness(1.08); background: linear-gradient(135deg, #B544B5, #661466); }
 
 /* ---- Pill toggle group — filters, kind switches, etc. ---- */
 .ai-section-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
 .ai-section-pill {
-  border: 1px solid rgba(140, 130, 200, .28); background: rgba(122, 105, 200, .08); color: #B4AFD6;
+  border: 1px solid rgba(235, 156, 239, 0.28); background: rgba(174, 64, 174, 0.176); color: #D5A9DC;
   font-family: var(--font-body); font-weight: 600; font-size: .8rem; padding: 8px 15px; border-radius: 999px; cursor: pointer;
   transition: background .15s, border-color .15s, color .15s;
 }
-.ai-section-pill:hover { background: rgba(122, 105, 200, .18); color: #EDEBFA; }
+.ai-section-pill:hover { background: rgba(174, 64, 174, 0.346); color: #F9EDF9; }
 .ai-section-pill.active {
-  background: linear-gradient(90deg, rgba(107, 50, 190, .5), rgba(83, 50, 150, .32));
-  border-color: rgba(164, 98, 255, .65); color: #fff; box-shadow: 0 0 18px rgba(126, 68, 255, .18);
+  background: linear-gradient(90deg, rgba(181, 68, 181, 0.5), rgba(102, 20, 102, 0.416));
+  border-color: rgba(235, 156, 239, 0.65); color: #fff; box-shadow: 0 0 18px rgba(181, 68, 181, 0.18);
 }
 
 /* ---- List cards — same tinted-row language as .kb-tree-item/.kb-search-item ---- */
 .ai-section-list { display: flex; flex-direction: column; gap: 10px; }
 .ai-section-card {
-  background: rgba(7, 13, 30, .36); border: 1px solid rgba(100, 125, 210, .30); border-radius: 16px; overflow: hidden;
+  background: rgba(53, 17, 63, 0.54); border: 1px solid rgba(235, 156, 239, 0.3); border-radius: 16px; overflow: hidden;
 }
 .ai-section-card.accent { border-color: rgba(217, 119, 6, .4); }
 
@@ -74,4 +74,4 @@
   border-radius: 999px; padding: 4px 10px; flex: none;
 }
 .ai-section-badge.warn { color: #FBBF66; background: rgba(217, 119, 6, .18); border: 1px solid rgba(217, 119, 6, .4); }
-.ai-section-badge.muted { color: #8983B5; background: rgba(122, 105, 200, .1); }
+.ai-section-badge.muted { color: #C193CA; background: rgba(174, 64, 174, 0.21); }

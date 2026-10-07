@@ -139,7 +139,7 @@ export default function StageManagerModal({ pipelineId, pipelineName, stages, on
   }
 
   return createPortal(
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="tmodal-box stage-manager-modal">
         <div className="tmodal-head">
           <div className="pipeline-modal-head">

@@ -89,14 +89,17 @@ export function aggregateClientsFromWeeks(rows) {
       const key = normText(c.name || c.text || '');
       if (!key) return;
       if (!byKey[key]) { byKey[key] = []; order.push(key); }
-      byKey[key].push({ weekIndex: wi, text: c.text || '', platform: c.platform, leadType: c.leadType, name: c.name, title: c.title || '' });
+      byKey[key].push({ weekIndex: wi, text: c.text || '', platform: c.platform, leadType: c.leadType, name: c.name, title: c.title || '', channel: c.channel || '', upworkChannel: c.upworkChannel || '' });
     });
   });
   return order.map((key) => {
     const list = byKey[key].slice().sort((a, b) => a.weekIndex - b.weekIndex);
     const last = list[list.length - 1];
     const combinedText = composeChronology(list.map((x) => ({ weekIndex: x.weekIndex, text: x.text }))) || '';
-    return { name: last.name || '', platform: last.platform, leadType: last.leadType, title: last.title, text: combinedText };
+    // A channel named in any week counts, the latest one winning.
+    const channel = [...list].reverse().find((x) => x.channel)?.channel || '';
+    const upworkChannel = [...list].reverse().find((x) => x.upworkChannel)?.upworkChannel || '';
+    return { name: last.name || '', platform: last.platform, leadType: last.leadType, title: last.title, channel, upworkChannel, text: combinedText };
   });
 }
 

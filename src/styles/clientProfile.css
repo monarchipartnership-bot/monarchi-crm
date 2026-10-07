@@ -473,3 +473,12 @@
   .client-profile-activity-tl-row { flex-wrap: wrap; }
   .client-profile-activity-tl-main { width: auto; }
 }
+.client-profile-row-edit textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; resize: vertical;
+  font-family: var(--font-body); font-size: .84rem; color: var(--ink); outline: none;
+}
+.client-profile-row-edit textarea:focus { border-color: var(--purple); }
+/* "Канал просування" picker: toggle chips for the shared channel catalog. */
+.client-channel-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.client-channel-chip { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: #fff; color: var(--ink-soft, var(--ink)); font-family: var(--font-body); font-size: .78rem; cursor: pointer; }
+.client-channel-chip.on { background: var(--purple-tint); border-color: var(--purple); color: var(--purple); font-weight: 600; }

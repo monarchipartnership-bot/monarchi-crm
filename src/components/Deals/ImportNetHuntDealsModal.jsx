@@ -275,7 +275,7 @@ export default function ImportNetHuntDealsModal({ pipelines, onClose, onImported
   }
 
   return (
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
+    <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
       <div className="tmodal-box import-contacts-modal">
         <div className="tmodal-head">
           <h3>Імпорт угод з NetHunt</h3>

@@ -170,7 +170,7 @@ export default function ImportDealsModal({ pipelines, defaultPipelineId, profile
   }
 
   return (
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
+    <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
       <div className="tmodal-box import-deals-modal">
         <div className="tmodal-head">
           <h3>Імпорт угод з CSV</h3>

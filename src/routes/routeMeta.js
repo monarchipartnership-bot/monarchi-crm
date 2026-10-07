@@ -1,4 +1,5 @@
 import { SECTION_ICONS } from '../lib/reportIcons';
+import { PAGE_ICONS } from '../lib/pageIcons';
 
 // Metadata for every route in the app: page title and short description
 // (both shown in TopBar — the description in its "ⓘ" popover), plus a
@@ -70,6 +71,8 @@ export const ROUTE_META = {
     title: 'Daily Report',
     desc: "Log today's work, clients touched, and tomorrow's plan.",
     trail: [{ label: 'Sales Managers Department' }, { label: 'Reports Manager', to: '/reports/hub' }, { label: 'Daily Report' }],
+    pageIcon: PAGE_ICONS['page.reports-manager'].src,
+    infoLabel: 'Про розділ',
   },
   '/reports/weekly': {
     title: 'Weekly Report',
@@ -95,37 +98,56 @@ export const ROUTE_META = {
     title: 'Задачі',
     desc: 'Усі задачі та дзвінки з угод в одному місці — статуси, пріоритети, виконавці.',
     trail: [{ label: 'Sales Managers Department' }, { label: 'Задачі' }],
+    pageIcon: PAGE_ICONS['page.deal-tasks'].src,
+    infoLabel: 'Про розділ',
   },
   '/reports/deals': {
     title: 'Угоди',
     desc: 'Воронка продажів — угоди по стадіях, сума, менеджер, задачі по угоді.',
     icon: SECTION_ICONS['Клієнти'],
     trail: [{ label: 'Sales Managers Department' }, { label: 'Угоди' }],
+    pageIcon: PAGE_ICONS['page.deals'].src,
+    infoLabel: 'Про розділ',
   },
   '/reports/clients-directory': {
     title: 'Контакти',
     desc: 'Єдина картка на кожного клієнта — платформа, тип, історія згадувань у тижневих звітах.',
     trail: [{ label: 'Sales Managers Department' }, { label: 'Контакти' }],
+    pageIcon: PAGE_ICONS['page.contacts'].src,
+    infoLabel: 'Про розділ',
   },
   '/tools/image-studio': {
     title: 'Image Studio',
     desc: 'Upwork catalog & portfolio image maker.',
     trail: [{ label: 'Tools' }, { label: 'Image Studio' }],
+    pageIcon: PAGE_ICONS['page.image-studio'].src,
+    infoLabel: 'Про розділ',
   },
   '/tools/followup': {
     title: 'Follow-up Generator',
     desc: 'AI-generated personalized follow-up messages for clients.',
     trail: [{ label: 'Tools' }, { label: 'Follow-up Generator' }],
+    // Approved page icon next to the title and a labelled "Про розділ"
+    // button (opt-in per route — see TopBar.jsx; other routes unchanged).
+    pageIcon: PAGE_ICONS['page.followup'].src,
+    infoLabel: 'Про розділ',
   },
   '/tools/calculator': {
     title: 'Project Calculator',
     desc: 'Internal funnel economics calculator for client & project numbers.',
     trail: [{ label: 'Tools' }, { label: 'Project Calculator' }],
+    pageIcon: PAGE_ICONS['page.calculator'].src,
+    infoLabel: 'Про розділ',
   },
   '/automation/dashboard': {
     title: 'Automation Dashboard',
     desc: 'Загальна картина по задачах: сьогодні, вчора, тижні та місяці.',
     trail: [{ label: 'Automation Department' }, { label: 'Dashboard' }],
+  },
+  '/automation/smm': {
+    title: "Mon'Archi SMM",
+    desc: 'Внутрішній розділ для роботи з сайтом і соцмережами Monarchi (у розробці).',
+    trail: [{ label: 'Automation Department' }, { label: "Mon'Archi SMM" }],
   },
   '/tasks': {
     title: 'Task Manager',
@@ -145,6 +167,15 @@ export const ROUTE_META = {
 // the page's own header already shows the name) rather than plumbing live
 // data into the breadcrumb trail.
 export const DYNAMIC_ROUTE_META = [
+  {
+    // A contact's own card is still the «Контакти» section (it used to fall back to "Monarchi CRM").
+    test: (pathname) => /^\/reports\/clients-directory\/[^/]+$/.test(pathname),
+    title: 'Контакти',
+    desc: 'Єдина картка на кожного клієнта — платформа, тип, історія згадувань у тижневих звітах.',
+    trail: [{ label: 'Sales Managers Department' }, { label: 'Контакти', to: '/reports/clients-directory' }],
+    pageIcon: PAGE_ICONS['page.contacts'].src,
+    infoLabel: 'Про розділ',
+  },
   {
     test: (pathname) => /^\/projects\/[^/]+$/.test(pathname),
     trail: [{ label: 'Project Managers Department' }, { label: 'Projects' }, { label: 'Project' }],

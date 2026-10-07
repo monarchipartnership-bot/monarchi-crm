@@ -7,7 +7,7 @@ Chart.register(BarController, LineController, CategoryScale, LinearScale, BarEle
 // First dark-themed chart in the app — no existing precedent to copy
 // (src/components/Reports/*/*.jsx are all light-page charts), so colors
 // are picked fresh to match adsInsightsAnalystPage.css's violet/cyan palette.
-const DATASET_COLORS = ['#8B5CF6', '#22D3EE', '#F472B6', '#34D399', '#FBBF24'];
+const DATASET_COLORS = ['#B544B5', '#22D3EE', '#F472B6', '#34D399', '#FBBF24'];
 
 export default function AiaChart({ title, type, labels, datasets }) {
   const canvasRef = useRef(null);
@@ -34,12 +34,12 @@ export default function AiaChart({ title, type, labels, datasets }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: datasets.length > 1, position: 'bottom', labels: { color: '#D8D4F0', font: { family: 'Inter', size: 10 } } },
-          tooltip: { backgroundColor: 'rgba(20,18,40,.95)', titleColor: '#F3F1FF', bodyColor: '#D8D4F0', borderColor: 'rgba(122,105,200,.4)', borderWidth: 1 },
+          legend: { display: datasets.length > 1, position: 'bottom', labels: { color: '#F2DDF4', font: { family: 'Inter', size: 10 } } },
+          tooltip: { backgroundColor: 'rgba(39,8,39,.95)', titleColor: '#F9EDF9', bodyColor: '#F2DDF4', borderColor: 'rgba(235,156,239,.4)', borderWidth: 1 },
         },
         scales: {
-          x: { ticks: { color: '#918CBB', font: { family: 'Inter', size: 10 } }, grid: { color: 'rgba(122,105,200,.12)' } },
-          y: { beginAtZero: true, ticks: { color: '#918CBB', font: { family: 'Inter', size: 10 } }, grid: { color: 'rgba(122,105,200,.12)' } },
+          x: { ticks: { color: '#C193CA', font: { family: 'Inter', size: 10 } }, grid: { color: 'rgba(235,156,239,.12)' } },
+          y: { beginAtZero: true, ticks: { color: '#C193CA', font: { family: 'Inter', size: 10 } }, grid: { color: 'rgba(235,156,239,.12)' } },
         },
       },
     });

@@ -5,6 +5,7 @@ import { ROUTE_META, DYNAMIC_ROUTE_META } from '../../routes/routeMeta';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { profileLabel } from '../../lib/api/profile';
 import NotificationBell from '../Sidebar/NotificationBell';
+import ActionIcon from '../common/ActionIcon';
 import './TopBar.css';
 
 function pageMeta(pathname) {
@@ -12,7 +13,7 @@ function pageMeta(pathname) {
   const meta = ROUTE_META[pathname] ?? dynamicMatch;
   const trail = meta?.trail ?? [];
   const title = meta?.title || trail[trail.length - 1]?.label || 'Monarchi CRM';
-  return { title, desc: meta?.desc, icon: meta?.icon };
+  return { title, desc: meta?.desc, icon: meta?.icon, pageIcon: meta?.pageIcon, infoLabel: meta?.infoLabel };
 }
 
 export default function TopBar() {
@@ -20,7 +21,7 @@ export default function TopBar() {
   const { pathname } = useLocation();
   const [infoOpen, setInfoOpen] = useState(false);
   const infoRef = useRef(null);
-  const { title, desc, icon } = pageMeta(pathname);
+  const { title, desc, icon, pageIcon, infoLabel } = pageMeta(pathname);
 
   useEffect(() => { setInfoOpen(false); }, [pathname]);
 
@@ -36,11 +37,20 @@ export default function TopBar() {
   return (
     <div className="topbar">
       <div className="topbar-heading">
-        {icon && <span className="topbar-icon" dangerouslySetInnerHTML={{ __html: icon }} />}
-        <h1 className="topbar-title">{title}</h1>
+        {pageIcon
+          ? <img className="topbar-page-icon" src={pageIcon} alt="" width="32" height="32" draggable="false" />
+          : icon && <span className="topbar-icon" dangerouslySetInnerHTML={{ __html: icon }} />}
+        <h1 className={'topbar-title' + (pageIcon ? ' topbar-title--page' : '')}>{title}</h1>
         {desc && (
           <div className="topbar-info-wrap" ref={infoRef}>
-            <button type="button" className="topbar-info-btn" aria-label="Про розділ" onClick={() => setInfoOpen((o) => !o)}>i</button>
+            {infoLabel ? (
+              <button type="button" className="topbar-info-btn topbar-info-btn--labeled" aria-label="Про розділ" aria-expanded={infoOpen} onClick={() => setInfoOpen((o) => !o)}>
+                <ActionIcon name="info" size={18} />
+                <span className="topbar-info-label">{infoLabel}</span>
+              </button>
+            ) : (
+              <button type="button" className="topbar-info-btn" aria-label="Про розділ" onClick={() => setInfoOpen((o) => !o)}>i</button>
+            )}
             {infoOpen && (
               <div className="topbar-info-card">
                 <p>{desc}</p>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DailyReportHero from '../../../components/Reports/DailyReportHero';
 import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
+import ActionIcon from '../../../components/common/ActionIcon';
 import AddClientModal from '../../../components/Reports/AddClientModal';
 import TaskDetailModal from '../../../components/Automation/TaskDetailModal';
 import TaskFormModal from '../../../pages/TaskManager/TaskFormModal';
@@ -32,6 +33,7 @@ import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import Select from '../../../components/common/Select';
 import DonutChart from '../../../components/Automation/DonutChart';
 import '../../../styles/reportPage.css';
+import '../../../styles/dailyReportDesign.css';
 import '../../../styles/automationTasksPage.css';
 import '../../../styles/automationDashboard.css';
 import '../../../styles/dealsBoard.css';
@@ -181,7 +183,7 @@ export default function DailyCreate() {
         } else {
           setName('');
           setDone([]);
-          setClients([{ id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: STATUSES[0], name: '', title: '', text: '', clientId: null }]);
+          setClients([{ id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: STATUSES[0], name: '', title: '', text: '', clientId: null, channel: '', upworkChannel: '' }]);
           setPlans([]);
           setStatusLabel('Ще не збережено');
         }
@@ -359,7 +361,7 @@ export default function DailyCreate() {
   const hasArchive = done.some((d) => d.text?.trim()) || plans.some((p) => p.text?.trim());
 
   return (
-    <div className="report-page daily-report-page" ref={pageRef}>
+    <div className="report-page daily-report-page daily-report-design" ref={pageRef}>
       {!capturing && <ReportTypeSwitcher />}
       <DailyReportHero
         year={period.year}
@@ -378,7 +380,7 @@ export default function DailyCreate() {
               Клієнти
               {!capturing && (
                 <button type="button" className="btn btn-p stitle-filter" onClick={() => setClientModal('new')}>
-                  <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.plus }} /> Додати клієнта
+                  <ActionIcon name="create" size={18} /> Додати клієнта
                 </button>
               )}
             </div>
@@ -438,9 +440,9 @@ export default function DailyCreate() {
                         <div className="client-grid-plain">{item.title || '—'}</div>
                         {!capturing && (
                           <button
-                            type="button" className="del-btn" title="Видалити"
+                            type="button" className="del-btn" title="Видалити" aria-label="Видалити"
                             onClick={(e) => { e.stopPropagation(); setClients((c) => c.filter((it) => it.id !== item.id)); }}
-                          >&times;</button>
+                          ><ActionIcon name="delete" size={18} /></button>
                         )}
                       </div>
                       {!capturing && (
@@ -458,10 +460,9 @@ export default function DailyCreate() {
                             dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }}
                           />
                           <button
-                            type="button" className="deal-field-icon-btn" title="Редагувати"
+                            type="button" className="deal-field-icon-btn" title="Редагувати" aria-label="Редагувати"
                             onClick={(e) => { e.stopPropagation(); setClientModal(item); }}
-                            dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }}
-                          />
+                          ><ActionIcon name="edit" size={16} /></button>
                         </div>
                       )}
                     </div>
@@ -494,7 +495,7 @@ export default function DailyCreate() {
               Задачі на сьогодні
               {!capturing && managerEmail && salesDeptId && (
                 <button type="button" className="btn btn-p stitle-filter" onClick={() => setTaskFormOpen(true)}>
-                  <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.plus }} /> Додати задачу
+                  <ActionIcon name="create" size={18} /> Додати задачу
                 </button>
               )}
             </div>
@@ -572,17 +573,15 @@ export default function DailyCreate() {
                                       dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }}
                                     />
                                     <button
-                                      type="button" className="deal-field-icon-btn" title="Скасувати"
+                                      type="button" className="deal-field-icon-btn" title="Скасувати" aria-label="Скасувати"
                                       onClick={(e) => { e.stopPropagation(); openCancel(task); }}
-                                      dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }}
-                                    />
+                                    ><ActionIcon name="close" size={16} /></button>
                                   </>
                                 )}
                                 <button
-                                  type="button" className="deal-field-icon-btn" title="Редагувати"
+                                  type="button" className="deal-field-icon-btn" title="Редагувати" aria-label="Редагувати"
                                   onClick={(e) => { e.stopPropagation(); openView(task); }}
-                                  dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }}
-                                />
+                                ><ActionIcon name="edit" size={16} /></button>
                               </div>
                             )}
                           </div>
@@ -646,10 +645,10 @@ export default function DailyCreate() {
             {!capturing && (
               <div className="deal-section-body wk-dl-row">
                 <button type="button" className="btn wk-dl-btn deal-btn-soft" onClick={exportPDF}>
-                  <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.download }} /> PDF
+                  <ActionIcon name="download" size={18} /> PDF
                 </button>
                 <button type="button" className="btn wk-dl-btn deal-btn-soft" onClick={handleExportJPEG} disabled={exportingJPEG}>
-                  {exportingJPEG ? '...' : <><span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.download }} /> JPEG</>}
+                  {exportingJPEG ? '...' : <><ActionIcon name="download" size={18} /> JPEG</>}
                 </button>
               </div>
             )}

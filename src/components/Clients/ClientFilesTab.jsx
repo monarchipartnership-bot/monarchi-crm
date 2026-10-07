@@ -1,3 +1,4 @@
+import ActionIcon from '../common/ActionIcon';
 import { useEffect, useRef, useState } from 'react';
 import { fetchClientFiles, uploadClientFile, deleteClientFile, getClientFilePublicUrl } from '../../lib/api/clientFiles';
 
@@ -39,7 +40,7 @@ export default function ClientFilesTab({ clientId, uploadedBy }) {
   return (
     <div className="client-files-tab">
       <label className="btn client-files-upload-btn">
-        {uploading ? 'Завантаження…' : '+ Додати файл'}
+        {uploading ? 'Завантаження…' : <><ActionIcon name="create" size={18} /> Додати файл</>}
         <input ref={inputRef} type="file" onChange={handleUpload} disabled={uploading} hidden />
       </label>
 

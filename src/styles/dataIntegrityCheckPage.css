@@ -4,22 +4,22 @@
 
 .dic-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 4px; }
 .dic-body::-webkit-scrollbar { width: 5px; }
-.dic-body::-webkit-scrollbar-thumb { background: rgba(130, 110, 170, .35); border-radius: 4px; }
+.dic-body::-webkit-scrollbar-thumb { background: rgba(235, 156, 239, 0.35); border-radius: 4px; }
 
 .dic-status-card {
   flex: none; display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px;
-  background: rgba(7, 13, 30, .5); border: 1px solid rgba(100, 125, 210, .28);
+  background: rgba(53, 17, 63, 0.75); border: 1px solid rgba(235, 156, 239, 0.28);
 }
 .dic-status-card.ok { border-color: rgba(16, 185, 129, .4); }
 .dic-status-card.warn { border-color: rgba(217, 119, 6, .4); }
-.dic-status-title { font-family: var(--font-head); font-weight: 800; font-size: 1rem; color: #F3F1FF; }
+.dic-status-title { font-family: var(--font-head); font-weight: 800; font-size: 1rem; color: #F9EDF9; }
 .dic-status-card.ok .dic-status-title { color: #6EE7B7; }
 .dic-status-card.warn .dic-status-title { color: #FBBF66; }
-.dic-status-meta { font-family: var(--font-body); font-size: .78rem; color: #A9A3C7; }
+.dic-status-meta { font-family: var(--font-body); font-size: .78rem; color: #D5A9DC; }
 
 .dic-report {
-  flex: none; margin: 0; padding: 16px 18px; border-radius: 14px; background: rgba(7, 13, 30, .5); border: 1px solid rgba(100, 125, 210, .28);
-  font-family: var(--font-body); font-size: .86rem; line-height: 1.7; color: #E4E1F5; white-space: pre-wrap; word-break: break-word;
+  flex: none; margin: 0; padding: 16px 18px; border-radius: 14px; background: rgba(53, 17, 63, 0.75); border: 1px solid rgba(235, 156, 239, 0.28);
+  font-family: var(--font-body); font-size: .86rem; line-height: 1.7; color: #F9EDF9; white-space: pre-wrap; word-break: break-word;
 }
 
-.dic-note { font-family: var(--font-body); font-size: .76rem; color: #7A76A3; margin: 0; line-height: 1.5; max-width: 640px; }
+.dic-note { font-family: var(--font-body); font-size: .76rem; color: #A878B1; margin: 0; line-height: 1.5; max-width: 640px; }

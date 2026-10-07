@@ -23,7 +23,11 @@ import CreateDealTaskModal from './CreateDealTaskModal';
 import ServiceTagsField from './ServiceTagsField';
 import { fetchServiceTags, createServiceTag } from '../../lib/api/dealServiceTags';
 import { COUNTRIES, flagClass } from '../../lib/countries';
-import { BUSINESS_NICHES } from '../../lib/businessNiches';
+import { CATEGORY_OPTIONS, NICHES_BY_CATEGORY, nicheOptionsFor } from '../../lib/businessNiches';
+import { useLeadChannels } from '../../lib/leadChannels';
+import MultiCountryField from '../common/MultiCountryField';
+import { UPWORK_CHANNEL_OPTIONS } from '../../lib/upworkChannels';
+import ActionIcon from '../common/ActionIcon';
 
 const LEAD_WARMTH_OPTIONS = [
   { value: 'warm', label: 'Теплий' },
@@ -35,8 +39,6 @@ const QUALIFICATION_OPTIONS = [
   { value: 'MQL', label: 'MQL' },
   { value: 'unqualified', label: 'Unqualified' },
 ];
-
-const NICHE_OPTIONS = BUSINESS_NICHES.map((n) => ({ value: n, label: n }));
 
 const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.code, label: c.name, iconClassName: flagClass(c.code) }));
 
@@ -110,7 +112,7 @@ function LinkField({ icon, label, value, onChange, onBlur, placeholder }) {
           <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.externalLink }} />
         </button>
         <button type="button" className="deal-field-icon-btn" disabled={!value} title="Копіювати" aria-label="Копіювати" onClick={() => copyToClipboard(value)}>
-          <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.copy }} />
+          <ActionIcon name="copy" size={15} />
         </button>
       </div>
     </div>
@@ -168,6 +170,20 @@ function SectionHead({ icon, title, subtitle, gradient }) {
   );
 }
 
+// Multi-line deal parameter in the same icon + label box as the other
+// parameters; saved on blur by the caller.
+function TextAreaField({ icon, label, value, onChange, onBlur }) {
+  return (
+    <div className="wk-field-box wk-field-box-wide">
+      <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: icon }} />
+      <div className="wk-field-body">
+        <label>{label}</label>
+        <textarea className="deal-param-textarea" rows={2} value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
+      </div>
+    </div>
+  );
+}
+
 export default function DealDetailModal({ deal, stages, profiles, onClose, onChanged }) {
   const navigate = useNavigate();
   const { email: myEmail } = useAuth();
@@ -182,11 +198,18 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   const [manager, setManager] = useState(deal.manager || '');
   const [expectedClose, setExpectedClose] = useState(deal.expected_close_date || '');
   const [source, setSource] = useState(deal.source || '');
+  const [upworkChannel, setUpworkChannel] = useState(deal.upwork_channel || '');
   const [chatLink, setChatLink] = useState(deal.chat_link || '');
   const [website, setWebsite] = useState(deal.website || '');
   const [lostReason, setLostReason] = useState(deal.lost_reason || '');
   const [leadWarmth, setLeadWarmth] = useState(deal.lead_warmth || '');
   const [niche, setNiche] = useState(deal.niche || '');
+  const [businessCategory, setBusinessCategory] = useState(deal.business_category || '');
+  const [promoGeo, setPromoGeo] = useState(deal.promo_geo || []);
+  const [goals, setGoals] = useState(deal.goals || '');
+  const [previousResults, setPreviousResults] = useState(deal.previous_results || '');
+  const [otherNotes, setOtherNotes] = useState(deal.other_notes || '');
+  const { options: channelOptions, addChannel } = useLeadChannels();
   const [country, setCountry] = useState(deal.country || '');
   const [qualification, setQualification] = useState(deal.qualification || '');
   const [serviceTagIds, setServiceTagIds] = useState(deal.service_tag_ids || []);
@@ -546,7 +569,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   const stageDays = daysInStage(deal);
 
   return (
-    <div className="report-page deal-page" ref={dealPageRef}>
+    <div className="report-page deal-page deals-design" ref={dealPageRef}>
       <section className="rpt-hero deal-page-hero">
         <span className="deal-section-icon deal-detail-head-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
         <div className="deal-detail-head-text">
@@ -559,7 +582,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
         </div>
 
         <div className="deal-page-actions-row">
-          <button type="button" className="btn deal-page-back" onClick={onClose}>&larr; Назад до угод</button>
+          <button type="button" className="btn deal-page-back" onClick={onClose}><ActionIcon name="back" size={18} /> Назад до угод</button>
           {!isClosed && (
             <>
               {wonStage && (
@@ -639,14 +662,28 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
               <div className="wk-field-body">
                 <label>Source</label>
-                <input
-                  type="text" value={source} onChange={(e) => setSource(e.target.value)}
-                  onBlur={() => saveField({ source: source.trim() || null })}
-                  placeholder="напр. Реферал, холодний лист..."
+                <Select
+                  bare searchable onCreate={addChannel} value={source}
+                  onChange={(v) => { setSource(v); saveField({ source: v || null }); }}
+                  options={channelOptions} placeholder="Не вказано"
                 />
               </div>
             </div>
+            {source === 'Upwork' && (
+              <div className="wk-field-box">
+                <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
+                <div className="wk-field-body">
+                  <label>Канал Upwork</label>
+                  <Select
+                    bare value={upworkChannel}
+                    onChange={(v) => { setUpworkChannel(v); saveField({ upwork_channel: v || null }); }}
+                    options={UPWORK_CHANNEL_OPTIONS} placeholder="Не вказано"
+                  />
+                </div>
+              </div>
+            )}
             <ServiceTagsField
+              label="Канал просування" placeholder="Оберіть канали..."
               value={serviceTagIds} catalog={serviceTagsCatalog}
               onToggle={handleToggleServiceTag} onCreate={handleCreateServiceTag}
             />
@@ -710,11 +747,35 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                 <div className="wk-field-box wk-field-box-wide">
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
                   <div className="wk-field-body">
+                    <label>Категорія бізнесу</label>
+                    <Select
+                      bare value={businessCategory} placeholder="Не вказано"
+                      onChange={(v) => {
+                        setBusinessCategory(v);
+                        // A niche that doesn't belong to the new category is cleared.
+                        const keep = !v || (NICHES_BY_CATEGORY[v] || []).includes(niche);
+                        if (!keep) setNiche('');
+                        saveField(keep ? { business_category: v || null } : { business_category: v || null, niche: null });
+                      }}
+                      options={CATEGORY_OPTIONS}
+                    />
+                  </div>
+                </div>
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
+                  <div className="wk-field-body">
                     <label>Ніша бізнесу</label>
                     <Select
-                      bare value={niche} onChange={(v) => { setNiche(v); saveField({ niche: v || null }); }}
-                      options={NICHE_OPTIONS} placeholder="Не вказано"
+                      bare searchable value={niche} onChange={(v) => { setNiche(v); saveField({ niche: v || null }); }}
+                      options={nicheOptionsFor(businessCategory, niche)} placeholder="Не вказано"
                     />
+                  </div>
+                </div>
+                <div className="wk-field-box wk-field-box-wide">
+                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.mapPin }} />
+                  <div className="wk-field-body">
+                    <label>ГЕО просування</label>
+                    <MultiCountryField value={promoGeo} onChange={(v) => { setPromoGeo(v); saveField({ promo_geo: v }); }} />
                   </div>
                 </div>
                 <div className="wk-field-box wk-field-box-wide">
@@ -737,6 +798,18 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                     />
                   </div>
                 </div>
+                <TextAreaField
+                  icon={FIELD_ICONS.target} label="Цілі" value={goals} onChange={setGoals}
+                  onBlur={() => saveField({ goals: goals.trim() || null })}
+                />
+                <TextAreaField
+                  icon={FIELD_ICONS.history} label="Що вже працювало, які результати" value={previousResults} onChange={setPreviousResults}
+                  onBlur={() => saveField({ previous_results: previousResults.trim() || null })}
+                />
+                <TextAreaField
+                  icon={FIELD_ICONS.tag} label="Інше" value={otherNotes} onChange={setOtherNotes}
+                  onBlur={() => saveField({ other_notes: otherNotes.trim() || null })}
+                />
                 <div className="deal-field-pair-row">
                   <div className="wk-field-box">
                     <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.amount }} />
@@ -773,7 +846,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
 
               {deal.deal_stages?.is_lost && (
                 <div className="deal-plain-field" style={{ marginTop: 14 }}>
-                  <label>Причина програшу</label>
+                  <label>Причина відмови</label>
                   <input
                     type="text" value={lostReason} onChange={(e) => setLostReason(e.target.value)}
                     onBlur={() => saveField({ lost_reason: lostReason.trim() || null })}
@@ -956,7 +1029,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
       </div>
 
       {historyDetail && createPortal(
-        <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setHistoryDetail(null); }}>
+        <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) setHistoryDetail(null); }}>
           <div className="tmodal-box task-detail-box">
             <div className="tmodal-head">
               <div className="pipeline-modal-head">
@@ -1038,7 +1111,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
       )}
 
       {activityModalOpen && createPortal(
-        <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeActivityModal(); }}>
+        <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) closeActivityModal(); }}>
           <div className="tmodal-box task-modal-box">
             <div className="tmodal-head">
               <div className="pipeline-modal-head">
@@ -1147,7 +1220,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
             <div className="tmodal-foot">
               <button type="button" className="btn" onClick={closeActivityModal}>Скасувати</button>
               <button type="button" className="btn btn-p" onClick={handleAddTask} disabled={adding || !newTaskText.trim()}>
-                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.plus }} /> {adding ? 'Додаємо...' : ACTIVITY_MODAL_META[activityModalType]?.addLabel}
+                <ActionIcon name="create" size={18} /> {adding ? 'Додаємо...' : ACTIVITY_MODAL_META[activityModalType]?.addLabel}
               </button>
             </div>
           </div>

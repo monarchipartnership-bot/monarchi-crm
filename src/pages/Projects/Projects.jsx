@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectModal from '../../components/Projects/ProjectModal';
 import { useAuth } from '../../contexts/AuthContext';
@@ -71,6 +71,9 @@ export default function Projects() {
     <div className="report-page projects-page">
       <div className="page-actions">
         <button type="button" className="btn" onClick={() => navigate(-1)}>&#8592; Back</button>
+        <Link className="btn" to="/projects/reports/daily">Daily Report</Link>
+        <Link className="btn" to="/projects/reports/weekly">Weekly Report</Link>
+        <Link className="btn" to="/projects/reports/monthly">Monthly Report</Link>
       </div>
 
       <section className="rpt-hero">

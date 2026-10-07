@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENT_DEPTS } from '../../data/aiAgentsData';
-import ParticleSphere from '../../components/ParticleSphere/ParticleSphere';
-import CosmicBackground from '../../components/SystemMap/CosmicBackground';
-import ParticleFieldCanvas from '../../components/SystemMap/ParticleFieldCanvas';
+import { AI_ASSETS, AI_PAGE_ICON } from '../../lib/aiAgentsAssets';
+import ActionIcon from '../../components/common/ActionIcon';
+import AiEnvironment from '../../components/AiEnvironment/AiEnvironment';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
+import { BOOK_ICON } from '../KnowledgeBase/KnowledgeOrb';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import DealHealthCheck from '../DealHealthCheck/DealHealthCheck';
 import CoverLetterAgent from '../CoverLetterAgent/CoverLetterAgent';
@@ -30,6 +31,14 @@ import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
 import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
+import DeptChartView from './aiMap/DeptChartView';
+import FocusedGraph from './aiMap/FocusedGraph';
+import OverviewMap, { AiSvgDefs } from './aiMap/OverviewMap';
+import { UI_SCALE, VIEWBOX_HALF, calculateDepartmentGraphLayout, findAgent } from './aiMap/graphLayout';
+import {
+  FONT_SAT, buildOverview, makeDims, pluralAgents, ringGeometry,
+} from './aiMap/overviewLayout';
+import { STATUS_TEXT, countStatuses } from './aiMap/status';
 import '../../styles/constellationTest.css';
 
 // Agents with a real interactive tool (as opposed to the generic read-only
@@ -59,575 +68,17 @@ const AGENT_TOOLS = {
   'ai-chief-of-staff': ChiefOfStaff,
 };
 
-// This page's own mount-time reveal: the core lights up, then every
-// department flies out from it, clockwise, staggered by `deptIdx`. Plays
-// the same way whether reached via a normal sidebar click or a direct URL
-// load — no separate transition/intro screen before it.
-const REVEAL_TIMELINE = {
-  core: 250,
-  hubs: 650,
-  done: 650 + 2400,
-};
-
-// AI Agents Constellation — 3-level radial map (department → subcategory →
-// agent) built from the real agent catalog in aiAgentsData.js. Zooms into a
-// department on click (CSS transform, not viewBox animation — keeps the
-// math simple: translate the focused hub to the origin, then scale).
-
-// Sized for 8 departments 45° apart (see AGENT_DEPTS) — hubs pulled in
-// close to the core so the whole graph fits a normal viewport without
-// clipping, now that every branch's dot-web renders at once (not just the
-// focused one). Subcat/agent fan angles are no longer one fixed degree for
-// everyone — they scale with how many siblings actually need to fit (see
-// fanSpread below), so a department with 4 subcategories (Sales) gets a
-// wider fan than one with a single subcategory, instead of either cramming
-// 4 into the same slice a lone subcat would use, or wasting a wide slice
-// on a department that doesn't need it.
-const HUB_RADIUS = 190;
-const SUBCAT_RADIUS = 130;
-const SUBCAT_DEG_PER_ITEM = 24;
-const SUBCAT_MAX_SPREAD = 72;
-// Agents within one subcategory chain outward by radius (each one further
-// from the subcat than the last) rather than fanning wide by angle — a
-// narrow angular fan wasn't enough room for a 3-agent subcategory to clear
-// its neighbor once every subcat's whole fan is visible at once (not just
-// the focused one), no matter how the angle budget was split: for two
-// points close in angle, distance is dominated by their radius gap, not
-// the (tiny) arc between them, so the radius step has to be the main
-// separator — a wide-but-short step just puts them back on top of each
-// other. STEP is doubled from the first pass at this (36→72) per explicit
-// feedback that the dots still read as cramped. BASE equals STEP so the
-// subcat-to-first-agent gap matches the agent-to-agent gap instead of
-// being its own (much smaller) distance — that mismatch was the "plain
-// dot sits almost on top of the first agent" feedback.
-const AGENT_RADIUS_BASE = 72;
-const AGENT_RADIUS_STEP = 72;
-const AGENT_ANGLE_PER_ITEM = 10;
-const AGENT_ANGLE_MAX = 20;
-// Extra rotation added per step outward, alternating direction per
-// subcategory — bends a chain into a curve instead of a straight radial
-// line. Also the fix for a single-subcategory department's chain running
-// dead straight toward its own outer label: with this, only the innermost
-// agent (k=0) still sits on that exact line, everything past it curves
-// away.
-const SPIRAL_DEG_PER_STEP = 15;
-// Past the outermost agent leaf (hub + subcat + longest agent chain), so
-// the department name sits beyond the whole branch — like the reference
-// layout's labels floating past the edge of each petal, not tucked under
-// the hub itself.
-const CHAIN_MAX_RADIUS = HUB_RADIUS + SUBCAT_RADIUS + AGENT_RADIUS_BASE + AGENT_RADIUS_STEP * 2;
-const LABEL_BASE_GAP = 40;
-// The label text itself is ~90-100 units wide and centered on the label
-// point — for a department sitting left/right, that whole width reads back
-// toward the hub, along the same line the agent chain approaches from, so
-// clearing it needs a much bigger margin than a top/bottom department
-// does (where the text's width runs sideways, away from the chain, and
-// only its much shorter height matters). labelRadius() below scales this
-// extra margin by how "horizontal" the department's own angle is —
-// full width for due left/right, none of it for due up/down — instead of
-// handing every department the worst case and pushing top/bottom labels
-// needlessly far out.
-const LABEL_TEXT_MARGIN = 100;
-// Long department names wrap onto two lines (see wrapDeptLabel) instead of
-// running past the network graph as one long line. A wrapped label only
-// grows in HEIGHT, not width, so it's the top/bottom-ish departments (whose
-// margin above was already ~0, since only a single line's height mattered
-// there) that need extra push-out — scaled by verticalness the same way
-// LABEL_TEXT_MARGIN scales by horizontalness.
-const LABEL_WRAP_THRESHOLD = 20;
-const LABEL_WRAP_MARGIN = 34;
-function labelRadius(deptAngleDeg, label) {
-  const rad = (deptAngleDeg * Math.PI) / 180;
-  const horizontalness = Math.abs(Math.cos(rad));
-  const verticalness = Math.abs(Math.sin(rad));
-  const wrapped = (label?.length || 0) > LABEL_WRAP_THRESHOLD;
-  const wrapExtra = wrapped ? LABEL_WRAP_MARGIN * verticalness : 0;
-  return CHAIN_MAX_RADIUS + LABEL_BASE_GAP + LABEL_TEXT_MARGIN * horizontalness + wrapExtra;
-}
-// Splits a long department name into two roughly-balanced lines at a word
-// boundary (never mid-word) — tries every split point and keeps the one
-// whose two line lengths are closest, so "Робота з клієнтами та
-// акаунт-менеджмент" breaks near its middle rather than leaving one huge
-// line and one tiny word dangling.
-function wrapDeptLabel(text) {
-  if (!text || text.length <= LABEL_WRAP_THRESHOLD) return [text];
-  const words = text.split(' ');
-  if (words.length < 2) return [text];
-  let bestSplit = 1;
-  let bestDiff = Infinity;
-  for (let i = 1; i < words.length; i++) {
-    const line1 = words.slice(0, i).join(' ');
-    const line2 = words.slice(i).join(' ');
-    const diff = Math.abs(line1.length - line2.length);
-    if (diff < bestDiff) { bestDiff = diff; bestSplit = i; }
-  }
-  return [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')];
-}
-// Half-size of the graph SVG's own viewBox — content must stay within this
-// radius from center or risk being clipped by the stage container on some
-// window shapes (unlike overview elements outside it, which only rely on
-// overflow:visible and a lucky letterboxed margin). Doubling the dot
-// spacing above pushed the label radius well past the old 420, so this
-// grew with it.
-const VIEWBOX_HALF = 700;
-// The bigger viewBox needed for the wider spacing above also shrinks
-// everything mapped into it (same screen space, more world-units per
-// pixel) — this scales the purely-visual sizes (circles, icons, text,
-// strokes) back up so hubs/leaves/labels read at roughly their old size
-// even though they now sit further apart. Position radii above are NOT
-// multiplied by this — only how big things are drawn, not where.
-const UI_SCALE = VIEWBOX_HALF / 420;
-
-// The overview's spread (above) is deliberately tight — 8 branches all
-// visible at once, 45° apart, must not collide with a neighbor.
-const OVERVIEW_PARAMS = {
-  subcatRadius: SUBCAT_RADIUS, subcatDegPerItem: SUBCAT_DEG_PER_ITEM, subcatMaxSpread: SUBCAT_MAX_SPREAD,
-  agentRadiusBase: AGENT_RADIUS_BASE, agentRadiusStep: AGENT_RADIUS_STEP,
-  agentAnglePerItem: AGENT_ANGLE_PER_ITEM, agentAngleMax: AGENT_ANGLE_MAX,
-};
-
-// ---------------------------------------------------------------------
-// Focused-department graph (Department → Function → Agent)
-// ---------------------------------------------------------------------
-// A completely separate layout from the overview wheel above, used only
-// for whichever single department is currently focused — every sibling
-// department is hidden then (see .focus-hidden), so instead of reusing the
-// tight 45°-apart overview budget, this spreads across most of the free
-// screen area: one big Department root, its Functions orbiting it as small
-// hubs, and each Function's own Agents fanning out further still. See
-// calculateDepartmentGraphLayout below.
-//
-// Reserved fractions of the (aspect-corrected) usable width/height the
-// graph must stay clear of — mirrors the panel/nav/carousel chrome actually
-// drawn over the stage, so a node can never land somewhere unclickable.
-const GRAPH_RESERVE_LEFT = 0.23;
-const GRAPH_RESERVE_RIGHT = 0.035;
-const GRAPH_RESERVE_TOP = 0.09;
-const GRAPH_RESERVE_BOTTOM = 0.14;
-// Department root sits toward the left of the *usable* (already-reserved)
-// area, not dead center of it, so Functions/Agents have the whole rest of
-// the freed-up space to fan rightward into.
-const GRAPH_DEPT_X_FRACTION = 0.16;
-const GRAPH_DEPT_Y_FRACTION = 0.52;
-
-const FUNCTION_RADIUS_BASE = 285;
-const FUNCTION_RADIUS_PER_EXTRA = 9;
-const GRAPH_AGENT_RADIUS_BASE = 175;
-// Minimum center-to-center distance kept between two agent nodes by the
-// collision pass below.
-const AGENT_MIN_DIST = 130;
-// Font size (viewbox units) the agent/function labels actually render at
-// (must match .dept-graph-agent-label / .dept-graph-fn-label in
-// constellationTest.css) — used only to approximate label bounding boxes
-// for the collision pass below, since this is a pure layout function with
-// no access to the real rendered text width.
-const GRAPH_LABEL_FONT = 13 * UI_SCALE;
-
-// Deterministic star field + nebula/dot-grid background now lives in
-// CosmicBackground.jsx (its own mulberry32-seeded RNG, same algorithm as
-// jitter() below just for a different purpose) — moved out as part of
-// splitting the scene into background/particle/network layers.
-
-// CHART tab: matrix view of a single department's own agents — rows are
-// the autonomy ladder, columns are the rollout stage (see the `stage`
-// comment in aiAgentsData.js). Reuses the same agent-detail modal as the
-// graph (via onSelectAgent) instead of building a second card layout.
-const LADDER_ORDER = ['human-led', 'human-assisted', 'fully-autonomous'];
-const LADDER_ROW_LABEL = {
-  'human-led': 'Human-led',
-  'human-assisted': 'Human-assisted',
-  'fully-autonomous': 'Fully autonomous',
-};
-const STAGE_ORDER = ['foundation', 'capture', 'generate', 'orchestrate'];
-const STAGE_LABEL = {
-  foundation: 'Foundation',
-  capture: 'Capture',
-  generate: 'Generate',
-  orchestrate: 'Orchestrate',
-};
-
-function DeptChartView({ dept, deptKey, onSelectAgent }) {
-  const agents = dept.subcategories.flatMap((sc) => sc.agents.map((a) => ({ ...a, subcatLabel: sc.label })));
-  const total = agents.length;
-  const autonomousCount = agents.filter((a) => a.autonomyLevel === 'fully-autonomous').length;
-  const assistedCount = agents.filter((a) => a.autonomyLevel === 'human-assisted').length;
-  const humanCount = agents.filter((a) => a.autonomyLevel === 'human-led').length;
-
-  return (
-    <div className="chart-view" style={{ '--dept-color': dept.color }}>
-      <div className="chart-header">
-        <div className="dept-panel-eyebrow">Відділ · Chart</div>
-        <h2>{dept.label}</h2>
-        <p className="chart-stats">
-          {autonomousCount} з {total} {total === 1 ? 'завдання' : 'завдань'} виконуються автономно · {assistedCount} асистовано · {humanCount} лишаються повністю на людині
-        </p>
-      </div>
-
-      <div className="chart-grid" style={{ '--stage-cols': STAGE_ORDER.length }}>
-        <div className="chart-corner" />
-        {STAGE_ORDER.map((stage) => (
-          <div key={stage} className="chart-col-header">{STAGE_LABEL[stage]}</div>
-        ))}
-        {LADDER_ORDER.map((level) => (
-          <Fragment key={level}>
-            <div className="chart-row-label">{LADDER_ROW_LABEL[level]}</div>
-            {STAGE_ORDER.map((stage) => {
-              const cellAgents = agents.filter((a) => a.autonomyLevel === level && a.stage === stage);
-              return (
-                <div key={stage} className="chart-cell">
-                  {cellAgents.length === 0 && <span className="chart-cell-empty">—</span>}
-                  {cellAgents.map((a) => (
-                    <button
-                      key={a.key} type="button" className="chart-card"
-                      onClick={() => onSelectAgent({ ...a, deptKey, deptLabel: dept.label, color: dept.color })}
-                    >
-                      <span className="chart-card-ic" dangerouslySetInnerHTML={{ __html: a.icon }} />
-                      <span className="chart-card-body">
-                        <span className="chart-card-name">{a.name}</span>
-                        <span className="chart-card-sub">{a.subcatLabel}</span>
-                      </span>
-                      {a.wave && <span className={'chart-card-wave wave-' + a.wave}>W{a.wave}</span>}
-                      <span className={'chart-card-dot status-' + a.status} />
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
-          </Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function toXY(angleDeg, r) {
-  const rad = (angleDeg * Math.PI) / 180;
-  return [Math.cos(rad) * r, Math.sin(rad) * r];
-}
-
-// Trims a straight line's two endpoints back to the edge of each circle
-// (radius r1 at the start, r2 at the end) instead of their centers — so a
-// spoke visibly starts at the core's rim and ends at the hub's rim, not
-// underneath either one.
-function trimLineToEdges(x1, y1, x2, y2, r1, r2) {
-  const dx = x2 - x1, dy = y2 - y1;
-  const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len, uy = dy / len;
-  return [x1 + ux * r1, y1 + uy * r1, x2 - ux * r2, y2 - uy * r2];
-}
-
-// N small dots evenly spaced around a circle of radius `r`, centered on
-// whatever local origin the caller places them at — replaces a plain
-// stroke-dasharray ring with a real ring of discrete points.
-function ringDots(r, count) {
-  return Array.from({ length: count }, (_, i) => {
-    const [x, y] = toXY((360 / count) * i, r);
-    return { x, y, key: i };
-  });
-}
-
-function jitter(seed) {
-  return ((seed * 37) % 17) - 8;
-}
-
-function fanAngle(baseAngle, index, count, spreadDeg) {
-  return baseAngle + (count > 1 ? spreadDeg * (index / (count - 1) - 0.5) : 0);
-}
-
-// How wide a fan `count` siblings need — scales with the actual count
-// instead of handing every branch the same fixed angle regardless of how
-// crowded it is.
-function fanSpread(count, degPerItem, maxSpread) {
-  return Math.min(maxSpread, degPerItem * (count - 1));
-}
-
-// Control point for a quadratic-bezier edge between two points, offset
-// perpendicular to the straight line by `bend` — curved "vine" edges
-// instead of dead-straight spokes, and it doubles as a cheap way to keep a
-// single-subcategory chain from running dead straight toward its own
-// department label (see SPIRAL_DEG_PER_STEP below).
-function curvePoint(x1, y1, x2, y2, bend) {
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.hypot(dx, dy) || 1;
-  return [mx - (dy / len) * bend, my + (dx / len) * bend];
-}
-
-// Builds one department's subcategory/agent positions around its hub —
-// used only for the overview wheel now (see calculateDepartmentGraphLayout
-// below for the focused single-department graph).
-function buildSubcats(dept, deptAngle, hx, hy, seedBase, params) {
-  const subcatSpread = fanSpread(dept.subcategories.length, params.subcatDegPerItem, params.subcatMaxSpread);
-  return dept.subcategories.map((sc, j) => {
-    const subAngle = fanAngle(deptAngle, j, dept.subcategories.length, subcatSpread);
-    const [sux, suy] = toXY(subAngle, 1);
-    const sDist = params.subcatRadius + jitter(seedBase * 20 + j);
-    const sx = hx + sux * sDist;
-    const sy = hy + suy * sDist;
-    const hubBend = (subAngle - deptAngle < 0 ? -1 : 1) * 14;
-    const [hubEdgeCx, hubEdgeCy] = curvePoint(hx, hy, sx, sy, hubBend);
-
-    const agentSpread = fanSpread(sc.agents.length, params.agentAnglePerItem, params.agentAngleMax);
-    // Spiral away from the department's own center line, not just
-    // alternating by index — a subcat sitting left of center needs its
-    // chain curving further left (away from its neighbors), not toward
-    // whichever one happens to be next in the list.
-    const subOffset = subAngle - deptAngle;
-    const spiralDir = subOffset < 0 ? -1 : 1;
-    const agents = sc.agents.map((ag, k) => {
-      const agentAngle = fanAngle(subAngle, k, sc.agents.length, agentSpread) + spiralDir * k * SPIRAL_DEG_PER_STEP;
-      const [aux, auy] = toXY(agentAngle, 1);
-      // No radius jitter here (unlike the subcat radius above) — the
-      // radius step is the load-bearing separator between agents at
-      // similar angles, so it needs to be exact, not nudged by a few
-      // units. The spiral rotation above is what varies the shape.
-      const aDist = params.agentRadiusBase + k * params.agentRadiusStep;
-      const ax = sx + aux * aDist;
-      const ay = sy + auy * aDist;
-      const [edgeCx, edgeCy] = curvePoint(sx, sy, ax, ay, (k % 2 === 0 ? 1 : -1) * (10 + k * 5));
-      return { ...ag, x: ax, y: ay, edgeCx, edgeCy, subcatKey: sc.key, subcatLabel: sc.label };
-    });
-
-    return { ...sc, x: sx, y: sy, hubEdgeCx, hubEdgeCy, agents };
-  });
-}
-
-function findAgent(dept, agentKey) {
-  for (const sc of dept.subcategories) {
-    const found = sc.agents.find((a) => a.key === agentKey);
-    if (found) return { ...found, subcatLabel: sc.label };
-  }
-  return null;
-}
-
-// A point on a cubic bezier at parameter t (De Casteljau's formula, direct
-// form) — used both to place the mid-edge decoration dots and internally by
-// cubicEdge below.
-function cubicPoint(p0, p1, p2, p3, t) {
-  const mt = 1 - t;
-  const a = mt * mt * mt, b = 3 * mt * mt * t, c = 3 * mt * t * t, d = t * t * t;
-  return [a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]];
-}
-
-// A soft cubic-bezier connection between two points, bent perpendicular to
-// the straight line by `bend` (second control point bends less than the
-// first, so the curve eases into its endpoint instead of arriving at an
-// angle) — replaces the old single-control-point quadratic edge with the
-// "M x1 y1 C cx1 cy1, cx2 cy2, x2 y2" shape the reference layout uses.
-function cubicEdge(x1, y1, x2, y2, bend) {
-  const dx = x2 - x1, dy = y2 - y1;
-  const len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len, ny = dx / len;
-  const p0 = [x1, y1];
-  const p1 = [x1 + dx * 0.33 + nx * bend, y1 + dy * 0.33 + ny * bend];
-  const p2 = [x1 + dx * 0.67 + nx * bend * 0.55, y1 + dy * 0.67 + ny * bend * 0.55];
-  const p3 = [x2, y2];
-  return { path: `M ${p0[0]} ${p0[1]} C ${p1[0]} ${p1[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`, p0, p1, p2, p3 };
-}
-
-// 1-3 small decoration points along an edge's curve, at fixed t positions —
-// purely visual "current flowing along the wire" dots, not separate data.
-function edgeDots(edge, ts) {
-  return ts.map((t) => cubicPoint(edge.p0, edge.p1, edge.p2, edge.p3, t));
-}
-
-// Which side a node's label should sit on, based on the node's offset from
-// the department root — right/left when the node is mostly to one side,
-// top/bottom when it's mostly straight up/down from the root.
-function pickLabelSide(dx, dy) {
-  if (Math.abs(dx) >= Math.abs(dy) * 0.6) return dx >= 0 ? 'right' : 'left';
-  return dy < 0 ? 'top' : 'bottom';
-}
-
-function labelProps(side, gap) {
-  switch (side) {
-    case 'right': return { x: gap, y: 0, textAnchor: 'start', dominantBaseline: 'middle' };
-    case 'left': return { x: -gap, y: 0, textAnchor: 'end', dominantBaseline: 'middle' };
-    case 'top': return { x: 0, y: -gap, textAnchor: 'middle', dominantBaseline: 'text-after-edge' };
-    default: return { x: 0, y: gap, textAnchor: 'middle', dominantBaseline: 'hanging' };
-  }
-}
-
-// Rough label bounding box for a given side/gap/text, in the same viewbox
-// units as everything else — there's no DOM here to measure real text
-// width against, so this is a plain char-count estimate (good enough to
-// steer the collision pass away from an obvious overlap, not pixel-exact).
-function approxLabelBBox(x, y, side, gap, text) {
-  // 0.62 (not the narrower ~0.56 an English-only estimate would use) — all
-  // labels are Ukrainian/Cyrillic now, whose glyphs run wider on average
-  // than Latin text at the same font size (fewer narrow letters like i/l/t).
-  const w = (text?.length || 6) * GRAPH_LABEL_FONT * 0.62;
-  const h = GRAPH_LABEL_FONT * 1.15;
-  switch (side) {
-    case 'right': return { left: x + gap, right: x + gap + w, top: y - h / 2, bottom: y + h / 2 };
-    case 'left': return { left: x - gap - w, right: x - gap, top: y - h / 2, bottom: y + h / 2 };
-    case 'top': return { left: x - w / 2, right: x + w / 2, top: y - gap - h, bottom: y - gap };
-    default: return { left: x - w / 2, right: x + w / 2, top: y + gap, bottom: y + gap + h };
-  }
-}
-function bboxHitsCircle(bbox, cx, cy, r) {
-  const nx = Math.max(bbox.left, Math.min(cx, bbox.right));
-  const ny = Math.max(bbox.top, Math.min(cy, bbox.bottom));
-  return Math.hypot(cx - nx, cy - ny) < r;
-}
-const LABEL_SIDE_TRY_ORDER = {
-  right: ['right', 'left', 'top', 'bottom'],
-  left: ['left', 'right', 'top', 'bottom'],
-  top: ['top', 'bottom', 'right', 'left'],
-  bottom: ['bottom', 'top', 'right', 'left'],
-};
-function withinBounds(bbox, bounds) {
-  return bbox.left >= bounds.minX && bbox.right <= bounds.maxX && bbox.top >= bounds.minY && bbox.bottom <= bounds.maxY;
-}
-// Picks the first side (starting from the natural/preferred one) whose
-// approximate label box clears every node in `circles` and stays inside
-// `bounds` ({minX, maxX, minY, maxY} — the reserved panel/nav/carousel
-// margins) — deterministic, not a general solver. `bounds` is a hard
-// constraint (reading text under the department panel or the carousel
-// pill is worse than one label overlapping a node it otherwise wouldn't),
-// so a second pass relaxes the node-collision check but keeps enforcing
-// it before finally falling back to the natural side untested — a long
-// Ukrainian agent name can be wide enough that no side clears every node,
-// but some side still keeps it off the reserved chrome.
-function resolveLabelSide(x, y, naturalSide, gap, text, circles, bounds) {
-  const order = LABEL_SIDE_TRY_ORDER[naturalSide];
-  for (const side of order) {
-    const bbox = approxLabelBBox(x, y, side, gap, text);
-    if (!withinBounds(bbox, bounds)) continue;
-    if (!circles.some((c) => bboxHitsCircle(bbox, c.x, c.y, c.r))) return side;
-  }
-  for (const side of order) {
-    if (withinBounds(approxLabelBBox(x, y, side, gap, text), bounds)) return side;
-  }
-  return naturalSide;
-}
-
-// ---------------------------------------------------------------------
-// calculateDepartmentGraphLayout — the focused single-department graph.
-// ---------------------------------------------------------------------
-// Pure, deterministic (no Math.random — every offset is a function of a
-// node's own index, via jitter() below, so the graph never reshuffles
-// between visits): Department root → Function hubs orbiting it → each
-// Function's own Agents fanning out further still. `halfW`/`halfH` are the
-// SVG viewBox's own half-extents (already corrected for the stage's real
-// aspect ratio, see `stageAspect`), so the reserved-space fractions below
-// translate directly into safe screen-relative margins regardless of
-// window size.
-function calculateDepartmentGraphLayout(dept, halfW, halfH) {
-  const usableXMin = -halfW + GRAPH_RESERVE_LEFT * halfW * 2;
-  const usableXMax = halfW - GRAPH_RESERVE_RIGHT * halfW * 2;
-  const usableYMin = -halfH + GRAPH_RESERVE_TOP * halfH * 2;
-  const usableYMax = halfH - GRAPH_RESERVE_BOTTOM * halfH * 2;
-  const deptX = usableXMin + (usableXMax - usableXMin) * GRAPH_DEPT_X_FRACTION;
-  const deptY = usableYMin + (usableYMax - usableYMin) * GRAPH_DEPT_Y_FRACTION;
-
-  const fnCount = dept.subcategories.length;
-  const functions = dept.subcategories.map((sc, fi) => {
-    // A lone Function doesn't fan out (nothing to spread against), so it
-    // gets a small fixed tilt off due-right instead of sitting on a flat
-    // horizontal line.
-    const tilt = fnCount === 1 ? -18 : 0;
-    const spread = Math.min(210, 55 * (fnCount - 1));
-    const baseAngle = fanAngle(tilt, fi, fnCount, spread) + jitter(fi * 13 + 3) * 0.6;
-    const radius = FUNCTION_RADIUS_BASE + fi * FUNCTION_RADIUS_PER_EXTRA + jitter(fi * 7 + 1) * 1.4;
-    const [ux, uy] = toXY(baseAngle, 1);
-    const fx = deptX + ux * radius;
-    const fy = deptY + uy * radius;
-    const deptEdge = cubicEdge(deptX, deptY, fx, fy, (baseAngle < tilt ? -1 : 1) * 22);
-
-    const agCount = sc.agents.length;
-    const agents = sc.agents.map((ag, ai) => {
-      const agSpread = Math.min(130, 46 * (agCount - 1));
-      const agAngle = fanAngle(baseAngle, ai, agCount, agSpread) + jitter(fi * 31 + ai * 17 + 5) * 0.8;
-      // ±~22% length variance per agent so a function's fan reads as an
-      // organic spray, not a mechanically even row of equal-length spokes.
-      const radiusMul = 1 + (jitter(fi * 19 + ai * 11 + 9) / 8) * 0.22;
-      const agRadius = GRAPH_AGENT_RADIUS_BASE * radiusMul;
-      const [aux, auy] = toXY(agAngle, 1);
-      const ax = fx + aux * agRadius;
-      const ay = fy + auy * agRadius;
-      return { ...ag, x: ax, y: ay, angle: agAngle, subcatKey: sc.key, subcatLabel: sc.label };
-    });
-
-    return {
-      ...sc, x: fx, y: fy, angle: baseAngle,
-      edgePath: deptEdge.path,
-      edgeDots: edgeDots(deptEdge, [0.35, 0.68]),
-      // Anchored toward the department, not outward — outward is where
-      // this Function's own Agents fan out to, and a label reaching that
-      // way would run straight into the first one of them. Finalized
-      // below (resolveLabelSide) once every node's final position — and
-      // so every node's collision circle — is known.
-      naturalLabelSide: pickLabelSide(deptX - fx, deptY - fy),
-      agents,
-    };
-  });
-
-  // Deterministic collision pass — not a physics/force simulation (the
-  // layout must land in the same spot every time a department is opened),
-  // just a few fixed passes pushing whichever of two too-close agents sits
-  // further from its own Function hub a bit further out along its own
-  // angle, until they clear AGENT_MIN_DIST.
-  const flat = functions.flatMap((f) => f.agents.map((a) => ({ a, f })));
-  for (let iter = 0; iter < 3; iter++) {
-    for (let i = 0; i < flat.length; i++) {
-      for (let j = i + 1; j < flat.length; j++) {
-        const A = flat[i], B = flat[j];
-        const dx = B.a.x - A.a.x, dy = B.a.y - A.a.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        if (dist >= AGENT_MIN_DIST) continue;
-        const distA = Math.hypot(A.a.x - A.f.x, A.a.y - A.f.y);
-        const distB = Math.hypot(B.a.x - B.f.x, B.a.y - B.f.y);
-        const target = distA >= distB ? A : B;
-        const push = AGENT_MIN_DIST - dist;
-        const [ux, uy] = toXY(target.a.angle, 1);
-        target.a.x += ux * push;
-        target.a.y += uy * push;
-      }
-    }
-  }
-
-  // Edges are finalized after the collision pass so they reflect any
-  // nudged position.
-  functions.forEach((f) => {
-    f.agents.forEach((a) => {
-      const agEdge = cubicEdge(f.x, f.y, a.x, a.y, (a.angle < f.angle ? -1 : 1) * 12);
-      a.edgePath = agEdge.path;
-      a.edgeDots = edgeDots(agEdge, [0.5]);
-      // Relative to its own Function hub, not the department — siblings of
-      // the same function fan out at different angles from each other, so
-      // this diverges their label sides more reliably than a department-
-      // relative direction would (which several siblings can share).
-      a.naturalLabelSide = pickLabelSide(a.x - f.x, a.y - f.y);
-    });
-  });
-
-  // Every node's final position (and so its collision circle) is now
-  // known — resolve each label's actual side against all of them plus the
-  // reserved panel margin, in one pass, instead of guessing blind.
-  const collisionCircles = [
-    { x: deptX, y: deptY, r: 46 * UI_SCALE },
-    ...functions.map((f) => ({ x: f.x, y: f.y, r: 17 * UI_SCALE })),
-    ...flat.map(({ a }) => ({ x: a.x, y: a.y, r: 22 * UI_SCALE })),
-  ];
-  const labelBounds = { minX: usableXMin, maxX: usableXMax, minY: usableYMin, maxY: usableYMax };
-  functions.forEach((f) => {
-    f.labelSide = resolveLabelSide(f.x, f.y, f.naturalLabelSide, 17 * UI_SCALE, f.label, collisionCircles, labelBounds);
-    f.agents.forEach((a) => {
-      a.labelSide = resolveLabelSide(a.x, a.y, a.naturalLabelSide, 30 * UI_SCALE, a.name, collisionCircles, labelBounds);
-    });
-  });
-
-  return { x: deptX, y: deptY, functions };
-}
+// AI Agents — a self-contained immersive system inside Hub: full-screen dark
+// shell (no CRM sidebar / light toolbar), floating section capsule, radial
+// map of the real departments + agents (aiAgentsData.js), nested department
+// focus (MAP / CHART / previous-next) and agent workspaces. Visual design:
+// "update ai agents" kit (approved-reference.png). The map is live SVG, never
+// an image; the background/core are decoration only.
 
 // Top-level views inside the AI Agents section, switched via its own
-// horizontal nav (see .constellation-section-nav below) — not routes, not
-// sidebar entries. Per explicit direction: anything AI-agents-related
-// stays inside this one section rather than spreading into the main CRM's
-// sidebar/routing, however tempting that'd be for e.g. deep-linking.
+// horizontal nav — not routes, not sidebar entries. Per explicit direction:
+// anything AI-agents-related stays inside this one section rather than
+// spreading into the main CRM's sidebar/routing.
 const SECTIONS = [
   { key: 'map', label: 'Мапа' },
   { key: 'agents', label: 'Агенти' },
@@ -637,13 +88,15 @@ const SECTIONS = [
 
 const WHATS_NEW_SEEN_KEY = 'aiAgentsWhatsNewSeenAt';
 
-function pluralAgents(n) {
+function newAgentsWord(n) {
   const mod10 = n % 10;
   const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'агент';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'агенти';
-  return 'агентів';
+  if (mod10 === 1 && mod100 !== 11) return 'новий або оновлений агент';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'нові або оновлені агенти';
+  return 'нових або оновлених агентів';
 }
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 export default function ConstellationTest() {
   const [section, setSection] = useState('map');
@@ -670,9 +123,6 @@ export default function ConstellationTest() {
   // First event-triggered handoff between two agent tools (§4.5): one
   // agent's own result hands off straight into another agent's workspace,
   // pre-filled, instead of the human re-typing/re-pasting the same input.
-  // `payload` shape is whatever the target tool component itself expects
-  // via its own `initialPayload` prop — this function is deliberately
-  // generic, not aware of any specific agent's payload shape.
   function handoffToAgentTool(toolKey, payload) {
     setAgentToolOpen(toolKey);
     setAgentToolPayload(payload || null);
@@ -680,49 +130,53 @@ export default function ConstellationTest() {
 
   const [deptPanelClosed, setDeptPanelClosed] = useState(false);
   const [viewMode, setViewMode] = useState('map');
-  const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
-  const [introPhase, setIntroPhase] = useState('start');
 
-  useEffect(() => {
-    const timers = Object.entries(REVEAL_TIMELINE).map(([phase, delay]) => setTimeout(() => setIntroPhase(phase), delay));
-    return () => timers.forEach(clearTimeout);
-  }, []);
-  const introDone = introPhase === 'done';
-
+  // Stage size drives the viewBox aspect, the compact (phone/narrow) layout
+  // and the minimum readable label size.
   const stageRef = useRef(null);
-
-  // Real stage aspect ratio, clamped to what the star field's data range
-  // can cover without gaps — drives the starfield SVG's own viewBox so it
-  // can use the default (non-distorting) preserveAspectRatio and still
-  // reach every edge of the screen.
-  const [stageAspect, setStageAspect] = useState(16 / 9);
+  const pageRef = useRef(null);
+  const [stageSize, setStageSize] = useState({ w: 1600, h: 1000 });
+  const [pageSize, setPageSize] = useState({ w: 1600, h: 1000 });
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setPageSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => {
     const el = stageRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setStageAspect(Math.min(2, Math.max(1, width / height)));
+      if (width > 0 && height > 0) setStageSize({ w: width, h: height });
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-  // The main graph's own viewBox widens the same way as the background
-  // star field's (see CosmicBackground) so the focused department's graph
-  // has real width to spread
-  // into instead of being letterboxed into a square in the middle of a
-  // wide window — the overview wheel is unaffected, since every overview
-  // position is a fixed radius from center regardless of how much extra
-  // margin sits past it.
-  const graphHalfW = VIEWBOX_HALF * stageAspect;
+  }, [section]);
+
+  const aspect = clamp(stageSize.w / stageSize.h, 0.35, 2.4);
+  const compact = pageSize.w < 760 || pageSize.w / pageSize.h < 1;
+  const graphHalfW = VIEWBOX_HALF * aspect;
   const graphHalfH = VIEWBOX_HALF;
+  // 1 viewBox unit = this many CSS px; labels never drop below ~11.5px.
+  // On shorter windows the whole ring is scaled down just enough that the
+  // top and bottom labels clear the header capsule and the footer pill
+  // (their size is fixed in px, the map scales with the window height).
+  const fit = compact ? 1 : clamp(Math.min((0.5 * stageSize.h - 70) / (0.434 * stageSize.h), (0.5 * stageSize.h - 80) / (0.409 * stageSize.h)), 0.62, 1);
+  const pxPerUnit = (stageSize.h / (VIEWBOX_HALF * 2)) * fit;
+  const fontScale = compact ? 1 : clamp(11.5 / (FONT_SAT * pxPerUnit), 1, 1.5);
+  const upx = (VIEWBOX_HALF * 2) / stageSize.h; // viewBox units per CSS px
 
   const deptKeys = Object.keys(AGENT_DEPTS);
 
-  // Flat, department-agnostic agent list for the top-right search box —
-  // built once (AGENT_DEPTS is static data, not state) rather than per
-  // keystroke. Each entry carries the same deptKey/deptLabel/color/
-  // subcatLabel context openAgent()/the agent modal already expect, so a
-  // search result can be opened exactly like any other agent click.
+  // Flat, department-agnostic agent list for the search box and the catalog —
+  // built once (AGENT_DEPTS is static data, not state). Each entry carries
+  // the same deptKey/deptLabel/color/subcatLabel context openAgent()/the
+  // agent modal already expect.
   const allAgents = useMemo(() => {
     const list = [];
     Object.entries(AGENT_DEPTS).forEach(([deptKey, dept]) => {
@@ -734,12 +188,11 @@ export default function ConstellationTest() {
     });
     return list;
   }, []);
+  const counts = useMemo(() => countStatuses(allAgents), [allAgents]);
+
   // §4.8 "what's new" (docs/ai-agents-roadmap.md) — surfaces agents whose
   // statusChangedAt is newer than the last time this viewer dismissed the
-  // banner, instead of the team discovering a newly-built agent by
-  // clicking around. Per-viewer convenience state only (not synced data),
-  // so localStorage is the right place for it, same as this app's other
-  // remembered-preference uses.
+  // banner. Per-viewer convenience state only, so localStorage is right.
   const [whatsNewSeenAt, setWhatsNewSeenAt] = useState(() => {
     try { return localStorage.getItem(WHATS_NEW_SEEN_KEY); } catch { return null; }
   });
@@ -758,9 +211,7 @@ export default function ConstellationTest() {
 
   const [agentSearch, setAgentSearch] = useState('');
   // Separate from whether there's query text — lets a click outside the
-  // search box collapse the results panel while leaving whatever was typed
-  // in place, same as every other dropdown in the app (ClientPicker,
-  // DealPicker, Select, etc.).
+  // search box collapse the results panel while leaving whatever was typed.
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef(null);
   useEffect(() => {
@@ -777,40 +228,28 @@ export default function ConstellationTest() {
     return allAgents.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 8);
   }, [agentSearch, allAgents]);
   // Jumps straight to the agent's department (only if it isn't already the
-  // focused one — focusDept() itself toggles, which would unfocus if we
-  // called it unconditionally) and opens the same modal/workspace a normal
-  // click would.
+  // focused one) and opens the same modal/workspace a normal click would.
   function selectSearchResult(agent) {
     setSearchOpen(false);
-    if (focusedDept !== agent.deptKey) {
-      setFocusedDept(agent.deptKey);
-      setView({ scale: 1.08, x: 40, y: 20 });
-    }
+    if (focusedDept !== agent.deptKey) setFocusedDept(agent.deptKey);
     openAgent(agent);
     setAgentSearch('');
   }
 
   // Re-show the department overview panel every time a (different)
   // department comes into focus — closing it is per-visit, not permanent.
-  // CHART is per-visit too: entering a (different) department always starts
-  // on MAP, same as the dept panel re-opening.
+  // CHART is per-visit too: entering a department always starts on MAP.
   useEffect(() => { setDeptPanelClosed(false); setViewMode('map'); }, [focusedDept]);
 
-  const layout = useMemo(() => {
-    const n = deptKeys.length;
-    return deptKeys.map((key, i) => {
-      const dept = AGENT_DEPTS[key];
-      const deptAngle = -90 + (360 / n) * i;
-      const [hx, hy] = toXY(deptAngle, HUB_RADIUS);
-      const subcats = buildSubcats(dept, deptAngle, hx, hy, i, OVERVIEW_PARAMS);
-      return { key, dept, deptAngle, hx, hy, subcats };
-    });
-  }, [deptKeys]);
+  const dims = useMemo(() => makeDims(compact, upx, stageSize.w), [compact, upx, stageSize.w]);
+  const ring = useMemo(
+    () => ringGeometry(graphHalfW, graphHalfH, compact, { upx, stageW: stageSize.w, stageH: stageSize.h }),
+    [graphHalfW, graphHalfH, compact, upx, stageSize.w, stageSize.h],
+  );
+  const nodes = useMemo(() => buildOverview(deptKeys, AGENT_DEPTS, ring, compact, dims), [deptKeys.join('|'), ring, compact, dims]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The Department → Function → Agent graph for whichever department is
-  // currently focused (see calculateDepartmentGraphLayout) — recomputed
-  // when the focus changes, or when the stage is resized (so it keeps
-  // using the freed-up space correctly after a window resize).
+  // currently focused — recomputed when the focus changes or the stage resizes.
   const focusedGraph = useMemo(() => {
     if (!focusedDept) return null;
     const dept = AGENT_DEPTS[focusedDept];
@@ -818,54 +257,33 @@ export default function ConstellationTest() {
     return calculateDepartmentGraphLayout(dept, graphHalfW, graphHalfH);
   }, [focusedDept, graphHalfW, graphHalfH]);
 
-  const isDimmed = (key) => {
-    if (focusedDept) return focusedDept !== key;
-    if (hoveredDept) return hoveredDept !== key;
-    return false;
-  };
-  const focused = layout.find((l) => l.key === focusedDept);
+  const focused = focusedDept && AGENT_DEPTS[focusedDept] ? { key: focusedDept, dept: AGENT_DEPTS[focusedDept] } : null;
 
-  // `view` no longer positions the focused graph itself — that's now
-  // computed directly in on-screen coordinates by calculateDepartmentGraphLayout
-  // (see the dedicated, untransformed <g> in the render below) — it only
-  // drives the pre-existing subtle background dot-grid drift (gridTransform
-  // below), which stays purely cosmetic and lives outside the graph SVG.
   function focusDept(key) {
-    const next = focusedDept === key ? null : key;
-    setFocusedDept(next);
-    setView(next ? { scale: 1.08, x: 40, y: 20 } : { scale: 1, x: 0, y: 0 });
-    // Focusing a department unmounts its hub <g> (see `!isFocused &&`
-    // below) without the mouse ever actually leaving it, so its own
-    // onMouseLeave never fires — without this, hoveredDept stays stuck on
-    // that key, and isDimmed() keeps treating every OTHER department as
-    // hovered-away-from (dimmed) even back on the full overview, instead
-    // of all of them lighting back up together.
+    setFocusedDept((cur) => (cur === key ? null : key));
+    // The focused node leaves the overview without the pointer ever leaving
+    // it, so its own mouseleave never fires — clear hover explicitly.
     setHoveredDept(null);
   }
   function resetView() {
     setFocusedDept(null);
-    setView({ scale: 1, x: 0, y: 0 });
     setHoveredDept(null);
   }
   function cycleDept(dir) {
     if (!focusedDept) return;
     const idx = deptKeys.indexOf(focusedDept);
-    const nextKey = deptKeys[(idx + dir + deptKeys.length) % deptKeys.length];
-    setFocusedDept(nextKey);
-    setView({ scale: 1.08, x: 40, y: 20 });
+    setFocusedDept(deptKeys[(idx + dir + deptKeys.length) % deptKeys.length]);
     setHoveredDept(null);
   }
 
-  // Mouse wheel cycles departments while one is focused — same action as
-  // the ‹ › carousel buttons, just via scroll. Throttled so a single
-  // trackpad flick doesn't skip past several departments at once, and
-  // skipped over the dept-panel/chart-view so their own overflow still
-  // scrolls normally instead of cycling the department underneath them.
+  // Mouse wheel cycles departments while one is focused — same action as the
+  // previous/next buttons. Throttled so one trackpad flick doesn't skip
+  // several departments, and ignored over scrollable panels.
   const wheelCooldownRef = useRef(0);
   useEffect(() => {
-    if (!focusedDept || selectedAgent || coreOpen) return undefined;
+    if (!focusedDept || selectedAgent || coreOpen || agentToolOpen || compact) return undefined;
     function handleWheel(e) {
-      if (e.target.closest('.chart-view, .dept-panel')) return;
+      if (e.target.closest('.chart-view, .dept-panel, .ai-section, [role="dialog"]')) return;
       e.preventDefault();
       const now = Date.now();
       if (now - wheelCooldownRef.current < 450 || Math.abs(e.deltaY) < 8) return;
@@ -875,7 +293,7 @@ export default function ConstellationTest() {
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusedDept, selectedAgent, coreOpen]);
+  }, [focusedDept, selectedAgent, coreOpen, agentToolOpen, compact]);
 
   // Escape backs out one layer at a time: closes an open agent/core modal
   // first, otherwise returns from a focused department to the overview.
@@ -891,20 +309,48 @@ export default function ConstellationTest() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedAgent, coreOpen, agentToolOpen, focusedDept]);
 
-  const stageTransform = `scale(${view.scale}) translate(${-view.x}px, ${-view.y}px)`;
-  const transitionCss = 'transform .6s cubic-bezier(.16,1,.3,1)';
-  // Background dot-grid: only a sliver of the real zoom/pan (so it stays
-  // reassuringly fine no matter how far into a department you go), damped
-  // enough that it still visibly drifts/settles with every zoom move.
-  const gridTransform = `scale(${1 + (view.scale - 1) * 0.045}) translate(${-view.x * 0.14}px, ${-view.y * 0.14}px)`;
+  // Animations pause with the tab / screen position (SMIL lights + pulses),
+  // and the whole scene is quieter while a form or another section is open.
+  const svgRef = useRef(null);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !svg.pauseAnimations) return undefined;
+    let offscreen = false;
+    const sync = () => { if (document.hidden || offscreen) svg.pauseAnimations(); else svg.unpauseAnimations(); };
+    const io = new IntersectionObserver(([e]) => { offscreen = !e.isIntersecting; sync(); });
+    io.observe(svg);
+    document.addEventListener('visibilitychange', sync);
+    return () => { io.disconnect(); document.removeEventListener('visibilitychange', sync); };
+  }, [section]);
+
+  const [motion, setMotion] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const on = () => setMotion(!mq.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
+
+  const calm = section !== 'map' || !!agentToolOpen || !!selectedAgent || coreOpen;
+  const selectedAgentKey = selectedAgent?.key || null;
+  const showMapChrome = section === 'map';
 
   return (
-    <div className="constellation-page" style={{ '--ui-scale': UI_SCALE }}>
-      {/* This section's own horizontal nav — everything AI-agents-related
-          (map, activity feed, and whatever's added later per
-          docs/ai-agents-roadmap.md) is switched here, inside the section
-          itself, rather than as separate CRM sidebar entries/routes. */}
-      <div className="constellation-section-nav" role="tablist">
+    <div ref={pageRef} className={'constellation-page ai-immersive' + (calm ? ' is-calm' : '') + (motion ? '' : ' is-still') + (compact ? ' is-compact' : '')} style={{ '--ui-scale': UI_SCALE }}>
+      <AiEnvironment calm={calm} />
+
+      <header className="ai-brand" data-ai-safe>
+        <img className="ai-brand-icon" src={AI_PAGE_ICON} alt="" />
+        <div className="ai-brand-text">
+          <h1>AI Agents</h1>
+          <span>Monarchi Hub</span>
+        </div>
+      </header>
+
+      {/* This section's own horizontal nav — everything AI-agents-related is
+          switched here, inside the section itself, rather than as separate
+          CRM sidebar entries/routes. */}
+      <div className="constellation-section-nav" role="tablist" aria-label="Розділи AI Agents" data-ai-safe>
         {SECTIONS.map((s) => (
           <button
             key={s.key} type="button" role="tab" aria-selected={section === s.key}
@@ -919,459 +365,232 @@ export default function ConstellationTest() {
         ))}
       </div>
 
-      <div className="constellation-topright">
-        {section === 'map' && (
-          <div className="agent-search" ref={searchRef}>
-            <svg className="agent-search-icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" /><path d="m21 21-5.2-5.2" /></svg>
-            <input
-              type="text" className="agent-search-input" placeholder="Пошук агента…"
-              value={agentSearch}
-              onChange={(e) => { setAgentSearch(e.target.value); setSearchOpen(true); }}
-              onFocus={() => setSearchOpen(true)}
-            />
-            {searchOpen && agentSearch.trim() && (
-              <div className="agent-search-results">
-                {searchResults.length > 0 ? searchResults.map((r) => (
-                  <button
-                    key={r.key} type="button" className="agent-search-result"
-                    onClick={() => selectSearchResult(r)}
-                  >
-                    <span className="agent-search-result-dot" style={{ background: r.color }} />
-                    <span className="agent-search-result-text">
-                      <span className="agent-search-result-name">{r.name}</span>
-                      <span className="agent-search-result-dept">{r.deptLabel}</span>
-                    </span>
-                  </button>
-                )) : (
-                  <div className="agent-search-empty">Нічого не знайдено</div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        <Link to="/" className="constellation-exit">
-          <svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8" /><path d="M5 10v10h14V10" /></svg>
-          CRM
-        </Link>
-      </div>
+      <Link to="/" className="constellation-exit ai-pill" data-ai-safe>
+        <ActionIcon name="back" size={18} />
+        <span>До Hub</span>
+      </Link>
 
-      {section === 'map' && recentlyChangedAgents.length > 0 && (
-        <div className="whats-new-banner">
-          <button type="button" className="whats-new-summary" onClick={() => setWhatsNewExpanded((v) => !v)}>
-            <span className="whats-new-badge">Нове</span>
-            <span className="whats-new-text">
-              {recentlyChangedAgents.length} {pluralAgents(recentlyChangedAgents.length)} нещодавно з&apos;явились або оновились
-            </span>
-            <svg className={'whats-new-chevron' + (whatsNewExpanded ? ' open' : '')} viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+      {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
+      {section === 'analytics' && <AgentAnalytics agents={allAgents} />}
+      {section === 'activity' && <AiAgentActivity />}
+
+      <div className="ai-flow">
+      {showMapChrome && (
+        <div className="agent-search ai-pill" ref={searchRef} data-ai-safe>
+          <ActionIcon name="search" size={20} className="agent-search-icon" />
+          <input
+            type="text" className="agent-search-input" placeholder="Пошук агента…" aria-label="Пошук агента"
+            value={agentSearch}
+            onChange={(e) => { setAgentSearch(e.target.value); setSearchOpen(true); }}
+            onFocus={() => setSearchOpen(true)}
+          />
+          {searchOpen && agentSearch.trim() && (
+            <div className="agent-search-results ai-panel">
+              {searchResults.length > 0 ? searchResults.map((r) => (
+                <button key={r.key} type="button" className="agent-search-result" onClick={() => selectSearchResult(r)}>
+                  <span className="agent-search-result-dot" />
+                  <span className="agent-search-result-text">
+                    <span className="agent-search-result-name">{r.name}</span>
+                    <span className="agent-search-result-dept">{r.deptLabel}</span>
+                  </span>
+                </button>
+              )) : (
+                <div className="agent-search-empty">Нічого не знайдено</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showMapChrome && !focused && recentlyChangedAgents.length > 0 && (
+        <div className="whats-new-banner" data-ai-safe>
+          <button type="button" className="whats-new-summary ai-pill" onClick={() => setWhatsNewExpanded((v) => !v)} aria-expanded={whatsNewExpanded}>
+            <span className="whats-new-dot-live" aria-hidden="true" />
+            <span className="whats-new-text">{recentlyChangedAgents.length} {newAgentsWord(recentlyChangedAgents.length)}</span>
+            <ActionIcon name="chevron" size={14} className={'whats-new-chevron' + (whatsNewExpanded ? ' open' : '')} />
           </button>
           {whatsNewExpanded && (
-            <div className="whats-new-list">
+            <div className="whats-new-list ai-panel">
+              <button type="button" className="whats-new-dismiss" onClick={dismissWhatsNew}>Приховати</button>
               {recentlyChangedAgents.map((a) => (
                 <button key={a.key} type="button" className="whats-new-item" onClick={() => openAgent(a)}>
-                  <span className="whats-new-dot" style={{ background: a.color }} />
+                  <span className="whats-new-dot" />
                   <span className="whats-new-name">{a.name}</span>
                   <span className="whats-new-date">{a.statusChangedAt}</span>
                 </button>
               ))}
             </div>
           )}
-          <button type="button" className="whats-new-dismiss" onClick={dismissWhatsNew}>Приховати</button>
         </div>
       )}
-
-      {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
-      {section === 'analytics' && <AgentAnalytics agents={allAgents} />}
-
-      {section === 'activity' && <AiAgentActivity />}
 
       {section === 'map' && (
-      <>
-      <div className="constellation-overlay">
-        {focused && (
-          <div className="constellation-breadcrumb-pill">
-            <span className="constellation-focus-dot" style={{ background: focused.dept.color }} />
-            <b>{focused.dept.label}</b><span className="sep">·</span>{focused.dept.subtitle}
-          </div>
-        )}
-        {focused && (
-          <button type="button" className="constellation-reset" onClick={resetView}>&larr; Всі відділи</button>
-        )}
-      </div>
-
-      {focused && !focused.dept.comingSoon && (
-        <div className="view-tabs">
-          <button type="button" className={'view-tab' + (viewMode === 'map' ? ' active' : '')} onClick={() => setViewMode('map')}>MAP</button>
-          <button type="button" className={'view-tab' + (viewMode === 'chart' ? ' active' : '')} onClick={() => setViewMode('chart')}>CHART</button>
-        </div>
-      )}
-
-      {focused && (
-        <div className="constellation-carousel" style={{ '--dept-color': focused.dept.color }}>
-          <button type="button" aria-label="Попередній відділ" onClick={() => cycleDept(-1)}>&lsaquo;</button>
-          <div className="constellation-carousel-info">
-            <div className="constellation-carousel-name">{focused.dept.label}</div>
-          </div>
-          <button type="button" aria-label="Наступний відділ" onClick={() => cycleDept(1)}>&rsaquo;</button>
-        </div>
-      )}
-
-      {focused && viewMode === 'map' && !deptPanelClosed && (() => {
-        const dept = focused.dept;
-
-        if (dept.comingSoon) {
-          return (
-            <div className="dept-panel dept-panel-soon" style={{ '--dept-color': dept.color }}>
-              <button type="button" className="dept-panel-close" onClick={() => setDeptPanelClosed(true)}>&times;</button>
-              <div className="dept-panel-eyebrow">Відділ · СКОРО</div>
-              <h2>{dept.label}</h2>
-              <div className="dept-panel-subtitle">{dept.subtitle}</div>
-              {dept.comingSoonNote && <p className="dept-panel-narrative">{dept.comingSoonNote}</p>}
-              <div className="dept-panel-soon-note">Узгоджено з командою як частина цільової карти відділів. Реалізація ще не почалась.</div>
+        <>
+          {focused && (
+            <div className="constellation-overlay" data-ai-safe>
+              <button type="button" className="constellation-reset ai-pill" onClick={resetView}>
+                <ActionIcon name="back" size={16} />Всі відділи
+              </button>
             </div>
-          );
-        }
-
-        const totalAgents = dept.subcategories.reduce((sum, sc) => sum + sc.agents.length, 0);
-        const startHereAgent = dept.startHere ? findAgent(dept, dept.startHere) : null;
-        return (
-          <div className="dept-panel" style={{ '--dept-color': dept.color }}>
-            <button type="button" className="dept-panel-close" onClick={() => setDeptPanelClosed(true)}>&times;</button>
-            <div className="dept-panel-eyebrow">Відділ</div>
-            <h2>{dept.label}</h2>
-            <div className="dept-panel-subtitle">{dept.subtitle}</div>
-            {dept.narrative && <p className="dept-panel-narrative">{dept.narrative}</p>}
-
-            <div className="dept-panel-section">
-              <h4>Що охоплює</h4>
-              <div className="dept-panel-pills">
-                {dept.subcategories.map((sc) => <span key={sc.key} className="dept-panel-pill">{sc.label}</span>)}
-              </div>
-            </div>
-
-            <div className="dept-panel-section">
-              <h4>Функції</h4>
-              <ul className="dept-panel-functions">
-                {dept.subcategories.map((sc) => (
-                  <li key={sc.key}><span>{sc.label}</span><span className="dept-panel-count">{sc.agents.length} {sc.agents.length === 1 ? 'агент' : 'агенти'}</span></li>
-                ))}
-              </ul>
-            </div>
-
-            {startHereAgent && (
-              <div className="dept-panel-section">
-                <h4>З чого почати</h4>
-                <button
-                  type="button" className="dept-panel-starthere"
-                  onClick={() => openAgent({ ...startHereAgent, deptKey: focused.key, deptLabel: dept.label, color: dept.color })}
-                >
-                  {startHereAgent.name} &rarr;
-                </button>
-              </div>
-            )}
-
-            <div className="dept-panel-numbers">
-              {totalAgents} {totalAgents === 1 ? 'агент' : 'агентів'} · {dept.subcategories.length} {dept.subcategories.length === 1 ? 'функція' : 'функції'}
-            </div>
-          </div>
-        );
-      })()}
-
-      {focused && viewMode === 'chart' && !focused.dept.comingSoon && (
-        <DeptChartView dept={focused.dept} deptKey={focused.key} onSelectAgent={setSelectedAgent} />
-      )}
-
-      <div
-        className="constellation-stage" ref={stageRef}
-        style={{ pointerEvents: introDone && viewMode === 'map' ? 'auto' : 'none' }}
-      >
-        <CosmicBackground stageAspect={stageAspect} gridTransform={gridTransform} transitionCss={transitionCss} />
-        <ParticleFieldCanvas />
-
-        <svg viewBox={`${-graphHalfW} ${-graphHalfH} ${graphHalfW * 2} ${graphHalfH * 2}`} className="constellation-svg">
-          <defs>
-            <filter id="edgeGlow" x="-60%" y="-60%" width="220%" height="220%">
-              <feGaussianBlur stdDeviation="2.2" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-
-          <g style={{ transformBox: 'view-box', transformOrigin: '0px 0px', transform: stageTransform, transition: transitionCss }}>
-            <circle r={HUB_RADIUS} className={'orbit-ring' + (introPhase === 'hubs' || introDone ? ' visible' : '')} />
-
-            <g
-              className={'constellation-core-btn' + (introPhase !== 'start' ? ' lit' : '') + (focusedDept ? ' inactive' : '')}
-              onClick={() => { if (!focusedDept) setCoreOpen(true); }}
-              role="button"
-              tabIndex={focusedDept ? -1 : 0}
-              aria-disabled={!!focusedDept}
-              aria-label="Інформаційна база"
-            >
-              <circle r={140 * UI_SCALE} className="core-hit-area" />
-              <ParticleSphere scale={0.38 * UI_SCALE} />
-            </g>
-
-            {layout.map(({ key, dept, deptAngle, hx, hy, subcats: overviewSubcats }, deptIdx) => {
-              const dimmed = isDimmed(key);
-              const isFocused = focusedDept === key;
-              // Any OTHER department fully disappears while one is
-              // focused, instead of just dimming — per feedback, seeing
-              // faint neighboring hubs/webs peeking in around the edges
-              // while zoomed into one was clutter, not context.
-              const hiddenByFocus = focusedDept !== null && !isFocused;
-              const subcats = overviewSubcats;
-              const branchRevealClass = introPhase === 'hubs' ? ' revealed' : (introDone ? '' : ' pre-reveal');
-              const color = dept.color;
-              const [outerDotX, outerDotY] = toXY(deptAngle, 30 * UI_SCALE);
-              const [innerDotX, innerDotY] = toXY(deptAngle + 180, 30 * UI_SCALE);
-              const [labelX, labelY] = toXY(deptAngle, labelRadius(deptAngle, dept.label));
-              const labelLines = wrapDeptLabel(dept.label);
-              // Generous invisible hit-rect behind the label text — SVG
-              // hit-testing on glyphs alone would only catch the actual
-              // painted letters (not the gaps/whitespace between words or
-              // between the two wrapped lines), making the click target
-              // annoyingly finicky. Sized from the longest line's rough
-              // character width, same estimate approxLabelBBox() uses for
-              // the focused-view labels below.
-              const labelLongestLine = Math.max(...labelLines.map((l) => l.length));
-              const labelHitW = labelLongestLine * 16 * UI_SCALE * 0.6 + 24 * UI_SCALE;
-              const labelHitH = (labelLines.length > 1 ? 40 : 24) * UI_SCALE;
-              // Core's approximate visible radius (ParticleSphere's own
-              // r=92 core glow, scaled by the 0.38*UI_SCALE it's mounted
-              // at) and the hub ring's own radius (30*UI_SCALE) — trims the
-              // spoke to run rim-to-rim instead of center-to-center.
-              const [spokeX1, spokeY1, spokeX2, spokeY2] = trimLineToEdges(0, 0, hx, hy, 92 * 0.38 * UI_SCALE, 30 * UI_SCALE);
-              const hubRing = ringDots(30 * UI_SCALE, 22);
-              return (
-                <g
-                  key={key}
-                  className={'constellation-branch' + (dimmed ? ' dimmed' : '') + (hiddenByFocus ? ' focus-hidden' : '') + branchRevealClass}
-                  style={{ '--dept-color': color, '--pulse-delay': `${deptIdx * 0.6}s`, '--fly-delay': `${deptIdx * 90}ms` }}
-                >
-                  {/* The currently-focused department's own hub/web is
-                      replaced entirely by its dedicated Department→
-                      Function→Agent graph (see focusedGraph, rendered as
-                      its own untransformed <g> right after this loop) — it
-                      has nothing left to draw here itself. Every other
-                      department keeps its normal small overview branch,
-                      just hidden via .focus-hidden while one is focused. */}
-                  {!isFocused && (
-                    <>
-                      {/* Spoke runs edge-to-edge (core's visible rim to the
-                          hub's ring), not center-to-center — trimLineToEdges
-                          keeps it from visibly starting/ending underneath
-                          either node. Colored via a small local gradient,
-                          core-violet fading into this department's own
-                          color, instead of one flat stroke color. */}
-                      <defs>
-                        <linearGradient
-                          id={`spokeGradient-${key}`} gradientUnits="userSpaceOnUse"
-                          x1={spokeX1} y1={spokeY1} x2={spokeX2} y2={spokeY2}
-                        >
-                          <stop offset="0%" stopColor="#8B5CF6" stopOpacity=".55" />
-                          <stop offset="100%" stopColor={color} stopOpacity=".9" />
-                        </linearGradient>
-                      </defs>
-                      <line
-                        x1={spokeX1} y1={spokeY1} x2={spokeX2} y2={spokeY2}
-                        className="constellation-edge spoke" stroke={`url(#spokeGradient-${key})`} filter="url(#edgeGlow)"
-                      />
-
-                      {/* Data "flowing" from each department into the shared
-                          core — everything the agents produce converges into
-                          one knowledge base at the center. */}
-                      <circle r={2.2 * UI_SCALE} className="flow-dot" style={{ '--sx': `${spokeX2}px`, '--sy': `${spokeY2}px`, animationDelay: `${(deptIdx % 8) * 0.35}s` }} />
-                      <circle r={2.2 * UI_SCALE} className="flow-dot" style={{ '--sx': `${spokeX2}px`, '--sy': `${spokeY2}px`, animationDelay: `${(deptIdx % 8) * 0.35 + 1.6}s` }} />
-
-                      {subcats.map((sc) => (
-                        <g key={sc.key}>
-                          <path
-                            d={`M ${hx} ${hy} Q ${sc.hubEdgeCx} ${sc.hubEdgeCy} ${sc.x} ${sc.y}`}
-                            fill="none" className="constellation-edge leaf"
-                          />
-                          {sc.agents.map((ag) => (
-                            <path
-                              key={ag.key} d={`M ${sc.x} ${sc.y} Q ${ag.edgeCx} ${ag.edgeCy} ${ag.x} ${ag.y}`}
-                              fill="none" className="constellation-edge agent-edge"
-                            />
-                          ))}
-                        </g>
-                      ))}
-
-                      {subcats.map((sc) => (
-                        <g key={sc.key} className="constellation-subcat" transform={`translate(${sc.x} ${sc.y})`}>
-                          <circle r={8 * UI_SCALE} className="subcat-circle" />
-                          <text x={13 * UI_SCALE} y={0} textAnchor="start" dominantBaseline="middle" className="subcat-label">
-                            {sc.label}
-                          </text>
-                        </g>
-                      ))}
-
-                      {subcats.flatMap((sc) => sc.agents).map((ag) => (
-                        <g
-                          key={ag.key}
-                          className={'constellation-leaf' + (selectedAgent?.key === ag.key ? ' active' : '')}
-                          transform={`translate(${ag.x} ${ag.y})`}
-                          role="button"
-                          tabIndex={-1}
-                        >
-                          <circle r={16 * UI_SCALE} className="leaf-circle" />
-                          {ag.status === 'live' && <circle r={3 * UI_SCALE} className="leaf-live-dot" cx={12 * UI_SCALE} cy={-12 * UI_SCALE} />}
-                          <foreignObject
-                            x={-8 * UI_SCALE} y={-8 * UI_SCALE} width={16 * UI_SCALE} height={16 * UI_SCALE}
-                          ><span dangerouslySetInnerHTML={{ __html: ag.icon }} /></foreignObject>
-                          <text x={28 * UI_SCALE} y={0} textAnchor="start" dominantBaseline="middle" className="leaf-label">
-                            {ag.name}
-                          </text>
-                        </g>
-                      ))}
-
-                      <g
-                        className={'constellation-hub' + (dept.comingSoon ? ' coming-soon' : '')}
-                        transform={`translate(${hx} ${hy})`}
-                        onClick={() => focusDept(key)}
-                        onMouseEnter={() => setHoveredDept(key)}
-                        onMouseLeave={() => setHoveredDept(null)}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <circle r={42 * UI_SCALE} className="hub-glow-outer" />
-                        <circle r={30 * UI_SCALE} className={'hub-circle' + (!focusedDept && !dimmed ? ' breathing' : '')} />
-                        {hubRing.map((d, i) => (
-                          <circle
-                            key={d.key} cx={d.x} cy={d.y} r={1.6 * UI_SCALE} className="hub-ring-dot"
-                            style={{ opacity: 0.55 + 0.45 * ((i * 7) % hubRing.length) / hubRing.length }}
-                          />
-                        ))}
-                        <circle cx={outerDotX} cy={outerDotY} r={2.6 * UI_SCALE} className="hub-marker-dot" />
-                        <circle cx={innerDotX} cy={innerDotY} r={2.6 * UI_SCALE} className="hub-marker-dot" />
-                        {dept.icon && <foreignObject x={-13 * UI_SCALE} y={-13 * UI_SCALE} width={26 * UI_SCALE} height={26 * UI_SCALE}><span dangerouslySetInnerHTML={{ __html: dept.icon }} /></foreignObject>}
-                      </g>
-
-                      {/* Department name — floats past the outermost agent
-                          leaf of this branch (see LABEL_RADIUS), not tucked
-                          under the hub, matching the reference layout.
-                          Overview only: once any department is focused, its
-                          name is already shown in the breadcrumb/panel/
-                          carousel instead. */}
-                      {!focusedDept && (
-                        <g
-                          transform={`translate(${labelX} ${labelY})`} className="constellation-dept-label"
-                          onClick={() => focusDept(key)}
-                          onMouseEnter={() => setHoveredDept(key)}
-                          onMouseLeave={() => setHoveredDept(null)}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <rect
-                            x={-labelHitW / 2} y={-labelHitH / 2} width={labelHitW} height={labelHitH}
-                            fill="transparent" className="dept-label-hit"
-                          />
-                          <text textAnchor="middle" className="hub-label">
-                            {labelLines.map((line, i) => (
-                              <tspan key={i} x={0} dy={i === 0 ? (labelLines.length > 1 ? '-0.6em' : '0') : '1.2em'}>{line}</tspan>
-                            ))}
-                          </text>
-                          {dept.comingSoon && (
-                            <text y={(labelLines.length > 1 ? 32 : 16) * UI_SCALE} textAnchor="middle" className="hub-soon-badge">СКОРО</text>
-                          )}
-                        </g>
-                      )}
-                    </>
-                  )}
-                </g>
-              );
-            })}
-          </g>
-
-          {/* The focused department's own graph — Department root →
-              Function hubs → Agents — rendered in its own untransformed
-              <g> (not the stageTransform one above) since its coordinates
-              are already computed as final on-screen positions by
-              calculateDepartmentGraphLayout. */}
-          {focused && focusedGraph && (
-            <g className="dept-graph" style={{ '--dept-color': focused.dept.color }}>
-              {[0.55, 0.85, 1.18].map((mul, i) => (
-                <circle
-                  key={i} r={FUNCTION_RADIUS_BASE * mul} className="dept-graph-orbit"
-                  transform={`translate(${focusedGraph.x} ${focusedGraph.y})`}
-                />
-              ))}
-
-              {focusedGraph.functions.map((fn) => (
-                <Fragment key={fn.key}>
-                  <path d={fn.edgePath} fill="none" className="dept-graph-edge dept-graph-edge-fn" />
-                  {fn.edgeDots.map(([dx, dy], i) => (
-                    <circle key={i} cx={dx} cy={dy} r={3 * UI_SCALE} className="dept-graph-dot" />
-                  ))}
-                  {fn.agents.map((ag) => (
-                    <Fragment key={ag.key}>
-                      <path d={ag.edgePath} fill="none" className="dept-graph-edge dept-graph-edge-agent" />
-                      {ag.edgeDots.map(([dx, dy], i) => (
-                        <circle key={i} cx={dx} cy={dy} r={2.3 * UI_SCALE} className="dept-graph-dot dept-graph-dot-small" />
-                      ))}
-                    </Fragment>
-                  ))}
-                </Fragment>
-              ))}
-
-              {focusedGraph.functions.map((fn) => (
-                <g key={fn.key} className="dept-graph-fn" transform={`translate(${fn.x} ${fn.y})`}>
-                  <circle r={17 * UI_SCALE} className="dept-graph-fn-halo" />
-                  <circle r={9 * UI_SCALE} className="dept-graph-fn-circle" />
-                  <text {...labelProps(fn.labelSide, 17 * UI_SCALE)} className="dept-graph-fn-label">{fn.label}</text>
-                </g>
-              ))}
-
-              {focusedGraph.functions.flatMap((fn) => fn.agents).map((ag) => (
-                <g
-                  key={ag.key}
-                  className={'dept-graph-agent' + (selectedAgent?.key === ag.key ? ' active' : '')}
-                  transform={`translate(${ag.x} ${ag.y})`}
-                  onClick={() => openAgent({ ...ag, deptKey: focused.key, deptLabel: focused.dept.label, color: focused.dept.color })}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <circle r={23 * UI_SCALE} className="dept-graph-agent-glow" />
-                  <circle r={20 * UI_SCALE} className="dept-graph-agent-circle" />
-                  {ag.status === 'live' && <circle r={3.4 * UI_SCALE} className="leaf-live-dot" cx={14 * UI_SCALE} cy={-14 * UI_SCALE} />}
-                  <foreignObject x={-10 * UI_SCALE} y={-10 * UI_SCALE} width={20 * UI_SCALE} height={20 * UI_SCALE}>
-                    <span dangerouslySetInnerHTML={{ __html: ag.icon }} />
-                  </foreignObject>
-                  <text {...labelProps(ag.labelSide, 30 * UI_SCALE)} className="dept-graph-agent-label">{ag.name}</text>
-                </g>
-              ))}
-
-              <g
-                className="dept-graph-root"
-                transform={`translate(${focusedGraph.x} ${focusedGraph.y})`}
-                onClick={resetView}
-                role="button"
-                tabIndex={0}
-                aria-label={`${focused.dept.label} — назад до всіх відділів`}
-              >
-                <circle r={62 * UI_SCALE} className="dept-graph-root-glow" />
-                <circle r={46 * UI_SCALE} className="dept-graph-root-circle" />
-                {focused.dept.icon && (
-                  <foreignObject x={-13 * UI_SCALE} y={-30 * UI_SCALE} width={26 * UI_SCALE} height={26 * UI_SCALE}>
-                    <span dangerouslySetInnerHTML={{ __html: focused.dept.icon }} />
-                  </foreignObject>
-                )}
-              </g>
-            </g>
           )}
-        </svg>
-      </div>
-      </>
+
+          {focused && !focused.dept.comingSoon && (
+            <div className="view-tabs" role="tablist" aria-label="Вигляд відділу" data-ai-safe>
+              <button type="button" role="tab" aria-selected={viewMode === 'map'} className={'view-tab' + (viewMode === 'map' ? ' active' : '')} onClick={() => setViewMode('map')}>MAP</button>
+              <button type="button" role="tab" aria-selected={viewMode === 'chart'} className={'view-tab' + (viewMode === 'chart' ? ' active' : '')} onClick={() => setViewMode('chart')}>CHART</button>
+            </div>
+          )}
+
+          {focused && (
+            <div className="constellation-carousel" data-ai-safe>
+              <button type="button" aria-label="Попередній відділ" onClick={() => cycleDept(-1)}>
+                <ActionIcon name="chevron" size={22} className="chev-prev" />
+              </button>
+              <div className="constellation-carousel-info">
+                <div className="constellation-carousel-name">{focused.dept.label}</div>
+              </div>
+              <button type="button" aria-label="Наступний відділ" onClick={() => cycleDept(1)}>
+                <ActionIcon name="chevron" size={22} />
+              </button>
+            </div>
+          )}
+
+          {focused && viewMode === 'map' && !deptPanelClosed && (() => {
+            const dept = focused.dept;
+            if (dept.comingSoon) {
+              return (
+                <div className="dept-panel ai-panel dept-panel-soon" data-ai-safe>
+                  <button type="button" className="dept-panel-close" aria-label="Закрити панель відділу" onClick={() => setDeptPanelClosed(true)}><ActionIcon name="close" size={18} /></button>
+                  <div className="dept-panel-eyebrow">Відділ · СКОРО</div>
+                  <h2>{dept.label}</h2>
+                  <div className="dept-panel-subtitle">{dept.subtitle}</div>
+                  {dept.comingSoonNote && <p className="dept-panel-narrative">{dept.comingSoonNote}</p>}
+                  <div className="dept-panel-soon-note">Узгоджено з командою як частина цільової карти відділів. Реалізація ще не почалась.</div>
+                </div>
+              );
+            }
+
+            const totalAgents = dept.subcategories.reduce((sum, sc) => sum + sc.agents.length, 0);
+            const startHereAgent = dept.startHere ? findAgent(dept, dept.startHere) : null;
+            return (
+              <div className="dept-panel ai-panel" data-ai-safe>
+                <button type="button" className="dept-panel-close" aria-label="Закрити панель відділу" onClick={() => setDeptPanelClosed(true)}><ActionIcon name="close" size={18} /></button>
+                <div className="dept-panel-eyebrow">Відділ</div>
+                <h2>{dept.label}</h2>
+                <div className="dept-panel-subtitle">{dept.subtitle}</div>
+                {dept.narrative && <p className="dept-panel-narrative">{dept.narrative}</p>}
+
+                <div className="dept-panel-section">
+                  <h4>Що охоплює</h4>
+                  <div className="dept-panel-pills">
+                    {dept.subcategories.map((sc) => <span key={sc.key} className="dept-panel-pill">{sc.label}</span>)}
+                  </div>
+                </div>
+
+                <div className="dept-panel-section">
+                  <h4>Функції</h4>
+                  <ul className="dept-panel-functions">
+                    {dept.subcategories.map((sc) => (
+                      <li key={sc.key}><span>{sc.label}</span><span className="dept-panel-count">{sc.agents.length} {sc.agents.length === 1 ? 'агент' : 'агенти'}</span></li>
+                    ))}
+                  </ul>
+                </div>
+
+                {startHereAgent && (
+                  <div className="dept-panel-section">
+                    <h4>З чого почати</h4>
+                    <button
+                      type="button" className="dept-panel-starthere"
+                      onClick={() => openAgent({ ...startHereAgent, deptKey: focused.key, deptLabel: dept.label, color: dept.color })}
+                    >
+                      {startHereAgent.name} &rarr;
+                    </button>
+                  </div>
+                )}
+
+                <div className="dept-panel-numbers">
+                  {totalAgents} {totalAgents === 1 ? 'агент' : 'агентів'} · {dept.subcategories.length} {dept.subcategories.length === 1 ? 'функція' : 'функції'}
+                </div>
+              </div>
+            );
+          })()}
+
+          {focused && viewMode === 'chart' && !focused.dept.comingSoon && (
+            <DeptChartView dept={focused.dept} deptKey={focused.key} onSelectAgent={setSelectedAgent} />
+          )}
+
+          {/* Phones/narrow windows: the focused department is a touch list
+              (same data, same open handlers) instead of a tiny SVG graph. */}
+          {focused && compact && viewMode === 'map' && !focused.dept.comingSoon && (
+            <div className="dept-sheet ai-panel" data-ai-safe>
+              <div className="dept-sheet-head">
+                <h2>{focused.dept.label}</h2>
+                <div className="dept-panel-subtitle">{focused.dept.subtitle}</div>
+              </div>
+              {focused.dept.subcategories.map((sc) => (
+                <div key={sc.key} className="dept-sheet-group">
+                  <h4>{sc.label}</h4>
+                  {sc.agents.map((ag) => (
+                    <button
+                      key={ag.key} type="button" className="dept-sheet-agent"
+                      onClick={() => openAgent({ ...ag, deptKey: focused.key, deptLabel: focused.dept.label, color: focused.dept.color, subcatLabel: sc.label })}
+                    >
+                      <span className="dept-sheet-dot" aria-hidden="true" />
+                      <span className="dept-sheet-name">{ag.name}</span>
+                      <span className="dept-sheet-status">{STATUS_TEXT[ag.status] || ag.status}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className={'constellation-stage' + (viewMode === 'chart' && focused ? ' is-chart' : '')} ref={stageRef}>
+            {/* decorative energy core: a picture, not a button or an agent */}
+            <img className={'ai-core' + (focused ? ' is-quiet' : '')} src={AI_ASSETS.core} alt="" aria-hidden="true" style={{ '--core-dy': `${(ring.dy || 0) / upx}px` }} />
+
+            <svg
+              ref={svgRef}
+              viewBox={`${-graphHalfW} ${-graphHalfH} ${graphHalfW * 2} ${graphHalfH * 2}`}
+              className="constellation-svg" role="group" aria-label="Мапа відділів і агентів"
+            >
+              <AiSvgDefs />
+              <OverviewMap
+                nodes={nodes} ring={ring} compact={compact} dims={dims} fontScale={fontScale} fit={fit}
+                focusedDept={focusedDept} hoveredDept={hoveredDept} setHoveredDept={setHoveredDept}
+                onFocusDept={focusDept} onOpenAgent={openAgent} selectedAgentKey={selectedAgentKey} motion={motion}
+              />
+              {focused && focusedGraph && !compact && (
+                <FocusedGraph
+                  key={focused.key} focused={focused} graph={focusedGraph} fs={fontScale}
+                  selectedAgentKey={selectedAgentKey} onOpenAgent={openAgent} onReset={resetView}
+                />
+              )}
+            </svg>
+          </div>
+
+          {!focused && (
+            <>
+              <button type="button" className="ai-kb-btn ai-pill" onClick={() => setCoreOpen(true)} data-ai-safe>
+                <span className="ai-kb-icon" dangerouslySetInnerHTML={{ __html: BOOK_ICON }} />
+                <span>Інформаційна база</span>
+              </button>
+              <div className="ai-footer ai-pill" data-ai-safe>
+                <span className="ai-footer-total">{counts.total} {pluralAgents(counts.total)}</span>
+                <span className="ai-footer-item"><i className="ai-dot ai-dot-live" />{counts.live} Live</span>
+                <span className="ai-footer-item"><i className="ai-dot ai-dot-dev" />{counts.in_development} у розробці</span>
+                <span className="ai-footer-item"><i className="ai-dot ai-dot-plan" />{counts.not_started} заплановано</span>
+              </div>
+            </>
+          )}
+        </>
       )}
+      </div>
 
       {/* Knowledge Base / an agent's own workspace / the read-only agent
           info modal all render regardless of `section` — opening one from
-          the Агенти catalog (or, later, anywhere else) must work the same
-          as opening it from the map itself. */}
+          the Агенти catalog (or anywhere else) must work the same as
+          opening it from the map itself. */}
       {coreOpen && <KnowledgeBase onClose={() => setCoreOpen(false)} />}
 
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {
@@ -1389,3 +608,4 @@ export default function ConstellationTest() {
     </div>
   );
 }
+

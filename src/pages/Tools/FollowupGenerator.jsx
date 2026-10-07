@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { generateOldLeadFollowup, generateFollowupStep } from '../../lib/api/followupApi';
@@ -13,13 +13,10 @@ import { copyToClipboard } from '../../lib/clipboard';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { flagClass } from '../../lib/countries';
 import Select from '../../components/common/Select';
+import ActionIcon from '../../components/common/ActionIcon';
+import { PAGE_ICONS } from '../../lib/pageIcons';
 import '../../styles/reportPage.css';
 import '../../styles/followupPage.css';
-
-// Same chevrons as DailyReportHero.jsx's own scroll-arrow row — reused verbatim
-// so the "arrows + wheel" scroll pattern looks identical wherever it appears.
-const CHEVRON_LEFT = '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>';
-const CHEVRON_RIGHT = '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
 
 // The 5-step series schedule (see followupPrompt.js for the matching prompt logic).
 // `info` is shown as a hover tooltip next to each step's tab (from the agency's
@@ -88,24 +85,6 @@ export default function FollowupGenerator() {
   const [style, setStyle] = useState(DEFAULT_STYLE_ID); // STYLE_OPTIONS id — leadType 'old' only, see buildArgs()
   const [chat, setChat] = useState('');
   const [extraContext, setExtraContext] = useState(prefill?.extraContext || '');
-
-  // Style-pill row (block 3) scrolls sideways via the two arrow buttons or
-  // the mouse wheel — same pattern as DailyReportHero.jsx's day strip.
-  const styleScrollRef = useRef(null);
-  useEffect(() => {
-    const el = styleScrollRef.current;
-    if (!el) return;
-    function onWheel(e) {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    }
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [leadType]);
-  function scrollStyleRow(dir) {
-    styleScrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
-  }
 
   const [status, setStatus] = useState({ text: '', error: false });
   const [generating, setGenerating] = useState(false);
@@ -395,272 +374,269 @@ function reloadCases() {
     ...(activeResult?.createdAt ? [{ icon: 'day', label: 'Створено', value: formatCreatedAt(activeResult.createdAt) }] : []),
   ] : [];
 
-  return (
-    <div className="report-page followup-page">
-      {prefill?.clientName && (
-        <section className="rpt-hero">
-          <p className="sub" style={{ color: 'var(--purple)' }}>
-            Підтягнуто дані угоди «{prefill.clientName}» — залишилось вставити переписку.
-          </p>
-        </section>
-      )}
 
-      <div className="fu-control-row">
-        <div className="fu-control-box">
-          <div className="fu-control-head">
-            <span className="fu-control-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.meeting }} />
-            <span className="fu-control-label">Тип Follow-up</span>
-          </div>
-          <div className="switch">
-            <button type="button" className={leadType === 'old' ? 'on' : ''} onClick={() => setLeadType('old')}>Одинарний</button>
-            <button type="button" className={leadType === 'fresh' ? 'on' : ''} onClick={() => setLeadType('fresh')}>5-ти кроковий</button>
-          </div>
-        </div>
+  // Keyboard navigation for the 5-step tab row: arrows/Home/End move both the
+  // selection and the focus, same as a native tablist.
+  function handleStepKeyDown(e) {
+    if (e.target.getAttribute('role') !== 'tab') return;
+    const idx = SERIES_STEPS.findIndex((s) => s.step === activeStep);
+    let next = null;
+    if (e.key === 'ArrowRight') next = SERIES_STEPS[(idx + 1) % SERIES_STEPS.length].step;
+    else if (e.key === 'ArrowLeft') next = SERIES_STEPS[(idx - 1 + SERIES_STEPS.length) % SERIES_STEPS.length].step;
+    else if (e.key === 'Home') next = SERIES_STEPS[0].step;
+    else if (e.key === 'End') next = SERIES_STEPS[SERIES_STEPS.length - 1].step;
+    if (next == null) return;
+    e.preventDefault();
+    setActiveStep(next);
+    document.getElementById(`fu-step-tab-${next}`)?.focus();
+  }
 
-        <div className="fu-control-box">
-          <div className="fu-control-head">
-            <span className="fu-control-icon" style={{ background: 'linear-gradient(135deg, #60A5FA, #2563EB)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.chatLink }} />
-            <span className="fu-control-label">Формат повідомлення</span>
-          </div>
-          <div className="switch">
-            <button type="button" className={format === 'upwork' ? 'on' : ''} onClick={() => setFormat('upwork')}>Upwork chat</button>
-            <button type="button" className={format === 'email' ? 'on' : ''} onClick={() => setFormat('email')}>Email</button>
-          </div>
-        </div>
-
-        <div className="fu-control-box">
-          <div className="fu-control-head">
-            <span className="fu-control-icon" style={{ background: 'linear-gradient(135deg, #F472B6, #DB2777)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }} />
-            <span className="fu-control-label">Ім&#39;я клієнта</span>
-          </div>
-          <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="наприклад, John" />
-        </div>
-
-        <div className="fu-control-box">
-          <div className="fu-control-head">
-            <span className="fu-control-icon" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.website }} />
-            <span className="fu-control-label">Мова повідомлення</span>
-          </div>
-          <Select bare value={language} onChange={setLanguage} options={LANGUAGE_OPTIONS} />
-        </div>
-
-        <div className="fu-control-box">
-          <div className="fu-control-head">
-            <span className="fu-control-icon" style={{ background: 'linear-gradient(135deg, #94A3B8, #475569)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
-            <span className="fu-control-label">Кейси для follow-up</span>
-          </div>
-          <div className="case-picker-field">
-            <span>{selected.size ? `${selected.size} ${pluralCases(selected.size)} обрано` : 'AI обере сам'}</span>
-            <button type="button" className="refreshBtn" onClick={openCasesModal}>Обрати</button>
-          </div>
-        </div>
-      </div>
-
-      {leadType === 'fresh' && (
-        <div className="fu-step-card">
-          <div className="fu-control-head">
-            <span className="fu-control-icon" style={{ background: 'linear-gradient(135deg, #FBBF24, #D97706)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.repeat }} />
-            <span className="fu-control-label">Крок серії</span>
-          </div>
-          <div className="step-switch">
-            {SERIES_STEPS.map(({ step, hint, info }) => (
-              <div className="step-switch-item" key={step}>
-                <button type="button" className={'step-btn' + (activeStep === step ? ' on' : '')} onClick={() => setActiveStep(step)}>
-                  <span className="step-btn-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.chatLink }} />
-                  Follow-up {step} <span className="hint">{hint}</span>
+  // One result card for both leadType branches (single / 5-step) — same
+  // content and actions as before, only the copy handler/label and the
+  // message source differ.
+  function renderResultBox({ text, onCopy, copyText }) {
+    return (
+      <div className="fu-result-box">
+        <div className="fu-result-box-head">
+          <span className="fu-format-pill">{FORMAT_LABELS[format]}</span>
+          <div className="fu-result-actions">
+            {isEditingResult ? (
+              <>
+                <button type="button" className="fu-btn fu-btn--ghost" onClick={handleCancelEditResult}>Скасувати</button>
+                <button type="button" className="fu-btn fu-btn--solid" onClick={handleSaveEditResult}>Зберегти</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="fu-btn fu-btn--ghost" onClick={handleStartEditResult}>
+                  <ActionIcon name="edit" size={16} />
+                  Редагувати
                 </button>
-                <div className="info-wrap">
-                  <button type="button" className="info-btn" aria-label={`Про Follow-up ${step}`}>?</button>
-                  <div className="info-tooltip" role="tooltip">{info}</div>
+                <button type="button" className="fu-btn fu-btn--ghost" onClick={onCopy}>
+                  <ActionIcon name="copy" size={16} />
+                  {copyText}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        {isEditingResult ? (
+          <textarea className="fu-result-edit" aria-label="Редагування повідомлення" value={editedText} onChange={(e) => setEditedText(e.target.value)} />
+        ) : (
+          <div className="fu-result-text">{text}</div>
+        )}
+        {metaRows.length > 0 && (
+          <div className="fu-meta-card">
+            {metaRows.map((row) => (
+              <div className="fu-meta-row" key={row.label}>
+                <div className="fu-meta-label-col">
+                  <span className="fu-meta-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[row.icon] }} />
+                  <span className="fu-meta-label">{row.label}</span>
                 </div>
+                <span className="fu-meta-value">{row.value}</span>
               </div>
             ))}
           </div>
-        </div>
+        )}
+      </div>
+    );
+  }
+
+  const stepError = leadType === 'fresh' ? activeStepData.error : null;
+  const emptyTitle = leadType === 'fresh' ? `Тут з'явиться Follow-up ${activeStep}.` : 'Тут з’явиться згенероване повідомлення.';
+  const statusId = 'fu-status';
+
+  return (
+    <div className="report-page followup-page">
+      {prefill?.clientName && (
+        <p className="fu-prefill" role="status">
+          Підтягнуто дані угоди «{prefill.clientName}» — залишилось вставити переписку.
+        </p>
       )}
 
-      <div className="fu-work-block">
-        <div className="fu-work-head">
-          <span className="fu-work-num">1</span>
-          <div className="fu-work-head-text">
-            <span className="fu-work-title">Додатковий контекст / результати</span>
-            <span className="fu-work-hint">Необов&#39;язково — якщо треба додати щось, чого немає в базі кейсів</span>
-          </div>
-        </div>
-        <div className="fu-textarea-wrap">
-          <textarea id="resultsInput" maxLength={1000} value={extraContext} onChange={(e) => setExtraContext(e.target.value)} placeholder="наприклад: цього тижня запустили нову кампанію на TikTok Ads для цього клієнта, вже 40 лідів" />
-          <span className="fu-char-count">{extraContext.length}/1000</span>
-        </div>
-      </div>
+      <div className="fu-shell">
+        <div className="fu-layout">
+          <div className="fu-col">
+            <section className="fu-panel" aria-labelledby="fu-settings-title">
+              <h2 className="fu-panel-title" id="fu-settings-title">Налаштування</h2>
 
-      <div className="workGrid">
-        <div className="field">
-          <div className="fu-work-block">
-            <div className="fu-work-head">
-              <span className="fu-work-num">2</span>
-              <div className="fu-work-head-text">
-                <span className="fu-work-title">Діалог з клієнтом</span>
-                <span className="fu-work-hint">Вставте переписку цілком або ключові фрагменти</span>
-              </div>
-              <button type="button" className="btn" onClick={handleClearChat}>Очистити</button>
-            </div>
-            <div className="fu-textarea-wrap">
-              <textarea id="chatInput" value={chat} onChange={(e) => setChat(e.target.value)} placeholder="Вставте сюди історію переписки з клієнтом..." />
-              {chat.length > 0 && <span className="fu-char-count">{chat.length} символів</span>}
-            </div>
-          </div>
-
-          {leadType === 'old' && (
-            <div className="fu-work-block fu-style-block">
-              <div className="fu-work-head">
-                <span className="fu-work-num">3</span>
-                <div className="fu-work-head-text">
-                  <span className="fu-work-title">Тон повідомлення</span>
-                  <span className="fu-work-hint">Обери стиль написання follow-up</span>
-                </div>
-              </div>
-              <div className="fu-style-row-wrap">
-                <button type="button" className="fu-style-scroll-btn" onClick={() => scrollStyleRow(-1)} aria-label="Прокрутити ліворуч">
-                  <span dangerouslySetInnerHTML={{ __html: CHEVRON_LEFT }} />
-                </button>
-                <div className="fu-style-row" ref={styleScrollRef}>
-                {STYLE_OPTIONS.map((s) => (
-                  <button
-                    type="button" key={s.id}
-                    className={'fu-style-pill' + (style === s.id ? ' on' : '')}
-                    onClick={() => setStyle(s.id)}
-                  >
-                    <span className="fu-style-pill-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[s.icon] }} />
-                    {s.label}
-                  </button>
-                ))}
-                </div>
-                <button type="button" className="fu-style-scroll-btn" onClick={() => scrollStyleRow(1)} aria-label="Прокрутити праворуч">
-                  <span dangerouslySetInnerHTML={{ __html: CHEVRON_RIGHT }} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="chatActionsRow">
-            <button type="button" className="btn btn-p" onClick={handlePrimaryGenerate} disabled={isGenerating}>
-              {isGenerating ? '...' : 'Згенерувати follow-up'}
-            </button>
-            <button type="button" className="btn" onClick={handlePrimaryGenerate} disabled={isGenerating || !hasResult}>
-              Згенерувати повторно
-            </button>
-          </div>
-          <div className={'followup-status' + (status.error ? ' err' : '')}>{status.text}</div>
-        </div>
-
-        <div className="field result-col">
-          <div className="fu-work-block fu-result-block">
-          <div className="fu-result-head">
-            <span className="fu-result-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.megaphone }} />
-            <span className="fu-result-title">Результат</span>
-            {hasResult && activeResult?.elapsedSec != null && (
-              <span className="fu-gen-badge">
-                <span className="fu-gen-badge-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} />
-                Згенеровано за {activeResult.elapsedSec} с
-              </span>
-            )}
-          </div>
-          {leadType === 'old' ? (
-            result ? (
-              <div className="result-box">
-                <div className="result-box-head">
-                  <span className="result-box-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[format === 'email' ? 'email' : 'chatLink'] }} />
-                  <div className="result-box-actions">
-                    {isEditingResult ? (
-                      <>
-                        <button type="button" className="btn" onClick={handleCancelEditResult}>Скасувати</button>
-                        <button type="button" className="btn btn-p" onClick={handleSaveEditResult}>Зберегти</button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" className="btn" onClick={handleStartEditResult}>
-                          <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }} />
-                          Редагувати
-                        </button>
-                        <button type="button" className="btn" onClick={handleCopy}>
-                          <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.copy }} />
-                          {copyLabel}
-                        </button>
-                      </>
-                    )}
+              <div className="fu-settings-grid">
+                <div className="fu-field">
+                  <span className="fu-label" id="fu-type-label">Тип follow-up</span>
+                  <div className="fu-seg" role="group" aria-labelledby="fu-type-label">
+                    <button type="button" aria-pressed={leadType === 'old'} className={leadType === 'old' ? 'on' : ''} onClick={() => setLeadType('old')}>Одинарний</button>
+                    <button type="button" aria-pressed={leadType === 'fresh'} className={leadType === 'fresh' ? 'on' : ''} onClick={() => setLeadType('fresh')}>5-ти кроковий</button>
                   </div>
                 </div>
-                {isEditingResult ? (
-                  <textarea className="fu-result-edit" value={editedText} onChange={(e) => setEditedText(e.target.value)} />
-                ) : (
-                  <div className="result-text">{result.messagePart}</div>
-                )}
-                {metaRows.length > 0 && (
-                  <div className="fu-meta-card">
-                    {metaRows.map((row) => (
-                      <div className="fu-meta-row" key={row.label}>
-                        <div className="fu-meta-label-col">
-                          <span className="fu-meta-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[row.icon] }} />
-                          <span className="fu-meta-label">{row.label}</span>
+
+                <div className="fu-field">
+                  <span className="fu-label" id="fu-format-label">Формат</span>
+                  <div className="fu-seg" role="group" aria-labelledby="fu-format-label">
+                    <button type="button" aria-pressed={format === 'upwork'} className={format === 'upwork' ? 'on' : ''} onClick={() => setFormat('upwork')}>Upwork chat</button>
+                    <button type="button" aria-pressed={format === 'email'} className={format === 'email' ? 'on' : ''} onClick={() => setFormat('email')}>Email</button>
+                  </div>
+                </div>
+
+                <div className="fu-field">
+                  <label className="fu-label" htmlFor="fu-client-name">Ім&#39;я клієнта</label>
+                  <input id="fu-client-name" className="fu-input" type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Наприклад, John" />
+                </div>
+
+                <div className="fu-field">
+                  <span className="fu-label" id="fu-lang-label">Мова</span>
+                  <Select bare className="fu-select" ariaLabel="Мова повідомлення" value={language} onChange={setLanguage} options={LANGUAGE_OPTIONS} />
+                </div>
+
+                <div className="fu-field fu-field--wide">
+                  <span className="fu-label" id="fu-cases-label">Кейси</span>
+                  <div className="fu-case-row">
+                    <div className="fu-case-field" role="status" aria-labelledby="fu-cases-label">
+                      {selected.size ? `${selected.size} ${pluralCases(selected.size)} обрано` : 'AI обере сам'}
+                    </div>
+                    <button type="button" className="fu-btn fu-btn--soft" onClick={openCasesModal}>Обрати</button>
+                  </div>
+                </div>
+
+                {leadType === 'fresh' && (
+                  <div className="fu-field fu-field--wide">
+                    <span className="fu-label" id="fu-steps-label">Крок серії</span>
+                    <div className="fu-steps" role="tablist" aria-labelledby="fu-steps-label" onKeyDown={handleStepKeyDown}>
+                      {SERIES_STEPS.map(({ step, hint, info }) => (
+                        <div className="fu-step" key={step}>
+                          <button
+                            type="button" role="tab" id={`fu-step-tab-${step}`}
+                            aria-selected={activeStep === step} tabIndex={activeStep === step ? 0 : -1}
+                            className={'fu-step-tab' + (activeStep === step ? ' on' : '')}
+                            onClick={() => setActiveStep(step)}
+                          >
+                            Follow-up {step} <span className="fu-step-hint">{hint}</span>
+                          </button>
+                          <div className="info-wrap">
+                            <button type="button" className="info-btn" aria-label={`Про Follow-up ${step}`} aria-describedby={`fu-step-info-${step}`}>?</button>
+                            <div className="info-tooltip" role="tooltip" id={`fu-step-info-${step}`}>{info}</div>
+                          </div>
                         </div>
-                        <span className="fu-meta-value">{row.value}</span>
-                      </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="fu-panel" aria-label="Повідомлення клієнта">
+              <div className="fu-block">
+                <div className="fu-block-head">
+                  <label className="fu-block-title" htmlFor="chatInput">Діалог з клієнтом</label>
+                  <button type="button" className="fu-link-btn" onClick={handleClearChat}>
+                    <ActionIcon name="clear" size={16} />
+                    Очистити
+                  </button>
+                </div>
+                <div className="fu-textarea-wrap">
+                  <textarea
+                    id="chatInput" className="fu-textarea fu-textarea--dialog" value={chat} onChange={(e) => setChat(e.target.value)}
+                    placeholder="Вставте переписку цілком або ключові фрагменти"
+                    aria-invalid={status.error && !chat.trim() ? true : undefined}
+                    aria-describedby={status.error ? statusId : undefined}
+                  />
+                  {chat.length > 0 && <span className="fu-char-count">{chat.length} символів</span>}
+                </div>
+              </div>
+
+              <div className="fu-block">
+                <div className="fu-block-head">
+                  <label className="fu-block-title" htmlFor="resultsInput">
+                    Додатковий контекст / результати <span className="fu-optional">(необов&#39;язково)</span>
+                  </label>
+                </div>
+                <div className="fu-textarea-wrap">
+                  <textarea
+                    id="resultsInput" className="fu-textarea fu-textarea--context" maxLength={1000} value={extraContext} onChange={(e) => setExtraContext(e.target.value)}
+                    placeholder="Наприклад, ваші послуги, попередні домовленості, очікуваний результат..."
+                  />
+                  <span className="fu-char-count">{extraContext.length}/1000</span>
+                </div>
+              </div>
+
+              {leadType === 'old' && (
+                <div className="fu-block">
+                  <div className="fu-block-head">
+                    <span className="fu-block-title" id="fu-tone-label">Тон повідомлення</span>
+                  </div>
+                  <div className="fu-chips" role="group" aria-labelledby="fu-tone-label">
+                    {STYLE_OPTIONS.map((s) => (
+                      <button
+                        type="button" key={s.id}
+                        className={'fu-chip' + (style === s.id ? ' on' : '')}
+                        aria-pressed={style === s.id}
+                        onClick={() => setStyle(s.id)}
+                      >
+                        {s.label}
+                      </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              <div className="fu-actions">
+                <button type="button" className="fu-btn fu-btn--primary" onClick={handlePrimaryGenerate} disabled={isGenerating}>
+                  <ActionIcon name="generate" size={20} />
+                  {isGenerating ? '...' : 'Згенерувати follow-up'}
+                </button>
+                <button type="button" className="fu-btn fu-btn--secondary" onClick={handlePrimaryGenerate} disabled={isGenerating || !hasResult}>
+                  <ActionIcon name="regenerate" size={20} />
+                  Згенерувати повторно
+                </button>
+              </div>
+              <div id={statusId} className={'followup-status' + (status.error ? ' err' : '')} role={status.error ? 'alert' : 'status'}>{status.text}</div>
+            </section>
+          </div>
+
+          <section
+            className="fu-panel fu-result-panel"
+            aria-busy={isGenerating}
+            {...(leadType === 'fresh'
+              ? { role: 'tabpanel', 'aria-labelledby': `fu-step-tab-${activeStep}` }
+              : { 'aria-labelledby': 'fu-result-title' })}
+          >
+            <div className="fu-result-head">
+              <h2 className="fu-panel-title" id="fu-result-title">Результат</h2>
+              {hasResult && activeResult?.elapsedSec != null && (
+                <span className="fu-gen-badge">
+                  <span className="fu-gen-badge-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} />
+                  Згенеровано за {activeResult.elapsedSec} с
+                </span>
+              )}
+            </div>
+
+            {hasResult ? (
+              renderResultBox(
+                leadType === 'old'
+                  ? { text: result.messagePart, onCopy: handleCopy, copyText: copyLabel }
+                  : { text: activeStepData.message, onCopy: () => handleCopyStep(activeStep, activeStepData.message), copyText: activeStepData.copyLabel || 'Скопіювати' },
+              )
+            ) : (
+              <div className="fu-empty">
+                {isGenerating ? (
+                  <>
+                    <span className="fu-spinner" aria-hidden="true" />
+                    <p className="fu-empty-title">Генеруємо повідомлення…</p>
+                  </>
+                ) : (
+                  <>
+                    <img className="fu-empty-icon" src={PAGE_ICONS['page.followup'].srcLarge} alt="" width="64" height="64" draggable="false" />
+                    {stepError ? (
+                      <p className="fu-empty-error" role="alert">Помилка: {stepError}</p>
+                    ) : (
+                      <>
+                        <p className="fu-empty-title">{emptyTitle}</p>
+                        <p className="fu-empty-hint">Додайте діалог і натисніть «Згенерувати follow-up».</p>
+                      </>
+                    )}
+                  </>
                 )}
               </div>
-            ) : (
-              <div className="result-box result-empty">Тут з&#39;явиться згенероване повідомлення.</div>
-            )
-          ) : activeStepData.message ? (
-            <div className="result-box">
-              <div className="result-box-head">
-                <span className="result-box-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[format === 'email' ? 'email' : 'chatLink'] }} />
-                <div className="result-box-actions">
-                  {isEditingResult ? (
-                    <>
-                      <button type="button" className="btn" onClick={handleCancelEditResult}>Скасувати</button>
-                      <button type="button" className="btn btn-p" onClick={handleSaveEditResult}>Зберегти</button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="btn" onClick={handleStartEditResult}>
-                        <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }} />
-                        Редагувати
-                      </button>
-                      <button type="button" className="btn" onClick={() => handleCopyStep(activeStep, activeStepData.message)}>
-                        <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.copy }} />
-                        {activeStepData.copyLabel || 'Скопіювати'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              {isEditingResult ? (
-                <textarea className="fu-result-edit" value={editedText} onChange={(e) => setEditedText(e.target.value)} />
-              ) : (
-                <div className="result-text">{activeStepData.message}</div>
-              )}
-              {metaRows.length > 0 && (
-                <div className="fu-meta-card">
-                  {metaRows.map((row) => (
-                    <div className="fu-meta-row" key={row.label}>
-                      <div className="fu-meta-label-col">
-                        <span className="fu-meta-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[row.icon] }} />
-                        <span className="fu-meta-label">{row.label}</span>
-                      </div>
-                      <span className="fu-meta-value">{row.value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="result-box result-empty">
-              {activeStepData.error ? <span className="followup-status err">Помилка: {activeStepData.error}</span> : `Тут з'явиться Follow-up ${activeStep}.`}
-            </div>
-          )}
-          </div>
+            )}
+          </section>
         </div>
       </div>
 
@@ -669,7 +645,9 @@ function reloadCases() {
           <div className="caseModal-box">
             <div className="caseModal-head">
               <h3>Кейси для follow-up</h3>
-              <button type="button" className="caseModal-close" onClick={() => setCasesModalOpen(false)} aria-label="Закрити">&times;</button>
+              <button type="button" className="caseModal-close" onClick={() => setCasesModalOpen(false)} aria-label="Закрити">
+                <ActionIcon name="close" size={20} />
+              </button>
             </div>
             <div className="caseModal-body">
               <div className="projListHead">
@@ -681,7 +659,7 @@ function reloadCases() {
                 <input type="text" value={newCaseName} onChange={(e) => setNewCaseName(e.target.value)} placeholder="Назва кейсу" />
                 <input type="text" value={newCaseDesc} onChange={(e) => setNewCaseDesc(e.target.value)} placeholder="Опис результатів" />
                 <button type="button" className="btn btn-p" onClick={handleAddCase} disabled={!newCaseName.trim() || !newCaseDesc.trim() || savingCase}>
-                  {savingCase ? '...' : '+ Додати'}
+                  {savingCase ? '...' : (<><ActionIcon name="create" size={16} /> Додати</>)}
                 </button>
               </div>
 
@@ -713,7 +691,10 @@ function reloadCases() {
               </div>
             </div>
             <div className="caseModal-foot">
-              <button type="button" className="btn btn-p" onClick={confirmCasesSelection}>Обрати</button>
+              <button type="button" className="btn btn-p" onClick={confirmCasesSelection}>
+                <ActionIcon name="select" size={16} />
+                {' '}Обрати
+              </button>
               <button type="button" className="btn" onClick={() => setCasesModalOpen(false)}>Скасувати</button>
             </div>
           </div>

@@ -1,0 +1,62 @@
+/* Image Studio panel additions for the DOM-renderer editor (cover type tiles,
+   hex colour fields, tag list, text-size sliders, image grid, saved cases).
+   Scoped to .studio-page; the shared tokens/classes (.si-*, .field, .slot…)
+   come from imageStudioPage.css. */
+
+.studio-page .type-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.studio-page .type-grid .fmt-btn { flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px; min-height: 64px; }
+.studio-page .type-grid .fmt-btn.on { padding: 9px; }
+.studio-page .type-grid .fmt-nm { font-size: 12px; line-height: 16px; }
+
+/* colour cells: label, well, editable hex */
+.studio-page .color-cell { cursor: default; }
+.studio-page .color-name { cursor: pointer; }
+.studio-page .color-hex {
+  width: 100%; min-height: 28px; padding: 0 4px; border: 1px solid var(--si-border); border-radius: 8px; background: #fff;
+  color: var(--si-ink-2); font: 400 11px 'Space Mono', ui-monospace, monospace; letter-spacing: 0; text-transform: uppercase; text-align: center;
+}
+.studio-page .color-hex:focus { border-color: var(--si-accent); outline: none; }
+.studio-page .color-hex:focus-visible { outline: 2px solid var(--si-accent); outline-offset: 2px; }
+
+.studio-page .si-note { margin: 0; font-family: var(--font-body); font-size: 12px; line-height: 16px; color: var(--si-muted); }
+.studio-page .si-error { margin: 0; font-family: var(--font-body); font-size: 12px; line-height: 16px; color: #B3261E; }
+
+/* tags */
+.studio-page .tags-ed { display: flex; flex-direction: column; gap: 8px; }
+.studio-page .tag-row { display: flex; align-items: center; gap: 8px; }
+.studio-page .tag-row.is-hidden .field { opacity: .5; }
+.studio-page .tag-dot { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #CDBAD3; background: #fff; cursor: pointer; padding: 0; }
+.studio-page .tag-dot.on { border-color: var(--si-accent); background: radial-gradient(circle, var(--si-accent) 0 45%, #fff 50%); }
+.studio-page .tag-del {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px;
+  background: none; color: var(--si-ink-2); cursor: pointer;
+}
+.studio-page .si-link:disabled { opacity: .5; cursor: default; }
+
+/* text-size sliders */
+.studio-page .size-row { display: grid; grid-template-columns: 72px minmax(0, 1fr) 44px; align-items: center; gap: 10px; }
+.studio-page .size-row label { font-family: var(--font-body); font-size: 13px; color: var(--si-ink-2); }
+.studio-page .size-row output { font-family: var(--font-body); font-size: 12px; color: var(--si-ink-2); text-align: right; }
+.studio-page .size-row input[type=range] { width: 100%; accent-color: var(--si-accent); min-height: 24px; }
+
+/* multi-image upload grid (phone screens + portrait) */
+.studio-page .img-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* saved cases */
+.studio-page .cases { display: flex; flex-direction: column; gap: 10px; }
+.studio-page .cases-add { display: flex; gap: 8px; }
+.studio-page .cases-add .field { flex: 1; min-width: 0; }
+.studio-page .cases-add .si-btn { min-height: 40px; padding: 0 14px; }
+.studio-page .cases-add .si-btn:disabled { opacity: .5; cursor: default; }
+.studio-page .cases-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.studio-page .cases-list li { display: flex; align-items: center; gap: 6px; }
+.studio-page .case-apply {
+  flex: 1; min-width: 0; min-height: 40px; padding: 0 12px; text-align: left; border: 1px solid var(--si-border); border-radius: 10px; background: #fff;
+  color: var(--si-ink); font: 500 14px var(--font-body); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* preview: the cover fills the stage at its real ratio */
+.studio-page .stage-cover { width: min(100cqw, calc(100cqh * 1.3333)); }
+@container (max-width: 849px) {
+  .studio-page .stage-cover { width: 100%; }
+}

@@ -43,7 +43,7 @@ export default function AgentWorkspaceShell({ agentKey, onClose, children }) {
       <div className="agent-workspace-panel">
         <div className="agent-workspace-panel-glow" />
         <AgentWorkspaceHeader
-          orb={agent && <AgentOrb color={agent.color} icon={agent.icon} size={112} />}
+          orb={agent && <AgentOrb icon={agent.icon} size={96} />}
           kicker={agent ? `AI-АГЕНТ · ${agent.deptLabel.toUpperCase()}` : 'AI-АГЕНТ'}
           name={agent?.name}
           description={agent?.description}

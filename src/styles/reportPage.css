@@ -683,3 +683,12 @@ body.capturing .save-row {
 .view:has(.monthly-report-page),
 .view:has(.annual-report-page),
 .view:has(.reports-compare-page) { max-width: none; opacity: 1; transform: none; animation: none; }
+
+/* Auto-counted leads (from the report's own "Клієнти" rows) next to a channel's title. */
+.chbox-leads { margin-left: auto; padding: 4px 11px; border-radius: 999px; background: var(--purple-tint); color: var(--purple); font-family: var(--font-head); font-weight: 700; font-size: .72rem; letter-spacing: .02em; }
+
+/* "З угод" line: QL / Contracts derived from deals, next to the hand-typed numbers. */
+.auto-deal-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: -6px 0 14px; padding: 9px 14px; border-radius: 12px; background: var(--purple-tint); border: 1px solid var(--border); font-family: var(--font-body); font-size: .8rem; color: var(--ink); }
+.auto-deal-stats-label { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--purple); }
+.auto-deal-stats-item i { font-style: normal; color: var(--muted); }
+.auto-deal-stats.differs { border-color: var(--purple); }

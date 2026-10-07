@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createTask, updateTaskFields } from '../../lib/api/tasks';
 import { createTaskAssignedNotification } from '../../lib/api/notifications';
@@ -7,6 +7,7 @@ import Select from '../common/Select';
 import DatePicker from '../common/DatePicker';
 import TimePicker from '../common/TimePicker';
 import DealPicker from './DealPicker';
+import ActionIcon from '../common/ActionIcon';
 
 const DIAMOND_ICON = '<svg viewBox="0 0 24 24"><path d="M12 2l10 10-10 10L2 12z"/></svg>';
 const CROWN_ICON = '<svg viewBox="0 0 24 24"><path d="M4 8l4 3 4-6 4 6 4-3-1.5 10h-13z"/><path d="M6.5 19h11"/></svg>';
@@ -36,6 +37,13 @@ const PRIORITY_CHIPS = [
   { value: 'low', label: 'Низький', color: '#16A34A', tint: '#DCFCE7' },
 ];
 
+// Hub (Sales «Задачі») palette — same soft tones as that page's priority badges.
+const PRIORITY_CHIPS_HUB = [
+  { value: 'high', label: 'Високий', color: '#B3261E', tint: '#FDE8EA' },
+  { value: 'medium', label: 'Середній', color: '#9A5B00', tint: '#FFF1D6' },
+  { value: 'low', label: 'Низький', color: '#4B3FB0', tint: '#ECE9FB' },
+];
+
 // `initDateTime(iso)` splits a scheduled_at timestamp back into the same
 // separate date/time strings the form edits, in local time (matching how
 // handleSubmit below re-composes them into an ISO string on save).
@@ -54,7 +62,9 @@ function initDateTime(iso) {
 // task doesn't move it to a different deal), and saving calls
 // `updateTaskFields` instead of `createTask`. `onSaved(patch)` replaces
 // `onCreated(row)` as the edit-mode completion callback.
-export default function CreateDealTaskModal({ deals, profiles, myEmail, task, deal: fixedDeal, onClose, onCreated, onSaved }) {
+// `hub` opts into the Sales «Задачі» page's light form styling (dealTasksPage.css);
+// without it the form looks as before (the deal card's own popup).
+export default function CreateDealTaskModal({ deals, profiles, myEmail, task, deal: fixedDeal, onClose, onCreated, onSaved, hub }) {
   const editing = !!task;
   const initDT = editing ? initDateTime(task.scheduled_at) : { date: '', time: '' };
   const [type, setType] = useState(editing ? (task.activity_type || 'task') : 'task');
@@ -68,6 +78,26 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
   const [adding, setAdding] = useState(false);
 
   const meta = metaFor(type);
+
+  // Hub variant: Escape closes, Tab stays inside the form, focus returns to
+  // whatever opened it.
+  const boxRef = useRef(null);
+  useEffect(() => {
+    if (!hub) return undefined;
+    const opener = document.activeElement;
+    function onKey(e) {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+      if (e.key !== 'Tab' || !boxRef.current) return;
+      const f = [...boxRef.current.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => !el.disabled && el.offsetParent !== null);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    return () => { document.removeEventListener('keydown', onKey, true); opener?.focus?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hub]);
 
   async function handleSubmit() {
     const trimmed = text.trim();
@@ -122,8 +152,8 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
   }
 
   return createPortal(
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tmodal-box task-modal-box">
+    <div className={'tmodal-overlay' + (hub ? ' task-modal-hub' : '')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="tmodal-box task-modal-box" ref={boxRef} role="dialog" aria-modal="true" aria-label={editing ? meta.editTitle : meta.title}>
         <div className="tmodal-head">
           <div className="pipeline-modal-head">
             <span className="pipeline-modal-head-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[meta.icon] }} />
@@ -132,7 +162,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
               <p>{meta.sub}</p>
             </div>
           </div>
-          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>
+          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">{hub ? <ActionIcon name="close" size={20} /> : <>&times;</>}</button>
         </div>
         <div className="tmodal-body">
           {/* Switching type is only a create-time choice — an existing task
@@ -192,7 +222,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
                 </div>
               </div>
               <div className="task-priority-chips">
-                {PRIORITY_CHIPS.map((p) => {
+                {(hub ? PRIORITY_CHIPS_HUB : PRIORITY_CHIPS).map((p) => {
                   const active = priority === p.value;
                   return (
                     <button
@@ -251,7 +281,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
         <div className="tmodal-foot">
           <button type="button" className="btn" onClick={onClose}>Скасувати</button>
           <button type="button" className="btn btn-p" onClick={handleSubmit} disabled={adding || !text.trim() || (!editing && !deal)}>
-            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[editing ? 'check' : 'plus'] }} />
+            {hub && !editing ? <ActionIcon name="create" size={18} /> : <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[editing ? 'check' : 'plus'] }} />}
             {adding ? (editing ? 'Зберігаємо...' : 'Додаємо...') : (editing ? 'Зберегти' : meta.addLabel)}
           </button>
         </div>

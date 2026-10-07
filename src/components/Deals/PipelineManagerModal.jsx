@@ -120,7 +120,7 @@ export default function PipelineManagerModal({ pipelines, onClose, onChanged }) 
   // a modal that's still a descendant of <main> renders under it. Moving the
   // overlay out to be a direct child of <body> sidesteps that entirely.
   return createPortal(
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="tmodal-box pipeline-manager-modal">
         <div className="tmodal-head">
           <div className="pipeline-modal-head">

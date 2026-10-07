@@ -2,7 +2,8 @@ import { useState } from 'react';
 
 const EDIT_ICON = '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
 const TRASH_ICON = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
-const PLUS_ICON = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+// canonical action-create symbol (public/icons/action-icons.svg) — the same plus the rest of the app uses
+const PLUS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons/action-icons.svg#action-create"/></svg>';
 
 // The sidebar's "Фреймворки" tab — a reusable library of audit frameworks
 // (name + instructions), selectable, editable, deletable. CRUD calls and

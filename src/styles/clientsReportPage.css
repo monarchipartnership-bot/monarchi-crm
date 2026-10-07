@@ -28,8 +28,10 @@
 .view:has(.clients-report-page){
   flex:1; min-height:0;
   max-width:none; opacity:1; transform:none; animation:none;
-  margin-left:clamp(-54px,-4vw,-20px);
-  margin-right:clamp(-54px,-4vw,-20px);
+  /* cancel exactly .main's horizontal padding, no more (a bigger negative
+     margin pulled the page under the app sidebar) */
+  margin-left:calc(-1 * clamp(14px, 1.5vw, 24px));
+  margin-right:calc(-1 * clamp(14px, 1.5vw, 24px));
   width:auto;
 }
 .clients-report-page *{box-sizing:border-box;}

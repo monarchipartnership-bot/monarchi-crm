@@ -1,280 +1,309 @@
-/* "Задачі" — cross-deal task/call inbox. Layout/tables/filters/pagination
-   all reuse existing shared classes (reportPage/clientsDirectory/dealsBoard);
-   only the bits specific to this page's table cells live here. */
+/* Sales — Задачі (kit "update sales tasks"): summary → scopes + create →
+   filters → view switch → one of three views (Список / Календар / Канбан за
+   пріоритетом). Everything is scoped under .dtp-page (plus the :has() hooks on
+   the shared layout and the .task-modal-hub / .dtp-detail dialogs), so the
+   sidebar and other pages are untouched. Tokens from the kit: page #FBF8FD,
+   surface #fff, ink #270827, secondary #746080, border #EADFF0, accent #B544B5,
+   primary gradient #B544B5 → #661466 (the shared .btn-p). */
 
-/* Replaces the old title+subtitle hero — just the tab strip (kept compact,
-   shrink-to-fit rather than stretched across the row) with "Створити
-   задачу" pushed to the far end of the same row. */
-.deal-tasks-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
-.deal-tasks-tabs { flex: none; margin-bottom: 0; }
-.deal-tasks-tab-count {
-  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 100px;
-  background: var(--surface); font-size: .72rem; font-weight: 700;
+.main:has(.dtp-page) { background: #FBF8FD; padding-bottom: 24px; }
+.view:has(.dtp-page) {
+  max-width: none; opacity: 1; transform: none; animation: none;
+  margin-left: 0; margin-right: 0; width: auto;
 }
-.chan-tab.active .deal-tasks-tab-count { background: rgba(255, 255, 255, .25); color: #fff; }
 
-.deal-tasks-subtitle { margin-top: 2px; font-size: .78rem; color: var(--muted); }
-
-/* The task list itself — each row its own floating rounded card (soft
-   shadow, gap between rows) instead of a plain bordered table, matching
-   the "card list" look asked for. A CSS grid (not a real <table>) is what
-   makes a per-row box-shadow + border-radius actually render reliably —
-   box-shadow on a table row is inconsistently supported across browsers. */
-.deal-tasks-grid { display: flex; flex-direction: column; gap: 10px; }
-.deal-tasks-grid-header, .deal-tasks-grid-row {
-  display: grid; grid-template-columns: 2fr 1.6fr 1fr 1fr 1.15fr 1.5fr 1.25fr 24px;
-  align-items: center; gap: 16px; padding: 0 18px;
+.dtp-page {
+  --dtp-surface: #fff;
+  --dtp-ink: #270827;
+  --dtp-muted: #746080;
+  --dtp-border: #EADFF0;
+  --dtp-pale: #F8EEF9;
+  --dtp-track: #F5EFFB;
+  --dtp-accent: #B544B5;
+  --dtp-plum: #661466;
+  --dtp-bad: #B3261E;
+  --dtp-shadow: 0 6px 24px rgba(39, 8, 39, .035);
+  color: var(--dtp-ink);
+  font-family: var(--font-body);
+  /* 24px content padding on desktop (16px on mobile) from the screen edge —
+     .main already contributes clamp(14px, 1.5vw, 24px). */
+  padding-inline: calc(24px - clamp(14px, 1.5vw, 24px));
+  display: flex; flex-direction: column; gap: 16px; min-width: 0;
 }
-.deal-tasks-grid-header {
-  padding: 4px 18px 10px; font-family: var(--font-head); font-size: .68rem; font-weight: 700;
-  letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+@media (max-width: 640px) {
+  .dtp-page { padding-inline: calc(16px - clamp(14px, 1.5vw, 24px)); }
 }
-.deal-tasks-grid-settings {
-  border: none; background: none; color: var(--muted); cursor: pointer; display: inline-flex; padding: 2px;
+.dtp-page *, .dtp-page *::before, .dtp-page *::after { box-sizing: border-box; }
+.dtp-page { position: relative; }
+.dtp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.dtp-ic { display: inline-flex; flex: none; }
+.dtp-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dtp-muted { color: var(--dtp-muted); }
+.dtp-flip { transform: rotate(180deg); }
+
+.dtp-page :is(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--dtp-accent); outline-offset: 2px; }
+
+/* ---------- summary ---------- */
+.dtp-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.dtp-metric {
+  display: flex; align-items: center; gap: 14px; min-height: 80px; padding: 14px 18px;
+  background: var(--dtp-surface); border: 1px solid var(--dtp-border); border-radius: 18px; box-shadow: var(--dtp-shadow);
 }
-.deal-tasks-grid-settings:disabled { opacity: .5; cursor: default; }
-.deal-tasks-grid-settings svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.deal-tasks-grid-row {
-  background: #fff; border-radius: 16px; padding: 14px 18px;
-  box-shadow: 0 4px 18px rgba(80, 30, 100, .07); cursor: pointer;
-  transition: transform .15s ease, box-shadow .15s ease;
+.dtp-metric-ic {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--dtp-pale); color: var(--dtp-plum);
 }
-.deal-tasks-grid-row:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(80, 30, 100, .14); }
+.dtp-metric-ic .dtp-ic svg { width: 20px; height: 20px; }
+.dtp-metric.overdue .dtp-metric-ic { background: #FDE8EA; color: var(--dtp-bad); }
+.dtp-metric.done .dtp-metric-ic { background: #E5F5EC; color: #1E7A4E; }
+.dtp-metric-label { font: 500 13px/1.3 var(--font-body); color: var(--dtp-muted); }
+.dtp-metric-value { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font: 800 26px/1.1 var(--font-head); font-variant-numeric: tabular-nums; }
+.dtp-delta { font: 600 12px/1 var(--font-body); color: var(--dtp-muted); }
 
-/* Задача cell — a themed rounded-square icon (same color/tint as the Тип
-   badge) to the left of the title/subtitle, vertically centered as one
-   unit rather than the text sitting on its own at the row's top edge. */
-.deal-tasks-title-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.deal-tasks-title-text { min-width: 0; }
-.deal-tasks-title-ic {
-  flex: none; width: 34px; height: 34px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
+/* ---------- scopes + create ---------- */
+.dtp-scope-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.dtp-scopes {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 14px;
+  background: var(--dtp-surface); border: 1px solid var(--dtp-border);
 }
-.deal-tasks-title-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-
-.deal-tasks-date { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; color: var(--ink); white-space: nowrap; }
-.deal-tasks-date svg { flex: none; width: 14px; height: 14px; color: var(--muted); stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-
-/* Тип/Статус chips — a soft-rectangle outline (not a full pill) so they
-   read as a bordered tag rather than a solid capsule; border color is the
-   chip's own color at reduced opacity, same `${color}4D` convention as
-   MyRequestsPanel's own type tags. */
-.deal-tasks-badge {
-  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 7px;
-  font-family: var(--font-head); font-size: .74rem; font-weight: 700; white-space: nowrap;
+.dtp-scope {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--dtp-ink); font: 600 14px/1 var(--font-head); cursor: pointer;
 }
-.deal-tasks-badge svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-.deal-tasks-assignee { display: inline-flex; align-items: center; gap: 7px; font-size: .84rem; color: var(--ink); }
-
-.deal-tasks-page-size {
-  display: flex; align-items: center; gap: 8px; font-family: var(--font-body); font-size: .82rem; color: var(--muted);
+.dtp-scope[aria-pressed="true"] { background: linear-gradient(88deg, #B544B5 3.66%, #661466 87.2%); color: #fff; }
+.dtp-scope-count {
+  min-width: 22px; padding: 3px 7px; border-radius: 999px; background: var(--dtp-pale); color: var(--dtp-plum);
+  font: 700 12px/1 var(--font-head); text-align: center; font-variant-numeric: tabular-nums;
 }
-.deal-tasks-page-size .ui-select { width: 70px; }
+.dtp-scope[aria-pressed="true"] .dtp-scope-count { background: rgba(255, 255, 255, .24); color: #fff; }
+.dtp-create { min-height: 44px; }
 
-/* Deal name reads as a link (the row itself already navigates to it on
-   click) — same purple-link convention as .client-file-name elsewhere,
-   not a literal blue since the app's own brand color is purple. */
-.deal-tasks-link { color: var(--purple); font-weight: 600; }
-
-/* Continuous soft pulse on "Високий" only — a slow opacity breathe (not a
-   jarring blink) so the most urgent items keep quietly drawing the eye
-   even when nothing else on the row changes. Shared .deal-tasks-badge class
-   with Тип/Статус now that Пріоритет is also an outlined chip. */
-@keyframes deal-tasks-priority-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .45; }
+/* ---------- filters ---------- */
+.dtp-filters {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 14px; align-items: end; padding: 16px 18px;
+  background: var(--dtp-surface); border: 1px solid var(--dtp-border); border-radius: 18px; box-shadow: var(--dtp-shadow);
 }
-.deal-tasks-badge.pulse { animation: deal-tasks-priority-pulse 1.6s ease-in-out infinite; }
+.dtp-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.dtp-field--search { grid-column: span 1; }
+.dtp-field label { font: 600 12px/1.2 var(--font-body); color: var(--dtp-muted); }
+.dtp-field .ui-select, .dtp-field .date-picker { width: 100%; }
+.dtp-search { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid var(--dtp-border); border-radius: 12px; background: #fff; color: var(--dtp-muted); }
+.dtp-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--dtp-ink); font: 500 14px/1 var(--font-body); }
+.dtp-search:focus-within { border-color: var(--dtp-accent); }
+.dtp-reset { min-height: 44px; width: 100%; justify-content: center; }
+.dtp-field .ui-select-trigger, .dtp-field .date-picker-trigger { min-height: 44px; border-radius: 12px; }
 
-/* Pages centered between the range hint (left) and page-size picker
-   (right) — .month-pagination-pages' own margin-left:auto (meant for a
-   2-column hint+pages layout elsewhere) is overridden here for this
-   3-column one. */
-.deal-tasks-page .month-pagination { justify-content: space-between; }
-.deal-tasks-page .month-pagination-pages { flex: 1; justify-content: center; margin-left: 0; }
-
-/* KPI cards reuse "Мої заявки"'s own card shape (.myreq-kpi-card/-spark/-bar
-   in myRequestsPage.css) — solid tinted background + a little bar-chart
-   illustration, instead of .dash-kpi's flat var(--surface) card + line
-   sparkline. One color per card's meaning, same pairing used for
-   .ti-card__icon/.delta-badge elsewhere. */
-.deal-tasks-kpi-card.purple { background: var(--purple-tint); }
-.deal-tasks-kpi-card.purple .myreq-kpi-ic, .deal-tasks-kpi-card.purple .myreq-kpi-bar { color: var(--purple); background: var(--purple); }
-.deal-tasks-kpi-card.purple .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
-
-.deal-tasks-kpi-card.yellow { background: #FCF3DA; }
-.deal-tasks-kpi-card.yellow .myreq-kpi-ic, .deal-tasks-kpi-card.yellow .myreq-kpi-bar { color: var(--warn); background: var(--warn); }
-.deal-tasks-kpi-card.yellow .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
-
-.deal-tasks-kpi-card.red { background: #FBEAEA; }
-.deal-tasks-kpi-card.red .myreq-kpi-ic, .deal-tasks-kpi-card.red .myreq-kpi-bar { color: var(--bad); background: var(--bad); }
-.deal-tasks-kpi-card.red .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
-
-.deal-tasks-kpi-card.green { background: #E9F7EF; }
-.deal-tasks-kpi-card.green .myreq-kpi-ic, .deal-tasks-kpi-card.green .myreq-kpi-bar { color: var(--ok); background: var(--ok); }
-.deal-tasks-kpi-card.green .myreq-kpi-ic { background: rgba(255, 255, 255, .7); }
-
-/* Toolbar row — every filter always visible side by side (matching "Мій
-   кабінет"'s .myreq-filters/.pf, reused as-is here) plus the view-mode
-   toggle docked to the far right. Kept to one line: fields shrink instead
-   of wrapping to a second row, with horizontal scroll as the fallback on
-   anything narrower than that (rather than silently clipping content). */
-.deal-tasks-toolbar { display: flex; align-items: flex-end; gap: 14px; flex-wrap: nowrap; margin-bottom: 18px; overflow-x: auto; padding-bottom: 2px; }
-.deal-tasks-toolbar .myreq-filters { margin-bottom: 0; flex: 1; flex-wrap: nowrap; min-width: 0; gap: 10px; }
-/* .pf's own margin-bottom (projectsPage.css, meant for a plain stacked form
-   layout) otherwise leaves a 14px gap below every field's actual content —
-   align-items:flex-end aligns to the *margin* box, so that gap sits between
-   the visible control and the row's true bottom, throwing off alignment
-   against .deal-tasks-view-toggle next to it. */
-.deal-tasks-toolbar .pf { min-width: 108px; flex: 1 1 108px; margin-bottom: 0; }
-.deal-tasks-toolbar .pf.myreq-keyword { flex: 1.6 1 150px; min-width: 150px; }
-.deal-tasks-toolbar .pf.myreq-reset-wrap { flex: none; }
-.deal-tasks-toolbar .pf .ui-select,
-.deal-tasks-toolbar .pf .date-picker { width: 100%; }
-
-/* Height matched to .myreq-reset's rendered box (35px, border-box) so the two
-   sit flush at both top and bottom under the toolbar's shared align-items:flex-end
-   — matching only the bottom left a visible height mismatch between them. */
-.deal-tasks-view-toggle { flex: none; display: flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 10px; padding: 2px; background: #fff; height: 35px; box-sizing: border-box; }
-.deal-tasks-view-toggle button {
-  width: 32px; height: 29px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 7px;
-  color: var(--muted); cursor: pointer; transition: background .15s, color .15s;
+/* ---------- view switch ---------- */
+.dtp-views { display: inline-flex; flex-wrap: wrap; gap: 6px; align-self: flex-start; }
+.dtp-view {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 12px;
+  border: 1px solid var(--dtp-border); background: var(--dtp-surface); color: var(--dtp-ink); font: 600 14px/1 var(--font-head); cursor: pointer;
 }
-.deal-tasks-view-toggle button svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.deal-tasks-view-toggle button:hover:not(:disabled) { background: var(--surface); }
-.deal-tasks-view-toggle button.on { background: var(--purple); color: #fff; }
-.deal-tasks-view-toggle button:disabled { opacity: .4; cursor: default; }
+.dtp-view[aria-pressed="true"] { border-color: transparent; background: linear-gradient(88deg, #B544B5 3.66%, #661466 87.2%); color: #fff; }
 
-/* Task detail popup — its own widened box (default .task-detail-box/-text/
-   -meta classes stay untouched since DealDetailModal's history popup still
-   uses those; this one gets fresh deal-tasks-detail-* names throughout so
-   neither can bleed into the other). */
-.deal-tasks-detail-box { max-width: 540px; width: 100%; }
+/* ---------- shared panel / states ---------- */
+.dtp-panel { background: var(--dtp-surface); border: 1px solid var(--dtp-border); border-radius: 18px; box-shadow: var(--dtp-shadow); }
+.dtp-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 48px 20px; text-align: center; }
+.dtp-empty-ic { width: 64px; height: 64px; object-fit: contain; }
+.dtp-empty-title { margin: 0; font: 700 16px/1.3 var(--font-head); }
+.dtp-skeleton { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.dtp-skeleton-row { height: 56px; border-radius: 12px; background: linear-gradient(90deg, #F5EFFB, #FBF8FD, #F5EFFB); background-size: 200% 100%; animation: dtp-shimmer 1.4s linear infinite; }
+@keyframes dtp-shimmer { to { background-position: -200% 0; } }
 
-.deal-tasks-detail-when { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: .84rem; color: var(--muted); margin-top: 3px; }
-.deal-tasks-detail-when svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* ---------- badges ---------- */
+.dtp-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font: 700 12px/1.2 var(--font-head); white-space: nowrap; }
+.dtp-badge .dtp-ic svg { width: 12px; height: 12px; stroke-width: 2; }
+.dtp-type-chip, .dtp-type { display: inline-flex; align-items: center; gap: 5px; font: 600 12px/1.2 var(--font-body); color: var(--dtp-muted); }
+.dtp-type-chip { margin-top: 4px; padding: 2px 9px; border-radius: 999px; background: var(--dtp-pale); color: var(--dtp-plum); }
+.dtp-sub { margin-top: 2px; font: 400 12px/1.4 var(--font-body); color: var(--dtp-muted); }
+.dtp-deal-link { display: inline-flex; align-items: center; gap: 5px; color: var(--dtp-plum); font: 600 14px/1.35 var(--font-body); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.dtp-deal-link .dtp-ic svg { width: 14px; height: 14px; }
+.dtp-deal-missing { color: var(--dtp-muted); font: 500 14px/1.35 var(--font-body); }
+.dtp-assignee { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; font: 500 14px/1.3 var(--font-body); overflow-wrap: anywhere; }
+.dtp-avatar { width: 28px; height: 28px; font-size: .62rem; flex: none; }
+.dtp-date { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1.3 var(--font-body); color: var(--dtp-ink); white-space: nowrap; }
+.dtp-date.overdue, .dtp-date-cell.overdue { color: var(--dtp-bad); font-weight: 600; }
 
-.deal-tasks-detail-close {
-  width: 34px; height: 34px; border-radius: 10px; background: var(--surface) !important; flex: none;
-  display: flex; align-items: center; justify-content: center; font-size: 18px;
-}
-.deal-tasks-detail-close:hover { background: #FBEAEA !important; }
+/* ---------- list ---------- */
+.dtp-table-panel { overflow: hidden; }
+.dtp-table-wrap { overflow-x: auto; position: relative; }
+.dtp-table { width: 100%; min-width: 1060px; border-collapse: collapse; }
+.dtp-table th { padding: 12px 16px; text-align: left; background: #F8F2FC; color: var(--dtp-ink); font: 700 13px/1.2 var(--font-head); white-space: nowrap; }
+.dtp-table td { padding: 14px 16px; border-top: 1px solid var(--dtp-border); vertical-align: middle; font: 500 14px/1.4 var(--font-body); }
+.dtp-table tbody tr { cursor: pointer; }
+.dtp-table tbody tr:focus-visible { outline: 2px solid var(--dtp-accent); outline-offset: -2px; }
+.dtp-sr-th { width: 56px; }
+.dtp-table th:nth-child(1) { min-width: 260px; }
+.dtp-table th:nth-child(2) { min-width: 230px; }
+.dtp-table th:nth-child(3) { min-width: 170px; }
+.dtp-table th:nth-child(4) { min-width: 130px; }
+.dtp-table td:nth-child(4) { white-space: nowrap; }
+.dtp-table th:nth-child(5), .dtp-table th:nth-child(6) { min-width: 130px; }
+.dtp-title-cell { display: flex; align-items: flex-start; gap: 12px; min-width: 220px; }
+.dtp-title-ic { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--dtp-pale); color: var(--dtp-plum); }
+.dtp-title-ic .dtp-ic svg { width: 18px; height: 18px; }
+.dtp-title-text { min-width: 0; }
+.dtp-title { font: 600 15px/1.35 var(--font-head); overflow-wrap: anywhere; }
+.dtp-actions-cell { text-align: right; }
 
-/* "Open the deal" box — a bordered card with its own icon badge on the
-   left and the external-link affordance boxed on the right, not just a
-   plain link line, since it's the one action in the popup that leaves it. */
-.deal-tasks-detail-dealbox {
-  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
-  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px;
-  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
+/* row menu — fixed-position so the scrollable wrapper never clips it */
+.dtp-menu-btn, .dtp-icon-btn {
+  width: 44px; height: 44px; display: inline-grid; place-items: center; border: 1px solid transparent; border-radius: 12px;
+  background: transparent; color: var(--dtp-muted); cursor: pointer;
 }
-.deal-tasks-detail-dealbox:hover { border-color: var(--purple); background: var(--purple-tint); }
-.deal-tasks-detail-dealbox-ic {
-  flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--purple-tint); color: var(--purple);
-  display: flex; align-items: center; justify-content: center;
-}
-.deal-tasks-detail-dealbox-ic svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.deal-tasks-detail-dealbox-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.deal-tasks-detail-dealbox-arrow {
-  flex: none; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); background: #fff;
-  color: var(--muted); display: flex; align-items: center; justify-content: center;
-}
-.deal-tasks-detail-dealbox-arrow svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dtp-icon-btn { border-color: var(--dtp-border); background: #fff; color: var(--dtp-ink); }
+.dtp-menu { position: fixed; z-index: 1200; min-width: 200px; padding: 6px; border-radius: 14px; background: #fff; border: 1px solid var(--dtp-border); box-shadow: 0 16px 40px rgba(39, 8, 39, .16); display: flex; flex-direction: column; }
+.dtp-menu button { min-height: 40px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; text-align: left; color: var(--dtp-ink); font: 500 14px/1 var(--font-body); cursor: pointer; }
+.dtp-menu button.danger { color: var(--dtp-bad); }
 
-.deal-tasks-detail-label {
-  display: block; font-family: var(--font-head); font-size: .66rem; font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
-}
-.deal-tasks-detail-text { font-family: var(--font-body); font-size: .9rem; color: var(--ink); line-height: 1.5; white-space: pre-wrap; }
+/* pagination */
+.dtp-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font: 400 13px/1.3 var(--font-body); color: var(--dtp-muted); }
+.dtp-pages { display: flex; flex: 1; justify-content: center; gap: 4px; flex-wrap: wrap; }
+.dtp-page-btn { min-width: 40px; height: 40px; padding: 0 10px; border: 1px solid var(--dtp-border); border-radius: 10px; background: #fff; color: var(--dtp-ink); font: 600 13px/1 var(--font-head); cursor: pointer; }
+.dtp-page-btn.on { background: var(--dtp-pale); border-color: var(--dtp-accent); color: var(--dtp-plum); }
+.dtp-page-btn:disabled { opacity: .45; cursor: default; }
+.dtp-page-size { display: flex; align-items: center; gap: 8px; }
+.dtp-page-size .ui-select { width: 76px; }
 
-.deal-tasks-detail-meta {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
-}
-.deal-tasks-detail-pill {
-  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px;
-  border: 1px solid var(--border); background: var(--surface);
-  font-family: var(--font-body); font-size: .8rem; color: var(--muted); white-space: nowrap;
-}
-.deal-tasks-detail-pill svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.deal-tasks-detail-pill b { color: var(--ink); font-weight: 700; }
+/* ---------- board ---------- */
+.dtp-board-scroll { overflow-x: auto; padding-bottom: 4px; }
+.dtp-board { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(260px, 1fr)); gap: 14px; align-items: start; }
+.dtp-col { background: var(--dtp-track); border: 1px solid var(--dtp-border); border-radius: 18px; padding: 12px; min-width: 0; }
+.dtp-col-head { display: flex; align-items: center; gap: 10px; padding: 4px 4px 12px; }
+.dtp-col-head h3 { margin: 0; font: 700 16px/1.2 var(--font-head); }
+.dtp-col-ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+.dtp-col-ic .dtp-ic svg { width: 16px; height: 16px; }
+.dtp-col-count { min-width: 26px; padding: 4px 8px; border-radius: 999px; background: #fff; border: 1px solid var(--dtp-border); font: 700 12px/1 var(--font-head); text-align: center; font-variant-numeric: tabular-nums; }
+.dtp-col-body { display: flex; flex-direction: column; gap: 12px; }
+.dtp-col-empty { padding: 20px 8px; text-align: center; color: var(--dtp-muted); font: 400 13px/1.4 var(--font-body); }
+.dtp-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; background: #fff; border: 1px solid var(--dtp-border); border-radius: 14px; cursor: pointer; box-shadow: var(--dtp-shadow); }
+.dtp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.dtp-card-title { margin: 0; font: 600 15px/1.35 var(--font-head); overflow-wrap: anywhere; }
+.dtp-card-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 
-.deal-tasks-detail-cancel-btn { background: #fff; border: 1px solid var(--bad); color: var(--bad); }
-.deal-tasks-detail-cancel-btn:hover { background: #FBEAEA; border-color: var(--bad); color: var(--bad); }
+/* ---------- calendar ---------- */
+.dtp-cal { padding: 18px; }
+.dtp-cal-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.dtp-cal-month { font: 700 17px/1.2 var(--font-head); text-transform: capitalize; }
+.dtp-cal-btns { display: flex; align-items: center; gap: 6px; }
+.dtp-cal-today { min-height: 44px; padding: 0 14px; border: 1px solid var(--dtp-border); border-radius: 12px; background: #fff; color: var(--dtp-ink); font: 600 13px/1 var(--font-head); cursor: pointer; }
+.dtp-cal-scroll { overflow-x: auto; }
+.dtp-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 6px; min-width: 784px; }
+.dtp-cal-dow { text-align: center; padding-bottom: 4px; color: var(--dtp-muted); font: 700 12px/1 var(--font-head); text-transform: uppercase; }
+.dtp-cal-cell { min-height: 104px; padding: 8px; border: 1px solid var(--dtp-border); border-radius: 12px; background: #FDFAFE; display: flex; flex-direction: column; gap: 5px; }
+.dtp-cal-cell.out { opacity: .5; }
+.dtp-cal-cell.today { border-color: var(--dtp-accent); background: var(--dtp-pale); }
+.dtp-cal-daynum { font: 700 13px/1 var(--font-head); }
+.dtp-cal-cell.today .dtp-cal-daynum { color: var(--dtp-plum); }
+.dtp-cal-items { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+.dtp-cal-chip { width: 100%; display: flex; align-items: center; gap: 6px; padding: 4px 6px; text-align: left; cursor: pointer; border: 1px solid var(--dtp-border); border-radius: 8px; background: #fff; color: var(--dtp-ink); font: 600 12px/1.3 var(--font-body); }
+.dtp-cal-chip-ic { flex: none; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; background: var(--dtp-pale); color: var(--dtp-plum); }
+.dtp-cal-chip-ic .dtp-ic svg { width: 11px; height: 11px; }
+.dtp-cal-chip-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtp-cal-more { padding: 0 2px; color: var(--dtp-muted); font: 400 12px/1.2 var(--font-body); }
+.dtp-cal-hint { margin-top: 12px; text-align: center; color: var(--dtp-muted); font: 400 13px/1.4 var(--font-body); }
 
-/* Канбан за пріоритетом — reuses the Угоди board's own funnel-column chrome
-   (.deals-board/.deals-column*, dealsBoard.css) as-is via the same
-   --stage-color custom property trick, just fed a priority color instead
-   of a pipeline stage color; only the 4-wide column count is page-specific.
-   Cards stay this page's own (a task's fields don't match DealCard's). */
-.deal-tasks-priority-board { grid-template-columns: repeat(4, 1fr); }
-@media (max-width: 900px) { .deal-tasks-priority-board { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .deal-tasks-priority-board { grid-template-columns: 1fr; } }
+/* ---------- task detail popup ---------- */
+.dtp-overlay { z-index: 1000; }
+.dtp-detail { max-width: 560px; width: calc(100vw - 32px); border-radius: 18px; border-color: var(--dtp-border, #EADFF0); }
+.dtp-detail .tmodal-head { align-items: flex-start; }
+.dtp-detail-head { display: flex; align-items: center; gap: 12px; }
+.dtp-detail-head h3 { margin: 0; font: 700 18px/1.2 var(--font-head); color: #270827; }
+.dtp-detail-when { display: inline-flex; align-items: center; gap: 6px; margin: 3px 0 0; color: #746080; font: 400 13px/1.3 var(--font-body); }
+.dtp-detail-deal { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; margin-bottom: 16px; text-align: left; cursor: pointer; border: 1px solid #EADFF0; border-radius: 12px; background: #FBF8FD; color: #746080; }
+.dtp-detail-deal-ic { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #F8EEF9; color: #661466; }
+.dtp-detail-deal-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dtp-detail-label { margin-bottom: 6px; color: #746080; font: 700 12px/1.2 var(--font-head); text-transform: uppercase; letter-spacing: .05em; }
+.dtp-detail-text { margin: 0; color: #270827; font: 400 14px/1.55 var(--font-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+.dtp-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #EADFF0; }
+.dtp-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 10px; border: 1px solid #EADFF0; background: #FBF8FD; color: #746080; font: 400 13px/1.3 var(--font-body); }
+.dtp-pill b { color: #270827; }
+.dtp-detail .dtp-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dtp-detail .dtp-icon-btn { flex: none; width: 44px; height: 44px; display: inline-grid; place-items: center; border: 1px solid #EADFF0; border-radius: 12px; background: #fff; color: #270827; cursor: pointer; }
+.dtp-detail .dtp-title-ic { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #F8EEF9; color: #661466; }
+.dtp-detail .dtp-sub { font: 400 12px/1.4 var(--font-body); color: #746080; }
+.dtp-detail .dtp-deal-link { color: #661466; font: 600 14px/1.35 var(--font-body); text-decoration: underline; }
+.dtp-cancel-task { border-color: var(--bad, #B3261E); color: var(--bad, #B3261E); background: #fff; }
+.dtp-detail :is(button, a):focus-visible { outline: 2px solid #B544B5; outline-offset: 2px; }
 
-.deal-tasks-kanban-card {
-  background: #fff; border-radius: 12px; padding: 12px; cursor: pointer;
-  box-shadow: 0 2px 10px rgba(80, 30, 100, .06); transition: transform .15s ease, box-shadow .15s ease;
+/* ---------- "Нова задача" / edit form (hub variant) ---------- */
+.task-modal-hub { z-index: 1100; }
+.task-modal-hub .task-modal-box { max-width: 700px; width: calc(100vw - 32px); border-radius: 18px; border-color: #EADFF0; }
+.task-modal-hub .tmodal-head { padding: 18px 22px; border-bottom: 1px solid #EADFF0; }
+.task-modal-hub .pipeline-modal-head h3 { color: #270827; font: 700 18px/1.2 var(--font-head); }
+.task-modal-hub .pipeline-modal-head p { color: #746080; }
+.task-modal-hub .tmodal-close { width: 44px; height: 44px; display: inline-grid; place-items: center; border: 1px solid #EADFF0; border-radius: 12px; background: #fff; color: #270827; font-size: 0; cursor: pointer; }
+.task-modal-hub .tmodal-body { padding: 18px 22px; gap: 14px; }
+.task-modal-hub .chan-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: #fff; border: 1px solid #EADFF0; margin: 0; align-self: flex-start; }
+.task-modal-hub .chan-tab { min-height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: transparent; color: #270827; font: 600 14px/1 var(--font-head); display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.task-modal-hub .chan-tab.active { background: linear-gradient(88deg, #B544B5 3.66%, #661466 87.2%); color: #fff; }
+.task-modal-hub .chan-tab:disabled { opacity: .7; cursor: default; }
+.task-modal-hub .chan-tab svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.task-modal-hub .task-modal-section { border: 1px solid #EADFF0; border-radius: 14px; padding: 14px 16px; background: #fff; margin: 0; }
+.task-modal-hub .task-modal-section-ic { background: #F8EEF9; color: #661466; }
+.task-modal-hub .task-modal-section-title { color: #270827; }
+.task-modal-hub .task-modal-section-sub { color: #746080; }
+.task-modal-hub .task-modal-grid { margin-bottom: 0; }
+.task-modal-hub .task-modal-textarea { border: 1px solid #EADFF0; border-radius: 12px; background: #fff; color: #270827; }
+.task-modal-hub .task-modal-textarea:focus { border-color: #B544B5; outline: none; }
+.task-modal-hub .task-priority-chip { min-height: 40px; border-radius: 12px; border: 1px solid #EADFF0; background: #fff; color: #270827; font-weight: 600; }
+.task-modal-hub .tmodal-foot { padding: 14px 22px; border-top: 1px solid #EADFF0; }
+.task-modal-hub .btn .action-icon { flex: none; }
+.task-modal-hub :is(button, a, input, textarea):focus-visible { outline: 2px solid #B544B5; outline-offset: 2px; }
+@media (max-width: 640px) {
+  .task-modal-hub .tmodal-body { padding: 16px; }
+  .task-modal-hub .tmodal-foot { padding: 12px 16px; }
 }
-.deal-tasks-kanban-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(80, 30, 100, .12); }
-.deal-tasks-kanban-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.deal-tasks-kanban-card-ic { flex: none; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-.deal-tasks-kanban-card-ic svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.deal-tasks-kanban-card-title { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); min-width: 0; }
-.deal-tasks-kanban-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
-.deal-tasks-kanban-status {
-  display: inline-flex; align-items: center; font-family: var(--font-head); font-weight: 700; font-size: .68rem;
-  padding: 3px 8px; border-radius: 6px; border: 1px solid transparent; white-space: nowrap;
-}
-.deal-tasks-kanban-status.done { background: linear-gradient(90deg, #fff, #BBF7D0); color: #15803D; }
-.deal-tasks-kanban-status.cancelled { background: linear-gradient(90deg, #fff, #FECACA); color: #B91C1C; }
-.deal-tasks-kanban-avatar { width: 22px; height: 22px; font-size: .55rem; }
 
-/* Календар — full 42-cell month grid (buildMonthGrid, dateHelpers.js), same
-   Monday-start/leading-trailing-days approach as DatePicker's own grid, just
-   sized for a whole page instead of a small dropdown, with task chips
-   dropped into each day instead of just a selectable number. */
-.deal-tasks-cal { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
-.deal-tasks-cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.deal-tasks-cal-month-label { font-family: var(--font-head); font-weight: 700; font-size: 1rem; color: var(--ink); text-transform: capitalize; }
-.deal-tasks-cal-nav-btns { display: flex; align-items: center; gap: 6px; }
-.deal-tasks-cal-nav-btns button {
-  height: 30px; border-radius: 8px; border: none; background: var(--surface); color: var(--ink-soft);
-  cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: var(--font-head);
+/* ---------- responsive ---------- */
+@media (max-width: 1180px) {
+  .dtp-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dtp-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-.deal-tasks-cal-nav-btns button:hover { background: var(--purple-tint); color: var(--purple); }
-.deal-tasks-cal-nav-btns button:not(.deal-tasks-cal-today-btn) { width: 30px; }
-.deal-tasks-cal-nav-btns button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.deal-tasks-cal-today-btn { padding: 0 12px; font-size: .78rem; font-weight: 600; }
+@media (max-width: 760px) {
+  .dtp-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dtp-field--search { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .dtp-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dtp-metric { padding: 12px; gap: 10px; }
+  .dtp-metric-ic { width: 36px; height: 36px; }
+  .dtp-filters { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+  .dtp-scope { padding: 0 12px; }
+  .dtp-scopes { width: 100%; }
+  .dtp-create { width: 100%; justify-content: center; }
+  .dtp-views { width: 100%; }
+  .dtp-view { flex: 1 1 auto; justify-content: center; }
+}
 
-.deal-tasks-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-.deal-tasks-cal-dow { text-align: center; font-family: var(--font-head); font-size: .68rem; font-weight: 700; color: var(--muted); padding-bottom: 4px; text-transform: uppercase; }
-.deal-tasks-cal-cell {
-  min-height: 96px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface);
-  display: flex; flex-direction: column; gap: 4px;
+@media (max-width: 420px) {
+  .dtp-summary { grid-template-columns: minmax(0, 1fr); }
 }
-.deal-tasks-cal-cell.out { opacity: .45; }
-.deal-tasks-cal-cell.today { border-color: var(--purple); background: var(--purple-tint); }
-.deal-tasks-cal-daynum { font-family: var(--font-head); font-weight: 700; font-size: .78rem; color: var(--ink); }
-.deal-tasks-cal-cell.today .deal-tasks-cal-daynum { color: var(--purple); }
-.deal-tasks-cal-items { display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow: hidden; }
-.deal-tasks-cal-chip {
-  width: 100%; display: flex; align-items: center; gap: 5px; text-align: left; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 6px; padding: 3px; background: #fff;
-  font-family: var(--font-body); font-size: .68rem; font-weight: 600; color: var(--ink); line-height: 1.3;
-  transition: border-color .12s ease, box-shadow .12s ease;
-}
-.deal-tasks-cal-chip:hover { border-color: var(--purple); box-shadow: 0 2px 8px rgba(80, 30, 100, .1); }
-.deal-tasks-cal-chip-ic {
-  flex: none; width: 16px; height: 16px; border-radius: 4px; color: #fff;
-  display: flex; align-items: center; justify-content: center;
-}
-.deal-tasks-cal-chip-ic svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.deal-tasks-cal-chip-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.deal-tasks-cal-more { font-family: var(--font-body); font-size: .66rem; color: var(--muted); padding: 0 2px; }
-.deal-tasks-cal-nodate-hint { margin-top: 12px; font-size: .78rem; color: var(--muted); text-align: center; }
 
-@media (max-width: 900px) {
-  .deal-tasks-cal-grid { grid-template-columns: repeat(7, 1fr); gap: 3px; }
-  .deal-tasks-cal-cell { min-height: 64px; padding: 4px; }
-  .deal-tasks-cal-dow { font-size: .58rem; }
+@media (prefers-reduced-motion: reduce) {
+  .dtp-skeleton-row { animation: none; }
+  .dtp-page *, .task-modal-hub *, .dtp-detail { transition: none !important; animation: none !important; }
 }
+
+/* ---------- buttons (kit tiers; override the older global .btn / .btn-p only here) ---------- */
+.dtp-page .btn, .task-modal-hub .btn, .dtp-detail .btn {
+  min-height: 44px; padding: 0 18px; border-radius: 12px; font: 600 14px/1 var(--font-head); letter-spacing: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid #EADFF0; background: #fff; color: #661466;
+}
+.dtp-page .btn:hover, .task-modal-hub .btn:hover, .dtp-detail .btn:hover { background: #fff; border-color: #EADFF0; color: #661466; }
+.dtp-page .btn-p, .task-modal-hub .btn-p, .dtp-detail .btn-p {
+  border-color: transparent; color: #fff;
+  background: linear-gradient(88deg, #B544B5 3.66%, #661466 87.2%);
+  box-shadow: 0 6px 16px rgba(102, 20, 102, .18);
+}
+.dtp-page .btn-p:hover, .task-modal-hub .btn-p:hover, .dtp-detail .btn-p:hover {
+  background: linear-gradient(88deg, #B544B5 3.66%, #661466 87.2%); border-color: transparent; color: #fff; filter: none;
+  box-shadow: 0 6px 16px rgba(102, 20, 102, .18);
+}
+.dtp-page .btn-p:disabled, .task-modal-hub .btn-p:disabled { opacity: .55; box-shadow: none; }
+.dtp-detail .btn-danger { color: #B3261E; border-color: #F2CFCB; background: #fff; }
+.dtp-detail .btn-danger:hover { color: #B3261E; border-color: #F2CFCB; background: #FDE8EA; }
+.dtp-detail .dtp-cancel-task:hover { background: #FDE8EA; border-color: #B3261E; color: #B3261E; }
+.dtp-page .btn .action-icon, .task-modal-hub .btn .action-icon, .dtp-detail .btn .action-icon { flex: none; }
+.dtp-page .btn svg, .dtp-detail .btn svg { stroke: currentColor; }

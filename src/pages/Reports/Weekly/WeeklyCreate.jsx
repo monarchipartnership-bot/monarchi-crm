@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import WeekFullness from '../../../components/Reports/Weekly/WeekFullness';
 import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
 import ChannelBlock from '../../../components/Reports/Weekly/ChannelBlock';
+import { countLeadsByUpworkChannel } from '../../../lib/upworkChannels';
+import { useDealChannelStats } from '../../../lib/dealChannelStats';
 import FinanceSection from '../../../components/Reports/Weekly/FinanceSection';
 import EditableClientList from '../../../components/Reports/EditableClientList';
 import EditableItemList from '../../../components/Reports/EditableItemList';
@@ -120,6 +122,7 @@ export default function WeeklyCreate() {
   const [period, setPeriod] = useState(initialPeriod);
   const [fields, setFields] = useState(emptyFields);
   const [clients, setClients] = useState([]);
+  const leadCounts = useMemo(() => countLeadsByUpworkChannel(clients), [clients]);
   const [tasks, setTasks] = useState({ t_plan: [], t_done: [], t_next: [], t_conc: [] });
   const [savedWeekIndexes, setSavedWeekIndexes] = useState(() => new Set());
   const [statusLabel, setStatusLabel] = useState('—');
@@ -160,6 +163,10 @@ export default function WeeklyCreate() {
 
   const weeks = computeWeeksForMonth(period.year, period.month);
   const currentWeek = weeks.find((w) => w.index === period.weekIndex) || weeks[0];
+  const dealStats = useDealChannelStats(
+    currentWeek ? isoDate(currentWeek.start.getFullYear(), currentWeek.start.getMonth() + 1, currentWeek.start.getDate()) : '',
+    currentWeek ? isoDate(currentWeek.end.getFullYear(), currentWeek.end.getMonth() + 1, currentWeek.end.getDate()) : '',
+  );
 
   function handlePeriodChange(next) {
     const dim = computeWeeksForMonth(next.year, next.month).length;
@@ -274,7 +281,7 @@ export default function WeeklyCreate() {
             t_next: tasks.t_next.map((it) => ({ text: it.text, tag: it.tag || '' })),
             t_conc: tasks.t_conc.map((it) => ({ text: it.text, tag: it.tag || '' })),
           },
-          clients: clients.map((c) => ({ name: c.name, platform: c.platform, leadType: c.leadType, title: c.title || '', text: c.text })),
+          clients: clients.map((c) => ({ name: c.name, platform: c.platform, leadType: c.leadType, title: c.title || '', text: c.text, channel: c.channel || '', upworkChannel: c.upworkChannel || '' })),
         };
         await saveWeeklyReport({ year: period.year, month: period.month, weekIndex: period.weekIndex, week: currentWeek, manager: fields.manager, data });
         setSavedWeekIndexes((prev) => new Set(prev).add(period.weekIndex));
@@ -532,6 +539,8 @@ export default function WeeklyCreate() {
         </div>
         <ChannelBlock
           channel={activeChannelData}
+          leadCount={leadCounts[activeChannelData.key]}
+          autoStats={dealStats.byBlock[activeChannelData.key] || { ql: 0, co: 0 }}
           fields={fields}
           onChange={setField}
           historyForMetric={historyForMetric}
@@ -561,6 +570,7 @@ export default function WeeklyCreate() {
         {activeOtherPlatform === 'LinkedIn' ? (
           <ChannelBlock
             channel={LI_CHANNEL}
+            autoStats={dealStats.byBlock.li || { ql: 0, co: 0 }}
             fields={fields}
             onChange={setField}
             historyForMetric={historyForMetric}
@@ -583,7 +593,7 @@ export default function WeeklyCreate() {
         <EditableClientList
           items={clients}
           onChange={(id, item) => setClients((c) => c.map((it) => (it.id === id ? item : it)))}
-          onAdd={() => setClients((c) => [...c, { id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: STATUSES[0], name: '', title: '', text: '', clientId: null, fromDaily: false }])}
+          onAdd={() => setClients((c) => [...c, { id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: STATUSES[0], name: '', title: '', text: '', clientId: null, channel: '', upworkChannel: '', fromDaily: false }])}
           onRemove={(id) => setClients((c) => c.filter((it) => it.id !== id))}
           capturing={capturing}
           iconBoxed

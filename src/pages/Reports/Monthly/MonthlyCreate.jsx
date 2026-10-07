@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MonthlyChannelBlock from '../../../components/Reports/Monthly/MonthlyChannelBlock';
+import { countLeadsByUpworkChannel } from '../../../lib/upworkChannels';
+import { useDealChannelStats } from '../../../lib/dealChannelStats';
 import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
 import MonthlyFinanceSection from '../../../components/Reports/Monthly/MonthlyFinanceSection';
 import EditableItemList from '../../../components/Reports/EditableItemList';
@@ -104,6 +106,11 @@ export default function MonthlyCreate() {
   const [weeksTotal, setWeeksTotal] = useState(0);
   const [missingWeeks, setMissingWeeks] = useState([]);
   const [clients, setClients] = useState([]);
+  const monthLeadCounts = useMemo(() => countLeadsByUpworkChannel(clients), [clients]);
+  const dealStats = useDealChannelStats(
+    isoDate(period.year, period.month, 1),
+    isoDate(period.year, period.month, new Date(period.year, period.month, 0).getDate()),
+  );
   const [tasks, setTasks] = useState({ t_next: [], t_conc: [] });
   const [legacyPlan, setLegacyPlan] = useState([]);
   const [legacyDone, setLegacyDone] = useState([]);
@@ -267,7 +274,7 @@ export default function MonthlyCreate() {
           tasks_done_count: monthSalesTasks.filter((t) => deriveTaskStatus(t) === 'done').length,
           tasks_total_count: monthSalesTasks.length,
           tasks: Object.fromEntries(TASK_SECTIONS.map((s) => [s.key, tasks[s.key].map((it) => ({ text: it.text, tag: it.tag || '' }))])),
-          clients: clients.map((c) => ({ name: c.name || '', platform: c.platform, leadType: c.leadType, title: c.title || '', text: c.text })),
+          clients: clients.map((c) => ({ name: c.name || '', platform: c.platform, leadType: c.leadType, title: c.title || '', text: c.text, channel: c.channel || '', upworkChannel: c.upworkChannel || '' })),
         };
         await saveMonthlyReport({ year: period.year, month: period.month, manager, weeksFound, weeksTotal, data });
         setStatusLabel('Збережено ' + new Date().toLocaleString('uk-UA'));
@@ -507,7 +514,7 @@ export default function MonthlyCreate() {
             </button>
           ))}
         </div>
-        <MonthlyChannelBlock channel={CHANNELS.find((c) => c.key === activeChannel) || CHANNELS[0]} sums={sums} />
+        <MonthlyChannelBlock channel={CHANNELS.find((c) => c.key === activeChannel) || CHANNELS[0]} sums={sums} leadCount={monthLeadCounts[(CHANNELS.find((c) => c.key === activeChannel) || CHANNELS[0]).key]} autoStats={dealStats.byBlock[(CHANNELS.find((c) => c.key === activeChannel) || CHANNELS[0]).key] || { ql: 0, co: 0 }} />
       </section>
 
       <section className="report-section">
@@ -530,7 +537,7 @@ export default function MonthlyCreate() {
           ))}
         </div>
         {activeOtherPlatform === 'LinkedIn' ? (
-          <MonthlyChannelBlock channel={LI_CHANNEL} sums={sums} />
+          <MonthlyChannelBlock channel={LI_CHANNEL} sums={sums} autoStats={dealStats.byBlock.li || { ql: 0, co: 0 }} />
         ) : (
           <div className="empty-state">
             <p>Розділ «{activeOtherPlatform}» у розробці — показники для цієї платформи буде додано пізніше.</p>

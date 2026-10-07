@@ -1,0 +1,270 @@
+/* Контакти — Soft Volume update ("update contacts" kit). Visual layer only:
+   every rule is scoped under .contacts-design (the directory page, a contact's
+   card and the dialogs they open), so the sidebar, other pages and shared
+   global components are untouched. Status and platform colours are the
+   existing semantic tokens (inline, from STATUS_META / platformColor) and are
+   not overridden here; text always accompanies colour. */
+
+.main:has(.contacts-design) { background: linear-gradient(180deg, #fbf9ff 0%, #f8f5ff 45%, #f6f1ff 100%); padding-bottom: 28px; }
+.view:has(.contacts-design) { max-width: none; opacity: 1; transform: none; animation: none; margin-left: 0; margin-right: 0; width: auto; }
+
+.contacts-design {
+  --contacts-bg: #f8f5ff;
+  --contacts-surface: linear-gradient(145deg, #fff 0%, #fcfaff 65%, #f5efff 100%);
+  --contacts-text: #241337;
+  --contacts-muted: #746387;
+  --contacts-border: #e7dcf6;
+  --contacts-field: #f5f0fc;
+  --contacts-accent: #9225bd;
+  --contacts-primary: linear-gradient(135deg, #b83ed4, #9225bd 55%, #702094);
+  --contacts-shadow: 0 6px 22px rgba(83, 30, 116, .07), inset 0 1px 0 rgba(255, 255, 255, .9);
+  --contacts-field-shadow: inset 0 1px 3px rgba(78, 30, 109, .05);
+  --contacts-primary-shadow: 0 4px 12px rgba(133, 36, 171, .19), inset 0 1px 0 rgba(255, 255, 255, .38);
+  --contacts-focus: #8e39bd;
+  --contacts-radius-panel: 18px;
+  --contacts-radius-control: 11px;
+  --contacts-transition: 160ms ease;
+  color: var(--contacts-text);
+}
+.report-page.contacts-design {
+  /* 24px content padding on desktop (16px on mobile) from the screen edge —
+     .main already contributes clamp(14px, 1.5vw, 24px). */
+  padding-inline: calc(24px - clamp(14px, 1.5vw, 24px));
+  min-width: 0;
+}
+@media (max-width: 640px) { .report-page.contacts-design { padding-inline: calc(16px - clamp(14px, 1.5vw, 24px)); } }
+.contacts-design *, .contacts-design *::before, .contacts-design *::after { box-sizing: border-box; }
+.contacts-design :is(button, a, input, textarea, select, [tabindex], [contenteditable]):focus-visible { outline: 2px solid var(--contacts-focus); outline-offset: 2px; }
+
+/* ---------- buttons ---------- */
+.contacts-design .btn {
+  min-height: 42px; padding: 0 16px; border-radius: var(--contacts-radius-control); gap: 8px;
+  font: 600 14px/1 var(--font-head); letter-spacing: 0;
+  background: linear-gradient(180deg, #fff, #faf6ff); border: 1px solid var(--contacts-border); color: #6c1f8c;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 2px 6px rgba(83, 30, 116, .05);
+  transition: background var(--contacts-transition), border-color var(--contacts-transition);
+}
+.contacts-design .btn:hover { background: linear-gradient(180deg, #fff, #f3eafd); border-color: #d6c3ee; color: #6c1f8c; }
+.contacts-design .btn:disabled { opacity: .55; }
+.contacts-design .btn-p, .contacts-design .btn-p:hover { background: var(--contacts-primary); border-color: transparent; color: #fff; box-shadow: var(--contacts-primary-shadow); filter: none; }
+.contacts-design .btn-p:hover { filter: brightness(1.05); }
+.contacts-design .btn .action-icon, .contacts-design button .action-icon { flex: none; }
+.contacts-design .contacts-btn-ic { display: inline-flex; flex: none; }
+.contacts-design .contacts-btn-ic svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- catalog: metrics ---------- */
+.contacts-design .client-kpi-row { gap: 14px; margin-bottom: 16px; }
+.contacts-design .client-kpi-card {
+  min-width: 240px; padding: 18px 20px; border-radius: var(--contacts-radius-panel); border-color: var(--contacts-border);
+  background: var(--contacts-surface); box-shadow: var(--contacts-shadow);
+}
+.contacts-design .client-kpi-icon { display: none; }
+.contacts-design .client-kpi-head { margin-bottom: 8px; }
+.contacts-design .client-kpi-label { font: 500 14px/1.2 var(--font-body); color: var(--contacts-muted); }
+.contacts-design .client-kpi-value { font-size: 2rem; color: var(--contacts-text); }
+.contacts-design .client-kpi-value--text { font-size: 1.5rem; }
+.contacts-design .client-kpi-delta { font-size: .78rem; }
+.contacts-design .client-kpi-sub { font-size: .8rem; white-space: normal; max-width: 150px; }
+.contacts-design .client-grid-plain { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.3; }
+.contacts-design .client-grid-country { align-items: center; }
+
+/* ---------- catalog: command row ---------- */
+.contacts-design .report-section {
+  margin: 0; padding: 16px; background: var(--contacts-surface); border: 1px solid var(--contacts-border);
+  border-radius: var(--contacts-radius-panel); box-shadow: var(--contacts-shadow);
+}
+.contacts-design .client-directory-toolbar { margin-bottom: 14px; gap: 10px 12px; flex-wrap: wrap; }
+.contacts-design .mc-client-search svg { left: 13px; width: 17px; height: 17px; stroke: var(--contacts-muted); }
+.contacts-design .mc-client-search input {
+  min-height: 44px; padding: 0 14px 0 40px; border: 1px solid var(--contacts-border); border-radius: var(--contacts-radius-control);
+  background: var(--contacts-field); box-shadow: var(--contacts-field-shadow); font: 500 14px/1 var(--font-body); color: var(--contacts-text);
+}
+.contacts-design .mc-client-search input:focus { border-color: var(--contacts-focus); background: #fff; }
+.contacts-design .ui-select-trigger, .contacts-design .date-picker-trigger {
+  min-height: 44px; border-radius: var(--contacts-radius-control); border-color: var(--contacts-border); background: var(--contacts-field);
+  box-shadow: var(--contacts-field-shadow); font-size: 14px;
+}
+.contacts-design .task-filter-btn.has-active { background: #f3eafd; border-color: var(--contacts-accent); color: #6c1f8c; }
+.contacts-design .task-filter-popover { border: 1px solid var(--contacts-border); border-radius: 16px; box-shadow: 0 18px 40px -16px rgba(83, 30, 116, .3); }
+
+/* ---------- catalog: rows ---------- */
+.contacts-design .client-grid { gap: 8px; }
+.contacts-design .client-grid-header, .contacts-design .client-grid-row { gap: 14px; padding: 0 18px; }
+.contacts-design .client-grid-header { padding: 6px 18px 8px; font: 700 12px/1.2 var(--font-head); letter-spacing: .04em; color: var(--contacts-muted); }
+.contacts-design .client-grid-row {
+  min-height: 60px; padding-block: 10px; background: var(--contacts-surface); border: 1px solid var(--contacts-border); border-radius: 14px;
+  box-shadow: 0 3px 12px rgba(83, 30, 116, .05), inset 0 1px 0 #fff;
+  transition: background var(--contacts-transition), border-color var(--contacts-transition), box-shadow var(--contacts-transition);
+}
+.contacts-design .client-grid-row:hover { transform: none; background: #f8f2ff; border-color: #d6c3ee; box-shadow: 0 8px 20px -10px rgba(83, 30, 116, .22); }
+.contacts-design .client-grid-row:focus-visible { outline-offset: 0; background: #f3eafd; }
+.contacts-design .client-grid-name-text .ink { font-size: .96rem; font-weight: 600; overflow-wrap: anywhere; }
+.contacts-design .client-grid-subtitle { font-size: .82rem; overflow-wrap: anywhere; }
+.contacts-design .client-grid-badge { font-size: .78rem; }
+.contacts-design .client-grid-plain { font-size: .9rem; }
+.contacts-design .client-grid-date { font-size: .88rem; color: var(--contacts-muted); }
+.contacts-design .placeholder { max-width: none; background: #faf6ff; border: 1px dashed #d9c9ee; border-radius: 14px; padding: 28px 24px; }
+.contacts-design .placeholder p { margin: 0; color: var(--contacts-muted); }
+.contacts-design .month-pagination { margin-top: 14px; padding: 12px 14px; background: #faf6ff; border: 1px solid var(--contacts-border); border-radius: 14px; }
+.contacts-design .month-pagination-hint { font-size: .88rem; color: var(--contacts-muted); }
+.contacts-design .month-pagination-pages button { min-width: 40px; height: 40px; border-radius: 11px; border-color: var(--contacts-border); background: #fff; color: var(--contacts-text); font-weight: 600; }
+.contacts-design .month-pagination-pages button.on { background: var(--contacts-primary); border-color: transparent; color: #fff; box-shadow: var(--contacts-primary-shadow); }
+
+/* ---------- card: actions + profile ---------- */
+.contacts-design .client-profile-top-row { margin-bottom: 14px; }
+.contacts-design .client-profile-top-actions { gap: 8px; }
+.contacts-design .client-profile-top-actions .btn { padding-left: 14px; }
+.contacts-design .client-profile-btn-danger { color: #b3261e; border-color: #f2cfcb; background: #fff; }
+.contacts-design .client-profile-btn-danger:hover { color: #b3261e; border-color: #e9aaa5; background: #fdebec; }
+
+.contacts-design .client-profile-card {
+  padding: 22px 24px; margin-bottom: 14px; background: var(--contacts-surface); border: 1px solid var(--contacts-border);
+  border-radius: var(--contacts-radius-panel); box-shadow: var(--contacts-shadow);
+}
+.contacts-design .client-profile-name-row h1 { font-size: clamp(1.5rem, 2.4vw, 2rem); line-height: 1.15; overflow-wrap: anywhere; }
+.contacts-design .client-profile-card .sub { font-size: .95rem; color: var(--contacts-muted); }
+.contacts-design .client-profile-status-trigger { min-height: 32px; padding: 0 14px 0 11px; font-size: .84rem; }
+.contacts-design .client-profile-quickrow { gap: 12px; padding-top: 16px; border-top-color: var(--contacts-border); }
+.contacts-design .client-profile-quick-field {
+  min-width: 190px; padding: 10px 14px; border-radius: 14px; background: #faf6ff; border: 1px solid var(--contacts-border); box-shadow: var(--contacts-field-shadow);
+}
+.contacts-design .client-profile-quick-ic { width: 38px; height: 38px; border-radius: 12px; background: var(--contacts-primary) !important; box-shadow: var(--contacts-primary-shadow); }
+.contacts-design .client-profile-quick-field label { font: 600 12px/1.2 var(--font-body); letter-spacing: .04em; color: var(--contacts-muted); }
+.contacts-design .client-profile-quick-field .ui-select-trigger, .contacts-design .client-profile-quick-field .platform-picker-trigger { min-height: 34px; border: 0; background: transparent; box-shadow: none; padding-left: 0; }
+.contacts-design .client-profile-quick-tags .tag-input-chips { border-color: var(--contacts-border); border-radius: var(--contacts-radius-control); background: var(--contacts-field); }
+.contacts-design .client-profile-readonly { color: var(--contacts-text); font-size: .95rem; overflow-wrap: anywhere; line-height: 1.3; }
+
+/* three metrics */
+.contacts-design .client-profile-stats-row { gap: 14px; margin-bottom: 14px; }
+.contacts-design .client-profile-stat-card {
+  min-height: 112px; padding: 18px 20px; background: var(--contacts-surface); border: 1px solid var(--contacts-border);
+  border-radius: var(--contacts-radius-panel); box-shadow: var(--contacts-shadow);
+}
+.contacts-design .client-profile-stat-icon { background: var(--contacts-primary) !important; box-shadow: var(--contacts-primary-shadow); width: 42px; height: 42px; border-radius: 13px; }
+.contacts-design .client-profile-stat-label { font-size: .9rem; color: var(--contacts-muted); }
+.contacts-design .client-profile-stat-value { font-size: 2rem; }
+
+/* tabs: one light panel, violet active segment, pale disabled ones keep «Скоро» */
+.contacts-design .client-profile-tabs {
+  padding: 5px; gap: 4px; margin-bottom: 14px; background: var(--contacts-surface); border: 1px solid var(--contacts-border);
+  border-radius: 16px; box-shadow: var(--contacts-shadow);
+}
+.contacts-design .client-profile-tabs .client-panel-tab {
+  min-height: 42px; padding: 0 18px; border-radius: 12px; font: 600 14px/1 var(--font-head); letter-spacing: 0; color: #4a2a66;
+  transition: background var(--contacts-transition), color var(--contacts-transition);
+}
+.contacts-design .client-profile-tabs .client-panel-tab:hover:not(:disabled):not(.active) { background: #f3eafd; }
+.contacts-design .client-profile-tabs .client-panel-tab.active { background: var(--contacts-primary); color: #fff; box-shadow: var(--contacts-primary-shadow); }
+.contacts-design .client-profile-tabs .client-panel-tab:disabled { opacity: 1; color: #a897ba; }
+
+/* two roughly equal columns */
+.contacts-design .client-profile-info-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1000px) { .contacts-design .client-profile-info-layout { grid-template-columns: minmax(0, 1fr); } }
+.contacts-design .client-profile-info-main, .contacts-design .client-profile-info-sidebar { gap: 14px; }
+.contacts-design .client-profile-section-card, .contacts-design .client-profile-side-card {
+  background: var(--contacts-surface); border: 1px solid var(--contacts-border); border-radius: var(--contacts-radius-panel); box-shadow: var(--contacts-shadow);
+}
+.contacts-design .client-profile-side-card { padding: 18px 20px; }
+.contacts-design .client-profile-section-head { padding: 16px 20px; min-height: 60px; }
+.contacts-design .client-profile-section-head:focus-visible { outline-offset: -3px; border-radius: var(--contacts-radius-panel); }
+.contacts-design .client-profile-section-ic { width: 38px; height: 38px; border-radius: 12px; background: var(--contacts-primary) !important; box-shadow: var(--contacts-primary-shadow); }
+.contacts-design .client-profile-section-title { font-size: 1.05rem; }
+.contacts-design .client-profile-section-sub { font-size: .8rem; color: var(--contacts-muted); }
+.contacts-design .client-profile-section-chevron { transition: transform 200ms ease; }
+.contacts-design .client-profile-section-body { padding: 6px 20px 12px; border-top-color: var(--contacts-border); }
+.contacts-design .client-profile-row { padding: 11px 0; border-bottom-color: #f0e8fa; }
+.contacts-design .client-profile-row-label { font-size: .9rem; color: var(--contacts-muted); }
+.contacts-design .client-profile-row-value { font-size: .92rem; color: var(--contacts-text); }
+.contacts-design .client-profile-side-title { font-size: 1.05rem; }
+.contacts-design .client-profile-side-link { color: #8e2c8e; font-size: .84rem; }
+
+/* inline editing: lavender fields with an inner shadow */
+.contacts-design .client-profile-row-edit input, .contacts-design .client-profile-row-edit textarea {
+  min-height: 42px; padding: 0 12px; border: 1px solid var(--contacts-border); border-radius: var(--contacts-radius-control);
+  background: var(--contacts-field); box-shadow: var(--contacts-field-shadow); font-size: 14px; color: var(--contacts-text);
+}
+.contacts-design .client-profile-row-edit textarea { padding: 10px 12px; min-height: 76px; }
+.contacts-design .client-profile-row-edit input:focus, .contacts-design .client-profile-row-edit textarea:focus { border-color: var(--contacts-focus); background: #fff; }
+.contacts-design .client-profile-row-edit .ui-select-trigger { min-height: 42px; }
+.contacts-design .client-channel-chip { min-height: 36px; padding: 0 14px; border-color: var(--contacts-border); background: var(--contacts-field); color: #4a2a66; font-size: .84rem; }
+.contacts-design .client-channel-chip.on { background: var(--contacts-primary); border-color: transparent; color: #fff; box-shadow: var(--contacts-primary-shadow); }
+
+/* right column widgets */
+.contacts-design .client-profile-quick-actions { gap: 10px; margin-top: 12px; }
+.contacts-design .client-profile-quick-action {
+  flex-direction: row; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; border-radius: 14px; font: 600 14px/1.2 var(--font-head); color: #4a2a66;
+  background: linear-gradient(180deg, #fff, #f7f0fe); border: 1px solid var(--contacts-border); box-shadow: 0 1px 0 #fff inset, 0 2px 6px rgba(83, 30, 116, .05);
+  transition: background var(--contacts-transition), border-color var(--contacts-transition);
+}
+.contacts-design .client-profile-quick-action:hover:not(:disabled) { transform: none; background: #f3eafd; border-color: #d6c3ee; }
+.contacts-design .client-profile-quick-action:disabled { opacity: 1; color: #a897ba; background: #faf7fd; }
+.contacts-design .client-profile-quick-action .action-icon { flex: none; color: var(--contacts-accent); }
+.contacts-design .client-profile-quick-action:disabled .action-icon { color: #c4b6d4; }
+.contacts-design .client-profile-subtabs { padding: 4px; border-radius: 12px; background: #f5effc; }
+.contacts-design .client-profile-subtab { min-height: 36px; font-size: .86rem; }
+.contacts-design .client-profile-subtab.active { color: #fff; background: var(--contacts-primary); box-shadow: var(--contacts-primary-shadow); }
+.contacts-design .client-profile-mini-row { min-height: 52px; border-color: var(--contacts-border); background: #faf6ff; border-radius: 14px; }
+.contacts-design .client-profile-mini-row:hover { background: #f3eafd; border-color: #d6c3ee; }
+.contacts-design .client-profile-mini-row-ic, .contacts-design .client-profile-activity-ic { background: var(--contacts-primary) !important; box-shadow: none; }
+.contacts-design .client-profile-side-empty { padding: 20px 10px; }
+.contacts-design .client-profile-side-empty-ic { background: #f3eafd; color: var(--contacts-accent); }
+
+/* notes editor (shared markup with the deal notes) */
+.contacts-design .deal-note-editor { min-height: 140px; border-color: var(--contacts-border); border-radius: 14px 14px 0 0; background: #fff; font-size: 15px; box-shadow: var(--contacts-field-shadow); }
+.contacts-design .deal-note-editor:focus { border-color: var(--contacts-focus); }
+.contacts-design .deal-note-toolbar { border-color: var(--contacts-border); border-radius: 0 0 14px 14px; background: #faf6ff; padding: 8px 10px; }
+.contacts-design .deal-note-toolbar-icons button { width: 34px; height: 34px; border-radius: 9px; }
+.contacts-design .deal-note-toolbar-icons button:hover { background: #f3eafd; color: var(--contacts-accent); }
+.contacts-design .deal-note-author-field input { min-height: 40px; border-radius: var(--contacts-radius-control); border-color: var(--contacts-border); background: var(--contacts-field); box-shadow: var(--contacts-field-shadow); font-size: 14px; }
+
+/* other tabs: same system, existing structure */
+.contacts-design .client-profile-deals-list-card, .contacts-design .client-profile-deal-detail-card {
+  background: var(--contacts-surface); border-color: var(--contacts-border); border-radius: var(--contacts-radius-panel); box-shadow: var(--contacts-shadow);
+}
+.contacts-design .client-profile-deal-row { border-color: var(--contacts-border); border-radius: 14px; }
+.contacts-design .client-profile-deal-row.active { background: #f3eafd; border-color: var(--contacts-accent); }
+.contacts-design .client-profile-deal-mini-card { background: #faf6ff; }
+.contacts-design .client-profile-deals-search, .contacts-design .client-profile-activity-search { border-color: var(--contacts-border); border-radius: var(--contacts-radius-control); background: var(--contacts-field); box-shadow: var(--contacts-field-shadow); min-height: 42px; }
+.contacts-design .client-profile-activity-filters { background: #f5effc; border-radius: 12px; }
+.contacts-design .client-profile-activity-filter.active { background: var(--contacts-primary); box-shadow: var(--contacts-primary-shadow); }
+.contacts-design .client-profile-activity-sort { border-color: var(--contacts-border); border-radius: var(--contacts-radius-control); min-height: 42px; }
+.contacts-design .client-profile-activity-tl-row:hover { background: #f8f2ff; }
+.contacts-design .client-profile-activity-tl-ic { background-image: none; }
+.contacts-design .ai-history-row { border-color: var(--contacts-border); border-radius: 14px; background: #fff; }
+.contacts-design .ai-history-row:hover { background: #f8f2ff; }
+.contacts-design .ai-history-row.active { background: #f3eafd; border-color: var(--contacts-accent); }
+.contacts-design .client-notes-textarea { border-color: var(--contacts-border); border-radius: 14px; background: var(--contacts-field); }
+.contacts-design .client-file-name { color: #8e2c8e; }
+
+/* ---------- dialogs opened from contacts ---------- */
+.contacts-design.tmodal-overlay { background: rgba(36, 19, 55, .45); }
+.contacts-design .tmodal-box {
+  border: 1px solid var(--contacts-border); border-radius: 20px; background: linear-gradient(145deg, #fff 0%, #fcfaff 70%, #f7f1ff 100%);
+  box-shadow: 0 30px 70px -20px rgba(54, 20, 80, .4), inset 0 1px 0 #fff;
+}
+.contacts-design .tmodal-head { border-bottom: 1px solid var(--contacts-border); padding: 18px 22px; }
+.contacts-design .tmodal-close { width: 40px; height: 40px; border-radius: var(--contacts-radius-control); border: 1px solid var(--contacts-border); background: #fff; }
+.contacts-design .tmodal-foot { border-top: 1px solid var(--contacts-border); padding: 14px 22px; }
+.contacts-design .wk-field-box { min-height: 52px; background: var(--contacts-field); border-color: var(--contacts-border); border-radius: var(--contacts-radius-control); box-shadow: var(--contacts-field-shadow); }
+.contacts-design .wk-field-box:focus-within { border-color: var(--contacts-focus); background: #fff; }
+.contacts-design .wk-field-body > label { font: 600 12px/1.2 var(--font-body); letter-spacing: 0; text-transform: none; color: var(--contacts-muted); }
+.contacts-design .wk-field-icon { background: #fff; }
+.contacts-design .import-map-row { background: #faf6ff; border-color: var(--contacts-border); border-radius: 12px; }
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .contacts-design, .contacts-design * { transition: none !important; animation: none !important; }
+}
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 900px) {
+  .contacts-design .client-grid { overflow-x: auto; }
+  .contacts-design .client-grid-header, .contacts-design .client-grid-row { min-width: 880px; }
+}
+@media (max-width: 720px) {
+  .contacts-design .client-profile-top-actions { width: 100%; }
+  .contacts-design .client-profile-card { padding: 16px; }
+  .contacts-design .client-profile-quick-field { min-width: 100%; }
+  .contacts-design .report-section { padding: 12px; }
+}
+.contacts-design .client-files-upload-btn { cursor: pointer; }

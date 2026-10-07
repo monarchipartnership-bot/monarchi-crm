@@ -1,0 +1,50 @@
+/* AI Agents environment layers (bottom -> top): base gradient, nebula bitmap,
+   readability mask, <=3 decorative planets, particle canvas. Pure decoration:
+   pointer-events none, aria-hidden, no business meaning. Tokens come from
+   the .ai-immersive root (constellationTest.css). */
+
+.ai-env {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  background: linear-gradient(180deg, #17051c 0%, #270827 100%);
+}
+.ai-nebula {
+  position: absolute; inset: -12px; background-position: center; background-size: cover; background-repeat: no-repeat;
+  opacity: .58; transition: opacity .4s ease; will-change: transform;
+  animation: aiNebulaDrift 60s ease-in-out infinite alternate;
+}
+/* drift stays within 8px over 60s (motion-config nebulaDrift) */
+@keyframes aiNebulaDrift {
+  from { transform: translate3d(-4px, -2px, 0); }
+  to { transform: translate3d(4px, 2px, 0); }
+}
+/* extra dark mask under text zones (header band, centre, footer band) */
+.ai-env-mask {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 46% 50% at 50% 50%, rgba(23, 5, 28, .38), rgba(23, 5, 28, 0) 100%),
+    linear-gradient(180deg, rgba(23, 5, 28, .5) 0, rgba(23, 5, 28, 0) 18%, rgba(23, 5, 28, 0) 82%, rgba(23, 5, 28, .45) 100%);
+}
+
+.ai-planet {
+  position: absolute; border-radius: 50%; pointer-events: none; opacity: .3;
+  background: radial-gradient(circle at 28% 20%, #d991e9, #682768 38%, #270827 80%);
+  box-shadow: inset -8px -8px 18px #17051c, 0 0 10px #ae40ae44;
+}
+.ai-planet-1 { left: 7.4%; top: 21%; width: 46px; height: 46px; opacity: .32; }
+.ai-planet-2 { right: 8.7%; top: 35%; width: 60px; height: 60px; opacity: .26; }
+.ai-planet-3 { right: 8.2%; top: 64%; width: 70px; height: 70px; opacity: .3; }
+
+.ai-particles { position: absolute; inset: 0; display: block; }
+
+/* A working form is open (or a non-map section): the scene gets quieter but
+   stays — nebula and planets dim, particles halve (see AiEnvironment.jsx). */
+.ai-env.is-calm .ai-nebula { opacity: .34; }
+.ai-env.is-calm .ai-planet { opacity: .14; }
+
+@media (max-width: 720px) {
+  .ai-planet-2, .ai-planet-3 { display: none; }
+  .ai-planet-1 { left: 5%; top: 24%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-nebula { animation: none; transition: none; }
+}

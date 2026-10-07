@@ -13,7 +13,7 @@ const CHECK_ICON = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
 // across every deal (the catalog lives in `deal_service_tags`), with an
 // inline "add new" row so a missing service can be added on the spot
 // instead of needing a separate management screen.
-export default function ServiceTagsField({ value, catalog, onToggle, onCreate }) {
+export default function ServiceTagsField({ value, catalog, onToggle, onCreate, label = 'Сервіс', placeholder = 'Оберіть сервіси...' }) {
   const containerRef = useRef(null);
   const popoverRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -64,7 +64,7 @@ export default function ServiceTagsField({ value, catalog, onToggle, onCreate })
     <div className="wk-field-box wk-field-box-wide" ref={containerRef}>
       <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.megaphone }} />
       <div className="wk-field-body">
-        <label>Сервіс</label>
+        <label>{label}</label>
         <button type="button" className="service-tags-trigger" onClick={() => setOpen((o) => !o)}>
           {selected.length ? (
             <span className="service-tags-chips">
@@ -72,7 +72,7 @@ export default function ServiceTagsField({ value, catalog, onToggle, onCreate })
                 <span key={t.id} className="service-tag-chip" style={{ background: t.color + '1f', color: t.color }}>{t.label}</span>
               ))}
             </span>
-          ) : <span className="ui-select-placeholder">Оберіть сервіси...</span>}
+          ) : <span className="ui-select-placeholder">{placeholder}</span>}
         </button>
       </div>
       {rendered && createPortal(

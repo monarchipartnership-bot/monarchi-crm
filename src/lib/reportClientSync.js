@@ -2,6 +2,7 @@ import { upsertClientDirectoryEntry } from './api/clients';
 import { fetchOpenDealForClient, createDeal, updateDealFields } from './api/deals';
 import { fetchPipelines } from './api/pipelines';
 import { upsertDealNoteForDate } from './api/dealNotes';
+import { SOURCES } from './clientTypeAndSource';
 
 // Syncs a report's own "Клієнти" mentions list into the real client
 // directory and pipeline. Daily Report is the one true origin for this —
@@ -53,11 +54,18 @@ export function syncReportClientsToDirectory(clients, manager, reportDate, onLin
         .then(async (client) => {
           if (!client) return;
           if (c.id && client.id !== c.clientId) onLinked?.(c.id, client.id);
+          // The lead's channel becomes the deal's Source; a platform that is
+          // itself a known channel (Upwork, LinkedIn...) stands in when none
+          // was picked.
+          const channel = c.channel?.trim() || (SOURCES.includes(c.platform) ? c.platform : '');
+          const upworkChannel = c.platform === 'Upwork' ? (c.upworkChannel || '') : '';
           let deal = await fetchOpenDealForClient(client.id, pipeline.id);
           if (!deal) {
-            deal = await createDeal({ clientId: client.id, manager, pipelineId: pipeline.id, title: c.title });
-          } else if (!deal.title?.trim() && c.title?.trim()) {
-            await updateDealFields(deal.id, { title: c.title.trim() });
+            deal = await createDeal({ clientId: client.id, manager, pipelineId: pipeline.id, title: c.title, source: channel, upworkChannel });
+          } else {
+            if (!deal.title?.trim() && c.title?.trim()) await updateDealFields(deal.id, { title: c.title.trim() });
+            if (channel && deal.source !== channel) await updateDealFields(deal.id, { source: channel });
+            if (upworkChannel && deal.upwork_channel !== upworkChannel) await updateDealFields(deal.id, { upwork_channel: upworkChannel });
           }
           if (deal && reportDate && c.text?.trim()) {
             await upsertDealNoteForDate(deal.id, reportDate, c.text.trim(), manager);

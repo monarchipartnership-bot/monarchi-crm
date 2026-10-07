@@ -31,6 +31,7 @@ import FollowupGenerator from './pages/Tools/FollowupGenerator';
 import ConstellationTest from './pages/Tools/ConstellationTest';
 import ClientsReport from './pages/ClientsReport/ClientsReport';
 import AutomationDashboard from './pages/Automation/Dashboard';
+import SmmHome from './pages/Smm/SmmHome';
 import './styles/pages.css';
 
 function AuthGate() {
@@ -78,6 +79,7 @@ function AuthGate() {
         <Route path="/tools/constellation-test" element={<ConstellationTest />} />
         <Route path="/clients" element={<ClientsReport />} />
         <Route path="/automation/dashboard" element={<AutomationDashboard />} />
+        <Route path="/automation/smm" element={<SmmHome />} />
         <Route path="/tasks" element={<TaskManagerPage />} />
         <Route path="/tasks/analytics" element={<TaskAnalyticsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

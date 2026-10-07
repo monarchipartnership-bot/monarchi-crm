@@ -16,6 +16,21 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
 }
 
+/* Opt-in page heading variant (routeMeta `pageIcon` / `infoLabel`): approved
+   page icon at 32px, 20px/28px semibold title, and a labelled "Про розділ"
+   button with the canonical info action icon. */
+.topbar-page-icon { flex: none; width: 32px; height: 32px; object-fit: contain; user-select: none; }
+.topbar-title.topbar-title--page { font-size: 20px; line-height: 28px; font-weight: 600; max-width: 340px; }
+/* Doubled class: the base .topbar-info-btn rule sits further down the file at
+   the same specificity and would otherwise win on width/height/border. */
+.topbar-info-btn.topbar-info-btn--labeled {
+  width: auto; height: 32px; border: none; border-radius: 10px; padding: 0 10px; gap: 6px; white-space: nowrap;
+  font-family: var(--font-body); font-size: 14px; font-style: normal; font-weight: 500; line-height: 20px; color: #8E2C8E;
+}
+.topbar-info-btn.topbar-info-btn--labeled:hover { color: #661466; background: #F9EDF9; border-color: transparent; }
+.topbar-info-btn.topbar-info-btn--labeled:focus-visible { outline: 2px solid #AE40AE; outline-offset: 2px; }
+.topbar-info-btn--labeled .action-icon { flex: none; }
+
 .topbar-info-wrap { position: relative; flex: none; }
 .topbar-info-btn {
   width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--muted); background: none;
@@ -209,8 +224,16 @@
 
 @media (max-width: 900px) {
   .topbar-title { display: none; }
+  .topbar-title.topbar-title--page { display: block; flex: 0 1 auto; min-width: 0; }
+  /* The page's hamburger button is pinned over the top-left corner; once the
+     bar sticks to the top it would cover the heading's icon. */
+  .topbar-heading:has(.topbar-page-icon) { padding-left: 46px; min-width: 0; }
 }
 
 @media (max-width: 560px) {
   .topbar-search { display: none; }
+  .topbar-heading { flex: 1; }
+  .topbar-title.topbar-title--page { font-size: 17px; max-width: 190px; }
+  .topbar-info-btn--labeled .topbar-info-label { display: none; }
+  .topbar-info-btn--labeled { padding: 0 6px; }
 }

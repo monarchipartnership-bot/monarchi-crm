@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "quality": {
+    "desktop": {
+      "dust": 120,
+      "stars": 28,
+      "foreground": 12,
+      "dpr": 2
+    },
+    "mobile": {
+      "dust": 55,
+      "stars": 14,
+      "foreground": 4,
+      "dpr": 1.5
+    }
+  },
+  "speedPxSec": {
+    "dust": [
+      0.3,
+      0.9
+    ],
+    "stars": [
+      1,
+      2.5
+    ],
+    "foreground": [
+      2,
+      4
+    ]
+  },
+  "durationsMs": {
+    "reveal": 1000,
+    "stagger": 60,
+    "department": 650,
+    "overlay": 240,
+    "hover": 160,
+    "breath": 5000
+  },
+  "orbitalPeriodSec": [
+    48,
+    72,
+    96
+  ],
+  "pulsePeriodSec": 7,
+  "maxConcurrentPulses": 3,
+  "nebulaDrift": {
+    "periodSec": 60,
+    "maxPx": 8
+  },
+  "reducedMotion": {
+    "particles": false,
+    "cameraTransform": false,
+    "transitionMaxMs": 100
+  }
+}

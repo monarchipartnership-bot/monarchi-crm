@@ -6,6 +6,7 @@ import { fetchPipelines } from '../../../lib/api/pipelines';
 import { fetchAllProfiles, profileLabel } from '../../../lib/api/profile';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import Select from '../../../components/common/Select';
+import ActionIcon from '../../../components/common/ActionIcon';
 import AddDealModal from '../../../components/Deals/AddDealModal';
 import DealDetailModal from '../../../components/Deals/DealDetailModal';
 import StageManagerModal from '../../../components/Deals/StageManagerModal';
@@ -22,6 +23,7 @@ import '../../../styles/automationDashboard.css';
 import '../../../styles/comparePage.css';
 import '../../../styles/clientsDirectory.css';
 import '../../../styles/dealsBoard.css';
+import '../../../styles/dealsDesign.css';
 
 const TABS = [
   { key: 'kanban', label: 'Канбан', icon: FIELD_ICONS.kanban },
@@ -121,7 +123,7 @@ export default function DealsBoard() {
   }
 
   return (
-    <div className="report-page deals-page">
+    <div className="report-page deals-page deals-design">
       <section className="rpt-hero deals-actions-row">
         <div className="deals-header-actions">
           <div className="pipeline-switcher">
@@ -146,7 +148,7 @@ export default function DealsBoard() {
             <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.upload }} /> Імпорт з NetHunt
           </button>
           <button type="button" className="btn btn-p deals-add-btn" onClick={() => openAddDeal(null)}>
-            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.plus }} /> Додати угоду
+            <ActionIcon name="create" size={18} /> Додати угоду
           </button>
         </div>
       </section>

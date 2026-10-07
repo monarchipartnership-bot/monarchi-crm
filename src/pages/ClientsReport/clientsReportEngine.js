@@ -1462,6 +1462,9 @@ function fitStage(){
   var scale = Math.min(availW/960, availH/540, 1.4);
   if(scale<=0 || !isFinite(scale)) scale = 1;
   stage.style.transform = 'scale(' + scale + ')';
+  // The 960x540 layout box keeps its full size under a CSS transform, so the
+  // wrapper would scroll/clip it; shrink the box to the scaled size instead.
+  stage.style.margin = ((540 * scale - 540) / 2) + 'px ' + ((960 * scale - 960) / 2) + 'px';
 }
 
 /* ---------------------------------------------------------- PDF EXPORT */
@@ -1681,6 +1684,11 @@ buildAddDropdown();
 wireUI();
 initDefaultDeck();
 fitStage();
+// Re-fit whenever the workspace itself changes size (app sidebar collapse,
+// panel toggles), not only on window resize.
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(fitStage).observe(document.getElementById('stageWrap'));
+}
 
 /* Pulls an already-saved project ad-report (Daily/Weekly/Monthly, built in
    the Project Managers Department) straight into this deck — skips CSV/SEO

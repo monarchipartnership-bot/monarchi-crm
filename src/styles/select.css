@@ -29,6 +29,7 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ui-select-row:hover { background: var(--surface); }
+.ui-select-create { color: var(--purple); font-weight: 600; }
 .ui-select-row.active { background: var(--purple-tint); color: var(--purple); font-weight: 600; }
 
 .ui-select-menu--searchable { padding: 6px; }

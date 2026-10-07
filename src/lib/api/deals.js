@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { mirrorDealPatchToClient, fetchClientBusinessProfile } from '../businessProfile';
 
 const DEAL_SELECT = '*, clients(name, name_key, company, country, phone), deal_stages(id, label, color, is_won, is_lost, position), pipelines(id, name, color)';
 
@@ -50,7 +51,7 @@ export async function fetchOpenDealForClient(clientId, pipelineId) {
   return data;
 }
 
-export async function createDeal({ clientId, manager, stageId, pipelineId, amount, currency, expectedCloseDate, title, source, chatLink }) {
+export async function createDeal({ clientId, manager, stageId, pipelineId, amount, currency, expectedCloseDate, title, source, chatLink, upworkChannel }) {
   let sid = stageId;
   let pid = pipelineId;
   if (!sid) {
@@ -58,7 +59,12 @@ export async function createDeal({ clientId, manager, stageId, pipelineId, amoun
     sid = firstStage?.id;
     pid = pid || firstStage?.pipeline_id;
   }
+  // A new deal starts from its contact's business profile (niche, channel,
+  // GEO, goals...); `source` falls back to the contact's own channel.
+  const profile = await fetchClientBusinessProfile(clientId);
+  const { source: clientSource, ...businessProfile } = profile;
   const { data, error } = await supabase.from('deals').insert({
+    ...businessProfile,
     client_id: clientId,
     manager: manager || null,
     stage_id: sid,
@@ -67,16 +73,30 @@ export async function createDeal({ clientId, manager, stageId, pipelineId, amoun
     currency: currency || 'USD',
     expected_close_date: expectedCloseDate || null,
     title: title?.trim() || null,
-    source: source?.trim() || null,
+    source: source?.trim() || clientSource || null,
     chat_link: chatLink?.trim() || null,
+    // Only sent when set, so deals made without a channel never touch the column.
+    ...(upworkChannel ? { upwork_channel: upworkChannel } : {}),
   }).select(DEAL_SELECT).single();
   if (error) { console.warn('createDeal failed', error); return null; }
   return data;
 }
 
 export async function updateDealFields(id, patch) {
+  // Per-channel QL counts need a date: stamp `qualified_at` the first time a
+  // deal becomes MQL/SQL, and clear it when it stops being qualified.
+  if ('qualification' in patch && !('qualified_at' in patch)) {
+    if (patch.qualification === 'MQL' || patch.qualification === 'SQL') {
+      const { data: cur } = await supabase.from('deals').select('qualified_at').eq('id', id).maybeSingle();
+      if (!cur?.qualified_at) patch = { ...patch, qualified_at: nowIso() };
+    } else {
+      patch = { ...patch, qualified_at: null };
+    }
+  }
   const { error } = await supabase.from('deals').update({ ...patch, updated_at: nowIso() }).eq('id', id);
   if (error) throw error;
+  // Business-profile fields are mirrored onto the contact (see businessProfile.js).
+  mirrorDealPatchToClient(id, patch);
 }
 
 // `stage` is the full deal_stages row (not just an id) — the caller already

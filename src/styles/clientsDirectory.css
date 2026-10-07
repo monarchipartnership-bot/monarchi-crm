@@ -194,3 +194,13 @@
 @media (max-width: 900px) {
   .clients-directory-layout.has-panel { grid-template-columns: 1fr; }
 }
+
+/* "Створити контакт": opt-out toggle for the auto-created deal. Overrides
+   .tmodal-body's tiny-uppercase label style — this one is a sentence. */
+.tmodal-body label.create-client-deal-toggle { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-family: var(--font-body); font-size: .86rem; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); cursor: pointer; }
+.create-client-deal-toggle input { width: 18px; height: 18px; flex: none; accent-color: var(--purple); }
+.tmodal-box.create-client-modal { max-width: 660px; width: calc(100vw - 32px); }
+.create-client-modal .task-detail-edit-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.create-client-modal .wk-field-box { width: 100%; min-width: 0; }
+.create-client-modal .wk-field-box-wide { grid-column: 1 / -1; }
+@media (max-width: 560px) { .create-client-modal .task-detail-edit-fields { grid-template-columns: minmax(0, 1fr); } }

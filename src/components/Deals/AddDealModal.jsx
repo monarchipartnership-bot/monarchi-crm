@@ -84,7 +84,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
   }
 
   return (
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="tmodal-box">
         <div className="tmodal-head">
           <h3>Додати угоду</h3>

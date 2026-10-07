@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { SERVICES } from '../../lib/projectConstants';
+import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload } from '../../lib/projectFields';
 
-const EMPTY_FORM = { name: '', manager: '', start_date: '', end_date: '', client: '', country: '', website: '', services: [] };
+const EMPTY_FORM = { name: '', manager: '', start_date: '', end_date: '', client: '', country: '', website: '', services: [], ...extraFieldsForm(null) };
 
 // Create-only: a project's editable metadata (status, CRM link, notes, etc.)
 // lives on its ProjectDetail Overview tab once it exists. This modal is just
@@ -30,6 +31,7 @@ export default function ProjectModal({ onClose, onSave, saving }) {
       client: form.client.trim() || null,
       country: form.country.trim() || null,
       website: form.website.trim() || null,
+      ...extraFieldsPayload(form),
     });
   }
 
@@ -48,11 +50,11 @@ export default function ProjectModal({ onClose, onSave, saving }) {
               <input type="text" value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder="напр. Byme — Google Ads" />
             </div>
             <div className="pf">
-              <label>Менеджер</label>
+              <label>Продакт (менеджер)</label>
               <input type="text" value={form.manager} onChange={(e) => setField('manager', e.target.value)} placeholder="Ім'я менеджера" />
             </div>
             <div className="pf">
-              <label>Дата початку</label>
+              <label>Початок роботи над стратегією</label>
               <input
                 type="date"
                 value={form.start_date}
@@ -61,7 +63,7 @@ export default function ProjectModal({ onClose, onSave, saving }) {
               />
             </div>
             <div className="pf">
-              <label>Дата закінчення</label>
+              <label>Завершення співпраці</label>
               <input
                 type="date"
                 value={form.end_date}
@@ -89,13 +91,35 @@ export default function ProjectModal({ onClose, onSave, saving }) {
               <input type="text" value={form.client} onChange={(e) => setField('client', e.target.value)} placeholder="напр. Acme Inc." />
             </div>
             <div className="pf">
-              <label>Країна</label>
+              <label>Гео (країна)</label>
               <input type="text" value={form.country} onChange={(e) => setField('country', e.target.value)} placeholder="напр. USA" />
             </div>
             <div className="pf full">
               <label>Сайт</label>
               <input type="text" value={form.website} onChange={(e) => setField('website', e.target.value)} placeholder="https://..." />
             </div>
+          </div>
+
+          <div className="pf-sec-label">Реєстр проєкту</div>
+          <div className="pf-grid">
+            {EXTRA_PROJECT_FIELDS.map((f) => (
+              <div className="pf" key={f.key}>
+                <label>{f.label}</label>
+                {f.type === 'select' ? (
+                  <select value={form[f.key]} onChange={(e) => setField(f.key, e.target.value)}>
+                    <option value="">Не вказано</option>
+                    {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={f.type === 'url' ? 'text' : f.type} value={form[f.key]} placeholder={f.placeholder}
+                    step={f.type === 'number' ? '0.01' : undefined}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                    onClick={f.type === 'date' ? (e) => e.currentTarget.showPicker?.() : undefined}
+                  />
+                )}
+              </div>
+            ))}
           </div>
 
           {error && <div className="form-err">{error}</div>}

@@ -14,25 +14,25 @@
   padding: 14px 18px; border: none; background: none; cursor: pointer; text-align: left;
   font-family: var(--font-body);
 }
-.aia-activity-row:hover { background: rgba(122, 105, 200, .1); }
+.aia-activity-row:hover { background: rgba(174, 64, 174, 0.21); }
 
 .aia-activity-kind {
   font-family: var(--font-head); font-size: .66rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
   padding: 4px 10px; border-radius: 999px; flex: none;
 }
-.aia-activity-kind--chat { color: #C9B6FF; background: rgba(122, 105, 200, .18); }
+.aia-activity-kind--chat { color: #EB9CEF; background: rgba(174, 64, 174, 0.346); }
 .aia-activity-kind--audit { color: #F0ABFC; background: rgba(192, 38, 211, .18); }
 
 .aia-activity-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.aia-activity-agent { font-size: .68rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #8983B5; }
-.aia-activity-title { font-size: .9rem; font-weight: 600; color: #EDEBFA; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aia-activity-agent { font-size: .68rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #C193CA; }
+.aia-activity-title { font-size: .9rem; font-weight: 600; color: #F9EDF9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.aia-activity-client { font-size: .82rem; color: #C9BAD9; flex: none; }
-.aia-activity-meta { font-size: .76rem; color: #7A76A3; flex: none; white-space: nowrap; }
-.aia-activity-reviewed { font-size: .74rem; color: #7A76A3; flex: none; }
+.aia-activity-client { font-size: .82rem; color: #D5A9DC; flex: none; }
+.aia-activity-meta { font-size: .76rem; color: #A878B1; flex: none; white-space: nowrap; }
+.aia-activity-reviewed { font-size: .74rem; color: #A878B1; flex: none; }
 
 .aia-activity-transcript {
-  display: flex; flex-direction: column; gap: 12px; padding: 4px 18px 18px; border-top: 1px solid rgba(100, 125, 210, .2);
+  display: flex; flex-direction: column; gap: 12px; padding: 4px 18px 18px; border-top: 1px solid rgba(235, 156, 239, 0.2);
 }
 .aia-activity-transcript .ai-section-btn-primary { align-self: flex-start; }
 
