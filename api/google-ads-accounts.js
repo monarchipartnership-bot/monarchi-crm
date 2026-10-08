@@ -127,6 +127,13 @@ export default async function handler(req, res) {
       if (!okDate(from) || !okDate(to)) { res.status(400).json({ error: 'from/to у форматі YYYY-MM-DD' }); return; }
       const rows = await target.query(`SELECT change_event.change_date_time, change_event.change_resource_type, change_event.resource_change_operation, change_event.changed_fields, change_event.user_email, change_event.client_type, change_event.campaign, change_event.ad_group, change_event.old_resource, change_event.new_resource FROM change_event WHERE change_event.change_date_time >= '${from} 00:00:00' AND change_event.change_date_time <= '${to} 23:59:59' ORDER BY change_event.change_date_time DESC LIMIT 300`);
       const clip = (v) => { try { return JSON.stringify(v).slice(0, 500); } catch { return null; } };
+      // The change log only carries campaign resource names, so campaign ids are looked up once to name them.
+      const names = {};
+      try {
+        const camps = await target.query('SELECT campaign.id, campaign.name FROM campaign');
+        camps.forEach((r) => { names[String(r.campaign?.id)] = r.campaign?.name; });
+      } catch { /* names stay empty; the summary then refers to "a campaign" */ }
+      const idOf = (rn) => (typeof rn === 'string' ? (rn.match(/campaigns\/(\d+)/) || [])[1] : null);
       res.status(200).json({
         account: digits,
         count: rows.length,
@@ -140,6 +147,8 @@ export default async function handler(req, res) {
             user: c.user_email,
             client: c.client_type,
             campaign: c.campaign,
+            campaignId: idOf(c.campaign),
+            campaignName: names[idOf(c.campaign)] || null,
             old: clip(c.old_resource),
             next: clip(c.new_resource),
           };

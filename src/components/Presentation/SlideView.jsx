@@ -1,4 +1,5 @@
 import RichText, { PlainCell } from './RichText';
+import { CellStyleContext } from './editorContext';
 import { WordmarkWhite } from '../Logo/Logo';
 import { plain } from '../../lib/presentation/textModel';
 import metaCover from '../../assets/presentation/meta-cover.png';
@@ -12,6 +13,7 @@ export const SLIDE_H = 540;
 const COVER_TYPES = ['title', 'section', 'closing'];
 
 const rid = (sid, path) => `${sid}:${path}`;
+const NO_STYLE = {};
 
 function Table({ head, rows, className = '', colClass = [] }) {
   return (
@@ -149,7 +151,9 @@ export default function SlideView({ slide, deck, pageNo }) {
         <i />
       </div>
       <div className="ps-content">
-        <Body slide={slide} deck={deck} />
+        <CellStyleContext.Provider value={slide.cellStyle || NO_STYLE}>
+          <Body slide={slide} deck={deck} />
+        </CellStyleContext.Provider>
       </div>
       {slide.image?.src && <div className="ps-image" data-pptx-img><img src={slide.image.src} alt="" /></div>}
       {slide.type !== 'title' && footer && <div className="ps-footer"><span>{footer}</span></div>}

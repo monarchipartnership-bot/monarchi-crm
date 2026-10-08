@@ -2,15 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Canvas from './Canvas';
 import Filmstrip from './Filmstrip';
 import AddSlideModal from './AddSlideModal';
-import { DataPanel, DesignPanel, SlidePanel, TextPanel } from './Panels';
+import { CellPanel, DataPanel, DesignPanel, SlidePanel, TextPanel } from './Panels';
 import useTextCommands from './useTextCommands';
 import { readSelection } from './RichText';
 import ActionIcon from '../common/ActionIcon';
 import { Popover } from './TextControls';
 import { blankSlide, uid } from '../../lib/presentation/deckModel';
+import { blockDefaults } from '../../lib/presentation/textDefaults';
+import { FONT_BY_ID, nearestWeight } from '../../lib/presentation/fonts';
 import {
   duplicateSlide, insertSlide, moveSlide, removeSlide, setBlockText, setCell, setMeta,
-  setSlideImage, tableAddCol, tableAddRow, tableRemoveCol, tableRemoveRow, toggleHidden, updateSlideData,
+  cellPaths, clearCellStyle, setCellStyle, setSlideImage, tableAddCol, tableAddRow, tableRemoveCol, tableRemoveRow, toggleHidden, updateSlideData,
 } from '../../lib/presentation/deckOps';
 import { setPlain } from '../../lib/presentation/textModel';
 
@@ -27,6 +29,7 @@ export default function Builder({ api, dataProps, onBack, onSave, saveLabel, sav
   const [mode, setMode] = useState(deck.slides.length ? 'slides' : 'data');
   const [activeId, setActiveId] = useState(deck.slides[0]?.id || null);
   const [sel, setSel] = useState(null);
+  const [cellSel, setCellSel] = useState(null); // id of the plain cell being edited
   const [adding, setAdding] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [safeFonts, setSafeFonts] = useState(() => { try { return localStorage.getItem('pres-safe-fonts') !== '0'; } catch { return true; } });
@@ -65,16 +68,45 @@ export default function Builder({ api, dataProps, onBack, onSave, saveLabel, sav
     return () => document.removeEventListener('selectionchange', onChange);
   }, []);
   const clearSel = useCallback(() => { selRef.current = null; setSel(null); }, []);
-  useEffect(() => { clearSel(); }, [activeId, clearSel]);
+  useEffect(() => { clearSel(); setCellSel(null); }, [activeId, clearSel]);
 
   const { info, cmds, onKey } = useTextCommands({ deck, update, sel, selRef, bus, rootRef });
   const textInfo = sel && info && mode !== 'data' && mode !== 'design' ? info : null;
+
+  // Plain cells: formatting of the whole cell (or of every cell on the slide).
+  const cell = useMemo(() => {
+    if (!cellSel || !slide || cellSel.indexOf(slide.id + ':') !== 0) return null;
+    const path = cellSel.slice(slide.id.length + 1);
+    const el = rootRef.current?.querySelector('[data-cell="' + cellSel.replace(/"/g, '') + '"]');
+    const d = blockDefaults(el);
+    const own = slide.cellStyle?.[path] || {};
+    return { path, style: { f: own.f || d.f, s: own.s || d.s, w: own.w || d.w, i: own.i ?? d.i, u: Boolean(own.u), c: own.c || d.c, align: own.align || d.align } };
+  }, [cellSel, slide, rootRef]);
+  const cellCmds = useMemo(() => {
+    const run = (patch, all) => update((d) => {
+      const sl = d.slides.find((x) => x.id === slide.id);
+      if (!sl || !cell) return d;
+      return setCellStyle(d, slide.id, all ? cellPaths(sl) : [cell.path], patch);
+    });
+    return {
+      font: (f, all) => run({ f, ...(FONT_BY_ID[f]?.italic ? {} : { i: null }), w: nearestWeight(f, cell?.style.w || 400) }, all),
+      size: (s, all) => run({ s }, all),
+      color: (c, all) => run({ c }, all),
+      align: (align, all) => run({ align }, all),
+      weight: (w, all) => run({ w }, all),
+      bold: (all) => run({ w: nearestWeight(cell?.style.f || 'Onest', cell?.style.w >= 600 ? 400 : 700) }, all),
+      italic: (all) => run({ i: cell?.style.i ? null : true }, all),
+      underline: (all) => run({ u: cell?.style.u ? null : true }, all),
+      reset: (all) => update((d) => (all ? clearCellStyle(d, slide.id) : setCellStyle(d, slide.id, [cell.path], { f: null, w: null, i: null, u: null, s: null, c: null, align: null }))),
+    };
+  }, [update, slide, cell]);
 
   const editor = useMemo(() => ({
     bus,
     onText: (id, t) => update((d) => setBlockText(d, id, t), 'text:' + id),
     onCell: (id, v) => update((d) => setCell(d, id, v), 'cell:' + id),
-    onFocusBlock: (id) => { if (!id) clearSel(); },
+    onFocusBlock: (id) => { if (!id) clearSel(); else setCellSel(null); },
+    onFocusCell: (id) => setCellSel(id),
     onBlurBlock: () => {},
     onKey,
   }), [update, clearSel, onKey]);
@@ -188,6 +220,7 @@ export default function Builder({ api, dataProps, onBack, onSave, saveLabel, sav
           {mode === 'design' && hasDeck && <DesignPanel deck={deck} onStyle={onStyle} />}
           {mode === 'slides' && hasDeck && slide && (textInfo
             ? <TextPanel info={textInfo} cmds={cmds} onClose={clearSel} />
+            : cell ? <CellPanel style={cell.style} cmds={cellCmds} onClose={() => setCellSel(null)} />
             : (
               <SlidePanel
                 slide={slide} index={index} total={deck.slides.length} tableCmd={tableCmd} onImage={(img) => update((d) => setSlideImage(d, slide.id, img))}

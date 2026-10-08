@@ -9,9 +9,13 @@ export const EditorContext = createContext({
   onText: () => {},
   onCell: () => {},
   onFocusBlock: () => {},
+  onFocusCell: () => {},
   onBlurBlock: () => {},
   // Lets the editor put the caret back after a toolbar command rebuilt a block.
   bus: { current: { pending: null } },
 });
 
 export const useEditor = () => useContext(EditorContext);
+
+// Formatting of plain table / metric cells of the slide being drawn: { path: { f, w, i, u, s, c, align } }.
+export const CellStyleContext = createContext({});

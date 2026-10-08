@@ -13,7 +13,7 @@ import { platformInfo } from '../../../lib/adAccounts';
 // builder: only the campaigns ticked in the picker go into the report and its downloads).
 export const campaignKey = (platform, name) => `${platform}|${name}`;
 
-export default function ResultView({ data, kind, custom, title, subtitle, fileBase, prevLabel, curLabel, children, campaignMode = 'all', selection = [], onSelectionChange }) {
+export default function ResultView({ data, kind, custom, title, subtitle, fileBase, prevLabel, curLabel, children, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -32,7 +32,10 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
   const currency = cur.currency;
   const rows = metricRows(keys, cur.total, prevSrc?.total, custom, currency);
   const showPrev = Boolean(data.previous);
-  const groups = isTotal ? [] : cur.groups || [];
+  // In the report builder the person decides whether the group columns go into the report.
+  const showGroups = campaignMode === 'all' || options.groups !== false;
+  const allGroups = isTotal ? [] : cur.groups || [];
+  const groups = showGroups ? allGroups : [];
   const campaigns = isTotal ? [] : [...(cur.campaigns || [])].sort((a, b) => (b.spend || 0) - (a.spend || 0));
   const shownCampaigns = campaignMode === 'all' ? campaigns : campaigns.filter((c) => selection.includes(campaignKey(active, c.name)));
 
@@ -76,6 +79,15 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
           </>
         )}
       </div>
+
+      {campaignMode === 'selected' && (campaigns.length > 0 || allGroups.length > 0) && (
+        <ContentOptions
+          hasGroups={allGroups.length > 0} groupsOn={showGroups} pickedCount={selection.filter((k) => k.startsWith(active + '|')).length}
+          onGroups={(v) => onOptionsChange({ ...options, groups: v })}
+          onOnlyTotals={() => { onOptionsChange({ ...options, groups: false }); onSelectionChange(selection.filter((k) => !k.startsWith(active + '|'))); }}
+          onEverything={() => { onOptionsChange({ ...options, groups: true }); onSelectionChange([...selection.filter((k) => !k.startsWith(active + '|')), ...campaigns.map((c) => campaignKey(active, c.name))]); }}
+        />
+      )}
 
       {campaignMode === 'selected' && campaigns.length > 0 && (
         <CampaignPicker
@@ -157,5 +169,29 @@ function CampaignPicker({ campaigns, platform, selection, onChange, kind, custom
         })}
       </ul>
     </details>
+  );
+}
+
+// What goes into the report besides the account totals: the group columns and / or single
+// campaigns (picked below). "Тільки загальні показники" turns both off. Outside the captured area.
+function ContentOptions({ hasGroups, groupsOn, pickedCount, onGroups, onOnlyTotals, onEverything }) {
+  const onlyTotals = !groupsOn && pickedCount === 0;
+  return (
+    <div className="prep-content">
+      <div className="prep-content-title">Що входить у звіт</div>
+      <div className="prep-content-row">
+        <span className="prep-chip on" aria-disabled="true">Загальні показники</span>
+        {hasGroups && (
+          <label className="prep-check">
+            <input type="checkbox" checked={groupsOn} onChange={(e) => onGroups(e.target.checked)} /> Групи кампаній (колонки)
+          </label>
+        )}
+        <span className="pacc-hint">{pickedCount ? `Окремі кампанії: ${pickedCount}` : 'Окремі кампанії не обрано'}</span>
+      </div>
+      <div className="prep-content-row">
+        <button type="button" className={'prep-chipbtn' + (onlyTotals ? ' on' : '')} onClick={onOnlyTotals}>Тільки загальні показники</button>
+        <button type="button" className="prep-chipbtn" onClick={onEverything}>Усе: групи й усі кампанії</button>
+      </div>
+    </div>
   );
 }

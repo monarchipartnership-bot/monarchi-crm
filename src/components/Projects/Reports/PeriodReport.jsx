@@ -8,6 +8,9 @@ import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import WeekPicker from '../../Reports/Weekly/WeekPicker';
 import { daysInRange, fetchProjectRange, periodFromPicker, precedingDays, previousPicker, regroupData } from '../../../lib/periodReport';
 import { fetchProjectReports, saveProjectReport, deleteProjectReport } from '../../../lib/api/projectReportStore';
+import { fetchProjectDecks } from '../../../lib/api/projectDecks';
+import { collectFacts, describeWork, mergeWeeks } from '../../../lib/workHistory';
+import { platformInfo } from '../../../lib/adAccounts';
 import { MONTH_NAMES, computeWeeksForMonth, defaultWeekIndexFor, todayIso, yearOptions } from '../../../lib/dateHelpers';
 import { useAuth } from '../../../contexts/AuthContext';
 import '../../../styles/projectReports.css';
@@ -37,16 +40,20 @@ export default function PeriodReport({ projectId, periodType }) {
   const ctx = useReportContext(projectId);
   const [picker, setPicker] = useState(initialPicker);
   const [saved, setSaved] = useState([]);
+  const [decks, setDecks] = useState([]);
   const [savedLoaded, setSavedLoaded] = useState(false);
   const applied = useRef('');
   const [data, setData] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
   const [note, setNote] = useState('');
   const [selection, setSelection] = useState([]);
+  const [options, setOptions] = useState({ groups: true });
   const [status, setStatus] = useState('draft');
   const [meta, setMeta] = useState({ source: 'manual', id: null });
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState('');
+  // The "What was done" helper: what it was built from (shown to the person, never printed in the report).
+  const [work, setWork] = useState(null);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
   const [modal, setModal] = useState(null);
@@ -69,7 +76,9 @@ export default function PeriodReport({ projectId, periodType }) {
   const unfinished = period.end >= todayIso();
 
   const reloadSaved = useCallback(async () => {
-    setSaved(await fetchProjectReports(projectId, periodType));
+    const [rows, deckRows] = await Promise.all([fetchProjectReports(projectId, periodType), fetchProjectDecks(projectId)]);
+    setSaved(rows);
+    setDecks(deckRows.filter((d) => d.period_type === periodType));
     setSavedLoaded(true);
   }, [projectId, periodType]);
   useEffect(() => { setSavedLoaded(false); setSaved([]); applied.current = ''; reloadSaved(); }, [reloadSaved]);
@@ -88,6 +97,7 @@ export default function PeriodReport({ projectId, periodType }) {
       setSections({ ...EMPTY_SECTIONS, ...(row.data?.sections || {}) });
       setNote(row.data?.note || '');
       setSelection(row.data?.selection || []);
+      setOptions({ groups: true, ...(row.data?.options || {}) });
       setStatus(row.status);
       setMeta({ source: row.source, id: row.id });
       setCmpMode(row.data?.compare?.mode || 'calendar');
@@ -96,6 +106,8 @@ export default function PeriodReport({ projectId, periodType }) {
       setSections(EMPTY_SECTIONS);
       setNote('');
       setSelection([]);
+      setOptions({ groups: true });
+      setWork(null);
       setStatus('draft');
       setMeta({ source: 'manual', id: null });
     }
@@ -142,7 +154,7 @@ export default function PeriodReport({ projectId, periodType }) {
         projectId, periodType, periodStart: period.start, periodEnd: period.end, status: nextStatus,
         source: meta.source, createdBy: email,
         // `compare` is internal bookkeeping (never printed on a presentation).
-        data: { version: 1, kind: ctx.kind, platforms: data?.platforms || {}, previous: data?.previous || null, compare: { mode: cmpMode, daysCur, daysPrev, unequal }, selection, sections, note, savedAt: new Date().toISOString() },
+        data: { version: 1, kind: ctx.kind, platforms: data?.platforms || {}, previous: data?.previous || null, compare: { mode: cmpMode, daysCur, daysPrev, unequal }, selection, options, sections, note, savedAt: new Date().toISOString() },
       });
       setStatus(row.status);
       setDirty(false);
@@ -166,6 +178,39 @@ export default function PeriodReport({ projectId, periodType }) {
     const weeks = computeWeeksForMonth(y, m);
     const idx = weeks.find((w) => `${w.start.getFullYear()}-${String(w.start.getMonth() + 1).padStart(2, '0')}-${String(w.start.getDate()).padStart(2, '0')}` === row.period_start)?.index || 1;
     changePicker({ year: y, month: m, weekIndex: idx });
+  }
+
+  // "What was done" from the accounts' change history (weekly) or from the month's weekly lists (monthly).
+  async function fillWhatWasDone(kind) {
+    if (sections.whatWasDone.trim() && !window.confirm('Поточний текст «What was done» буде замінено. Продовжити?')) return;
+    setBusy('work');
+    setMessage('');
+    setWork(null);
+    try {
+      let result;
+      let info;
+      if (kind === 'weeks') {
+        const rows = (await fetchProjectReports(projectId, 'weekly')).filter((r) => r.period_start >= period.start && r.period_start <= period.end).sort((a, b) => a.period_start.localeCompare(b.period_start));
+        const weeks = rows.map((r) => ({ label: `${fmt(r.period_start)} – ${fmt(r.period_end)}`, text: r.data?.sections?.whatWasDone || '' }));
+        const withText = weeks.filter((w) => w.text.trim());
+        const expected = computeWeeksForMonth(picker.year, picker.month).length;
+        info = { kind, weeks: withText.map((w) => w.label), missing: expected - withText.length, facts: [], notes: [], errors: {} };
+        if (!withText.length) { setWork({ ...info, empty: 'Для цього місяця немає тижневих звітів з текстом «What was done». Збережіть тижневі звіти або згенеруйте текст з історії кабінетів.' }); return; }
+        result = await mergeWeeks({ weeks: withText, projectName: ctx.project.name, note, from: period.start, to: period.end });
+      } else {
+        const { facts, errors, notes } = await collectFacts(ctx.accounts, period.start, period.end);
+        info = { kind, facts, notes, errors };
+        if (!facts.length) { setWork({ ...info, empty: 'У кабінетах за цей період не знайдено дій людей (лише системні події). Додайте текст вручну.' }); return; }
+        result = await describeWork({ facts, projectName: ctx.project.name, note, from: period.start, to: period.end, periodType });
+      }
+      setSections((s) => ({ ...s, whatWasDone: result.text }));
+      setDirty(true);
+      setWork({ ...info, writer: result.writer });
+    } catch (e) {
+      setMessage(e.message || 'Не вдалося сформувати текст.');
+    } finally {
+      setBusy('');
+    }
   }
 
   if (ctx.error) return <div className="proj-empty">{ctx.error}</div>;
@@ -236,6 +281,7 @@ export default function PeriodReport({ projectId, periodType }) {
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
             campaignMode="selected" selection={selection} onSelectionChange={(s) => { setSelection(s); setDirty(true); }}
+            options={options} onOptionsChange={(o) => { setOptions(o); setDirty(true); }}
             curLabel={`${fmt(period.start)} – ${fmt(period.end)}`}
             prevLabel={data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній'}
           />
@@ -249,6 +295,31 @@ export default function PeriodReport({ projectId, periodType }) {
             <div className="ov-field-box" key={b.key}>
               <div className="ov-field-label">{b.title}</div>
               <AutoResizeTextarea value={sections[b.key]} onChange={(v) => { setSections((s) => ({ ...s, [b.key]: v })); setDirty(true); }} placeholder={b.title + '…'} />
+              {b.key === 'whatWasDone' && (
+                <div className="prep-work">
+                  <div className="prep-work-actions">
+                    {periodType === 'monthly' && (
+                      <button type="button" className="btn" onClick={() => fillWhatWasDone('weeks')} disabled={busy === 'work'}>{busy === 'work' ? 'Формуємо…' : 'Зібрати з тижневих звітів'}</button>
+                    )}
+                    <button type="button" className={'btn' + (periodType === 'weekly' ? ' btn-p' : '')} onClick={() => fillWhatWasDone('history')} disabled={busy === 'work' || !hasAccounts}>{busy === 'work' ? 'Формуємо…' : 'Сформувати з історії кабінетів'}</button>
+                    {!hasAccounts && <span className="pacc-hint">Потрібен підключений кабінет.</span>}
+                  </div>
+                  {work && (
+                    <div className="prep-internal-note" role="note">
+                      <b>Тільки для внутрішнього користування.</b>{' '}
+                      {work.empty || (work.kind === 'weeks'
+                        ? `Текст зібрано з тижневих звітів: ${work.weeks.join('; ')}.${work.missing > 0 ? ` Тижнів без тексту: ${work.missing}.` : ''}`
+                        : `Текст написано за ${work.facts.length} діями з кабінетів (системні сповіщення відфільтровано).`)}
+                      {work.writer === 'plain' && ' Автоматичне оформлення зараз недоступне, тому показано сирий список дій: відредагуйте його.'}
+                      {work.notes?.map((n) => <div key={n}>{n}</div>)}
+                      {Object.entries(work.errors || {}).map(([p, m]) => <div key={p}>{p}: {m}</div>)}
+                      {work.facts?.length > 0 && (
+                        <details className="prep-work-facts"><summary>Які дії враховано</summary><ul>{work.facts.map((f) => <li key={f}>{f}</li>)}</ul></details>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           <div className="ov-field-box">
@@ -284,7 +355,7 @@ export default function PeriodReport({ projectId, periodType }) {
           <div className="empty-hint">Збережених звітів ще немає.</div>
         ) : (
           <table className="prep-table prep-saved">
-            <thead><tr><th>Період</th><th>Джерело</th><th>Статус</th><th>Оновлено</th><th /></tr></thead>
+            <thead><tr><th>Період</th><th>Джерело</th><th>Статус</th><th>Оновлено</th><th>Презентація</th><th /></tr></thead>
             <tbody>
               {saved.map((r) => (
                 <tr key={r.id} className={r.period_start === period.start ? 'on' : ''}>
@@ -292,6 +363,21 @@ export default function PeriodReport({ projectId, periodType }) {
                   <td><span className={'pacc-pill prep-src prep-src--' + r.source}>{r.source === 'agent' ? 'AI-агент' : 'Вручну'}</span></td>
                   <td>{STATUS[r.status] || r.status}</td>
                   <td className="muted">{new Date(r.updated_at).toLocaleString('uk-UA')}</td>
+                  <td>
+                    <div className="prep-deckcell">
+                      {Object.keys(r.data?.platforms || {}).map((p, _i, all) => {
+                        const has = decks.some((d) => d.period_start === r.period_start && d.platform === p);
+                        return (
+                          <button
+                            key={p} type="button" className="pacc-link"
+                            onClick={() => navigate(`/clients?project=${projectId}&type=${periodType}&start=${r.period_start}&platform=${p}`)}
+                          >
+                            {has ? 'Відкрити презентацію' : 'Створити презентацію'}{all.length > 1 ? ` · ${platformInfo(p).label}` : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </td>
                   <td className="num"><button type="button" className="pacc-link pacc-link--danger" onClick={() => remove(r)}>Видалити</button></td>
                 </tr>
               ))}

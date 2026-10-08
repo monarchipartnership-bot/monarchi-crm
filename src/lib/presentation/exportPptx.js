@@ -30,7 +30,7 @@ function blockRuns(el, tx, ctx) {
   const upper = cs.textTransform === 'uppercase';
   const fontOf = (id) => { const f = FONT_BY_ID[id] || FONT_BY_ID.Onest; return ctx.safeFonts ? f.safe : f.pptx; };
   const def = {
-    f: fontIdFromFamily(cs.fontFamily), w: Number(cs.fontWeight) || 400, i: cs.fontStyle === 'italic', s: baseSize,
+    f: fontIdFromFamily(cs.fontFamily), w: Number(cs.fontWeight) || 400, i: cs.fontStyle === 'italic', u: String(cs.textDecorationLine).includes('underline'), s: baseSize,
     c: hex(cs.color), ls: parseFloat(cs.letterSpacing) || 0, align: ['center', 'right'].includes(cs.textAlign) ? cs.textAlign : 'left',
     lh: (cs.lineHeight === 'normal' ? 1.2 : parseFloat(cs.lineHeight) / baseSize),
   };
@@ -50,7 +50,7 @@ function blockRuns(el, tx, ctx) {
         align: p.align || def.align, lineSpacingMultiple: Math.min(3, Math.max(0.5, p.lh || def.lh)),
         paraSpaceAfter: Math.round(after * PT * 10) / 10, breakLine: ri === runs.length - 1 && pi < tx.paras.length - 1,
       };
-      if (r.u) options.underline = { style: 'sng' };
+      if (r.u || def.u) options.underline = { style: 'sng' };
       if (p.list === 'bullet') options.bullet = { indent: 20 };
       if (p.list === 'number') options.bullet = { type: 'number', indent: 24 };
       out.push({ text, options });
@@ -99,13 +99,14 @@ function collectTables(slideEl, ctx) {
     const heads = [...table.querySelectorAll('thead th')];
     const bodyRows = [...table.querySelectorAll('tbody tr')];
     const cell = (td, kind, rowIdx) => {
-      const cs = getComputedStyle(td);
+      // The look of a cell lives on the text element inside it (that is what the person formats).
+      const cs = getComputedStyle(td.querySelector('.pc') || td);
       const f = FONT_BY_ID[fontIdFromFamily(cs.fontFamily)] || FONT_BY_ID.Onest;
       return {
         text: td.textContent || ' ',
         options: {
           fontFace: ctx.safeFonts ? f.safe : f.pptx, fontSize: Math.round(parseFloat(cs.fontSize) * PT * 10) / 10, bold: Number(cs.fontWeight) >= 600,
-          color: hex(cs.color), align: cs.textAlign === 'right' ? 'right' : 'left', valign: 'middle',
+          color: hex(cs.color), italic: cs.fontStyle === 'italic', underline: String(cs.textDecorationLine).includes('underline') ? { style: 'sng' } : undefined, align: cs.textAlign === 'right' ? 'right' : cs.textAlign === 'center' ? 'center' : 'left', valign: 'middle',
           fill: { color: kind === 'head' ? TABLE.head : rowIdx % 2 ? TABLE.even : TABLE.odd },
           margin: [0.03, 0.12, 0.03, 0.12],
         },

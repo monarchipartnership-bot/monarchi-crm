@@ -11,6 +11,7 @@ import { STATUS_LABEL, SERVICES, fmtIsoDate } from '../../lib/projectConstants';
 import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload, fmtCost } from '../../lib/projectFields';
+import ProjectDecksTab from '../../components/Projects/ProjectDecksTab';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
 import '../../styles/projectReportPage.css';
@@ -21,6 +22,7 @@ const TABS = [
   { key: 'period', label: 'Показники за період' },
   { key: 'weekly', label: 'Тижневий звіт' },
   { key: 'monthly', label: 'Місячний звіт' },
+  { key: 'decks', label: 'Презентації' },
 ];
 
 const STATUSES = ['active', 'paused', 'completed'];
@@ -467,6 +469,7 @@ export default function ProjectDetail() {
       {tab === 'period' && <PeriodStats key={'period-' + id} projectId={id} />}
       {tab === 'weekly' && <PeriodReport key={'weekly-' + id} projectId={id} periodType="weekly" />}
       {tab === 'monthly' && <PeriodReport key={'monthly-' + id} projectId={id} periodType="monthly" />}
+      {tab === 'decks' && <ProjectDecksTab key={'decks-' + id} projectId={id} />}
     </div>
   );
 }

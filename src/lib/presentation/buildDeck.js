@@ -8,7 +8,7 @@ import { text, listText } from './textModel';
 import { emptyDeck, labels, periodLabel, platformName, uid } from './deckModel';
 
 // How much fits on one slide (the editor still warns when a manual edit overflows).
-export const PER_PAGE = { metricslist: 12, kpigrid: 6, tableRows: 9, tableCols: 4, dynamics: 9, listItems: 8, listChars: 760, paragraphChars: 900 };
+export const PER_PAGE = { metricslist: 12, kpigrid: 6, tableRows: 8, tableCols: 4, dynamics: 8, listItems: 8, listChars: 760, paragraphChars: 900 };
 
 // Splits into the fewest pages that fit `n` per page, as even as possible (12 rows with 9 per page → 6 + 6, not 9 + 3).
 const chunk = (arr, n) => {
@@ -150,7 +150,7 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
       n += 1;
     }));
   };
-  if (plat?.groups?.length) {
+  if (plat?.groups?.length && rd.options?.groups !== false) {
     toc.push(L.byGroups);
     colTable(L.byGroups, plat.groups.map((g) => ({ name: g.name === 'Інше' ? L.other : g.name, base: g })));
   }

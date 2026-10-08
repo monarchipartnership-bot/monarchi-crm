@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef } from 'react';
-import { useEditor } from './editorContext';
+import { useContext, useLayoutEffect, useRef } from 'react';
+import { CellStyleContext, useEditor } from './editorContext';
 import { FONT_BY_ID, fontCss, MAX_SIZE, MIN_SIZE } from '../../lib/presentation/fonts';
 import { RUN_KEYS, normalize, normalizeHex, replaceRange } from '../../lib/presentation/textModel';
 
@@ -249,17 +249,21 @@ export default function RichText({ id, value, className = '', placeholder = '', 
 export function PlainCell({ id, value, className = '', placeholder = '' }) {
   const ed = useEditor();
   const ref = useRef(null);
+  const styles = useContext(CellStyleContext);
+  const own = styles[id.slice(id.indexOf(':') + 1)];
+  const css = own ? { ...runCss(own), ...(own.align ? { textAlign: own.align } : {}) } : undefined;
   useLayoutEffect(() => {
     const el = ref.current;
     if (el && document.activeElement !== el && el.textContent !== (value || '')) el.textContent = value || '';
   });
-  if (!ed.editable) return <span className={`pc ${className}${value ? '' : ' is-empty'}`} data-ph={placeholder} data-pc="1">{value}</span>;
+  if (!ed.editable) return <span className={`pc ${className}${value ? '' : ' is-empty'}`} data-ph={placeholder} data-pc="1" style={css}>{value}</span>;
   return (
     <span
       ref={ref}
       className={`pc ${className}${value ? '' : ' is-empty'}`}
       data-ph={placeholder}
       data-cell={id}
+      style={css}
       contentEditable
       suppressContentEditableWarning
       spellCheck={false}
@@ -271,7 +275,7 @@ export function PlainCell({ id, value, className = '', placeholder = '' }) {
         document.execCommand('insertText', false, str);
       }}
       onDrop={(e) => e.preventDefault()}
-      onFocus={() => ed.onFocusBlock(null)}
+      onFocus={() => { ed.onFocusBlock(null); ed.onFocusCell(id); }}
     />
   );
 }

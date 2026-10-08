@@ -243,3 +243,40 @@ export function TextPanel({ info, cmds, onClose }) {
     </div>
   );
 }
+
+// ----- Комірка (a table / metric cell is selected) ----------------------------------------------------
+// Cells hold plain text, so formatting applies to the whole cell (or to every cell of the slide).
+export function CellPanel({ style, cmds, onClose }) {
+  const [all, setAll] = useState(false);
+  const italicDisabled = !FONT_BY_ID[style.f]?.italic;
+  return (
+    <div className="pb-panel" data-floating>
+      <div className="pb-panel-head">
+        <h2>Комірка</h2>
+        <button type="button" className="pb-iconbtn" onMouseDown={keepFocus} onClick={onClose} aria-label="Закрити панель комірки" title="Закрити"><ActionIcon name="close" size={18} /></button>
+      </div>
+      <div className="pb-scope" role="radiogroup" aria-label="До чого застосувати">
+        <button type="button" role="radio" aria-checked={!all} className={'prep-chipbtn' + (!all ? ' on' : '')} onMouseDown={keepFocus} onClick={() => setAll(false)}>Ця комірка</button>
+        <button type="button" role="radio" aria-checked={all} className={'prep-chipbtn' + (all ? ' on' : '')} onMouseDown={keepFocus} onClick={() => setAll(true)}>Усі комірки слайда</button>
+      </div>
+
+      <label className="pb-label">Шрифт</label>
+      <FontMenu value={style.f} onChange={(v) => cmds.font(v, all)} />
+      <div className="pb-row2">
+        <div><label className="pb-label">Розмір</label><SizeField value={style.s} onChange={(v) => cmds.size(v, all)} /></div>
+        <div><label className="pb-label">Насиченість</label><WeightSelect fontId={style.f} value={style.w} onChange={(v) => cmds.weight(v, all)} /></div>
+      </div>
+      <div className="pb-row2">
+        <div>
+          <label className="pb-label">Стиль</label>
+          <StyleButtons bold={style.w >= 600} italic={style.i} underline={style.u} italicDisabled={italicDisabled} onBold={() => cmds.bold(all)} onItalic={() => cmds.italic(all)} onUnderline={() => cmds.underline(all)} />
+        </div>
+        <div><label className="pb-label">Вирівнювання</label><AlignButtons value={style.align} onChange={(v) => cmds.align(v, all)} /></div>
+      </div>
+      <label className="pb-label">Колір тексту</label>
+      <ColorField value={style.c} onChange={(v) => cmds.color(v, all)} />
+      <button type="button" className="btn pb-wide" onMouseDown={keepFocus} onClick={() => cmds.reset(all)}><ActionIcon name="regenerate" size={16} /> Скинути форматування</button>
+      <p className="pacc-hint">Числа й підписи змінюються лише на слайді. Тут змінюється вигляд: шрифт, розмір, колір.</p>
+    </div>
+  );
+}

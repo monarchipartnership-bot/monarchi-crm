@@ -153,3 +153,50 @@ export function setSlideImage(deck, id, image) {
     }),
   };
 }
+
+// ----- Formatting of plain cells (tables, metric values, KPI cards) ----------------------------------
+// Every editable cell of a slide as its path ("rows.1.cells.0"), in reading order.
+export function cellPaths(slide) {
+  const d = slide.data;
+  const out = [];
+  switch (slide.type) {
+    case 'metricslist': d.items.forEach((_, i) => out.push(`items.${i}.label`, `items.${i}.value`, `items.${i}.delta`)); break;
+    case 'kpigrid': d.cards.forEach((_, i) => out.push(`cards.${i}.label`, `cards.${i}.value`, `cards.${i}.delta`)); break;
+    case 'campaignTable':
+      out.push('corner'); d.columns.forEach((_, i) => out.push(`columns.${i}`));
+      d.rows.forEach((r, i) => { out.push(`rows.${i}.label`); r.cells.forEach((__, j) => out.push(`rows.${i}.cells.${j}`)); });
+      break;
+    case 'dynamicsTable':
+      d.headers.forEach((_, i) => out.push(`headers.${i}`));
+      d.rows.forEach((_, i) => ['label', 'prev', 'change', 'cur'].forEach((k) => out.push(`rows.${i}.${k}`)));
+      break;
+    case 'table':
+      d.header.forEach((_, i) => out.push(`header.${i}`));
+      d.rows.forEach((r, i) => r.forEach((__, j) => out.push(`rows.${i}.${j}`)));
+      break;
+    default: break;
+  }
+  return out;
+}
+
+// patch: { f, w, i, u, s, c, align }; a key set to null clears it. paths = one cell or all of them.
+export function setCellStyle(deck, slideId, paths, patch) {
+  return {
+    ...deck,
+    slides: deck.slides.map((s) => {
+      if (s.id !== slideId) return s;
+      const cellStyle = { ...(s.cellStyle || {}) };
+      paths.forEach((p) => {
+        const next = { ...(cellStyle[p] || {}) };
+        Object.keys(patch).forEach((k) => { if (patch[k] == null) delete next[k]; else next[k] = patch[k]; });
+        if (Object.keys(next).length) cellStyle[p] = next; else delete cellStyle[p];
+      });
+      const { cellStyle: _old, ...rest } = s;
+      return Object.keys(cellStyle).length ? { ...rest, cellStyle } : rest;
+    }),
+  };
+}
+
+export function clearCellStyle(deck, slideId) {
+  return { ...deck, slides: deck.slides.map((s) => { if (s.id !== slideId) return s; const { cellStyle: _c, ...rest } = s; return rest; }) };
+}

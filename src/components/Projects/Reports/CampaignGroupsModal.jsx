@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { replaceCampaignGroups } from '../../../lib/api/projectReportStore';
+import { suggestGroups } from '../../../lib/groupSuggest';
 import '../../../styles/projectReports.css';
 
 let seq = 1;
@@ -12,6 +13,7 @@ export default function CampaignGroupsModal({ projectId, groups, campaignNames, 
     ? groups.map((g) => ({ key: seq++, name: g.name, keywords: (g.keywords || []).join(', ') }))
     : [emptyGroup()]));
   const [saving, setSaving] = useState(false);
+  const [hints, setHints] = useState(null);
   const [error, setError] = useState('');
 
   function setRow(key, patch) { setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r))); }
@@ -56,7 +58,24 @@ export default function CampaignGroupsModal({ projectId, groups, campaignNames, 
               </div>
             ))}
           </div>
-          <button type="button" className="btn" onClick={() => setRows((rs) => [...rs, emptyGroup()])}>+ Додати групу</button>
+          <div className="prep-group-btns">
+            <button type="button" className="btn" onClick={() => setRows((rs) => [...rs, emptyGroup()])}>+ Додати групу</button>
+            {campaignNames.length >= 3 && <button type="button" className="btn" onClick={() => setHints(suggestGroups(campaignNames))}>Запропонувати за назвами кампаній</button>}
+          </div>
+          {hints && (
+            <div className="prep-hints">
+              {hints.length === 0 && <span className="pacc-hint">У назвах немає слів, які повторюються у кількох кампаніях: задайте групи вручну.</span>}
+              {hints.map((h) => (
+                <button
+                  key={h.keyword} type="button" className="prep-chipbtn"
+                  disabled={rows.some((r) => r.keywords.toLowerCase().split(',').map((k) => k.trim()).includes(h.keyword))}
+                  onClick={() => setRows((rs) => [...rs.filter((r) => r.name || r.keywords), { key: seq++, name: h.name, keywords: h.keyword }])}
+                >
+                  + {h.name} · {h.count} камп.
+                </button>
+              ))}
+            </div>
+          )}
           {campaignNames.length > 0 && (
             <details className="prep-campaigns">
               <summary>Кампанії, які є зараз ({campaignNames.length})</summary>

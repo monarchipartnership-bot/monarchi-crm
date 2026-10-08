@@ -78,3 +78,23 @@
 .prep-picker-name { min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
 .prep-picker-meta { color: var(--muted); font-size: .78rem; white-space: nowrap; }
 @media (max-width: 560px) { .prep-picker-list li label { grid-template-columns: auto 1fr; } .prep-picker-meta { grid-column: 2; white-space: normal; } }
+
+.prep-deckcell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.prep-deckcell .pacc-link { white-space: nowrap; }
+
+/* What goes into the report (groups / campaigns / totals only) */
+.prep-content { margin-top: 14px; border: 1px solid var(--border); border-radius: 14px; background: #fff; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.prep-content-title { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); }
+.prep-content-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.prep-chip { display: inline-flex; padding: 6px 12px; border-radius: 8px; font-family: var(--font-head); font-weight: 600; font-size: .76rem; border: 1px solid var(--border); color: var(--ink-soft); }
+.prep-chip.on { background: #F3E8F9; color: var(--purple); border-color: #E3CBF0; }
+.prep-chipbtn.on { background: #F3E8F9; color: var(--purple); border-color: #E3CBF0; }
+
+/* "What was done" helper */
+.prep-work { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.prep-work-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.prep-work-facts { margin-top: 6px; }
+.prep-work-facts ul { margin: 6px 0 0; padding-left: 18px; font-size: .8rem; }
+
+.prep-group-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.prep-hints { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }

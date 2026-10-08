@@ -119,6 +119,8 @@ export default function Presentation() {
       });
       if (!next.slides.length) { setMessage('У звіті немає даних для цієї платформи.'); return; }
       update(() => next);
+      // A new deck is saved at once, so it exists in the list of presentations and autosave takes over from here.
+      await persist(next);
     } catch (e) {
       setMessage(e.message || 'Не вдалося створити презентацію.');
     } finally {
@@ -126,16 +128,16 @@ export default function Presentation() {
     }
   }
 
-  const save = useCallback(async () => {
-    if (!deck.slides.length || !sel.projectId) return;
+  const persist = useCallback(async (d) => {
+    if (!d.slides.length || !sel.projectId) return;
     setSaveBusy(true);
     try {
       const row = await saveDeck({
-        projectId: Number(sel.projectId), reportId: report?.id || deck.meta.reportId, periodType: sel.periodType,
-        periodStart: period.start, periodEnd: period.end, platform: sel.platform, style: deck.meta.style, lang: deck.meta.lang,
-        deck, createdBy: email,
+        projectId: Number(sel.projectId), reportId: report?.id || d.meta.reportId, periodType: sel.periodType,
+        periodStart: period.start, periodEnd: period.end, platform: sel.platform, style: d.meta.style, lang: d.meta.lang,
+        deck: d, createdBy: email,
       });
-      savedDeck.current = deck;
+      savedDeck.current = d;
       setSavedAt(row.updated_at);
       setMessage('');
     } catch (e) {
@@ -143,7 +145,8 @@ export default function Presentation() {
     } finally {
       setSaveBusy(false);
     }
-  }, [deck, sel, period, report, email]);
+  }, [sel, period, report, email]);
+  const save = useCallback(() => persist(deck), [persist, deck]);
 
   // Autosave a few seconds after the last change.
   useEffect(() => {

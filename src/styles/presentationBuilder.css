@@ -189,3 +189,5 @@
 .pb-check input { margin-top: 2px; flex: none; }
 
 .pb-imgprev { max-width: 100%; max-height: 140px; object-fit: contain; border-radius: 10px; border: 1px solid var(--pb-line); background: #270827; }
+
+.pb-scope { display: flex; flex-wrap: wrap; gap: 6px; }
