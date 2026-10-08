@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAnimatedOpen } from '../../lib/useAnimatedOpen';
 import { useFloatingPosition } from '../../lib/useFloatingPosition';
+import { ddTheme } from '../../lib/ddTheme';
 import '../../styles/dropdownAnim.css';
 import '../../styles/select.css';
+import '../../styles/dropdownPlum.css';
 
 const CLOSE_MS = 140;
 const CHEVRON_ICON = '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
@@ -75,7 +77,7 @@ export default function Select({ value, onChange, options, placeholder, bare, cl
       {rendered && !disabled && createPortal(
         <div
           ref={menuRef}
-          className={'ui-select-menu' + (open ? '' : ' closing') + (pos.placement === 'top' ? ' placement-top' : '') + (pos.placement === 'left' ? ' placement-left' : '') + (searchable ? ' ui-select-menu--searchable' : '')}
+          className={'ui-select-menu' + ddTheme(containerRef) + (open ? '' : ' closing') + (pos.placement === 'top' ? ' placement-top' : '') + (pos.placement === 'left' ? ' placement-left' : '') + (searchable ? ' ui-select-menu--searchable' : '')}
           style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, right: pos.right, minWidth: pos.width }}
         >
           {searchable && (

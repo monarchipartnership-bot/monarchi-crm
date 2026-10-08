@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdAccountPicker from './AdAccountPicker';
 import Select from '../common/Select';
+import ActionIcon from '../common/ActionIcon';
+import { PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
 import { AD_PLATFORMS, platformInfo, statusInfo, formatAccountId, formatMoney, fetchAccountInsights, lookupAdAccount } from '../../lib/adAccounts';
 import { fetchAllProjectAccounts, fetchProjectAccounts, addProjectAccount, refreshProjectAccount, removeProjectAccount } from '../../lib/api/projectAccounts';
 import { useAuth } from '../../contexts/AuthContext';
 import '../../styles/projectAccounts.css';
+import AccountCampaigns from './AccountCampaigns';
 
 const PERIODS = [{ value: 'last_7d', label: '7 днів' }, { value: 'last_30d', label: '30 днів' }];
 
@@ -119,22 +122,22 @@ export default function ProjectAccountsPanel({ projectId, services, onAddService
   const d = insights.data;
 
   return (
-    <section className="report-section pacc-panel">
+    <section className="report-section pacc-panel pw-card">
       <div className="pacc-panel-head">
         <div className="stitle">Рекламні кабінети</div>
         <div className="pacc-panel-actions">
           {accounts.length > 1 && (
-            <div className="pacc-tabs" role="tablist">
+            <div className="pw-switch" role="tablist" aria-label="Платформа кабінету">
               {accounts.map((a) => (
-                <button key={a.id} type="button" role="tab" aria-selected={a.platform === active} className={'pacc-tab' + (a.platform === active ? ' on' : '')} onClick={() => { setActive(a.platform); setConfirmRemove(false); setMsg(''); }}>
+                <button key={a.id} type="button" role="tab" aria-selected={a.platform === active} className={'pw-btn' + (a.platform === active ? ' pw-btn--selected' : '')} onClick={() => { setActive(a.platform); setConfirmRemove(false); setMsg(''); }}>
+                  <img src={PLATFORM_ICONS[PLATFORM_SYMBOL[a.platform]]?.src} alt="" width="23" height="23" draggable="false" />
                   {platformInfo(a.platform).label}
-                  <span className={'pacc-dot pacc-dot--' + statusInfo(a.account_status).tone} />
                 </button>
               ))}
             </div>
           )}
           {freePlatforms.length > 0 && !adding && (
-            <button type="button" className="btn" onClick={startAdding}>+ Підключити кабінет</button>
+            <button type="button" className="pw-btn" onClick={startAdding}><ActionIcon name="create" size={18} /> Підключити кабінет</button>
           )}
         </div>
       </div>
@@ -149,27 +152,27 @@ export default function ProjectAccountsPanel({ projectId, services, onAddService
           <AdAccountPicker platform={addPlatform} value={picked} onChange={setPicked} usedKeys={usedKeys} />
           {msg && <div className="pacc-err">{msg}</div>}
           <div className="pacc-add-actions">
-            <button type="button" className="btn btn-p" onClick={saveAdded} disabled={!picked || busy}>{busy ? '...' : 'Підключити'}</button>
-            <button type="button" className="btn" onClick={() => setAdding(false)}>Скасувати</button>
+            <button type="button" className="pw-btn pw-btn--primary" onClick={saveAdded} disabled={!picked || busy}>{busy ? '...' : 'Підключити'}</button>
+            <button type="button" className="pw-btn" onClick={() => setAdding(false)}>Скасувати</button>
           </div>
         </div>
       )}
 
       {!current && !adding && (
         <div className="pacc-empty">
-          До проекту ще не підключено рекламного кабінету. {freePlatforms.length > 0 ? 'Підключіть Meta Ads або Google Ads, щоб бачити цифри кабінету тут.' : ''}
+          До проєкту ще не підключено рекламного кабінету. {freePlatforms.length > 0 ? 'Підключіть Meta Ads або Google Ads, щоб бачити цифри кабінету тут.' : ''}
         </div>
       )}
 
       {current && (
         <div className="pacc-card">
           <div className="pacc-card-top">
-            <span className="pacc-badge" style={{ background: info.gradient }}>{info.mark}</span>
+            <img className="pacc-platform-img" src={PLATFORM_ICONS[PLATFORM_SYMBOL[current.platform]]?.src} alt="" width="40" height="40" draggable="false" />
             <div className="pacc-card-title">
               <div className="pacc-card-name">{current.account_name || 'Без назви'}</div>
               <div className="pacc-card-sub">{info.label} · {formatAccountId(current.platform, current.account_id)}</div>
             </div>
-            <span className={'pacc-pill pacc-pill--' + st.tone}>{st.label}</span>
+            <span className={'pw-chip pw-chip--' + (st.tone === 'ok' ? 'ok' : st.tone === 'bad' ? 'bad' : st.tone === 'warn' ? 'warn' : 'muted')}>{st.label}</span>
           </div>
           <div className="pacc-facts">
             <div><span>Валюта</span><b>{current.currency || '—'}</b></div>
@@ -201,18 +204,23 @@ export default function ProjectAccountsPanel({ projectId, services, onAddService
             </div>
           )}
 
+          <AccountCampaigns account={current} period={period} />
+
           <div className="pacc-card-actions">
-            <button type="button" className="btn" onClick={refreshCurrent} disabled={busy}>Оновити дані кабінету</button>
-            {!confirmRemove ? (
-              <button type="button" className="pacc-link pacc-link--danger" onClick={() => setConfirmRemove(true)}>Відвʼязати кабінет</button>
-            ) : (
-              <span className="pacc-confirm">
-                Відвʼязати цей кабінет від проекту? Звіти збережуться.
-                <button type="button" className="pacc-link pacc-link--danger" onClick={removeCurrent} disabled={busy}>Так, відвʼязати</button>
-                <button type="button" className="pacc-link" onClick={() => setConfirmRemove(false)}>Ні</button>
-              </span>
+            <button type="button" className="pw-btn" onClick={refreshCurrent} disabled={busy}><ActionIcon name="regenerate" size={18} /> Оновити дані кабінету</button>
+            {!confirmRemove && (
+              <button type="button" className="pw-btn pw-btn--danger-quiet" onClick={() => setConfirmRemove(true)}>Відвʼязати кабінет</button>
             )}
           </div>
+          {confirmRemove && (
+            <div className="pw-notice pw-notice--warn" role="alert">
+              <span>Відвʼязати цей кабінет від проєкту? Звіти збережуться.</span>
+              <span className="pw-notice-actions">
+                <button type="button" className="pw-btn pw-btn--danger" onClick={removeCurrent} disabled={busy}>Так, відвʼязати</button>
+                <button type="button" className="pw-btn" onClick={() => setConfirmRemove(false)}>Ні</button>
+              </span>
+            </div>
+          )}
           {msg && !adding && <div className="pacc-hint">{msg}</div>}
         </div>
       )}

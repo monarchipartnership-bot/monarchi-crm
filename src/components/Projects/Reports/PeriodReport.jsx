@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import CompareModal from './CompareModal';
 import ResultView from './ResultView';
 import CampaignGroupsModal from './CampaignGroupsModal';
 import CustomMetricModal from './CustomMetricModal';
 import { useReportContext } from './useReportContext';
+import { useConfirm } from '../../common/ConfirmDialog';
 import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import WeekPicker from '../../Reports/Weekly/WeekPicker';
 import { daysInRange, fetchProjectRange, periodFromPicker, precedingDays, previousPicker, regroupData } from '../../../lib/periodReport';
@@ -14,6 +16,7 @@ import { platformInfo } from '../../../lib/adAccounts';
 import { MONTH_NAMES, computeWeeksForMonth, defaultWeekIndexFor, todayIso, yearOptions } from '../../../lib/dateHelpers';
 import { useAuth } from '../../../contexts/AuthContext';
 import '../../../styles/projectReports.css';
+import Select from '../../common/Select';
 
 const TEXT_BLOCKS = [
   { key: 'whatWasDone', title: 'What was done' },
@@ -35,6 +38,7 @@ function initialPicker() {
 // project's ad accounts together with the period before it for comparison, add
 // the text, save. Reports made by hand and (later) by the AI agent sit in one list.
 export default function PeriodReport({ projectId, periodType }) {
+  const [confirm, confirmDialog] = useConfirm();
   const { email } = useAuth();
   const navigate = useNavigate();
   const ctx = useReportContext(projectId);
@@ -57,22 +61,31 @@ export default function PeriodReport({ projectId, periodType }) {
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
   const [modal, setModal] = useState(null);
-  // What the numbers are compared with: the previous report period (previous week of
-  // the month / previous month) or the same number of days right before this period.
-  const [cmpMode, setCmpMode] = useState('calendar');
+  // What the numbers are compared with. Nothing until the person asks («Порівняти»):
+  //   { mode: 'calendar' } the previous report period (previous week of the month / previous month)
+  //   { mode: 'days' }     the same number of days right before this period
+  //   { mode: 'custom', from, to } any dates; null = no comparison.
+  const [cmp, setCmp] = useState(null);
+  const [askOff, setAskOff] = useState(() => { try { return localStorage.getItem('prep-ask-compare') === 'off'; } catch { return false; } });
 
   const period = periodFromPicker(periodType, picker);
-  const prevFor = (mode) => {
-    if (mode === 'days') {
+  const prevFor = (c) => {
+    if (!c) return null;
+    if (c.mode === 'custom') return { start: c.from, end: c.to, label: '' };
+    if (c.mode === 'days') {
       const p = precedingDays(period.start, daysInRange(period.start, period.end));
       return { ...p, label: '' };
     }
     return periodFromPicker(periodType, previousPicker(periodType, picker));
   };
-  const prev = prevFor(cmpMode);
+  const prev = prevFor(cmp);
   const daysCur = daysInRange(period.start, period.end);
-  const daysPrev = daysInRange(prev.start, prev.end);
+  const daysPrev = prev ? daysInRange(prev.start, prev.end) : daysCur;
   const unequal = daysCur !== daysPrev;
+  const comparePresets = [
+    { key: 'calendar', title: periodType === 'weekly' ? 'Попередній тиждень місяця' : 'Попередній місяць', hint: 'за календарем звітів', range: (() => { const q = prevFor({ mode: 'calendar' }); return { from: q.start, to: q.end }; })() },
+    { key: 'days', title: `Попередні ${daysCur} дн.`, hint: 'така ж тривалість, одразу перед періодом', range: (() => { const q = prevFor({ mode: 'days' }); return { from: q.start, to: q.end }; })() },
+  ];
   const unfinished = period.end >= todayIso();
 
   const reloadSaved = useCallback(async () => {
@@ -100,13 +113,14 @@ export default function PeriodReport({ projectId, periodType }) {
       setOptions({ groups: true, ...(row.data?.options || {}) });
       setStatus(row.status);
       setMeta({ source: row.source, id: row.id });
-      setCmpMode(row.data?.compare?.mode || 'calendar');
+      setCmp(row.data?.previous?.period ? (row.data.compare?.mode === 'custom' ? { mode: 'custom', from: row.data.previous.period.start, to: row.data.previous.period.end } : { mode: row.data.compare?.mode || 'calendar' }) : null);
     } else {
       setData(null);
       setSections(EMPTY_SECTIONS);
       setNote('');
       setSelection([]);
       setOptions({ groups: true });
+      setCmp(null);
       setWork(null);
       setStatus('draft');
       setMeta({ source: 'manual', id: null });
@@ -117,8 +131,8 @@ export default function PeriodReport({ projectId, periodType }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saved, savedLoaded, period.start, projectId, periodType, dirty]);
 
-  function changePicker(next) {
-    if (dirty && !window.confirm('Є незбережені зміни в цьому звіті. Перейти до іншого періоду без збереження?')) return;
+  async function changePicker(next) {
+    if (dirty && !(await confirm({ title: 'Незбережені зміни', body: 'Є незбережені зміни в цьому звіті. Перейти до іншого періоду без збереження?', confirmLabel: 'Перейти без збереження', cancelLabel: 'Залишитись' }))) return;
     if (periodType === 'weekly') {
       const dim = computeWeeksForMonth(next.year, next.month).length;
       setPicker({ year: next.year, month: next.month, weekIndex: Math.min(next.weekIndex || 1, dim) });
@@ -127,23 +141,49 @@ export default function PeriodReport({ projectId, periodType }) {
     }
   }
 
-  async function pull(mode = cmpMode) {
-    const pv = prevFor(mode);
+  async function pull(c = cmp) {
+    const pv = prevFor(c);
     setBusy('pull');
     setMessage('');
     try {
       const [cur, before] = await Promise.all([
         fetchProjectRange(ctx.accounts, period.start, period.end, ctx.kind, ctx.groups),
-        fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups),
+        pv ? fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups) : Promise.resolve(null),
       ]);
       setErrors(cur.errors);
-      setData({ platforms: cur.platforms, previous: { period: { start: pv.start, end: pv.end }, platforms: before.platforms } });
+      setData({ platforms: cur.platforms, previous: before ? { period: { start: pv.start, end: pv.end }, platforms: before.platforms } : null });
       setDirty(true);
+      // The period is on screen: offer a comparison (unless it is set already or switched off).
+      if (!c && !askOff) setModal('ask');
     } catch (e) {
       setMessage(e.message || 'Не вдалося отримати дані.');
     } finally {
       setBusy('');
     }
+  }
+
+  // Adds / changes / removes the comparison of the numbers already pulled, without asking the accounts for the period again.
+  async function applyCompare(c) {
+    setCmp(c);
+    setModal(null);
+    if (!data) return;
+    setDirty(true);
+    if (!c) { setData((d) => ({ ...d, previous: null })); return; }
+    const pv = prevFor(c);
+    setBusy('pull');
+    try {
+      const before = await fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups);
+      setData((d) => ({ ...d, previous: { period: { start: pv.start, end: pv.end }, platforms: before.platforms } }));
+    } catch (e) {
+      setMessage(e.message || 'Не вдалося отримати дані для порівняння.');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  function neverAsk() {
+    setAskOff(true);
+    try { localStorage.setItem('prep-ask-compare', 'off'); } catch { /* optional */ }
   }
 
   async function save(nextStatus = status) {
@@ -154,7 +194,7 @@ export default function PeriodReport({ projectId, periodType }) {
         projectId, periodType, periodStart: period.start, periodEnd: period.end, status: nextStatus,
         source: meta.source, createdBy: email,
         // `compare` is internal bookkeeping (never printed on a presentation).
-        data: { version: 1, kind: ctx.kind, platforms: data?.platforms || {}, previous: data?.previous || null, compare: { mode: cmpMode, daysCur, daysPrev, unequal }, selection, options, sections, note, savedAt: new Date().toISOString() },
+        data: { version: 1, kind: ctx.kind, platforms: data?.platforms || {}, previous: data?.previous || null, compare: cmp ? { mode: cmp.mode, daysCur, daysPrev, unequal } : null, selection, options, sections, note, savedAt: new Date().toISOString() },
       });
       setStatus(row.status);
       setDirty(false);
@@ -168,7 +208,7 @@ export default function PeriodReport({ projectId, periodType }) {
   }
 
   async function remove(row) {
-    if (!window.confirm('Видалити збережений звіт? Дію не можна скасувати.')) return;
+    if (!(await confirm({ title: 'Видалити звіт?', body: 'Видалити збережений звіт? Дію не можна скасувати.', confirmLabel: 'Видалити звіт', danger: true }))) return;
     try { await deleteProjectReport(row.id); await reloadSaved(); } catch (e) { setMessage(e.message || 'Не вдалося видалити.'); }
   }
 
@@ -182,7 +222,7 @@ export default function PeriodReport({ projectId, periodType }) {
 
   // "What was done" from the accounts' change history (weekly) or from the month's weekly lists (monthly).
   async function fillWhatWasDone(kind) {
-    if (sections.whatWasDone.trim() && !window.confirm('Поточний текст «What was done» буде замінено. Продовжити?')) return;
+    if (sections.whatWasDone.trim() && !(await confirm({ title: 'Замінити текст?', body: 'Поточний текст «What was done» буде замінено. Продовжити?', confirmLabel: 'Замінити', cancelLabel: 'Залишити' }))) return;
     setBusy('work');
     setMessage('');
     setWork(null);
@@ -229,34 +269,26 @@ export default function PeriodReport({ projectId, periodType }) {
           <div className="picker">
             <div className="pk-field">
               <label>Рік</label>
-              <select value={picker.year} onChange={(e) => changePicker({ ...picker, year: +e.target.value })}>
-                {yearOptions().map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
+              <Select value={picker.year} onChange={(v) => changePicker({ ...picker, year: v })} ariaLabel="Рік" options={yearOptions().map((y) => ({ value: y, label: String(y) }))} />
             </div>
             <div className="pk-field">
               <label>Місяць</label>
-              <select value={picker.month} onChange={(e) => changePicker({ ...picker, month: +e.target.value })}>
-                {MONTH_NAMES.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}
-              </select>
+              <Select value={picker.month} onChange={(v) => changePicker({ ...picker, month: v })} ariaLabel="Місяць" options={MONTH_NAMES.map((name, i) => ({ value: i + 1, label: name }))} />
             </div>
           </div>
         )}
         <div className="prep-period-line">
-          <b>{period.label}</b> · {fmt(period.start)} – {fmt(period.end)} · порівняння з {fmt(prev.start)} – {fmt(prev.end)}
+          <b>{period.label}</b> · {fmt(period.start)} – {fmt(period.end)}{prev ? ` · порівняння з ${fmt(prev.start)} – ${fmt(prev.end)}` : ''}
           {meta.id && <span className={'pacc-pill prep-src prep-src--' + meta.source}>{meta.source === 'agent' ? 'AI-агент' : 'Вручну'}</span>}
         </div>
         <div className="prep-actions">
-          <div className="pk-field">
-            <label>Порівняти з</label>
-            <select value={cmpMode} onChange={(e) => { setCmpMode(e.target.value); if (data) pull(e.target.value); }} disabled={busy === 'pull'}>
-              <option value="calendar">{periodType === 'weekly' ? 'Попереднім тижнем місяця' : 'Попереднім місяцем'}</option>
-              <option value="days">Попередніми {daysCur} дн. (така ж тривалість)</option>
-            </select>
-          </div>
           <button type="button" className="btn btn-p" onClick={() => pull()} disabled={!hasAccounts || busy === 'pull'}>{busy === 'pull' ? 'Завантаження…' : data ? 'Оновити з кабінетів' : 'Підтягнути з кабінетів'}</button>
+          <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={busy === 'pull'}>
+            {cmp && prev ? `Порівняння: ${fmt(prev.start)}–${fmt(prev.end)}` : 'Порівняти'}
+          </button>
           <button type="button" className="btn" onClick={() => setModal('groups')}>Групи кампаній</button>
           <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
-          {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Overview», щоб тягнути цифри автоматично.</span>}
+          {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Огляд», щоб тягнути цифри автоматично.</span>}
         </div>
       </section>
 
@@ -330,9 +362,7 @@ export default function PeriodReport({ projectId, periodType }) {
         <div className="prep-save-row">
           <div className="pk-field">
             <label>Статус</label>
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setDirty(true); }}>
-              {Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+            <Select value={status} onChange={(v) => { setStatus(v); setDirty(true); }} ariaLabel="Статус" options={Object.entries(STATUS).map(([v, l]) => ({ value: v, label: l }))} />
           </div>
           <button type="button" className="btn btn-p" onClick={() => save()} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)}>
             {busy === 'save' ? '...' : 'Зберегти звіт'}
@@ -386,6 +416,12 @@ export default function PeriodReport({ projectId, periodType }) {
         )}
       </section>
 
+      {(modal === 'compare' || modal === 'ask') && (
+        <CompareModal
+          offer={modal === 'ask'} current={{ from: period.start, to: period.end }} presets={comparePresets} value={cmp}
+          onApply={applyCompare} onClose={() => setModal(null)} onNeverAsk={neverAsk}
+        />
+      )}
       {modal === 'groups' && (
         <CampaignGroupsModal projectId={projectId} groups={ctx.groups} campaignNames={campaignNames} onClose={() => setModal(null)}
           onSaved={async () => { const g = await ctx.reloadGroups(); setData((d) => (d ? regroupData(d, g) : d)); setDirty(true); }} />
@@ -394,6 +430,7 @@ export default function PeriodReport({ projectId, periodType }) {
         <CustomMetricModal projectId={projectId} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}
           sample={first ? { base: first.total, currency: first.currency, label: 'весь акаунт' } : null} />
       )}
+      {confirmDialog}
     </div>
   );
 }

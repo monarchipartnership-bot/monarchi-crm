@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import useDialogA11y from '../../../lib/useDialogA11y';
 import { replaceCampaignGroups } from '../../../lib/api/projectReportStore';
 import { suggestGroups } from '../../../lib/groupSuggest';
 import '../../../styles/projectReports.css';
@@ -9,6 +10,8 @@ const emptyGroup = () => ({ key: seq++, name: '', keywords: '' });
 // "Групи кампаній": the columns of the report. A campaign goes to the first
 // group whose keyword appears in its name (any case); the rest land in "Інше".
 export default function CampaignGroupsModal({ projectId, groups, campaignNames, onClose, onSaved }) {
+  const box = useRef(null);
+  useDialogA11y(box, onClose);
   const [rows, setRows] = useState(() => (groups.length
     ? groups.map((g) => ({ key: seq++, name: g.name, keywords: (g.keywords || []).join(', ') }))
     : [emptyGroup()]));
@@ -41,10 +44,10 @@ export default function CampaignGroupsModal({ projectId, groups, campaignNames, 
 
   return (
     <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-box prep-modal">
+      <div ref={box} tabIndex={-1} className="modal-box prep-modal" role="dialog" aria-modal="true" aria-labelledby="cg-title">
         <div className="modal-head">
-          <h3>Групи кампаній</h3>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
+          <h3 id="cg-title">Групи кампаній</h3>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Закрити">&times;</button>
         </div>
         <div className="modal-body">
           <div className="pacc-hint">Кожна група стає колонкою у звіті. Вкажіть слова з назви кампанії через кому (наприклад: <i>Kinky Bang, kinky</i>). Кампанія потрапляє до першої групи, чиє слово є в її назві, решта йде в «Інше».</div>

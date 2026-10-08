@@ -1,0 +1,66 @@
+/* «AI Агент» tab of the project card. Prefix pag-. White cards, thin borders, brand purple for the primary actions. */
+
+.pag-wrap { display: flex; flex-direction: column; gap: 16px; }
+.pag-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 4px 18px rgba(80, 30, 100, .06); }
+.pag-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.pag-card-head .stitle { margin: 0; }
+.pag-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+/* Status */
+.pag-status { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; }
+.pag-status-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.pag-status-title { font-family: var(--font-head); font-size: 1.1rem; color: var(--ink); }
+.pag-status-sub { font-size: .84rem; color: var(--muted); margin-top: 2px; max-width: 60ch; }
+.pag-status-side { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.pag-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: #9CA3AF; }
+.pag-dot--ok { background: #16A34A; box-shadow: 0 0 0 4px rgba(22, 163, 74, .15); }
+.pag-dot--bad { background: #DC2626; box-shadow: 0 0 0 4px rgba(220, 38, 38, .15); }
+.pag-dot--muted { background: #9CA3AF; }
+.pag-error, .pag-hint { flex-basis: 100%; }
+
+/* Switch */
+.pag-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.pag-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pag-switch-track { width: 46px; height: 26px; border-radius: 999px; background: #D1D5DB; position: relative; flex: none; }
+.pag-switch-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
+.pag-switch input:checked + .pag-switch-track { background: linear-gradient(88deg, #B544B5, #661466); }
+.pag-switch input:checked + .pag-switch-track .pag-switch-knob { left: 23px; }
+.pag-switch input:focus-visible + .pag-switch-track { outline: 2px solid var(--purple); outline-offset: 2px; }
+.pag-switch input:disabled + .pag-switch-track { opacity: .5; }
+.pag-switch-label { font-weight: 600; font-size: .86rem; color: var(--ink); min-width: 78px; }
+
+/* Settings */
+.pag-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 20px; }
+.pag-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: #FCF8FC; }
+.pag-field--wide { grid-column: 1 / -1; }
+.pag-label { font-family: var(--font-head); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.pag-checks { display: flex; flex-direction: column; gap: 8px; }
+.pag-check { display: flex; gap: 10px; align-items: flex-start; font-size: .88rem; color: var(--ink); cursor: pointer; }
+.pag-check input { margin-top: 3px; flex: none; }
+.pag-check > span { display: flex; flex-direction: column; gap: 2px; }
+.pag-check small { color: var(--muted); font-size: .78rem; }
+.pag-check--soon { opacity: .6; cursor: default; }
+.pag-stack { display: flex; flex-direction: column; gap: 8px; }
+.pag-row { display: flex; gap: 8px; }
+.pag-field select, .pag-field input[type=time] { width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--ink); font-family: var(--font-body); font-size: .86rem; }
+.pag-row input[type=time] { width: 120px; flex: none; }
+
+/* History */
+.pag-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pag-event { display: flex; gap: 12px; align-items: flex-start; padding: 12px 4px; border-top: 1px solid var(--border); }
+.pag-event:first-child { border-top: 0; }
+.pag-event .pag-dot { margin-top: 5px; box-shadow: none; }
+.pag-event-body { min-width: 0; flex: 1; }
+.pag-event-msg { font-size: .9rem; color: var(--ink); overflow-wrap: anywhere; }
+.pag-event--problem .pag-event-msg { color: #991B1B; }
+.pag-event-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .76rem; color: var(--muted); margin-top: 3px; }
+.pag-kind { font-weight: 700; color: var(--purple); }
+
+@media (max-width: 1000px) { .pag-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .pag-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Agent chip in the project header */
+.pacc-chip--agent { cursor: pointer; font-family: inherit; }
+.pacc-chip--ok { background: #DCFCE7; color: #166534; border-color: #BBF7D0; }
+.pacc-chip--bad { background: #FEE2E2; color: #991B1B; border-color: #FECACA; }
+.pacc-chip--muted { background: #F3F4F6; color: #4B5563; border-color: #E5E7EB; }

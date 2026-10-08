@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom';
 import { MONTH_NAMES, isoDate, todayIso, buildMonthGrid } from '../../lib/dateHelpers';
 import { useAnimatedOpen } from '../../lib/useAnimatedOpen';
 import { useFloatingPosition } from '../../lib/useFloatingPosition';
+import { ddTheme } from '../../lib/ddTheme';
 import '../../styles/dropdownAnim.css';
 import '../../styles/datePicker.css';
+import '../../styles/dropdownPlum.css';
 
 const CLOSE_MS = 140;
 
@@ -78,7 +80,7 @@ export default function DatePicker({ value, onChange, placeholder, bare, classNa
       </button>
       {rendered && createPortal(
         <div
-          className={'date-picker-menu' + (open ? '' : ' closing') + (pos.placement === 'top' ? ' placement-top' : '')}
+          className={'date-picker-menu' + ddTheme(containerRef) + (open ? '' : ' closing') + (pos.placement === 'top' ? ' placement-top' : '')}
           style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left }}
         >
           <div className="date-picker-nav">

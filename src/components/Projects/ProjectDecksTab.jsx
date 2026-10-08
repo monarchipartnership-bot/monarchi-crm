@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useConfirm } from '../common/ConfirmDialog';
 import { deleteDeck, fetchProjectDecks } from '../../lib/api/projectDecks';
 import { STYLES, periodLabel, platformName } from '../../lib/presentation/deckModel';
 import '../../styles/projectReports.css';
@@ -7,6 +8,7 @@ import '../../styles/projectReports.css';
 // «Презентації» tab of a project: every client deck made for it, newest period first.
 export default function ProjectDecksTab({ projectId }) {
   const navigate = useNavigate();
+  const [confirm, confirmDialog] = useConfirm();
   const [rows, setRows] = useState(null);
   const [error, setError] = useState('');
 
@@ -16,7 +18,7 @@ export default function ProjectDecksTab({ projectId }) {
   const open = (d) => navigate(`/clients?project=${projectId}&type=${d.period_type}&start=${d.period_start}&platform=${d.platform}`);
 
   async function remove(d) {
-    if (!window.confirm('Видалити збережену презентацію? Дію не можна скасувати. Звіт, з якого її зроблено, залишиться.')) return;
+    if (!(await confirm({ title: 'Видалити презентацію?', body: 'Видалити збережену презентацію? Дію не можна скасувати. Звіт, з якого її зроблено, залишиться.', confirmLabel: 'Видалити презентацію', danger: true }))) return;
     try { await deleteDeck(d.id); await load(); } catch (e) { setError(e.message || 'Не вдалося видалити.'); }
   }
 
@@ -55,6 +57,7 @@ export default function ProjectDecksTab({ projectId }) {
           </tbody>
         </table>
       )}
+      {confirmDialog}
     </section>
   );
 }

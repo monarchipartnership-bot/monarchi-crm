@@ -28,14 +28,18 @@ export const ROUTE_META = {
     trail: [{ label: 'Team' }, { label: 'Team Accounts' }],
   },
   '/projects/dashboard': {
-    title: 'Projects Dashboard',
+    title: 'Дашборд проєктів',
     desc: 'Загальна картина по всіх проєктах: витрати, дохід, ROAS, статуси та тренди.',
     trail: [{ label: 'Project Managers Department' }, { label: 'Dashboard' }],
+    pageIcon: PAGE_ICONS['page.projects-dashboard'].src,
+    infoLabel: 'Про розділ',
   },
   '/projects': {
-    title: 'Projects',
-    desc: 'База проєктів агенції, керована відповідальними менеджерами.',
-    trail: [{ label: 'Project Managers Department' }, { label: 'Projects' }],
+    title: 'Проєкти',
+    desc: 'База проєктів агенції, керована відповідальними менеджерами: кабінети, клієнт, звіти та презентації.',
+    trail: [{ label: 'Project Managers Department' }, { label: 'Проєкти' }],
+    pageIcon: PAGE_ICONS['page.projects'].src,
+    infoLabel: 'Про розділ',
   },
   '/clients': {
     title: 'Презентація',
@@ -180,7 +184,11 @@ export const DYNAMIC_ROUTE_META = [
   },
   {
     test: (pathname) => /^\/projects\/[^/]+$/.test(pathname),
-    trail: [{ label: 'Project Managers Department' }, { label: 'Projects' }, { label: 'Project' }],
+    title: 'Проєкти',
+    desc: 'База проєктів агенції, керована відповідальними менеджерами: кабінети, клієнт, звіти та презентації.',
+    trail: [{ label: 'Project Managers Department' }, { label: 'Проєкти', to: '/projects' }, { label: 'Проєкт' }],
+    pageIcon: PAGE_ICONS['page.projects'].src,
+    infoLabel: 'Про розділ',
   },
   {
     test: (pathname) => /^\/team\/members\/[^/]+$/.test(pathname),

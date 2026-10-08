@@ -5,6 +5,8 @@ import ActionIcon from '../common/ActionIcon';
 import { slideTitle } from './Filmstrip';
 import { CATEGORIES, SLIDE_TYPES, STYLES, platformName, sampleSlide, typeInfo } from '../../lib/presentation/deckModel';
 import { text } from '../../lib/presentation/textModel';
+import Select from '../common/Select';
+import { dropdownOpen } from '../../lib/useDialogA11y';
 
 const STRUCTURE = {
   title: [['T', 'Назва звіту', 'Редагований текст'], ['T', 'Клієнт і період', 'Спільні поля презентації']],
@@ -49,7 +51,7 @@ export default function AddSlideModal({ deck, afterId, onAdd, onClose, openerRef
     const prev = document.activeElement;
     box.current?.querySelector('button.pb-modal-first')?.focus();
     const onKey = (e) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+      if (e.key === 'Escape') { if (dropdownOpen()) return; e.stopPropagation(); onClose(); return; }
       if (e.key !== 'Tab' || !box.current) return;
       const f = [...box.current.querySelectorAll('button:not([disabled]), select, [tabindex="0"]')].filter((n) => n.offsetParent !== null);
       if (!f.length) return;
@@ -68,7 +70,7 @@ export default function AddSlideModal({ deck, afterId, onAdd, onClose, openerRef
   }, [onClose, openerRef]);
 
   return createPortal(
-    <div className="pb-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="pb-overlay" data-dd="plum" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} className="pb-modal" role="dialog" aria-modal="true" aria-labelledby="pb-modal-title">
         <header className="pb-modal-head">
           <h2 id="pb-modal-title">Додати готовий слайд</h2>
@@ -107,9 +109,8 @@ export default function AddSlideModal({ deck, afterId, onAdd, onClose, openerRef
         </div>
         <footer className="pb-modal-foot">
           <label htmlFor="pb-after">Додати після слайда</label>
-          <select id="pb-after" className="pb-native" value={after} onChange={(e) => setAfter(e.target.value)}>
-            {deck.slides.map((s, i) => <option key={s.id} value={s.id}>{i + 1}. {slideTitle(s)}</option>)}
-          </select>
+          <Select ariaLabel="Додати після слайда" className="pb-after" value={after} onChange={setAfter}
+            options={deck.slides.map((s, i) => ({ value: s.id, label: `${i + 1}. ${slideTitle(s)}` }))} />
           <span className="pb-spacer" />
           <button type="button" className="btn" onClick={onClose}>Скасувати</button>
           <button type="button" className="btn btn-p" onClick={() => onAdd(type, after)}><ActionIcon name="create" size={18} /> Додати слайд</button>

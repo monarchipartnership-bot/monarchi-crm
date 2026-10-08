@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import useDialogA11y from '../../../lib/useDialogA11y';
 import { addCustomMetric, deleteCustomMetric } from '../../../lib/api/projectReportStore';
 import { FORMAT_LABELS, OPERATIONS, metricOptions, slugKey, formatMetric, computeMetric } from '../../../lib/reportMetrics';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -11,6 +12,8 @@ const NUMBER = '__number__';
 // "+ Метрика": a custom metric from two others (or a number): name = A ÷ × + − B.
 // Saved for this project, or for every project.
 export default function CustomMetricModal({ projectId, custom, sample, onClose, onChanged }) {
+  const box = useRef(null);
+  useDialogA11y(box, onClose);
   const { email } = useAuth();
   const options = metricOptions(custom);
   const [name, setName] = useState('');
@@ -50,10 +53,10 @@ export default function CustomMetricModal({ projectId, custom, sample, onClose, 
 
   return (
     <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-box prep-modal">
+      <div ref={box} tabIndex={-1} className="modal-box prep-modal" role="dialog" aria-modal="true" aria-labelledby="cm-title">
         <div className="modal-head">
-          <h3>Свої метрики</h3>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
+          <h3 id="cm-title">Свої метрики</h3>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Закрити">&times;</button>
         </div>
         <div className="modal-body">
           {custom.length > 0 && (

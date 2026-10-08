@@ -72,7 +72,7 @@ export default function ActivityFeedCard() {
       [...projects].filter((p) => p.updated_at).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, FETCH_LIMIT).forEach((p) => {
         events.push({
           key: `project-${p.id}`, icon: '\u{1F4E6}', tone: 'project', time: p.updated_at,
-          title: 'Проект оновлено', sub: p.name,
+          title: 'Проєкт оновлено', sub: p.name,
         });
       });
 

@@ -11,6 +11,7 @@ import { canHaveImage, tableInfo } from '../../lib/presentation/deckOps';
 import { useRef, useState } from 'react';
 import { readSlideImage } from '../../lib/presentation/imageFile';
 import { MIXED, plain, text } from '../../lib/presentation/textModel';
+import Select from '../common/Select';
 
 const STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
 
@@ -26,38 +27,31 @@ export function DataPanel({ sel, setSel, report, reportState, platforms, deck, h
       <div className="pb-row2">
         <div className="pk-field">
           <label>Тип звіту</label>
-          <select value={sel.periodType} onChange={(e) => setSel({ ...sel, periodType: e.target.value })}>
-            <option value="weekly">Тижневий</option>
-            <option value="monthly">Місячний</option>
-          </select>
+          <Select value={sel.periodType} onChange={(v) => setSel({ ...sel, periodType: v })} ariaLabel="Тип звіту" options={[{ value: 'weekly', label: 'Тижневий' }, { value: 'monthly', label: 'Місячний' }]} />
         </div>
         <div className="pk-field">
           <label>Платформа</label>
-          <select value={sel.platform} onChange={(e) => setSel({ ...sel, platform: e.target.value })}>
-            {PLATFORMS.map((p) => <option key={p.id} value={p.id} disabled={platforms && !platforms.includes(p.id)}>{p.name}{platforms && !platforms.includes(p.id) ? ' (немає у звіті)' : ''}</option>)}
-          </select>
+          <Select value={sel.platform} ariaLabel="Платформа"
+            onChange={(v) => { if (!platforms || platforms.includes(v)) setSel({ ...sel, platform: v }); }}
+            options={PLATFORMS.map((p) => ({ value: p.id, label: p.name + (platforms && !platforms.includes(p.id) ? ' (немає у звіті)' : '') }))} />
         </div>
       </div>
 
       <div className="pk-field">
         <label>Період</label>
         <div className="pb-row2">
-          <select aria-label="Рік" value={sel.year} onChange={(e) => setSel({ ...sel, year: +e.target.value })}>{yearOptions().map((y) => <option key={y} value={y}>{y}</option>)}</select>
-          <select aria-label="Місяць" value={sel.month} onChange={(e) => setSel({ ...sel, month: +e.target.value })}>{MONTH_NAMES.map((n, i) => <option key={n} value={i + 1}>{n}</option>)}</select>
+          <Select ariaLabel="Рік" value={sel.year} onChange={(v) => setSel({ ...sel, year: v })} options={yearOptions().map((y) => ({ value: y, label: String(y) }))} />
+          <Select ariaLabel="Місяць" value={sel.month} onChange={(v) => setSel({ ...sel, month: v })} options={MONTH_NAMES.map((n, i) => ({ value: i + 1, label: n }))} />
         </div>
         {sel.periodType === 'weekly' && (
-          <select aria-label="Тиждень" value={Math.min(sel.weekIndex, weeks.length)} onChange={(e) => setSel({ ...sel, weekIndex: +e.target.value })} style={{ marginTop: 8 }}>
-            {weeks.map((w) => <option key={w.index} value={w.index}>Тиждень {w.index} ({fmtDate(w.start.getFullYear(), w.start.getMonth() + 1, w.start.getDate())}–{fmtDate(w.end.getFullYear(), w.end.getMonth() + 1, w.end.getDate())})</option>)}
-          </select>
+          <Select ariaLabel="Тиждень" value={Math.min(sel.weekIndex, weeks.length)} onChange={(v) => setSel({ ...sel, weekIndex: v })} style={{ marginTop: 8 }}
+            options={weeks.map((w) => ({ value: w.index, label: `Тиждень ${w.index} (${fmtDate(w.start.getFullYear(), w.start.getMonth() + 1, w.start.getDate())}–${fmtDate(w.end.getFullYear(), w.end.getMonth() + 1, w.end.getDate())})` }))} />
         )}
       </div>
 
       <div className="pk-field">
         <label>Мова слайдів</label>
-        <select value={lang} onChange={(e) => onLang(e.target.value)}>
-          <option value="en">English (для клієнта)</option>
-          <option value="uk">Українська</option>
-        </select>
+        <Select value={lang} onChange={onLang} ariaLabel="Мова слайдів" options={[{ value: 'en', label: 'English (для клієнта)' }, { value: 'uk', label: 'Українська' }]} />
         {hasDeck && <span className="pacc-hint">Мова застосовується при створенні презентації зі звіту.</span>}
       </div>
 
@@ -212,19 +206,21 @@ export function TextPanel({ info, cmds, onClose }) {
       <div className="pb-row2">
         <div>
           <label className="pb-label" htmlFor="pb-lh">Міжрядковий інтервал</label>
-          <select id="pb-lh" className="pb-native" value={style.lh === MIXED ? '' : String(style.lh)} onChange={(e) => cmds.lineHeight(Number(e.target.value))}>
-            {style.lh === MIXED && <option value="">Змішано</option>}
-            {!LH.includes(style.lh) && style.lh !== MIXED && <option value={style.lh}>{style.lh}</option>}
-            {LH.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <Select ariaLabel="Міжрядковий інтервал" value={style.lh === MIXED ? '' : Number(style.lh)} onChange={(v) => { if (v !== '') cmds.lineHeight(Number(v)); }}
+            options={[
+              ...(style.lh === MIXED ? [{ value: '', label: 'Змішано' }] : []),
+              ...(!LH.includes(style.lh) && style.lh !== MIXED ? [{ value: Number(style.lh), label: String(style.lh) }] : []),
+              ...LH.map((v) => ({ value: Number(v), label: String(v) })),
+            ]} />
         </div>
         <div>
           <label className="pb-label" htmlFor="pb-ls">Міжсимвольний інтервал</label>
-          <select id="pb-ls" className="pb-native" value={style.ls === MIXED ? '' : String(style.ls)} onChange={(e) => cmds.spacing(Number(e.target.value))}>
-            {style.ls === MIXED && <option value="">Змішано</option>}
-            {[-1, -0.5, 0, 0.5, 1, 2, 3, 4, 5].map((v) => <option key={v} value={v}>{v} px</option>)}
-            {style.ls !== MIXED && ![-1, -0.5, 0, 0.5, 1, 2, 3, 4, 5].includes(style.ls) && <option value={style.ls}>{style.ls} px</option>}
-          </select>
+          <Select ariaLabel="Міжсимвольний інтервал" value={style.ls === MIXED ? '' : Number(style.ls)} onChange={(v) => { if (v !== '') cmds.spacing(Number(v)); }}
+            options={[
+              ...(style.ls === MIXED ? [{ value: '', label: 'Змішано' }] : []),
+              ...[-1, -0.5, 0, 0.5, 1, 2, 3, 4, 5].map((v) => ({ value: v, label: `${v} px` })),
+              ...(style.ls !== MIXED && ![-1, -0.5, 0, 0.5, 1, 2, 3, 4, 5].includes(style.ls) ? [{ value: Number(style.ls), label: `${style.ls} px` }] : []),
+            ]} />
         </div>
       </div>
 

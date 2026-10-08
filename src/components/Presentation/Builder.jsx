@@ -151,7 +151,7 @@ export default function Builder({ api, dataProps, onBack, onSave, saveLabel, sav
   const pageNo = slide && !slide.hidden ? visibleNo : 0;
 
   return (
-    <div className="pb" onKeyDown={onKeyDown}>
+    <div className="pb" data-dd="plum" onKeyDown={onKeyDown}>
       <div className="pb-bar" data-editor-only="true">
         <button type="button" className="pb-barbtn" onClick={onBack}><ActionIcon name="back" size={18} /> Назад</button>
         <div className="pb-modes" role="tablist" aria-label="Режими">

@@ -219,7 +219,7 @@ function describeActivity(e) {
 const TABS = [
   { key: 'info', label: 'Основна інформація' },
   { key: 'companies', label: 'Компанії', soon: true },
-  { key: 'projects', label: 'Проекти' },
+  { key: 'projects', label: 'Проєкти' },
   { key: 'notes', label: 'Нотатки' },
   { key: 'activity', label: 'Активність' },
   { key: 'deals', label: 'Угоди' },

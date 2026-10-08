@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AutoResizeTextarea from '../../components/Reports/AutoResizeTextarea';
 import PeriodStats from '../../components/Projects/Reports/PeriodStats';
 import PeriodReport from '../../components/Projects/Reports/PeriodReport';
@@ -12,28 +12,39 @@ import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload, fmtCost } from '../../lib/projectFields';
 import ProjectDecksTab from '../../components/Projects/ProjectDecksTab';
+import ActionIcon from '../../components/common/ActionIcon';
+import { useConfirm } from '../../components/common/ConfirmDialog';
+import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
+import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
+import { fetchAgent } from '../../lib/api/projectAgents';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
 import '../../styles/projectReportPage.css';
 import '../../styles/projectAccounts.css';
+import '@fontsource/onest/500.css';
+import '@fontsource/onest/600.css';
+import '@fontsource/onest/700.css';
+import '../../styles/projectWorkspace.css';
+import Select from '../../components/common/Select';
+import DatePicker from '../../components/common/DatePicker';
 
 const TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'period', label: 'Показники за період' },
-  { key: 'weekly', label: 'Тижневий звіт' },
-  { key: 'monthly', label: 'Місячний звіт' },
-  { key: 'decks', label: 'Презентації' },
+  { key: 'overview', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src },
+  { key: 'period', label: 'Показники за період', icon: null },
+  { key: 'weekly', label: 'Тижневий звіт', icon: PAGE_ICONS['page.weekly-report'].src },
+  { key: 'monthly', label: 'Місячний звіт', icon: PAGE_ICONS['page.monthly-report'].src },
+  { key: 'decks', label: 'Презентації', icon: PAGE_ICONS['page.clients-report'].src },
+  { key: 'agent', label: 'AI Агент', icon: PAGE_ICONS['page.ai-agents'].src },
 ];
 
 const STATUSES = ['active', 'paused', 'completed'];
 
 // The Overview fields in reading order. Empty ones are hidden while viewing.
 const FIELD_GROUPS = [
-  { title: 'Основне', items: ['manager', 'status', 'period', 'services'] },
-  { title: 'Клієнт', items: ['client', 'country', 'website', 'business_type', 'contacts', 'timezone'] },
-  { title: 'Реєстр проєкту', items: ['specialist', 'comm_start_date', 'payment_channel', 'cost', 'worksection_link', 'stop_reason'] },
+  { title: 'Основне', hint: 'Хто веде проєкт і в якому він стані', items: ['manager', 'specialist', 'status', 'period', 'services', 'stop_reason'] },
+  { title: 'Клієнт', hint: 'Хто клієнт і де він працює', items: ['client', 'country', 'website', 'business_type', 'contacts', 'timezone'] },
+  { title: 'Комунікація та оплата', hint: 'Початок співпраці, оплата, робочий простір', items: ['comm_start_date', 'payment_channel', 'cost', 'worksection_link'] },
 ];
-const ALL_FIELD_KEYS = FIELD_GROUPS.flatMap((g) => g.items);
 
 const ICONS = {
   manager: <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>,
@@ -57,10 +68,36 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [loadError, setLoadError] = useState('');
-  const [tab, setTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTabState] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview'));
+  const setTab = (next) => {
+    setTabState(next);
+    setSearchParams(next === 'overview' ? {} : { tab: next }, { replace: true });
+  };
   const [deleting, setDeleting] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
+  const tabRefs = useRef({});
+
+  // Arrow keys / Home / End move between the folder tabs (the focused one is the selected one).
+  function onTabKey(e) {
+    const keys = TABS.map((t) => t.key);
+    const i = keys.indexOf(tab);
+    let next = null;
+    if (e.key === 'ArrowRight') next = keys[(i + 1) % keys.length];
+    else if (e.key === 'ArrowLeft') next = keys[(i - 1 + keys.length) % keys.length];
+    else if (e.key === 'Home') next = keys[0];
+    else if (e.key === 'End') next = keys[keys.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  }
 
   const [linkedAccounts, setLinkedAccounts] = useState([]);
+  // The agent's state for the chip in the header (the tab itself loads everything it needs).
+  const [agentChip, setAgentChip] = useState(null);
+  // The project name in the header is a field that saves itself (like the deal title).
+  const [nameValue, setNameValue] = useState('');
 
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState(null);
@@ -71,9 +108,22 @@ export default function ProjectDetail() {
   const [infoValue, setInfoValue] = useState('');
   const [infoSaving, setInfoSaving] = useState(false);
 
+  useEffect(() => {
+    let off = false;
+    fetchAgent(id).then(({ agent }) => {
+      if (off) return;
+      if (!agent) setAgentChip(null);
+      else if (agent.health === 'problem') setAgentChip({ label: 'є проблеми', tone: 'bad' });
+      else setAgentChip(agent.enabled ? { label: 'активний', tone: 'ok' } : { label: 'вимкнений', tone: 'muted' });
+    });
+    return () => { off = true; };
+  }, [id, tab]);
+
   async function reload() {
     try {
-      setProject(await fetchProjectById(id));
+      const fresh = await fetchProjectById(id);
+      setProject(fresh);
+      setNameValue(fresh?.name || '');
       setLoadError('');
     } catch (e) {
       console.warn('loadProject failed', e);
@@ -114,6 +164,21 @@ export default function ProjectDetail() {
 
   function setEditField(field, value) {
     setEditForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function saveName() {
+    const next = nameValue.trim();
+    if (!next) { setNameValue(project.name || ''); return; }
+    if (next === project.name) { setNameValue(next); return; }
+    try {
+      await updateProject(id, { name: next });
+      setProject((p) => ({ ...p, name: next }));
+      setNameValue(next);
+    } catch (e) {
+      console.warn('saveName failed', e);
+      setNameValue(project.name || '');
+      alert('Не вдалося зберегти назву проєкту.');
+    }
   }
 
   function toggleEditService(s) {
@@ -157,7 +222,8 @@ export default function ProjectDetail() {
   }
 
   async function handleDelete() {
-    if (!confirm('Видалити цей проєкт? Дію не можна скасувати.')) return;
+    if (deleting) return;
+    if (!(await confirm({ title: 'Видалити проєкт?', body: 'Видалити цей проєкт? Дію не можна скасувати.', confirmLabel: 'Видалити проєкт', danger: true }))) return;
     setDeleting(true);
     try {
       await deleteProject(id);
@@ -217,26 +283,17 @@ export default function ProjectDetail() {
 
   const isEmpty = (v) => v == null || v === '' || (Array.isArray(v) && v.length === 0);
 
-  // Which fields have nothing in them (hidden while viewing, shown while editing).
-  const emptyKeys = ALL_FIELD_KEYS.filter((k) => {
-    if (k === 'status') return false;
-    if (k === 'period') return !project.start_date && !project.end_date;
-    return isEmpty(project[k]);
-  });
-  const hiddenCount = emptyKeys.length;
 
   function renderExtra(key) {
     const f = EXTRA_PROJECT_FIELDS.find((x) => x.key === key);
-    if (!f || (!editMode && isEmpty(project[key]))) return null;
+    if (!f) return null;
     return (
       <div className="ov-field-box" key={key}>
         <div className="ov-field-label">{f.label}</div>
         {editMode ? (
           f.type === 'select' ? (
-            <select value={editForm[f.key]} onChange={(e) => setEditField(f.key, e.target.value)}>
-              <option value="">Не вказано</option>
-              {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
+            <Select value={editForm[f.key] || ''} onChange={(v) => setEditField(f.key, v)} ariaLabel={f.label}
+              options={[{ value: '', label: 'Не вказано' }, ...f.options.map((o) => ({ value: o, label: o }))]} />
           ) : (
             <input
               type={f.type === 'url' ? 'text' : f.type} value={editForm[f.key]} placeholder={f.placeholder}
@@ -245,6 +302,8 @@ export default function ProjectDetail() {
               onClick={f.type === 'date' ? (e) => e.currentTarget.showPicker?.() : undefined}
             />
           )
+        ) : isEmpty(project[f.key]) ? (
+          <div className="ov-field-value ov-empty">—</div>
         ) : f.key === 'worksection_link' ? (
           <a className="ov-field-value ov-link" href={project[f.key]} target="_blank" rel="noreferrer">Відкрити в Worksection</a>
         ) : (
@@ -259,13 +318,12 @@ export default function ProjectDetail() {
   function renderItem(key) {
     switch (key) {
       case 'manager':
-        if (!editMode && isEmpty(project.manager)) return null;
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="manager" />Продакт (менеджер)</div>
             {editMode
               ? <input type="text" value={editForm.manager} onChange={(e) => setEditField('manager', e.target.value)} placeholder="Ім'я менеджера" />
-              : <div className="ov-field-value">{project.manager}</div>}
+              : <div className={'ov-field-value' + (isEmpty(project.manager) ? ' ov-empty' : '')}>{isEmpty(project.manager) ? '—' : project.manager}</div>}
           </div>
         );
       case 'status':
@@ -286,23 +344,21 @@ export default function ProjectDetail() {
           </div>
         );
       case 'period':
-        if (!editMode && !project.start_date && !project.end_date) return null;
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="period" />Початок роботи над стратегією – завершення співпраці</div>
             {editMode ? (
               <div className="ov-date-row">
-                <input type="date" value={editForm.start_date} onChange={(e) => setEditField('start_date', e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} />
+                <DatePicker value={editForm.start_date} onChange={(v) => setEditField('start_date', v)} />
                 <span>–</span>
-                <input type="date" value={editForm.end_date} onChange={(e) => setEditField('end_date', e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} />
+                <DatePicker value={editForm.end_date} onChange={(v) => setEditField('end_date', v)} />
               </div>
             ) : (
-              <div className="ov-field-value">{fmtIsoDate(project.start_date) || '—'} – {fmtIsoDate(project.end_date) || '—'}</div>
+              <div className={'ov-field-value' + (!project.start_date && !project.end_date ? ' ov-empty' : '')}>{!project.start_date && !project.end_date ? '—' : `${fmtIsoDate(project.start_date) || '—'} – ${fmtIsoDate(project.end_date) || '—'}`}</div>
             )}
           </div>
         );
       case 'services':
-        if (!editMode && isEmpty(project.services)) return null;
         return (
           <div className="ov-field-box ov-field-box-wide" key={key}>
             <div className="ov-field-label"><FieldIcon name="services" />Послуги (канал роботи)</div>
@@ -316,12 +372,13 @@ export default function ProjectDetail() {
                 ))}
               </div>
             ) : (
-              <div className="proj-tags">{project.services.map((s) => <span className="svc-tag" key={s}>{s}</span>)}</div>
+              isEmpty(project.services)
+                ? <div className="ov-field-value ov-empty">—</div>
+                : <div className="proj-tags">{project.services.map((x) => <span className="svc-tag" key={x}>{x}</span>)}</div>
             )}
           </div>
         );
       case 'client':
-        if (!editMode && isEmpty(project.client)) return null;
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="client" />Клієнт</div>
@@ -334,28 +391,26 @@ export default function ProjectDetail() {
             ) : project.client_id ? (
               <Link className="ov-field-value ov-link" to={'/reports/clients-directory/' + project.client_id}>{project.client || 'Відкрити контакт'}</Link>
             ) : (
-              <div className="ov-field-value">{project.client}</div>
+              <div className={'ov-field-value' + (isEmpty(project.client) ? ' ov-empty' : '')}>{isEmpty(project.client) ? '—' : project.client}</div>
             )}
           </div>
         );
       case 'country':
-        if (!editMode && isEmpty(project.country)) return null;
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="country" />Гео (країна)</div>
             {editMode
               ? <input type="text" value={editForm.country} onChange={(e) => setEditField('country', e.target.value)} placeholder="напр. USA" />
-              : <div className="ov-field-value">{project.country}</div>}
+              : <div className={'ov-field-value' + (isEmpty(project.country) ? ' ov-empty' : '')}>{isEmpty(project.country) ? '—' : project.country}</div>}
           </div>
         );
       case 'website':
-        if (!editMode && isEmpty(project.website)) return null;
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="website" />Сайт</div>
             {editMode
               ? <input type="text" value={editForm.website} onChange={(e) => setEditField('website', e.target.value)} placeholder="https://..." />
-              : <a className="ov-field-value ov-link" href={project.website} target="_blank" rel="noreferrer">{project.website}</a>}
+              : (isEmpty(project.website) ? <div className="ov-field-value ov-empty">—</div> : <a className="ov-field-value ov-link" href={project.website} target="_blank" rel="noreferrer">{project.website}</a>)}
           </div>
         );
       default:
@@ -367,80 +422,88 @@ export default function ProjectDetail() {
   const infoDirty = infoValue !== (project.additional_info || '');
 
   return (
-    <div className="report-page project-detail-page">
-      <div className="page-actions">
-        <button type="button" className="btn" onClick={() => navigate('/projects')}>&#8592; Back</button>
-      </div>
-
-      <div className="pd-header">
+    <div className="report-page project-detail-page pw" data-dd="plum">
+      <div className="pd-header pw-head">
         <div className="pd-header-meta">
-          <div className="pd-header-name">{project.name}</div>
+          <div className="pd-title-row">
+            <input
+              type="text" className="deal-title-input pd-title-input" value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setNameValue(project.name || ''); e.currentTarget.blur(); } }}
+              placeholder="Назва проєкту" aria-label="Назва проєкту"
+            />
+            <button type="button" className="pw-btn pd-back" onClick={() => navigate('/projects')}><ActionIcon name="back" size={18} /> Назад</button>
+          </div>
           <div className="pd-header-chips">
-            {linkedAccounts.map((a) => (
-              <span className="pacc-chip" key={a.platform}>
-                <span className="pacc-badge pacc-badge--xs" style={{ background: platformInfo(a.platform).gradient }}>{platformInfo(a.platform).mark}</span>
-                {platformInfo(a.platform).label}
-              </span>
-            ))}
+            {linkedAccounts.map((a) => {
+              const sym = PLATFORM_ICONS[PLATFORM_SYMBOL[a.platform]];
+              return (
+                <span className="pw-chip pw-chip--platform" key={a.platform}>
+                  {sym && <img src={sym.src} alt="" width="23" height="23" draggable="false" />}
+                  {platformInfo(a.platform).label}
+                </span>
+              );
+            })}
+            <span className={'pw-chip pw-chip--status pw-chip--' + (project.status === 'active' ? 'ok' : project.status === 'paused' ? 'warn' : 'muted')}>{STATUS_LABEL[project.status]}</span>
             {project.client && (project.client_id
-              ? <Link className="pacc-chip pacc-chip--link" to={'/reports/clients-directory/' + project.client_id}>{project.client}</Link>
-              : <span className="pacc-chip">{project.client}</span>)}
-            {project.manager && <span className="pacc-chip">{project.manager}</span>}
+              ? <Link className="pw-chip" to={'/reports/clients-directory/' + project.client_id}>{project.client}</Link>
+              : <span className="pw-chip">{project.client}</span>)}
+            {project.manager && <span className="pw-chip">{project.manager}</span>}
+            {agentChip && (
+              <button type="button" className={'pw-chip pw-chip--agent pw-chip--' + agentChip.tone} onClick={() => setTab('agent')} title="Відкрити вкладку AI Агент">
+                AI-агент: {agentChip.label}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="pd-tabs">
+      <div className="pw-tabs" role="tablist" aria-label="Розділи проєкту" onKeyDown={onTabKey}>
         {TABS.map((t) => (
-          <button key={t.key} type="button" className={'pd-tab' + (tab === t.key ? ' on' : '')} onClick={() => setTab(t.key)}>
-            {t.label}
+          <button
+            key={t.key} id={'pw-tab-' + t.key} ref={(n) => { tabRefs.current[t.key] = n; }}
+            type="button" role="tab" aria-selected={tab === t.key} aria-controls="pw-panel" tabIndex={tab === t.key ? 0 : -1}
+            className={'pw-tab' + (tab === t.key ? ' on' : '')} onClick={() => setTab(t.key)}
+          >
+            {t.icon && <img src={t.icon} alt="" aria-hidden="true" draggable="false" />}
+            <span>{t.label}</span>
           </button>
         ))}
       </div>
 
+      <div className="pw-workspace" id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + tab}>
       {tab === 'overview' && (
         <>
           <ProjectAccountsPanel projectId={id} services={project.services} onAddService={addService} onAccountsChange={setLinkedAccounts} />
 
-          <section className="report-section">
+          <section className="report-section pw-card">
             <div className="ov-section-head">
               <div className="stitle">Про проєкт</div>
               {!editMode ? (
-                <button type="button" className="btn" onClick={startEdit}>Редагувати</button>
+                <button type="button" className="pw-btn" onClick={startEdit}><ActionIcon name="edit" size={18} /> Редагувати</button>
               ) : (
                 <div className="ov-edit-actions">
-                  <button type="button" className="btn btn-p" onClick={saveEdit} disabled={savingEdit}>{savingEdit ? '...' : 'Зберегти'}</button>
-                  <button type="button" className="btn" onClick={cancelEdit}>Скасувати</button>
+                  <button type="button" className="pw-btn pw-btn--primary" onClick={saveEdit} disabled={savingEdit}><ActionIcon name="save" size={18} /> {savingEdit ? '...' : 'Зберегти'}</button>
+                  <button type="button" className="pw-btn" onClick={cancelEdit}>Скасувати</button>
                 </div>
               )}
             </div>
 
-            {FIELD_GROUPS.map((group) => {
-              const boxes = group.items.map(renderItem).filter(Boolean);
-              if (!boxes.length) return null;
-              return (
+            <div className="pw-groups">
+              {FIELD_GROUPS.map((group) => (
                 <div className="ov-group" key={group.title}>
-                  <div className="ov-group-title">{group.title}</div>
-                  <div className="ov-field-grid">{boxes}</div>
+                  <div className="ov-group-head">
+                    <div className="ov-group-title">{group.title}</div>
+                  </div>
+                  <div className="ov-field-grid">{group.items.map(renderItem).filter(Boolean)}</div>
                 </div>
-              );
-            })}
-
-            {!editMode && hiddenCount > 0 && (
-              <div className="ov-hidden-hint">
-                Не заповнено полів: {hiddenCount}. Вони приховані.
-                <button type="button" className="pacc-link" onClick={startEdit}>Показати й заповнити</button>
-              </div>
-            )}
-
-            {!editMode && (
-              <button type="button" className="del-link ov-delete-link" onClick={handleDelete} disabled={deleting}>
-                {deleting ? '...' : 'Видалити проект'}
-              </button>
-            )}
+              ))}
+            </div>
           </section>
 
-          <section className="report-section">
+          <div className="pw-notes">
+          <section className="report-section pw-card">
             <div className="ov-field-box ov-notes-box">
               <div className="ov-field-label"><FieldIcon name="notes" />Особливості роботи з клієнтом</div>
               <AutoResizeTextarea value={notesValue} onChange={setNotesValue} placeholder="Нотатки по клієнту..." />
@@ -452,7 +515,7 @@ export default function ProjectDetail() {
             </div>
           </section>
 
-          <section className="report-section">
+          <section className="report-section pw-card">
             <div className="ov-field-box ov-notes-box">
               <div className="ov-field-label"><FieldIcon name="info" />Додаткова інформація</div>
               <AutoResizeTextarea value={infoValue} onChange={setInfoValue} placeholder="Будь-яка додаткова інформація..." />
@@ -463,6 +526,13 @@ export default function ProjectDetail() {
               )}
             </div>
           </section>
+          </div>
+
+          {!editMode && (
+            <button type="button" className="pw-btn pw-btn--danger-quiet ov-delete-link" onClick={handleDelete} disabled={deleting}>
+              <ActionIcon name="delete" size={18} /> {deleting ? '...' : 'Видалити проєкт'}
+            </button>
+          )}
         </>
       )}
 
@@ -470,6 +540,9 @@ export default function ProjectDetail() {
       {tab === 'weekly' && <PeriodReport key={'weekly-' + id} projectId={id} periodType="weekly" />}
       {tab === 'monthly' && <PeriodReport key={'monthly-' + id} projectId={id} periodType="monthly" />}
       {tab === 'decks' && <ProjectDecksTab key={'decks-' + id} projectId={id} />}
+      {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
+      </div>
+      {confirmDialog}
     </div>
   );
 }

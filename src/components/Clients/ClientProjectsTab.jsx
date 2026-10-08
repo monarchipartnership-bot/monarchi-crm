@@ -37,7 +37,7 @@ export default function ClientProjectsTab({ clientId }) {
   if (!projects.length) {
     return (
       <div className="client-profile-info">
-        <p className="client-history-empty">Проектів у цього контакту ще немає.</p>
+        <p className="client-history-empty">Проєктів у цього контакту ще немає.</p>
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           <button type="button" className="btn btn-p" onClick={() => navigate('/projects', { state: { newForClient: clientId } })}>Створити проект</button>
           <button type="button" className="btn" onClick={() => navigate('/projects')}>Усі проекти</button>
@@ -52,12 +52,12 @@ export default function ClientProjectsTab({ clientId }) {
     <div className="client-profile-deals-layout">
       <div className="client-profile-deals-list-card">
         <div className="client-profile-deals-list-head">
-          <h3>Проекти ({projects.length})</h3>
+          <h3>Проєкти ({projects.length})</h3>
           <button type="button" className="btn" onClick={() => navigate('/projects', { state: { newForClient: clientId } })}>+ Новий</button>
         </div>
         <div className="client-profile-deals-search">
           <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.search }} />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Пошук серед проектів..." />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Пошук серед проєктів..." />
         </div>
         <div className="client-profile-deals-list">
           {shown.map((p) => (
@@ -82,7 +82,7 @@ export default function ClientProjectsTab({ clientId }) {
 
       <div className="client-profile-deal-detail-card">
         {!selected ? (
-          <p className="client-history-empty">Оберіть проект зі списку.</p>
+          <p className="client-history-empty">Оберіть проєкт зі списку.</p>
         ) : (
           <>
             <div className="client-profile-deal-detail-top">
@@ -90,7 +90,7 @@ export default function ClientProjectsTab({ clientId }) {
               <div className="client-profile-deal-detail-top-actions">
                 <button type="button" className="btn btn-p" onClick={() => navigate('/projects/' + selected.id)}>
                   <span className="client-profile-action-ic client-profile-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.externalLink }} />
-                  Відкрити проект
+                  Відкрити проєкт
                 </button>
               </div>
             </div>

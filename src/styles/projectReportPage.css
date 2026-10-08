@@ -69,3 +69,17 @@
 /* Full working area (same fix as every other report page this session). */
 .view:has(.project-detail-page),
 .view:has(.ad-report-page) { max-width: none; opacity: 1; transform: none; animation: none; }
+
+/* Project title row: Назад on the left, the name as a self-saving field next to it */
+.pd-header-meta { flex: 1; min-width: 0; }
+.pd-title-row { display: flex; align-items: center; gap: 14px; }
+.pd-back { flex: none; display: inline-flex; align-items: center; gap: 8px; }
+.pd-title-input { flex: 1; min-width: 0; font-size: 1.55rem; letter-spacing: -.01em; border-radius: 10px; }
+.pd-title-input:hover { border-color: var(--border); }
+
+/* "Про проєкт": every field is always shown, grouped into cards */
+.project-detail-page .ov-group { margin-top: 0; background: #FCF8FC; border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px 4px; margin-bottom: 16px; }
+.project-detail-page .ov-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 12px; }
+.project-detail-page .ov-group-title { font-family: var(--font-head); font-weight: 700; font-size: 1.02rem; letter-spacing: 0; text-transform: none; color: var(--ink); margin: 0; }
+.project-detail-page .ov-group-hint { font-size: .8rem; color: var(--muted); }
+.project-detail-page .ov-empty { color: var(--muted); }

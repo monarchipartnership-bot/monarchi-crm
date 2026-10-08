@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchProjects } from '../../lib/api/projects';
+import Select from '../common/Select';
 
 // Project <select>, used only by the standalone report pages (the
 // project-detail page's own tabs already have projectId from the route).
@@ -19,10 +20,8 @@ export default function ProjectPicker({ value, onChange }) {
   return (
     <div className="pk-field">
       <label>Проєкт</label>
-      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} disabled={loading}>
-        <option value="">{loading ? 'Завантаження...' : '— оберіть проєкт —'}</option>
-        {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-      </select>
+      <Select value={value == null ? '' : String(value)} onChange={(v) => onChange(v || null)} disabled={loading} ariaLabel="Проєкт" searchable
+        options={[{ value: '', label: loading ? 'Завантаження...' : '— оберіть проєкт —' }, ...projects.map((p) => ({ value: String(p.id), label: p.name }))]} />
     </div>
   );
 }

@@ -98,3 +98,14 @@
 
 .prep-group-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .prep-hints { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+
+/* «Порівняти» button state and the compare dialog */
+.prep-btn-on { background: #F3E8F9; color: var(--purple); border-color: #E3CBF0; }
+.prep-cmp-options { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.prep-cmp-opt { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; cursor: pointer; }
+.prep-cmp-opt.on { border-color: var(--purple); background: #FBF5FD; }
+.prep-cmp-opt input[type=radio] { margin-top: 4px; flex: none; }
+.prep-cmp-opt > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.prep-cmp-opt small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
+.prep-cmp-dates { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.prep-cmp-dates input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; font-family: var(--font-body); font-size: .86rem; background: #fff; color: var(--ink); }

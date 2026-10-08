@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ClientPicker from '../Clients/ClientPicker';
 import AdAccountPicker from './AdAccountPicker';
 import Select from '../common/Select';
@@ -10,6 +10,8 @@ import { fetchClientById } from '../../lib/api/clients';
 import { clientFullName } from '../../lib/clientName';
 import { COUNTRIES } from '../../lib/countries';
 import '../../styles/projectAccounts.css';
+import DatePicker from '../common/DatePicker';
+import { dropdownOpen } from '../../lib/useDialogA11y';
 
 const EMPTY_FORM = { name: '', manager: '', start_date: '', end_date: '', client: '', country: '', website: '', services: [], ...extraFieldsForm(null) };
 const PLATFORM_OPTIONS = AD_PLATFORMS.map((p) => ({ value: p.key, label: p.label }));
@@ -30,6 +32,22 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
   const [clientId, setClientId] = useState(initialClientId || null);
   const [usedKeys, setUsedKeys] = useState(() => new Set());
   const [error, setError] = useState('');
+  const boxRef = useRef(null);
+
+  // Escape closes without creating anything; Tab / Shift+Tab stay inside the dialog.
+  useEffect(() => {
+    boxRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape') { if (dropdownOpen()) return; e.stopPropagation(); onClose(); return; }
+      if (e.key !== 'Tab' || !boxRef.current) return;
+      const f = [...boxRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((n) => n.offsetParent !== null);
+      if (!f.length) return;
+      if (e.shiftKey && (document.activeElement === f[0] || document.activeElement === boxRef.current)) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
 
   useEffect(() => {
     fetchAllProjectAccounts().then((all) => setUsedKeys(new Set(all.map((a) => `${a.platform}:${a.account_id}`))));
@@ -84,7 +102,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
 
   function handleSave() {
     const name = form.name.trim();
-    if (!name) { setError('Введіть назву проекту.'); return; }
+    if (!name) { setError('Введіть назву проєкту.'); return; }
     if (rows.some((r) => !r.account)) { setError('Оберіть кабінет у кожному рядку або приберіть порожній рядок.'); return; }
     setError('');
     onSave({
@@ -106,10 +124,10 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
 
   return (
     <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-box pacc-modal">
+      <div ref={boxRef} data-dd="plum" className="modal-box pacc-modal proj-modal-folder" role="dialog" aria-modal="true" aria-labelledby="proj-modal-title" tabIndex={-1}>
         <div className="modal-head">
-          <h3>Створити проект</h3>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
+          <h3 id="proj-modal-title">Створити проєкт</h3>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Закрити">&times;</button>
         </div>
         <div className="modal-body">
           <div className="pf-sec-label">Рекламні кабінети</div>
@@ -125,7 +143,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
                 <AdAccountPicker platform={r.platform} value={r.account} onChange={(a) => setRowAccount(r.key, a)} usedKeys={usedKeys} />
               </div>
             ))}
-            {!rows.length && <div className="pacc-hint">Проект без рекламного кабінету (SEO, розробка та інше). Кабінет можна підключити пізніше на сторінці проекту.</div>}
+            {!rows.length && <div className="pacc-hint">Проєкт без рекламного кабінету (SEO, розробка та інше). Кабінет можна підключити пізніше на сторінці проекту.</div>}
             {freePlatform && (
               <button type="button" className="btn pacc-add" onClick={addRow}>+ {rows.length ? `Додати ще кабінет (${freePlatform.label})` : 'Підключити кабінет'}</button>
             )}
@@ -134,7 +152,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
           <div className="pf-sec-label">Основне</div>
           <div className="pf-grid">
             <div className="pf full">
-              <label>Назва проекту</label>
+              <label>Назва проєкту</label>
               <input type="text" value={form.name} onChange={(e) => { setNameTouched(true); setField('name', e.target.value); }} placeholder="напр. Byme — Google Ads" />
             </div>
             <div className="pf full">
@@ -147,21 +165,11 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
             </div>
             <div className="pf">
               <label>Початок роботи над стратегією</label>
-              <input
-                type="date"
-                value={form.start_date}
-                onChange={(e) => setField('start_date', e.target.value)}
-                onClick={(e) => e.currentTarget.showPicker?.()}
-              />
+              <DatePicker value={form.start_date} onChange={(v) => setField('start_date', v)} />
             </div>
             <div className="pf">
               <label>Завершення співпраці</label>
-              <input
-                type="date"
-                value={form.end_date}
-                onChange={(e) => setField('end_date', e.target.value)}
-                onClick={(e) => e.currentTarget.showPicker?.()}
-              />
+              <DatePicker value={form.end_date} onChange={(v) => setField('end_date', v)} />
             </div>
           </div>
           <div className="pf full">
@@ -194,10 +202,8 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
               <div className="pf" key={f.key}>
                 <label>{f.label}</label>
                 {f.type === 'select' ? (
-                  <select value={form[f.key]} onChange={(e) => setField(f.key, e.target.value)}>
-                    <option value="">Не вказано</option>
-                    {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
+                  <Select value={form[f.key] || ''} onChange={(v) => setField(f.key, v)} ariaLabel={f.label}
+                    options={[{ value: '', label: 'Не вказано' }, ...f.options.map((o) => ({ value: o, label: o }))]} />
                 ) : (
                   <input
                     type={f.type === 'url' ? 'text' : f.type} value={form[f.key]} placeholder={f.placeholder}
@@ -213,7 +219,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
           {error && <div className="form-err">{error}</div>}
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-p" onClick={handleSave} disabled={saving}>{saving ? '...' : 'Створити проект'}</button>
+          <button type="button" className="btn btn-p" onClick={handleSave} disabled={saving}>{saving ? '...' : 'Створити проєкт'}</button>
           <button type="button" className="btn" onClick={onClose}>Скасувати</button>
         </div>
       </div>

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAnimatedOpen } from '../../lib/useAnimatedOpen';
 import { useFloatingPosition } from '../../lib/useFloatingPosition';
+import { ddTheme } from '../../lib/ddTheme';
 import '../../styles/dropdownAnim.css';
 import '../../styles/timePicker.css';
+import '../../styles/dropdownPlum.css';
 
 const CLOSE_MS = 140;
 const CLOCK_ICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>';
@@ -59,7 +61,7 @@ export default function TimePicker({ value, onChange, placeholder, bare, classNa
       </button>
       {rendered && createPortal(
         <div
-          className={'time-picker-menu' + (open ? '' : ' closing') + (pos.placement === 'top' ? ' placement-top' : '')}
+          className={'time-picker-menu' + ddTheme(containerRef) + (open ? '' : ' closing') + (pos.placement === 'top' ? ' placement-top' : '')}
           style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left }}
         >
           <div className="time-picker-col" ref={hourListRef}>

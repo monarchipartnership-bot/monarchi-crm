@@ -5,10 +5,11 @@
 import { METRIC_SETS, computeMetric, deltaPct, metricMeta } from '../reportMetrics';
 import { visibleKeys } from '../periodReport';
 import { text, listText } from './textModel';
+import { paginateBlocks } from './textFit';
 import { emptyDeck, labels, periodLabel, platformName, uid } from './deckModel';
 
 // How much fits on one slide (the editor still warns when a manual edit overflows).
-export const PER_PAGE = { metricslist: 12, kpigrid: 6, tableRows: 8, tableCols: 4, dynamics: 8, listItems: 8, listChars: 760, paragraphChars: 900 };
+export const PER_PAGE = { metricslist: 12, kpigrid: 6, tableRows: 8, tableCols: 4, dynamics: 8, listItems: 8 };
 
 // Splits into the fewest pages that fit `n` per page, as even as possible (12 rows with 9 per page → 6 + 6, not 9 + 3).
 const chunk = (arr, n) => {
@@ -50,31 +51,16 @@ function splitList(str) {
   return String(str || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
 
-function paginateLines(lines) {
-  const pages = [];
-  let cur = [];
-  let chars = 0;
-  lines.forEach((l) => {
-    if (cur.length && (cur.length >= PER_PAGE.listItems || chars + l.length > PER_PAGE.listChars)) { pages.push(cur); cur = []; chars = 0; }
-    cur.push(l);
-    chars += l.length;
-  });
-  if (cur.length) pages.push(cur);
-  return pages;
+// Report texts are split into slides by the height they really take (see textFit.js), not by length.
+const stripMarker = (l) => String(l).replace(/^\s*(?:[-–•*]|\d+[.)])\s+/, '').trim();
+
+export function paginateLines(lines, style) {
+  return paginateBlocks('list', lines.map(stripMarker).filter(Boolean), style, PER_PAGE.listItems);
 }
 
-function paginateParagraphs(str) {
+export function paginateParagraphs(str, style) {
   const paras = String(str || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const pages = [];
-  let cur = [];
-  let chars = 0;
-  paras.forEach((p) => {
-    if (cur.length && chars + p.length > PER_PAGE.paragraphChars) { pages.push(cur); cur = []; chars = 0; }
-    cur.push(p);
-    chars += p.length;
-  });
-  if (cur.length) pages.push(cur);
-  return pages;
+  return paginateBlocks('paragraph', paras, style);
 }
 
 const withPart = (title, i, total, L) => title + L.part(i + 1, total);
@@ -177,13 +163,13 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
   // Texts of the report
   const sec = rd.sections || {};
   const addList = (title, str) => {
-    const pages = paginateLines(splitList(str));
+    const pages = paginateLines(splitList(str), style);
     if (!pages.length) return;
     toc.push(title);
     pages.forEach((page, i) => slides.push({ id: uid(), type: 'bullets', data: { heading: text(withPart(title, i, pages.length, L)), list: listText(page, 'bullet') } }));
   };
   addList(L.whatWasDone, sec.whatWasDone);
-  const concl = paginateParagraphs(sec.conclusion);
+  const concl = paginateParagraphs(sec.conclusion, style);
   if (concl.length) {
     toc.push(L.conclusion);
     concl.forEach((page, i) => slides.push({ id: uid(), type: 'paragraph', data: { heading: text(withPart(L.conclusion, i, concl.length, L)), body: { paras: page.map((p) => ({ runs: [{ t: p }] })) } } }));

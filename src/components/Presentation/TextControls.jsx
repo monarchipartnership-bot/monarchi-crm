@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import ActionIcon from '../common/ActionIcon';
 import { FONTS, FONT_BY_ID, MAX_SIZE, MIN_SIZE, SIZE_PRESETS, WEIGHT_LABELS, fontCss, nearestWeight } from '../../lib/presentation/fonts';
 import { MIXED, clampSize, normalizeHex } from '../../lib/presentation/textModel';
+import Select from '../common/Select';
 
 // Keeps the caret in the slide text while a toolbar button is pressed.
 export const keepFocus = (e) => e.preventDefault();
@@ -106,10 +107,8 @@ export function WeightSelect({ fontId, value, onChange }) {
   const weights = (FONT_BY_ID[fontId === MIXED ? 'Onest' : fontId] || FONT_BY_ID.Onest).weights;
   const near = value === MIXED ? '' : String(nearestWeight(fontId === MIXED ? 'Onest' : fontId, value));
   return (
-    <select className="pb-native" aria-label="Насиченість" value={near} onChange={(e) => onChange(Number(e.target.value))}>
-      {value === MIXED && <option value="">Змішано</option>}
-      {weights.map((w) => <option key={w} value={w}>{w} · {WEIGHT_LABELS[w] || ''}</option>)}
-    </select>
+    <Select ariaLabel="Насиченість" value={near === '' ? '' : Number(near)} onChange={(v) => { if (v !== '') onChange(Number(v)); }}
+      options={[...(value === MIXED ? [{ value: '', label: 'Змішано' }] : []), ...weights.map((w) => ({ value: w, label: `${w} · ${WEIGHT_LABELS[w] || ''}` }))]} />
   );
 }
 

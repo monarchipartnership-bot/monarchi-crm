@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import BarChart from '../../components/Reports/Weekly/BarChart';
 import LineChart from '../../components/Reports/Annual/LineChart';
 import DonutChart from '../../components/Automation/DonutChart';
 import DeltaBadge from '../../components/Automation/DeltaBadge';
 import ProjectsRegistry from '../../components/Projects/ProjectsRegistry';
+import ActionIcon from '../../components/common/ActionIcon';
+import { lastCompletedWeek } from '../../lib/periodReport';
 import { fetchProjects } from '../../lib/api/projects';
-import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween } from '../../lib/api/projectReportStore';
+import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatuses } from '../../lib/api/projectReportStore';
 import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, MONTH_NAMES } from '../../lib/dateHelpers';
 import '../../styles/reportPage.css';
 import '../../styles/comparePage.css';
@@ -14,10 +16,12 @@ import '../../styles/automationDashboard.css';
 import '../../styles/projectsDashboard.css';
 
 const TREND_WEEKS = 8;
+const REPORT_STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
 
 function toIso(d) {
   return isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
+const fmtIso = (s) => s.split('-').reverse().join('.');
 function moneyFmt(v) {
   return '$' + Math.round(v || 0).toLocaleString('uk-UA');
 }
@@ -39,6 +43,8 @@ export default function Dashboard() {
   const [thisMonthRows, setThisMonthRows] = useState([]);
   const [prevMonthRows, setPrevMonthRows] = useState([]);
   const [trendRows, setTrendRows] = useState([]);
+  const [lastWeekStatuses, setLastWeekStatuses] = useState([]);
+  const doneWeek = useMemo(() => lastCompletedWeek(todayIso()), []);
 
   const todayI = todayIso();
   const thisMonday = mondayOf(todayI);
@@ -61,8 +67,9 @@ export default function Dashboard() {
       fetchAllMonthlyReportsForMonth(thisMonthStartIso),
       fetchAllMonthlyReportsForMonth(prevMonthStartIso),
       fetchWeeklyReportsBetween(trendRangeStartIso, thisWeekStartIso),
+      doneWeek ? fetchWeeklyReportStatuses(doneWeek.start) : Promise.resolve([]),
     ])
-      .then(([projs, tw, lw, tm, pm, trend]) => {
+      .then(([projs, tw, lw, tm, pm, trend, statuses]) => {
         if (cancelled) return;
         setProjects(projs);
         setThisWeekRows(tw);
@@ -70,6 +77,7 @@ export default function Dashboard() {
         setThisMonthRows(tm);
         setPrevMonthRows(pm);
         setTrendRows(trend);
+        setLastWeekStatuses(statuses);
       })
       .catch((e) => console.warn('dashboard fetch failed', e))
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -154,11 +162,11 @@ export default function Dashboard() {
   return (
     <div className="report-page projects-dashboard-page">
       <div className="page-actions">
-        <button type="button" className="btn" onClick={() => navigate(-1)}>&#8592; Back</button>
+        <button type="button" className="btn" onClick={() => navigate(-1)}><ActionIcon name="back" size={18} /> Назад</button>
       </div>
 
       <section className="rpt-hero">
-        <h1>Projects Dashboard</h1>
+        <h1>Дашборд проєктів</h1>
         <p className="sub">Загальна картина по всіх проєктах: витрати, дохід, ROAS, статуси та тренди по тижнях.</p>
       </section>
 
@@ -175,24 +183,47 @@ export default function Dashboard() {
               <div className="dash-kpi">
                 <div className="dash-kpi-label">Витрати цього тижня</div>
                 <div className="dash-kpi-value">{moneyFmt(stats.thisWeek.spend)}</div>
-                <div className="dash-kpi-sub">vs минулий тиждень ({moneyFmt(stats.lastWeek.spend)}) <DeltaBadge diff={Math.round(stats.thisWeek.spend - stats.lastWeek.spend)} suffix=" $" /></div>
+                <div className="dash-kpi-sub">до минулого тижня ({moneyFmt(stats.lastWeek.spend)}) <DeltaBadge diff={Math.round(stats.thisWeek.spend - stats.lastWeek.spend)} suffix=" $" /></div>
               </div>
               <div className="dash-kpi">
                 <div className="dash-kpi-label">Дохід цього тижня</div>
                 <div className="dash-kpi-value">{moneyFmt(stats.thisWeek.revenue)}</div>
-                <div className="dash-kpi-sub">vs минулий тиждень ({moneyFmt(stats.lastWeek.revenue)}) <DeltaBadge diff={Math.round(stats.thisWeek.revenue - stats.lastWeek.revenue)} suffix=" $" /></div>
+                <div className="dash-kpi-sub">до минулого тижня ({moneyFmt(stats.lastWeek.revenue)}) <DeltaBadge diff={Math.round(stats.thisWeek.revenue - stats.lastWeek.revenue)} suffix=" $" /></div>
               </div>
               <div className="dash-kpi">
                 <div className="dash-kpi-label">ROAS цього місяця</div>
                 <div className="dash-kpi-value">{stats.thisMonth.roas === null ? '—' : stats.thisMonth.roas.toFixed(2) + 'x'}</div>
                 <div className="dash-kpi-sub">
-                  vs минулий місяць ({stats.prevMonth.roas === null ? '—' : stats.prevMonth.roas.toFixed(2) + 'x'})
+                  до минулого місяця ({stats.prevMonth.roas === null ? '—' : stats.prevMonth.roas.toFixed(2) + 'x'})
                   {stats.thisMonth.roas !== null && stats.prevMonth.roas !== null && (
                     <DeltaBadge diff={Math.round((stats.thisMonth.roas - stats.prevMonth.roas) * 100) / 100} />
                   )}
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="report-section">
+            <div className="stitle">Тижневі звіти{doneWeek ? ` за ${fmtIso(doneWeek.start)} – ${fmtIso(doneWeek.end)}` : ''}</div>
+            {projects.filter((p) => p.status === 'active').length === 0 ? (
+              <div className="empty-hint">Активних проєктів ще немає.</div>
+            ) : (
+              <table className="cmp-table">
+                <thead><tr><th>Проєкт</th><th>Звіт</th><th /></tr></thead>
+                <tbody>
+                  {projects.filter((p) => p.status === 'active').map((p) => {
+                    const st = lastWeekStatuses.find((r) => String(r.project_id) === String(p.id))?.status;
+                    return (
+                      <tr key={p.id}>
+                        <td><Link to={`/projects/${p.id}`}>{p.name}</Link></td>
+                        <td>{st ? (REPORT_STATUS[st] || st) : 'Немає'}</td>
+                        <td><Link className="btn" to={`/projects/${p.id}?tab=weekly`}>{st ? 'Відкрити' : 'Створити'}</Link></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </section>
 
           <section className="report-section">
@@ -227,7 +258,7 @@ export default function Dashboard() {
           </section>
 
           <section className="report-section">
-            <div className="stitle">Тиждень: цей vs минулий</div>
+            <div className="stitle">Цей тиждень і минулий</div>
             <div className="dash-chart">
               <BarChart labels={weekCmpLabels} series={weekCmpSeries} />
             </div>
