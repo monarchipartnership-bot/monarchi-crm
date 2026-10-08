@@ -35,7 +35,7 @@ export const DEPTS = {
     items: [
       { key: 'dashboard', name: 'Dashboard', desc: 'Загальна картина по всіх проєктах: витрати, дохід, ROAS, статуси та тренди.', icon: SI.projectsDashboard, type: 'link', to: '/projects/dashboard' },
       { key: 'projects', name: 'Projects', desc: 'Database of all agency projects, managed by their owners.', icon: SI.projects, type: 'link', to: '/projects' },
-      { key: 'clients', name: 'Clients Report', desc: 'Client-facing reporting for PMs.', icon: SI.clientsReport, type: 'link', to: '/clients' },
+      { key: 'clients', name: 'Презентація', desc: 'Презентація для клієнта з цифрами та текстом звіту.', icon: SI.clientsReport, type: 'link', to: '/clients' },
       // Daily/Weekly/Monthly project reports no longer have their own
       // entries — they're reached from buttons on the Projects page (their
       // /projects/reports/* routes still exist, and light up "Projects" here

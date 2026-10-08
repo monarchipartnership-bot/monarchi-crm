@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchReportByDate } from '../../lib/api/dailyReports';
 import { fetchProjects } from '../../lib/api/projects';
-import { fetchAllDailyReportsForDate } from '../../lib/api/projectReports';
+import { fetchWeeklyReportStatuses } from '../../lib/api/projectReportStore';
+import { lastCompletedWeek } from '../../lib/periodReport';
 import { todayIso, addDaysIso } from '../../lib/dateHelpers';
 
 function ymd(iso) {
@@ -42,20 +43,24 @@ export default function OverdueReportsCard() {
       const { y, m, d } = ymd(bizYesterdayI);
       const phrase = periodPhrase(bizYesterdayI, todayI);
 
-      const [salesYesterday, projects, pmYesterday] = await Promise.all([
+      const week = lastCompletedWeek(todayI);
+      const weekLabel = `тиждень ${week.start.split('-').reverse().slice(0, 2).join('.')}–${week.end.split('-').reverse().slice(0, 2).join('.')}`;
+      const [salesYesterday, projects, weeklyRows] = await Promise.all([
         safe(fetchReportByDate(y, m, d), null),
         safe(fetchProjects(), []),
-        safe(fetchAllDailyReportsForDate(bizYesterdayI), []),
+        safe(fetchWeeklyReportStatuses(week.start), []),
       ]);
       if (cancelled) return;
 
       const activeProjects = projects.filter((p) => p.status === 'active');
-      const reportedIds = new Set(pmYesterday.map((r) => r.project_id));
+      const statusById = new Map(weeklyRows.map((r) => [r.project_id, r.status]));
 
       const list = [];
       if (!salesYesterday) list.push({ key: 'sales', title: 'Щоденний звіт — команда Sales', dept: 'Sales', phrase });
       activeProjects.forEach((p) => {
-        if (!reportedIds.has(p.id)) list.push({ key: `proj-${p.id}`, title: `Звіт по рекламі — «${p.name}»`, dept: 'Project Managers', phrase });
+        const st = statusById.get(p.id);
+        if (!st) list.push({ key: `proj-${p.id}`, title: `Тижневий звіт — «${p.name}»`, dept: 'Project Managers', phrase: weekLabel });
+        else if (st === 'draft') list.push({ key: `proj-${p.id}`, title: `Тижневий звіт — «${p.name}» ще чернетка`, dept: 'Project Managers', phrase: weekLabel });
       });
 
       if (!cancelled) setItems(list);

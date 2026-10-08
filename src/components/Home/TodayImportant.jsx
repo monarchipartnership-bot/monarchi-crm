@@ -4,7 +4,8 @@ import { fetchTasksForDay } from '../../lib/api/tasks';
 import { fetchDepartmentIdByName } from '../../lib/api/departments';
 import { fetchReportByDate } from '../../lib/api/dailyReports';
 import { fetchProjects } from '../../lib/api/projects';
-import { fetchAllDailyReportsForDate } from '../../lib/api/projectReports';
+import { fetchWeeklyReportStatuses } from '../../lib/api/projectReportStore';
+import { lastCompletedWeek } from '../../lib/periodReport';
 import { fetchPendingQueue } from '../../lib/api/profile';
 import { todayIso, addDaysIso } from '../../lib/dateHelpers';
 import { deriveTaskStatus } from '../../lib/taskStatus';
@@ -76,17 +77,18 @@ export default function TodayImportant() {
       const { y, m, d } = ymd(bizYesterdayI);
 
       const automationDeptId = await safe(fetchDepartmentIdByName('Відділ автоматизації'), null);
-      const [salesYesterday, projects, pmYesterday, tasksToday, pendingQueue] = await Promise.all([
+      const week = lastCompletedWeek(todayI);
+      const [salesYesterday, projects, pmWeekly, tasksToday, pendingQueue] = await Promise.all([
         safe(fetchReportByDate(y, m, d), null),
         safe(fetchProjects(), []),
-        safe(fetchAllDailyReportsForDate(bizYesterdayI), []),
+        safe(fetchWeeklyReportStatuses(week.start), []),
         safe(fetchTasksForDay(todayI, automationDeptId), []),
         safe(fetchPendingQueue(), []),
       ]);
       if (cancelled) return;
 
       const activeProjects = projects.filter((p) => p.status === 'active');
-      const reportedIds = new Set(pmYesterday.map((r) => r.project_id));
+      const reportedIds = new Set(pmWeekly.filter((r) => r.status !== 'draft').map((r) => r.project_id));
       const overdueReports = (salesYesterday ? 0 : 1) + activeProjects.filter((p) => !reportedIds.has(p.id)).length;
       const urgentTasks = tasksToday.filter((t) => deriveTaskStatus(t) === 'pending').length;
 

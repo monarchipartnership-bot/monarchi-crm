@@ -27,6 +27,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ClientAvatar from '../../components/Clients/ClientAvatar';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import ClientFilesTab from '../../components/Clients/ClientFilesTab';
+import ClientProjectsTab from '../../components/Clients/ClientProjectsTab';
 import AiHistoryTab from '../../components/ClientProfile/AiHistoryTab';
 import NoteEditor from '../../components/Deals/NoteEditor';
 import TagInput from '../../components/Automation/TagInput';
@@ -211,14 +212,14 @@ function describeActivity(e) {
 
 
 // Confirmed final tab order (from the full dashboard mockup discussion).
-// "Компанії"/"Проекти"/"Задачі"/"Bot communication" are placeholders for
+// "Компанії"/"Задачі"/"Bot communication" are placeholders for
 // features whose content hasn't been designed yet — `soon` renders them
 // disabled instead of a working tab. "AI Team work history" used to be one
 // of these too but is now a real tab (see AiHistoryTab.jsx).
 const TABS = [
   { key: 'info', label: 'Основна інформація' },
   { key: 'companies', label: 'Компанії', soon: true },
-  { key: 'projects', label: 'Проекти', soon: true },
+  { key: 'projects', label: 'Проекти' },
   { key: 'notes', label: 'Нотатки' },
   { key: 'activity', label: 'Активність' },
   { key: 'deals', label: 'Угоди' },
@@ -716,7 +717,7 @@ export default function ClientProfile() {
         ))}
       </div>
 
-      <section className={'report-section client-profile-section' + (activeTab === 'info' || activeTab === 'deals' || activeTab === 'activity' ? ' client-profile-section--wide' : '')}>
+      <section className={'report-section client-profile-section' + (activeTab === 'info' || activeTab === 'deals' || activeTab === 'projects' || activeTab === 'activity' ? ' client-profile-section--wide' : '')}>
         {activeTab === 'info' && (
           <div className="client-profile-info-layout">
             <div className="client-profile-info-main">
@@ -1297,6 +1298,7 @@ export default function ClientProfile() {
             ))}
           </div>
         )}
+        {activeTab === 'projects' && <ClientProjectsTab clientId={client.id} />}
         {activeTab === 'files' && <ClientFilesTab clientId={client.id} uploadedBy={email} />}
         {activeTab === 'ai' && <AiHistoryTab clientId={client.id} />}
       </section>

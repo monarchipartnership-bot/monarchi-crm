@@ -12,9 +12,21 @@ export async function fetchProjectById(id) {
   return data;
 }
 
+// Returns the created row so the caller can attach ad accounts to its id.
 export async function createProject(payload, createdBy) {
-  const { error } = await supabase.from('projects').insert({ ...payload, status: 'active', created_by: createdBy });
+  const { data, error } = await supabase.from('projects').insert({ ...payload, status: 'active', created_by: createdBy }).select().single();
   if (error) throw error;
+  return data;
+}
+
+// A contact's projects with their linked ad accounts, for the "Проекти" tab on
+// the contact card. Falls back to no accounts if project_ad_accounts doesn't
+// exist yet; and to [] if projects.client_id doesn't exist yet.
+export async function fetchProjectsForClient(clientId) {
+  let res = await supabase.from('projects').select('*, project_ad_accounts(platform, account_id, account_name, account_status)').eq('client_id', clientId).order('created_at', { ascending: false });
+  if (res.error) res = await supabase.from('projects').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
+  if (res.error) { console.warn('fetchProjectsForClient failed', res.error); return []; }
+  return res.data ?? [];
 }
 
 export async function updateProject(id, payload) {

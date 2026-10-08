@@ -6,7 +6,7 @@ import DonutChart from '../../components/Automation/DonutChart';
 import DeltaBadge from '../../components/Automation/DeltaBadge';
 import ProjectsRegistry from '../../components/Projects/ProjectsRegistry';
 import { fetchProjects } from '../../lib/api/projects';
-import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween } from '../../lib/api/projectReports';
+import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween } from '../../lib/api/projectReportStore';
 import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, MONTH_NAMES } from '../../lib/dateHelpers';
 import '../../styles/reportPage.css';
 import '../../styles/comparePage.css';

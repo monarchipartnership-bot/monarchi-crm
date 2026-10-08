@@ -1,22 +1,37 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import AutoResizeTextarea from '../../components/Reports/AutoResizeTextarea';
-import AdReportForm from '../../components/Projects/AdReportForm';
+import PeriodStats from '../../components/Projects/Reports/PeriodStats';
+import PeriodReport from '../../components/Projects/Reports/PeriodReport';
+import ProjectAccountsPanel from '../../components/Projects/ProjectAccountsPanel';
+import ClientPicker from '../../components/Clients/ClientPicker';
+import { clientFullName } from '../../lib/clientName';
 import { fetchProjectById, updateProject, deleteProject } from '../../lib/api/projects';
 import { STATUS_LABEL, SERVICES, fmtIsoDate } from '../../lib/projectConstants';
+import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
+import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload, fmtCost } from '../../lib/projectFields';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
 import '../../styles/projectReportPage.css';
+import '../../styles/projectAccounts.css';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'daily', label: 'Daily Report' },
-  { key: 'weekly', label: 'Weekly Report' },
-  { key: 'monthly', label: 'Monthly Report' },
+  { key: 'period', label: 'Показники за період' },
+  { key: 'weekly', label: 'Тижневий звіт' },
+  { key: 'monthly', label: 'Місячний звіт' },
 ];
 
 const STATUSES = ['active', 'paused', 'completed'];
+
+// The Overview fields in reading order. Empty ones are hidden while viewing.
+const FIELD_GROUPS = [
+  { title: 'Основне', items: ['manager', 'status', 'period', 'services'] },
+  { title: 'Клієнт', items: ['client', 'country', 'website', 'business_type', 'contacts', 'timezone'] },
+  { title: 'Реєстр проєкту', items: ['specialist', 'comm_start_date', 'payment_channel', 'cost', 'worksection_link', 'stop_reason'] },
+];
+const ALL_FIELD_KEYS = FIELD_GROUPS.flatMap((g) => g.items);
 
 const ICONS = {
   manager: <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>,
@@ -43,6 +58,8 @@ export default function ProjectDetail() {
   const [tab, setTab] = useState('overview');
   const [deleting, setDeleting] = useState(false);
 
+  const [linkedAccounts, setLinkedAccounts] = useState([]);
+
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -63,6 +80,7 @@ export default function ProjectDetail() {
   }
 
   useEffect(() => { reload(); }, [id]);
+  useEffect(() => { fetchProjectAccounts(id).then(setLinkedAccounts); }, [id]);
 
   useEffect(() => {
     if (project) {
@@ -75,9 +93,9 @@ export default function ProjectDetail() {
     setEditForm({
       manager: project.manager || '',
       client: project.client || '',
+      client_id: project.client_id || null,
       country: project.country || '',
       website: project.website || '',
-      crm_link: project.crm_link || '',
       start_date: project.start_date || '',
       end_date: project.end_date || '',
       status: project.status || 'active',
@@ -106,9 +124,9 @@ export default function ProjectDetail() {
       await updateProject(id, {
         manager: editForm.manager.trim() || null,
         client: editForm.client.trim() || null,
+        client_id: editForm.client_id || null,
         country: editForm.country.trim() || null,
         website: editForm.website.trim() || null,
-        crm_link: editForm.crm_link.trim() || null,
         start_date: editForm.start_date || null,
         end_date: editForm.end_date || null,
         status: editForm.status,
@@ -123,6 +141,16 @@ export default function ProjectDetail() {
       alert('Не вдалося зберегти проєкт.');
     } finally {
       setSavingEdit(false);
+    }
+  }
+
+  // Linking an account adds its platform to the project's services, so the two never disagree.
+  async function addService(service) {
+    try {
+      await updateProject(id, { services: [...(project.services || []), service] });
+      await reload();
+    } catch (e) {
+      console.warn('addService failed', e);
     }
   }
 
@@ -185,6 +213,154 @@ export default function ProjectDetail() {
     );
   }
 
+  const isEmpty = (v) => v == null || v === '' || (Array.isArray(v) && v.length === 0);
+
+  // Which fields have nothing in them (hidden while viewing, shown while editing).
+  const emptyKeys = ALL_FIELD_KEYS.filter((k) => {
+    if (k === 'status') return false;
+    if (k === 'period') return !project.start_date && !project.end_date;
+    return isEmpty(project[k]);
+  });
+  const hiddenCount = emptyKeys.length;
+
+  function renderExtra(key) {
+    const f = EXTRA_PROJECT_FIELDS.find((x) => x.key === key);
+    if (!f || (!editMode && isEmpty(project[key]))) return null;
+    return (
+      <div className="ov-field-box" key={key}>
+        <div className="ov-field-label">{f.label}</div>
+        {editMode ? (
+          f.type === 'select' ? (
+            <select value={editForm[f.key]} onChange={(e) => setEditField(f.key, e.target.value)}>
+              <option value="">Не вказано</option>
+              {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input
+              type={f.type === 'url' ? 'text' : f.type} value={editForm[f.key]} placeholder={f.placeholder}
+              step={f.type === 'number' ? '0.01' : undefined}
+              onChange={(e) => setEditField(f.key, e.target.value)}
+              onClick={f.type === 'date' ? (e) => e.currentTarget.showPicker?.() : undefined}
+            />
+          )
+        ) : f.key === 'worksection_link' ? (
+          <a className="ov-field-value ov-link" href={project[f.key]} target="_blank" rel="noreferrer">Відкрити в Worksection</a>
+        ) : (
+          <div className="ov-field-value">
+            {f.key === 'cost' ? fmtCost(project.cost) : f.type === 'date' ? (fmtIsoDate(project[f.key]) || '—') : project[f.key]}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderItem(key) {
+    switch (key) {
+      case 'manager':
+        if (!editMode && isEmpty(project.manager)) return null;
+        return (
+          <div className="ov-field-box" key={key}>
+            <div className="ov-field-label"><FieldIcon name="manager" />Продакт (менеджер)</div>
+            {editMode
+              ? <input type="text" value={editForm.manager} onChange={(e) => setEditField('manager', e.target.value)} placeholder="Ім'я менеджера" />
+              : <div className="ov-field-value">{project.manager}</div>}
+          </div>
+        );
+      case 'status':
+        return (
+          <div className="ov-field-box" key={key}>
+            <div className="ov-field-label"><FieldIcon name="status" />Статус</div>
+            {editMode ? (
+              <div className="status-picker">
+                {STATUSES.map((s) => (
+                  <button key={s} type="button" className={'status-btn' + (editForm.status === s ? ` on ${s}` : '')} onClick={() => setEditField('status', s)}>
+                    {STATUS_LABEL[s]}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className={'status-pill ' + project.status}>{STATUS_LABEL[project.status]}</span>
+            )}
+          </div>
+        );
+      case 'period':
+        if (!editMode && !project.start_date && !project.end_date) return null;
+        return (
+          <div className="ov-field-box" key={key}>
+            <div className="ov-field-label"><FieldIcon name="period" />Початок роботи над стратегією – завершення співпраці</div>
+            {editMode ? (
+              <div className="ov-date-row">
+                <input type="date" value={editForm.start_date} onChange={(e) => setEditField('start_date', e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} />
+                <span>–</span>
+                <input type="date" value={editForm.end_date} onChange={(e) => setEditField('end_date', e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} />
+              </div>
+            ) : (
+              <div className="ov-field-value">{fmtIsoDate(project.start_date) || '—'} – {fmtIsoDate(project.end_date) || '—'}</div>
+            )}
+          </div>
+        );
+      case 'services':
+        if (!editMode && isEmpty(project.services)) return null;
+        return (
+          <div className="ov-field-box ov-field-box-wide" key={key}>
+            <div className="ov-field-label"><FieldIcon name="services" />Послуги (канал роботи)</div>
+            {editMode ? (
+              <div className="svc-picker">
+                {SERVICES.map((s) => (
+                  <label className="svc-opt" key={s}>
+                    <input type="checkbox" checked={editForm.services.includes(s)} onChange={() => toggleEditService(s)} />
+                    <span>{s}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="proj-tags">{project.services.map((s) => <span className="svc-tag" key={s}>{s}</span>)}</div>
+            )}
+          </div>
+        );
+      case 'client':
+        if (!editMode && isEmpty(project.client)) return null;
+        return (
+          <div className="ov-field-box" key={key}>
+            <div className="ov-field-label"><FieldIcon name="client" />Клієнт</div>
+            {editMode ? (
+              <ClientPicker
+                value={editForm.client_id}
+                placeholder={editForm.client || 'Пошук клієнта або створити нового...'}
+                onChange={(c) => setEditForm((f) => ({ ...f, client_id: c ? c.id : null, client: c ? (c.company || clientFullName(c)) : '' }))}
+              />
+            ) : project.client_id ? (
+              <Link className="ov-field-value ov-link" to={'/reports/clients-directory/' + project.client_id}>{project.client || 'Відкрити контакт'}</Link>
+            ) : (
+              <div className="ov-field-value">{project.client}</div>
+            )}
+          </div>
+        );
+      case 'country':
+        if (!editMode && isEmpty(project.country)) return null;
+        return (
+          <div className="ov-field-box" key={key}>
+            <div className="ov-field-label"><FieldIcon name="country" />Гео (країна)</div>
+            {editMode
+              ? <input type="text" value={editForm.country} onChange={(e) => setEditField('country', e.target.value)} placeholder="напр. USA" />
+              : <div className="ov-field-value">{project.country}</div>}
+          </div>
+        );
+      case 'website':
+        if (!editMode && isEmpty(project.website)) return null;
+        return (
+          <div className="ov-field-box" key={key}>
+            <div className="ov-field-label"><FieldIcon name="website" />Сайт</div>
+            {editMode
+              ? <input type="text" value={editForm.website} onChange={(e) => setEditField('website', e.target.value)} placeholder="https://..." />
+              : <a className="ov-field-value ov-link" href={project.website} target="_blank" rel="noreferrer">{project.website}</a>}
+          </div>
+        );
+      default:
+        return renderExtra(key);
+    }
+  }
+
   const notesDirty = notesValue !== (project.notes || '');
   const infoDirty = infoValue !== (project.additional_info || '');
 
@@ -197,7 +373,18 @@ export default function ProjectDetail() {
       <div className="pd-header">
         <div className="pd-header-meta">
           <div className="pd-header-name">{project.name}</div>
-          <span className={'status-pill ' + project.status}>{STATUS_LABEL[project.status]}</span>
+          <div className="pd-header-chips">
+            {linkedAccounts.map((a) => (
+              <span className="pacc-chip" key={a.platform}>
+                <span className="pacc-badge pacc-badge--xs" style={{ background: platformInfo(a.platform).gradient }}>{platformInfo(a.platform).mark}</span>
+                {platformInfo(a.platform).label}
+              </span>
+            ))}
+            {project.client && (project.client_id
+              ? <Link className="pacc-chip pacc-chip--link" to={'/reports/clients-directory/' + project.client_id}>{project.client}</Link>
+              : <span className="pacc-chip">{project.client}</span>)}
+            {project.manager && <span className="pacc-chip">{project.manager}</span>}
+          </div>
         </div>
       </div>
 
@@ -211,6 +398,8 @@ export default function ProjectDetail() {
 
       {tab === 'overview' && (
         <>
+          <ProjectAccountsPanel projectId={id} services={project.services} onAddService={addService} onAccountsChange={setLinkedAccounts} />
+
           <section className="report-section">
             <div className="ov-section-head">
               <div className="stitle">Про проєкт</div>
@@ -224,136 +413,23 @@ export default function ProjectDetail() {
               )}
             </div>
 
-            <div className="ov-field-grid">
-              <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="manager" />Продакт (менеджер)</div>
-                {editMode
-                  ? <input type="text" value={editForm.manager} onChange={(e) => setEditField('manager', e.target.value)} placeholder="Ім'я менеджера" />
-                  : <div className="ov-field-value">{project.manager || '—'}</div>}
-              </div>
-
-              <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="client" />Клієнт</div>
-                {editMode
-                  ? <input type="text" value={editForm.client} onChange={(e) => setEditField('client', e.target.value)} placeholder="напр. Acme Inc." />
-                  : <div className="ov-field-value">{project.client || '—'}</div>}
-              </div>
-
-              <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="country" />Гео (країна)</div>
-                {editMode
-                  ? <input type="text" value={editForm.country} onChange={(e) => setEditField('country', e.target.value)} placeholder="напр. USA" />
-                  : <div className="ov-field-value">{project.country || '—'}</div>}
-              </div>
-
-              <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="website" />Сайт</div>
-                {editMode
-                  ? <input type="text" value={editForm.website} onChange={(e) => setEditField('website', e.target.value)} placeholder="https://..." />
-                  : project.website
-                    ? <a className="ov-field-value ov-link" href={project.website} target="_blank" rel="noreferrer">{project.website}</a>
-                    : <div className="ov-field-value">—</div>}
-              </div>
-
-              <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="crm" />CRM link</div>
-                {editMode
-                  ? <input type="text" value={editForm.crm_link} onChange={(e) => setEditField('crm_link', e.target.value)} placeholder="https://..." />
-                  : project.crm_link
-                    ? <a className="ov-field-value ov-link" href={project.crm_link} target="_blank" rel="noreferrer">Відкрити в CRM</a>
-                    : <div className="ov-field-value">—</div>}
-              </div>
-
-              <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="period" />Початок роботи над стратегією – завершення співпраці</div>
-                {editMode ? (
-                  <div className="ov-date-row">
-                    <input
-                      type="date"
-                      value={editForm.start_date}
-                      onChange={(e) => setEditField('start_date', e.target.value)}
-                      onClick={(e) => e.currentTarget.showPicker?.()}
-                    />
-                    <span>–</span>
-                    <input
-                      type="date"
-                      value={editForm.end_date}
-                      onChange={(e) => setEditField('end_date', e.target.value)}
-                      onClick={(e) => e.currentTarget.showPicker?.()}
-                    />
-                  </div>
-                ) : (
-                  <div className="ov-field-value">{fmtIsoDate(project.start_date) || '—'} – {fmtIsoDate(project.end_date) || '—'}</div>
-                )}
-              </div>
-
-              <div className="ov-field-box">
-                <div className="ov-field-label"><FieldIcon name="status" />Статус</div>
-                {editMode ? (
-                  <div className="status-picker">
-                    {STATUSES.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        className={'status-btn' + (editForm.status === s ? ` on ${s}` : '')}
-                        onClick={() => setEditField('status', s)}
-                      >
-                        {STATUS_LABEL[s]}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <span className={'status-pill ' + project.status}>{STATUS_LABEL[project.status]}</span>
-                )}
-              </div>
-
-              {EXTRA_PROJECT_FIELDS.map((f) => (
-                <div className="ov-field-box" key={f.key}>
-                  <div className="ov-field-label">{f.label}</div>
-                  {editMode ? (
-                    f.type === 'select' ? (
-                      <select value={editForm[f.key]} onChange={(e) => setEditField(f.key, e.target.value)}>
-                        <option value="">Не вказано</option>
-                        {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : (
-                      <input
-                        type={f.type === 'url' ? 'text' : f.type} value={editForm[f.key]} placeholder={f.placeholder}
-                        step={f.type === 'number' ? '0.01' : undefined}
-                        onChange={(e) => setEditField(f.key, e.target.value)}
-                        onClick={f.type === 'date' ? (e) => e.currentTarget.showPicker?.() : undefined}
-                      />
-                    )
-                  ) : f.key === 'worksection_link' && project[f.key] ? (
-                    <a className="ov-field-value ov-link" href={project[f.key]} target="_blank" rel="noreferrer">Відкрити в Worksection</a>
-                  ) : (
-                    <div className="ov-field-value">
-                      {f.key === 'cost' ? fmtCost(project.cost) : f.type === 'date' ? (fmtIsoDate(project[f.key]) || '—') : (project[f.key] || '—')}
-                    </div>
-                  )}
+            {FIELD_GROUPS.map((group) => {
+              const boxes = group.items.map(renderItem).filter(Boolean);
+              if (!boxes.length) return null;
+              return (
+                <div className="ov-group" key={group.title}>
+                  <div className="ov-group-title">{group.title}</div>
+                  <div className="ov-field-grid">{boxes}</div>
                 </div>
-              ))}
+              );
+            })}
 
-              <div className="ov-field-box ov-field-box-wide">
-                <div className="ov-field-label"><FieldIcon name="services" />Послуги (канал роботи)</div>
-                {editMode ? (
-                  <div className="svc-picker">
-                    {SERVICES.map((s) => (
-                      <label className="svc-opt" key={s}>
-                        <input type="checkbox" checked={editForm.services.includes(s)} onChange={() => toggleEditService(s)} />
-                        <span>{s}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : project.services?.length ? (
-                  <div className="proj-tags">
-                    {project.services.map((s) => <span className="svc-tag" key={s}>{s}</span>)}
-                  </div>
-                ) : (
-                  <div className="ov-field-value">—</div>
-                )}
+            {!editMode && hiddenCount > 0 && (
+              <div className="ov-hidden-hint">
+                Не заповнено полів: {hiddenCount}. Вони приховані.
+                <button type="button" className="pacc-link" onClick={startEdit}>Показати й заповнити</button>
               </div>
-            </div>
+            )}
 
             {!editMode && (
               <button type="button" className="del-link ov-delete-link" onClick={handleDelete} disabled={deleting}>
@@ -388,9 +464,9 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {tab === 'daily' && <AdReportForm key={'daily-' + id} projectId={id} periodType="daily" />}
-      {tab === 'weekly' && <AdReportForm key={'weekly-' + id} projectId={id} periodType="weekly" />}
-      {tab === 'monthly' && <AdReportForm key={'monthly-' + id} projectId={id} periodType="monthly" />}
+      {tab === 'period' && <PeriodStats key={'period-' + id} projectId={id} />}
+      {tab === 'weekly' && <PeriodReport key={'weekly-' + id} projectId={id} periodType="weekly" />}
+      {tab === 'monthly' && <PeriodReport key={'monthly-' + id} projectId={id} periodType="monthly" />}
     </div>
   );
 }

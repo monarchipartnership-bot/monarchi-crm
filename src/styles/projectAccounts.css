@@ -1,0 +1,96 @@
+/* Ad accounts on projects: the create-project picker, the project page panel
+   and the contact card's project list. Plain white cards, gradient platform
+   badges, tinted status pills (see the locked design system). All classes are
+   prefixed pacc-. */
+
+.pacc-modal { max-width: 680px; }
+
+.pacc-rows { display: flex; flex-direction: column; gap: 12px; margin-bottom: 6px; }
+.pacc-row { border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
+.pacc-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pacc-row-platform { width: 200px; max-width: 100%; }
+.pacc-add { align-self: flex-start; }
+
+.pacc-picker { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pacc-manual { display: flex; gap: 8px; align-items: center; }
+.pacc-manual input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; font-family: var(--font-body); font-size: .86rem; color: var(--ink); background: #fff; outline: none; }
+.pacc-manual input:focus { border-color: var(--purple); }
+
+.pacc-link { align-self: flex-start; background: none; border: 0; padding: 0; font-family: var(--font-body); font-size: .8rem; font-weight: 600; color: var(--purple); cursor: pointer; }
+.pacc-link--danger { color: #DC2626; }
+.pacc-link:disabled { opacity: .5; cursor: default; }
+.pacc-hint { font-size: .8rem; color: var(--muted); line-height: 1.45; }
+.pacc-err { font-size: .8rem; color: #DC2626; line-height: 1.45; }
+
+/* Gradient platform badge (white mark, soft shadow) */
+.pacc-badge { width: 40px; height: 40px; border-radius: 12px; flex: none; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-family: var(--font-head); font-weight: 800; font-size: 1rem; box-shadow: 0 6px 14px -6px rgba(60, 20, 90, .45); }
+.pacc-badge--sm { width: 30px; height: 30px; border-radius: 9px; font-size: .82rem; }
+
+.pacc-pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-family: var(--font-head); font-weight: 600; font-size: .72rem; white-space: nowrap; border: 1px solid transparent; }
+.pacc-pill--ok { background: #DCFCE7; color: #166534; border-color: #BBF7D0; }
+.pacc-pill--warn { background: #FEF3C7; color: #92400E; border-color: #FDE68A; }
+.pacc-pill--bad { background: #FEE2E2; color: #991B1B; border-color: #FECACA; }
+.pacc-pill--muted { background: #F3F4F6; color: #4B5563; border-color: #E5E7EB; }
+
+/* The found / chosen account, under a picker and inside the contact card */
+.pacc-found { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); min-width: 0; }
+.pacc-found-body { flex: 1; min-width: 0; }
+.pacc-found-name { font-weight: 600; font-size: .88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pacc-found-meta { font-size: .76rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* Project page panel */
+.pacc-panel { margin-bottom: 18px; }
+.pacc-panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.pacc-panel-head .stitle { margin: 0; }
+.pacc-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.pacc-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.pacc-tab { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 7px 14px; border-radius: 9px; font-family: var(--font-head); font-weight: 600; font-size: .8rem; color: var(--ink-soft); cursor: pointer; }
+.pacc-tab.on { background: #fff; color: var(--ink); box-shadow: 0 2px 8px rgba(80, 30, 100, .12); }
+.pacc-dot { width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF; }
+.pacc-dot--ok { background: #16A34A; }
+.pacc-dot--warn { background: #CA8A04; }
+.pacc-dot--bad { background: #DC2626; }
+
+.pacc-add-box { border: 1px solid var(--border); border-radius: 14px; padding: 14px; background: #fff; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.pacc-add-actions { display: flex; gap: 8px; }
+.pacc-empty { color: var(--muted); font-size: .88rem; padding: 14px 4px; }
+
+.pacc-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 4px 18px rgba(80, 30, 100, .07); padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.pacc-card-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pacc-card-title { flex: 1; min-width: 0; }
+.pacc-card-name { font-family: var(--font-head); font-weight: 700; font-size: 1.05rem; color: var(--ink); overflow-wrap: anywhere; }
+.pacc-card-sub { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.pacc-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.pacc-facts > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pacc-facts span, .pacc-metric span { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.pacc-facts b { font-size: .88rem; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+
+.pacc-metrics-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 14px; }
+.pacc-metrics-title { font-family: var(--font-head); font-weight: 700; font-size: .9rem; color: var(--ink); }
+.pacc-period { display: inline-flex; gap: 4px; }
+.pacc-period-btn { border: 1px solid var(--border); background: #fff; padding: 5px 12px; border-radius: 8px; font-family: var(--font-head); font-weight: 600; font-size: .76rem; color: var(--ink-soft); cursor: pointer; }
+.pacc-period-btn.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+.pacc-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.pacc-metric { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pacc-metric b { font-family: var(--font-head); font-weight: 700; font-size: 1.05rem; color: var(--ink); overflow-wrap: anywhere; }
+.pacc-card-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pacc-confirm { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .8rem; color: var(--ink-soft); }
+
+/* Contact card: the project's accounts under the detail stats */
+.pacc-client-accounts { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+
+@media (max-width: 560px) {
+  .pacc-row-platform { width: 100%; }
+  .pacc-row-head { flex-wrap: wrap; }
+}
+
+/* Project page: grouped overview fields and header chips */
+.ov-group { margin-top: 18px; }
+.ov-group:first-of-type { margin-top: 4px; }
+.ov-group-title { font-family: var(--font-head); font-weight: 700; font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--purple); margin: 0 0 10px; }
+.ov-hidden-hint { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: .82rem; color: var(--muted); }
+.pd-header-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.pacc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px 4px 5px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-family: var(--font-head); font-weight: 600; font-size: .78rem; color: var(--ink-soft); text-decoration: none; }
+.pacc-chip:not(:has(.pacc-badge)) { padding-left: 11px; }
+a.pacc-chip--link { color: var(--purple); }
+.pacc-badge--xs { width: 20px; height: 20px; border-radius: 6px; font-size: .66rem; box-shadow: none; }

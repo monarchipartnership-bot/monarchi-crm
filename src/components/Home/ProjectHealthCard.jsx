@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import DonutChart from '../Automation/DonutChart';
 import { fetchProjects } from '../../lib/api/projects';
-import { fetchAllDailyReportsBetween } from '../../lib/api/projectReports';
-import { todayIso, addDaysIso } from '../../lib/dateHelpers';
+import { fetchWeeklyReportStatuses } from '../../lib/api/projectReportStore';
+import { lastCompletedWeek } from '../../lib/periodReport';
+import { todayIso } from '../../lib/dateHelpers';
 
 // Health isn't a stored field — there's no such column on `projects` yet —
 // it's derived here from two things we do have: the deadline and whether a
-// daily ad-report has come in recently. Overdue deadline wins as the
-// clearest signal; no report in 2 days is the softer "needs attention" one.
+// weekly ad report exists for the last finished week. Overdue deadline wins as
+// the clearest signal; a missing weekly report is the softer "needs attention" one.
 function healthOf(project, reportedIds, todayI) {
   if (project.end_date && project.end_date < todayI) return 'risk';
   if (!reportedIds.has(project.id)) return 'attention';
@@ -29,10 +30,10 @@ export default function ProjectHealthCard() {
 
     async function load() {
       const todayI = todayIso();
-      const since = addDaysIso(todayI, -1);
+      const week = lastCompletedWeek(todayI);
       const [projects, recentReports] = await Promise.all([
         fetchProjects(),
-        fetchAllDailyReportsBetween(since, todayI),
+        fetchWeeklyReportStatuses(week.start),
       ]);
       if (cancelled) return;
 

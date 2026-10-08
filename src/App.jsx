@@ -19,7 +19,7 @@ import DealTasksPage from './pages/Reports/Deals/DealTasksPage';
 import Projects from './pages/Projects/Projects';
 import ProjectsDashboard from './pages/Projects/Dashboard';
 import ProjectDetail from './pages/Projects/ProjectDetail';
-import AdReportPage from './pages/Projects/Reports/AdReportPage';
+import ProjectReportsPage from './pages/Projects/Reports/ProjectReportsPage';
 import TeamCalendar from './pages/Team/TeamCalendar';
 import TeamAccounts from './pages/Team/TeamAccounts';
 import TeamMembers from './pages/Team/TeamMembers';
@@ -29,7 +29,7 @@ import Calculator from './pages/Tools/Calculator';
 import ImageStudio from './pages/Tools/ImageStudio';
 import FollowupGenerator from './pages/Tools/FollowupGenerator';
 import ConstellationTest from './pages/Tools/ConstellationTest';
-import ClientsReport from './pages/ClientsReport/ClientsReport';
+import Presentation from './pages/Presentation/Presentation';
 import AutomationDashboard from './pages/Automation/Dashboard';
 import SmmHome from './pages/Smm/SmmHome';
 import './styles/pages.css';
@@ -64,9 +64,10 @@ function AuthGate() {
         <Route path="/reports/deal-tasks" element={<DealTasksPage />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/dashboard" element={<ProjectsDashboard />} />
-        <Route path="/projects/reports/daily" element={<AdReportPage periodType="daily" />} />
-        <Route path="/projects/reports/weekly" element={<AdReportPage periodType="weekly" />} />
-        <Route path="/projects/reports/monthly" element={<AdReportPage periodType="monthly" />} />
+        <Route path="/projects/reports/daily" element={<Navigate to="/projects/reports/period" replace />} />
+        <Route path="/projects/reports/period" element={<ProjectReportsPage mode="period" />} />
+        <Route path="/projects/reports/weekly" element={<ProjectReportsPage mode="weekly" />} />
+        <Route path="/projects/reports/monthly" element={<ProjectReportsPage mode="monthly" />} />
         <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/team/calendar" element={<TeamCalendar />} />
         <Route path="/team/accounts" element={<TeamAccounts />} />
@@ -77,7 +78,7 @@ function AuthGate() {
         <Route path="/tools/image-studio" element={<ImageStudio />} />
         <Route path="/tools/followup" element={<FollowupGenerator />} />
         <Route path="/tools/constellation-test" element={<ConstellationTest />} />
-        <Route path="/clients" element={<ClientsReport />} />
+        <Route path="/clients" element={<Presentation />} />
         <Route path="/automation/dashboard" element={<AutomationDashboard />} />
         <Route path="/automation/smm" element={<SmmHome />} />
         <Route path="/tasks" element={<TaskManagerPage />} />

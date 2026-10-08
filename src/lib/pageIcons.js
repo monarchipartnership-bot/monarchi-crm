@@ -15,4 +15,5 @@ export const PAGE_ICONS = {
   'page.deals': { src: SI.deals },
   'page.contacts': { src: SI.contacts },
   'page.reports-manager': { src: SI.reportsManager },
+  'page.clients-report': { src: SI.clientsReport },
 };

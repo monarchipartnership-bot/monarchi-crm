@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectModal from '../../components/Projects/ProjectModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchProjects, createProject } from '../../lib/api/projects';
+import { addProjectAccount } from '../../lib/api/projectAccounts';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
 
@@ -16,13 +17,16 @@ const TABS = [
 
 export default function Projects() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { email } = useAuth();
+  // The contact card's "Проекти" tab can open this page with the create form and that contact preselected.
+  const newForClient = location.state?.newForClient || null;
 
   const [projects, setProjects] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(Boolean(newForClient));
   const [saving, setSaving] = useState(false);
 
   async function reload() {
@@ -53,27 +57,40 @@ export default function Projects() {
     });
   }, [projects, tab, search]);
 
-  async function handleSave(payload) {
+  async function handleSave({ project, accounts }) {
     setSaving(true);
+    let created = null;
     try {
-      await createProject(payload, email);
-      setModalOpen(false);
-      await reload();
+      created = await createProject(project, email);
     } catch (e) {
       console.warn('saveProject failed', e);
-      alert('Не вдалося зберегти проєкт.');
-    } finally {
       setSaving(false);
+      alert('Не вдалося зберегти проєкт. Якщо це перший проєкт із клієнтом, перевірте, що в базі застосовано останню міграцію.');
+      return;
     }
+    // The project exists now; a failing account link must not look like the project was lost.
+    const failed = [];
+    for (const a of accounts) {
+      try {
+        await addProjectAccount({ projectId: created.id, platform: a.platform, account: a.account, createdBy: email });
+      } catch (e) {
+        console.warn('addProjectAccount failed', e);
+        failed.push(`${a.platform}: ${e.message || e}`);
+      }
+    }
+    setSaving(false);
+    setModalOpen(false);
+    if (failed.length) alert('Проєкт створено, але кабінети підключилися не всі:' + String.fromCharCode(10) + failed.join(String.fromCharCode(10)));
+    navigate('/projects/' + created.id);
   }
 
   return (
     <div className="report-page projects-page">
       <div className="page-actions">
         <button type="button" className="btn" onClick={() => navigate(-1)}>&#8592; Back</button>
-        <Link className="btn" to="/projects/reports/daily">Daily Report</Link>
-        <Link className="btn" to="/projects/reports/weekly">Weekly Report</Link>
-        <Link className="btn" to="/projects/reports/monthly">Monthly Report</Link>
+        <Link className="btn" to="/projects/reports/period">Показники за період</Link>
+        <Link className="btn" to="/projects/reports/weekly">Тижневий звіт</Link>
+        <Link className="btn" to="/projects/reports/monthly">Місячний звіт</Link>
       </div>
 
       <section className="rpt-hero">
@@ -114,6 +131,7 @@ export default function Projects() {
           onClose={() => setModalOpen(false)}
           onSave={handleSave}
           saving={saving}
+          initialClientId={newForClient}
         />
       )}
     </div>
