@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DailyReportHero from '../../../components/Reports/DailyReportHero';
 import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
@@ -29,11 +28,11 @@ import { CLIENT_PLATFORMS } from '../../../lib/reportConstants';
 import { STATUSES, STATUS_META } from '../../../lib/clientStatus';
 import { platformColor, platformLogo } from '../../../lib/platforms';
 import { exportPDF, exportJPEG } from '../../../lib/exportHelpers';
-import { SECTION_ICONS } from '../../../lib/reportIcons';
+import contactsIcon from '../../../assets/sidebar/contacts.webp';
+import taskManagerIcon from '../../../assets/sidebar/task-manager.webp';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import Select from '../../../components/common/Select';
 import '../../../styles/reportPage.css';
-import '../../../styles/dailyReportShapes.css';
 import '../../../styles/dailyReportDesign.css';
 import '../../../styles/automationTasksPage.css';
 import '../../../styles/automationDashboard.css';
@@ -44,25 +43,10 @@ import '../../../styles/clientsDirectory.css';
 // Status chip colour: the shared pill style plus the colour itself, which the folder design uses for a pale chip with a coloured dot.
 const chipStyle = (color) => ({ ...stagePillStyle(color), '--chip': color });
 
-const MONTH_GENITIVE = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
-
-// True while the window is at least `query` wide (the manager / save state / exports then sit in the top bar).
-function useMatchMedia(query) {
-  const [matches, setMatches] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : true));
-  useEffect(() => {
-    if (!window.matchMedia) return undefined;
-    const mq = window.matchMedia(query);
-    const on = () => setMatches(mq.matches);
-    on();
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, [query]);
-  return matches;
-}
 
 // Flat completeness ring: a pale track plus arcs for exactly the counts shown in the legend (nothing is drawn for 0).
 function ProgressRing({ stats }) {
-  const R = 46, C = 2 * Math.PI * R;
+  const R = 48, C = 2 * Math.PI * R;
   const arcs = [
     { n: stats.done, color: '#1E9E5D' },
     { n: stats.over, color: '#D14343' },
@@ -71,13 +55,13 @@ function ProgressRing({ stats }) {
   return (
     <div className="progress-ring" role="img" aria-label={`Заповненість місяця: ${stats.pct}%`}>
       <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="#E6D9F0" strokeWidth="13" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke="#D7CEDE" strokeWidth="11" />
         {stats.total > 0 && arcs.map((a, i) => {
           if (!a.n) return null;
           const len = (a.n / stats.total) * C;
           const el = (
-            <circle key={i} cx="60" cy="60" r={R} fill="none" stroke={a.color} strokeWidth="13"
-              strokeDasharray={`${Math.max(len - 2, 0.5)} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)" />
+            <circle key={i} cx="60" cy="60" r={R} fill="none" stroke={a.color} strokeWidth="11"
+              strokeDasharray={`${Math.max(len - 1.5, 0.5)} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)" />
           );
           offset += len;
           return el;
@@ -137,9 +121,6 @@ export default function DailyCreate() {
   const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [salesDeptId, setSalesDeptId] = useState(null);
   const [salesStages, setSalesStages] = useState([]);
-  const wide = useMatchMedia('(min-width: 1100px)');
-  const [toolbarSlot, setToolbarSlot] = useState(null);
-  useEffect(() => { setToolbarSlot(document.getElementById('topbar-slot')); }, []);
   const saveTimerRef = useRef(null);
   const skipNextSaveRef = useRef(false);
 
@@ -412,34 +393,36 @@ export default function DailyCreate() {
   const hasArchive = done.some((d) => d.text?.trim()) || plans.some((p) => p.text?.trim());
 
   const saveTone = /^Помилка/.test(statusLabel) ? 'err' : /^Збережено/.test(statusLabel) ? 'ok' : /^(Завантаження|Зберігається)/.test(statusLabel) ? 'busy' : 'idle';
-  // Manager, save state and exports: in the top bar when the window is wide, in the side pocket otherwise (never both).
+  // Manager, exports and the real save state live in the first card of the side panel (never duplicated in the top bar).
   const controls = (
-    <div className="daily-controls" data-dd="plum">
+    <section className="side-card side-card--controls" data-dd="plum">
+      <label id="daily-manager-label">Менеджер</label>
       <div className="daily-manager">
         <Select
-          value={name} onChange={setName} placeholder="Оберіть менеджера" side="left" ariaLabel="Менеджер"
+          value={name} onChange={setName} placeholder="Оберіть менеджера" ariaLabel="Менеджер"
           options={[{ value: '', label: 'Не обрано' }, ...profiles.map((p) => ({ value: profileLabel(p), label: profileLabel(p) }))]}
         />
       </div>
-      <span className={'daily-save-state daily-save-state--' + saveTone} role="status" aria-live="polite">{statusLabel}</span>
       {!capturing && (
         <>
-          <button type="button" className="btn" onClick={exportPDF}><ActionIcon name="download" size={18} /> PDF</button>
-          <button type="button" className="btn" onClick={handleExportJPEG} disabled={exportingJPEG}>
-            {exportingJPEG ? '...' : <><ActionIcon name="download" size={18} /> JPEG</>}
-          </button>
+          <label className="side-card-sub">Експорт</label>
+          <div className="export">
+            <button type="button" className="btn" onClick={exportPDF}><ActionIcon name="download" size={18} /> PDF</button>
+            <button type="button" className="btn" onClick={handleExportJPEG} disabled={exportingJPEG}>
+              {exportingJPEG ? '...' : <><ActionIcon name="download" size={18} /> JPEG</>}
+            </button>
+          </div>
         </>
       )}
-    </div>
+      <p className={'daily-save-state daily-save-state--' + saveTone} role="status" aria-live="polite">{statusLabel}</p>
+    </section>
   );
 
   return (
     <div className="report-page daily-report-page daily-report-design" data-dd="plum" ref={pageRef}>
-      {wide && toolbarSlot && createPortal(controls, toolbarSlot)}
-      <div className="folder-shell">
-        {!capturing && <ReportTypeSwitcher />}
-        <div className="folder-cover">
-        <div className="folder-sheet">
+      {!capturing && <ReportTypeSwitcher />}
+      <div className="report-grid">
+      <div className="main-sheet">
       <DailyReportHero
         year={period.year}
         month={period.month}
@@ -449,16 +432,15 @@ export default function DailyCreate() {
         onChangeMonth={handleMonthNav}
       />
 
-      <div className="rpt-layout">
         <div className="folder-main">
           <section className="report-section folder-section">
             <div className="stitle">
-              <span className="section-tab">
-                <span className="stitle-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} />
+              <h2 className="section-tab">
+                <img className="section-asset" src={contactsIcon} alt="" />
                 Клієнти <b className="section-count">{clients.length}</b>
-              </span>
+              </h2>
               {!capturing && (
-                <button type="button" className="btn stitle-filter" onClick={() => setClientModal('new')}>
+                <button type="button" className="btn btn-p stitle-filter" onClick={() => setClientModal('new')}>
                   <ActionIcon name="create" size={18} /> Додати клієнта
                 </button>
               )}
@@ -472,7 +454,7 @@ export default function DailyCreate() {
                   <div>Статус</div>
                   <div>Платформа</div>
                   <div>Назва угоди</div>
-                  <div />
+                  <div className="client-grid-head-actions">Дії</div>
                 </div>
                 {clients.map((item) => {
                   const brandColor = item.platform ? platformColor(item.platform) : null;
@@ -574,12 +556,12 @@ export default function DailyCreate() {
 
           <section className="report-section folder-section">
             <div className="stitle">
-              <span className="section-tab">
-                <span className="stitle-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Задачі'] }} />
+              <h2 className="section-tab">
+                <img className="section-asset" src={taskManagerIcon} alt="" />
                 Задачі на сьогодні {managerEmail && !tasksLoading && <b className="section-count">{salesTasks.length}</b>}
-              </span>
+              </h2>
               {!capturing && managerEmail && salesDeptId && (
-                <button type="button" className="btn stitle-filter" onClick={() => setTaskFormOpen(true)}>
+                <button type="button" className="btn btn-p stitle-filter" onClick={() => setTaskFormOpen(true)}>
                   <ActionIcon name="create" size={18} /> Додати задачу
                 </button>
               )}
@@ -598,7 +580,7 @@ export default function DailyCreate() {
                       <div>Задача</div>
                       <div>Статус</div>
                       <div>Підзадачі</div>
-                      <div />
+                      <div className="client-grid-head-actions">Дії</div>
                     </div>
                     {salesTasks.map((task) => {
                       const done = task.status === 'done';
@@ -709,36 +691,29 @@ export default function DailyCreate() {
           </section>
         </div>
 
-        <aside className="side-pocket-col">
-          {!(wide && toolbarSlot) && (
-            <div className="side-pocket pocket-controls">
-              <h3>Менеджер і експорт</h3>
-              {controls}
-            </div>
-          )}
-          <div className="side-pocket pocket-summary">
-            <h3>Підсумок за {period.day} {MONTH_GENITIVE[period.month - 1]}</h3>
-            <div className="summary-stats">
-              <div><b>{clientsAdded}</b><span>клієнтів додано</span></div>
-              <div><b>{tasksDoneCount}</b><span>задач виконано</span></div>
-              <div><b>{tasksPendingCount}</b><span>в очікуванні</span></div>
-            </div>
-            <p className="summary-meta">Менеджер: <b>{name || 'не обрано'}</b> · {fmtDate(period.year, period.month, period.day)}</p>
-          </div>
-          <div className="side-pocket pocket-progress">
-            <h3>Прогрес за місяць</h3>
+        </div>
+
+        <aside className="side-pocket">
+          {controls}
+          <section className="side-card pocket-summary">
+            <h3>Підсумок за {fmtDate(period.year, period.month, period.day)}</h3>
+            <div className="stat"><span>Клієнти</span><b>{clientsAdded}</b></div>
+            <div className="stat"><span>Виконано задач</span><b>{tasksDoneCount}</b></div>
+            <div className="stat"><span>В очікуванні</span><b>{tasksPendingCount}</b></div>
+            <hr className="divider" />
+            <h4>Заповненість місяця</h4>
             <div className="progress-row">
               <ProgressRing stats={monthFillStats} />
               <ul className="progress-legend">
                 <li className="done"><span>Внесено</span><b>{monthFillStats.done}</b></li>
                 <li className="over"><span>Прострочено</span><b>{monthFillStats.over}</b></li>
                 <li className="future"><span>Ще не настав</span><b>{monthFillStats.future}</b></li>
-                <li className="total"><span>Всього ({MONTH_NAMES[period.month - 1].toLowerCase()})</span><b>{monthFillStats.total}</b></li>
               </ul>
             </div>
-          </div>
+            <p className="progress-total">Всього днів ({MONTH_NAMES[period.month - 1].toLowerCase()}): <b>{monthFillStats.total}</b></p>
+          </section>
           {hasArchive && (
-            <div className="side-pocket pocket-archive">
+            <section className="side-card pocket-archive">
               <h3>Архів (до оновлення)</h3>
               <p className="archive-note">Збережено до переходу на новий рушій задач — лише перегляд.</p>
               {done.filter((d) => d.text?.trim()).length > 0 && (
@@ -753,12 +728,9 @@ export default function DailyCreate() {
                   <ul className="archive-list">{plans.filter((p) => p.text?.trim()).map((p) => <li key={p.id}>{p.text}</li>)}</ul>
                 </>
               )}
-            </div>
+            </section>
           )}
         </aside>
-      </div>
-        </div>
-        </div>
       </div>
 
       {viewTask && (

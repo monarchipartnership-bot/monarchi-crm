@@ -103,6 +103,19 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
             </div>
           </div>
 
+          <div className="modal-field">
+            <div className="modal-field-head">
+              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
+              <div>
+                <label>Статус</label>
+                <p>Встановіть поточний статус клієнта</p>
+              </div>
+            </div>
+            <div className="modal-field-control">
+              <Select value={leadType} onChange={setLeadType} options={STATUSES.map((s) => ({ value: s, label: s }))} />
+            </div>
+          </div>
+
           {platform === 'Upwork' && (
             <div className="modal-field">
               <div className="modal-field-head">
@@ -120,35 +133,9 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
 
           <div className="modal-field">
             <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
-              <div>
-                <label>Канал (Source)</label>
-                <p>Звідки прийшов лід; потрібного каналу немає — додайте його в списку</p>
-              </div>
-            </div>
-            <div className="modal-field-control">
-              <LeadChannelSelect value={channel} onChange={setChannel} />
-            </div>
-          </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
-              <div>
-                <label>Статус</label>
-                <p>Встановіть поточний статус клієнта</p>
-              </div>
-            </div>
-            <div className="modal-field-control">
-              <Select value={leadType} onChange={setLeadType} options={STATUSES.map((s) => ({ value: s, label: s }))} />
-            </div>
-          </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
               <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
               <div>
-                <label>Ім'я клієнта</label>
+                <label>Ім'я клієнта *</label>
                 <p>Назва компанії або ім'я замовника</p>
               </div>
             </div>
@@ -165,6 +152,19 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
                   if (c.status) setLeadType(c.status);
                 }}
               />
+            </div>
+          </div>
+
+          <div className="modal-field">
+            <div className="modal-field-head">
+              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
+              <div>
+                <label>Канал (Source)</label>
+                <p>Звідки прийшов лід; потрібного каналу немає — додайте його в списку</p>
+              </div>
+            </div>
+            <div className="modal-field-control">
+              <LeadChannelSelect value={channel} onChange={setChannel} />
             </div>
           </div>
 
