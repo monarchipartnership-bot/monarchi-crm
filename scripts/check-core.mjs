@@ -195,4 +195,97 @@ await ok('agent sign-in: returns a token, explains a missing setup, and reports 
   await assert.rejects(() => signInAgent({ email: 'a@b.c', password: 'p', makeClient: () => bad }), /Invalid login/);
 });
 
+// ---- The project agent's run (in-memory database, stub platforms)
+const { runProjectReport } = await import('../api/_lib/projectAgentRun.js');
+const { describeDynamics } = await import('../src/lib/reportDynamics.js');
+
+function fakeRepo({ agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, locked = true, existingDeck = null } = {}) {
+  const log = { runs: [], events: [], reports: [], decks: [], health: [], unlocked: 0 };
+  return {
+    log,
+    startRun: async (r) => { const run = { id: 1, started_at: '2026-10-09T00:00:00Z', ...r }; log.runs.push(run); return run; },
+    finishRun: async (id, patch) => { log.runs[0] = { ...log.runs[0], ...patch }; },
+    costSince: async () => 0.004,
+    getAgent: async () => agent,
+    tryLock: async () => locked,
+    unlock: async () => { log.unlocked += 1; },
+    setAgentHealth: async (id, patch) => { log.health.push(patch); },
+    addEvent: async (e) => { log.events.push(e); },
+    getProject: async () => ({ id: 3, name: 'Mellowdiamond', business_type: null }),
+    getAccounts: async () => accounts,
+    getGroups: async () => [],
+    getCustomMetrics: async () => [],
+    getReport: async () => existingReport,
+    getReports: async () => [],
+    saveReport: async ({ projectId, periodType, period, source, status, data }) => { const row = { id: 11, project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, source, status, data }; log.reports.push(row); return row; },
+    getDeck: async () => existingDeck,
+    saveDeck: async (d) => { log.decks.push(d); return { id: 21 + log.decks.length }; },
+  };
+}
+
+await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {
+  const platforms = { meta: { currency: 'USD', total: { spend: 1200, impressions: 100000, clicks: 3000, purchases: 20, revenue: 4800, leads: 0 } } };
+  const previous = { period: { start: '2026-09-24', end: '2026-09-30' }, platforms: { meta: { total: { spend: 1000, impressions: 90000, clicks: 2700, purchases: 25, revenue: 4500, leads: 0 } } } };
+  const t = describeDynamics({ platforms, previous, kind: 'ecom', names: { meta: 'Meta Ads' } });
+  assert.match(t, /^Meta Ads: compared with 24\.09–30\.09, /);
+  assert.match(t, /ad spend rose by 20% to \$1,200/);
+  assert.match(t, /sales fell by 20% to 20/);
+  assert.match(t, /CTR remained stable|Ctr remained stable|CTR/);
+  assert.doesNotMatch(t, /good|bad|improv|worse|success|because/i);
+  const u = describeDynamics({ platforms, previous, kind: 'ecom', names: { meta: 'Meta Ads' }, unequal: true });
+  assert.doesNotMatch(u, /ad spend rose/);
+  assert.match(u, /differ in length/);
+  assert.match(describeDynamics({ platforms, previous: null, kind: 'ecom', names: { meta: 'Meta Ads' } }), /during the period, ad spend was \$1,200/);
+  assert.match(describeDynamics({ platforms: { google: { total: { spend: 0, impressions: 0, clicks: 0 } } }, previous: null, names: { google: 'Google Ads' } }), /no ad delivery/);
+});
+
+await ok('agent run: makes a draft report with the dynamics text, a deck, an event, and unlocks', async () => {
+  const repo = fakeRepo();
+  const r = await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
+  assert.equal(r.status, 'ok');
+  assert.equal(repo.log.reports[0].source, 'agent');
+  assert.equal(repo.log.reports[0].status, 'draft');
+  assert.match(repo.log.reports[0].data.sections.conclusion, /^Meta Ads: /);
+  assert.equal(repo.log.reports[0].data.sections.plans, '');
+  assert.match(repo.log.reports[0].data.sections.whatWasDone, /Test RTS/);
+  assert.equal(repo.log.decks.length, 1);
+  assert.equal(repo.log.decks[0].platform, 'meta');
+  assert.ok(repo.log.decks[0].deck.slides.length >= 5);
+  assert.ok(repo.log.events.some((e) => e.kind === 'report_created' && e.status === 'ok'));
+  assert.equal(repo.log.runs[0].status, 'ok');
+  assert.equal(repo.log.unlocked, 1);
+});
+await ok('agent run: a report made by hand or already reviewed is never touched', async () => {
+  const repo = fakeRepo({ existingReport: { id: 5, source: 'manual', status: 'draft' } });
+  const r = await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(r.status, 'skipped');
+  assert.equal(repo.log.reports.length, 0);
+  const reviewed = fakeRepo({ existingReport: { id: 5, source: 'agent', status: 'reviewed' } });
+  assert.equal((await runProjectReport({ repo: reviewed, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' })).status, 'skipped');
+});
+await ok('agent run: an earlier agent draft is regenerated; a hand-made deck is kept', async () => {
+  const repo = fakeRepo({ existingReport: { id: 5, source: 'agent', status: 'draft' }, existingDeck: { id: 9, source: 'manual' } });
+  const r = await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(r.status, 'ok');
+  assert.equal(repo.log.reports.length, 1);
+  assert.equal(repo.log.decks.length, 0);
+  assert.ok(r.notes.some((n) => /створена вручну/.test(n)));
+});
+await ok('agent run: skips when another run holds the project, or when the cron finds it switched off', async () => {
+  assert.equal((await runProjectReport({ repo: fakeRepo({ locked: false }), post, projectId: 3, periodType: 'weekly', today: '2026-10-15' })).status, 'skipped');
+  const off = fakeRepo({ agent: { enabled: false, config: {} } });
+  assert.equal((await runProjectReport({ repo: off, post, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' })).status, 'skipped');
+  assert.equal(off.log.unlocked, 0);
+});
+await ok('agent run: when no platform answers it ends as a problem, says why, marks the agent unhealthy and still unlocks', async () => {
+  const repo = fakeRepo();
+  const broken = async () => { throw new Error('Сесія недійсна'); };
+  const r = await runProjectReport({ repo, post: broken, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(r.status, 'problem');
+  assert.match(r.message, /Не вдалося отримати дані/);
+  assert.equal(repo.log.reports.length, 0);
+  assert.equal(repo.log.health.at(-1).health, 'problem');
+  assert.equal(repo.log.unlocked, 1);
+});
+
 console.log(`\n${passed} checks passed`);

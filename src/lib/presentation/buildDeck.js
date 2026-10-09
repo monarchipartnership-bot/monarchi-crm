@@ -6,7 +6,7 @@ import { METRIC_SETS, computeMetric, deltaPct, metricMeta } from '../reportMetri
 import { visibleKeys } from '../periodReport.js';
 import { text, listText } from './textModel.js';
 import { paginateBlocks } from './textFit.js';
-import { emptyDeck, labels, periodLabel, platformName, uid } from './deckModel.js';
+import { PLATFORMS, emptyDeck, labels, periodLabel, platformName, uid } from './deckModel.js';
 
 // How much fits on one slide (the editor still warns when a manual edit overflows).
 export const PER_PAGE = { metricslist: 12, kpigrid: 6, tableRows: 8, tableCols: 4, dynamics: 8, listItems: 8 };
@@ -58,8 +58,10 @@ export function paginateLines(lines, style) {
   return paginateBlocks('list', lines.map(stripMarker).filter(Boolean), style, PER_PAGE.listItems);
 }
 
-export function paginateParagraphs(str, style) {
-  const paras = String(str || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+// A paragraph that starts with another platform's name ("Google Ads: ...") belongs to that platform's deck, not this one.
+export function paginateParagraphs(str, style, platform) {
+  const others = PLATFORMS.filter((p) => p.id !== platform).map((p) => p.name + ':');
+  const paras = String(str || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).filter((l) => !platform || !others.some((o) => l.startsWith(o)));
   return paginateBlocks('paragraph', paras, style);
 }
 
@@ -169,7 +171,7 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
     pages.forEach((page, i) => slides.push({ id: uid(), type: 'bullets', data: { heading: text(withPart(title, i, pages.length, L)), list: listText(page, 'bullet') } }));
   };
   addList(L.whatWasDone, sec.whatWasDone);
-  const concl = paginateParagraphs(sec.conclusion, style);
+  const concl = paginateParagraphs(sec.conclusion, style, platform);
   if (concl.length) {
     toc.push(L.conclusion);
     concl.forEach((page, i) => slides.push({ id: uid(), type: 'paragraph', data: { heading: text(withPart(L.conclusion, i, concl.length, L)), body: { paras: page.map((p) => ({ runs: [{ t: p }] })) } } }));

@@ -9,10 +9,12 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import '../../../styles/projectAgent.css';
 import Select from '../../common/Select';
 import TimePicker from '../../common/TimePicker';
+import { authedPost } from '../../../lib/adAccounts';
 
-// While false the tab only prepares the ground: switch, settings and history are real and saved,
-// but nothing executes them yet. Flip to true when the agent's runner is live.
-export const AGENT_RUNNER_READY = false;
+// «Запустити зараз» works (the agent makes a draft report and presentation on request). While this is false the
+// agent does not yet start by itself on the schedule from the settings. Flip it when the scheduler is live.
+export const AGENT_SCHEDULE_READY = false;
+const RUN_TYPES = [{ value: 'weekly', label: 'Тижневий звіт' }, { value: 'monthly', label: 'Місячний звіт' }];
 
 const DAYS = [[1, 'Понеділок'], [2, 'Вівторок'], [3, 'Середа'], [4, 'Четвер'], [5, 'Пʼятниця'], [6, 'Субота'], [7, 'Неділя']];
 const TASKS = [
@@ -66,6 +68,8 @@ export default function ProjectAgentTab({ projectId }) {
   const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
+  const [runType, setRunType] = useState('weekly');
+  const [runResult, setRunResult] = useState(null);
 
   const load = useCallback(async () => {
     const [{ agent: a, missing: m }, accs, ev] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId)]);
@@ -109,6 +113,14 @@ export default function ProjectAgentTab({ projectId }) {
     const changed = describeChanges(agent.config || {}, form);
     await updateAgent(projectId, { config: form });
     await addAgentEvent({ projectId, kind: 'config_changed', status: 'info', message: changed.length ? `Змінено налаштування: ${changed.join(', ')}.` : 'Налаштування збережено.', details: { changed }, createdBy: email });
+  });
+
+  // The agent works as its own user on the server and answers when it is done (up to a few minutes).
+  const runNow = () => run('run', async () => {
+    if (dirty) throw new Error('Спершу збережіть налаштування, потім запускайте агента.');
+    setRunResult(null);
+    const res = await authedPost('/api/project-agent-run', { projectId: Number(projectId), periodType: runType });
+    setRunResult(res);
   });
 
   const disconnect = async () => {
@@ -156,8 +168,26 @@ export default function ProjectAgentTab({ projectId }) {
           {!agent && <button type="button" className="btn btn-p" onClick={connect} disabled={busy === 'connect' || missing}>{busy === 'connect' ? 'Підключаємо…' : 'Підключити агента'}</button>}
         </div>
         {agent?.health === 'problem' && agent.last_error && <div className="pacc-err pag-error">Остання помилка: {agent.last_error}</div>}
-        {!AGENT_RUNNER_READY && (
-          <div className="pacc-hint pag-hint">Виконавець агента ще не підключений: перемикач, налаштування й історія вже зберігаються, а самі дії зʼявляться в історії, коли агент запрацює.</div>
+        {agent && (
+          <div className="pag-run">
+            <div className="pag-run-head">Запустити зараз</div>
+            <div className="pag-run-row">
+              <Select value={runType} onChange={setRunType} ariaLabel="Який звіт зробити" options={RUN_TYPES} />
+              <button type="button" className="btn btn-p" onClick={runNow} disabled={busy === 'run' || missing}>{busy === 'run' ? 'Агент працює…' : 'Створити чернетку'}</button>
+            </div>
+            <div className="pacc-hint">Агент збере цифри з кабінетів за останній завершений період, напише текст і підготує презентацію. Усе зберігається як чернетка: ви перевіряєте її у вкладках звітів і презентацій.</div>
+            {busy === 'run' && <div className="pacc-hint">Це може тривати до хвилини-двох: агент читає кабінети й історію змін.</div>}
+            {runResult && (
+              <div className={'pag-run-result pag-run-result--' + runResult.status} role="status">
+                <b>{runResult.status === 'ok' ? 'Готово' : runResult.status === 'skipped' ? 'Пропущено' : 'Не вдалося'}.</b> {runResult.message}
+                {runResult.costUsd > 0 && <span className="pacc-hint"> Вартість запуску: ≈ ${Number(runResult.costUsd).toFixed(3)}.</span>}
+                {runResult.notes?.length > 0 && <ul>{runResult.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+              </div>
+            )}
+          </div>
+        )}
+        {!AGENT_SCHEDULE_READY && (
+          <div className="pacc-hint pag-hint">Запуск за розкладом ще не ввімкнено: поки агент працює лише за кнопкою «Створити чернетку». Перемикач і розклад збережуться й почнуть діяти, коли запуск за розкладом буде ввімкнено.</div>
         )}
         {message && <div className="pacc-err pag-error">{message}</div>}
       </section>

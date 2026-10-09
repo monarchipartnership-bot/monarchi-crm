@@ -64,3 +64,14 @@
 .pacc-chip--ok { background: #DCFCE7; color: #166534; border-color: #BBF7D0; }
 .pacc-chip--bad { background: #FEE2E2; color: #991B1B; border-color: #FECACA; }
 .pacc-chip--muted { background: #F3F4F6; color: #4B5563; border-color: #E5E7EB; }
+
+/* «Запустити зараз» */
+.pag-run { margin-top: 18px; padding-top: 18px; border-top: 1px solid #EFE5F3; display: flex; flex-direction: column; gap: 10px; }
+.pag-run-head { font-weight: 700; font-size: 14px; color: #2E1037; }
+.pag-run-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.pag-run-row .ui-select { width: 230px; max-width: 100%; }
+.pag-run-result { border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.6; background: #F3EDF7; color: #45204F; }
+.pag-run-result--ok { background: #E9F6EE; color: #28764A; }
+.pag-run-result--problem { background: #FDE9EE; color: #A9425D; }
+.pag-run-result--skipped { background: #FFF3DF; color: #94622C; }
+.pag-run-result ul { margin: 6px 0 0; padding-left: 18px; }
