@@ -51,7 +51,7 @@
 }
 .daily-report-design .report-type-card {
   --tab-shape: var(--shape-tab-t1); --tab-lift: 6px;
-  position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; min-height: 52px; margin: 0 0 0 -26px; padding: 0 46px;
+  position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; min-height: 58px; margin: 0 0 0 -34px; padding: 0 62px;
   margin-top: var(--tab-lift); background: none; border: 0; border-radius: 0; box-shadow: none; z-index: 1;
   color: var(--d-ink); font: 500 15px/1.2 'Onest', sans-serif; text-decoration: none; transition: filter var(--d-ease);
 }
@@ -60,30 +60,30 @@
   content: ''; position: absolute; z-index: -1; inset: 0; border: 0 solid transparent; border-width: 0 28px;
   border-image: var(--tab-shape) 0 28 fill / 0 28px stretch; filter: drop-shadow(0 -1px 0 #ffffff55);
 }
-.daily-report-design .report-type-card:nth-child(1) { --tab-shape: var(--shape-tab-active); z-index: 5; --tab-lift: 0px; min-height: 60px; }
+.daily-report-design .report-type-card:nth-child(1) { --tab-shape: var(--shape-tab-active); z-index: 5; --tab-lift: 0px; min-height: 68px; }
 .daily-report-design .report-type-card:nth-child(2) { --tab-shape: var(--shape-tab-t1); z-index: 4; --tab-lift: 8px; }
 .daily-report-design .report-type-card:nth-child(3) { --tab-shape: var(--shape-tab-t2); z-index: 3; --tab-lift: 5px; }
 .daily-report-design .report-type-card:nth-child(4) { --tab-shape: var(--shape-tab-t3); z-index: 2; --tab-lift: 9px; }
 .daily-report-design .report-type-card:nth-child(5) { --tab-shape: var(--shape-tab-t4); z-index: 1; --tab-lift: 6px; }
-.daily-report-design .report-type-card.active { --tab-shape: var(--shape-tab-active); --tab-lift: 0px; min-height: 60px; z-index: 9; font-weight: 650; padding-bottom: 4px; }
+.daily-report-design .report-type-card.active { --tab-shape: var(--shape-tab-active); --tab-lift: 0px; min-height: 68px; z-index: 9; font-weight: 650; padding-bottom: 4px; }
 .daily-report-design .report-type-card:hover:not(.active) { filter: brightness(1.05); transform: none; }
 .daily-report-design .report-type-card::after { content: none; }
 .daily-report-design .report-type-card-icon { display: none; }
-.daily-report-design .report-type-card-label { position: relative; font-size: 15px; white-space: nowrap; padding-top: 2px; }
-.daily-report-design .report-type-card.active .report-type-card-label { font-size: 18px; padding-top: 0; }
+.daily-report-design .report-type-card-label { position: relative; font-size: 16px; font-weight: 600; white-space: nowrap; padding-top: 2px; }
+.daily-report-design .report-type-card.active .report-type-card-label { font-size: 19px; font-weight: 700; padding-top: 0; }
 
 .daily-report-design .folder-cover {
-  position: relative; isolation: isolate; margin-top: -22px; padding: 14px 14px 22px 20px; min-width: 0;
-  background: linear-gradient(180deg, #A261B5, #86429A 55%, #77347F); border-radius: 28px; box-shadow: 0 18px 24px -6px #52185D47, inset 0 1px 0 #C79AD6;
+  position: relative; isolation: isolate; margin-top: -22px; padding: 12px 12px 18px 16px; min-width: 0;
+  background: linear-gradient(180deg, #B88BC9, #9B5BB0 40%, #8A47A0); border-radius: 30px; box-shadow: 0 22px 30px -10px #52185D40, inset 0 1px 0 #D7B3E3;
 }
 .daily-report-design .folder-cover::before { /* the lavender middle layer */
-  content: ''; position: absolute; z-index: -1; top: 0; left: 11px; right: 7px; bottom: 11px; border-radius: 26px 22px 24px 24px;
-  background: linear-gradient(180deg, #E5CDF4, #EAD5F4 60%, #E3CDF1); box-shadow: inset 0 1px 0 #F6ECFB;
+  content: ''; position: absolute; z-index: -1; top: 0; left: 8px; right: 6px; bottom: 8px; border-radius: 28px;
+  background: linear-gradient(180deg, #ECDCF8, #EEE0FA 60%, #E8D7F5); box-shadow: inset 0 1px 0 #F6ECFB;
 }
 .daily-report-design .folder-sheet {
   position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) 304px; grid-template-areas: 'top top' 'days pocket' 'main pocket'; column-gap: 24px; align-items: start;
-  background: linear-gradient(180deg, #FCF8FE, #F9F3FB); border-radius: 22px; padding: 26px 26px 30px; min-width: 0;
-  box-shadow: 0 -1px 0 #F6ECFB, 0 4px 16px #52185D1F, inset 0 1px 0 #fff;
+  background: linear-gradient(180deg, #FCF8FE, #F9F3FB); border-radius: 24px; padding: 28px 28px 32px; min-width: 0;
+  box-shadow: 0 5px 18px #52185D1A, inset 0 1px 0 #fff;
 }
 
 /* ---------- calendar ---------- */
@@ -136,13 +136,13 @@
 /* nested sheets: lavender back leaf with a darker top edge, the white front surface, and a shaped shoulder on the left that holds the
    title and the counter; the Add button sits on the back leaf at the right */
 .daily-report-design .report-section.folder-section {
-  position: relative; margin: 54px 0 0; padding: 14px; min-width: 0; background: #FDFBFF; border: 1px solid #E6DAEF; border-radius: 6px 16px 16px 16px;
+  position: relative; margin: 54px 0 0; padding: 14px; min-width: 0; background: #FDFBFF; border: 1px solid #EEE5F5; border-radius: 6px 16px 16px 16px;
   box-shadow: 0 6px 16px #52185D12, inset 0 1px 0 #fff;
 }
 .daily-report-design .folder-main > .folder-section:first-child { margin-top: 50px; }
 .daily-report-design .folder-section::before { /* back leaf */
-  content: ''; position: absolute; z-index: -1; top: -40px; left: -6px; right: -7px; bottom: -8px; border-radius: 18px 20px 20px 20px;
-  background: linear-gradient(180deg, #E8D5F4, #D9C7E8 70%, #D2C0E3); border: 1px solid #C79AD6; border-bottom-color: #CDB7E0; box-shadow: 0 8px 14px #52185D14;
+  content: ''; position: absolute; z-index: -1; top: -40px; left: -4px; right: -5px; bottom: -5px; border-radius: 18px 20px 20px 20px;
+  background: linear-gradient(180deg, #EBDCF6, #E2D2F0 70%, #DCCBEC); border: 1px solid #D4B9E4; box-shadow: 0 6px 12px #52185D10;
 }
 .daily-report-design .folder-section .stitle {
   position: absolute; z-index: 1; left: -1px; right: -1px; top: -39px; height: 40px; margin: 0; padding: 0; display: flex; align-items: stretch; justify-content: space-between; gap: 12px; pointer-events: none;
