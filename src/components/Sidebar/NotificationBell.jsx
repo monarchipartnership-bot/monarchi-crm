@@ -47,6 +47,9 @@ function plainDescribe(n) {
   const rows = taskFieldRows(n).map((r) => `${r.label}: ${r.value}`);
   if (n.task_scheduled_at) rows.push(`Дата: ${fmtDateOnly(n.task_scheduled_at)}`, `Час: ${fmtTimeOnly(n.task_scheduled_at)}`);
   switch (n.type) {
+    case 'project_report':
+    case 'project_agent_problem':
+      return { title: n.title || 'Проєкт', body: n.body || '' };
     case 'assigned':
       return { title: 'Нова задача', body: rows.join('\n') };
     case 'reminder_due':
@@ -127,6 +130,20 @@ function describe(n) {
         title: n.type === 'assigned' ? 'Нова задача' : 'Нагадування про задачу',
         body: taskBody(n),
         to: taskLink(n),
+      };
+    }
+    case 'project_report':
+    case 'project_agent_problem': {
+      const problem = n.type === 'project_agent_problem';
+      const color = problem ? '#DC2626' : '#682768';
+      const tint = problem ? '#FEE2E2' : '#F3E8F9';
+      return {
+        iconNode: <span dangerouslySetInnerHTML={{ __html: problem ? FIELD_ICONS.thermometer : FIELD_ICONS.barChart }} />,
+        accentColor: color, tintColor: tint,
+        badge: { label: problem ? 'Проблема' : 'AI-агент', color, tint },
+        title: n.title || 'Проєкт',
+        body: <div className="notif-card__fields"><div className="notif-card__field"><span>{n.body}</span></div></div>,
+        to: n.link || (n.project_id ? `/projects/${n.project_id}` : null),
       };
     }
     case 'mention':

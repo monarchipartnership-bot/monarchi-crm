@@ -13,6 +13,7 @@ export const DEFAULT_AGENT_CONFIG = {
   deck: { style: 'brand-pulse', lang: 'en' },
   schedule: { weeklyDay: 1, weeklyTime: '09:00', monthlyDay: 1, monthlyTime: '09:00' },
   notify: true,
+  notifyEmails: [], // who gets the notification (emails of CRM users)
   note: '',
 };
 

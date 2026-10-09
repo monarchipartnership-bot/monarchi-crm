@@ -40,6 +40,17 @@ export function createAgentRepo(db, agentEmail) {
       must(await db.from('project_agent_events').insert({ project_id: projectId, actor: 'agent', kind, status, message, details, created_by: agentEmail }));
     },
 
+    // ---- notifications (the common bell)
+    async addNotifications(rows) {
+      if (!rows.length) return;
+      must(await db.from('notifications').insert(rows.map((r) => ({ ...r, sender_email: agentEmail }))));
+    },
+    async hasRecentNotification(projectId, type, hours) {
+      const since = new Date(Date.now() - hours * 3600000).toISOString();
+      const rows = must(await db.from('notifications').select('id').eq('project_id', projectId).eq('type', type).eq('read', false).gte('created_at', since).limit(1));
+      return Boolean(rows?.length);
+    },
+
     // ---- what the scheduler needs
     async listEnabledAgents() {
       return must(await db.from('project_agents').select('*').eq('enabled', true)) || [];

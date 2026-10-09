@@ -11,6 +11,7 @@ import Select from '../../common/Select';
 import TimePicker from '../../common/TimePicker';
 import { authedPost } from '../../../lib/adAccounts';
 import { nextScheduled } from '../../../lib/agentSchedule';
+import { fetchAllProfiles, profileLabel } from '../../../lib/api/profile';
 
 // «Запустити зараз» makes a draft report on request; with the switch on, the scheduler (cron, api/agent-tick.js)
 // also starts the reports by the schedule from the settings. Keep false only if the cron is turned off.
@@ -53,8 +54,16 @@ function describeChanges(before, after) {
   if (!sameJson(before.deck, after.deck)) out.push('стиль і мова презентації');
   if (!sameJson(before.schedule, after.schedule)) out.push('розклад');
   if (before.notify !== after.notify) out.push('сповіщення');
+  if (JSON.stringify([...(before.notifyEmails || [])].sort()) !== JSON.stringify([...(after.notifyEmails || [])].sort())) out.push('кому надсилати сповіщення');
   if ((before.note || '') !== (after.note || '')) out.push('нотатка для агента');
   return out;
+}
+
+// Everyone who can be picked: the CRM users with a profile, plus anyone already chosen who has none yet.
+function recipientChoices(people, chosen) {
+  const known = new Map(people.map((p) => [String(p.email).toLowerCase(), { email: String(p.email).toLowerCase(), label: profileLabel(p) }]));
+  (chosen || []).forEach((e) => { if (!known.has(e)) known.set(e, { email: e, label: e }); });
+  return [...known.values()].sort((a, b) => a.label.localeCompare(b.label, 'uk'));
 }
 
 // «Далі: тижневий — пн 12.10 о 09:00» for every report the agent is set to make.
@@ -85,11 +94,13 @@ export default function ProjectAgentTab({ projectId }) {
   const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
+  const [people, setPeople] = useState([]); // CRM users who can be picked to get the notifications
   const [runType, setRunType] = useState('weekly');
   const [runResult, setRunResult] = useState(null);
 
   const load = useCallback(async () => {
-    const [{ agent: a, missing: m }, accs, ev] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId)]);
+    const [{ agent: a, missing: m }, accs, ev, profiles] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles()]);
+    setPeople(profiles);
     setAgent(a);
     setMissing(m);
     setAccounts(accs);
@@ -114,7 +125,7 @@ export default function ProjectAgentTab({ projectId }) {
   }
 
   const connect = () => run('connect', async () => {
-    const cfg = { ...DEFAULT_AGENT_CONFIG, platforms: linked };
+    const cfg = { ...DEFAULT_AGENT_CONFIG, platforms: linked, notifyEmails: email ? [email.toLowerCase()] : [] };
     await connectAgent(projectId, cfg, email);
     await addAgentEvent({ projectId, kind: 'connected', status: 'ok', message: 'Агента підключено до проєкту (вимкнений, чекає налаштування).', createdBy: email });
   });
@@ -122,6 +133,7 @@ export default function ProjectAgentTab({ projectId }) {
   const setEnabled = (on) => run('toggle', async () => {
     if (on && (!form.platforms.length || !Object.values(form.tasks).some(Boolean))) throw new Error('Перед вмиканням оберіть, що робить агент і на яких платформах.');
     if (on && dirty) throw new Error('Спершу збережіть налаштування, потім вмикайте агента.');
+    if (on && form.notify && !(form.notifyEmails || []).length) throw new Error('Оберіть, кому надсилати сповіщення про готові звіти, або вимкніть сповіщення.');
     // enabled_since: the scheduler only starts reports whose scheduled moment came after the agent was switched on.
     await updateAgent(projectId, { enabled: on, enabled_since: on ? new Date().toISOString() : null, ...(on ? {} : { run_state: 'idle' }) });
     await addAgentEvent({ projectId, kind: on ? 'enabled' : 'disabled', status: 'info', message: on ? 'Агента ввімкнено.' : 'Агента вимкнено.', createdBy: email });
@@ -288,10 +300,25 @@ export default function ProjectAgentTab({ projectId }) {
                 </label>
                 <label className="pag-check">
                   <input type="checkbox" checked={form.notify} onChange={(e) => setCfg({ notify: e.target.checked })} />
-                  <span><b>Сповістити менеджера, що звіт готовий</b></span>
+                  <span><b>Сповістити, що звіт готовий (або що агент не зміг його створити)</b><small>Сповіщення зʼявляться в загальному дзвіночку CRM</small></span>
                 </label>
               </div>
             </div>
+
+            {form.notify && (
+              <div className="pag-field pag-field--wide">
+                <div className="pag-label">Кому надсилати сповіщення</div>
+                <div className="pag-checks pag-people">
+                  {recipientChoices(people, form.notifyEmails).map((p) => (
+                    <label className="pag-check" key={p.email}>
+                      <input type="checkbox" checked={(form.notifyEmails || []).includes(p.email)} onChange={() => toggleIn('notifyEmails', p.email)} />
+                      <span><b>{p.label}</b>{p.label !== p.email && <small>{p.email}</small>}</span>
+                    </label>
+                  ))}
+                </div>
+                {!(form.notifyEmails || []).length && <div className="pacc-hint">Нікого не обрано: сповіщень не буде, а увімкнути агента не вийде.</div>}
+              </div>
+            )}
 
             <div className="pag-field pag-field--wide">
               <div className="pag-label">Нотатка для агента</div>

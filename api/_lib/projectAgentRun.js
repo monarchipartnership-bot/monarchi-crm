@@ -11,11 +11,12 @@ import { PLATFORMS } from '../../src/lib/presentation/deckModel.js';
 import { computeWeeksForMonth } from '../../src/lib/dateHelpers.js';
 import { projectKind } from '../../src/lib/reportMetrics.js';
 import { describeDynamics } from '../../src/lib/reportDynamics.js';
+import { PROBLEM_QUIET_HOURS, buildNotifications } from './agentNotify.js';
 import {
   EMPTY_SECTIONS, buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload,
 } from '../../src/lib/reportEngine.js';
 
-const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '' };
+const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [] };
 const PLATFORM_NAMES = Object.fromEntries(PLATFORMS.map((p) => [p.id, p.name]));
 const LABEL = { weekly: 'тижневий', monthly: 'місячний' };
 const GENITIVE = { weekly: 'тижневого', monthly: 'місячного' };
@@ -34,10 +35,20 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
   const run = await repo.startRun({ projectId, trigger, periodType, startedBy });
   const notes = [];
   let locked = false;
+  let notifyConfig = null; // who to tell, known once the agent's settings are loaded
+  let projectName = '';
   let periodInfo = null; // set as soon as the period is known, so even a failed run says which period it was for
 
   const finish = async (status, message, extra = {}) => {
     const cost = await repo.costSince(run.started_at).catch(() => 0);
+    // Tell the chosen people (common notification bell): a draft is ready, or the agent hit a problem.
+    if (notifyConfig && (status === 'ok' || status === 'problem')) {
+      try {
+        let rows = buildNotifications({ projectId, projectName, periodType, status, message, config: notifyConfig, startedBy });
+        if (status === 'problem' && rows.length && await repo.hasRecentNotification(projectId, 'project_agent_problem', PROBLEM_QUIET_HOURS)) rows = [];
+        if (rows.length) await repo.addNotifications(rows);
+      } catch (e) { notes.push('Не вдалося надіслати сповіщення: ' + (e?.message || e)); }
+    }
     await repo.finishRun(run.id, { status, error: status === 'problem' ? message : null, cost_usd: cost, summary: { message, notes, ...extra.summary }, report_id: extra.reportId || null, deck_ids: extra.deckIds || [], period_start: extra.period?.start || null, period_end: extra.period?.end || null });
     return { status, message, runId: run.id, reportId: extra.reportId || null, deckIds: extra.deckIds || [], notes, costUsd: cost };
   };
@@ -48,6 +59,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     if (!agent) return await finish('skipped', 'До проєкту не підключено AI-агента.');
     if (trigger === 'cron' && !agent.enabled) return await finish('skipped', 'Агента вимкнено.');
     const config = { ...DEFAULT_CONFIG, ...(agent.config || {}), tasks: { ...DEFAULT_CONFIG.tasks, ...(agent.config?.tasks || {}) }, deck: { ...DEFAULT_CONFIG.deck, ...(agent.config?.deck || {}) } };
+    notifyConfig = config;
     if (trigger === 'cron' && !config.tasks[periodType === 'weekly' ? 'weeklyReport' : 'monthlyReport']) return await finish('skipped', `Агент не налаштований робити ${LABEL[periodType]} звіт.`);
 
     locked = await repo.tryLock(projectId, LEASE_MINUTES);
@@ -56,6 +68,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
 
     const [project, allAccounts, groups, custom] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId)]);
     if (!project) throw new Error('Проєкт не знайдено.');
+    projectName = project.name || '';
     const accounts = config.platforms?.length ? allAccounts.filter((a) => config.platforms.includes(a.platform)) : allAccounts;
     if (!accounts.length) throw new Error('До проєкту не підключено рекламних кабінетів' + (config.platforms?.length ? ' для обраних платформ.' : '.'));
     const kind = projectKind(project);

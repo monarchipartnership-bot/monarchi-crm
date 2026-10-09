@@ -199,14 +199,16 @@ await ok('agent sign-in: returns a token, explains a missing setup, and reports 
 const { runProjectReport } = await import('../api/_lib/projectAgentRun.js');
 const { describeDynamics } = await import('../src/lib/reportDynamics.js');
 
-function fakeRepo({ agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, locked = true, existingDeck = null } = {}) {
-  const log = { runs: [], events: [], reports: [], decks: [], health: [], unlocked: 0 };
+function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, locked = true, existingDeck = null } = {}) {
+  const log = { runs: [], events: [], reports: [], decks: [], health: [], unlocked: 0, notifications: [] };
   return {
     log,
     startRun: async (r) => { const run = { id: 1, started_at: '2026-10-09T00:00:00Z', ...r }; log.runs.push(run); return run; },
     finishRun: async (id, patch) => { log.runs[0] = { ...log.runs[0], ...patch }; },
     costSince: async () => 0.004,
     getAgent: async () => agent,
+    addNotifications: async (rows) => { log.notifications.push(...rows); },
+    hasRecentNotification: async () => recentNotice,
     tryLock: async () => locked,
     unlock: async () => { log.unlocked += 1; },
     setAgentHealth: async (id, patch) => { log.health.push(patch); },
@@ -346,6 +348,40 @@ await ok('tick: starts due reports with the scheduled day as their date, a few p
   assert.deepEqual([none.checked, none.due, none.started.length], [0, 0, 0]);
   const boom = await runDueAgents({ repo: { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [] }, now: NOW, runFor: async () => { throw new Error('x'); } });
   assert.equal(boom.started[0].status, 'problem');
+});
+
+await ok('notifications: a finished draft and a problem go to the chosen people, not to the one who started the run, and a problem is not repeated', async () => {
+  const withPeople = { enabled: true, config: { notify: true, notifyEmails: ['Boss@x.y', 'me@x.y', 'boss@x.y'] } };
+  const repo = fakeRepo({ agent: withPeople });
+  await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
+  assert.deepEqual(repo.log.notifications.map((n) => n.recipient_email), ['boss@x.y']);
+  assert.equal(repo.log.notifications[0].type, 'project_report');
+  assert.equal(repo.log.notifications[0].link, '/projects/3?tab=weekly');
+  assert.match(repo.log.notifications[0].body, /^Mellowdiamond: Створено чернетку/);
+
+  const cron = fakeRepo({ agent: withPeople });
+  await runProjectReport({ repo: cron, post, projectId: 3, periodType: 'monthly', trigger: 'cron', today: '2026-10-15' });
+  assert.equal(cron.log.notifications.length, 2);
+  assert.equal(cron.log.notifications[0].link, '/projects/3?tab=monthly');
+
+  const broken = async () => { throw new Error('Сесія недійсна'); };
+  const bad = fakeRepo({ agent: withPeople });
+  await runProjectReport({ repo: bad, post: broken, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' });
+  assert.equal(bad.log.notifications[0].type, 'project_agent_problem');
+  assert.equal(bad.log.notifications[0].link, '/projects/3?tab=agent');
+  const quiet = fakeRepo({ agent: withPeople, recentNotice: true });
+  await runProjectReport({ repo: quiet, post: broken, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' });
+  assert.equal(quiet.log.notifications.length, 0);
+
+  const off = fakeRepo({ agent: { enabled: true, config: { notify: false, notifyEmails: ['boss@x.y'] } } });
+  await runProjectReport({ repo: off, post, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' });
+  assert.equal(off.log.notifications.length, 0);
+  const nobody = fakeRepo({ agent: { enabled: true, config: {} } });
+  await runProjectReport({ repo: nobody, post, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' });
+  assert.equal(nobody.log.notifications.length, 0);
+  const skipped = fakeRepo({ agent: withPeople, existingReport: { id: 5, source: 'manual', status: 'draft' } });
+  await runProjectReport({ repo: skipped, post, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' });
+  assert.equal(skipped.log.notifications.length, 0);
 });
 
 console.log(`\n${passed} checks passed`);
