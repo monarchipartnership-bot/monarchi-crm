@@ -173,7 +173,6 @@
   position: relative; isolation: isolate; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 10px; margin-top: 0;
   background: #F6F0F8; border: 1px solid #E8DDEC; border-radius: 15px; box-shadow: var(--d-shadow);
 }
-.daily-report-design .side-pocket::before { content: ''; position: absolute; z-index: -1; top: -21px; left: 0; right: 20px; height: 24px; border: 1px solid #E8DDEC; border-bottom: 0; border-radius: 12px 12px 0 0; background: #FAF6FC; }
 .daily-report-design .side-card { padding: 18px 14px; background: #FFFAFD; border: 1px solid #EEE5F1; border-radius: 12px; box-shadow: var(--d-shadow); min-width: 0; }
 .daily-report-design .side-card h3 { margin: 0 0 16px; font: 650 16px/1.25 'Onest', sans-serif; color: var(--d-ink); }
 .daily-report-design .side-card h4 { margin: 0 0 12px; font: 650 13px/1.3 'Onest', sans-serif; color: var(--d-ink); }
@@ -302,12 +301,10 @@ body:has(.daily-report-design) .platform-picker-row.active { background: #F3E8F9
 
 /* ---------- export + print: no tabs, actions, trays or dialogs; date, manager and rows stay ---------- */
 body.capturing .daily-report-design, body.capturing .daily-report-design * { transition: none !important; animation: none !important; }
-body.capturing .daily-report-design .side-pocket::before { display: none; }
 @media print {
   .daily-report-design .report-type-switcher, .daily-report-design .stitle-filter, .daily-report-design .row-more, .daily-report-design .daily-list-row-actions,
   .daily-report-design .export, .daily-report-design .daily-hero-scroll-btn, .daily-report-design .daily-hero-nav-btn, .daily-report-design .tmodal-overlay { display: none !important; }
   .daily-report-design .main-sheet, .daily-report-design .folder-section, .daily-report-design .side-pocket, .daily-report-design .side-card { box-shadow: none !important; }
-  .daily-report-design .side-pocket::before { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .daily-report-design, .daily-report-design * { transition: none !important; animation: none !important; } }
 
@@ -315,7 +312,6 @@ body.capturing .daily-report-design .side-pocket::before { display: none; }
 @media (max-width: 1000px) {
   .daily-report-design .report-grid { grid-template-columns: minmax(0, 1fr); }
   .daily-report-design .side-pocket { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .daily-report-design .side-pocket::before { display: none; }
 }
 @media (max-width: 640px) {
   .daily-report-design .report-type-card { flex-basis: 130px; }
