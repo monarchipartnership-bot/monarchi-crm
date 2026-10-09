@@ -384,4 +384,33 @@ await ok('notifications: a finished draft and a problem go to the chosen people,
   assert.equal(skipped.log.notifications.length, 0);
 });
 
+const { summarize, windows } = await import('../src/lib/aiUsageStats.js');
+await ok('spend stats: totals by window, agent, project and day on the Kyiv clock; problems listed', () => {
+  const now = new Date('2026-10-09T10:00:00Z'); // Fri 13:00 Kyiv
+  const c = (iso, agent, cost, extra = {}) => ({ id: iso + agent, created_at: iso, agent_key: agent, project_id: null, status: 'ok', input_tokens: 1000, output_tokens: 100, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: cost, retries: 0, duration_ms: 2000, ...extra });
+  const calls = [
+    c('2026-10-09T08:00:00Z', 'followup', 0.02),
+    c('2026-10-09T08:30:00Z', 'project-report', 0.01, { project_id: 3, retries: 2 }),
+    c('2026-10-08T21:30:00Z', 'followup', 0.5), // 9 Oct 00:30 Kyiv: still "today"
+    c('2026-10-08T20:30:00Z', 'followup', 1), // 8 Oct 23:30 Kyiv: yesterday, same week and month
+    c('2026-10-02T10:00:00Z', 'followup', 2), // within 7 days? 2 Oct is 7 days back: outside the 7-day window
+    c('2026-09-20T10:00:00Z', 'followup', 4, { status: 'error', error: 'overloaded' }), // last month
+  ];
+  const s = summarize(calls, { now });
+  assert.equal(windows(now).today.toISOString(), '2026-10-08T21:00:00.000Z');
+  assert.equal(s.total.today.cost, 0.53);
+  assert.equal(s.total.today.calls, 3);
+  assert.equal(s.total.week.cost, 1.53);
+  assert.equal(s.total.month.cost, 3.53);
+  assert.equal(s.total.month.retries, 2);
+  assert.deepEqual(s.byAgent.map((a) => [a.key, a.calls]), [['followup', 4], ['project-report', 1]]);
+  assert.equal(s.byAgent[1].name, 'AI-агент проєктів');
+  assert.equal(s.byProject[0].id, 3);
+  assert.equal(s.byDay.length, 30);
+  assert.equal(s.byDay.at(-1).cost, 0.53);
+  assert.equal(s.problems.length, 1);
+  assert.equal(s.problems[0].error, 'overloaded');
+  assert.equal(s.spent.day, 0.53);
+});
+
 console.log(`\n${passed} checks passed`);

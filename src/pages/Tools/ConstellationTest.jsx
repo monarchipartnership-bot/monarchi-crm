@@ -29,6 +29,7 @@ import ChiefOfStaff from '../ChiefOfStaff/ChiefOfStaff';
 import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
 import AgentCatalog from '../AgentCatalog/AgentCatalog';
 import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
+import AgentSpend from '../AgentSpend/AgentSpend';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
 import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
 import DeptChartView from './aiMap/DeptChartView';
@@ -84,6 +85,7 @@ const SECTIONS = [
   { key: 'agents', label: 'Агенти' },
   { key: 'activity', label: 'Задачі агентів' },
   { key: 'analytics', label: 'Аналітика' },
+  { key: 'spend', label: 'Витрати' },
 ];
 
 const WHATS_NEW_SEEN_KEY = 'aiAgentsWhatsNewSeenAt';
@@ -373,6 +375,7 @@ export default function ConstellationTest() {
       {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
       {section === 'analytics' && <AgentAnalytics agents={allAgents} />}
       {section === 'activity' && <AiAgentActivity />}
+      {section === 'spend' && <AgentSpend />}
 
       <div className="ai-flow">
       {showMapChrome && (

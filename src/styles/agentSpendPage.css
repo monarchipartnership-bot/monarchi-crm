@@ -1,0 +1,33 @@
+/* «Витрати» inside the AI Agents section. Built on the shared .ai-section / .analytics-* foundation;
+   only what is specific to this page (limits, day bars, tables) lives here. */
+
+.spend-limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; max-width: 900px; }
+.spend-limit { padding: 16px 18px; border-radius: 16px; background: rgba(53, 17, 63, 0.54); border: 1px solid rgba(235, 156, 239, 0.3); display: flex; flex-direction: column; gap: 10px; }
+.spend-limit-top { display: flex; justify-content: space-between; gap: 10px; font-family: var(--font-body); font-size: .84rem; color: #D5A9DC; }
+.spend-limit-top b { color: #F9EDF9; }
+.spend-bar { height: 10px; border-radius: 999px; background: rgba(174, 64, 174, 0.21); border: 1px solid rgba(235, 156, 239, 0.25); overflow: hidden; }
+.spend-bar-fill { display: block; height: 100%; background: #b07ce0; border-radius: 999px; transition: width .25s; }
+.spend-bar-fill.hot { background: #f59b5b; }
+.spend-limit-edit { display: flex; align-items: center; gap: 10px; }
+.spend-limit-edit label { display: flex; align-items: center; gap: 6px; color: #F2DDF4; font-family: var(--font-body); }
+.spend-limit-edit input { width: 100px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(235, 156, 239, 0.3); background: rgba(23, 5, 28, 0.6); color: #F9EDF9; font-family: var(--font-body); font-size: .86rem; }
+.spend-limit-edit input:focus-visible, .spend-page a:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; }
+.spend-message { color: #D5A9DC; font-family: var(--font-body); font-size: .82rem; margin: 10px 0 0; }
+
+.spend-days { display: flex; align-items: flex-end; gap: 4px; height: 160px; max-width: 900px; padding: 12px 12px 0; border-radius: 16px; background: rgba(53, 17, 63, 0.54); border: 1px solid rgba(235, 156, 239, 0.3); }
+.spend-day { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; position: relative; }
+.spend-day-bar { display: block; width: 100%; max-width: 22px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #d09cf5, #8a4fc9); min-height: 2px; }
+.spend-day-label { height: 18px; font-family: var(--font-body); font-size: .62rem; color: #C193CA; white-space: nowrap; }
+
+.spend-table-wrap { overflow-x: auto; max-width: 1000px; border-radius: 16px; border: 1px solid rgba(235, 156, 239, 0.3); background: rgba(53, 17, 63, 0.54); }
+.spend-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: .8rem; color: #F2DDF4; }
+.spend-table th { text-align: left; font-size: .64rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: #C193CA; padding: 12px 14px; border-bottom: 1px solid rgba(235, 156, 239, 0.2); white-space: nowrap; }
+.spend-table td { padding: 11px 14px; border-bottom: 1px solid rgba(235, 156, 239, 0.1); vertical-align: top; }
+.spend-table tr:last-child td { border-bottom: 0; }
+.spend-agent { display: flex; flex-direction: column; gap: 5px; min-width: 190px; }
+.spend-agent-bar { display: block; height: 4px; border-radius: 4px; background: rgba(174, 64, 174, 0.2); }
+.spend-agent-bar span { display: block; height: 100%; border-radius: 4px; background: #b07ce0; }
+.spend-bad { color: #f59b9b; font-weight: 700; }
+.spend-page .analytics-note a { color: #EB9CEF; }
+
+@media (max-width: 640px) { .spend-days { gap: 2px; padding: 10px 8px 0; } .spend-limit-edit input { width: 80px; } }

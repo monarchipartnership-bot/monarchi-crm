@@ -8,7 +8,8 @@ import ProjectsRegistry from '../../components/Projects/ProjectsRegistry';
 import ActionIcon from '../../components/common/ActionIcon';
 import { lastCompletedWeek } from '../../lib/periodReport';
 import { fetchProjects } from '../../lib/api/projects';
-import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatuses } from '../../lib/api/projectReportStore';
+import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatuses, fetchAgentDrafts } from '../../lib/api/projectReportStore';
+import { fetchAgentsOverview } from '../../lib/api/projectAgents';
 import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, MONTH_NAMES } from '../../lib/dateHelpers';
 import '../../styles/reportPage.css';
 import '../../styles/comparePage.css';
@@ -44,6 +45,8 @@ export default function Dashboard() {
   const [prevMonthRows, setPrevMonthRows] = useState([]);
   const [trendRows, setTrendRows] = useState([]);
   const [lastWeekStatuses, setLastWeekStatuses] = useState([]);
+  const [agentRows, setAgentRows] = useState([]);
+  const [agentDrafts, setAgentDrafts] = useState([]);
   const doneWeek = useMemo(() => lastCompletedWeek(todayIso()), []);
 
   const todayI = todayIso();
@@ -68,8 +71,10 @@ export default function Dashboard() {
       fetchAllMonthlyReportsForMonth(prevMonthStartIso),
       fetchWeeklyReportsBetween(trendRangeStartIso, thisWeekStartIso),
       doneWeek ? fetchWeeklyReportStatuses(doneWeek.start) : Promise.resolve([]),
+      fetchAgentsOverview(),
+      fetchAgentDrafts(),
     ])
-      .then(([projs, tw, lw, tm, pm, trend, statuses]) => {
+      .then(([projs, tw, lw, tm, pm, trend, statuses, agents, drafts]) => {
         if (cancelled) return;
         setProjects(projs);
         setThisWeekRows(tw);
@@ -78,6 +83,8 @@ export default function Dashboard() {
         setPrevMonthRows(pm);
         setTrendRows(trend);
         setLastWeekStatuses(statuses);
+        setAgentRows(agents);
+        setAgentDrafts(drafts);
       })
       .catch((e) => console.warn('dashboard fetch failed', e))
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -125,6 +132,14 @@ export default function Dashboard() {
   }, [projects, thisWeekRows, lastWeekRows, thisMonthRows, prevMonthRows, trendRows, thisWeekStartIso]);
 
   const totalProjects = projects.length;
+
+  // «Потрібна увага»: where the AI agent hit a problem, and the drafts it made that wait for a person.
+  const attention = useMemo(() => {
+    const nameOf = (id) => projects.find((p) => String(p.id) === String(id))?.name || `Проєкт ${id}`;
+    const problems = agentRows.filter((a) => a.health === 'problem').map((a) => ({ key: 'p' + a.project_id, kind: 'problem', project: nameOf(a.project_id), text: a.last_error || 'Агент повідомив про проблему.', to: `/projects/${a.project_id}?tab=agent`, action: 'Відкрити агента' }));
+    const reviews = agentDrafts.map((r) => ({ key: 'r' + r.id, kind: 'review', project: nameOf(r.project_id), text: `${r.period_type === 'monthly' ? 'Місячний' : 'Тижневий'} звіт за ${fmtIso(r.period_start)} – ${fmtIso(r.period_end)}: чернетка агента чекає перевірки`, to: `/projects/${r.project_id}?tab=${r.period_type}`, action: 'Перевірити' }));
+    return [...problems, ...reviews];
+  }, [projects, agentRows, agentDrafts]);
 
   const weekCmpLabels = ['Витрати', 'Дохід'];
   const weekCmpSeries = [
@@ -202,6 +217,24 @@ export default function Dashboard() {
               </div>
             </div>
           </section>
+
+          {attention.length > 0 && (
+            <section className="report-section">
+              <div className="stitle">Потрібна увага <span className="pct">{attention.length}</span></div>
+              <table className="cmp-table">
+                <thead><tr><th>Проєкт</th><th>Що сталося</th><th /></tr></thead>
+                <tbody>
+                  {attention.map((a) => (
+                    <tr key={a.key}>
+                      <td><Link to={`/projects/${a.to.split('/')[2].split('?')[0]}`}>{a.project}</Link></td>
+                      <td>{a.kind === 'problem' ? <b>Проблема. </b> : null}{a.text}</td>
+                      <td><Link className="btn" to={a.to}>{a.action}</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
 
           <section className="report-section">
             <div className="stitle">Тижневі звіти{doneWeek ? ` за ${fmtIso(doneWeek.start)} – ${fmtIso(doneWeek.end)}` : ''}</div>

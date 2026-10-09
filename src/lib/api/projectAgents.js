@@ -23,6 +23,13 @@ export async function fetchAgent(projectId) {
   return { agent: data, missing: false };
 }
 
+// Every project's agent in one read (for the dashboard's «потрібна увага»).
+export async function fetchAgentsOverview() {
+  const { data, error } = await supabase.from('project_agents').select('project_id, enabled, health, last_error, last_run_at, run_state');
+  if (error) { console.warn('fetchAgentsOverview failed', error); return []; }
+  return data ?? [];
+}
+
 export async function connectAgent(projectId, config, createdBy) {
   const { data, error } = await supabase.from('project_agents').insert({ project_id: projectId, enabled: false, config, created_by: createdBy || null }).select().single();
   if (error) throw error;
