@@ -1,7 +1,11 @@
 {
   "functions": {
-    "api/project-agent-run.js": { "maxDuration": 300 }
+    "api/project-agent-run.js": { "maxDuration": 300 },
+    "api/agent-tick.js": { "maxDuration": 300 }
   },
+  "crons": [
+    { "path": "/api/agent-tick", "schedule": "*/15 * * * *" }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

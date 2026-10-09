@@ -34,6 +34,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
   const run = await repo.startRun({ projectId, trigger, periodType, startedBy });
   const notes = [];
   let locked = false;
+  let periodInfo = null; // set as soon as the period is known, so even a failed run says which period it was for
 
   const finish = async (status, message, extra = {}) => {
     const cost = await repo.costSince(run.started_at).catch(() => 0);
@@ -62,6 +63,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const due = dueReportPeriod(periodType, today);
     if (!due) throw new Error('Не вдалося визначити період звіту.');
     const { picker, period } = due;
+    periodInfo = period;
 
     const existing = await repo.getReport(projectId, periodType, period.start);
     if (existing && !(existing.source === 'agent' && existing.status === 'draft')) {
@@ -132,7 +134,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const message = e?.message || String(e);
     await event('problem', 'problem', 'Не вдалося створити звіт: ' + message);
     await repo.setAgentHealth(projectId, { health: 'problem', last_error: message }).catch(() => {});
-    return await finish('problem', message);
+    return await finish('problem', message, { period: periodInfo });
   } finally {
     if (locked) await repo.unlock(projectId).catch(() => {});
   }

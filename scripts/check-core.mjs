@@ -288,4 +288,64 @@ await ok('agent run: when no platform answers it ends as a problem, says why, ma
   assert.equal(repo.log.unlocked, 1);
 });
 
+// ---- The schedule and the scheduler tick
+const { kyivParts, lastScheduled, nextScheduled, isDue } = await import('../src/lib/agentSchedule.js');
+const { runDueAgents } = await import('../api/_lib/agentTick.js');
+const SCHED = { weeklyDay: 1, weeklyTime: '09:00', monthlyDay: 1, monthlyTime: '09:00' };
+
+await ok('schedule: the latest scheduled moment is read on the Kyiv clock', () => {
+  assert.deepEqual(kyivParts(new Date('2026-10-08T12:00:00Z')), { date: '2026-10-08', weekday: 4, minutes: 15 * 60 });
+  assert.equal(lastScheduled('weekly', SCHED, new Date('2026-10-08T12:00:00Z')).date, '2026-10-05'); // Thursday → this Monday
+  assert.equal(lastScheduled('weekly', SCHED, new Date('2026-10-05T05:00:00Z')).date, '2026-09-28'); // Monday 08:00 Kyiv, before 09:00 → last Monday
+  assert.equal(lastScheduled('weekly', SCHED, new Date('2026-10-05T07:00:00Z')).date, '2026-10-05'); // Monday 10:00 Kyiv → today
+  assert.equal(lastScheduled('monthly', SCHED, new Date('2026-10-08T12:00:00Z')).date, '2026-10-01');
+  assert.equal(lastScheduled('monthly', SCHED, new Date('2026-10-01T05:00:00Z')).date, '2026-09-01');
+  assert.equal(lastScheduled('monthly', { ...SCHED, monthlyDay: 15 }, new Date('2026-01-10T12:00:00Z')).date, '2025-12-15');
+  assert.equal(lastScheduled('weekly', SCHED, new Date('2026-10-05T07:00:00Z')).at.toISOString(), '2026-10-05T06:00:00.000Z'); // 09:00 Kyiv summer = 06:00 UTC
+});
+await ok('schedule: the next scheduled moment', () => {
+  assert.equal(nextScheduled('weekly', SCHED, new Date('2026-10-08T12:00:00Z')).date, '2026-10-12');
+  assert.equal(nextScheduled('monthly', SCHED, new Date('2026-10-08T12:00:00Z')).date, '2026-11-01');
+  assert.equal(nextScheduled('weekly', { ...SCHED, weeklyDay: 5, weeklyTime: '17:30' }, new Date('2026-10-08T12:00:00Z')).date, '2026-10-09');
+});
+
+const startOf = (type, date) => dueReportPeriod(type, date).period.start;
+const NOW = new Date('2026-10-08T12:00:00Z'); // Thursday afternoon; the weekly report was due on Monday 5 Oct for week 1–4 Oct
+const agentRow = (over = {}) => ({ project_id: 3, enabled: true, enabled_since: '2026-09-01T00:00:00Z', config: { tasks: { weeklyReport: true, monthlyReport: true }, schedule: SCHED }, ...over });
+await ok('isDue: due once its moment has passed, not before the agent was switched on, not when already done', () => {
+  const dueStartOf = (d) => startOf('weekly', d);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [], now: NOW, dueStartOf }).due, true);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow({ enabled_since: '2026-10-07T00:00:00Z' }), runs: [], now: NOW, dueStartOf }).due, false);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow({ enabled: false }), runs: [], now: NOW, dueStartOf }).due, false);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow({ config: { tasks: { weeklyReport: false }, schedule: SCHED } }), runs: [], now: NOW, dueStartOf }).due, false);
+  const p = startOf('weekly', '2026-10-05');
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [{ status: 'ok', period_start: p }], now: NOW, dueStartOf }).due, false);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [{ status: 'skipped', period_start: p }], now: NOW, dueStartOf }).due, false);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [{ status: 'running', period_start: p, started_at: '2026-10-08T11:55:00Z' }], now: NOW, dueStartOf }).due, false);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [{ status: 'running', period_start: p, started_at: '2026-10-08T09:00:00Z' }], now: NOW, dueStartOf }).due, true, 'a run that crashed hours ago does not block');
+});
+await ok('isDue: a failed run is retried after an hour, at most three times', () => {
+  const dueStartOf = (d) => startOf('weekly', d);
+  const p = startOf('weekly', '2026-10-05');
+  const fail = (finished) => ({ status: 'problem', period_start: p, started_at: finished, finished_at: finished });
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [fail('2026-10-08T11:50:00Z')], now: NOW, dueStartOf }).due, false);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [fail('2026-10-08T09:00:00Z')], now: NOW, dueStartOf }).due, true);
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [fail('2026-10-06T09:00:00Z'), fail('2026-10-07T09:00:00Z'), fail('2026-10-08T09:00:00Z')], now: NOW, dueStartOf }).due, false);
+});
+await ok('tick: starts due reports with the scheduled day as their date, a few per tick, leaves the rest for the next one', async () => {
+  const agents = [3, 4, 5, 6, 7].map((id) => agentRow({ project_id: id, config: { tasks: { weeklyReport: true, monthlyReport: false }, schedule: SCHED } }));
+  const started = [];
+  const repo = { listEnabledAgents: async () => agents, getRecentRuns: async () => [] };
+  const r = await runDueAgents({ repo, now: NOW, batch: 4, runFor: async (job) => { started.push(job); return { status: 'ok', message: 'done' }; } });
+  assert.equal(r.checked, 5);
+  assert.equal(r.due, 5);
+  assert.equal(r.started.length, 4);
+  assert.equal(r.waiting, 1);
+  assert.ok(started.every((j) => j.periodType === 'weekly' && j.scheduledFor === '2026-10-05'));
+  const none = await runDueAgents({ repo: { listEnabledAgents: async () => [], getRecentRuns: async () => [] }, now: NOW, runFor: async () => { throw new Error('must not run'); } });
+  assert.deepEqual([none.checked, none.due, none.started.length], [0, 0, 0]);
+  const boom = await runDueAgents({ repo: { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [] }, now: NOW, runFor: async () => { throw new Error('x'); } });
+  assert.equal(boom.started[0].status, 'problem');
+});
+
 console.log(`\n${passed} checks passed`);

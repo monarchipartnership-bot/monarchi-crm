@@ -10,10 +10,11 @@ import '../../../styles/projectAgent.css';
 import Select from '../../common/Select';
 import TimePicker from '../../common/TimePicker';
 import { authedPost } from '../../../lib/adAccounts';
+import { nextScheduled } from '../../../lib/agentSchedule';
 
-// «Запустити зараз» works (the agent makes a draft report and presentation on request). While this is false the
-// agent does not yet start by itself on the schedule from the settings. Flip it when the scheduler is live.
-export const AGENT_SCHEDULE_READY = false;
+// «Запустити зараз» makes a draft report on request; with the switch on, the scheduler (cron, api/agent-tick.js)
+// also starts the reports by the schedule from the settings. Keep false only if the cron is turned off.
+export const AGENT_SCHEDULE_READY = true;
 const RUN_TYPES = [{ value: 'weekly', label: 'Тижневий звіт' }, { value: 'monthly', label: 'Місячний звіт' }];
 
 const DAYS = [[1, 'Понеділок'], [2, 'Вівторок'], [3, 'Середа'], [4, 'Четвер'], [5, 'Пʼятниця'], [6, 'Субота'], [7, 'Неділя']];
@@ -53,6 +54,22 @@ function describeChanges(before, after) {
   if (!sameJson(before.schedule, after.schedule)) out.push('розклад');
   if (before.notify !== after.notify) out.push('сповіщення');
   if ((before.note || '') !== (after.note || '')) out.push('нотатка для агента');
+  return out;
+}
+
+// «Далі: тижневий — пн 12.10 о 09:00» for every report the agent is set to make.
+const WD = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд'];
+function nextRuns(config) {
+  const cfg = { ...DEFAULT_AGENT_CONFIG, ...(config || {}), tasks: { ...DEFAULT_AGENT_CONFIG.tasks, ...(config?.tasks || {}) } };
+  const out = [];
+  [['weekly', 'weeklyReport', 'тижневий'], ['monthly', 'monthlyReport', 'місячний']].forEach(([type, task, label]) => {
+    if (!cfg.tasks[task]) return;
+    const n = nextScheduled(type, cfg.schedule, new Date());
+    if (!n) return;
+    const [, m, d] = n.date.split('-');
+    const wd = WD[(new Date(n.date + 'T12:00:00Z').getUTCDay() + 6) % 7];
+    out.push(`${label} — ${wd} ${d}.${m} о ${type === 'weekly' ? cfg.schedule.weeklyTime : cfg.schedule.monthlyTime}`);
+  });
   return out;
 }
 
@@ -105,7 +122,8 @@ export default function ProjectAgentTab({ projectId }) {
   const setEnabled = (on) => run('toggle', async () => {
     if (on && (!form.platforms.length || !Object.values(form.tasks).some(Boolean))) throw new Error('Перед вмиканням оберіть, що робить агент і на яких платформах.');
     if (on && dirty) throw new Error('Спершу збережіть налаштування, потім вмикайте агента.');
-    await updateAgent(projectId, { enabled: on, ...(on ? {} : { run_state: 'idle' }) });
+    // enabled_since: the scheduler only starts reports whose scheduled moment came after the agent was switched on.
+    await updateAgent(projectId, { enabled: on, enabled_since: on ? new Date().toISOString() : null, ...(on ? {} : { run_state: 'idle' }) });
     await addAgentEvent({ projectId, kind: on ? 'enabled' : 'disabled', status: 'info', message: on ? 'Агента ввімкнено.' : 'Агента вимкнено.', createdBy: email });
   });
 
@@ -151,7 +169,7 @@ export default function ProjectAgentTab({ projectId }) {
             <div className="pag-status-title">AI-агент · <b>{status.label}</b></div>
             <div className="pag-status-sub">
               {agent
-                ? <>Останній запуск: {fmtTime(agent.last_run_at)}</>
+                ? <>Останній запуск: {fmtTime(agent.last_run_at)}{agent.enabled && nextRuns(agent.config).length > 0 && <> · Далі: {nextRuns(agent.config).join('; ')}</>}</>
                 : 'Агент допоможе робити тижневі й місячні звіти та презентації для цього проєкту.'}
             </div>
           </div>
@@ -245,7 +263,7 @@ export default function ProjectAgentTab({ projectId }) {
             </div>
 
             <div className="pag-field">
-              <div className="pag-label">Розклад: тижневий звіт</div>
+              <div className="pag-label">Розклад: тижневий звіт (за останній завершений тиждень)</div>
               <div className="pag-row">
                 <Select value={Number(form.schedule.weeklyDay)} onChange={(v) => setCfg({ schedule: { ...form.schedule, weeklyDay: v } })} ariaLabel="День тижня" options={DAYS.map(([v, l]) => ({ value: v, label: l }))} />
                 <TimePicker value={form.schedule.weeklyTime} onChange={(v) => setCfg({ schedule: { ...form.schedule, weeklyTime: v } })} />
@@ -253,11 +271,12 @@ export default function ProjectAgentTab({ projectId }) {
             </div>
 
             <div className="pag-field">
-              <div className="pag-label">Розклад: місячний звіт</div>
+              <div className="pag-label">Розклад: місячний звіт (за останній завершений місяць)</div>
               <div className="pag-row">
                 <Select value={Number(form.schedule.monthlyDay)} onChange={(v) => setCfg({ schedule: { ...form.schedule, monthlyDay: v } })} ariaLabel="День місяця" options={Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${i + 1}-го числа` }))} />
                 <TimePicker value={form.schedule.monthlyTime} onChange={(v) => setCfg({ schedule: { ...form.schedule, monthlyTime: v } })} />
               </div>
+              <div className="pacc-hint">Час за Києвом. Агент перевіряє розклад кожні 15 хвилин, тому звіт зʼявиться в межах чверті години після вказаного часу. День місяця — від 1 до 28.</div>
             </div>
 
             <div className="pag-field pag-field--wide">

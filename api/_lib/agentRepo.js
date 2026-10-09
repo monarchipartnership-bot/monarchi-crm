@@ -40,6 +40,16 @@ export function createAgentRepo(db, agentEmail) {
       must(await db.from('project_agent_events').insert({ project_id: projectId, actor: 'agent', kind, status, message, details, created_by: agentEmail }));
     },
 
+    // ---- what the scheduler needs
+    async listEnabledAgents() {
+      return must(await db.from('project_agents').select('*').eq('enabled', true)) || [];
+    },
+    // Runs of this project and report type from the last 60 days (any period).
+    async getRecentRuns(projectId, periodType) {
+      const since = new Date(Date.now() - 60 * 86400000).toISOString();
+      return must(await db.from('agent_runs').select('id, status, period_start, started_at, finished_at').eq('project_id', projectId).eq('period_type', periodType).gte('started_at', since)) || [];
+    },
+
     // ---- the project
     async getProject(projectId) { return must(await db.from('projects').select('*').eq('id', projectId).maybeSingle()); },
     async getAccounts(projectId) { return must(await db.from('project_ad_accounts').select('*').eq('project_id', projectId).order('created_at', { ascending: true })) || []; },
