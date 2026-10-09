@@ -32,8 +32,8 @@ import { exportPDF, exportJPEG } from '../../../lib/exportHelpers';
 import { SECTION_ICONS } from '../../../lib/reportIcons';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import Select from '../../../components/common/Select';
-import DonutChart from '../../../components/Automation/DonutChart';
 import '../../../styles/reportPage.css';
+import '../../../styles/dailyReportShapes.css';
 import '../../../styles/dailyReportDesign.css';
 import '../../../styles/automationTasksPage.css';
 import '../../../styles/automationDashboard.css';
@@ -58,6 +58,34 @@ function useMatchMedia(query) {
     return () => mq.removeEventListener('change', on);
   }, [query]);
   return matches;
+}
+
+// Flat completeness ring: a pale track plus arcs for exactly the counts shown in the legend (nothing is drawn for 0).
+function ProgressRing({ stats }) {
+  const R = 46, C = 2 * Math.PI * R;
+  const arcs = [
+    { n: stats.done, color: '#1E9E5D' },
+    { n: stats.over, color: '#D14343' },
+  ];
+  let offset = 0;
+  return (
+    <div className="progress-ring" role="img" aria-label={`Заповненість місяця: ${stats.pct}%`}>
+      <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
+        <circle cx="60" cy="60" r={R} fill="none" stroke="#E6D9F0" strokeWidth="13" />
+        {stats.total > 0 && arcs.map((a, i) => {
+          if (!a.n) return null;
+          const len = (a.n / stats.total) * C;
+          const el = (
+            <circle key={i} cx="60" cy="60" r={R} fill="none" stroke={a.color} strokeWidth="13"
+              strokeDasharray={`${Math.max(len - 2, 0.5)} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)" />
+          );
+          offset += len;
+          return el;
+        })}
+      </svg>
+      <span className="progress-ring-value">{stats.pct}%</span>
+    </div>
+  );
 }
 
 function makeId() {
@@ -410,6 +438,7 @@ export default function DailyCreate() {
       {wide && toolbarSlot && createPortal(controls, toolbarSlot)}
       <div className="folder-shell">
         {!capturing && <ReportTypeSwitcher />}
+        <div className="folder-cover">
         <div className="folder-sheet">
       <DailyReportHero
         year={period.year}
@@ -699,18 +728,7 @@ export default function DailyCreate() {
           <div className="side-pocket pocket-progress">
             <h3>Прогрес за місяць</h3>
             <div className="progress-row">
-              <div className="progress-ring">
-                <DonutChart
-                  slices={[
-                    { label: 'Внесено', value: monthFillStats.done, color: '#1E9E5D' },
-                    { label: 'Просрочено', value: monthFillStats.over, color: '#D14343' },
-                    { label: 'Ще не настав', value: monthFillStats.future, color: '#E1D9EA' },
-                  ]}
-                  centerValue={`${monthFillStats.pct}%`}
-                  showLegend={false}
-                  gradient smallCenter
-                />
-              </div>
+              <ProgressRing stats={monthFillStats} />
               <ul className="progress-legend">
                 <li className="done"><span>Внесено</span><b>{monthFillStats.done}</b></li>
                 <li className="over"><span>Прострочено</span><b>{monthFillStats.over}</b></li>
@@ -739,6 +757,7 @@ export default function DailyCreate() {
           )}
         </aside>
       </div>
+        </div>
         </div>
       </div>
 
