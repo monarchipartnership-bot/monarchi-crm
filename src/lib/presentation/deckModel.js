@@ -2,7 +2,7 @@
 // { id, type, hidden?, data } and everything the viewer sees (editor, thumbnails,
 // PDF, PPTX) is drawn from it. Numbers in a deck are text copied from the report
 // (computed in code, never typed through the rich-text editor).
-import { text, listText } from './textModel';
+import { text, listText } from './textModel.js';
 
 export const DECK_VERSION = 1;
 

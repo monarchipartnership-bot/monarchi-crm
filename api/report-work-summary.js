@@ -88,11 +88,12 @@ export default async function handler(req, res) {
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1100, system: STYLE, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 1500, thinking: { type: 'disabled' }, system: STYLE, messages: [{ role: 'user', content: prompt }] }),
     });
     const data = await upstream.json();
     if (!upstream.ok) { bad(res, 502, data?.error?.message || 'Помилка моделі'); return; }
     const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    if (!text) { bad(res, 502, `Модель не повернула текст (stop_reason: ${data.stop_reason || '?'}, блоки: ${(data.content || []).map((x) => x.type).join(',') || 'немає'}, токени: ${data.usage?.output_tokens ?? '?'})`); return; }
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => (l.startsWith('-') ? l : '- ' + l.replace(/^[•*]\s*/, '')));
     // The model sometimes adds a platform the source never named; take such phrases out again.
     const source = (action === 'merge' ? weeks.map((w) => w.text).join('\n') : facts.join('\n')).toLowerCase();

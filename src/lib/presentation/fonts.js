@@ -2,50 +2,6 @@
 // standards. The standards are drawn with free look-alikes that have the same letter
 // widths (Arimo for Arial, Carlito for Calibri, ...), so line breaks in the preview and
 // the PDF match PowerPoint; the PPTX gets the real family name.
-import '@fontsource/onest/400.css';
-import '@fontsource/onest/500.css';
-import '@fontsource/onest/600.css';
-import '@fontsource/onest/700.css';
-import '@fontsource/onest/800.css';
-import '@fontsource/onest/900.css';
-import '@fontsource/barlow-condensed/400.css';
-import '@fontsource/barlow-condensed/400-italic.css';
-import '@fontsource/barlow-condensed/700.css';
-import '@fontsource/barlow-condensed/700-italic.css';
-import '@fontsource/barlow-condensed/800.css';
-import '@fontsource/barlow-condensed/800-italic.css';
-import '@fontsource/barlow-condensed/900.css';
-import '@fontsource/barlow-condensed/900-italic.css';
-import '@fontsource/cormorant-garamond/400.css';
-import '@fontsource/cormorant-garamond/400-italic.css';
-import '@fontsource/cormorant-garamond/600.css';
-import '@fontsource/cormorant-garamond/600-italic.css';
-import '@fontsource/cormorant-garamond/700.css';
-import '@fontsource/cormorant-garamond/700-italic.css';
-import '@fontsource/arimo/400.css';
-import '@fontsource/arimo/400-italic.css';
-import '@fontsource/arimo/700.css';
-import '@fontsource/arimo/700-italic.css';
-import '@fontsource/carlito/400.css';
-import '@fontsource/carlito/400-italic.css';
-import '@fontsource/carlito/700.css';
-import '@fontsource/carlito/700-italic.css';
-import '@fontsource/tinos/400.css';
-import '@fontsource/tinos/400-italic.css';
-import '@fontsource/tinos/700.css';
-import '@fontsource/tinos/700-italic.css';
-import '@fontsource/caladea/400.css';
-import '@fontsource/caladea/400-italic.css';
-import '@fontsource/caladea/700.css';
-import '@fontsource/caladea/700-italic.css';
-import '@fontsource/gelasio/400.css';
-import '@fontsource/gelasio/400-italic.css';
-import '@fontsource/gelasio/700.css';
-import '@fontsource/gelasio/700-italic.css';
-import '@fontsource/cousine/400.css';
-import '@fontsource/cousine/400-italic.css';
-import '@fontsource/cousine/700.css';
-import '@fontsource/cousine/700-italic.css';
 
 // weights = the weights that exist as real files; italic = a real italic file exists.
 // pptx = the name written into a PPTX; safe = what the "standard fonts" export option uses instead.

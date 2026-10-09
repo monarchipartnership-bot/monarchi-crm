@@ -1,4 +1,4 @@
-import { formatMoney } from './adAccounts';
+import { formatMoney } from './adAccounts.js';
 
 // Every platform row is normalised to these base numbers; everything else a
 // report shows is computed from them (in code, never by the AI model).

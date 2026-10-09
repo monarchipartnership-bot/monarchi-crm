@@ -1,4 +1,3 @@
-import { supabase } from './supabaseClient';
 
 // Ad platforms a project can be created from. `key` is what project_ad_accounts.platform
 // and the project reports already use ('meta' / 'google').
@@ -52,6 +51,8 @@ export function formatMoney(value, currency) {
 // POST to one of our serverless endpoints with the signed-in session. These
 // only exist on the deployed site (the Vite dev server doesn't serve /api).
 export async function authedPost(path, body) {
+  // Loaded here, not at the top, so this file can also be imported on the server (the browser client reads import.meta.env).
+  const { supabase } = await import('./supabaseClient.js');
   const { data } = await supabase.auth.getSession();
   const token = data?.session?.access_token;
   let res;

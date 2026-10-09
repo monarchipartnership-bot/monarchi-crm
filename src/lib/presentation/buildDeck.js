@@ -2,11 +2,11 @@
 // no network): the "Презентація" page uses it, and so will the AI agent. Every figure
 // comes from computeMetric() over the report's numbers, so the deck can never show a
 // number the report does not.
-import { METRIC_SETS, computeMetric, deltaPct, metricMeta } from '../reportMetrics';
-import { visibleKeys } from '../periodReport';
-import { text, listText } from './textModel';
-import { paginateBlocks } from './textFit';
-import { emptyDeck, labels, periodLabel, platformName, uid } from './deckModel';
+import { METRIC_SETS, computeMetric, deltaPct, metricMeta } from '../reportMetrics.js';
+import { visibleKeys } from '../periodReport.js';
+import { text, listText } from './textModel.js';
+import { paginateBlocks } from './textFit.js';
+import { emptyDeck, labels, periodLabel, platformName, uid } from './deckModel.js';
 
 // How much fits on one slide (the editor still warns when a manual edit overflows).
 export const PER_PAGE = { metricslist: 12, kpigrid: 6, tableRows: 8, tableCols: 4, dynamics: 8, listItems: 8 };

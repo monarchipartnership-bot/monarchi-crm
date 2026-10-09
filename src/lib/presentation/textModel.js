@@ -7,7 +7,7 @@
 // A missing property means "inherit from the style of the block", so switching the
 // presentation style restyles everything the person did not format by hand.
 // Everything the editor, the preview, the PDF and the PPTX show comes from this.
-import { FONT_BY_ID, MAX_SIZE, MIN_SIZE, nearestWeight } from './fonts';
+import { FONT_BY_ID, MAX_SIZE, MIN_SIZE, nearestWeight } from './fonts.js';
 
 export const MIXED = Symbol('mixed');
 export const RUN_KEYS = ['f', 'w', 'i', 'u', 's', 'c', 'ls'];

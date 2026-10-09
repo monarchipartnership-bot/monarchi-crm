@@ -8,10 +8,10 @@ import { useReportContext } from './useReportContext';
 import { useConfirm } from '../../common/ConfirmDialog';
 import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import WeekPicker from '../../Reports/Weekly/WeekPicker';
-import { daysInRange, fetchProjectRange, periodFromPicker, precedingDays, previousPicker, regroupData } from '../../../lib/periodReport';
+import { daysInRange, fetchProjectRange, periodFromPicker, regroupData } from '../../../lib/periodReport';
 import { fetchProjectReports, saveProjectReport, deleteProjectReport } from '../../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../../lib/api/projectDecks';
-import { collectFacts, describeWork, mergeWeeks } from '../../../lib/workHistory';
+import { EMPTY_SECTIONS, buildWhatWasDone, comparisonPeriod, pullReportData, reportPayload } from '../../../lib/reportEngine';
 import { platformInfo } from '../../../lib/adAccounts';
 import { MONTH_NAMES, computeWeeksForMonth, defaultWeekIndexFor, todayIso, yearOptions } from '../../../lib/dateHelpers';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -23,7 +23,6 @@ const TEXT_BLOCKS = [
   { key: 'conclusion', title: 'Conclusion' },
   { key: 'plans', title: 'Plans for the next period' },
 ];
-const EMPTY_SECTIONS = { whatWasDone: '', conclusion: '', plans: '' };
 const STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
 const fmt = (s) => s.split('-').reverse().join('.');
 
@@ -69,15 +68,7 @@ export default function PeriodReport({ projectId, periodType }) {
   const [askOff, setAskOff] = useState(() => { try { return localStorage.getItem('prep-ask-compare') === 'off'; } catch { return false; } });
 
   const period = periodFromPicker(periodType, picker);
-  const prevFor = (c) => {
-    if (!c) return null;
-    if (c.mode === 'custom') return { start: c.from, end: c.to, label: '' };
-    if (c.mode === 'days') {
-      const p = precedingDays(period.start, daysInRange(period.start, period.end));
-      return { ...p, label: '' };
-    }
-    return periodFromPicker(periodType, previousPicker(periodType, picker));
-  };
+  const prevFor = (c) => comparisonPeriod(periodType, picker, period, c);
   const prev = prevFor(cmp);
   const daysCur = daysInRange(period.start, period.end);
   const daysPrev = prev ? daysInRange(prev.start, prev.end) : daysCur;
@@ -146,12 +137,9 @@ export default function PeriodReport({ projectId, periodType }) {
     setBusy('pull');
     setMessage('');
     try {
-      const [cur, before] = await Promise.all([
-        fetchProjectRange(ctx.accounts, period.start, period.end, ctx.kind, ctx.groups),
-        pv ? fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups) : Promise.resolve(null),
-      ]);
-      setErrors(cur.errors);
-      setData({ platforms: cur.platforms, previous: before ? { period: { start: pv.start, end: pv.end }, platforms: before.platforms } : null });
+      const pulled = await pullReportData({ accounts: ctx.accounts, kind: ctx.kind, groups: ctx.groups, period, prev: pv });
+      setErrors(pulled.errors);
+      setData(pulled.data);
       setDirty(true);
       // The period is on screen: offer a comparison (unless it is set already or switched off).
       if (!c && !askOff) setModal('ask');
@@ -193,8 +181,7 @@ export default function PeriodReport({ projectId, periodType }) {
       const row = await saveProjectReport({
         projectId, periodType, periodStart: period.start, periodEnd: period.end, status: nextStatus,
         source: meta.source, createdBy: email,
-        // `compare` is internal bookkeeping (never printed on a presentation).
-        data: { version: 1, kind: ctx.kind, platforms: data?.platforms || {}, previous: data?.previous || null, compare: cmp ? { mode: cmp.mode, daysCur, daysPrev, unequal } : null, selection, options, sections, note, savedAt: new Date().toISOString() },
+        data: reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note }),
       });
       setStatus(row.status);
       setDirty(false);
@@ -227,25 +214,15 @@ export default function PeriodReport({ projectId, periodType }) {
     setMessage('');
     setWork(null);
     try {
-      let result;
-      let info;
-      if (kind === 'weeks') {
-        const rows = (await fetchProjectReports(projectId, 'weekly')).filter((r) => r.period_start >= period.start && r.period_start <= period.end).sort((a, b) => a.period_start.localeCompare(b.period_start));
-        const weeks = rows.map((r) => ({ label: `${fmt(r.period_start)} – ${fmt(r.period_end)}`, text: r.data?.sections?.whatWasDone || '' }));
-        const withText = weeks.filter((w) => w.text.trim());
-        const expected = computeWeeksForMonth(picker.year, picker.month).length;
-        info = { kind, weeks: withText.map((w) => w.label), missing: expected - withText.length, facts: [], notes: [], errors: {} };
-        if (!withText.length) { setWork({ ...info, empty: 'Для цього місяця немає тижневих звітів з текстом «What was done». Збережіть тижневі звіти або згенеруйте текст з історії кабінетів.' }); return; }
-        result = await mergeWeeks({ weeks: withText, projectName: ctx.project.name, note, from: period.start, to: period.end });
-      } else {
-        const { facts, errors, notes } = await collectFacts(ctx.accounts, period.start, period.end);
-        info = { kind, facts, notes, errors };
-        if (!facts.length) { setWork({ ...info, empty: 'У кабінетах за цей період не знайдено дій людей (лише системні події). Додайте текст вручну.' }); return; }
-        result = await describeWork({ facts, projectName: ctx.project.name, note, from: period.start, to: period.end, periodType });
-      }
+      const weeklyRows = kind === 'weeks' ? await fetchProjectReports(projectId, 'weekly') : [];
+      const result = await buildWhatWasDone({
+        source: kind === 'weeks' ? 'weeks' : 'history', periodType, period, accounts: ctx.accounts, projectName: ctx.project.name, note,
+        weeklyRows, expectedWeeks: computeWeeksForMonth(picker.year, picker.month).length,
+      });
+      if (result.empty) { setWork({ ...result.info, empty: result.empty }); return; }
       setSections((s) => ({ ...s, whatWasDone: result.text }));
       setDirty(true);
-      setWork({ ...info, writer: result.writer });
+      setWork({ ...result.info, writer: result.writer });
     } catch (e) {
       setMessage(e.message || 'Не вдалося сформувати текст.');
     } finally {

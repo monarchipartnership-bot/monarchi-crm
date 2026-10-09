@@ -5,6 +5,7 @@ import useDeckHistory from '../../components/Presentation/useDeckHistory';
 import { buildDeckFromReport } from '../../lib/presentation/buildDeck';
 import { emptyDeck, ensureDeck } from '../../lib/presentation/deckModel';
 import { setMeta } from '../../lib/presentation/deckOps';
+import '../../lib/presentation/fontFaces';
 import { fontsReady } from '../../lib/presentation/fonts';
 import { fetchDeck, saveDeck } from '../../lib/api/projectDecks';
 import { fetchProjectReports } from '../../lib/api/projectReportStore';

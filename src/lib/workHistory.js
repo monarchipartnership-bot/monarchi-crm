@@ -5,7 +5,7 @@
 //      grouped, with counts. Pure code: it never invents anything.
 //   2. /api/report-work-summary turns the facts into a client-friendly English list
 //      (see api/report-work-summary.js); describeWork() below is the client side of it.
-import { authedPost } from './adAccounts';
+import { authedPost } from './adAccounts.js';
 
 // English amounts for a client text: $30, $12.50, EUR 25.
 function formatMoney(value, currency) {
@@ -188,19 +188,19 @@ export function googleFacts(items, currency = 'USD') {
 
 // ----- Reading + summarising ---------------------------------------------------------------------
 // accounts: project_ad_accounts rows. Google keeps ~30 days of history, so older ranges skip it.
-export async function collectFacts(accounts, from, to) {
+export async function collectFacts(accounts, from, to, post = authedPost) {
   const facts = [];
   const errors = {};
   const notes = [];
   await Promise.all(accounts.map(async (a) => {
     try {
       if (a.platform === 'meta') {
-        const r = await authedPost('/api/meta-ads-insights', { accountId: a.account_id, activities: true, timeRange: { since: from, until: to } });
+        const r = await post('/api/meta-ads-insights', { accountId: a.account_id, activities: true, timeRange: { since: from, until: to } });
         facts.push(...metaFacts(r.items || [], a.currency || 'USD'));
       } else if (a.platform === 'google') {
         const daysAgo = Math.floor((Date.now() - new Date(from + 'T00:00:00Z').getTime()) / 86400000);
         if (daysAgo > 29) { notes.push('Google Ads зберігає історію змін лише 30 днів, тому за цей період її немає.'); return; }
-        const r = await authedPost('/api/google-ads-accounts', { action: 'changes', customerId: a.account_id, from, to });
+        const r = await post('/api/google-ads-accounts', { action: 'changes', customerId: a.account_id, from, to });
         facts.push(...googleFacts(r.items || [], a.currency || 'USD'));
       }
     } catch (e) {
@@ -211,21 +211,21 @@ export async function collectFacts(accounts, from, to) {
 }
 
 // Facts → client-ready English bullets ("- ..." lines). Falls back to the facts themselves when the writer is unavailable.
-export async function describeWork({ facts, projectName, note, from, to, periodType }) {
+export async function describeWork({ facts, projectName, note, from, to, periodType }, post = authedPost) {
   if (!facts.length) return { text: '', writer: 'none' };
   try {
-    const r = await authedPost('/api/report-work-summary', { action: 'describe', facts, projectName, note, from, to, periodType });
+    const r = await post('/api/report-work-summary', { action: 'describe', facts, projectName, note, from, to, periodType });
     if (r.text) return { text: r.text, writer: 'ai' };
   } catch { /* fall through to the plain list */ }
   return { text: facts.map((f) => '- ' + f.replace(/^(Meta|Google Ads): /, '')).join('\n'), writer: 'plain' };
 }
 
 // A month's list from the weekly lists already written for it.
-export async function mergeWeeks({ weeks, projectName, note, from, to }) {
+export async function mergeWeeks({ weeks, projectName, note, from, to }, post = authedPost) {
   const texts = weeks.filter((w) => w.text?.trim());
   if (!texts.length) return { text: '', writer: 'none' };
   try {
-    const r = await authedPost('/api/report-work-summary', { action: 'merge', weeks: texts, projectName, note, from, to });
+    const r = await post('/api/report-work-summary', { action: 'merge', weeks: texts, projectName, note, from, to });
     if (r.text) return { text: r.text, writer: 'ai' };
   } catch { /* fall through */ }
   const lines = [];
