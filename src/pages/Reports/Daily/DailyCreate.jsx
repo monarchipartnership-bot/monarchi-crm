@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import DailyReportHero from '../../../components/Reports/DailyReportHero';
 import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
@@ -23,7 +24,7 @@ import {
 } from '../../../lib/api/tasks';
 import { fetchDepartmentIdByName } from '../../../lib/api/departments';
 import { fetchTaskStages, moveTaskStage } from '../../../lib/api/taskStages';
-import { daysInMonth, defaultDayFor, fmtDate, isoDate } from '../../../lib/dateHelpers';
+import { MONTH_NAMES, daysInMonth, defaultDayFor, fmtDate, isoDate } from '../../../lib/dateHelpers';
 import { CLIENT_PLATFORMS } from '../../../lib/reportConstants';
 import { STATUSES, STATUS_META } from '../../../lib/clientStatus';
 import { platformColor, platformLogo } from '../../../lib/platforms';
@@ -39,6 +40,25 @@ import '../../../styles/automationDashboard.css';
 import '../../../styles/dealsBoard.css';
 import '../../../styles/comparePage.css';
 import '../../../styles/clientsDirectory.css';
+
+// Status chip colour: the shared pill style plus the colour itself, which the folder design uses for a pale chip with a coloured dot.
+const chipStyle = (color) => ({ ...stagePillStyle(color), '--chip': color });
+
+const MONTH_GENITIVE = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
+
+// True while the window is at least `query` wide (the manager / save state / exports then sit in the top bar).
+function useMatchMedia(query) {
+  const [matches, setMatches] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : true));
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(query);
+    const on = () => setMatches(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return matches;
+}
 
 function makeId() {
   return crypto.randomUUID();
@@ -89,6 +109,9 @@ export default function DailyCreate() {
   const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [salesDeptId, setSalesDeptId] = useState(null);
   const [salesStages, setSalesStages] = useState([]);
+  const wide = useMatchMedia('(min-width: 1100px)');
+  const [toolbarSlot, setToolbarSlot] = useState(null);
+  useEffect(() => { setToolbarSlot(document.getElementById('topbar-slot')); }, []);
   const saveTimerRef = useRef(null);
   const skipNextSaveRef = useRef(false);
 
@@ -360,9 +383,34 @@ export default function DailyCreate() {
   }, [period.year, period.month, savedDays]);
   const hasArchive = done.some((d) => d.text?.trim()) || plans.some((p) => p.text?.trim());
 
+  const saveTone = /^Помилка/.test(statusLabel) ? 'err' : /^Збережено/.test(statusLabel) ? 'ok' : /^(Завантаження|Зберігається)/.test(statusLabel) ? 'busy' : 'idle';
+  // Manager, save state and exports: in the top bar when the window is wide, in the side pocket otherwise (never both).
+  const controls = (
+    <div className="daily-controls" data-dd="plum">
+      <div className="daily-manager">
+        <Select
+          value={name} onChange={setName} placeholder="Оберіть менеджера" side="left" ariaLabel="Менеджер"
+          options={[{ value: '', label: 'Не обрано' }, ...profiles.map((p) => ({ value: profileLabel(p), label: profileLabel(p) }))]}
+        />
+      </div>
+      <span className={'daily-save-state daily-save-state--' + saveTone} role="status" aria-live="polite">{statusLabel}</span>
+      {!capturing && (
+        <>
+          <button type="button" className="btn" onClick={exportPDF}><ActionIcon name="download" size={18} /> PDF</button>
+          <button type="button" className="btn" onClick={handleExportJPEG} disabled={exportingJPEG}>
+            {exportingJPEG ? '...' : <><ActionIcon name="download" size={18} /> JPEG</>}
+          </button>
+        </>
+      )}
+    </div>
+  );
+
   return (
-    <div className="report-page daily-report-page daily-report-design" ref={pageRef}>
-      {!capturing && <ReportTypeSwitcher />}
+    <div className="report-page daily-report-page daily-report-design" data-dd="plum" ref={pageRef}>
+      {wide && toolbarSlot && createPortal(controls, toolbarSlot)}
+      <div className="folder-shell">
+        {!capturing && <ReportTypeSwitcher />}
+        <div className="folder-sheet">
       <DailyReportHero
         year={period.year}
         month={period.month}
@@ -373,13 +421,15 @@ export default function DailyCreate() {
       />
 
       <div className="rpt-layout">
-        <div>
-          <section className="report-section">
+        <div className="folder-main">
+          <section className="report-section folder-section">
             <div className="stitle">
-              <span className="stitle-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} />
-              Клієнти
+              <span className="section-tab">
+                <span className="stitle-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} />
+                Клієнти <b className="section-count">{clients.length}</b>
+              </span>
               {!capturing && (
-                <button type="button" className="btn btn-p stitle-filter" onClick={() => setClientModal('new')}>
+                <button type="button" className="btn stitle-filter" onClick={() => setClientModal('new')}>
                   <ActionIcon name="create" size={18} /> Додати клієнта
                 </button>
               )}
@@ -400,11 +450,12 @@ export default function DailyCreate() {
                   const brandLogo = item.platform ? platformLogo(item.platform) : null;
                   const statusMeta = item.leadType ? STATUS_META[item.leadType] : null;
                   const expanded = expandedClientId === item.id;
+                  const toggleRow = () => setExpandedClientId((cur) => (cur === item.id ? null : item.id));
                   return (
                     <div
                       className={'client-grid-row' + (expanded ? ' expanded' : '')}
                       key={item.id}
-                      onClick={() => !capturing && setExpandedClientId((cur) => (cur === item.id ? null : item.id))}
+                      onClick={() => !capturing && toggleRow()}
                     >
                       <div className="daily-list-row-main">
                         <div className="client-grid-name-cell">
@@ -415,7 +466,7 @@ export default function DailyCreate() {
                         </div>
                         <div>
                           {statusMeta ? (
-                            <span className="client-grid-badge client-grid-status-badge" style={stagePillStyle(statusMeta.color)}>
+                            <span className="client-grid-badge client-grid-status-badge" style={chipStyle(statusMeta.color)}>
                               <span className="client-grid-status-dot" style={{ background: 'rgba(255,255,255,.7)' }} />
                               {item.leadType}
                             </span>
@@ -438,31 +489,34 @@ export default function DailyCreate() {
                           ) : '—'}
                         </div>
                         <div className="client-grid-plain">{item.title || '—'}</div>
-                        {!capturing && (
+                        {!capturing ? (
                           <button
-                            type="button" className="del-btn" title="Видалити" aria-label="Видалити"
-                            onClick={(e) => { e.stopPropagation(); setClients((c) => c.filter((it) => it.id !== item.id)); }}
-                          ><ActionIcon name="delete" size={18} /></button>
-                        )}
+                            type="button" className="row-more" aria-label="Дії з клієнтом" aria-expanded={expanded}
+                            onClick={(e) => { e.stopPropagation(); toggleRow(); }}
+                            dangerouslySetInnerHTML={{ __html: FIELD_ICONS.more }}
+                          />
+                        ) : <div />}
                       </div>
-                      {!capturing && (
+                      {!capturing && expanded && (
                         <div className="daily-list-row-actions">
                           <button
-                            type="button" className="deal-field-icon-btn" title="Відкрити угоду"
+                            type="button" className="row-action" title="Відкрити угоду"
                             onClick={(e) => { e.stopPropagation(); handleOpenDeal(item); }}
                             disabled={!item.clientId}
-                            dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }}
-                          />
+                          ><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />Відкрити угоду</button>
                           <button
-                            type="button" className="deal-field-icon-btn" title="Відкрити контакт"
+                            type="button" className="row-action" title="Відкрити контакт"
                             onClick={(e) => { e.stopPropagation(); navigate(`/reports/clients-directory/${item.clientId}`); }}
                             disabled={!item.clientId}
-                            dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }}
-                          />
+                          ><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }} />Відкрити контакт</button>
                           <button
-                            type="button" className="deal-field-icon-btn" title="Редагувати" aria-label="Редагувати"
+                            type="button" className="row-action" title="Редагувати" aria-label="Редагувати"
                             onClick={(e) => { e.stopPropagation(); setClientModal(item); }}
-                          ><ActionIcon name="edit" size={16} /></button>
+                          ><ActionIcon name="edit" size={18} />Редагувати</button>
+                          <button
+                            type="button" className="row-action row-action--danger" title="Видалити" aria-label="Видалити"
+                            onClick={(e) => { e.stopPropagation(); setClients((c) => c.filter((it) => it.id !== item.id)); }}
+                          ><ActionIcon name="delete" size={18} />Видалити</button>
                         </div>
                       )}
                     </div>
@@ -489,18 +543,20 @@ export default function DailyCreate() {
             />
           )}
 
-          <section className="report-section">
+          <section className="report-section folder-section">
             <div className="stitle">
-              <span className="stitle-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Задачі'] }} />
-              Задачі на сьогодні
+              <span className="section-tab">
+                <span className="stitle-icon" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Задачі'] }} />
+                Задачі на сьогодні {managerEmail && !tasksLoading && <b className="section-count">{salesTasks.length}</b>}
+              </span>
               {!capturing && managerEmail && salesDeptId && (
-                <button type="button" className="btn btn-p stitle-filter" onClick={() => setTaskFormOpen(true)}>
+                <button type="button" className="btn stitle-filter" onClick={() => setTaskFormOpen(true)}>
                   <ActionIcon name="create" size={18} /> Додати задачу
                 </button>
               )}
             </div>
             {!managerEmail ? (
-              <div className="empty-hint">Оберіть менеджера справа, щоб побачити його задачі на цей день.</div>
+              <div className="empty-hint">Оберіть менеджера, щоб побачити його задачі на цей день.</div>
             ) : (
               <>
                 {tasksLoading ? (
@@ -511,6 +567,8 @@ export default function DailyCreate() {
                   <div className="client-grid daily-task-grid">
                     <div className="client-grid-header">
                       <div>Задача</div>
+                      <div>Статус</div>
+                      <div>Підзадачі</div>
                       <div />
                     </div>
                     {salesTasks.map((task) => {
@@ -520,14 +578,25 @@ export default function DailyCreate() {
                       const primaryTag = task.tags?.[0];
                       const [title, ...descParts] = (task.text || '').split('\n');
                       const description = descParts.join(' ').trim();
+                      const subs = task.subtasks || [];
+                      const subsDone = subs.filter((s) => s.done).length;
+                      const toggleRow = () => setExpandedTaskId((cur) => (cur === task.id ? null : task.id));
                       return (
                         <div key={task.id}>
                           <div
                             className={'client-grid-row' + (expanded ? ' expanded' : '') + (isOverdue ? ' overdue' : '')}
-                            onClick={() => !capturing && setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
+                            onClick={() => !capturing && toggleRow()}
                           >
                             <div className="daily-list-row-main">
                               <div className="client-grid-name-cell">
+                                {!capturing && (
+                                  <input
+                                    type="checkbox" className="task-check" checked={done}
+                                    aria-label={done ? 'Повернути задачу' : 'Позначити задачу виконаною'}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => handleToggleDone(task)}
+                                  />
+                                )}
                                 <span
                                   className="daily-task-grid-icon"
                                   style={{ background: colorForTag(primaryTag || 'default') }}
@@ -541,47 +610,59 @@ export default function DailyCreate() {
                               </div>
                               <div className="daily-task-status-cell">
                                 {isOverdue && (
-                                  <span className="client-grid-badge client-grid-status-badge" style={stagePillStyle('#D14343')}>
+                                  <span className="client-grid-badge client-grid-status-badge" style={chipStyle('#D14343')}>
                                     <span className="client-grid-status-dot" style={{ background: 'rgba(255,255,255,.7)' }} />
                                     Протерміновано
                                   </span>
                                 )}
-                                <span className="client-grid-badge client-grid-status-badge" style={stagePillStyle(done ? '#1E9E5D' : '#F59E0B')}>
+                                <span className="client-grid-badge client-grid-status-badge" style={chipStyle(done ? '#1E9E5D' : '#F59E0B')}>
                                   <span className="client-grid-status-dot" style={{ background: 'rgba(255,255,255,.7)' }} />
                                   {done ? 'Виконано' : 'В очікуванні'}
                                 </span>
                               </div>
+                              <div className="task-progress" aria-label={subs.length ? `Підзадачі: ${subsDone} з ${subs.length}` : 'Підзадач немає'}>
+                                {subs.length > 0 ? (
+                                  <>
+                                    <span className="task-progress-count">{subsDone}/{subs.length}</span>
+                                    <span className="task-progress-bar"><span style={{ width: (subsDone / subs.length) * 100 + '%' }} /></span>
+                                  </>
+                                ) : '—'}
+                              </div>
+                              {!capturing ? (
+                                <button
+                                  type="button" className="row-more" aria-label="Дії із задачею" aria-expanded={expanded}
+                                  onClick={(e) => { e.stopPropagation(); toggleRow(); }}
+                                  dangerouslySetInnerHTML={{ __html: FIELD_ICONS.more }}
+                                />
+                              ) : <div />}
                             </div>
-                            {!capturing && (
+                            {!capturing && expanded && (
                               <div className="daily-list-row-actions">
                                 {done ? (
                                   <button
-                                    type="button" className="deal-field-icon-btn" title="Повернути"
+                                    type="button" className="row-action" title="Повернути"
                                     onClick={(e) => { e.stopPropagation(); handleToggleDone(task); }}
-                                    dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }}
-                                  />
+                                  ><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} />Повернути</button>
                                 ) : (
                                   <>
                                     <button
-                                      type="button" className="deal-field-icon-btn" title="Виконано"
+                                      type="button" className="row-action" title="Виконано"
                                       onClick={(e) => { e.stopPropagation(); handleToggleDone(task); }}
-                                      dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }}
-                                    />
+                                    ><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} />Виконано</button>
                                     <button
-                                      type="button" className="deal-field-icon-btn" title="Перенести"
+                                      type="button" className="row-action" title="Перенести"
                                       onClick={(e) => { e.stopPropagation(); openMove(task); }}
-                                      dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }}
-                                    />
+                                    ><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />Перенести</button>
                                     <button
-                                      type="button" className="deal-field-icon-btn" title="Скасувати" aria-label="Скасувати"
+                                      type="button" className="row-action" title="Скасувати" aria-label="Скасувати"
                                       onClick={(e) => { e.stopPropagation(); openCancel(task); }}
-                                    ><ActionIcon name="close" size={16} /></button>
+                                    ><ActionIcon name="close" size={18} />Скасувати</button>
                                   </>
                                 )}
                                 <button
-                                  type="button" className="deal-field-icon-btn" title="Редагувати" aria-label="Редагувати"
+                                  type="button" className="row-action" title="Редагувати" aria-label="Редагувати"
                                   onClick={(e) => { e.stopPropagation(); openView(task); }}
-                                ><ActionIcon name="edit" size={16} /></button>
+                                ><ActionIcon name="edit" size={18} />Редагувати</button>
                               </div>
                             )}
                           </div>
@@ -597,11 +678,51 @@ export default function DailyCreate() {
               </>
             )}
           </section>
+        </div>
 
+        <aside className="side-pocket-col">
+          {!(wide && toolbarSlot) && (
+            <div className="side-pocket pocket-controls">
+              <h3>Менеджер і експорт</h3>
+              {controls}
+            </div>
+          )}
+          <div className="side-pocket pocket-summary">
+            <h3>Підсумок за {period.day} {MONTH_GENITIVE[period.month - 1]}</h3>
+            <div className="summary-stats">
+              <div><b>{clientsAdded}</b><span>клієнтів додано</span></div>
+              <div><b>{tasksDoneCount}</b><span>задач виконано</span></div>
+              <div><b>{tasksPendingCount}</b><span>в очікуванні</span></div>
+            </div>
+            <p className="summary-meta">Менеджер: <b>{name || 'не обрано'}</b> · {fmtDate(period.year, period.month, period.day)}</p>
+          </div>
+          <div className="side-pocket pocket-progress">
+            <h3>Прогрес за місяць</h3>
+            <div className="progress-row">
+              <div className="progress-ring">
+                <DonutChart
+                  slices={[
+                    { label: 'Внесено', value: monthFillStats.done, color: '#1E9E5D' },
+                    { label: 'Просрочено', value: monthFillStats.over, color: '#D14343' },
+                    { label: 'Ще не настав', value: monthFillStats.future, color: '#E1D9EA' },
+                  ]}
+                  centerValue={`${monthFillStats.pct}%`}
+                  showLegend={false}
+                  gradient smallCenter
+                />
+              </div>
+              <ul className="progress-legend">
+                <li className="done"><span>Внесено</span><b>{monthFillStats.done}</b></li>
+                <li className="over"><span>Прострочено</span><b>{monthFillStats.over}</b></li>
+                <li className="future"><span>Ще не настав</span><b>{monthFillStats.future}</b></li>
+                <li className="total"><span>Всього ({MONTH_NAMES[period.month - 1].toLowerCase()})</span><b>{monthFillStats.total}</b></li>
+              </ul>
+            </div>
+          </div>
           {hasArchive && (
-            <section className="report-section">
-              <div className="stitle">Архів (до оновлення)</div>
-              <p className="empty-hint" style={{ marginBottom: 10 }}>Збережено до переходу на новий рушій задач — лише перегляд.</p>
+            <div className="side-pocket pocket-archive">
+              <h3>Архів (до оновлення)</h3>
+              <p className="archive-note">Збережено до переходу на новий рушій задач — лише перегляд.</p>
               {done.filter((d) => d.text?.trim()).length > 0 && (
                 <>
                   <div className="ssub">Виконано за день</div>
@@ -614,72 +735,10 @@ export default function DailyCreate() {
                   <ul className="archive-list">{plans.filter((p) => p.text?.trim()).map((p) => <li key={p.id}>{p.text}</li>)}</ul>
                 </>
               )}
-            </section>
+            </div>
           )}
-        </div>
-
-        <div className="wk-sidebar">
-          <div className="wk-side-panel">
-            <div className="deal-section-head">
-              <span className="deal-section-icon" style={{ background: 'linear-gradient(135deg, #60A5FA, #2563EB)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
-              <div className="deal-section-text">
-                <h4>Менеджер</h4>
-                <p>Хто веде цей день</p>
-              </div>
-            </div>
-            <div className="deal-section-body">
-              <Select
-                value={name} onChange={setName} placeholder="Оберіть менеджера" side="left"
-                options={[{ value: '', label: 'Не обрано' }, ...profiles.map((p) => ({ value: profileLabel(p), label: profileLabel(p) }))]}
-              />
-            </div>
-          </div>
-          <div className="wk-side-panel">
-            <div className="deal-section-head">
-              <span className="deal-section-icon" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.download }} />
-              <div className="deal-section-text">
-                <h4>Завантажити</h4>
-                <p>PDF або JPEG версія звіту</p>
-              </div>
-            </div>
-            {!capturing && (
-              <div className="deal-section-body wk-dl-row">
-                <button type="button" className="btn wk-dl-btn deal-btn-soft" onClick={exportPDF}>
-                  <ActionIcon name="download" size={18} /> PDF
-                </button>
-                <button type="button" className="btn wk-dl-btn deal-btn-soft" onClick={handleExportJPEG} disabled={exportingJPEG}>
-                  {exportingJPEG ? '...' : <><ActionIcon name="download" size={18} /> JPEG</>}
-                </button>
-              </div>
-            )}
-            <div className="save-state">{statusLabel}</div>
-          </div>
-          <div className="wk-side-panel">
-            <div className="deal-section-head">
-              <span className="deal-section-icon" style={{ background: 'linear-gradient(135deg, #F472B6, #DB2777)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.checklist }} />
-              <div className="deal-section-text">
-                <h4>Сьогодні</h4>
-                <p>{fmtDate(period.year, period.month, period.day)}</p>
-              </div>
-            </div>
-            <div className="deal-section-body">
-              <div className="wk-progress-chart">
-                <DonutChart
-                  slices={[
-                    { label: 'Внесено', value: monthFillStats.done, color: '#1E9E5D' },
-                    { label: 'Просрочено', value: monthFillStats.over, color: '#D14343' },
-                    { label: 'Ще не настав', value: monthFillStats.future, color: '#E1D9EA' },
-                  ]}
-                  centerValue={`${monthFillStats.pct}%`}
-                  centerLabel={`${monthFillStats.done} з ${monthFillStats.total} днів`}
-                  gradient smallCenter
-                />
-              </div>
-              <div className="wk-side-stat"><span className="wk-side-stat-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }} /><span>Клієнти додано</span><b>{clientsAdded}</b></div>
-              <div className="wk-side-stat"><span className="wk-side-stat-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /><span>Задач виконано</span><b>{tasksDoneCount}</b></div>
-              <div className="wk-side-stat"><span className="wk-side-stat-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.clock }} /><span>Задач в очікуванні</span><b>{tasksPendingCount}</b></div>
-            </div>
-          </div>
+        </aside>
+      </div>
         </div>
       </div>
 

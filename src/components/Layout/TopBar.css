@@ -237,3 +237,7 @@
   .topbar-info-btn--labeled .topbar-info-label { display: none; }
   .topbar-info-btn--labeled { padding: 0 6px; }
 }
+
+/* Page-supplied controls (portal target); takes no room while empty. */
+.topbar-slot { display: flex; align-items: center; gap: 10px; flex: none; }
+.topbar-slot:empty { display: none; }

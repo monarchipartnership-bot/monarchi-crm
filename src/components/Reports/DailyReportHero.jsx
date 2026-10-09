@@ -75,6 +75,7 @@ export default function DailyReportHero({ year, month, currentDay, savedDays, on
       </div>
 
       <div className="daily-hero-calendar">
+        <div className="daily-hero-toprow">
         <div className="daily-hero-nav">
           <button type="button" className="daily-hero-nav-btn" onClick={() => onChangeMonth(-1)} aria-label="Попередній місяць">
             <span dangerouslySetInnerHTML={{ __html: CHEVRON_LEFT }} />
@@ -86,6 +87,14 @@ export default function DailyReportHero({ year, month, currentDay, savedDays, on
           <button type="button" className="daily-hero-nav-btn" onClick={() => onChangeMonth(1)} aria-label="Наступний місяць">
             <span dangerouslySetInnerHTML={{ __html: CHEVRON_RIGHT }} />
           </button>
+        </div>
+        {/* What the colours of the days mean (text always accompanies colour); shown by the folder design. */}
+        <ul className="daily-legend" aria-label="Позначення днів">
+          <li className="done">Внесено</li>
+          <li className="over">Прострочено</li>
+          <li className="future">Майбутні</li>
+          <li className="weekend">Вихідні</li>
+        </ul>
         </div>
 
         <div className="daily-hero-days-wrap">
@@ -118,6 +127,7 @@ export default function DailyReportHero({ year, month, currentDay, savedDays, on
                 >
                   <span className="daily-hero-day-num">{d}</span>
                   <span className="daily-hero-day-wd">{WEEKDAY_SHORT[thisDate.getDay()]}</span>
+                  <span className="daily-hero-day-dot" aria-hidden="true" />
                 </button>
               );
             })}

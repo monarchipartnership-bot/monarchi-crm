@@ -65,6 +65,9 @@ export default function TopBar() {
         <input type="text" placeholder="Пошук по CRM — скоро" disabled />
       </div>
 
+      {/* A page may put its own compact controls here (React portal), e.g. Daily Report's manager / save state / exports. Empty everywhere else. */}
+      <div className="topbar-slot" id="topbar-slot" />
+
       <div className="topbar-actions">
         <NotificationBell />
         <div className="topbar-account">
