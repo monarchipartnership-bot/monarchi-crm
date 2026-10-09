@@ -1,4 +1,4 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildCaseSelectorSystemPrompt, buildCaseSelectorUserMessage, parseCaseSelectorReply } from '../caseSelectorPrompt';
 
 export async function selectCase({ leadDescription, cases }) {
@@ -6,7 +6,7 @@ export async function selectCase({ leadDescription, cases }) {
   const systemPrompt = buildCaseSelectorSystemPrompt();
   const userMsg = buildCaseSelectorUserMessage({ leadDescription, casesBlock });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('case-selector', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

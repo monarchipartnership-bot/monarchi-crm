@@ -10,6 +10,8 @@
 // Returns { text } — a "- item" list in English. The model may only reword and group what it is
 // given: no invented reasons, results or numbers.
 import { createClient } from '@supabase/supabase-js';
+import { getModelClient } from './_lib/ai.js';
+import { BudgetError, ModelError } from './_lib/modelClient.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -85,15 +87,12 @@ export default async function handler(req, res) {
   } else { bad(res, 400, 'action: describe | merge'); return; }
 
   try {
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1500, thinking: { type: 'disabled' }, system: STYLE, messages: [{ role: 'user', content: prompt }] }),
+    // Through the shared client: retries, usage log, spending limits.
+    const result = await getModelClient(token).callModel({
+      agentKey: 'report-work-summary', trigger: 'user', actor: userData.user.email || null,
+      params: { model: MODEL, max_tokens: 1500, thinking: { type: 'disabled' }, system: STYLE, messages: [{ role: 'user', content: prompt }] },
     });
-    const data = await upstream.json();
-    if (!upstream.ok) { bad(res, 502, data?.error?.message || 'Помилка моделі'); return; }
-    const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
-    if (!text) { bad(res, 502, `Модель не повернула текст (stop_reason: ${data.stop_reason || '?'}, блоки: ${(data.content || []).map((x) => x.type).join(',') || 'немає'}, токени: ${data.usage?.output_tokens ?? '?'})`); return; }
+    const text = result.text;
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => (l.startsWith('-') ? l : '- ' + l.replace(/^[•*]\s*/, '')));
     // The model sometimes adds a platform the source never named; take such phrases out again.
     const source = (action === 'merge' ? weeks.map((w) => w.text).join('\n') : facts.join('\n')).toLowerCase();
@@ -106,6 +105,7 @@ export default async function handler(req, res) {
     });
     res.status(200).json({ text: out });
   } catch (e) {
-    bad(res, 502, 'Не вдалося звернутися до моделі: ' + e.message);
+    if (e instanceof BudgetError) { bad(res, 429, e.message); return; }
+    bad(res, 502, e instanceof ModelError ? e.message : 'Не вдалося звернутися до моделі: ' + e.message);
   }
 }

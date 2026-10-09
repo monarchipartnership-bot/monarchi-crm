@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildJobPostAnalyzerSystemPrompt, buildJobPostAnalyzerUserMessage, parseJobPostAnalyzerReply } from '../jobPostAnalyzerPrompt';
 
 export async function analyzeJobPost({ jobPost, extraContext }) {
   const systemPrompt = buildJobPostAnalyzerSystemPrompt();
   const userMsg = buildJobPostAnalyzerUserMessage({ jobPost, extraContext });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('job-post-analyzer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

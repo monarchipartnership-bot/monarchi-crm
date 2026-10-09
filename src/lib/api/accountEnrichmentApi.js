@@ -1,4 +1,4 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildAccountEnrichmentSystemPrompt, buildAccountEnrichmentUserMessage, parseAccountEnrichmentReply } from '../accountEnrichmentPrompt';
 
 const FETCH_ENDPOINT = '/api/fetch-website-text';
@@ -25,7 +25,7 @@ export async function enrichAccount({ url }) {
   const systemPrompt = buildAccountEnrichmentSystemPrompt();
   const userMsg = buildAccountEnrichmentUserMessage({ url, websiteText: fetched.text });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('account-enrichment', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

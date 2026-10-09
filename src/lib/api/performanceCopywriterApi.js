@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildPerformanceCopywriterSystemPrompt, buildPerformanceCopywriterUserMessage, parsePerformanceCopywriterReply } from '../performanceCopywriterPrompt';
 
 export async function writeAdCopy({ platform, productDescription, audience, hypothesis }) {
   const systemPrompt = buildPerformanceCopywriterSystemPrompt(platform);
   const userMsg = buildPerformanceCopywriterUserMessage({ productDescription, audience, hypothesis });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('performance-copywriter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

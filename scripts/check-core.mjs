@@ -94,4 +94,87 @@ await ok('server call adapter: runs a handler in-process with the agent token an
   await assert.rejects(() => agentPost('/api/nope', {}), /Невідомий/);
 });
 
+// ---- The shared model client: retries, cost, limits, usage log (stub SDK and stub database, no network)
+const { createModelClient, BudgetError, ModelError, windowStart } = await import('../api/_lib/modelClient.js');
+const { costUsd, worstCaseUsd } = await import('../api/_lib/aiPricing.js');
+
+const reply = (text, usage = { input_tokens: 1000, output_tokens: 500 }, extra = {}) => ({ content: text ? [{ type: 'text', text }] : [{ type: 'thinking', thinking: '' }], stop_reason: 'end_turn', usage, ...extra });
+const apiError = (status, headers = {}) => Object.assign(new Error('boom ' + status), { status, headers });
+function harness({ script, limits = [], spent = 0, recordFails = false }) {
+  const rows = [];
+  const waits = [];
+  const queue = [...script];
+  const client = createModelClient({
+    getSdk: () => ({ messages: { create: async () => { const next = queue.shift(); if (next instanceof Error) throw next; return next; } } }),
+    store: {
+      recordCall: async (r) => { if (recordFails) throw new Error('db down'); rows.push(r); },
+      limits: async () => limits,
+      spentSince: async () => spent,
+    },
+    sleep: async (ms) => { waits.push(ms); },
+    random: () => 0,
+  });
+  return { client, rows, waits, calls: () => script.length - queue.length };
+}
+const P = { model: 'claude-sonnet-5', max_tokens: 1500, system: 'x', messages: [{ role: 'user', content: 'hi' }] };
+
+await ok('model client: cost of a call is computed from the exact usage', async () => {
+  assert.equal(costUsd('claude-sonnet-5', { input_tokens: 1000, output_tokens: 500 }), 0.007);
+  assert.equal(costUsd('claude-sonnet-5', { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 1e6 }), 0.2);
+  assert.ok(costUsd('some-new-model', { output_tokens: 1e6 }) >= 50, 'an unknown model is priced like the most expensive one');
+  const h = harness({ script: [reply('- done')] });
+  const r = await h.client.callModel({ agentKey: 'a', params: P });
+  assert.equal(r.text, '- done');
+  assert.equal(r.costUsd, 0.007);
+  assert.equal(h.rows.length, 1);
+  assert.equal(h.rows[0].status, 'ok');
+  assert.equal(h.rows[0].output_tokens, 500);
+});
+await ok('model client: retries overload and honours retry-after, counts the retries', async () => {
+  const h = harness({ script: [apiError(529), apiError(429, { 'retry-after': '3' }), reply('ok')] });
+  const r = await h.client.callModel({ agentKey: 'a', params: P });
+  assert.equal(r.retries, 2);
+  assert.deepEqual(h.waits, [1800, 3000]);
+  assert.equal(h.rows[0].retries, 2);
+});
+await ok('model client: gives up after the attempts, with a reason, and logs the failure', async () => {
+  const h = harness({ script: [apiError(529), apiError(529), apiError(529), apiError(529)] });
+  await assert.rejects(() => h.client.callModel({ agentKey: 'a', params: P }), (e) => e instanceof ModelError && e.reason === 'overloaded' && e.attempts === 4);
+  assert.equal(h.rows[0].status, 'error');
+  assert.equal(h.rows[0].retries, 3);
+});
+await ok('model client: a rejected request (400) is not retried', async () => {
+  const h = harness({ script: [apiError(400), reply('never')] });
+  await assert.rejects(() => h.client.callModel({ agentKey: 'a', params: P }), (e) => e.reason === 'rejected');
+  assert.equal(h.calls(), 1);
+});
+await ok('model client: an answer with no text is an error that says why (the thinking-ate-the-tokens case)', async () => {
+  const h = harness({ script: [reply('', { input_tokens: 10, output_tokens: 1500 }, { stop_reason: 'max_tokens' })] });
+  await assert.rejects(() => h.client.callModel({ agentKey: 'a', params: P }), (e) => e.reason === 'empty' && /max_tokens/.test(e.message) && /thinking/.test(e.message));
+  assert.equal(h.rows[0].status, 'empty');
+});
+await ok('model client: refuses a call that could exceed the per-call cap, before sending it', async () => {
+  const h = harness({ script: [reply('never')] });
+  const big = { ...P, model: 'claude-fable-5-1', max_tokens: 100000 };
+  assert.ok(worstCaseUsd(big.model, big) > 0.5);
+  await assert.rejects(() => h.client.callModel({ agentKey: 'a', params: big }), (e) => e instanceof BudgetError && e.kind === 'call');
+  assert.equal(h.calls(), 0);
+  assert.equal(h.rows[0].status, 'budget_stopped');
+});
+await ok('model client: stops when the day or month budget is used up; other agents’ limits do not apply', async () => {
+  const h = harness({ script: [reply('never')], limits: [{ scope: 'global', period: 'day', limit_usd: 1 }], spent: 1.5 });
+  await assert.rejects(() => h.client.callModel({ agentKey: 'a', params: P }), (e) => e instanceof BudgetError && e.kind === 'day');
+  assert.equal(h.calls(), 0);
+  const other = harness({ script: [reply('fine')], limits: [{ scope: 'agent:someone-else', period: 'month', limit_usd: 1 }], spent: 5 });
+  assert.equal((await other.client.callModel({ agentKey: 'a', params: P })).text, 'fine');
+});
+await ok('model client: a failing usage log never breaks the call', async () => {
+  const h = harness({ script: [reply('still works')], recordFails: true });
+  assert.equal((await h.client.callModel({ agentKey: 'a', params: P })).text, 'still works');
+});
+await ok('budget windows start at midnight Kyiv time (summer UTC+3, winter UTC+2)', () => {
+  assert.equal(windowStart('day', new Date('2026-07-15T10:00:00Z')), '2026-07-14T21:00:00.000Z');
+  assert.equal(windowStart('month', new Date('2026-12-20T10:00:00Z')), '2026-11-30T22:00:00.000Z');
+});
+
 console.log(`\n${passed} checks passed`);

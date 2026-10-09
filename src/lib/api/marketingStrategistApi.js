@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildMarketingStrategistSystemPrompt, buildMarketingStrategistUserMessage } from '../marketingStrategistPrompt';
 
 export async function buildStrategy({ businessDescription, goals, budget, audienceNotes, existingResearch }) {
   const systemPrompt = buildMarketingStrategistSystemPrompt();
   const userMsg = buildMarketingStrategistUserMessage({ businessDescription, goals, budget, audienceNotes, existingResearch });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('marketing-strategist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

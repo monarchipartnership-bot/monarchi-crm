@@ -1,4 +1,4 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import {
   buildOldLeadSystemPrompt, buildSeriesStepSystemPrompt, buildUserMessage,
   parseOldLeadReply, parseSeriesStepReply, appendSignatureIfEmail, appendPreviousStepsContext,
@@ -12,7 +12,7 @@ export async function generateOldLeadFollowup({ chat, extraContext, nameOverride
   const systemPrompt = buildOldLeadSystemPrompt({ language, format, style });
   const userMsg = buildUserMessage({ chat, nameOverride, projectsBlock, extraContext });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('followup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -46,7 +46,7 @@ export async function generateFollowupStep({ chat, extraContext, nameOverride, l
     previousMessages,
   );
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('followup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

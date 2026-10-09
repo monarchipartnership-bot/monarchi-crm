@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildLeadQualificationSystemPrompt, buildLeadQualificationUserMessage, parseLeadQualificationReply } from '../leadQualificationPrompt';
 
 export async function qualifyLead({ deal, icpCriteria }) {
   const systemPrompt = buildLeadQualificationSystemPrompt();
   const userMsg = buildLeadQualificationUserMessage({ deal, icpCriteria });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('lead-qualification', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildOnboardingMeetingCoordinatorSystemPrompt, buildOnboardingMeetingCoordinatorUserMessage } from '../onboardingMeetingCoordinatorPrompt';
 
 export async function coordinateOnboardingMeeting({ onboardingContext, meetingContext }) {
   const systemPrompt = buildOnboardingMeetingCoordinatorSystemPrompt();
   const userMsg = buildOnboardingMeetingCoordinatorUserMessage({ onboardingContext, meetingContext });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('onboarding-meeting-coordinator', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

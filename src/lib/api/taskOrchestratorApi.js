@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildTaskOrchestratorSystemPrompt, buildTaskOrchestratorUserMessage, parseTaskOrchestratorReply } from '../taskOrchestratorPrompt';
 
 export async function routeTask({ taskDescription }) {
   const systemPrompt = buildTaskOrchestratorSystemPrompt();
   const userMsg = buildTaskOrchestratorUserMessage({ taskDescription });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('task-orchestrator', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

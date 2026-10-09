@@ -9,6 +9,8 @@
 // client's ad account (never invents figures itself), then answers in
 // Ukrainian using only what the tool returned.
 import { createClient } from '@supabase/supabase-js';
+import { getModelClient } from './_lib/ai.js';
+import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { GoogleAdsApi } from 'google-ads-api';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
@@ -288,23 +290,17 @@ export default async function handler(req, res) {
     let round = 0;
     while (round < maxRounds) {
       round += 1;
-      const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
+      // Through the shared client: retries, usage log, spending limits.
+      const { message: data } = await getModelClient(token).callModel({
+        agentKey: 'ads-insights-analyst', trigger: 'user', actor: userData.user.email || null,
+        params: {
           model: MODEL,
           max_tokens: auditInstructions ? 4000 : 1200,
           system: systemPrompt,
           tools: [REPORT_TOOL, PRESENT_TABLE_TOOL, PRESENT_CHART_TOOL],
           messages: anthropicMessages,
-        }),
+        },
       });
-      if (!upstream.ok) {
-        const errText = await upstream.text();
-        res.status(upstream.status).json({ error: 'Anthropic API error: ' + errText });
-        return;
-      }
-      const data = await upstream.json();
 
       if (data.stop_reason !== 'tool_use') {
         const textBlock = (data.content || []).find((b) => b.type === 'text');
@@ -339,6 +335,7 @@ export default async function handler(req, res) {
     }
     res.status(200).json({ reply: 'Не вдалося отримати повну відповідь за відведену кількість кроків. Спробуйте уточнити питання.' });
   } catch (err) {
-    res.status(502).json({ error: 'Failed to reach Anthropic API: ' + err.message });
+    if (err instanceof BudgetError) { res.status(429).json({ error: err.message }); return; }
+    res.status(502).json({ error: err instanceof ModelError ? err.message : 'Failed to reach Anthropic API: ' + err.message });
   }
 }

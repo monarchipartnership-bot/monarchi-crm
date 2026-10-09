@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildChiefOfStaffSystemPrompt, buildChiefOfStaffUserMessage } from '../chiefOfStaffPrompt';
 
 export async function briefChiefOfStaff({ leadershipRequest, gatheredOutputs }) {
   const systemPrompt = buildChiefOfStaffSystemPrompt();
   const userMsg = buildChiefOfStaffUserMessage({ leadershipRequest, gatheredOutputs });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('chief-of-staff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

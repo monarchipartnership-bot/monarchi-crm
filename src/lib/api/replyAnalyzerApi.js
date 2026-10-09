@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildReplyAnalyzerSystemPrompt, buildReplyAnalyzerUserMessage, parseReplyAnalyzerReply } from '../replyAnalyzerPrompt';
 
 export async function analyzeReply({ clientReply, ourPreviousMessage }) {
   const systemPrompt = buildReplyAnalyzerSystemPrompt();
   const userMsg = buildReplyAnalyzerUserMessage({ clientReply, ourPreviousMessage });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('reply-analyzer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

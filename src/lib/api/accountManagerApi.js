@@ -1,4 +1,4 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { fetchClientBriefingData } from './accountManagerData';
 import { buildAccountManagerSystemPrompt, buildAccountManagerUserMessage, parseAccountManagerReply } from '../accountManagerPrompt';
 
@@ -8,7 +8,7 @@ export async function buildClientBriefing(clientId) {
   const systemPrompt = buildAccountManagerSystemPrompt();
   const userMsg = buildAccountManagerUserMessage({ client, deals, tasks, conversations });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('account-manager', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

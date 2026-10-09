@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildQualityControllerSystemPrompt, buildQualityControllerUserMessage, parseQualityControllerReply } from '../qualityControllerPrompt';
 
 export async function reviewOutput({ outputToReview, originalContext }) {
   const systemPrompt = buildQualityControllerSystemPrompt();
   const userMsg = buildQualityControllerUserMessage({ outputToReview, originalContext });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('quality-controller', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

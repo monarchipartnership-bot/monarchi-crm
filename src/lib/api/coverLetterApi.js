@@ -1,4 +1,4 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildCoverLetterSystemPrompt, buildCoverLetterUserMessage, parseCoverLetterReply } from '../coverLetterPrompt';
 
 export async function generateCoverLetter({ jobPost, extraContext, language, style, cases, selectedCases }) {
@@ -8,7 +8,7 @@ export async function generateCoverLetter({ jobPost, extraContext, language, sty
   const systemPrompt = buildCoverLetterSystemPrompt({ language, style });
   const userMsg = buildCoverLetterUserMessage({ jobPost, casesBlock, extraContext });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('cover-letter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildGoogleOptimizationSystemPrompt, buildGoogleOptimizationUserMessage, parseGoogleOptimizationReply } from '../googleOptimizationPrompt';
 
 export async function buildOptimizationPlan({ diagnosis, accountContext }) {
   const systemPrompt = buildGoogleOptimizationSystemPrompt();
   const userMsg = buildGoogleOptimizationUserMessage({ diagnosis, accountContext });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('google-optimization', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

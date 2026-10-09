@@ -1,11 +1,11 @@
-import { API_ENDPOINT } from '../followupData';
+import { anthropicFetch } from '../followupData';
 import { buildBusinessResearchSystemPrompt, buildBusinessResearchUserMessage } from '../businessResearchPrompt';
 
 export async function researchBusiness({ businessNameOrNiche, rawMaterial }) {
   const systemPrompt = buildBusinessResearchSystemPrompt();
   const userMsg = buildBusinessResearchUserMessage({ businessNameOrNiche, rawMaterial });
 
-  const response = await fetch(API_ENDPOINT, {
+  const response = await anthropicFetch('business-research', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
