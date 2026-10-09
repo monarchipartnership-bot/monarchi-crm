@@ -177,4 +177,22 @@ await ok('budget windows start at midnight Kyiv time (summer UTC+3, winter UTC+2
   assert.equal(windowStart('month', new Date('2026-12-20T10:00:00Z')), '2026-11-30T22:00:00.000Z');
 });
 
+const { isCronRequest, signInAgent } = await import('../api/_lib/agentSession.js');
+await ok('cron requests: only the exact secret passes; a missing or short secret never does', () => {
+  const req = (auth) => ({ headers: { authorization: auth } });
+  const secret = 'a-long-enough-secret-123';
+  assert.equal(isCronRequest(req('Bearer ' + secret), secret), true);
+  assert.equal(isCronRequest(req('Bearer wrong-secret-of-same-len'), secret), false);
+  assert.equal(isCronRequest(req(undefined), secret), false);
+  assert.equal(isCronRequest(req('Bearer undefined'), undefined), false);
+  assert.equal(isCronRequest(req('Bearer short'), 'short'), false);
+});
+await ok('agent sign-in: returns a token, explains a missing setup, and reports a failed sign-in', async () => {
+  const good = { auth: { signInWithPassword: async () => ({ data: { session: { access_token: 'tok' } }, error: null }) } };
+  assert.deepEqual(await signInAgent({ email: 'agent@x.y', password: 'p', makeClient: () => good }), { accessToken: 'tok', email: 'agent@x.y' });
+  await assert.rejects(() => signInAgent({ email: '', password: '' }), /AGENT_EMAIL/);
+  const bad = { auth: { signInWithPassword: async () => ({ data: {}, error: { message: 'Invalid login credentials' } }) } };
+  await assert.rejects(() => signInAgent({ email: 'a@b.c', password: 'p', makeClient: () => bad }), /Invalid login/);
+});
+
 console.log(`\n${passed} checks passed`);
