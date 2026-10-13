@@ -152,7 +152,7 @@ export const ROUTE_META = {
   },
   '/automation/smm': {
     title: "Mon'Archi SMM",
-    desc: 'Внутрішній розділ для роботи з сайтом і соцмережами Monarchi (у розробці).',
+    desc: 'Команда SMM-асистентів Monarchi: бренд-профіль, контент-план, черга схвалення постів для соцмереж.',
     trail: [{ label: 'Automation Department' }, { label: "Mon'Archi SMM" }],
   },
   '/tasks': {

@@ -49,7 +49,7 @@ export const DEPTS = {
       { key: 'constellation', name: 'AI Agents', desc: 'Карта реальних AI-агентів CRM за відділами — від живих (Follow-up Generator) до запланованих.', icon: SI.aiAgents, type: 'link', to: '/tools/constellation-test' },
       // Placeholder page for now. The icon is a stand-in (Image Studio's) —
       // the icon atlas has no SMM glyph yet.
-      { key: 'smm', name: "Mon'Archi SMM", desc: 'Внутрішній розділ для роботи з сайтом і соцмережами Monarchi (у розробці).', icon: SI.imageStudio, type: 'link', to: '/automation/smm' },
+      { key: 'smm', name: "Mon'Archi SMM", desc: 'Контент-план і черга схвалення постів для соцмереж Monarchi, бренд-профіль, конкуренти.', icon: SI.imageStudio, type: 'link', to: '/automation/smm' },
     ],
   },
   team: {

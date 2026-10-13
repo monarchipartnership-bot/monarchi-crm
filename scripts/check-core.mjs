@@ -9,6 +9,8 @@ import {
   buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload,
 } from '../src/lib/reportEngine.js';
 
+import { buildPrompts, nextMonday, parsePosts, scheduleFor, validRequest } from '../api/_lib/smmContent.js';
+
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
 
@@ -411,6 +413,53 @@ await ok('spend stats: totals by window, agent, project and day on the Kyiv cloc
   assert.equal(s.problems.length, 1);
   assert.equal(s.problems[0].error, 'overloaded');
   assert.equal(s.spent.day, 0.53);
+});
+
+await ok('smm: request validation caps the run and rejects nonsense', () => {
+  assert.ok(validRequest({ platforms: [], weekStart: '2026-10-19' }).errors.length);
+  assert.ok(validRequest({ platforms: [{ platform: 'myspace', count: 2 }], weekStart: '2026-10-19' }).errors.length);
+  assert.ok(validRequest({ platforms: [{ platform: 'instagram', count: 7 }, { platform: 'linkedin', count: 7 }], weekStart: '2026-10-19' }).errors.length);
+  const v = validRequest({ platforms: [{ platform: 'instagram', count: 3 }, { platform: 'linkedin', count: 2 }], weekStart: '2026-10-19', language: 'xx' });
+  assert.deepEqual(v.errors, []);
+  assert.equal(v.language, 'en');
+});
+
+await ok('smm: the prompt carries the safety rules, the brand and the counts', () => {
+  const { system, user } = buildPrompts({ brand: { voice: 'Direct, calm', materials: 'We run Meta and Google ads.' }, competitors: [{ name: 'Acme', notes: 'loud' }], platforms: [{ platform: 'instagram', count: 2 }, { platform: 'threads', count: 1 }], language: 'uk', focus: 'reporting', weekStart: '2026-10-19', recentTopics: ['Old topic'] });
+  assert.match(system, /Never invent facts/);
+  assert.match(system, /Ukrainian/);
+  assert.match(user, /2 for Instagram, 1 for Threads \(3 posts\)/);
+  assert.match(user, /Direct, calm/);
+  assert.match(user, /Old topic/);
+  assert.match(buildPrompts({ platforms: [{ platform: 'threads', count: 1 }], weekStart: '2026-10-19', rejections: ['too salesy'] }).user, /rejected earlier posts[\s\S]*too salesy/);
+  assert.match(buildPrompts({ platforms: [{ platform: 'linkedin', count: 1 }], weekStart: '2026-10-19' }).user, /brand profile is still empty/);
+});
+
+await ok('smm: the answer is read back strictly (fences, extra text, wrong network, short body, per-network cap)', () => {
+  const raw = '```json\n' + JSON.stringify({ posts: [
+    { platform: 'instagram', format: 'carousel', topic: 'A', body: 'x'.repeat(60), hashtags: '#a', visual_brief: 'slides', day: 1, time: '9:05' },
+    { platform: 'instagram', format: 'weird', topic: 'B', body: 'y'.repeat(60), day: 9 },
+    { platform: 'instagram', topic: 'C', body: 'z'.repeat(60) },
+    { platform: 'tiktok', topic: 'D', body: 'w'.repeat(60) },
+    { platform: 'threads', topic: 'E', body: 'short' },
+  ] }) + '\n```';
+  const posts = parsePosts(raw, [{ platform: 'instagram', count: 2 }, { platform: 'threads', count: 1 }]);
+  assert.equal(posts.length, 2); // 3rd instagram over the cap, tiktok not requested, threads body too short
+  assert.equal(posts[0].format, 'carousel');
+  assert.equal(posts[0].time, '09:05');
+  assert.equal(posts[1].format, 'image'); // unknown format falls back
+  assert.equal(posts[1].day, null);
+  assert.deepEqual(parsePosts('nothing useful', [{ platform: 'instagram', count: 1 }]), []);
+  assert.equal(parsePosts('Here you go: ' + JSON.stringify({ posts: [{ platform: 'linkedin', body: 'q'.repeat(40) }] }) + ' enjoy', [{ platform: 'linkedin', count: 1 }]).length, 1);
+});
+
+await ok('smm: posts are scheduled on the Kyiv clock, the next week starts on Monday', () => {
+  const [a, b] = scheduleFor([{ platform: 'instagram', day: 1, time: '18:00' }, { platform: 'linkedin', day: null, time: '09:30' }], '2026-10-19');
+  assert.equal(a.scheduled_for, '2026-10-20T15:00:00.000Z'); // 18:00 Kyiv (UTC+3 in October) on Tuesday
+  assert.equal(b.scheduled_for, '2026-10-20T06:30:00.000Z'); // no day given: spread over the week by order (2nd post -> Tuesday)
+  assert.equal(nextMonday('2026-10-13', 2), '2026-10-19'); // Tuesday -> next Monday
+  assert.equal(nextMonday('2026-10-12', 1), '2026-10-19'); // Monday -> a week ahead
+  assert.equal(nextMonday('2026-10-18', 7), '2026-10-19'); // Sunday
 });
 
 console.log(`\n${passed} checks passed`);
