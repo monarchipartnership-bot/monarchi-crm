@@ -10,6 +10,8 @@ import {
 } from '../src/lib/reportEngine.js';
 
 import { buildPrompts, nextMonday, parsePosts, scheduleFor, validRequest } from '../api/_lib/smmContent.js';
+import { assertPublicUrl, pickPages, readHtml, readSite, robotsAllows } from '../api/_lib/siteReader.js';
+import { buildAnalysisPrompts, insightLine, parseAnalysis } from '../api/_lib/competitorAnalysis.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -460,6 +462,75 @@ await ok('smm: posts are scheduled on the Kyiv clock, the next week starts on Mo
   assert.equal(nextMonday('2026-10-13', 2), '2026-10-19'); // Tuesday -> next Monday
   assert.equal(nextMonday('2026-10-12', 1), '2026-10-19'); // Monday -> a week ahead
   assert.equal(nextMonday('2026-10-18', 7), '2026-10-19'); // Sunday
+});
+
+await ok('competitors: internal and unsafe addresses are refused (before and after DNS)', async () => {
+  const pub = async () => [{ address: '93.184.216.34' }];
+  for (const bad of ['http://localhost/x', 'http://127.0.0.1/', 'http://10.0.0.5/', 'http://169.254.169.254/latest/meta-data', 'http://[::1]/', 'ftp://example.com', 'https://user:pw@example.com', 'https://example.com:8080', 'http://intranet', 'http://foo.internal']) {
+    await assert.rejects(() => assertPublicUrl(bad, pub), undefined, bad);
+  }
+  await assert.rejects(() => assertPublicUrl('https://sneaky.example.com', async () => [{ address: '192.168.1.10' }]), /Внутрішні/);
+  await assert.rejects(() => assertPublicUrl('https://dual.example.com', async () => [{ address: '93.184.216.34' }, { address: '10.1.1.1' }]), /Внутрішні/);
+  assert.equal((await assertPublicUrl('example.com', pub)).toString(), 'https://example.com/');
+});
+
+await ok('competitors: robots.txt is honoured (disallow, longer allow wins, own group first)', () => {
+  const txt = 'User-agent: *\nDisallow: /private\nAllow: /private/open\n\nUser-agent: MonarchiSMMBot\nDisallow: /blog\n';
+  assert.equal(robotsAllows(txt, '/blog/post'), false);
+  assert.equal(robotsAllows(txt, '/private'), true); // our own group applies, not "*"
+  assert.equal(robotsAllows('User-agent: *\nDisallow: /private\nAllow: /private/open\n', '/private/open/x'), true);
+  assert.equal(robotsAllows('User-agent: *\nDisallow: /private\n', '/private/a'), false);
+  assert.equal(robotsAllows('User-agent: *\nDisallow: /\n', '/'), false);
+  assert.equal(robotsAllows('', '/anything'), true);
+});
+
+await ok('competitors: a page is read to text, links, and the right extra pages are picked', () => {
+  const html = '<html><head><title>Acme &amp; Co</title><meta name="description" content="We grow shops"><style>.x{}</style></head><body><nav><a href="/menu">Menu</a></nav><h1>Paid ads for shops</h1><p>We run Meta ads.</p><script>alert(1)</script><a href="/blog/why-roas">Blog: why ROAS</a><a href="/blog/why-roas">dup</a><a href="/services/meta">Services</a><a href="https://other.com/blog/x">out</a><a href="/files/deck.pdf">pdf</a><a href="/contact">Contact</a><footer>Copyright</footer></body></html>';
+  const p = readHtml(html, 'https://acme.example/');
+  assert.equal(p.title, 'Acme & Co');
+  assert.equal(p.description, 'We grow shops');
+  assert.match(p.text, /Paid ads for shops/);
+  assert.doesNotMatch(p.text, /alert|Copyright|Menu/);
+  assert.deepEqual(pickPages(p.links, 'https://acme.example/'), ['https://acme.example/blog/why-roas', 'https://acme.example/services/meta']);
+});
+
+await ok('competitors: a whole site is read with a stand-in network, redirects to private hosts are stopped', async () => {
+  const headers = (o) => ({ get: (k) => o[k.toLowerCase()] ?? null });
+  const empty = { status: 404, ok: false, headers: headers({}), arrayBuffer: async () => new ArrayBuffer(0) };
+  const page = (body, status = 200) => ({ status, ok: status < 400, headers: headers({ 'content-type': 'text/html' }), arrayBuffer: async () => new TextEncoder().encode(body).buffer });
+  const site = {
+    'https://acme.example/': page('<title>Home</title><h1>Hello</h1><a href="/blog/a">Blog</a><a href="/about">About</a>'),
+    'https://acme.example/blog/a': page('<title>Post A</title><p>All about ads</p>'),
+    'https://acme.example/about': page('nope', 500),
+  };
+  const fetchFn = async (url) => site[url] || empty;
+  const lookup = async () => [{ address: '93.184.216.34' }];
+  const r = await readSite('acme.example', { fetchFn, lookup });
+  assert.equal(r.blockedByRobots, false);
+  assert.deepEqual(r.pages.map((p) => [p.url, p.ok]), [['https://acme.example/', true], ['https://acme.example/blog/a', true], ['https://acme.example/about', false]]);
+  assert.match(r.pages[1].text, /All about ads/);
+  // a redirect to an internal address must be refused
+  const evil = async (url) => (url.endsWith('robots.txt') ? empty : { status: 302, ok: false, headers: headers({ location: 'http://169.254.169.254/' }), arrayBuffer: async () => new ArrayBuffer(0) });
+  await assert.rejects(() => readSite('evil.example', { fetchFn: evil, lookup }), /Внутрішні/);
+  // robots.txt that forbids everything
+  const closed = async (url) => (url.endsWith('robots.txt') ? { status: 200, ok: true, headers: headers({ 'content-type': 'text/plain' }), arrayBuffer: async () => new TextEncoder().encode('User-agent: *\nDisallow: /').buffer } : page('x'));
+  assert.equal((await readSite('closed.example', { fetchFn: closed, lookup })).blockedByRobots, true);
+});
+
+await ok('competitors: the analysis answer is read back and summed up for the strategist', () => {
+  const a = parseAnalysis('Sure:\n```json\n' + JSON.stringify({ positioning: 'Ads for shops', offers: ['Meta ads', 'Reporting'], content_themes: ['ROAS', 'Creatives'], weaknesses: ['No cases'], post_ideas: [{ topic: 'ROAS myths', angle: 'with a real checklist' }, { angle: 'no topic' }], limits: 'no prices' }) + '\n```');
+  assert.equal(a.post_ideas.length, 1);
+  assert.deepEqual(a.offers, ['Meta ads', 'Reporting']);
+  assert.equal(parseAnalysis('nothing'), null);
+  assert.equal(parseAnalysis('{"foo": 1}'), null);
+  const line = insightLine('Acme', a);
+  assert.equal(line, 'Acme: positioning: Ads for shops | they write about: ROAS; Creatives | gaps: No cases | ideas for us: ROAS myths (with a real checklist)');
+  assert.equal(insightLine('X', null), '');
+  const { user } = buildPrompts({ competitors: [{ name: 'Acme', insight: line }], platforms: [{ platform: 'threads', count: 1 }], weekStart: '2026-10-19' });
+  assert.match(user, /competitor agent learned[\s\S]*ROAS myths/);
+  const prompt = buildAnalysisPrompts({ name: 'Acme', website: 'acme.example' }, [{ ok: true, url: 'https://acme.example/', title: 'Home', text: 'Hello' }, { ok: false, url: 'https://acme.example/x' }]);
+  assert.match(prompt.user, /Page 1: https:\/\/acme.example\//);
+  assert.doesNotMatch(prompt.user, /Page 2/);
 });
 
 console.log(`\n${passed} checks passed`);

@@ -2,7 +2,8 @@
   "functions": {
     "api/project-agent-run.js": { "maxDuration": 300 },
     "api/agent-tick.js": { "maxDuration": 300 },
-    "api/smm-generate.js": { "maxDuration": 300 }
+    "api/smm-generate.js": { "maxDuration": 300 },
+    "api/smm-competitors-run.js": { "maxDuration": 300 }
   },
   "crons": [
     { "path": "/api/agent-tick", "schedule": "*/15 * * * *" }

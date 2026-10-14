@@ -109,3 +109,17 @@ export async function reviewPost(id, action, { note, url, email } = {}) {
 export function generatePlan({ platforms, weekStart, language, focus }) {
   return authedPost('/api/smm-generate', { platforms, weekStart, language, focus });
 }
+
+// What the competitor agent learned (api/smm-competitors-run.js): the newest report of each competitor, failed runs included.
+export async function fetchCompetitorReports() {
+  const { data, error } = await supabase.from('smm_competitor_reports').select('*').order('created_at', { ascending: false }).limit(200);
+  if (error) { warn('fetchCompetitorReports', error); return {}; }
+  const latest = {};
+  (data || []).forEach((r) => { if (!latest[r.competitor_id]) latest[r.competitor_id] = r; });
+  return latest;
+}
+
+// Reads the public site of one competitor (or of all that have one). Takes up to a minute or two.
+export function runCompetitorAgent(competitorId) {
+  return authedPost('/api/smm-competitors-run', competitorId ? { competitorId } : {});
+}

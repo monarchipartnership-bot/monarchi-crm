@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getModelClient } from './_lib/ai.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { buildPrompts, parsePosts, scheduleFor, validRequest } from './_lib/smmContent.js';
+import { insightLine } from './_lib/competitorAnalysis.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -32,14 +33,21 @@ export default async function handler(req, res) {
   const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
   const [brandRes, compRes, recentRes, rejectRes] = await Promise.all([
     db.from('smm_brand').select('*').eq('id', 1).maybeSingle(),
-    db.from('smm_competitors').select('name, notes').order('created_at', { ascending: true }).limit(20),
+    db.from('smm_competitors').select('id, name, notes').order('created_at', { ascending: true }).limit(20),
     db.from('smm_posts').select('topic').order('created_at', { ascending: false }).limit(40),
     db.from('smm_posts').select('review_note').eq('status', 'rejected').not('review_note', 'is', null).order('reviewed_at', { ascending: false }).limit(10),
   ]);
   if (brandRes.error) { bad(res, 500, 'Таблиці SMM ще не створено (потрібна міграція): ' + brandRes.error.message); return; }
 
+  // The newest successful analysis of each competitor, in one short line each.
+  const comps = compRes.data || [];
+  const repRes = comps.length ? await db.from('smm_competitor_reports').select('competitor_id, analysis, created_at').in('competitor_id', comps.map((c) => c.id)).not('analysis', 'is', null).order('created_at', { ascending: false }).limit(60) : { data: [] };
+  const latest = new Map();
+  (repRes.data || []).forEach((r) => { if (!latest.has(r.competitor_id)) latest.set(r.competitor_id, r.analysis); });
+  const competitorsWithInsight = comps.map((c) => ({ ...c, insight: insightLine(c.name, latest.get(c.id)) }));
+
   const { system, user } = buildPrompts({
-    brand: brandRes.data || {}, competitors: compRes.data || [], platforms: reqInfo.platforms, language: reqInfo.language,
+    brand: brandRes.data || {}, competitors: competitorsWithInsight, platforms: reqInfo.platforms, language: reqInfo.language,
     focus: reqInfo.focus, weekStart: reqInfo.weekStart, recentTopics: (recentRes.data || []).map((r) => r.topic).filter(Boolean),
     rejections: (rejectRes.data || []).map((r) => r.review_note).filter(Boolean),
   });

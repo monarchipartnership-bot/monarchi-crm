@@ -179,3 +179,15 @@ button.smm-stat { cursor: pointer; }
   .smm-btn, .smm-icon-btn { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .smm-overlay, .smm-dialog { animation: none; } .smm-btn { transition: none; } }
+
+/* competitor reports */
+.smm-comp { border-bottom: 1px solid #EEE7F2; }
+.smm-comp:last-child { border-bottom: 0; }
+.smm-comp .smm-row { border-bottom: 0; }
+.smm-comp-notes { padding: 0 12px 8px; }
+.smm-bad { color: var(--s-bad); }
+.smm-report { margin: 4px 12px 14px; padding: 14px 16px; background: #FBF8FD; border: 1px solid #EEE5F1; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5; }
+.smm-rep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px; }
+.smm-rep-sec h5 { margin: 0 0 4px; font: 650 12px/1.3 'Onest', sans-serif; color: var(--s-plum); text-transform: none; }
+.smm-rep-sec ul { margin: 0; padding-left: 18px; }
+.smm-rep-sec li { margin: 2px 0; overflow-wrap: anywhere; }

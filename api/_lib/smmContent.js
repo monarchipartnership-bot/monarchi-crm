@@ -62,6 +62,7 @@ export function buildPrompts({ brand = {}, competitors = [], platforms = [], lan
     focus ? `Focus for this week (from the team): ${clip(focus, 600)}` : '',
     brandLines.length ? `Brand profile:\n${brandLines.join('\n')}` : 'The brand profile is still empty: write careful, general-purpose expert content for a digital marketing agency and avoid any specifics about Monarchi itself.',
     competitors.length ? `Competitors we watch (to differentiate from, never to name): ${competitors.slice(0, 12).map((c) => clip(c.name, 80) + (c.notes ? ` (${clip(c.notes, 160)})` : '')).join('; ')}` : '',
+    competitors.some((c) => c.insight) ? `What the competitor agent learned from their public pages (use it to take a different angle; never copy, never name them):\n${competitors.filter((c) => c.insight).slice(0, 8).map((c) => '- ' + clip(c.insight, 900)).join('\n')}` : '',
     recentTopics.length ? `Topics already used recently, do not repeat them:\n${recentTopics.slice(0, 40).map((t) => '- ' + clip(t, 100)).join('\n')}` : '',
     rejections.length ? `The team rejected earlier posts for these reasons, learn from them:\n${rejections.slice(0, 10).map((r) => '- ' + clip(r, 200)).join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
