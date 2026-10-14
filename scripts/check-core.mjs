@@ -429,6 +429,7 @@ await ok('smm: request validation caps the run and rejects nonsense', () => {
 await ok('smm: the prompt carries the safety rules, the brand and the counts', () => {
   const { system, user } = buildPrompts({ brand: { voice: 'Direct, calm', materials: 'We run Meta and Google ads.' }, competitors: [{ name: 'Acme', notes: 'loud' }], platforms: [{ platform: 'instagram', count: 2 }, { platform: 'threads', count: 1 }], language: 'uk', focus: 'reporting', weekStart: '2026-10-19', recentTopics: ['Old topic'] });
   assert.match(system, /Never invent facts/);
+  assert.match(system, /retell a case[\s\S]*ONLY the figures/);
   assert.match(system, /Ukrainian/);
   assert.match(user, /2 for Instagram, 1 for Threads \(3 posts\)/);
   assert.match(user, /Direct, calm/);
