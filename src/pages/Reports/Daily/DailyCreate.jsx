@@ -215,7 +215,7 @@ export default function DailyCreate() {
         } else {
           setName('');
           setDone([]);
-          setClients([{ id: makeId(), platform: CLIENT_PLATFORMS[0], leadType: STATUSES[0], name: '', title: '', text: '', clientId: null, channel: '', upworkChannel: '' }]);
+          setClients([]); // a day without a report starts empty: clients are added with «Додати клієнта»
           setPlans([]);
           setStatusLabel('Ще не збережено');
         }

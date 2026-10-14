@@ -90,7 +90,7 @@ export default function SmmBrand({ brand, competitors, reports = {}, notify, rel
           {BRAND_FIELDS.map((f) => (
             <div key={f.key} className="smm-field smm-field--wide">
               <label htmlFor={'smm-brand-' + f.key}>{f.label}</label>
-              <textarea id={'smm-brand-' + f.key} rows={f.key === 'materials' ? 7 : 3} value={form[f.key]} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} maxLength={3000} />
+              <textarea id={'smm-brand-' + f.key} rows={f.key === 'materials' ? 7 : 3} value={form[f.key]} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} maxLength={f.max || 3000} />
               <span className="smm-hint">{f.hint}</span>
             </div>
           ))}

@@ -37,6 +37,7 @@ const clip = (v, n) => String(v ?? '').trim().slice(0, n);
 const SAFETY = [
   'You write posts for the official accounts of Mon\'Archi, a digital marketing agency (paid ads, reporting, creatives, automation).',
   'Never invent facts: no client names, no results, percentages, revenue, ROAS, awards, testimonials, years of experience, team size or statistics unless they are written in the brand notes below. When a post would be stronger with a real number or case, write it without one and put a short note for the person in fact_check (what to add or verify).',
+  'When you retell a case from the brand notes, use ONLY the figures, the challenges and the fixes written for that case. Do not describe the client's situation, what an audit found, why a result happened, or any quote unless it is written there; if a case lists no fixes, tell it by its results only. Name a client only if it is listed as a published case.',
   'Never promise results, never make comparative or medical/financial claims, never mention a competitor by name, never reuse another brand\'s text.',
   'Every post must be genuinely useful or interesting to the audience (an insight, a how-to, a lesson, a behind-the-scenes angle, a question), not an advertisement for "our services". At most one post in four may be a soft call to action.',
   'No two posts may repeat the same idea, hook or opening line, across networks too. Adapt one idea to a network, do not copy it.',
@@ -47,8 +48,8 @@ export function buildPrompts({ brand = {}, competitors = [], platforms = [], lan
   const total = platforms.reduce((s, p) => s + p.count, 0);
   const brandLines = [
     ['Voice and tone', brand.voice], ['Audience', brand.audience], ['Content pillars (topics we stand for)', brand.pillars],
-    ['Always', brand.dos], ['Never', brand.donts], ['Preferred formats', brand.formats], ['Facts and materials you may use', brand.materials],
-  ].filter(([, v]) => String(v || '').trim()).map(([k, v]) => `${k}: ${clip(v, 3000)}`);
+    ['Always', brand.dos], ['Never', brand.donts], ['Preferred formats', brand.formats], ['Facts and materials you may use', brand.materials, 9000],
+  ].filter(([, v]) => String(v || '').trim()).map(([k, v, max]) => `${k}: ${clip(v, max || 3000)}`);
   const system = [
     ...SAFETY,
     `Write every post in ${lang}.`,
