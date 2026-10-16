@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, BRAND_FIELDS } from '../../lib/api/smm';
+import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, fetchSiteAudits, BRAND_FIELDS } from '../../lib/api/smm';
 import '../../styles/projectWorkspace.css'; // the shared confirmation window (useConfirm) lives in this sheet
 import '../../styles/smmPage.css';
 import SmmBrand from './SmmBrand';
@@ -8,11 +8,13 @@ import { GenerateDialog, PostDialog } from './SmmDialogs';
 import SmmOverview from './SmmOverview';
 import SmmPlan from './SmmPlan';
 import SmmQueue from './SmmQueue';
+import SmmSite from './SmmSite';
 
 const TABS = [
   { key: 'overview', label: 'Огляд' },
   { key: 'plan', label: 'Контент-план' },
   { key: 'queue', label: 'Черга схвалення' },
+  { key: 'site', label: 'Сайт' },
   { key: 'brand', label: 'Бренд і конкуренти' },
 ];
 
@@ -26,6 +28,7 @@ export default function SmmHome() {
   const [posts, setPosts] = useState([]);
   const [reports, setReports] = useState({});
   const [settings, setSettings] = useState(null);
+  const [audits, setAudits] = useState([]);
   const [missing, setMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState(null); // null | { kind: 'post', post } | { kind: 'generate' }
@@ -34,8 +37,8 @@ export default function SmmHome() {
   const tabRefs = useRef({});
 
   const reload = useCallback(async () => {
-    const [b, c, p, r, st] = await Promise.all([fetchBrand(), fetchCompetitors(), fetchPosts(), fetchCompetitorReports(), fetchSettings()]);
-    setReports(r); setSettings(st);
+    const [b, c, p, r, st, au] = await Promise.all([fetchBrand(), fetchCompetitors(), fetchPosts(), fetchCompetitorReports(), fetchSettings(), fetchSiteAudits()]);
+    setReports(r); setSettings(st); setAudits(au);
     setBrand(b.brand); setCompetitors(c); setPosts(p.posts); setMissing(b.missing || p.missing); setLoading(false);
   }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -81,6 +84,7 @@ export default function SmmHome() {
             {tab === 'overview' && <SmmOverview brand={brand} competitors={competitors} posts={posts} settings={settings} notify={notify} reload={reload} go={go} onGenerate={() => setDialog({ kind: 'generate' })} />}
             {tab === 'plan' && <SmmPlan {...common} onGenerate={() => setDialog({ kind: 'generate' })} onNew={() => setDialog({ kind: 'post', post: null })} onEdit={(post) => setDialog({ kind: 'post', post })} />}
             {tab === 'queue' && <SmmQueue {...common} onEdit={(post) => setDialog({ kind: 'post', post })} />}
+            {tab === 'site' && <SmmSite settings={settings} audits={audits} notify={notify} reload={reload} />}
             {tab === 'brand' && <SmmBrand brand={brand} competitors={competitors} reports={reports} notify={notify} reload={reload} />}
           </>
         )}

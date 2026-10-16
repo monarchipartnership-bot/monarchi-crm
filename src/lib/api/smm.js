@@ -136,3 +136,13 @@ export async function saveSettings(patch, email) {
   if (error) throw error;
   return data;
 }
+
+// The SEO agent (api/smm-seo-audit.js): the newest audits of the public site, and a run (about a minute).
+export async function fetchSiteAudits(limit = 10) {
+  const { data, error } = await supabase.from('smm_site_audits').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (error) { warn('fetchSiteAudits', error); return []; }
+  return data ?? [];
+}
+export function runSeoAudit(url) {
+  return authedPost('/api/smm-seo-audit', url ? { url } : {});
+}

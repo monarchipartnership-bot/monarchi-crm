@@ -106,7 +106,7 @@ export function pickPages(links, homeUrl, limit = 3) {
   return out;
 }
 
-async function fetchOne(url, { fetchFn, lookup, timeoutMs, hops = 3 }) {
+export async function fetchOne(url, { fetchFn, lookup, timeoutMs, hops = 3 }) {
   let current = url;
   for (let i = 0; i <= hops; i += 1) {
     const u = await assertPublicUrl(current, lookup);
@@ -121,7 +121,7 @@ async function fetchOne(url, { fetchFn, lookup, timeoutMs, hops = 3 }) {
 }
 
 // Reads at most MAX_BYTES of the body: a big page is cut (the text we need is at its start), not refused.
-async function readBody(res) {
+export async function readBody(res) {
   const type = res.headers.get('content-type') || '';
   let buf;
   if (res.body && typeof res.body.getReader === 'function') {

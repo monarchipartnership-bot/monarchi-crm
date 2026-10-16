@@ -13,6 +13,8 @@ import { buildPrompts, nextMonday, parsePosts, scheduleFor, validRequest } from 
 import { assertPublicUrl, pickPages, readHtml, readSite, robotsAllows } from '../api/_lib/siteReader.js';
 import { buildAnalysisPrompts, insightLine, parseAnalysis } from '../api/_lib/competitorAnalysis.js';
 import { runSmmWeekly, smmDue } from '../api/_lib/smmRun.js';
+import { auditSite, crawlSite, parsePage } from '../api/_lib/seoAudit.js';
+import { buildPlanPrompts, parsePlan } from '../api/_lib/seoPlan.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -643,6 +645,79 @@ await ok('smm autopilot: a bad model answer is a problem, retried later, and peo
   tables.smm_settings[0].run_state = 'running'; tables.smm_settings[0].lease_until = '2026-10-16T13:00:00Z';
   const blocked = await runSmmWeekly({ db, model, settings: tables.smm_settings[0], scheduledFor: '2026-10-23', email: 'agent@x.com', now: t('2026-10-16T12:30:00Z'), read: async () => ({ pages: [] }) });
   assert.equal(blocked.status, 'skipped');
+});
+
+await ok('seo: a page is read for what search engines look at', () => {
+  const html = '<!doctype html><html lang="uk"><head><title>Мій  сайт &amp; сервіс</title><meta name="description" content="Опис сторінки"><meta name="viewport" content="width=device-width"><meta name="robots" content="NOINDEX, follow"><link rel="canonical" href="https://a.example/page/"><meta property="og:title" content="t"><script type="application/ld+json">{}</script></head><body><nav><a href="/menu">menu</a></nav><h1>Головний заголовок</h1><h2>Підзаголовок</h2><p>Текст сторінки з кількома словами</p><img src="a.jpg" alt="Опис"><img src="b.jpg"><img src="c.jpg" alt=""><a href="/about/">About</a><a href="https://other.com/x">out</a><a href="mailto:a@b.c">mail</a><footer>fine print</footer></body></html>';
+  const p = parsePage(html, 'https://a.example/page/', { status: 200, ms: 120, bytes: html.length, xRobots: 'NoIndex' });
+  assert.equal(p.title, 'Мій сайт & сервіс');
+  assert.equal(p.description, 'Опис сторінки');
+  assert.deepEqual(p.h1, ['Головний заголовок']);
+  assert.equal(p.canonical, 'https://a.example/page/');
+  assert.equal(p.robotsMeta, 'noindex, follow');
+  assert.equal(p.xRobots, 'noindex');
+  assert.equal(p.lang, 'uk');
+  assert.equal(p.viewport, true);
+  assert.equal(p.ogTitle, true);
+  assert.equal(p.ogImage, false);
+  assert.equal(p.jsonLd, 1);
+  assert.deepEqual(p.images, { total: 3, noAlt: 2 });
+  assert.ok(p.links.includes('https://a.example/about/') && p.links.includes('https://other.com/x') && !p.links.some((l) => l.startsWith('mailto')));
+  assert.doesNotMatch(p.excerpt, /fine print|menu/);
+});
+
+await ok('seo: the checks find missing and duplicated things and sort by importance', () => {
+  const page = (url, o = {}) => ({ url, status: 200, ms: 300, bytes: 5000, title: 'A good page title that is long enough ok', description: 'x'.repeat(130), h1: ['H'], h2Count: 2, canonical: url, robotsMeta: '', xRobots: '', lang: 'en', viewport: true, ogTitle: true, ogImage: true, jsonLd: 1, images: { total: 4, noAlt: 0 }, words: 600, links: [], ...o });
+  const pages = [
+    page('https://s.example/'),
+    page('https://s.example/a/', { title: '', h1: [], description: '', words: 100, robotsMeta: 'noindex' }),
+    page('https://s.example/b/', { title: 'Same title for two pages here ok', description: 'y'.repeat(130) }),
+    page('https://s.example/c/', { title: 'Same title for two pages here ok', description: 'y'.repeat(130), images: { total: 10, noAlt: 9 }, ms: 4000 }),
+    page('https://s.example/gone/', { status: 404 }),
+  ];
+  const a = auditSite(pages, { robots: null, sitemap: { found: false, urls: 0 }, httpRedirectsToHttps: false, brokenLinks: [{ url: 'https://s.example/x', status: 404, from: ['https://s.example/'] }] });
+  const ids = a.findings.map((f) => f.id);
+  for (const id of ['status', 'noindex', 'title_missing', 'title_dup', 'desc_missing', 'desc_dup', 'h1_missing', 'thin', 'alt', 'slow', 'broken_links', 'site_robots', 'site_sitemap', 'site_https']) assert.ok(ids.includes(id), id);
+  assert.ok(!ids.includes('viewport') && !ids.includes('lang') && !ids.includes('canonical_missing'));
+  const sev = a.findings.map((f) => f.severity);
+  assert.deepEqual(sev, [...sev].sort((x, y) => ({ high: 0, medium: 1, low: 2 }[x] - { high: 0, medium: 1, low: 2 }[y]))); // high first
+  assert.deepEqual(a.findings.find((f) => f.id === 'title_dup').pages.sort(), ['https://s.example/b/', 'https://s.example/c/']);
+  assert.equal(a.summary.pages, 5);
+  assert.equal(a.summary.ok, 4);
+  assert.equal(auditSite([page('https://s.example/')], { robots: 'User-agent: *', sitemap: { found: true, urls: 3 }, httpRedirectsToHttps: true, brokenLinks: [] }).findings.length, 0); // a clean site has no findings
+});
+
+await ok('seo: the crawler follows the sitemap, honours robots.txt, finds a broken link, and refuses internal hosts', async () => {
+  const headers = (o) => ({ get: (k) => o[k.toLowerCase()] ?? null });
+  const html = (body) => ({ status: 200, ok: true, headers: headers({ 'content-type': 'text/html' }), arrayBuffer: async () => new TextEncoder().encode(body).buffer });
+  const plain = (body, type = 'text/plain') => ({ status: 200, ok: true, headers: headers({ 'content-type': type }), arrayBuffer: async () => new TextEncoder().encode(body).buffer });
+  const nope = { status: 404, ok: false, headers: headers({}), arrayBuffer: async () => new ArrayBuffer(0) };
+  const calls = [];
+  const site = {
+    'https://s.example/robots.txt': plain('User-agent: *\nDisallow: /private\n'),
+    'https://s.example/sitemap.xml': plain('<urlset><url><loc>https://s.example/</loc></url><url><loc>https://s.example/a/</loc></url><url><loc>https://s.example/private/x/</loc></url></urlset>', 'application/xml'),
+    'https://s.example/': html('<html lang="en"><head><title>Home</title></head><body><h1>Home</h1><a href="/a/">A</a><a href="/missing/">Gone</a></body></html>'),
+    'https://s.example/a/': html('<html lang="en"><head><title>A</title></head><body><h1>A</h1></body></html>'),
+    'https://s.example/private/x/': html('<html><body>secret</body></html>'),
+  };
+  const fetchFn = async (url, init) => { calls.push(url); if (url === 'http://s.example/') return { status: 301, ok: false, headers: headers({ location: 'https://s.example/' }), arrayBuffer: async () => new ArrayBuffer(0) }; return site[url] || nope; };
+  const r = await crawlSite('https://s.example', { fetchFn, lookup: async () => [{ address: '93.184.216.34' }] });
+  assert.deepEqual(r.pages.map((p) => p.url), ['https://s.example/', 'https://s.example/a/']); // the private page was not read
+  assert.ok(!calls.includes('https://s.example/private/x/'));
+  assert.deepEqual(r.ctx.sitemap, { found: true, urls: 3 });
+  assert.equal(r.ctx.httpRedirectsToHttps, true);
+  assert.deepEqual(r.ctx.brokenLinks.map((b) => [b.url, b.status]), [['https://s.example/missing/', 404]]);
+  await assert.rejects(() => crawlSite('http://127.0.0.1', { fetchFn, lookup: async () => [{ address: '127.0.0.1' }] }), /Внутрішні/);
+});
+
+await ok('seo: the plan answer is read back strictly', () => {
+  const plan = parsePlan('Here:\n```json\n' + JSON.stringify({ summary: 'Mostly fine.', priorities: [{ title: 'Add H1', why: 'Missing', action: 'Add one', effort: 'low' }, { title: '', why: 'x' }, { title: 'Alt texts', effort: 'weird' }], rewrites: [{ url: 'https://s.example/a/', field: 'title', current: '', proposed: 'A clear title for page A' }, { url: 'u', field: 'h1', proposed: 'no' }, { url: 'u2', field: 'description' }], notes: 'n' }) + '\n```');
+  assert.equal(plan.priorities.length, 2);
+  assert.equal(plan.priorities[1].effort, 'medium');
+  assert.equal(plan.rewrites.length, 1); // only title/description rewrites that propose something
+  assert.equal(parsePlan('nothing'), null);
+  const { user } = buildPlanPrompts('https://s.example', { findings: [{ id: 'title_missing', severity: 'high', title: 'Немає title', count: 1, pages: ['https://s.example/a/'] }], summary: { pages: 2, high: 1, medium: 0, low: 0 } }, [{ url: 'https://s.example/a/', status: 200, title: '', description: '', h1: [], excerpt: 'About A page' }]);
+  assert.match(user, /Немає title[\s\S]*Page text: About A page/);
 });
 
 console.log(`\n${passed} checks passed`);

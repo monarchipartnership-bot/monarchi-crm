@@ -199,3 +199,21 @@ button.smm-stat { cursor: pointer; }
 .smm-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
 .smm-people { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .smm-last { font-size: 12px; color: var(--s-muted); }
+
+/* SEO agent */
+.smm-seo-bar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.smm-seo-bar .smm-field { flex: 1 1 320px; max-width: 520px; }
+.smm-inline { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.smm-inline select { min-height: 36px; padding: 4px 10px; border: 1px solid var(--s-field-line); border-radius: 6px; background: var(--s-field); font: 400 13px 'Onest', sans-serif; color: var(--s-ink); }
+.smm-prio { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 12px; }
+.smm-prio li { padding: 2px 0 2px 4px; }
+.smm-prio-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.smm-rewrite { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-bottom: 1px solid #EEE7F2; }
+.smm-rewrite-new { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 10px; background: var(--s-sel); border-radius: 8px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.smm-finds { display: flex; flex-direction: column; gap: 8px; }
+.smm-find { border: 1px solid var(--s-line); border-radius: 10px; background: #fff; }
+.smm-find summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; flex-wrap: wrap; }
+.smm-find summary::-webkit-details-marker { display: none; }
+.smm-find-body { padding: 0 14px 12px; font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; gap: 6px; }
+.smm-find-body ul { margin: 0; padding-left: 18px; }
+.smm-find-body li { overflow-wrap: anywhere; }
