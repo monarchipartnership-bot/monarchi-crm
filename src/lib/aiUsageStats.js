@@ -7,6 +7,9 @@ import { kyivInstant, kyivParts } from './agentSchedule.js';
 export const CALLER_LABELS = {
   'report-work-summary': 'Текст «What was done» у звітах',
   'project-report': 'AI-агент проєктів',
+  'smm-content': 'SMM: контент-стратег і копірайтер',
+  'smm-competitors': 'SMM: аналіз конкурентів',
+  'smm-seo': 'SMM: SEO-оптимізатор',
   followup: 'Follow-up Generator',
   'chief-of-staff': 'AI Chief of Staff',
   'account-manager': 'AI Account Manager',
