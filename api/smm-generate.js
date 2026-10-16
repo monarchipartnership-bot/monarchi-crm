@@ -66,7 +66,11 @@ export default async function handler(req, res) {
   }
 
   const posts = scheduleFor(parsePosts(result.text, reqInfo.platforms), reqInfo.weekStart);
-  if (!posts.length) { bad(res, 502, 'Модель не повернула жодного придатного поста. Спробуйте ще раз.'); return; }
+  if (!posts.length) {
+    console.warn('smm-generate: unusable model answer', String(result.text || '').slice(0, 1500));
+    res.status(502).json({ error: 'Модель не повернула жодного придатного поста. Спробуйте ще раз.', raw: String(result.text || '').slice(0, 700) + ' [...] ' + String(result.text || '').slice(-200) });
+    return;
+  }
 
   const batchId = crypto.randomUUID();
   const rows = posts.map((p) => ({

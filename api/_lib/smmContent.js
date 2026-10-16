@@ -55,6 +55,7 @@ export function buildPrompts({ brand = {}, competitors = [], platforms = [], lan
     `Write every post in ${lang}.`,
     'Network rules:',
     ...platforms.map((p) => `- ${PLATFORMS[p.platform].label} (formats: ${PLATFORMS[p.platform].formats.join(', ')}): ${PLATFORMS[p.platform].rule}`),
+    'The answer is machine-read JSON: escape every double quote inside a text as \\" or, better, use single quotes or typographic quotes inside posts; use \n for line breaks; no trailing commas; no text before or after the JSON.',
     'Answer with ONE JSON object and nothing else: {"posts":[{"platform":"instagram|facebook|threads|tiktok|linkedin","format":"one of the formats of that network","topic":"3 to 8 words","body":"the text to publish","hashtags":"#a #b (or empty)","visual_brief":"what to shoot or design (or empty)","fact_check":"what a person must verify or add (or empty)","day":0-6,"time":"HH:MM"}]}.',
     '"day" is the day of the week to publish, 0 = Monday. Spread the posts over the week, at most two per network a day, at the usual good times for each network (Kyiv time).',
   ].join('\n');
