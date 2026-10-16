@@ -48,7 +48,7 @@ export function buildPrompts({ brand = {}, competitors = [], platforms = [], lan
   const total = platforms.reduce((s, p) => s + p.count, 0);
   const brandLines = [
     ['Voice and tone', brand.voice], ['Audience', brand.audience], ['Content pillars (topics we stand for)', brand.pillars],
-    ['Always', brand.dos], ['Never', brand.donts], ['Preferred formats', brand.formats], ['Facts and materials you may use', brand.materials, 9000],
+    ['Always', brand.dos], ['Never', brand.donts], ['Preferred formats', brand.formats], ['Facts and materials you may use', brand.materials, 16000],
   ].filter(([, v]) => String(v || '').trim()).map(([k, v, max]) => `${k}: ${clip(v, max || 3000)}`);
   const system = [
     ...SAFETY,
