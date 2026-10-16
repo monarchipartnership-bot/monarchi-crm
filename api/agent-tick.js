@@ -6,6 +6,8 @@ import { createAgentRepo } from './_lib/agentRepo.js';
 import { makeInternalPost } from './_lib/internalPost.js';
 import { runProjectReport } from './_lib/projectAgentRun.js';
 import { runDueAgents } from './_lib/agentTick.js';
+import { getModelClient } from './_lib/ai.js';
+import { runSmmWeekly, smmDue } from './_lib/smmRun.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -21,7 +23,14 @@ export default async function handler(req, res) {
       repo,
       runFor: ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor }),
     });
-    res.status(200).json(result);
+    // The SMM team's weekly autopilot (switched off until a person turns it on in the SMM section).
+    let smm = { due: false, reason: 'не перевірено' };
+    try {
+      const { data: settings } = await db.from('smm_settings').select('*').eq('id', 1).maybeSingle();
+      const verdict = smmDue({ settings });
+      smm = verdict.due ? { ...verdict, ...(await runSmmWeekly({ db, model: getModelClient(agent.accessToken), settings, scheduledFor: verdict.scheduledFor, email: agent.email })) } : verdict;
+    } catch (e) { smm = { due: false, reason: 'помилка: ' + (e.message || e) }; }
+    res.status(200).json({ ...result, smm });
   } catch (e) {
     res.status(500).json({ error: e.message || String(e) });
   }

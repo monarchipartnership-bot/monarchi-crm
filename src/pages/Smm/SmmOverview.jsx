@@ -1,5 +1,6 @@
 import ActionIcon from '../../components/common/ActionIcon';
 import { BRAND_FIELDS } from '../../lib/api/smm';
+import SmmAutopilot from './SmmAutopilot';
 
 // The team as it really is today: which assistants work, which wait for an access or a decision.
 const TEAM = [
@@ -12,7 +13,7 @@ const TEAM = [
 ];
 const STATE = { live: ['Працює', 'ok'], next: ['Наступний крок', 'next'], wait: ['Чекає доступ', 'wait'] };
 
-export default function SmmOverview({ brand, competitors, posts, go, onGenerate }) {
+export default function SmmOverview({ brand, competitors, posts, settings, notify, reload, go, onGenerate }) {
   const filled = BRAND_FIELDS.filter((f) => (brand?.[f.key] || '').trim()).length;
   const count = (s) => posts.filter((p) => p.status === s).length;
   const month = Date.now() - 30 * 24 * 3600 * 1000;
@@ -45,6 +46,8 @@ export default function SmmOverview({ brand, competitors, posts, go, onGenerate 
           ))}
         </ol>
       </section>
+
+      <SmmAutopilot settings={settings} notify={notify} reload={reload} />
 
       <section className="smm-block">
         <h3>Команда SMM</h3>

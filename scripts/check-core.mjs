@@ -12,6 +12,7 @@ import {
 import { buildPrompts, nextMonday, parsePosts, scheduleFor, validRequest } from '../api/_lib/smmContent.js';
 import { assertPublicUrl, pickPages, readHtml, readSite, robotsAllows } from '../api/_lib/siteReader.js';
 import { buildAnalysisPrompts, insightLine, parseAnalysis } from '../api/_lib/competitorAnalysis.js';
+import { runSmmWeekly, smmDue } from '../api/_lib/smmRun.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -532,6 +533,115 @@ await ok('competitors: the analysis answer is read back and summed up for the st
   const prompt = buildAnalysisPrompts({ name: 'Acme', website: 'acme.example' }, [{ ok: true, url: 'https://acme.example/', title: 'Home', text: 'Hello' }, { ok: false, url: 'https://acme.example/x' }]);
   assert.match(prompt.user, /Page 1: https:\/\/acme.example\//);
   assert.doesNotMatch(prompt.user, /Page 2/);
+});
+
+// ---- a tiny in-memory stand-in for the Supabase client: just the calls the SMM run uses
+function fakeDb(tables) {
+  const T = (n) => (tables[n] ||= []);
+  const matchOr = (row, clause) => clause.split(',').some((part) => {
+    const [col, op, ...rest] = part.split('.');
+    const val = rest.join('.');
+    return op === 'eq' ? String(row[col]) === val : op === 'lt' ? row[col] != null && new Date(row[col]) < new Date(val) : false;
+  });
+  return {
+    from(name) {
+      const q = { mode: 'select', filters: [], patch: null, rows: null, limitN: null, order: null };
+      const run = () => {
+        const rows = T(name);
+        const pass = (r) => q.filters.every((f) => f(r));
+        if (q.mode === 'insert') { const made = q.rows.map((r, i) => ({ id: rows.length + i + 1, ...r })); rows.push(...made); return { data: made, error: null }; }
+        if (q.mode === 'update') { const hit = rows.filter(pass); hit.forEach((r) => Object.assign(r, q.patch)); return { data: hit, error: null }; }
+        let out = rows.filter(pass);
+        if (q.order) out = [...out].sort((a, b) => (String(b[q.order]) > String(a[q.order]) ? 1 : -1));
+        if (q.limitN) out = out.slice(0, q.limitN);
+        return { data: out, error: null };
+      };
+      const api = {
+        select() { return api; },
+        insert(r) { q.mode = 'insert'; q.rows = Array.isArray(r) ? r : [r]; return api; },
+        update(p) { q.mode = 'update'; q.patch = p; return api; },
+        eq(c, v) { q.filters.push((r) => r[c] === v); return api; },
+        neq(c, v) { q.filters.push((r) => r[c] !== v); return api; },
+        in(c, vs) { q.filters.push((r) => vs.includes(r[c])); return api; },
+        not(c, op, v) { q.filters.push((r) => (op === 'is' && v === null ? r[c] != null : true)); return api; },
+        or(clause) { q.filters.push((r) => matchOr(r, clause)); return api; },
+        order(c) { q.order = c; return api; },
+        limit(n) { q.limitN = n; return api; },
+        maybeSingle() { const r = run(); return Promise.resolve({ data: r.data[0] || null, error: null }); },
+        then(res, rej) { return Promise.resolve(run()).then(res, rej); },
+      };
+      return api;
+    },
+  };
+}
+const goodPost = (platform, n) => ({ platform, format: 'text', topic: `Topic ${platform} ${n}`, body: `A useful post number ${n} for ${platform}, long enough to pass the check.`, hashtags: '#a', visual_brief: '', fact_check: '', day: n % 5, time: '10:00' });
+const fakeModel = (answer) => ({ calls: [], async callModel(args) { this.calls.push(args.agentKey); return { text: answer(args) }; } });
+
+await ok('smm autopilot: when is it due (weekday and time on the Kyiv clock, enabled_since, retries, lease)', () => {
+  const base = { enabled: true, weekday: 5, time: '12:00', enabled_since: '2026-10-12T00:00:00Z', last_scheduled: null, attempts: 0, last_status: null, run_state: 'idle' };
+  const fri13 = new Date('2026-10-16T10:00:00Z'); // 13:00 Kyiv on Friday
+  const fri11 = new Date('2026-10-16T08:00:00Z'); // 11:00 Kyiv on Friday, the moment has not come yet
+  assert.equal(smmDue({ settings: { ...base, enabled: false }, now: fri13 }).due, false);
+  assert.deepEqual(smmDue({ settings: base, now: fri13 }), { due: true, scheduledFor: '2026-10-16' });
+  assert.equal(smmDue({ settings: base, now: fri11 }).due, false); // it was before the autopilot was switched on
+  assert.equal(smmDue({ settings: { ...base, last_scheduled: '2026-10-16', last_status: 'ok' }, now: fri13 }).due, false);
+  const failed = { ...base, last_scheduled: '2026-10-16', last_status: 'problem', attempts: 1, last_attempt_at: '2026-10-16T09:40:00Z' };
+  assert.equal(smmDue({ settings: failed, now: fri13 }).due, false); // 20 minutes after a failure: wait
+  assert.equal(smmDue({ settings: { ...failed, last_attempt_at: '2026-10-16T08:30:00Z' }, now: fri13 }).due, true); // an hour later: retry
+  assert.equal(smmDue({ settings: { ...failed, attempts: 3, last_attempt_at: '2026-10-16T05:00:00Z' }, now: fri13 }).due, false); // out of tries
+  assert.equal(smmDue({ settings: { ...base, run_state: 'running', lease_until: '2026-10-16T10:05:00Z' }, now: fri13 }).due, false);
+  assert.equal(smmDue({ settings: { ...base, run_state: 'running', lease_until: '2026-10-16T09:00:00Z' }, now: fri13 }).due, true); // a crashed run's claim has expired
+});
+
+await ok('smm autopilot: one run refreshes a stale competitor, writes next week into the queue, notifies, and records the outcome', async () => {
+  const tables = {
+    smm_settings: [{ id: 1, enabled: true, run_state: 'idle', lease_until: null, weekday: 5, time: '12:00', language: 'en', counts: { linkedin: 2, instagram: 1, threads: 0, facebook: 0, tiktok: 0 }, refresh_competitors: true, notify_emails: ['A@x.com', 'a@x.com', 'b@x.com'], last_scheduled: null, attempts: 0 }],
+    smm_brand: [{ id: 1, voice: 'Direct', materials: 'Fact one.' }],
+    smm_competitors: [{ id: 7, name: 'Acme', website: 'acme.example', notes: '' }, { id: 8, name: 'NoSite', website: '', notes: '' }],
+    smm_competitor_reports: [], smm_posts: [], notifications: [],
+  };
+  const db = fakeDb(tables);
+  const model = fakeModel((a) => (a.agentKey === 'smm-competitors'
+    ? JSON.stringify({ positioning: 'Ads for shops', offers: ['Meta ads'], content_themes: ['ROAS'], post_ideas: [{ topic: 'ROAS myths', angle: 'a checklist' }] })
+    : JSON.stringify({ posts: [goodPost('linkedin', 1), goodPost('linkedin', 2), goodPost('instagram', 3)] })));
+  const read = async () => ({ pages: [{ url: 'https://acme.example/', title: 'Home', ok: true, text: 'We sell ads.' }], blockedByRobots: false });
+  const r = await runSmmWeekly({ db, model, settings: tables.smm_settings[0], scheduledFor: '2026-10-16', email: 'agent@x.com', now: new Date('2026-10-16T10:00:00Z'), read });
+  assert.equal(r.status, 'ok');
+  assert.equal(r.weekStart, '2026-10-19'); // the Monday after the scheduled Friday
+  assert.deepEqual(model.calls, ['smm-competitors', 'smm-content']); // the competitor with a site was refreshed first, the one without a site was skipped
+  assert.equal(tables.smm_competitor_reports.length, 1);
+  assert.equal(tables.smm_posts.length, 3);
+  assert.ok(tables.smm_posts.every((p) => p.status === 'needs_review' && p.source === 'agent' && p.created_by === 'agent@x.com' && p.language === 'en'));
+  assert.deepEqual(tables.notifications.map((n) => n.recipient_email).sort(), ['a@x.com', 'b@x.com']); // de-duplicated, lower-cased
+  assert.equal(tables.notifications[0].link, '/automation/smm?tab=queue');
+  const s = tables.smm_settings[0];
+  assert.deepEqual([s.run_state, s.last_status, s.last_scheduled, s.attempts], ['idle', 'ok', '2026-10-16', 1]);
+  // the same instant a second time: the claim is free again, but smmDue says it is already done
+  assert.equal(smmDue({ settings: s, now: new Date('2026-10-16T10:30:00Z') }).due, false);
+});
+
+await ok('smm autopilot: a bad model answer is a problem, retried later, and people are told only after the last try', async () => {
+  const tables = {
+    smm_settings: [{ id: 1, enabled: true, run_state: 'idle', lease_until: null, weekday: 5, time: '12:00', language: 'en', counts: { linkedin: 1 }, refresh_competitors: false, notify_emails: ['a@x.com'], last_scheduled: null, attempts: 0 }],
+    smm_brand: [{ id: 1 }], smm_competitors: [], smm_competitor_reports: [], smm_posts: [], notifications: [],
+  };
+  const db = fakeDb(tables);
+  const model = fakeModel(() => 'Sorry, I cannot do that.');
+  const t = (iso) => new Date(iso);
+  let r = await runSmmWeekly({ db, model, settings: tables.smm_settings[0], scheduledFor: '2026-10-16', email: 'agent@x.com', now: t('2026-10-16T10:00:00Z'), read: async () => ({ pages: [] }) });
+  assert.equal(r.status, 'problem');
+  assert.equal(tables.smm_posts.length, 0);
+  assert.equal(tables.notifications.length, 0); // first failure: quiet, a retry follows
+  assert.equal(tables.smm_settings[0].attempts, 1);
+  r = await runSmmWeekly({ db, model, settings: { ...tables.smm_settings[0] }, scheduledFor: '2026-10-16', email: 'agent@x.com', now: t('2026-10-16T11:10:00Z'), read: async () => ({ pages: [] }) });
+  r = await runSmmWeekly({ db, model, settings: { ...tables.smm_settings[0] }, scheduledFor: '2026-10-16', email: 'agent@x.com', now: t('2026-10-16T12:20:00Z'), read: async () => ({ pages: [] }) });
+  assert.equal(tables.smm_settings[0].attempts, 3);
+  assert.equal(tables.notifications.length, 1); // told once, after the third failure
+  assert.equal(tables.notifications[0].type, 'project_agent_problem');
+  // while a run holds the claim, a second one does not start
+  tables.smm_settings[0].run_state = 'running'; tables.smm_settings[0].lease_until = '2026-10-16T13:00:00Z';
+  const blocked = await runSmmWeekly({ db, model, settings: tables.smm_settings[0], scheduledFor: '2026-10-23', email: 'agent@x.com', now: t('2026-10-16T12:30:00Z'), read: async () => ({ pages: [] }) });
+  assert.equal(blocked.status, 'skipped');
 });
 
 console.log(`\n${passed} checks passed`);

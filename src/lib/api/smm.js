@@ -123,3 +123,16 @@ export async function fetchCompetitorReports() {
 export function runCompetitorAgent(competitorId) {
   return authedPost('/api/smm-competitors-run', competitorId ? { competitorId } : {});
 }
+
+// The weekly autopilot of the content team (migration 20261018000000_smm_settings.sql): one row, switched off by default.
+export const AUTOPILOT_DEFAULTS = { enabled: false, weekday: 5, time: '12:00', language: 'en', counts: { linkedin: 3, instagram: 2, threads: 2, facebook: 0, tiktok: 0 }, refresh_competitors: true, notify_emails: [] };
+export async function fetchSettings() {
+  const { data, error } = await supabase.from('smm_settings').select('*').eq('id', 1).maybeSingle();
+  if (error) { warn('fetchSettings', error); return null; }
+  return data;
+}
+export async function saveSettings(patch, email) {
+  const { data, error } = await supabase.from('smm_settings').update({ ...patch, updated_by: email || null, updated_at: nowIso() }).eq('id', 1).select().single();
+  if (error) throw error;
+  return data;
+}
