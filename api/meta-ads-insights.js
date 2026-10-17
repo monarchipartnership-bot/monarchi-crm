@@ -15,78 +15,10 @@
 //   activities — true → the account's change history for timeRange (who changed what)
 //   check      — true → only verify the token and return the account's name/status
 import { createClient } from '@supabase/supabase-js';
+import { formatRow, GRAPH, graphGet, LEVELS, MAX_PAGES } from './_lib/metaAdsData.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
-
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v26.0';
-const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}/`;
-const LEVELS = ['account', 'campaign', 'adset', 'ad'];
-const MAX_PAGES = 5;
-
-const PURCHASE_TYPES = ['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase'];
-const LEAD_TYPES = ['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead'];
-
-function round2(n) { return Math.round(n * 100) / 100; }
-function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
-
-// Meta returns `actions` as [{action_type, value}]; take the first matching
-// type only, because several aliases of the same event are reported together
-// and summing them would double count.
-function pickAction(list, types) {
-  if (!Array.isArray(list)) return 0;
-  for (const t of types) {
-    const hit = list.find((a) => a.action_type === t);
-    if (hit) return num(hit.value);
-  }
-  return 0;
-}
-
-function formatRow(row, includeRaw = false) {
-  const spend = num(row.spend);
-  const impressions = num(row.impressions);
-  const clicks = num(row.clicks);
-  const purchases = pickAction(row.actions, PURCHASE_TYPES);
-  const leads = pickAction(row.actions, LEAD_TYPES);
-  const revenue = pickAction(row.action_values, PURCHASE_TYPES);
-  return {
-    name: row.campaign_name || row.adset_name || row.ad_name || undefined,
-    date: row.date_start && row.date_stop && row.date_start === row.date_stop ? row.date_start : undefined,
-    period: { from_date: row.date_start, to_date: row.date_stop },
-    spend: round2(spend),
-    impressions,
-    reach: num(row.reach),
-    clicks,
-    ctr_pct: impressions > 0 ? round2((clicks / impressions) * 100) : null,
-    cpc: clicks > 0 ? round2(spend / clicks) : null,
-    cpm: impressions > 0 ? round2((spend / impressions) * 1000) : null,
-    purchases,
-    leads,
-    revenue: round2(revenue),
-    // Computed here (not trusted from purchase_roas) so it stays consistent
-    // with the other numbers in the same row; null, not 0, when undefined.
-    roas: spend > 0 && revenue > 0 ? round2(revenue / spend) : null,
-    cost_per_purchase: purchases > 0 ? round2(spend / purchases) : null,
-    cost_per_lead: leads > 0 ? round2(spend / leads) : null,
-    // Debug aid: the untouched action lists, so a metric mapping can be checked against Meta.
-    ...(includeRaw ? { raw_actions: row.actions || [], raw_action_values: row.action_values || [] } : {}),
-  };
-}
-
-async function graphGet(url, token) {
-  const r = await fetch(url);
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok || body.error) {
-    const e = body.error || {};
-    // The token goes in the query string, so make sure it never reaches the caller.
-    const msg = String(e.message || `HTTP ${r.status}`).split(token).join('[token]');
-    const err = new Error(msg);
-    err.status = r.status;
-    err.code = e.code;
-    throw err;
-  }
-  return body;
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

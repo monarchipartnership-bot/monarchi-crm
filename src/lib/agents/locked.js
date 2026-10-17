@@ -70,3 +70,26 @@ export function composeSystem(role, body, ctx = {}) {
   const editable = String(body || '').trim();
   return locked ? `${editable}\n\n=== Fixed rules (set by the team lead, not part of the editable instruction) ===\n${locked}` : editable;
 }
+
+// ---------------------------------------------------------------------------------------------------- campaign-team agents
+// The locked rules of every agent of a client's campaign team: they work only from the data they are given, and everything they
+// write is a proposal for a person (the account manager), never an action.
+export const CAMPAIGN_RULES = [
+  'You work for Mon\'Archi, a performance marketing agency, on ONE client\'s campaigns. Your reader is the agency\'s account manager. Everything you write is a proposal for a person: never say or imply that you changed something in an ad account or sent something to the client.',
+  'Use ONLY the data and texts given below. Never invent numbers, benchmarks, competitors, audiences or facts about the client. When data is missing or an input failed to load, say so plainly and work with what is there; do not fill the gap with guesses.',
+  'Give the period and the name of the campaign, ad set, ad or keyword for every figure. Do not quote a figure that is not in the data. When you compare periods, calculate carefully; if unsure, show both numbers.',
+  'Keep facts (from the data) apart from hypotheses (say "hypothesis"). No promises of results and no percentage forecasts unless the data gives them.',
+  'Be concrete and short: name the object, say why, say what to do. Rank by importance, most important first. No generic advice that would fit any account.',
+  'Write the report in Markdown. Start with a section titled «Підсумок» (translate the title into the language of the report) of 2 to 4 sentences: the main finding and what to do first. Then the body. End with a short section «Чого бракує» (translated): missing data and open questions, or that nothing is missing.',
+];
+
+export const campaignLockedText = (language = null) => [...CAMPAIGN_RULES, language ? `Write the whole report in ${language}.` : ''].filter(Boolean).join('\n');
+
+// The system prompt of a campaign agent: the editable instruction, the client-specific instruction typed in the agent's settings,
+// then the locked rules.
+export function composeCampaignSystem(body, extra = '', language = 'Ukrainian') {
+  const parts = [String(body || '').trim()];
+  if (String(extra || '').trim()) parts.push(`=== Instruction for THIS client (from the account manager) ===\n${String(extra).trim()}`);
+  parts.push(`=== Fixed rules (set by the team lead, not part of the editable instruction) ===\n${campaignLockedText(language)}`);
+  return parts.join('\n\n');
+}

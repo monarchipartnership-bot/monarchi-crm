@@ -19,7 +19,10 @@ import { agentDue, chainStates, dependents } from '../src/lib/agents/chain.js';
 import { composeSystem } from '../src/lib/agents/locked.js';
 import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
 import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
-import { approvePlan, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
+import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
+import { ancestorsOf } from '../src/lib/agents/chain.js';
+import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
+import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
 import { buildRequest, check as hfCheck, submit as hfSubmit } from '../api/_lib/higgsfield.js';
 
 let passed = 0;
@@ -927,6 +930,103 @@ await ok('higgsfield: requests are built from the visual, status is read, a fini
   assert.deepEqual(tables.smm_posts.map((p) => p.asset_status), ['ready', 'failed', 'failed']); // the third waited more than 45 minutes
   assert.equal(tables.smm_posts[0].asset_url, 'https://store.example/1.png');
   assert.equal(tables.smm_posts[1].visual_prompt.generation_error, 'nsfw');
+});
+
+await ok('campaign team: only the agents of the chosen platforms take part, the chain follows the links', () => {
+  const names = (pl) => participants(pl).map((r) => r.role);
+  assert.ok(names(['meta']).includes('meta_analyst') && !names(['meta']).includes('google_analyst') && !names(['meta']).includes('tiktok_analyst'));
+  assert.ok(names(['google']).includes('google_optimizer') && !names(['google']).includes('creative_strategist')); // creative work is Meta / TikTok
+  assert.ok(names(['tiktok']).includes('tiktok_analyst') && !names(['tiktok']).includes('tracking_integrity')); // no connection to check
+  assert.equal(names(['meta', 'google', 'tiktok']).length, 16);
+  assert.ok(linksFor(['google']).every((l) => names(['google']).includes(l.from) && names(['google']).includes(l.to))); // no link to an agent that is not there
+  const agents = [1, 2, 3, 4].map((id) => ({ id }));
+  const links = [{ from_agent_id: 1, to_agent_id: 2 }, { from_agent_id: 2, to_agent_id: 3 }, { from_agent_id: 4, to_agent_id: 3 }];
+  assert.deepEqual(ancestorsOf(3, links).sort(), [1, 2, 4]);
+  assert.deepEqual(ancestorsOf(1, links), []);
+  assert.match(summaryOf('## Підсумок\nМета: CPA виріс на 20%.\n\n## Деталі\nтекст'), /^Мета: CPA виріс/);
+});
+
+await ok('campaign team: ad-account inputs never throw, skip what is not connected and name what failed', async () => {
+  const accounts = { google: '222' };
+  const g = await fetchBlock('google:campaign:LAST_7_DAYS', accounts, { google: async () => ({ period: { from_date: 'a', to_date: 'b' }, campaigns: [{ name: 'Low', cost: 1 }, { name: 'High', cost: 50 }] }) });
+  assert.equal(g.ok, true);
+  assert.ok(g.text.indexOf('High') < g.text.indexOf('Low')); // the biggest spend first
+  assert.match(g.title, /Google Ads · кампанії · останні 7 днів/);
+  const noMeta = await fetchBlock('meta:account:last_7d', accounts, {});
+  assert.deepEqual([noMeta.ok, noMeta.skipped], [false, true]);
+  const bad = await fetchBlock('google:account:LAST_30_DAYS', accounts, { google: async () => { throw new Error('API access blocked'); } });
+  assert.deepEqual([bad.ok, bad.error], [false, 'API access blocked']);
+  const noToken = await fetchBlock('meta:account:last_7d', { meta: '111' }, { metaToken: '' });
+  assert.match(noToken.error, /META_ACCESS_TOKEN/);
+});
+
+await ok('campaign team: launch -> research -> strategy -> analysts -> optimizers and creative -> copy -> control -> report -> client message; pause stops it', async () => {
+  const tables = {
+    projects: [{ id: 5, name: 'Acme Shop', client: 'Acme LLC' }],
+    project_ad_accounts: [{ project_id: 5, platform: 'meta', account_id: '111' }, { project_id: 5, platform: 'google', account_id: '222' }],
+    ag_campaigns: [{ id: 1, project_id: 5, name: 'Acme autumn', platforms: ['meta', 'google'], status: 'draft', config: { brief: 'Furniture store, sells in the US.', goals: 'More sales', language: 'uk' } }],
+    ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [],
+  };
+  const db = fakeDb(tables);
+  const team = await ensureCampaignTeam(db, tables.ag_campaigns[0], 'a@x.com');
+  assert.equal(team.agents.length, 15); // Meta + Google: 8 common + 5 Meta/shared + 2 Google
+  assert.equal(tables.ag_prompts.length, 15);
+  await ensureCampaignTeam(db, tables.ag_campaigns[0], 'a@x.com');
+  assert.deepEqual([tables.ag_agents.length, tables.ag_prompts.length], [15, 15]); // idempotent
+  const A = (r) => tables.ag_agents.find((a) => a.role === r);
+  tables.ag_agents.forEach((a) => { a.enabled = true; });
+  A('competitor_research').config = { ...A('competitor_research').config, competitors: 'Rival https://rival.example', extra: 'Never compare prices.' };
+  A('meta_analyst').config = { ...A('meta_analyst').config, kpi: 'CPA under 12 dollars' };
+
+  const model = { calls: [], async callModel(args) {
+    this.calls.push(args.agentKey);
+    return { text: `## Підсумок\nSummary of ${args.agentKey}.\n\n## Деталі\nbody`, usage: { input_tokens: 10, output_tokens: 5 }, costUsd: 0.01 };
+  } };
+  const read = async () => ({ pages: [{ ok: true, url: 'https://rival.example/', title: 'Rival', text: 'We sell sofas.' }], blockedByRobots: false });
+  const campaignDeps = { metaToken: 't', meta: async () => ({ account: 'act_111', rows: [{ name: 'M1', spend: 10 }], truncated: false }), google: async (id, { level }) => ({ period: {}, [level === 'account' ? 'account' : 'rows']: level === 'account' ? { cost: 5 } : [{ name: 'G1', cost: 5 }] }) };
+  const ctx = { db, model, email: 'a@x.com', trigger: 'user', hf: null, read, campaignDeps, now: () => new Date('2026-10-19T08:00:00Z') };
+
+  // before the launch nothing runs (the campaign is a draft)
+  tables.ag_tasks.push({ id: 900, agent_id: A('meta_analyst').id, type: 'report', status: 'queued', brief: {} });
+  assert.equal((await processQueue(ctx)).processed, 0);
+  tables.ag_tasks.length = 0;
+
+  const l = await launchCampaign(ctx, 1);
+  assert.equal(l.started, 7); // 3 researchers + meta/google analysts + creative analyst + tracking
+  assert.equal(tables.ag_campaigns[0].status, 'active');
+  let q = await processQueue(ctx);
+  assert.equal(q.failed, 0, JSON.stringify(tables.ag_tasks.filter((t) => t.status === 'failed').map((t) => t.error)));
+  assert.equal(q.left, 0);
+  const done = (r) => tables.ag_tasks.filter((t) => t.agent_id === A(r).id && t.status === 'done');
+  for (const a of tables.ag_agents) assert.equal(done(a.role).length, 1, a.role); // every agent worked exactly once
+  const order = (r) => done(r)[0].id;
+  assert.ok(order('marketing_strategist') > Math.max(order('business_research'), order('competitor_research'), order('audience_research'))); // waits for all researchers
+  assert.ok(order('meta_optimizer') > order('meta_analyst') && order('meta_optimizer') > order('marketing_strategist'));
+  assert.ok(order('performance_copywriter') > order('creative_strategist'));
+  assert.ok(order('quality_controller') > Math.max(order('performance_copywriter'), order('meta_optimizer'), order('google_optimizer'))); // checks the finished work
+  assert.ok(order('cross_channel_report') > order('quality_controller') && order('account_manager') > order('cross_channel_report'));
+  // prompts: editable + client instruction + locked rules; inputs: brief, accounts, the pages of the rival, upstream results
+  const run = (role) => tables.ag_runs.find((r) => r.agent_id === A(role).id);
+  assert.match(run('competitor_research').system_prompt, /^You are the competitor researcher/);
+  assert.match(run('competitor_research').system_prompt, /Never compare prices/);
+  assert.match(run('competitor_research').system_prompt, /Never invent numbers/);
+  assert.match(run('competitor_research').system_prompt, /Ukrainian/);
+  assert.match(run('competitor_research').user_prompt, /We sell sofas/);
+  assert.match(run('meta_analyst').user_prompt, /Meta Ads · кампанії · останні 7 днів[\s\S]*M1/);
+  assert.match(run('meta_analyst').user_prompt, /CPA under 12 dollars/);
+  assert.match(run('google_analyst').user_prompt, /Google Ads · ключові слова/);
+  assert.match(run('meta_optimizer').user_prompt, /Результат агента «Аналітик Meta Ads»[\s\S]*Summary of campaign-meta_analyst/);
+  assert.match(run('account_manager').user_prompt, /Результат агента «Міжканальний звіт»/);
+  assert.match(run('cross_channel_report').user_prompt, /Результат агента «Аналітик Google Ads»/);
+
+  // a paused campaign stops all of its agents at once
+  tables.ag_campaigns[0].status = 'paused';
+  tables.ag_tasks.push({ id: 901, agent_id: A('meta_analyst').id, type: 'report', status: 'queued', brief: {} });
+  q = await processQueue(ctx);
+  assert.deepEqual([q.processed, q.waiting], [0, 1]);
+  // a manual run of an agent works regardless, and a missing required input is a readable failure
+  const r2 = await runNow(ctx, A('tiktok_analyst')?.id ?? -1, {}).catch((e) => e);
+  assert.ok(r2 instanceof Error); // TikTok is not part of this campaign
 });
 
 console.log(`\n${passed} checks passed`);

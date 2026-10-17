@@ -48,6 +48,19 @@ export function dependents(agentId, links) {
   return [...out];
 }
 
+// Every agent upstream of this one, through any links (required or not), nearest first.
+export function ancestorsOf(agentId, links) {
+  const out = [];
+  const seen = new Set([agentId]);
+  let level = [agentId];
+  while (level.length) {
+    const next = [];
+    for (const id of level) for (const l of links) if (l.to_agent_id === id && !seen.has(l.from_agent_id)) { seen.add(l.from_agent_id); out.push(l.from_agent_id); next.push(l.from_agent_id); }
+    level = next;
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------------------------------- the schedule of one agent
 // agent.schedule = { weekday: 1..7 (Mon..Sun), time: 'HH:MM' } in Kyiv time, or null (the agent starts only from tasks).
 // → { due, scheduledFor: 'YYYY-MM-DD', reason }. Missing a cron tick only delays a run, never loses it. A failed run is tried

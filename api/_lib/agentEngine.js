@@ -5,7 +5,7 @@
 //   strategist  -> plan of the week (waits for the person's OK) -> per post: copywriter (write) + visual (visual) in parallel
 //   copywriter + visual (both done) -> quality control (review) -> back to the executor with comments (up to maxRounds) or to the person
 // The database, the model and the site readers are handed in, so the same code runs from the buttons, from the cron and in tests.
-import { agentDue, chainStates } from '../../src/lib/agents/chain.js';
+import { agentDue, ancestorsOf, chainStates } from '../../src/lib/agents/chain.js';
 import { DEFAULT_PROMPTS } from '../../src/lib/agents/defaultPrompts.js';
 import { SMM_ROLES, TEAM } from '../../src/lib/agents/smmTeam.js';
 import { kyivParts } from '../../src/lib/agentSchedule.js';
@@ -15,6 +15,8 @@ import { analyseCompetitors } from './smmRun.js';
 import { insightLine } from './competitorAnalysis.js';
 import { runSeoAudit } from './seoRun.js';
 import * as higgsfield from './higgsfield.js';
+import { campaignRole } from './campaignRun.js';
+import { CAMPAIGN_TEAM } from '../../src/lib/agents/campaignTeam.js';
 import { LANGUAGES, MAX_POSTS_PER_RUN, nextMonday, PLATFORM_KEYS } from './smmContent.js';
 
 const MODEL = 'claude-sonnet-5';
@@ -99,6 +101,26 @@ async function loadResearch(db) {
   const seo = audit?.plan ? [audit.plan.summary, ...(audit.plan.priorities || []).map((p) => `${p.title}: ${p.why}`)].filter(Boolean) : [];
   return { competitors, seo, social: [] };
 }
+
+// Every agent of every team (the SMM team and the campaign teams of the clients) with the links between them. States are computed
+// per agent id, and links never cross a team, so one pass of the queue serves all teams.
+export async function loadAll(db) {
+  const agents = must(await db.from('ag_agents').select('*').order('sort'), 'agents') || [];
+  const links = agents.length ? must(await db.from('ag_links').select('*').in('from_agent_id', agents.map((a) => a.id)), 'links') || [] : [];
+  const campaigns = must(await db.from('ag_campaigns').select('id, status'), 'campaigns') || [];
+  return { agents, links, byId: new Map(agents.map((a) => [a.id, a])), campaigns: new Map(campaigns.map((c) => [String(c.id), c.status])) };
+}
+// The team one agent belongs to (same team and scope), in the shape the handlers use.
+export function subTeam(all, agent) {
+  const agents = all.agents.filter((a) => a.team === agent.team && a.scope_type === agent.scope_type && a.scope_id === agent.scope_id);
+  const ids = new Set(agents.map((a) => a.id));
+  return { agents, links: all.links.filter((l) => ids.has(l.from_agent_id) && ids.has(l.to_agent_id)), byRole: new Map(agents.map((a) => [a.role, a])), byId: new Map(agents.map((a) => [a.id, a])) };
+}
+const readyOf = (a) => (a?.team === CAMPAIGN_TEAM ? { ready: true } : READY[a?.role] || { ready: false });
+const typeOf = (a) => (a.team === CAMPAIGN_TEAM ? 'report' : TASK_TYPE[a.role]);
+// A campaign team works only while its campaign is active (pausing a campaign stops all of its agents at once).
+const campaignOn = (all, a) => a.team !== CAMPAIGN_TEAM || all.campaigns.get(a.scope_id) === 'active';
+const runnable = (all, states, a) => !!a && readyOf(a).ready && campaignOn(all, a) && states[a.id]?.state === 'on';
 
 // ---------------------------------------------------------------------------------------------------------------- production of a post
 // After the copywriter or the visual agent finishes: when nothing of the production is still open and the text is written,
@@ -280,6 +302,7 @@ async function seo({ ctx, task, rec }) {
 }
 
 const HANDLERS = { strategist, copywriter, visual, qc: qualityControl, competitors, seo };
+const handlerOf = (a) => (a?.team === CAMPAIGN_TEAM ? campaignRole : HANDLERS[a?.role]);
 
 // Pictures and videos that were sent to the generator: look at each, keep the finished file in our storage, record a failure.
 export async function pollAssets(ctx) {
@@ -320,12 +343,12 @@ export async function runTask(ctx, team, task) {
   const now = ctx.now();
   const claim = await db.from('ag_tasks').update({ status: 'running', started_at: iso(now), lease_until: iso(new Date(now.getTime() + LEASE_MIN * 60000)) }).eq('id', task.id).or(`status.eq.queued,lease_until.lt.${iso(now)}`).select();
   if (claim.error || !claim.data?.length) return null;
-  const handler = HANDLERS[agent?.role];
+  const handler = handlerOf(agent);
   const prompt = agent ? await loadPrompt(db, agent, task) : { id: null, version: null, body: '' };
-  const rec = recorder(ctx, { task, agent: agent || { id: task.agent_id }, prompt, prefix: ['competitors', 'seo'].includes(agent?.role) ? prompt.body : '' });
+  const rec = recorder(ctx, { task, agent: agent || { id: task.agent_id }, prompt, prefix: agent?.team !== CAMPAIGN_TEAM && ['competitors', 'seo'].includes(agent?.role) ? prompt.body : '' });
   let outcome;
   try {
-    if (!handler) throw new Error(READY[agent?.role]?.note || 'Цей агент ще не вміє виконувати завдання.');
+    if (!handler) throw new Error(readyOf(agent).note || 'Цей агент ще не вміє виконувати завдання.');
     const r = await handler({ ctx, team, agent, task, prompt, rec });
     outcome = { ok: true, ...r };
   } catch (e) {
@@ -335,23 +358,50 @@ export async function runTask(ctx, team, task) {
   const status = outcome.ok ? 'done' : 'failed';
   await db.from('ag_tasks').update({ status, output: outcome.ok ? outcome.output : null, error: outcome.ok ? null : String(outcome.error).slice(0, 600), cost_usd: rec.state.cost, finished_at: finished, lease_until: null, prompt_id: prompt.id, prompt_version: prompt.version }).eq('id', task.id);
   if (agent) await db.from('ag_agents').update({ last_run_at: finished, last_status: outcome.ok ? 'ok' : 'problem', last_message: String(outcome.ok ? outcome.summary : outcome.error).slice(0, 500) }).eq('id', agent.id);
+  if (outcome.ok && agent) { try { await fanOut(ctx, team, agent); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
   if (outcome.ok && outcome.advance) { try { await advancePost(ctx, team, outcome.advance); } catch (e) { console.warn('advancePost failed:', e?.message || e); } }
   return { id: task.id, status, role: agent?.role, error: outcome.ok ? null : outcome.error };
 }
 
+// A campaign agent finished: the agents that depend on it may start. An agent starts only when the whole chain above it has delivered
+// for this round: every agent upstream of it (directly or further up, only the ones that are switched on) has a finished task that is
+// newer (a later task id) than the agent's own last one (the researchers, which work once at the launch, only need to have finished once). So a report
+// or a control never starts before the work it checks, whatever order the parallel tasks finish in. If something upstream failed,
+// the round waits until it is retried: that is how a broken link stops the chain.
+async function fanOut(ctx, team, agent) {
+  if (agent.team !== CAMPAIGN_TEAM) return;
+  const targets = team.links.filter((l) => l.from_agent_id === agent.id).map((l) => team.byId.get(l.to_agent_id)).filter((b) => b && b.enabled && b.config?.trigger === 'upstream');
+  for (const b of targets) {
+    const ups = ancestorsOf(b.id, team.links).map((id) => team.byId.get(id)).filter((a) => a && a.enabled);
+    const ids = [b.id, ...ups.map((a) => a.id)];
+    const open = must(await ctx.db.from('ag_tasks').select('id').in('agent_id', ids).in('status', ['queued', 'running']).limit(1), 'tasks') || [];
+    if (open.length) continue; // someone in the chain is still working: the last one to finish starts it
+    const rows = must(await ctx.db.from('ag_tasks').select('agent_id, id').in('agent_id', ids).eq('status', 'done').order('id', { ascending: false }).limit(600), 'tasks') || [];
+    const last = new Map();
+    rows.forEach((r) => { if (!last.has(r.agent_id) || r.id > last.get(r.agent_id)) last.set(r.agent_id, r.id); }); // task ids only grow: no ties, unlike timestamps
+    const mine = last.get(b.id);
+    const ready = ups.every((u) => last.has(u.id) && (u.config?.trigger === 'initial' || !mine || last.get(u.id) > mine));
+    if (!ready) continue;
+    const task = await enqueue(ctx.db, { agent: b, type: 'report', brief: { trigger: 'upstream', from: agent.name }, by: 'ланцюжок' });
+    // Two agents finishing at the same moment may both start the same one: the earliest open task stays, the later one withdraws.
+    const same = must(await ctx.db.from('ag_tasks').select('id').eq('agent_id', b.id).in('status', ['queued', 'running']).order('id', { ascending: true }), 'tasks') || [];
+    if (same.length > 1 && Math.min(...same.map((t) => t.id)) !== task.id) await ctx.db.from('ag_tasks').update({ status: 'cancelled', finished_at: iso(ctx.now()) }).eq('id', task.id).eq('status', 'queued');
+  }
+}
+
 // Agents with a schedule whose moment has come get a task. → [roles started]
-async function scheduleDue(ctx, team) {
-  const states = chainStates(team.agents, team.links);
+async function scheduleDue(ctx, all) {
+  const states = chainStates(all.agents, all.links);
   const started = [];
-  for (const a of team.agents) {
-    if (!a.enabled || states[a.id].state !== 'on' || !READY[a.role]?.ready || !a.schedule) continue;
+  for (const a of all.agents) {
+    if (!a.schedule || !runnable(all, states, a) || !a.enabled) continue;
     const verdict = agentDue({ agent: a, now: ctx.now() });
     if (!verdict.due) continue;
     const open = must(await ctx.db.from('ag_tasks').select('id').eq('agent_id', a.id).in('status', ['queued', 'running']).limit(1), 'tasks') || [];
     if (open.length) continue;
     const same = a.last_scheduled === verdict.scheduledFor;
     must(await ctx.db.from('ag_agents').update({ last_scheduled: verdict.scheduledFor, attempts: same ? (a.attempts || 0) + 1 : 1, last_attempt_at: iso(ctx.now()) }).eq('id', a.id), 'agent');
-    await enqueue(ctx.db, { agent: a, type: TASK_TYPE[a.role], brief: { scheduled: true, scheduledFor: verdict.scheduledFor }, by: 'розклад' });
+    await enqueue(ctx.db, { agent: a, type: typeOf(a), brief: { scheduled: true, scheduledFor: verdict.scheduledFor }, by: 'розклад' });
     started.push(a.role);
   }
   return started;
@@ -362,26 +412,26 @@ async function scheduleDue(ctx, team) {
 export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
   const began = Date.now();
   const stats = { processed: 0, failed: 0, started: [], waiting: 0, left: 0 };
-  let team = await loadTeam(ctx.db);
-  if (!team.agents.length) return { ...stats, note: 'Команду ще не створено.' };
-  stats.started = await scheduleDue(ctx, team);
+  let all = await loadAll(ctx.db);
+  if (!all.agents.length) return { ...stats, note: 'Команди ще не створено.' };
+  stats.started = await scheduleDue(ctx, all);
   try { stats.assets = await pollAssets(ctx); } catch (e) { console.warn('pollAssets failed:', e?.message || e); }
   for (let pass = 0; pass < 60 && Date.now() - began < maxMs; pass += 1) {
-    team = await loadTeam(ctx.db); // switches may be flipped while we work
-    const states = chainStates(team.agents, team.links);
+    all = await loadAll(ctx.db); // switches may be flipped while we work
+    const states = chainStates(all.agents, all.links);
     const now = iso(ctx.now());
     const tasks = must(await ctx.db.from('ag_tasks').select('*').or(`status.eq.queued,and(status.eq.running,lease_until.lt.${now})`).order('created_at', { ascending: true }).limit(40), 'tasks') || [];
-    const runnable = tasks.filter((t) => { const a = team.byId.get(t.agent_id); return a && READY[a.role]?.ready && states[a.id]?.state === 'on'; });
-    stats.waiting = tasks.length - runnable.length;
-    stats.left = runnable.length;
-    if (!runnable.length) break;
-    const results = await Promise.all(runnable.slice(0, parallel).map((t) => runTask(ctx, team, t).catch((e) => ({ status: 'failed', error: e.message }))));
+    const ready = tasks.filter((t) => runnable(all, states, all.byId.get(t.agent_id)));
+    stats.waiting = tasks.length - ready.length;
+    stats.left = ready.length;
+    if (!ready.length) break;
+    const results = await Promise.all(ready.slice(0, parallel).map((t) => runTask(ctx, subTeam(all, all.byId.get(t.agent_id)), t).catch((e) => ({ status: 'failed', error: e.message }))));
     results.filter(Boolean).forEach((r) => { stats.processed += 1; if (r.status === 'failed') stats.failed += 1; });
     if (!results.filter(Boolean).length) break;
   }
   const rest = must(await ctx.db.from('ag_tasks').select('id, agent_id').in('status', ['queued', 'running']).limit(100), 'tasks') || [];
-  const states = chainStates(team.agents, team.links);
-  stats.left = rest.filter((t) => { const a = team.byId.get(t.agent_id); return a && READY[a.role]?.ready && states[a.id]?.state === 'on'; }).length;
+  const states = chainStates(all.agents, all.links);
+  stats.left = rest.filter((t) => runnable(all, states, all.byId.get(t.agent_id))).length;
   stats.waiting = rest.length - stats.left;
   return stats;
 }
@@ -389,14 +439,33 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
 // «Run now» from the agent's page: puts a task in the queue and runs THAT task even if the agent is switched off (a deliberate
 // manual run, e.g. to try a prompt before switching the agent on); what the task creates next runs only if its agents are on.
 export async function runNow(ctx, agentId, brief = {}) {
-  const team = await loadTeam(ctx.db);
-  const agent = team.byId.get(agentId);
+  const all = await loadAll(ctx.db);
+  const agent = all.byId.get(agentId);
   if (!agent) throw new Error('Агента не знайдено.');
-  if (!READY[agent.role]?.ready) throw new Error(READY[agent.role]?.note || 'Цей агент ще не готовий до роботи.');
-  if (!['strategist', 'seo', 'competitors'].includes(agent.role)) throw new Error('Цей агент працює за завданнями від інших агентів.');
-  const task = await enqueue(ctx.db, { agent, type: TASK_TYPE[agent.role], brief, by: ctx.email });
-  const result = await runTask(ctx, team, task);
+  if (!readyOf(agent).ready) throw new Error(readyOf(agent).note || 'Цей агент ще не готовий до роботи.');
+  if (agent.team !== CAMPAIGN_TEAM && !['strategist', 'seo', 'competitors'].includes(agent.role)) throw new Error('Цей агент працює за завданнями від інших агентів.');
+  const task = await enqueue(ctx.db, { agent, type: typeOf(agent), brief, by: ctx.email });
+  const result = await runTask(ctx, subTeam(all, agent), task);
   return { taskId: task.id, ...(result || { status: 'skipped' }) };
+}
+
+// The campaign is launched: it becomes active, and the agents that start the work (research, the weekly analysts) get their first
+// task right away; everything else follows through the chain. A weekly agent's next scheduled run is the following one.
+export async function launchCampaign(ctx, campaignId) {
+  const all = await loadAll(ctx.db);
+  const campaign = must(await ctx.db.from('ag_campaigns').select('*').eq('id', campaignId).maybeSingle(), 'campaign');
+  if (!campaign) throw new Error('Кампанію не знайдено.');
+  if (campaign.status === 'active') throw new Error('Кампанію вже запущено.');
+  const mine = all.agents.filter((a) => a.team === CAMPAIGN_TEAM && a.scope_id === String(campaign.id) && a.enabled);
+  if (!mine.length) throw new Error('Увімкніть хоча б одного агента.');
+  const now = iso(ctx.now());
+  must(await ctx.db.from('ag_campaigns').update({ status: 'active', launched_at: now, updated_at: now }).eq('id', campaign.id), 'campaign');
+  must(await ctx.db.from('ag_agents').update({ enabled_since: now, attempts: 0 }).eq('team', CAMPAIGN_TEAM).eq('scope_id', String(campaign.id)).eq('enabled', true), 'agents');
+  let started = 0;
+  for (const a of mine) {
+    if (['initial', 'schedule'].includes(a.config?.trigger)) { await enqueue(ctx.db, { agent: a, type: 'report', brief: { launch: true }, by: ctx.email }); started += 1; }
+  }
+  return { started, agents: mine.length };
 }
 
 export async function retryTask(ctx, taskId) {
