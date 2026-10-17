@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchPlans, fetchPostTasks, kickQueue, loadTeam } from '../../lib/api/agents';
+import { agentAction, fetchPlans, fetchPostTasks, kickQueue, loadTeam } from '../../lib/api/agents';
 import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, fetchSiteAudits, BRAND_FIELDS } from '../../lib/api/smm';
 import '../../styles/projectWorkspace.css'; // the shared confirmation window (useConfirm) lives in this sheet
 import '../../styles/smmPage.css';
@@ -66,6 +66,12 @@ export default function SmmHome() {
     kickQueue().catch((e) => console.warn('queue kick failed', e)).finally(() => { kicking.current = false; reload(); });
   }, [reload]);
   const busyProduction = posts.some((x) => ['planned', 'producing', 'qc'].includes(x.status)) || Object.values(team?.counts || {}).some((c) => c.queued || c.running);
+  const pendingAssets = posts.some((x) => x.asset_status === 'pending');
+  useEffect(() => {
+    if (!pendingAssets) return undefined;
+    const t = setInterval(() => { agentAction('poll_assets').then(reload).catch(() => {}); }, 20000);
+    return () => clearInterval(t);
+  }, [pendingAssets, reload]);
   useEffect(() => {
     if (!busyProduction) return undefined;
     const t = setInterval(() => { reload(); }, 8000);

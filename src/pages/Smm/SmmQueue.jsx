@@ -9,7 +9,7 @@ import { TextPromptDialog } from './SmmDialogs';
 
 const SEV = { high: 'важливо', medium: 'помірно', low: 'дрібниця' };
 
-function VisualBlock({ p }) {
+function VisualBlock({ p, onRedo, busy }) {
   const v = p.visual_prompt;
   if (!p.needs_visual && !p.visual_brief) return null;
   return (
@@ -26,6 +26,7 @@ function VisualBlock({ p }) {
         </details>
       ) : null}
       {p.visual_brief && <span>{p.visual_brief}</span>}
+      {onRedo && v && p.status === 'needs_review' && <button type="button" className="smm-btn" disabled={busy} onClick={() => onRedo(p)}><ActionIcon name="regenerate" size={18} />Інший варіант візуалу</button>}
     </div>
   );
 }
@@ -43,12 +44,12 @@ function QcBlock({ qc }) {
   );
 }
 
-function PostBody({ p }) {
+function PostBody({ p, onRedo, busy }) {
   return (
     <>
       <p className="smm-post-full">{p.body}</p>
       {p.hashtags && <p className="smm-tags">{p.hashtags}</p>}
-      <VisualBlock p={p} />
+      <VisualBlock p={p} onRedo={onRedo} busy={busy} />
       {p.fact_check && <div className="smm-warn"><b>Перевірте перед публікацією</b><span>{p.fact_check}</span></div>}
       <QcBlock qc={p.qc} />
     </>
@@ -89,6 +90,10 @@ export default function SmmQueue({ posts, plans, postTasks, team, onEdit, notify
       await reload();
       kick();
     } catch (e) { notify(e.message || 'Не вдалося схвалити план.', true); } finally { setBusyId(null); }
+  }
+  async function redoVisual(p) {
+    setBusyId(p.id);
+    try { await agentAction('redo_visual', { postId: p.id }); notify('Візуал-агент готує інший варіант.'); await reload(); kick(); } catch (e) { notify(e.message || 'Не вдалося виконати.', true); } finally { setBusyId(null); }
   }
   async function retry(task) {
     setBusyId('task' + task.id);
@@ -174,7 +179,7 @@ export default function SmmQueue({ posts, plans, postTasks, team, onEdit, notify
             <article key={p.id} className="smm-review">
               <header><NetworkBadge platform={p.platform} /><span className="smm-when">{fmtWhen(p.scheduled_for)}</span>{p.source === 'agent' && <span className="smm-agent-tag">написав агент</span>}</header>
               <h4>{p.topic || 'Без теми'}</h4>
-              <PostBody p={p} />
+              <PostBody p={p} onRedo={redoVisual} busy={busyId === p.id} />
               <footer>
                 <button type="button" className="smm-btn smm-btn--primary" disabled={busyId === p.id} onClick={() => act(p, 'approve')}><ActionIcon name="select" size={18} />Схвалити</button>
                 <button type="button" className="smm-btn" onClick={() => onEdit(p)}><ActionIcon name="edit" size={18} />Редагувати</button>

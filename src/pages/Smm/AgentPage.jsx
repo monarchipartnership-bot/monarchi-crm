@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ActionIcon from '../../components/common/ActionIcon';
 import DatePicker from '../../components/common/DatePicker';
 import Select from '../../components/common/Select';
-import { agentAction, fetchPrompts, fetchTasks, nextRunOf, setLinkRequired } from '../../lib/api/agents';
+import { agentAction, fetchPrompts, fetchServerStatus, fetchTasks, nextRunOf, setLinkRequired } from '../../lib/api/agents';
 import AgentSettings, { LANGUAGE_OPTIONS } from './AgentSettings';
 import AgentPrompts from './AgentPrompts';
 import AgentHistory from './AgentHistory';
@@ -104,6 +104,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
   const [tasks, setTasks] = useState([]);
   const [running, setRunning] = useState(false);
   const [dialog, setDialog] = useState(false);
+  const [serverStatus, setServerStatus] = useState(null);
   const headRef = useRef(null);
 
   const loadMine = useCallback(async () => {
@@ -113,6 +114,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
   }, [agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadMine(); }, [loadMine]);
   useEffect(() => { headRef.current?.focus(); }, [role]);
+  useEffect(() => { if (role === 'visual') fetchServerStatus().then(setServerStatus).catch(() => setServerStatus(null)); }, [role]);
 
   const st = agent ? stateOf(agent, team) : null;
   const month = Date.now() - 30 * 86400000;
@@ -158,6 +160,8 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
         <>
           {st.key === 'blocked' && <p className="smm-warn-banner" role="status">Агент зупинено, бо вимкнено «{st.blockedBy.name}», від якого він залежить. Його завдання чекають у черзі й продовжаться, щойно ви увімкнете «{st.blockedBy.name}».</p>}
           {st.key === 'wait' && <p className="smm-warn-banner" role="status">{meta.readyNote} Поки цього немає, агент не може працювати, але його промт і налаштування вже можна готувати.</p>}
+          {role === 'visual' && serverStatus && !serverStatus.higgsfield && <p className="smm-warn-banner" role="status">Ключі Higgsfield ще не додані на сервері, тому агент пише промти, але не запускає генерацію. Щоб підключити, додайте HF_API_KEY_ID і HF_API_KEY_SECRET у Vercel (Settings, Environment Variables) і перезапустіть розгортання. Ключі ніколи не вводяться в чат чи на сторінку.</p>}
+          {role === 'visual' && serverStatus?.higgsfield && <p className="smm-note">Higgsfield підключено: після промту зображення або відео генерується автоматично й зберігається в нашому сховищі.</p>}
           <p className="smm-agent-desc">{agent.description}</p>
           <div className="smm-stats">
             <div className="smm-stat"><b>{agent.last_run_at ? fmtDateTime(agent.last_run_at) : '—'}</b><span>останній запуск{agent.last_status === 'problem' ? ' (з помилкою)' : ''}</span></div>

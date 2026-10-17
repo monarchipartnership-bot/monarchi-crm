@@ -93,3 +93,6 @@ export async function kickQueue(onProgress) {
 }
 
 export const nextRunOf = (agent) => (agent.schedule?.weekday ? nextScheduled('weekly', { weeklyDay: agent.schedule.weekday, weeklyTime: agent.schedule.time }) : null);
+
+// What the server has connected (for the visual agent's page).
+export const fetchServerStatus = () => agentAction('status');

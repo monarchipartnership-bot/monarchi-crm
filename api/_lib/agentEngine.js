@@ -14,6 +14,7 @@ import { buildCopyPrompts, buildQcPrompts, buildStrategistPrompts, buildVisualPr
 import { analyseCompetitors } from './smmRun.js';
 import { insightLine } from './competitorAnalysis.js';
 import { runSeoAudit } from './seoRun.js';
+import * as higgsfield from './higgsfield.js';
 import { LANGUAGES, MAX_POSTS_PER_RUN, nextMonday, PLATFORM_KEYS } from './smmContent.js';
 
 const MODEL = 'claude-sonnet-5';
@@ -21,6 +22,10 @@ const LEASE_MIN = 10;
 const MAX_REFRESH_PER_RUN = 5;
 const TASK_TYPE = { site_analyst: 'report', seo: 'audit', competitors: 'analyse', social_analyst: 'report', strategist: 'plan_week', copywriter: 'write', visual: 'visual', qc: 'review', publisher: 'publish' };
 const READY = Object.fromEntries(SMM_ROLES.map((r) => [r.role, { ready: r.ready, note: r.readyNote }]));
+
+// The image/video generator: the real Higgsfield when its keys are set on the server, nothing otherwise (ctx.hf = null turns it off, a stand-in replaces it in tests).
+const hfOf = (ctx) => (ctx.hf === undefined ? (higgsfield.isConfigured() ? higgsfield : null) : ctx.hf);
+export const generatorReady = (ctx) => !!hfOf(ctx);
 
 const must = (r, what) => { if (r.error) throw new Error(`${what}: ${r.error.message}`); return r.data; };
 const iso = (d) => d.toISOString();
@@ -214,9 +219,10 @@ async function visual({ ctx, agent, task, prompt, rec }) {
   if (!v) throw new Error('Модель не повернула придатний промт для візуалу (відповідь збережено в історії).');
   const update = { visual_prompt: v, asset_kind: v.mode, asset_status: 'none', asset_url: null, updated_at: iso(ctx.now()) };
   let generated = null;
-  if (agent.config?.generate !== false && ctx.generate) {
-    try { generated = await ctx.generate({ post, visual: v, agent }); } catch (e) { update.asset_status = 'failed'; update.visual_prompt = { ...v, generation_error: String(e.message || e).slice(0, 300) }; }
-    if (generated) { update.asset_status = generated.status || 'pending'; update.asset_url = generated.url || null; update.visual_prompt = { ...v, generation: { job_id: generated.jobId || null, provider: generated.provider || null } }; }
+  const hf = hfOf(ctx);
+  if (agent.config?.generate !== false && hf) {
+    try { generated = await hf.submit({ post, visual: v }); } catch (e) { update.asset_status = 'failed'; update.visual_prompt = { ...v, generation_error: String(e.message || e).slice(0, 300) }; }
+    if (generated) { update.asset_status = 'pending'; update.visual_prompt = { ...v, generation: { job_id: generated.jobId, status_url: generated.statusUrl, provider: generated.provider, at: iso(ctx.now()) } }; }
   }
   must(await db.from('smm_posts').update(update).eq('id', post.id), 'post');
   return { output: { mode: v.mode, aspect: v.aspect_ratio, asset: update.asset_status }, summary: `Промт для ${post.platform}: ${v.mode}, ${v.aspect_ratio}${generated ? ', генерацію запущено' : ', без генерації'}.`, advance: post.id };
@@ -275,6 +281,37 @@ async function seo({ ctx, task, rec }) {
 
 const HANDLERS = { strategist, copywriter, visual, qc: qualityControl, competitors, seo };
 
+// Pictures and videos that were sent to the generator: look at each, keep the finished file in our storage, record a failure.
+export async function pollAssets(ctx) {
+  const hf = hfOf(ctx);
+  if (!hf) return 0;
+  const posts = must(await ctx.db.from('smm_posts').select('id, asset_kind, visual_prompt, updated_at').eq('asset_status', 'pending').limit(20), 'posts') || [];
+  let changed = 0;
+  for (const post of posts) {
+    const gen = post.visual_prompt?.generation;
+    let patch = null;
+    if (!gen?.status_url) patch = { asset_status: 'failed' };
+    else {
+      const r = await hf.check({ statusUrl: gen.status_url, kind: post.asset_kind });
+      if (r.state === 'ready') patch = { asset_status: 'ready', asset_url: await hf.persist({ db: ctx.db, url: r.url, kind: post.asset_kind, postId: post.id }) };
+      else if (r.state === 'failed') patch = { asset_status: 'failed', visual_prompt: { ...post.visual_prompt, generation_error: r.error } };
+      else if (ctx.now().getTime() - new Date(gen.at || post.updated_at).getTime() > 45 * 60000) patch = { asset_status: 'failed', visual_prompt: { ...post.visual_prompt, generation_error: 'Час очікування генерації вичерпано.' } };
+    }
+    if (patch) { await ctx.db.from('smm_posts').update({ ...patch, updated_at: iso(ctx.now()) }).eq('id', post.id); changed += 1; }
+  }
+  return changed;
+}
+
+// A person asks for a new picture of a post that is already in the queue (the same visual brief, a new prompt and a new generation).
+export async function redoVisual(ctx, postId, note = '') {
+  const team = await loadTeam(ctx.db);
+  const vis = team.byRole.get('visual');
+  if (!vis) throw new Error('Візуал-агента не знайдено.');
+  const feedback = String(note || '').trim() ? [String(note).trim().slice(0, 400)] : ['Зробіть інший варіант: інша композиція, той самий сенс.'];
+  await enqueue(ctx.db, { agent: vis, type: 'visual', postId, from: null, by: ctx.email, brief: { feedback, redo: true } });
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------------------------------------------- running tasks
 // Claims a queued task (only one process can) and runs it. → the finished task row, or null when someone else took it.
 export async function runTask(ctx, team, task) {
@@ -328,6 +365,7 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
   let team = await loadTeam(ctx.db);
   if (!team.agents.length) return { ...stats, note: 'Команду ще не створено.' };
   stats.started = await scheduleDue(ctx, team);
+  try { stats.assets = await pollAssets(ctx); } catch (e) { console.warn('pollAssets failed:', e?.message || e); }
   for (let pass = 0; pass < 60 && Date.now() - began < maxMs; pass += 1) {
     team = await loadTeam(ctx.db); // switches may be flipped while we work
     const states = chainStates(team.agents, team.links);

@@ -19,7 +19,8 @@ import { agentDue, chainStates, dependents } from '../src/lib/agents/chain.js';
 import { composeSystem } from '../src/lib/agents/locked.js';
 import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
 import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
-import { approvePlan, processQueue, runNow } from '../api/_lib/agentEngine.js';
+import { approvePlan, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
+import { buildRequest, check as hfCheck, submit as hfSubmit } from '../api/_lib/higgsfield.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -828,7 +829,7 @@ await ok('agents: a whole run: plan -> approval -> text and visual in parallel -
       return { text: JSON.stringify(out), usage: { input_tokens: 10, output_tokens: 5 }, costUsd: 0.01 };
     },
   };
-  const ctx = { db, model, email: 'a@x.com', trigger: 'user', now: () => new Date('2026-10-16T10:00:00Z') };
+  const ctx = { db, model, email: 'a@x.com', trigger: 'user', hf: null, now: () => new Date('2026-10-16T10:00:00Z') };
   const on = (...roles) => tables.ag_agents.forEach((a) => { a.enabled = roles.includes(a.role); });
   const role = (r) => tables.ag_agents.find((a) => a.role === r);
   role('strategist').config = { counts: { linkedin: 1, instagram: 1 }, language: 'en', requirePlanApproval: true, notifyEmails: ['p@x.com'] };
@@ -891,6 +892,40 @@ await ok('agents: a whole run: plan -> approval -> text and visual in parallel -
   assert.equal(role('competitors').last_status, 'ok');
   q = await processQueue(wed);
   assert.deepEqual(q.started, []); // not again
+});
+
+await ok('higgsfield: requests are built from the visual, status is read, a finished file is kept, failures are reported', async () => {
+  const img = buildRequest({ mode: 'image', prompt: 'A desk', negative_prompt: 'text', aspect_ratio: '4:5' });
+  assert.equal(img.path, 'higgsfield-ai/soul/standard');
+  assert.deepEqual([img.body.aspect_ratio, img.body.resolution], ['3:4', '1080p']); // Soul has no 4:5: the nearest
+  assert.match(img.body.prompt, /Avoid: text/);
+  const vid = buildRequest({ mode: 'video', prompt: 'A pan', aspect_ratio: '9:16', duration_seconds: 99 });
+  assert.deepEqual([vid.path, vid.body.duration, vid.body.aspect_ratio, vid.body.sound], ['kling-video/v3.0/std/text-to-video', 15, '9:16', 'off']);
+  const env = { HF_API_KEY_ID: 'id', HF_API_KEY_SECRET: 'sec' };
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    seen.push([url, init?.headers?.Authorization, init?.headers?.['Idempotency-Key']]);
+    if (init?.method === 'POST') return { ok: true, status: 200, json: async () => ({ request_id: 'r1', status: 'queued', status_url: 'https://api.higgsfield.ai/requests/r1/status' }) };
+    return { ok: true, status: 200, json: async () => (url.endsWith('r1/status') ? { status: 'completed', images: [{ url: 'https://cdn.example/a.png' }] } : { status: 'failed', error: 'bad' }) };
+  };
+  const job = await hfSubmit({ post: { id: 5, rounds: 0 }, visual: { mode: 'image', prompt: 'A desk', aspect_ratio: '1:1' }, env, fetchFn });
+  assert.deepEqual([job.jobId, job.status], ['r1', 'pending']);
+  assert.equal(seen[0][1], 'Key id:sec');
+  assert.match(seen[0][2], /^smm-post-5-/); // an idempotency key: a retried submit does not pay twice
+  assert.deepEqual(await hfCheck({ statusUrl: job.statusUrl, kind: 'image', env, fetchFn }), { state: 'ready', url: 'https://cdn.example/a.png' });
+  assert.equal((await hfCheck({ statusUrl: 'https://api.higgsfield.ai/requests/r2/status', kind: 'image', env, fetchFn })).state, 'failed');
+  assert.equal((await hfCheck({ statusUrl: 'https://evil.example/x', kind: 'image', env, fetchFn })).state, 'failed'); // only the provider's own host
+  // the engine: a pending post becomes ready (file kept via persist) or failed
+  const tables = { smm_posts: [
+    { id: 1, asset_status: 'pending', asset_kind: 'image', visual_prompt: { prompt: 'p', generation: { status_url: 'u1', at: '2026-10-16T09:50:00Z' } }, updated_at: '2026-10-16T09:50:00Z' },
+    { id: 2, asset_status: 'pending', asset_kind: 'image', visual_prompt: { prompt: 'p', generation: { status_url: 'u2', at: '2026-10-16T09:50:00Z' } }, updated_at: '2026-10-16T09:50:00Z' },
+    { id: 3, asset_status: 'pending', asset_kind: 'image', visual_prompt: { prompt: 'p', generation: { status_url: 'u3', at: '2026-10-16T08:00:00Z' } }, updated_at: '2026-10-16T08:00:00Z' }] };
+  const hf = { async check({ statusUrl }) { return statusUrl === 'u1' ? { state: 'ready', url: 'https://cdn.example/a.png' } : statusUrl === 'u2' ? { state: 'failed', error: 'nsfw' } : { state: 'pending' }; }, async persist({ url, postId }) { return `https://store.example/${postId}.png`; } };
+  const n = await pollAssets({ db: fakeDb(tables), hf, now: () => new Date('2026-10-16T10:00:00Z') });
+  assert.equal(n, 3);
+  assert.deepEqual(tables.smm_posts.map((p) => p.asset_status), ['ready', 'failed', 'failed']); // the third waited more than 45 minutes
+  assert.equal(tables.smm_posts[0].asset_url, 'https://store.example/1.png');
+  assert.equal(tables.smm_posts[1].visual_prompt.generation_error, 'nsfw');
 });
 
 console.log(`\n${passed} checks passed`);

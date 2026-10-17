@@ -5,11 +5,12 @@
 //   POST { action: 'reject_plan', planId, reason }   the plan is rejected; the reason is fed back to the strategist
 //   POST { action: 'run_agent', agentId, brief? }    run one agent now (strategist, SEO, competitors), even if it is switched off
 //   POST { action: 'retry_task' | 'cancel_task', taskId }
+//   POST { action: 'poll_assets' }                   look at the pictures/videos being generated; { action: 'redo_visual', postId, note? }; { action: 'status' }
 // A person acts with their own session (row-level security applies); the cron signs in as the agent user. The model key stays on the server.
 import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { getModelClient } from './_lib/ai.js';
-import { approvePlan, cancelTask, processQueue, rejectPlan, retryTask, runNow } from './_lib/agentEngine.js';
+import { approvePlan, cancelTask, generatorReady, pollAssets, processQueue, redoVisual, rejectPlan, retryTask, runNow } from './_lib/agentEngine.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
@@ -43,6 +44,9 @@ export default async function handler(req, res) {
     else if (action === 'run_agent') { out = await runNow(ctx, Number(body.agentId), body.brief && typeof body.brief === 'object' ? body.brief : {}); if (out.status === 'done') out.queue = await processQueue(ctx, { maxMs: 120000 }); }
     else if (action === 'retry_task') out = await retryTask(ctx, Number(body.taskId));
     else if (action === 'cancel_task') out = await cancelTask(ctx, Number(body.taskId));
+    else if (action === 'poll_assets') out = { changed: await pollAssets(ctx) };
+    else if (action === 'redo_visual') out = await redoVisual(ctx, Number(body.postId), body.note);
+    else if (action === 'status') out = { higgsfield: generatorReady(ctx) };
     else { bad(res, 400, 'Невідома дія'); return; }
     res.status(200).json(out);
   } catch (e) {
