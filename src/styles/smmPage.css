@@ -329,3 +329,5 @@ button.smm-stat { cursor: pointer; }
   .smm-run-head { align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { .smm-stage-chip.is-active i { animation: none; } }
+
+.smm-page .smm-agent-title h2:focus-visible { outline: none; }
