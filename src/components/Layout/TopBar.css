@@ -230,6 +230,13 @@
   .topbar-heading:has(.topbar-page-icon) { padding-left: 46px; min-width: 0; }
 }
 
+/* The search is a placeholder for now; below this width the heading, the search and the account block no longer fit side by side,
+   so the search steps aside and the heading may shrink instead of pushing the bar wider than the window. */
+@media (max-width: 860px) {
+  .topbar-search { display: none; }
+  .topbar-heading { flex: 1 1 auto; }
+}
+
 @media (max-width: 560px) {
   .topbar-search { display: none; }
   .topbar-heading { flex: 1; }

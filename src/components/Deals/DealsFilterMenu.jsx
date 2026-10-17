@@ -161,7 +161,7 @@ export default function DealsFilterMenu({
                   </div>
                 </div>
                 <div className="deals-filter-section">
-                  <span className="deals-filter-section-label">Source</span>
+                  <span className="deals-filter-section-label">Джерело</span>
                   <div className="deals-filter-list deals-filter-list-inline">
                     <button type="button" className={'deals-filter-row' + (!sourceFilter ? ' active' : '')} onClick={() => onSourceChange('')}>
                       Усі джерела {!sourceFilter && <span dangerouslySetInnerHTML={{ __html: CHECK_ICON }} />}

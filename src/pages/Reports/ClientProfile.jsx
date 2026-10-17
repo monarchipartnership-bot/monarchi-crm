@@ -32,6 +32,7 @@ import AiHistoryTab from '../../components/ClientProfile/AiHistoryTab';
 import NoteEditor from '../../components/Deals/NoteEditor';
 import TagInput from '../../components/Automation/TagInput';
 import AddDealModal from '../../components/Deals/AddDealModal';
+import CreateDealTaskModal from '../../components/Deals/CreateDealTaskModal';
 import PlatformPicker from '../../components/common/PlatformPicker';
 import Select from '../../components/common/Select';
 import MultiTextField from '../../components/common/MultiTextField';
@@ -245,6 +246,7 @@ export default function ClientProfile() {
   const [profiles, setProfiles] = useState([]);
   const [teamProfiles, setTeamProfiles] = useState([]);
   const [addDealOpen, setAddDealOpen] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
 
   // Discrete, pinnable client notes — same shape/UI as a deal's own
   // "Нотатки" (client_notes mirrors deal_notes), now living inside "Основна
@@ -915,7 +917,7 @@ export default function ClientProfile() {
                     <ActionIcon name="create" size={20} />
                     Створити угоду
                   </button>
-                  <button type="button" className="client-profile-quick-action" disabled title="Скоро">
+                  <button type="button" className="client-profile-quick-action" disabled={!deals.length} title={deals.length ? undefined : 'Задача прив’язується до угоди: спочатку створіть угоду'} onClick={() => setAddTaskOpen(true)}>
                     <ActionIcon name="create" size={20} />
                     Створити задачу
                   </button>
@@ -1302,6 +1304,16 @@ export default function ClientProfile() {
         {activeTab === 'files' && <ClientFilesTab clientId={client.id} uploadedBy={email} />}
         {activeTab === 'ai' && <AiHistoryTab clientId={client.id} />}
       </section>
+
+      {addTaskOpen && (
+        <CreateDealTaskModal
+          deals={deals}
+          profiles={profiles}
+          myEmail={email}
+          onClose={() => setAddTaskOpen(false)}
+          onCreated={(row) => { setTasks((t) => [row, ...t]); setAddTaskOpen(false); }}
+        />
+      )}
 
       {addDealOpen && pipelines.length > 0 && (
         <AddDealModal

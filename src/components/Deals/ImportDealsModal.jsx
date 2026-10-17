@@ -13,13 +13,13 @@ import { STATUSES } from '../../lib/clientStatus';
 const TARGET_FIELDS = [
   { value: 'ignore', label: 'Ігнорувати' },
   { value: 'clientName', label: "Клієнт (обов'язково)" },
-  { value: 'title', label: 'Title' },
+  { value: 'title', label: 'Назва' },
   { value: 'amount', label: 'Сума' },
   { value: 'currency', label: 'Валюта' },
   { value: 'stage', label: 'Стадія (текст)' },
-  { value: 'source', label: 'Source' },
-  { value: 'chatLink', label: 'Chat link' },
-  { value: 'owner', label: 'Owner' },
+  { value: 'source', label: 'Джерело' },
+  { value: 'chatLink', label: 'Посилання на чат' },
+  { value: 'owner', label: 'Менеджер' },
   { value: 'expectedClose', label: 'Очікуване закриття (РРРР-ММ-ДД)' },
 ];
 

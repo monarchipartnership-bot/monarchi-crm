@@ -95,7 +95,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
             <div className="wk-field-box wk-field-box-wide">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.title }} />
               <div className="wk-field-body">
-                <label>Title (необов'язково)</label>
+                <label>Назва (необов'язково)</label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="напр. Ребрендинг сайту" />
               </div>
             </div>
@@ -103,7 +103,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
             <div className="wk-field-box wk-field-box-wide">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.pipeline }} />
               <div className="wk-field-body">
-                <label>Pipeline</label>
+                <label>Воронка</label>
                 <Select
                   bare value={pipelineId} onChange={(v) => setPipelineId(Number(v))}
                   options={pipelines.map((p) => ({ value: p.id, label: p.name }))}
@@ -114,7 +114,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
             <div className="wk-field-box wk-field-box-wide">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
               <div className="wk-field-body">
-                <label>Contact</label>
+                <label>Контакт</label>
                 <ClientPicker value={client?.id} onChange={handleClientChange} placeholder="Пошук клієнта..." defaultPlatform={activePipeline?.name} manager={manager} />
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                 <div className="wk-field-box wk-field-box-wide">
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
                   <div className="wk-field-body">
-                    <label>Source</label>
+                    <label>Джерело</label>
                     <input type="text" value={source} onChange={(e) => setSource(e.target.value)} placeholder="напр. Реферал, холодний лист..." />
                   </div>
                 </div>
@@ -152,7 +152,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                 <div className="wk-field-box wk-field-box-wide">
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.chatLink }} />
                   <div className="wk-field-body">
-                    <label>Chat link</label>
+                    <label>Посилання на чат</label>
                     <input type="text" value={chatLink} onChange={(e) => setChatLink(e.target.value)} placeholder="Посилання на переписку" />
                   </div>
                 </div>
@@ -160,7 +160,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                 <div className="wk-field-box wk-field-box-wide">
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.company }} />
                   <div className="wk-field-body">
-                    <label>Company (необов'язково)</label>
+                    <label>Компанія (необов'язково)</label>
                     <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Назва компанії" />
                   </div>
                 </div>
@@ -190,7 +190,7 @@ export default function AddDealModal({ pipelines, defaultPipelineId, defaultStag
                 <div className="wk-field-box wk-field-box-wide">
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.owner }} />
                   <div className="wk-field-body">
-                    <label>Owner</label>
+                    <label>Менеджер</label>
                     <Select
                       bare value={manager} onChange={setManager}
                       options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.label, label: p.label }))]}

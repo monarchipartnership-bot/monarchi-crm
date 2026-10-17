@@ -320,7 +320,7 @@ export default function ImportNetHuntDealsModal({ pipelines, onClose, onImported
               <div className="tbl-wrap import-preview-wrap">
                 <table className="cmp-table">
                   <thead>
-                    <tr><th>Контакт</th><th>Pipeline</th><th>Етап</th><th>Сума</th><th>Статус</th></tr>
+                    <tr><th>Контакт</th><th>Воронка</th><th>Етап</th><th>Сума</th><th>Статус</th></tr>
                   </thead>
                   <tbody>
                     {mappedRows.slice(0, 20).map((r, i) => (

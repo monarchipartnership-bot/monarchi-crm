@@ -379,13 +379,13 @@ export default function DealTasksPage() {
   const num = (v) => (loading || loadError ? '—' : v);
   const hasNoTasks = !loading && !loadError && rows.length === 0;
   const noMatches = !loading && !loadError && rows.length > 0 && filtered.length === 0;
-  const delta = (d) => (d !== 0 ? <span className="dtp-delta">{d > 0 ? '▲ +' : '▼ '}{d}</span> : null);
+  const delta = (d, hint) => (d !== 0 ? <span className="dtp-delta" title={hint}>{d > 0 ? '▲ +' : '▼ '}{d}</span> : null);
 
   const summary = [
-    { key: 'total', label: 'Всього задач (за 7 днів)', value: num(kpis.total), extra: loading ? null : delta(kpis.totalDelta), icon: FIELD_ICONS.checklist },
+    { key: 'total', label: 'Всього задач', value: num(kpis.total), extra: loading ? null : delta(kpis.totalDelta, 'Створено за останні 7 днів проти попередніх 7 днів'), icon: FIELD_ICONS.checklist },
     { key: 'today', label: 'Сьогодні', value: num(kpis.today), icon: FIELD_ICONS.day },
     { key: 'overdue', label: 'Прострочені', value: num(kpis.overdue), icon: FIELD_ICONS.deadline, tone: 'overdue' },
-    { key: 'done', label: 'Завершено (тиждень)', value: num(kpis.doneWeek), extra: loading ? null : delta(kpis.doneWeekDelta), icon: FIELD_ICONS.check, tone: 'done' },
+    { key: 'done', label: 'Завершено (тиждень)', value: num(kpis.doneWeek), extra: loading ? null : delta(kpis.doneWeekDelta, 'Завершено за останні 7 днів проти попередніх 7 днів'), icon: FIELD_ICONS.check, tone: 'done' },
   ];
 
   return (

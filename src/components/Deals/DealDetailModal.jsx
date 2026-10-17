@@ -654,14 +654,14 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
             <div className="wk-field-box">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.pipeline }} />
               <div className="wk-field-body">
-                <label>Pipeline</label>
+                <label>Воронка</label>
                 <div className="wk-field-static">{deal.pipelines?.name || '—'}</div>
               </div>
             </div>
             <div className="wk-field-box">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
               <div className="wk-field-body">
-                <label>Source</label>
+                <label>Джерело</label>
                 <Select
                   bare searchable onCreate={addChannel} value={source}
                   onChange={(v) => { setSource(v); saveField({ source: v || null }); }}
@@ -690,7 +690,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
             <div className="wk-field-box">
               <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.owner }} />
               <div className="wk-field-body">
-                <label>Owner</label>
+                <label>Менеджер</label>
                 <Select
                   bare value={manager} onChange={(v) => { setManager(v); saveField({ manager: v }); }}
                   options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.label, label: p.label }))]}
@@ -723,7 +723,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                   </div>
                 </div>
                 <LinkField
-                  icon={FIELD_ICONS.chatLink} label="Chat link" value={chatLink}
+                  icon={FIELD_ICONS.chatLink} label="Посилання на чат" value={chatLink}
                   onChange={(e) => setChatLink(e.target.value)}
                   onBlur={() => saveField({ chat_link: chatLink.trim() || null })}
                   placeholder="Посилання на переписку"
@@ -873,7 +873,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
                 <div className="wk-field-box wk-field-box-wide" style={{ marginTop: 14 }}>
                   <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.company }} />
                   <div className="wk-field-body">
-                    <label>Company (необов'язково)</label>
+                    <label>Компанія (необов'язково)</label>
                     <input
                       type="text" value={company} onChange={(e) => setCompany(e.target.value)}
                       onBlur={() => saveCompany(company)}
