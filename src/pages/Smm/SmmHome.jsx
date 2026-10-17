@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { fetchPlans, fetchPostTasks, kickQueue, loadTeam } from '../../lib/api/agents';
 import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, fetchSiteAudits, BRAND_FIELDS } from '../../lib/api/smm';
 import '../../styles/projectWorkspace.css'; // the shared confirmation window (useConfirm) lives in this sheet
 import '../../styles/smmPage.css';
+import AgentPage from './AgentPage';
+import SmmAgents from './SmmAgents';
 import SmmBrand from './SmmBrand';
 import { GenerateDialog, PostDialog } from './SmmDialogs';
 import SmmOverview from './SmmOverview';
@@ -12,6 +16,7 @@ import SmmSite from './SmmSite';
 
 const TABS = [
   { key: 'overview', label: 'Огляд' },
+  { key: 'agents', label: 'Агенти' },
   { key: 'plan', label: 'Контент-план' },
   { key: 'queue', label: 'Черга схвалення' },
   { key: 'site', label: 'Сайт' },
@@ -29,6 +34,11 @@ export default function SmmHome() {
   const [reports, setReports] = useState({});
   const [settings, setSettings] = useState(null);
   const [audits, setAudits] = useState([]);
+  const [team, setTeam] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [postTasks, setPostTasks] = useState([]);
+  const { email } = useAuth();
+  const kicking = useRef(false);
   const [missing, setMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState(null); // null | { kind: 'post', post } | { kind: 'generate' }
@@ -36,12 +46,31 @@ export default function SmmHome() {
   const toastTimer = useRef(null);
   const tabRefs = useRef({});
 
+  const reloadTeam = useCallback(async () => {
+    try { setTeam(await loadTeam(email)); } catch (e) { console.warn('loadTeam failed', e); setTeam(null); }
+  }, [email]);
   const reload = useCallback(async () => {
-    const [b, c, p, r, st, au] = await Promise.all([fetchBrand(), fetchCompetitors(), fetchPosts(), fetchCompetitorReports(), fetchSettings(), fetchSiteAudits()]);
-    setReports(r); setSettings(st); setAudits(au);
+    const [b, c, p, r, st, au, pl] = await Promise.all([fetchBrand(), fetchCompetitors(), fetchPosts(), fetchCompetitorReports(), fetchSettings(), fetchSiteAudits(), fetchPlans().catch(() => [])]);
+    const producing = p.posts.filter((x) => ['planned', 'producing', 'qc'].includes(x.status)).map((x) => x.id);
+    const [pt] = await Promise.all([fetchPostTasks(producing).catch(() => []), reloadTeam()]);
+    setReports(r); setSettings(st); setAudits(au); setPlans(pl); setPostTasks(pt);
     setBrand(b.brand); setCompetitors(c); setPosts(p.posts); setMissing(b.missing || p.missing); setLoading(false);
-  }, []);
+  }, [reloadTeam]);
   useEffect(() => { reload(); }, [reload]);
+
+  // The queue is worked through by the server (the cron every 15 minutes, and this call right after a plan is approved);
+  // while something is in production the page refreshes itself.
+  const kick = useCallback(() => {
+    if (kicking.current) return;
+    kicking.current = true;
+    kickQueue().catch((e) => console.warn('queue kick failed', e)).finally(() => { kicking.current = false; reload(); });
+  }, [reload]);
+  const busyProduction = posts.some((x) => ['planned', 'producing', 'qc'].includes(x.status)) || Object.values(team?.counts || {}).some((c) => c.queued || c.running);
+  useEffect(() => {
+    if (!busyProduction) return undefined;
+    const t = setInterval(() => { reload(); }, 8000);
+    return () => clearInterval(t);
+  }, [busyProduction, reload]);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   const notify = useCallback((text, isError = false) => {
@@ -50,6 +79,8 @@ export default function SmmHome() {
     toastTimer.current = setTimeout(() => setToast(null), isError ? 7000 : 4000);
   }, []);
   const go = (key) => setParams(key === 'overview' ? {} : { tab: key }, { replace: false });
+  const agentRole = params.get('agent');
+  const openAgent = (role) => setParams({ tab: 'agents', agent: role });
 
   function onKeyTabs(e) {
     const i = TABS.findIndex((t) => t.key === tab);
@@ -60,6 +91,7 @@ export default function SmmHome() {
 
   const brandFilled = BRAND_FIELDS.some((f) => (brand?.[f.key] || '').trim());
   const common = { posts, notify, reload };
+  const toReview = posts.filter((p) => p.status === 'needs_review').length + plans.filter((pl) => pl.status === 'awaiting_approval').length;
 
   return (
     <div className="smm-page" data-dd="plum">
@@ -70,7 +102,7 @@ export default function SmmHome() {
             tabIndex={tab === t.key ? 0 : -1} className={'smm-tab' + (tab === t.key ? ' is-active' : '')} onClick={() => go(t.key)}
           >
             {t.label}
-            {t.key === 'queue' && posts.some((p) => p.status === 'needs_review') && <span className="smm-tab-badge">{posts.filter((p) => p.status === 'needs_review').length}</span>}
+            {t.key === 'queue' && toReview > 0 && <span className="smm-tab-badge">{toReview}</span>}
           </button>
         ))}
       </div>
@@ -81,9 +113,12 @@ export default function SmmHome() {
           <div className="smm-empty smm-empty--big" role="alert">Таблиці SMM ще не створено в базі. Потрібно застосувати міграцію <code>20261016000000_smm.sql</code>.</div>
         ) : (
           <>
-            {tab === 'overview' && <SmmOverview brand={brand} competitors={competitors} posts={posts} settings={settings} notify={notify} reload={reload} go={go} onGenerate={() => setDialog({ kind: 'generate' })} />}
+            {tab === 'overview' && <SmmOverview brand={brand} competitors={competitors} posts={posts} plans={plans} team={team} go={go} open={openAgent} />}
+            {tab === 'agents' && !team && <div className="smm-empty smm-empty--big" role="alert">Агентів ще не створено в базі. Потрібно застосувати міграцію <code>20261020000000_agent_framework.sql</code>.</div>}
+            {tab === 'agents' && team && !agentRole && <SmmAgents team={team} open={openAgent} notify={notify} reloadTeam={reloadTeam} />}
+            {tab === 'agents' && team && agentRole && <AgentPage role={agentRole} team={team} posts={posts} notify={notify} reloadTeam={reloadTeam} reloadAll={reload} back={() => go('agents')} open={openAgent} go={go} kick={kick} />}
             {tab === 'plan' && <SmmPlan {...common} onGenerate={() => setDialog({ kind: 'generate' })} onNew={() => setDialog({ kind: 'post', post: null })} onEdit={(post) => setDialog({ kind: 'post', post })} />}
-            {tab === 'queue' && <SmmQueue {...common} onEdit={(post) => setDialog({ kind: 'post', post })} />}
+            {tab === 'queue' && team && <SmmQueue {...common} plans={plans} postTasks={postTasks} team={team} kick={kick} onEdit={(post) => setDialog({ kind: 'post', post })} />}
             {tab === 'site' && <SmmSite settings={settings} audits={audits} notify={notify} reload={reload} />}
             {tab === 'brand' && <SmmBrand brand={brand} competitors={competitors} reports={reports} notify={notify} reload={reload} />}
           </>

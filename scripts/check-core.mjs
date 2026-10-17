@@ -751,6 +751,8 @@ await ok('agents: an agent with a schedule is due once per moment, retried after
   assert.equal(agentDue({ agent: { ...base, schedule: null }, now: wed10 }).due, false);
   assert.deepEqual(agentDue({ agent: base, now: wed10 }), { due: true, scheduledFor: '2026-10-21' });
   assert.equal(agentDue({ agent: base, now: new Date('2026-10-21T05:00:00Z') }).scheduledFor, '2026-10-14'); // 08:00 Kyiv: the last moment was a week ago
+  assert.equal(agentDue({ agent: { ...base, enabled_since: '2026-10-21T06:30:00Z' }, now: wed10 }).due, false); // switched on after 09:00 Kyiv: that moment is not made up for
+  assert.equal(agentDue({ agent: { ...base, enabled_since: '2026-10-20T06:30:00Z' }, now: wed10 }).due, true);
   assert.equal(agentDue({ agent: { ...base, last_scheduled: '2026-10-21', last_status: 'ok' }, now: wed10 }).due, false);
   const failed = { ...base, last_scheduled: '2026-10-21', last_status: 'problem', attempts: 1, last_attempt_at: '2026-10-21T06:40:00Z' };
   assert.equal(agentDue({ agent: failed, now: wed10 }).due, false);

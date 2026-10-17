@@ -38,10 +38,10 @@ export default async function handler(req, res) {
     const action = trigger === 'cron' ? 'process' : String(body.action || 'process');
     let out;
     if (action === 'process') out = await processQueue(ctx);
-    else if (action === 'approve_plan') { out = await approvePlan(ctx, Number(body.planId)); out.queue = await processQueue(ctx, { maxMs: 150000 }); }
+    else if (action === 'approve_plan') out = await approvePlan(ctx, Number(body.planId)); // the page then calls `process` until the queue is empty
     else if (action === 'reject_plan') out = await rejectPlan(ctx, Number(body.planId), body.reason);
     else if (action === 'run_agent') { out = await runNow(ctx, Number(body.agentId), body.brief && typeof body.brief === 'object' ? body.brief : {}); if (out.status === 'done') out.queue = await processQueue(ctx, { maxMs: 120000 }); }
-    else if (action === 'retry_task') { out = await retryTask(ctx, Number(body.taskId)); out.queue = await processQueue(ctx, { maxMs: 150000 }); }
+    else if (action === 'retry_task') out = await retryTask(ctx, Number(body.taskId));
     else if (action === 'cancel_task') out = await cancelTask(ctx, Number(body.taskId));
     else { bad(res, 400, 'Невідома дія'); return; }
     res.status(200).json(out);

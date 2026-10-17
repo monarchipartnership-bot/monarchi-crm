@@ -14,6 +14,9 @@ export const NETWORKS = {
 export const NETWORK_KEYS = Object.keys(NETWORKS);
 
 export const STATUSES = {
+  planned: { label: 'У плані', color: '#6B5B8C' },
+  producing: { label: 'У виробництві', color: '#2B63C4' },
+  qc: { label: 'На контролі якості', color: '#0F9CA8' },
   draft: { label: 'Чернетка', color: '#807394' },
   needs_review: { label: 'На перевірці', color: '#B7791F' },
   approved: { label: 'Схвалено', color: '#2B63C4' },

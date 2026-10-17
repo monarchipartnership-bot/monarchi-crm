@@ -61,6 +61,7 @@ const RETRY_AFTER_MIN = 60;
 export function agentDue({ agent, now = new Date() }) {
   if (!agent.schedule || !agent.schedule.weekday) return { due: false, reason: 'без розкладу' };
   const sched = lastScheduled('weekly', { weeklyDay: agent.schedule.weekday, weeklyTime: agent.schedule.time }, now);
+  if (agent.enabled_since && sched.at < new Date(agent.enabled_since)) return { due: false, reason: 'запланований момент був до вмикання агента' };
   if (agent.last_scheduled === sched.date) {
     if (agent.last_status === 'ok') return { due: false, reason: 'вже виконано', scheduledFor: sched.date };
     if ((agent.attempts || 0) >= MAX_TRIES) return { due: false, reason: 'вичерпано спроби', scheduledFor: sched.date };
