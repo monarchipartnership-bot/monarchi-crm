@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { saveAgent } from '../../lib/api/agents';
 import { fetchAllProfiles, profileLabel } from '../../lib/api/profile';
 import { NETWORKS, NETWORK_KEYS } from '../../lib/api/smm';
+import { CAMPAIGN_TEAM } from '../../lib/agents/campaignTeam';
 import { roleMeta } from './agentUi';
 
 export const LANGUAGE_OPTIONS = [{ value: 'en', label: 'English' }, { value: 'uk', label: 'Українська' }];
@@ -42,6 +43,7 @@ export default function AgentSettings({ agent, notify, reload }) {
   }
 
   const sch = f.schedule;
+  const isCampaign = agent.team === CAMPAIGN_TEAM;
   return (
     <form className="smm-auto" onSubmit={save}>
       {hasSchedule && (
@@ -55,6 +57,25 @@ export default function AgentSettings({ agent, notify, reload }) {
           )}
           <p className="smm-hint">Агент стартує за розкладом, лише коли він увімкнений і ввімкнені ті, від кого він залежить. Якщо запуск не вдався, повтор через годину, до трьох спроб.</p>
         </>
+      )}
+
+      {isCampaign && (
+        <div className="smm-form">
+          {(meta.fields || []).map((fld) => (
+            <div key={fld.key} className="smm-field smm-field--wide">
+              <label htmlFor={'ag-f-' + fld.key}>{fld.label}</label>
+              {fld.type === 'text'
+                ? <input id={'ag-f-' + fld.key} type="text" value={f.config[fld.key] || ''} onChange={(e) => setCfg(fld.key, e.target.value)} maxLength={300} />
+                : <textarea id={'ag-f-' + fld.key} rows={fld.rows || 3} value={f.config[fld.key] || ''} onChange={(e) => setCfg(fld.key, e.target.value)} maxLength={12000} />}
+              {fld.hint && <span className="smm-hint">{fld.hint}</span>}
+            </div>
+          ))}
+          <div className="smm-field smm-field--wide">
+            <label htmlFor="ag-extra">Додаткова інструкція для цього клієнта</label>
+            <textarea id="ag-extra" rows={4} value={f.config.extra || ''} onChange={(e) => setCfg('extra', e.target.value)} maxLength={2000} placeholder="Наприклад: не порівнювати з конкурентами за ціною; писати коротко; завжди називати кампанії за іменем." />
+            <span className="smm-hint">Додається до промту цього агента лише для цієї кампанії. Основний промт редагується у вкладці «Промти».</span>
+          </div>
+        </div>
       )}
 
       {agent.role === 'strategist' && (
@@ -100,7 +121,7 @@ export default function AgentSettings({ agent, notify, reload }) {
         </div>
       )}
 
-      {!hasSchedule && !['strategist', 'competitors', 'visual', 'qc'].includes(agent.role) && <p className="smm-muted">Окремих налаштувань у цього агента поки немає: він працює за завданнями від інших агентів.{meta.readyNote ? ' ' + meta.readyNote : ''}</p>}
+      {!isCampaign && !hasSchedule && !['strategist', 'competitors', 'visual', 'qc'].includes(agent.role) && <p className="smm-muted">Окремих налаштувань у цього агента поки немає: він працює за завданнями від інших агентів.{meta.readyNote ? ' ' + meta.readyNote : ''}</p>}
 
       <div className="smm-form-foot">
         <button type="submit" className="smm-btn smm-btn--primary" disabled={saving || !dirty}><ActionIcon name="save" size={18} />{saving ? 'Зберігаємо…' : 'Зберегти'}</button>

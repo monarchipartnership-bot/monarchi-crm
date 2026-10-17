@@ -20,6 +20,7 @@ const SUBTABS = [
   { key: 'tasks', label: 'Завдання' },
 ];
 const MANUAL_RUN = ['strategist', 'seo', 'competitors'];
+const canRunByHand = (agent) => agent.team === 'campaign' || MANUAL_RUN.includes(agent.role);
 const RUN_LABEL = { strategist: 'Скласти план тижня', seo: 'Запустити аудит сайту', competitors: 'Проаналізувати конкурентів' };
 const RUN_NOTE = { strategist: 'Агент складе план і покладе його в «Чергу схвалення» чекати на ваше «ок». Це займає до хвилини.', seo: 'Агент прочитає публічні сторінки сайту (до двох хвилин). Результат зʼявиться у вкладці «Сайт».', competitors: 'Агент прочитає сайти конкурентів (до двох хвилин).' };
 
@@ -38,7 +39,7 @@ function RunDialog({ agent, prompts, onClose, onRun }) {
   }
   return (
     <Dialog
-      title={RUN_LABEL[agent.role]} onClose={busy ? () => {} : onClose}
+      title={RUN_LABEL[agent.role] || 'Запустити зараз'} onClose={busy ? () => {} : onClose}
       foot={(
         <>
           <button type="button" className="smm-btn" onClick={onClose} disabled={busy}>Скасувати</button>
@@ -47,7 +48,7 @@ function RunDialog({ agent, prompts, onClose, onRun }) {
       )}
     >
       <form id="smm-run-form" className="smm-form" onSubmit={submit}>
-        <p className="smm-note smm-field--wide">{RUN_NOTE[agent.role]}{!agent.enabled ? ' Агент вимкнений: це разовий запуск вручну, розклад він не вмикає.' : ''}</p>
+        <p className="smm-note smm-field--wide">{RUN_NOTE[agent.role] || 'Агент прочитає дані кампанії та результати агентів, від яких залежить, і складе звіт. Це займає до двох хвилин.'}{!agent.enabled ? ' Агент вимкнений: це разовий запуск вручну, розклад він не вмикає.' : ''}</p>
         {agent.role === 'strategist' && (
           <>
             <div className="smm-field"><label>Тиждень починається (понеділок)</label><DatePicker value={weekStart} onChange={setWeekStart} /></div>
@@ -131,7 +132,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
       const r = await agentAction('run_agent', { agentId: agent.id, brief });
       setDialog(false);
       if (r.status === 'failed') notify(r.error || 'Агент не зміг виконати завдання.', true);
-      else notify(role === 'strategist' ? 'План готовий і чекає на ваше «ок» у черзі схвалення.' : 'Готово.');
+      else notify(role === 'strategist' ? 'План готовий і чекає на ваше «ок» у черзі схвалення.' : 'Готово. Звіт у вкладці «Завдання».');
       await Promise.all([reloadAll(), loadMine()]);
       if (r.queue?.left) kick();
     } finally { setRunning(false); }
@@ -170,9 +171,9 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
             <div className="smm-stat"><b>${cost30.toFixed(2)}</b><span>витрати за 30 днів</span></div>
           </div>
           {agent.last_message && <p className={'smm-last' + (agent.last_status === 'problem' ? ' smm-bad' : '')}>{agent.last_message}</p>}
-          {MANUAL_RUN.includes(role) && meta.ready && (
+          {canRunByHand(agent) && meta.ready && (
             <div className="smm-form-foot">
-              <button type="button" className="smm-btn smm-btn--primary" onClick={() => (role === 'strategist' || prompts.length > 1 ? setDialog(true) : run({}).catch((e) => notify(e.message || 'Не вдалося виконати.', true)))} disabled={running}><ActionIcon name="generate" size={18} />{running ? 'Працює…' : RUN_LABEL[role]}</button>
+              <button type="button" className="smm-btn smm-btn--primary" onClick={() => (role === 'strategist' || prompts.length > 1 ? setDialog(true) : run({}).catch((e) => notify(e.message || 'Не вдалося виконати.', true)))} disabled={running}><ActionIcon name="generate" size={18} />{running ? 'Працює…' : RUN_LABEL[role] || 'Запустити зараз'}</button>
               {running && <span className="smm-muted">Не закривайте сторінку, це займає до двох хвилин.</span>}
             </div>
           )}

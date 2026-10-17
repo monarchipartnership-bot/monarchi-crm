@@ -40,6 +40,7 @@ import {
   FONT_SAT, buildOverview, makeDims, pluralAgents, ringGeometry,
 } from './aiMap/overviewLayout';
 import { STATUS_TEXT, countStatuses } from './aiMap/status';
+import CampaignsSection from './campaigns/CampaignsSection';
 import '../../styles/constellationTest.css';
 
 // Agents with a real interactive tool (as opposed to the generic read-only
@@ -83,6 +84,7 @@ const AGENT_TOOLS = {
 const SECTIONS = [
   { key: 'map', label: 'Мапа' },
   { key: 'agents', label: 'Агенти' },
+  { key: 'campaigns', label: 'Кампанії' },
   { key: 'activity', label: 'Задачі агентів' },
   { key: 'analytics', label: 'Аналітика' },
   { key: 'spend', label: 'Витрати' },
@@ -118,6 +120,7 @@ export default function ConstellationTest() {
   // modal's content (badges/breaks-into/ladder/etc.) is still reachable
   // from inside the workspace itself via its own "?" button.
   function openAgent(agentWithContext) {
+    if (agentWithContext.tool === 'campaign-teams') { setSection('campaigns'); return; }
     if (AGENT_TOOLS[agentWithContext.tool]) { setAgentToolOpen(agentWithContext.tool); setAgentToolPayload(null); }
     else setSelectedAgent(agentWithContext);
   }
@@ -373,6 +376,7 @@ export default function ConstellationTest() {
       </Link>
 
       {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
+      {section === 'campaigns' && <CampaignsSection />}
       {section === 'analytics' && <AgentAnalytics agents={allAgents} />}
       {section === 'activity' && <AiAgentActivity />}
       {section === 'spend' && <AgentSpend />}

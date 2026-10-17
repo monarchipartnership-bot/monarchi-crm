@@ -331,3 +331,11 @@ button.smm-stat { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .smm-stage-chip.is-active i { animation: none; } }
 
 .smm-page .smm-agent-title h2:focus-visible { outline: none; }
+
+.smm-md { font-size: 13px; line-height: 1.55; display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
+.smm-md p, .smm-md ul { margin: 0; }
+.smm-md ul { padding-left: 20px; }
+.smm-md-h { margin: 8px 0 0; font: 700 14px/1.3 Onest, sans-serif; color: var(--s-plum); }
+.smm-task-result { border: 1px solid var(--s-line); border-radius: 8px; padding: 8px 12px; background: #FBF8FD; }
+.smm-task-result summary { cursor: pointer; font-size: 13px; font-weight: 500; }
+.smm-task-result .smm-md { margin-top: 8px; }

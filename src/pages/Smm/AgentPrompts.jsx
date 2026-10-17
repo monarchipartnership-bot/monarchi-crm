@@ -3,7 +3,7 @@ import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { createPrompt, deletePrompt, fetchPromptVersions, savePrompt, setDefaultPrompt } from '../../lib/api/agents';
-import { lockedText, ROLES_WITH_LOCKED_PROMPT } from '../../lib/agents/locked';
+import { campaignLockedText, lockedText, ROLES_WITH_LOCKED_PROMPT } from '../../lib/agents/locked';
 import { fmtDateTime } from './agentUi';
 
 // The prompt library of one agent: several named prompts (for a client, a process, a style), one of them the main one.
@@ -25,7 +25,7 @@ export default function AgentPrompts({ agent, prompts, reload, notify }) {
   useEffect(() => { if (selected) fetchPromptVersions(selected.id).then(setVersions).catch(() => setVersions([])); else setVersions([]); }, [selected?.id, selected?.current_version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty = selected && (name !== selected.name || body !== selected.body);
-  const locked = ROLES_WITH_LOCKED_PROMPT.includes(agent.role) ? lockedText(agent.role) : '';
+  const locked = agent.team === 'campaign' ? campaignLockedText() : ROLES_WITH_LOCKED_PROMPT.includes(agent.role) ? lockedText(agent.role) : '';
 
   async function run(fn, okText) {
     setBusy(true);

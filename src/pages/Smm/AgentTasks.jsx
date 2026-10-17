@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { agentAction } from '../../lib/api/agents';
 import { NETWORKS } from '../../lib/api/smm';
 import { fmtDateTime, TASK_STATUS, TASK_TYPE } from './agentUi';
+import Markdown from './Markdown';
 
 // The tasks of one agent: who asked, for which post, with which prompt version, what came out. A failed task can be retried,
 // a waiting one cancelled.
@@ -43,6 +44,9 @@ export default function AgentTasks({ agent, team, tasks, posts, reload, notify, 
               {t.output?.rework ? ' · друга версія' : ''}
             </p>
             {t.error && <p className="smm-error">{t.error}</p>}
+            {t.status === 'done' && t.output?.text && (
+              <details className="smm-task-result"><summary>{t.output.summary || 'Результат'}</summary><Markdown text={t.output.text} />{t.output.failedInputs?.length > 0 && <p className="smm-warn">Не завантажились дані: {t.output.failedInputs.join('; ')}</p>}</details>
+            )}
             {t.status === 'done' && t.output?.verdict && <p className="smm-task-line">Висновок: {t.output.verdict === 'pass' ? 'пройшов' : 'повернуто на доопрацювання'}{t.output.issues ? `, зауважень: ${t.output.issues}` : ''}</p>}
             <div className="smm-task-actions">
               {(t.status === 'failed' || t.status === 'cancelled') && <button type="button" className="smm-btn" disabled={busyId === t.id} onClick={() => act(t, 'retry_task')}>Повторити</button>}
