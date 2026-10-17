@@ -15,6 +15,11 @@ import { buildAnalysisPrompts, insightLine, parseAnalysis } from '../api/_lib/co
 import { runSmmWeekly, smmDue } from '../api/_lib/smmRun.js';
 import { auditSite, crawlSite, parsePage } from '../api/_lib/seoAudit.js';
 import { buildPlanPrompts, parsePlan } from '../api/_lib/seoPlan.js';
+import { agentDue, chainStates, dependents } from '../src/lib/agents/chain.js';
+import { composeSystem } from '../src/lib/agents/locked.js';
+import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
+import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
+import { approvePlan, processQueue, runNow } from '../api/_lib/agentEngine.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -541,7 +546,9 @@ await ok('competitors: the analysis answer is read back and summed up for the st
 // ---- a tiny in-memory stand-in for the Supabase client: just the calls the SMM run uses
 function fakeDb(tables) {
   const T = (n) => (tables[n] ||= []);
-  const matchOr = (row, clause) => clause.split(',').some((part) => {
+  const splitTop = (str) => { const out = []; let depth = 0; let cur = ''; for (const ch of str) { if (ch === '(') depth += 1; if (ch === ')') depth -= 1; if (ch === ',' && depth === 0) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out; };
+  const matchOr = (row, clause) => splitTop(clause).some((part) => {
+    if (part.startsWith('and(')) return splitTop(part.slice(4, -1)).every((p) => matchOr(row, p));
     const [col, op, ...rest] = part.split('.');
     const val = rest.join('.');
     return op === 'eq' ? String(row[col]) === val : op === 'lt' ? row[col] != null && new Date(row[col]) < new Date(val) : false;
@@ -555,7 +562,8 @@ function fakeDb(tables) {
         if (q.mode === 'insert') { const made = q.rows.map((r, i) => ({ id: rows.length + i + 1, ...r })); rows.push(...made); return { data: made, error: null }; }
         if (q.mode === 'update') { const hit = rows.filter(pass); hit.forEach((r) => Object.assign(r, q.patch)); return { data: hit, error: null }; }
         let out = rows.filter(pass);
-        if (q.order) out = [...out].sort((a, b) => (String(b[q.order]) > String(a[q.order]) ? 1 : -1));
+        if (q.order && q.asc) out = [...out].sort((a, b) => (String(a[q.order]) > String(b[q.order]) ? 1 : String(a[q.order]) < String(b[q.order]) ? -1 : 0));
+        else if (q.order) out = [...out].sort((a, b) => (String(b[q.order]) > String(a[q.order]) ? 1 : -1));
         if (q.limitN) out = out.slice(0, q.limitN);
         return { data: out, error: null };
       };
@@ -568,8 +576,9 @@ function fakeDb(tables) {
         in(c, vs) { q.filters.push((r) => vs.includes(r[c])); return api; },
         not(c, op, v) { q.filters.push((r) => (op === 'is' && v === null ? r[c] != null : true)); return api; },
         or(clause) { q.filters.push((r) => matchOr(r, clause)); return api; },
-        order(c) { q.order = c; return api; },
+        order(c, o) { q.order = c; q.asc = o?.ascending === true; return api; },
         limit(n) { q.limitN = n; return api; },
+        single() { const r = run(); return Promise.resolve({ data: r.data[0] || null, error: r.data[0] ? null : { message: 'no row' } }); },
         maybeSingle() { const r = run(); return Promise.resolve({ data: r.data[0] || null, error: null }); },
         then(res, rej) { return Promise.resolve(run()).then(res, rej); },
       };
@@ -718,6 +727,168 @@ await ok('seo: the plan answer is read back strictly', () => {
   assert.equal(parsePlan('nothing'), null);
   const { user } = buildPlanPrompts('https://s.example', { findings: [{ id: 'title_missing', severity: 'high', title: 'Немає title', count: 1, pages: ['https://s.example/a/'] }], summary: { pages: 2, high: 1, medium: 0, low: 0 } }, [{ url: 'https://s.example/a/', status: 200, title: '', description: '', h1: [], excerpt: 'About A page' }]);
   assert.match(user, /Немає title[\s\S]*Page text: About A page/);
+});
+
+// ---- the agent framework: chain rules, schedule, prompts, readers, and a whole production run on the stand-in database
+await ok('agents: an agent is stopped by its own switch or by a REQUIRED upstream agent, never by an optional one', () => {
+  const A = (id, enabled) => ({ id, enabled });
+  const agents = [A(1, true), A(2, true), A(3, true), A(4, true)];
+  const links = [{ from_agent_id: 1, to_agent_id: 2, required: true }, { from_agent_id: 2, to_agent_id: 3, required: true }, { from_agent_id: 4, to_agent_id: 3, required: false }];
+  assert.deepEqual(Object.values(chainStates(agents, links)).map((s) => s.state), ['on', 'on', 'on', 'on']);
+  agents[0].enabled = false; // 1 off: 2 and, through 2, 3 stop; 4 (an optional input of 3) is unaffected
+  const st = chainStates(agents, links);
+  assert.deepEqual([st[1].state, st[2].state, st[3].state, st[4].state], ['off', 'blocked', 'blocked', 'on']);
+  assert.equal(st[2].blockedBy.id, 1);
+  assert.equal(st[3].blockedBy.id, 1); // the reason is the agent to switch back on
+  assert.deepEqual(dependents(1, links).sort(), [2, 3]);
+  agents[0].enabled = true; agents[3].enabled = false; // an optional upstream agent off: nothing stops
+  assert.equal(chainStates(agents, links)[3].state, 'on');
+});
+
+await ok('agents: an agent with a schedule is due once per moment, retried after an hour, three tries in all', () => {
+  const base = { schedule: { weekday: 3, time: '09:00' }, last_scheduled: null, attempts: 0, last_status: null };
+  const wed10 = new Date('2026-10-21T07:00:00Z'); // 10:00 Kyiv on Wednesday
+  assert.equal(agentDue({ agent: { ...base, schedule: null }, now: wed10 }).due, false);
+  assert.deepEqual(agentDue({ agent: base, now: wed10 }), { due: true, scheduledFor: '2026-10-21' });
+  assert.equal(agentDue({ agent: base, now: new Date('2026-10-21T05:00:00Z') }).scheduledFor, '2026-10-14'); // 08:00 Kyiv: the last moment was a week ago
+  assert.equal(agentDue({ agent: { ...base, last_scheduled: '2026-10-21', last_status: 'ok' }, now: wed10 }).due, false);
+  const failed = { ...base, last_scheduled: '2026-10-21', last_status: 'problem', attempts: 1, last_attempt_at: '2026-10-21T06:40:00Z' };
+  assert.equal(agentDue({ agent: failed, now: wed10 }).due, false);
+  assert.equal(agentDue({ agent: { ...failed, last_attempt_at: '2026-10-21T05:50:00Z' }, now: wed10 }).due, true);
+  assert.equal(agentDue({ agent: { ...failed, attempts: 3, last_attempt_at: '2026-10-21T01:00:00Z' }, now: wed10 }).due, false);
+});
+
+await ok('agents: the system prompt is the editable instruction plus the locked rules and the answer format of the role', () => {
+  const s = composeSystem('copywriter', 'MY EDITABLE TEXT', { language: 'English', platformRules: ['- LinkedIn: rule'] });
+  assert.match(s, /^MY EDITABLE TEXT/);
+  assert.match(s, /Never invent facts/);
+  assert.match(s, /- LinkedIn: rule/);
+  assert.match(s, /"body":/);
+  const v = composeSystem('visual', 'TEMPLATE');
+  assert.match(v, /readable text, logos/); // the visual guardrails are locked, the facts rules are for texts
+  assert.doesNotMatch(v, /Never invent facts/);
+  assert.equal(composeSystem('seo', 'extra only'), 'extra only'); // roles with their own system prompt: the instruction alone
+});
+
+await ok('agents: the readers of the strategist, copywriter, visual agent and controller are strict', () => {
+  const platforms = [{ platform: 'linkedin', count: 1 }, { platform: 'instagram', count: 1 }];
+  const plan = parseStrategy('```json\n' + JSON.stringify({ summary: 'Week', posts: [
+    { platform: 'linkedin', format: 'text', topic: 'Audit first', angle: 'Why audits come first', key_points: ['a', 'b'], day: 1, time: '9:30' },
+    { platform: 'linkedin', topic: 'Over the count' }, { platform: 'tiktok', topic: 'Not requested' },
+    { platform: 'instagram', format: 'carousel', topic: 'Three checks', angle: 'x', visual_brief: 'slides', day: 9 }] }) + '\n```', platforms);
+  assert.deepEqual(plan.posts.map((p) => p.platform), ['linkedin', 'instagram']);
+  assert.equal(plan.posts[0].needs_visual, false); // a LinkedIn text post needs no picture
+  assert.equal(plan.posts[1].needs_visual, true); // Instagram always does
+  assert.equal(plan.posts[0].time, '09:30');
+  assert.equal(plan.posts[1].day, null); // an invalid day is dropped, the schedule spreads it
+  assert.equal(scheduleStrategy(plan.posts, '2026-10-19')[0].scheduled_for, '2026-10-20T06:30:00.000Z'); // Tuesday 09:30 Kyiv
+  assert.equal(parseStrategy('nope', platforms), null);
+  assert.equal(parseCopy('{"body":"too short"}'), null);
+  assert.equal(parseCopy('{"body":"A text of the post that is long enough.","hashtags":"#a"}').hashtags, '#a');
+  const v = parseVisual('{"mode":"video","prompt":"A long enough generation prompt for the model to use.","aspect_ratio":"7:3","duration_seconds":99}', { platform: 'tiktok' });
+  assert.deepEqual([v.mode, v.aspect_ratio, v.duration_seconds], ['video', '9:16', 15]);
+  assert.equal(parseVisual('{"prompt":"short"}'), null);
+  // the controller's rule is in code: a high issue, or two medium ones, is a revise whatever the model says
+  assert.equal(parseQc('{"verdict":"pass","issues":[{"target":"text","severity":"high","comment":"Invented figure"}]}').verdict, 'revise');
+  assert.equal(parseQc('{"verdict":"pass","issues":[{"severity":"medium","comment":"a"},{"severity":"medium","comment":"b"}]}').verdict, 'revise');
+  assert.equal(parseQc('{"verdict":"pass","issues":[{"severity":"low","comment":"nit"}]}').verdict, 'pass');
+  assert.equal(parseQc('{"verdict":"maybe"}'), null);
+  const qc = parseQc('{"verdict":"revise","issues":[{"target":"visual","severity":"high","comment":"No text in the image"},{"target":"text","severity":"low","comment":"nit"}]}');
+  assert.deepEqual(decideQc({ qc, rounds: 0, maxRounds: 2, hasVisual: true }), { action: 'rework', targets: ['visual'], unresolved: false });
+  assert.deepEqual(decideQc({ qc, rounds: 2, maxRounds: 2, hasVisual: true }), { action: 'to_review', targets: [], unresolved: true }); // out of rounds: the person decides
+  assert.deepEqual(feedbackFor(qc, 'text'), []);
+  assert.deepEqual(feedbackFor(qc, 'visual'), ['No text in the image']);
+});
+
+await ok('agents: a whole run: plan -> approval -> text and visual in parallel -> control -> rework -> the person; switches stop the chain', async () => {
+  const tables = { smm_brand: [{ id: 1, voice: 'Direct', materials: 'Fact one.' }], smm_competitors: [], smm_competitor_reports: [], smm_site_audits: [], smm_posts: [], smm_plans: [], ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [], notifications: [], smm_settings: [] };
+  const db = fakeDb(tables);
+  const team1 = await ensureSmmTeam(db, 'a@x.com');
+  assert.equal(team1.agents.length, 9);
+  assert.equal(team1.links.length, 11);
+  assert.equal(tables.ag_prompts.length, 9);
+  await ensureSmmTeam(db, 'a@x.com'); // idempotent
+  assert.deepEqual([tables.ag_agents.length, tables.ag_links.length, tables.ag_prompts.length], [9, 11, 9]);
+
+  const model = {
+    calls: [],
+    async callModel(args) {
+      this.calls.push(args.agentKey);
+      const user = args.params.messages[0].content;
+      const out = {
+        'smm-strategist': { summary: 'A calm week.', posts: [
+          { platform: 'linkedin', format: 'text', topic: 'Audit first', angle: 'Why audits come first', key_points: ['one', 'two'], cta: 'Ask a question', day: 1, time: '09:30' },
+          { platform: 'instagram', format: 'image', topic: 'Three checks', angle: 'A quick checklist', key_points: ['x'], visual_brief: 'a desk with a laptop', day: 2, time: '18:00' }] },
+        'smm-copywriter': { body: /Fix exactly/.test(user) ? 'SECOND DRAFT of the post text, now correct and clear.' : 'FIRST DRAFT of the post text, with a flaw in it.', hashtags: '#a', fact_check: '' },
+        'smm-visual': { mode: 'image', prompt: 'A tidy desk with a laptop and a notebook, soft window light, shallow depth of field, muted palette.', negative_prompt: 'text', aspect_ratio: '4:5', style_tags: ['clean'], alt_text: 'A desk' },
+        'smm-qc': /FIRST DRAFT/.test(user) && /Instagram/.test(user) ? { verdict: 'revise', summary: 'A flaw', issues: [{ target: 'text', severity: 'high', comment: 'Remove the flaw' }] } : { verdict: 'pass', summary: 'Fine', issues: [] },
+      }[args.agentKey];
+      return { text: JSON.stringify(out), usage: { input_tokens: 10, output_tokens: 5 }, costUsd: 0.01 };
+    },
+  };
+  const ctx = { db, model, email: 'a@x.com', trigger: 'user', now: () => new Date('2026-10-16T10:00:00Z') };
+  const on = (...roles) => tables.ag_agents.forEach((a) => { a.enabled = roles.includes(a.role); });
+  const role = (r) => tables.ag_agents.find((a) => a.role === r);
+  role('strategist').config = { counts: { linkedin: 1, instagram: 1 }, language: 'en', requirePlanApproval: true, notifyEmails: ['p@x.com'] };
+
+  // nothing is on: the queue does nothing
+  on();
+  let q = await processQueue(ctx);
+  assert.equal(q.processed, 0);
+
+  // the strategist is run by hand (it works even while switched off) and waits for the person's OK
+  const r = await runNow(ctx, role('strategist').id, { weekStart: '2026-10-19' });
+  assert.equal(r.status, 'done');
+  assert.equal(tables.smm_plans[0].status, 'awaiting_approval');
+  assert.deepEqual(tables.smm_posts.map((p) => p.status), ['planned', 'planned']);
+  assert.deepEqual(tables.smm_posts.map((p) => p.needs_visual), [false, true]);
+  assert.equal(tables.ag_tasks.filter((t) => t.agent_id !== role('strategist').id).length, 0); // no work for the others before the OK
+  assert.equal(tables.notifications[0].recipient_email, 'p@x.com');
+  assert.match(tables.ag_runs[0].system_prompt, /^You are the content strategist/); // the editable prompt first...
+  assert.match(tables.ag_runs[0].system_prompt, /Never invent facts/); // ...then the locked rules
+  assert.match(tables.ag_runs[0].user_prompt, /Week starting 2026-10-19/);
+
+  // the OK: 2 texts + 1 visual are queued
+  assert.equal((await approvePlan(ctx, tables.smm_plans[0].id)).started, 2);
+  assert.deepEqual(tables.smm_posts.map((p) => p.status), ['producing', 'producing']);
+  assert.deepEqual(tables.ag_tasks.filter((t) => t.status === 'queued').map((t) => t.type).sort(), ['visual', 'write', 'write']);
+
+  // the strategist is switched off: the copywriter and the visual agent REQUIRE it, so they stop and their tasks wait
+  on('copywriter', 'visual', 'qc');
+  q = await processQueue(ctx);
+  assert.deepEqual([q.processed, q.waiting], [0, 3]);
+
+  // everything on: the chain runs to the end
+  on('strategist', 'copywriter', 'visual', 'qc');
+  q = await processQueue(ctx);
+  assert.equal(q.failed, 0);
+  assert.equal(q.left, 0);
+  const li = tables.smm_posts.find((p) => p.platform === 'linkedin');
+  const ig = tables.smm_posts.find((p) => p.platform === 'instagram');
+  assert.equal(li.status, 'needs_review'); // passed on the first review
+  assert.match(li.body, /FIRST DRAFT/);
+  assert.equal(li.qc.verdict, 'pass');
+  assert.equal(ig.status, 'needs_review'); // sent back once, then passed
+  assert.equal(ig.rounds, 1);
+  assert.match(ig.body, /SECOND DRAFT/);
+  assert.equal(ig.qc.round, 2);
+  assert.equal(ig.qc.history[0].verdict, 'revise'); // the first round is kept
+  assert.equal(ig.visual_prompt.aspect_ratio, '4:5');
+  assert.equal(ig.asset_status, 'none'); // no generator is connected in this run
+  const copyRuns = tables.ag_runs.filter((x) => x.agent_id === role('copywriter').id);
+  assert.match(copyRuns.find((x) => /Fix exactly/.test(x.user_prompt)).user_prompt, /Remove the flaw/); // the controller's comment reached the copywriter
+  assert.ok(tables.ag_tasks.every((t) => t.status === 'done'));
+  assert.ok(tables.ag_tasks.filter((t) => t.agent_id === role('copywriter').id).every((t) => t.prompt_version === 1));
+
+  // the schedule: a competitors agent on Wednesday 09:00 starts by itself once
+  role('competitors').schedule = { weekday: 3, time: '09:00' };
+  on('competitors');
+  const wed = { ...ctx, now: () => new Date('2026-10-21T07:00:00Z') };
+  q = await processQueue(wed);
+  assert.deepEqual(q.started, ['competitors']);
+  assert.equal(role('competitors').last_status, 'ok');
+  q = await processQueue(wed);
+  assert.deepEqual(q.started, []); // not again
 });
 
 console.log(`\n${passed} checks passed`);
