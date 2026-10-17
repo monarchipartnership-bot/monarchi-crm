@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { agentAction, fetchPlans, fetchPostTasks, kickQueue, loadTeam } from '../../lib/api/agents';
-import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, fetchSiteAudits, BRAND_FIELDS } from '../../lib/api/smm';
+import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, fetchSiteAudits } from '../../lib/api/smm';
 import '../../styles/projectWorkspace.css'; // the shared confirmation window (useConfirm) lives in this sheet
 import '../../styles/smmPage.css';
 import AgentPage from './AgentPage';
 import SmmAgents from './SmmAgents';
 import SmmBrand from './SmmBrand';
-import { GenerateDialog, PostDialog } from './SmmDialogs';
+import { PostDialog } from './SmmDialogs';
 import SmmOverview from './SmmOverview';
 import SmmPlan from './SmmPlan';
 import SmmQueue from './SmmQueue';
@@ -41,7 +41,7 @@ export default function SmmHome() {
   const kicking = useRef(false);
   const [missing, setMissing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [dialog, setDialog] = useState(null); // null | { kind: 'post', post } | { kind: 'generate' }
+  const [dialog, setDialog] = useState(null); // null | { kind: 'post', post }
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
   const tabRefs = useRef({});
@@ -95,7 +95,6 @@ export default function SmmHome() {
     e.preventDefault(); go(TABS[next].key); tabRefs.current[TABS[next].key]?.focus();
   }
 
-  const brandFilled = BRAND_FIELDS.some((f) => (brand?.[f.key] || '').trim());
   const common = { posts, notify, reload };
   const toReview = posts.filter((p) => p.status === 'needs_review').length + plans.filter((pl) => pl.status === 'awaiting_approval').length;
 
@@ -123,7 +122,7 @@ export default function SmmHome() {
             {tab === 'agents' && !team && <div className="smm-empty smm-empty--big" role="alert">Агентів ще не створено в базі. Потрібно застосувати міграцію <code>20261020000000_agent_framework.sql</code>.</div>}
             {tab === 'agents' && team && !agentRole && <SmmAgents team={team} open={openAgent} notify={notify} reloadTeam={reloadTeam} />}
             {tab === 'agents' && team && agentRole && <AgentPage role={agentRole} team={team} posts={posts} notify={notify} reloadTeam={reloadTeam} reloadAll={reload} back={() => go('agents')} open={openAgent} go={go} kick={kick} />}
-            {tab === 'plan' && <SmmPlan {...common} onGenerate={() => setDialog({ kind: 'generate' })} onNew={() => setDialog({ kind: 'post', post: null })} onEdit={(post) => setDialog({ kind: 'post', post })} />}
+            {tab === 'plan' && <SmmPlan {...common} onGenerate={() => openAgent('strategist')} onNew={() => setDialog({ kind: 'post', post: null })} onEdit={(post) => setDialog({ kind: 'post', post })} />}
             {tab === 'queue' && team && <SmmQueue {...common} plans={plans} postTasks={postTasks} team={team} kick={kick} onEdit={(post) => setDialog({ kind: 'post', post })} />}
             {tab === 'site' && <SmmSite settings={settings} audits={audits} notify={notify} reload={reload} />}
             {tab === 'brand' && <SmmBrand brand={brand} competitors={competitors} reports={reports} notify={notify} reload={reload} />}
@@ -133,12 +132,6 @@ export default function SmmHome() {
 
       {dialog?.kind === 'post' && (
         <PostDialog post={dialog.post} onClose={() => setDialog(null)} onSaved={(msg) => { setDialog(null); notify(msg); reload(); }} />
-      )}
-      {dialog?.kind === 'generate' && (
-        <GenerateDialog
-          brandFilled={brandFilled} onClose={() => setDialog(null)}
-          onDone={(r) => { setDialog(null); notify(`Готово: ${r.count} постів чекають на вашу перевірку.`); reload(); go('queue'); }}
-        />
       )}
     </div>
   );

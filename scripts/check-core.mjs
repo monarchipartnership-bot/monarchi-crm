@@ -791,9 +791,10 @@ await ok('agents: the readers of the strategist, copywriter, visual agent and co
   const v = parseVisual('{"mode":"video","prompt":"A long enough generation prompt for the model to use.","aspect_ratio":"7:3","duration_seconds":99}', { platform: 'tiktok' });
   assert.deepEqual([v.mode, v.aspect_ratio, v.duration_seconds], ['video', '9:16', 15]);
   assert.equal(parseVisual('{"prompt":"short"}'), null);
-  // the controller's rule is in code: a high issue, or two medium ones, is a revise whatever the model says
+  // the controller's rule is in code: a high issue, or three medium ones, is a revise whatever the model says
   assert.equal(parseQc('{"verdict":"pass","issues":[{"target":"text","severity":"high","comment":"Invented figure"}]}').verdict, 'revise');
-  assert.equal(parseQc('{"verdict":"pass","issues":[{"severity":"medium","comment":"a"},{"severity":"medium","comment":"b"}]}').verdict, 'revise');
+  assert.equal(parseQc('{"verdict":"pass","issues":[{"severity":"medium","comment":"a"},{"severity":"medium","comment":"b"},{"severity":"medium","comment":"c"}]}').verdict, 'revise');
+  assert.equal(parseQc('{"verdict":"pass","issues":[{"severity":"medium","comment":"a"},{"severity":"medium","comment":"b"}]}').verdict, 'pass'); // two medium points are noted, not a reason to send back
   assert.equal(parseQc('{"verdict":"pass","issues":[{"severity":"low","comment":"nit"}]}').verdict, 'pass');
   assert.equal(parseQc('{"verdict":"maybe"}'), null);
   const qc = parseQc('{"verdict":"revise","issues":[{"target":"visual","severity":"high","comment":"No text in the image"},{"target":"text","severity":"low","comment":"nit"}]}');

@@ -54,7 +54,7 @@ export default function SmmPlan({ posts, onGenerate, onNew, onEdit, notify, relo
         </div>
         <div className="smm-toolbar-actions">
           <button type="button" className="smm-btn" onClick={onNew}><ActionIcon name="create" size={18} />Додати пост</button>
-          <button type="button" className="smm-btn smm-btn--primary" onClick={onGenerate}><ActionIcon name="generate" size={18} />Згенерувати план</button>
+          <button type="button" className="smm-btn smm-btn--primary" onClick={onGenerate}><ActionIcon name="generate" size={18} />План від стратега</button>
         </div>
       </div>
       <p className="smm-muted">Постів на тижні: {weekCount}. Час вказано за Києвом.</p>

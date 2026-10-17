@@ -32,7 +32,7 @@ export const CONTRACTS = {
   copywriter: [
     'Write the final text of ONE post, following the brief exactly. Keep the language and the rules of the network.',
     JSON_RULES,
-    'Answer with ONE JSON object: {"body":"the text to publish","hashtags":"#a #b (or empty)","fact_check":"what a person must verify or add (or empty)"}. Hashtags go in the hashtags field, not inside the body.',
+    'Answer with ONE JSON object: {"body":"the text to publish","hashtags":"#a #b (or empty)","fact_check":"what a person must verify or add (or empty)"}. Hashtags go in the hashtags field, not inside the body. fact_check is short and only for things you could not check against the brand notes (a missing number, an unclear period); do not repeat the safety rules and do not ask for approval of cases the notes list as published.',
   ],
   visual: [
     'Turn the visual brief into ONE prompt for the Higgsfield image or video model, following the template in the instruction. The prompt is written in English.',
@@ -43,8 +43,10 @@ export const CONTRACTS = {
   qc: [
     'Review ONE finished post (text + the visual prompt) before a person sees it. Check, in this order: 1) every fact, number, case and claim against the brand notes (anything not in the notes is a problem); 2) the safety rules above; 3) the tone and language against the brand voice; 4) length and format against the network rules; 5) that the text and the visual prompt tell the same story; 6) that the first line works as a hook.',
     'Be strict about facts and calm about style: send a post back (revise) only for a real problem, not for taste. Each issue must be specific and say what to change.',
+    'Raise ONLY problems that the writer or the visual agent can fix by changing the post itself. Judge by the rules in this prompt and the brand notes, never by rules you assume. NEVER raise as an issue: client approval or clearance (cases listed as published in the brand notes may be named; a person checks anything else through the writer\'s note), a note the writer left for the person, the lack of a visual when the post is marked as having none, a hashtag count within the network limit, a period or platform that the notes do not state (do not demand details the notes do not have), or style you merely prefer. Leaving out facts, goals or details that are in the notes is NEVER an issue (a post does not have to cover everything), and never ask the writer to ADD a claim: the fix for a problem is to remove or soften what is wrong.',
+    'Severity: high = a fact, number, name or claim that is NOT in the brand notes or that contradicts them, or a broken safety rule; medium = a clear mismatch with the notes, the network rules or the brief, or text and visual telling different stories; low = taste or polish. Quote the exact sentence that is wrong. If you cannot quote a sentence that breaks a rule, it is not a high issue.',
     JSON_RULES,
-    'Answer with ONE JSON object: {"verdict":"pass|revise","summary":"one sentence","issues":[{"target":"text|visual|both","severity":"high|medium|low","comment":"what is wrong and what to change"}]}. verdict is revise if there is any high issue or two or more medium ones; otherwise pass (list the small issues anyway).',
+    'Answer with ONE JSON object: {"verdict":"pass|revise","summary":"one sentence","issues":[{"target":"text|visual|both","severity":"high|medium|low","comment":"what is wrong and what to change"}]}. verdict is revise if there is any high issue or three or more medium ones; otherwise pass (list the small issues anyway).',
   ],
 };
 

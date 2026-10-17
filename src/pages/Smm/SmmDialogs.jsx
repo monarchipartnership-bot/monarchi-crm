@@ -3,11 +3,10 @@ import ActionIcon from '../../components/common/ActionIcon';
 import Select from '../../components/common/Select';
 import DatePicker from '../../components/common/DatePicker';
 import { useAuth } from '../../contexts/AuthContext';
-import { NETWORKS, NETWORK_KEYS, generatePlan, saveCompetitor, savePost } from '../../lib/api/smm';
+import { NETWORKS, NETWORK_KEYS, saveCompetitor, savePost } from '../../lib/api/smm';
 import { kyivTime, kyivYmd, nextMondayYmd, toIso, todayKyiv } from '../../lib/smmDates';
 import { Dialog } from './smmCommon';
 
-const MAX_PER_RUN = 12;
 const errText = (e) => (e && e.message) || 'Не вдалося виконати дію.';
 
 // ---------- one post: write by hand or edit what the agent wrote ----------
@@ -59,60 +58,6 @@ export function PostDialog({ post, onClose, onSaved }) {
         <div className="smm-field smm-field--wide"><label htmlFor="smm-fact">Що перевірити перед публікацією</label><input id="smm-fact" type="text" value={f.fact_check} onChange={(e) => set('fact_check')(e.target.value)} maxLength={500} /></div>
         <div className="smm-field"><label>Дата публікації (Київ)</label><DatePicker value={f.date} onChange={set('date')} placeholder="Без дати" /></div>
         <div className="smm-field"><label htmlFor="smm-time">Час</label><input id="smm-time" type="time" value={f.time} onChange={(e) => set('time')(e.target.value)} disabled={!f.date} /></div>
-        {error && <p className="smm-error smm-field--wide" role="alert">{error}</p>}
-      </form>
-    </Dialog>
-  );
-}
-
-// ---------- ask the agent for a week of posts ----------
-export function GenerateDialog({ brandFilled, onClose, onDone }) {
-  const [counts, setCounts] = useState({ instagram: 3, linkedin: 2, threads: 2, facebook: 0, tiktok: 0 });
-  const [language, setLanguage] = useState('en');
-  const [weekStart, setWeekStart] = useState(nextMondayYmd());
-  const [focus, setFocus] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const total = NETWORK_KEYS.reduce((s, k) => s + (counts[k] || 0), 0);
-
-  async function submit(e) {
-    e.preventDefault();
-    if (total < 1) { setError('Оберіть хоча б один пост.'); return; }
-    if (total > MAX_PER_RUN) { setError(`За один запуск — не більше ${MAX_PER_RUN} постів.`); return; }
-    if (weekStart < todayKyiv()) { setError('Початок тижня не може бути в минулому.'); return; }
-    setBusy(true); setError('');
-    try {
-      const r = await generatePlan({ platforms: NETWORK_KEYS.filter((k) => counts[k] > 0).map((k) => ({ platform: k, count: counts[k] })), weekStart, language, focus });
-      onDone(r);
-    } catch (err) { setError(errText(err)); setBusy(false); }
-  }
-  const setCount = (k, v) => setCounts((c) => ({ ...c, [k]: Math.max(0, Math.min(7, Number(v) || 0)) }));
-
-  return (
-    <Dialog
-      title="Згенерувати контент-план" onClose={busy ? () => {} : onClose}
-      foot={(
-        <>
-          <button type="button" className="smm-btn" onClick={onClose} disabled={busy}>Скасувати</button>
-          <button type="submit" form="smm-gen-form" className="smm-btn smm-btn--primary" disabled={busy}><ActionIcon name="generate" size={18} />{busy ? 'Пишемо пости…' : `Згенерувати (${total})`}</button>
-        </>
-      )}
-    >
-      <form id="smm-gen-form" className="smm-form" onSubmit={submit}>
-        {!brandFilled && <p className="smm-note smm-field--wide">Бренд-профіль ще порожній, тому пости вийдуть загальними. Заповніть його у вкладці «Бренд і конкуренти», і текст стане точнішим.</p>}
-        <fieldset className="smm-field smm-field--wide smm-counts">
-          <legend>Скільки постів на тиждень (разом до {MAX_PER_RUN})</legend>
-          {NETWORK_KEYS.map((k) => (
-            <label key={k} className="smm-count">
-              <span>{NETWORKS[k].label}</span>
-              <input type="number" min="0" max="7" value={counts[k]} onChange={(e) => setCount(k, e.target.value)} aria-label={`Постів для ${NETWORKS[k].label}`} />
-            </label>
-          ))}
-        </fieldset>
-        <div className="smm-field"><label>Мова постів</label><Select value={language} onChange={setLanguage} options={[{ value: 'en', label: 'English' }, { value: 'uk', label: 'Українська' }]} ariaLabel="Мова" /></div>
-        <div className="smm-field"><label>Тиждень починається (понеділок)</label><DatePicker value={weekStart} onChange={setWeekStart} /></div>
-        <div className="smm-field smm-field--wide"><label htmlFor="smm-focus">Фокус тижня (необовʼязково)</label><textarea id="smm-focus" rows={3} value={focus} onChange={(e) => setFocus(e.target.value)} maxLength={600} placeholder="Наприклад: звітність для клієнтів, або запуск нової послуги" /></div>
-        {busy && <p className="smm-note smm-field--wide" role="status">Агент пише пости. Це займає до хвилини, не закривайте вікно.</p>}
         {error && <p className="smm-error smm-field--wide" role="alert">{error}</p>}
       </form>
     </Dialog>

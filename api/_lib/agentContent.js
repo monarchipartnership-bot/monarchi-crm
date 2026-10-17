@@ -150,8 +150,10 @@ export function buildQcPrompts({ body, brand = {}, post, language = 'en' }) {
     `TEXT:\n${clip(post.body, 4000)}`,
     post.hashtags ? `HASHTAGS: ${post.hashtags}` : '',
     post.needs_visual ? (v ? `VISUAL PROMPT (${v.mode}, ${v.aspect_ratio}):\n${clip(v.prompt, 1800)}\nAvoid: ${clip(v.negative_prompt, 400)}` : 'VISUAL: still missing.') : 'This post has no visual.',
-    post.fact_check ? `Note from the writer for the person: ${clip(post.fact_check, 400)}` : '',
+    post.fact_check ? `Note the writer left for the person who publishes (information only: do NOT raise it as an issue, do not repeat it): ${clip(post.fact_check, 400)}` : '',
     brandText(brand),
+    // A second look: the controller checks that its earlier points were fixed instead of inventing new demands every round.
+    post.qc?.issues?.length ? `This is a re-check. In the previous round you asked for:\n${post.qc.issues.filter((i) => i.severity !== 'low').map((i) => '- ' + clip(i.comment, 300)).join('\n')}\nCheck whether these are now fixed. Raise a NEW issue only if it is high (a fact, number or claim that is not in the notes); do not raise new medium or low points about parts you did not object to before.` : '',
   ].filter(Boolean).join('\n\n');
   return { system, user };
 }
@@ -164,8 +166,8 @@ export function parseQc(text) {
   const issues = (Array.isArray(d.issues) ? d.issues : []).map((i) => ({ target: target(i?.target), severity: sev(i?.severity), comment: clip(i?.comment, 500) })).filter((i) => i.comment).slice(0, 10);
   const asked = String(d.verdict || '').toLowerCase();
   if (!['pass', 'revise'].includes(asked)) return null;
-  // The rule of the role is fixed in code, not left to the model's mood: a high issue, or two medium ones, always means revise.
-  const mustRevise = issues.some((i) => i.severity === 'high') || issues.filter((i) => i.severity === 'medium').length >= 2;
+  // The rule of the role is fixed in code, not left to the model's mood: a high issue, or three medium ones, always means revise.
+  const mustRevise = issues.some((i) => i.severity === 'high') || issues.filter((i) => i.severity === 'medium').length >= 3;
   return { verdict: mustRevise ? 'revise' : asked, summary: clip(d.summary, 400), issues };
 }
 
