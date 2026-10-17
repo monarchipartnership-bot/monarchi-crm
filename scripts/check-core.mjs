@@ -944,6 +944,9 @@ await ok('campaign team: only the agents of the chosen platforms take part, the 
   assert.deepEqual(ancestorsOf(3, links).sort(), [1, 2, 4]);
   assert.deepEqual(ancestorsOf(1, links), []);
   assert.match(summaryOf('## Підсумок\nМета: CPA виріс на 20%.\n\n## Деталі\nтекст'), /^Мета: CPA виріс/);
+  assert.equal(summaryOf('# Звіт Meta\n\n## Підсумок\n\nCPA виріс.\n\n---\n\n## Деталі\nдовгий текст'), 'CPA виріс.'); // a title above the summary does not swallow it
+  assert.equal(summaryOf('Просто текст без заголовків.'), 'Просто текст без заголовків.');
+  assert.equal(summaryOf('### Перша секція\nтіло\n\n## Друга\nінше'), 'тіло');
 });
 
 await ok('campaign team: ad-account inputs never throw, skip what is not connected and name what failed', async () => {

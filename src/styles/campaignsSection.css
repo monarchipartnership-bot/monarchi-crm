@@ -188,3 +188,10 @@ textarea.cmp-input { resize: vertical; }
   .cmp-wiz-head, .cmp-wiz-body, .cmp-wiz-foot { padding-left: 16px; padding-right: 16px; }
   .cmp-row2 { grid-template-columns: 1fr; }
 }
+
+.cmp-step1.has-client { grid-template-columns: minmax(0, 1fr); }
+.cmp-chosen { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; border-radius: 16px; border: 1px solid rgba(235, 156, 239, .4); background: linear-gradient(90deg, rgba(181, 68, 181, .3), rgba(102, 20, 102, .22)); flex-wrap: wrap; }
+.cmp-chosen > div { display: flex; flex-direction: column; gap: 3px; }
+.cmp-chosen b { font: 800 1.1rem var(--font-head); }
+.cmp-has-client .cmp-diagram { min-width: 0; }
+.cmp-step1.has-client .cmp-diagram { min-width: 0; }

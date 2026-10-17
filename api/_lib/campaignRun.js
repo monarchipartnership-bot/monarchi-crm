@@ -72,8 +72,12 @@ async function siteBlocks(text, { limit, read }) {
 // The first section of the report (the «Підсумок»), used as the short message of the agent and the hint for the next agents.
 export function summaryOf(text) {
   const t = String(text || '').trim();
-  const m = t.match(/^#{1,3}[^\n]*\n+([\s\S]*?)(?=\n#{1,3}\s|$)/);
-  return clip((m ? m[1] : t).replace(/\s+/g, ' '), 400);
+  // split into sections at the headings; the summary is the section titled «Підсумок» / «Summary», else the first section with text
+  const parts = t.split(/^#{1,4}[ \t]+(.*)$/m);
+  const sections = [];
+  for (let i = 1; i < parts.length; i += 2) sections.push({ title: parts[i], body: (parts[i + 1] || '').replace(/^\s*-{3,}\s*$/gm, '').trim() });
+  const pick = sections.find((x) => /підсумок|summary|итог/i.test(x.title) && x.body) || sections.find((x) => x.body);
+  return clip((pick ? pick.body : t).replace(/\s+/g, ' '), 400);
 }
 
 export async function campaignRole({ ctx, team: sub, agent, task, prompt, rec }) {

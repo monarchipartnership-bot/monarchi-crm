@@ -150,7 +150,18 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
           {error && <p className="cmp-error" role="alert">{error}</p>}
 
           {step === 1 && (
-            <div className="cmp-step1">
+            <div className={'cmp-step1' + (project ? ' has-client' : '')}>
+              {project ? (
+                <section className="cmp-chosen" aria-label="Обраний клієнт">
+                  <div>
+                    <span className="cmp-kicker">1. Клієнт</span>
+                    <b>{project.name}</b>
+                    <span className="cmp-client-sub">{project.client || 'Кабінети проєкту:'}</span>
+                    <span className="cmp-client-badges">{project.accounts.map((a) => <em key={a.platform} style={{ '--c': PLATFORMS[a.platform]?.color || '#EB9CEF' }}>{platformLabel(a.platform)}</em>)}</span>
+                  </div>
+                  <button type="button" className="cmp-btn" onClick={() => { setProject(null); setPlatforms([]); }}>Змінити клієнта</button>
+                </section>
+              ) : (
               <section className="cmp-clientpick">
                 <h3>1. Оберіть клієнта з кабінетом у CRM</h3>
                 <input className="cmp-input" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Пошук клієнта або проєкту" aria-label="Пошук клієнта" />
@@ -168,6 +179,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                   ))}
                 </ul>
               </section>
+              )}
 
               <section className={'cmp-schemebox' + (project ? ' is-open' : '')} aria-hidden={!project}>
                 {project && (

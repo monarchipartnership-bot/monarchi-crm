@@ -80,6 +80,7 @@ export const CAMPAIGN_RULES = [
   'Give the period and the name of the campaign, ad set, ad or keyword for every figure. Do not quote a figure that is not in the data. When you compare periods, calculate carefully; if unsure, show both numbers.',
   'Keep facts (from the data) apart from hypotheses (say "hypothesis"). No promises of results and no percentage forecasts unless the data gives them.',
   'Be concrete and short: name the object, say why, say what to do. Rank by importance, most important first. No generic advice that would fit any account.',
+  'Start directly with the report: no preface, do not repeat or quote the input blocks, and add a review of other agents\' work only if reviewing is your role.',
   'Write the report in Markdown. Start with a section titled «Підсумок» (translate the title into the language of the report) of 2 to 4 sentences: the main finding and what to do first. Then the body. End with a short section «Чого бракує» (translated): missing data and open questions, or that nothing is missing.',
 ];
 
