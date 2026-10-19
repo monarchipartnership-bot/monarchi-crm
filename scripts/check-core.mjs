@@ -638,6 +638,8 @@ await ok('site analyst: small numbers get no percentages, missing conversions ar
   assert.deepEqual(small.gsc.opportunities.map((o) => o.query), ['seo агенція', 'ppc']);
   assert.ok(small.handoff.seo.some((l) => /seo агенція/.test(l)));
   assert.ok(small.handoff.strategist.length > 0);
+  assert.ok(!small.handoff.strategist.some((l) => /«monarchi»/.test(l))); // a search for our own name is not a topic
+  assert.ok(!small.handoff.strategist.some((l) => /\(0%\)/.test(l)));
   const big = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch({ big: true }).fetchFn, now: SITE_NOW }));
   assert.equal(big.ga4.metrics.find((m) => m.key === 'users').delta, 33.3); // 400 vs 300
   assert.ok(big.findings.some((f) => f.kind === 'up' && f.source === 'ga4'));

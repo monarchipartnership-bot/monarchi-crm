@@ -17,6 +17,9 @@ const GSC = 'https://www.googleapis.com/webmasters/v3/sites/';
 
 export const DEFAULT_SITE = { ga4PropertyId: '503944052', gscSiteUrl: 'sc-domain:monarchi.agency' };
 export const THRESHOLDS = { minUsers: 30, minClicks: 20, minImpressions: 100, minPageViews: 15 };
+// queries that are just people looking for us by name: not a content topic for the strategist
+export const BRAND_TERMS = ['monarchi', 'mon archi', "mon'archi", 'archi agency'];
+const isBrand = (q) => BRAND_TERMS.some((t) => String(q || '').toLowerCase().includes(t));
 
 // The key from the environment → { client_email, private_key }. Accepts the JSON file as it is, or base64 of it.
 export function serviceAccountFromEnv(env = process.env) {
@@ -186,7 +189,7 @@ export function analyseSite(raw, thresholds = THRESHOLDS) {
     if (top && users.cur > 0 && c.sessions > 0) out.findings.push({ kind: 'info', source: 'ga4', text: `Головний канал: ${top.name}, ${Math.round((top.sessions / c.sessions) * 100)}% сеансів.` });
     const fell = out.ga4.pages.filter((pg) => pg.delta != null && pg.delta <= -40 && pg.prevViews >= T.minPageViews).slice(0, 5);
     fell.forEach((pg) => out.handoff.seo.push(`Сторінка ${pg.path}: переглядів ${pg.views} проти ${pg.prevViews} (${pg.delta}%). Перевірте title, description і внутрішні посилання.`));
-    out.ga4.pages.filter((pg) => pg.views >= T.minPageViews).slice(0, 5).forEach((pg) => out.handoff.strategist.push(`Сторінка ${pg.path} приводить читачів: ${pg.views} переглядів${pg.delta != null ? ` (${pg.delta > 0 ? '+' : ''}${pg.delta}%)` : ''}.`));
+    out.ga4.pages.filter((pg) => pg.views >= T.minPageViews).slice(0, 5).forEach((pg) => out.handoff.strategist.push(`Сторінка ${pg.path} приводить читачів: ${pg.views} переглядів${pg.delta ? ` (${pg.delta > 0 ? '+' : ''}${pg.delta}%)` : ''}.`));
   }
 
   if (raw.gsc) {
@@ -211,7 +214,7 @@ export function analyseSite(raw, thresholds = THRESHOLDS) {
       out.findings.push({ kind: 'opportunity', source: 'gsc', text: `Є ${out.gsc.opportunities.length} запитів із показами, але майже без кліків (позиції 4–20): їх можна посилити заголовком, описом і текстом.` });
       out.gsc.opportunities.slice(0, 6).forEach((q) => out.handoff.seo.push(`Запит «${q.query}»: ${q.impressions} показів, ${q.clicks} кліків, позиція ${q.position}. Підсильте сторінку під цей запит.`));
     }
-    out.gsc.topQueries.filter((q) => q.impressions >= 10).slice(0, 6).forEach((q) => out.handoff.strategist.push(`Запит «${q.query}»: ${q.clicks} кліків, ${q.impressions} показів. Тема цікавить аудиторію.`));
+    out.gsc.topQueries.filter((q) => q.impressions >= 10 && !isBrand(q.query)).slice(0, 6).forEach((q) => out.handoff.strategist.push(`Запит «${q.query}»: ${q.clicks} кліків, ${q.impressions} показів. Люди шукають цю тему.`));
   }
 
   Object.entries(out.errors).forEach(([k, v]) => out.findings.push({ kind: 'error', source: k, text: `${k === 'ga4' ? 'GA4' : 'Search Console'} недоступні: ${v}` }));
