@@ -171,7 +171,7 @@
 /* Weekly / monthly report: the period on the left, what goes into the report on the right, two equal boxes */
 .prep-top { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; margin-bottom: 4px; }
 .prep-top--one { grid-template-columns: 1fr; }
-.prep-top > .report-section { margin: 0; min-width: 0; }
+.prep-wrap .prep-top > .report-section { margin: 0; min-width: 0; }
 @media (max-width: 900px) { .prep-top { grid-template-columns: 1fr; } }
 .prep-box-title { font-family: var(--font-head); font-weight: 700; font-size: .95rem; color: var(--ink); margin-bottom: 14px; }
 .prep-top .picker { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
