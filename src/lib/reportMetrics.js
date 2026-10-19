@@ -1,4 +1,5 @@
 import { formatMoney } from './adAccounts.js';
+import { META_METRICS, isExtraMetric } from './metaColumns.js';
 
 // Every platform row is normalised to these base numbers; everything else a
 // report shows is computed from them (in code, never by the AI model).
@@ -21,6 +22,9 @@ export const METRICS = {
   roas: { label: 'ROAS', en: 'ROAS', format: 'ratio', goodWhen: 'up', calc: (b) => ratio(b.revenue, b.spend) },
   aov: { label: 'AOV (середній чек)', en: 'AOV', format: 'money', goodWhen: 'up', calc: (b) => ratio(b.revenue, b.purchases) },
 };
+
+// The extra columns of a platform (src/lib/metaColumns.js) are metrics too: they get their label, format and formula here.
+Object.assign(METRICS, META_METRICS);
 
 function ratio(a, b, k = 1) {
   const x = Number(a);
@@ -50,9 +54,10 @@ export const OPERATIONS = [
 ];
 
 // All metrics available to build a custom one from (built-in + other custom).
-export function metricOptions(customMetrics = []) {
+// `extraKeys` = the extra columns picked for the platform: only those can be used in a formula (the others are never fetched).
+export function metricOptions(customMetrics = [], extraKeys = []) {
   return [
-    ...Object.entries(METRICS).map(([key, m]) => ({ key, label: m.label })),
+    ...Object.entries(METRICS).filter(([key]) => !isExtraMetric(key) || extraKeys.includes(key)).map(([key, m]) => ({ key, label: m.label })),
     ...customMetrics.map((c) => ({ key: c.key, label: c.name })),
   ];
 }
@@ -121,8 +126,10 @@ export function deltaTone(delta, goodWhen) {
 // Adds rows of base numbers. A field that no row has (e.g. reach for Google, which
 // doesn't report it) stays null instead of turning into a misleading 0.
 export function sumBase(rows) {
-  const out = Object.fromEntries(BASE_FIELDS.map((f) => [f, null]));
-  rows.forEach((r) => BASE_FIELDS.forEach((f) => {
+  // the standard numbers, plus any extra count a platform reported (x_...)
+  const fields = [...BASE_FIELDS, ...new Set(rows.flatMap((r) => Object.keys(r || {}).filter((k) => k.startsWith('x_'))))];
+  const out = Object.fromEntries(fields.map((f) => [f, null]));
+  rows.forEach((r) => fields.forEach((f) => {
     if (r?.[f] == null) return;
     out[f] = (out[f] || 0) + (Number(r[f]) || 0);
   }));

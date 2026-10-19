@@ -15,7 +15,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
+export default function ResultView({ data, kind, custom, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -26,7 +26,9 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
   const active = tabs.some((t) => t.key === tab) ? tab : tabs[0]?.key;
   const captureRef = useRef(null);
 
-  const keys = useMemo(() => visibleKeys(METRIC_SETS[kind], custom), [kind, custom]);
+  const extraId = extraKeys.join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const keys = useMemo(() => visibleKeys(METRIC_SETS[kind], custom, extraKeys), [kind, custom, extraId]);
 
   if (!tabs.length) return null;
 
@@ -46,7 +48,7 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
   const metricsExport = metricsToExport(rows, showPrev);
   const sheets = [{ name: 'Показники', ...metricsExport }];
   if (groups.length) sheets.push({ name: 'Групи кампаній', ...groupsToExport(keys, cur.total, groups, custom, currency) });
-  if (shownCampaigns.length) sheets.push({ name: 'Кампанії', ...campaignExport(shownCampaigns, kind, custom, currency) });
+  if (shownCampaigns.length) sheets.push({ name: 'Кампанії', ...campaignExport(shownCampaigns, kind, custom, currency, isTotal ? [] : extraKeys) });
   const tabLabel = tabs.find((t) => t.key === active)?.label;
 
   return (
@@ -82,7 +84,7 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
         {shownCampaigns.length > 0 && (
           <>
             <div className="prep-subtitle">Кампанії</div>
-            <CampaignsTable campaigns={shownCampaigns} kind={kind} custom={custom} currency={currency} />
+            <CampaignsTable campaigns={shownCampaigns} kind={kind} custom={custom} currency={currency} extraKeys={isTotal ? [] : extraKeys} />
           </>
         )}
       </div>
@@ -108,8 +110,8 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
 
 const CAMPAIGN_KEYS = { ecom: ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'purchases', 'revenue', 'roas'], leadgen: ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'leads', 'cpl'] };
 
-function CampaignsTable({ campaigns, kind, custom, currency }) {
-  const keys = CAMPAIGN_KEYS[kind];
+function CampaignsTable({ campaigns, kind, custom, currency, extraKeys = [] }) {
+  const keys = [...CAMPAIGN_KEYS[kind], ...extraKeys];
   const sorted = [...campaigns].sort((a, b) => (b.spend || 0) - (a.spend || 0));
   return (
     <div className="prep-scroll">
@@ -130,8 +132,8 @@ function CampaignsTable({ campaigns, kind, custom, currency }) {
   );
 }
 
-function campaignExport(campaigns, kind, custom, currency) {
-  const keys = CAMPAIGN_KEYS[kind];
+function campaignExport(campaigns, kind, custom, currency, extraKeys = []) {
+  const keys = [...CAMPAIGN_KEYS[kind], ...extraKeys];
   return {
     columns: ['Кампанія', ...keys.map((k) => metricMeta(k, custom).label)],
     rows: [...campaigns].sort((a, b) => (b.spend || 0) - (a.spend || 0)).map((c) => [c.name, ...keys.map((k) => { const m = metricMeta(k, custom); return formatMetric(computeMetric(k, c, custom), m.format, currency); })]),

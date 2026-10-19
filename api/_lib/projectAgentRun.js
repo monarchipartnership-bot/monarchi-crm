@@ -67,7 +67,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     if (!locked) return await finish('skipped', 'Агент уже працює над цим проєктом.');
     await event('run_started', 'info', `Запуск: ${LABEL[periodType]} звіт.`, { trigger });
 
-    const [project, allAccounts, groups, custom] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId)]);
+    const [project, allAccounts, groups, custom, columns] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId), repo.getColumns(projectId)]);
     if (!project) throw new Error('Проєкт не знайдено.');
     projectName = project.name || '';
     const accounts = config.platforms?.length ? allAccounts.filter((a) => config.platforms.includes(a.platform)) : allAccounts;
@@ -102,7 +102,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const compare = { mode: 'calendar' };
     const prev = comparisonPeriod(periodType, picker, period, compare);
     const info = comparisonInfo(period, prev);
-    const { data, errors } = await pullReportData({ accounts, kind, groups, period, prev, post });
+    const { data, errors } = await pullReportData({ accounts, kind, groups, period, prev, post, columns });
     const failed = Object.entries(errors).map(([p, m]) => `${PLATFORM_NAMES[p] || p}: ${m}`);
     if (!Object.keys(data.platforms).length) throw new Error('Не вдалося отримати дані з кабінетів. ' + failed.join(' '));
     failed.forEach((f) => notes.push('Не вдалося отримати дані: ' + f));

@@ -65,6 +65,11 @@ export function createAgentRepo(db, agentEmail) {
     async getProject(projectId) { return must(await db.from('projects').select('*').eq('id', projectId).maybeSingle()); },
     async getAccounts(projectId) { return must(await db.from('project_ad_accounts').select('*').eq('project_id', projectId).order('created_at', { ascending: true })) || []; },
     async getGroups(projectId) { return must(await db.from('project_campaign_groups').select('*').eq('project_id', projectId).order('sort', { ascending: true }).order('id', { ascending: true })) || []; },
+    // The extra report columns picked per platform: { meta: ['mx_add_to_cart', ...] }
+    async getColumns(projectId) {
+      const rows = must(await db.from('project_report_columns').select('platform, columns').eq('project_id', projectId)) || [];
+      return Object.fromEntries(rows.map((r) => [r.platform, r.columns || []]));
+    },
     async getCustomMetrics(projectId) { return must(await db.from('report_custom_metrics').select('*').or(`project_id.eq.${projectId},project_id.is.null`).order('id', { ascending: true })) || []; },
 
     // ---- reports and decks

@@ -145,17 +145,17 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     }
   }
 
-  async function pull(c = cmp) {
+  async function pull(c = cmp, columns = ctx.fetchColumns, quiet = false) {
     const pv = prevFor(c);
     setBusy('pull');
     setMessage('');
     try {
-      const pulled = await pullReportData({ accounts: ctx.accounts, kind: ctx.kind, groups: ctx.groups, period, prev: pv });
+      const pulled = await pullReportData({ accounts: ctx.accounts, kind: ctx.kind, groups: ctx.groups, period, prev: pv, columns });
       setErrors(pulled.errors);
       setData(pulled.data);
       setDirty(true);
       // The period is on screen: offer a comparison (unless it is set already or switched off).
-      if (!c && !askOff) setModal('ask');
+      if (!quiet && !c && !askOff) setModal('ask');
     } catch (e) {
       setMessage(e.message || 'Не вдалося отримати дані.');
     } finally {
@@ -173,7 +173,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     const pv = prevFor(c);
     setBusy('pull');
     try {
-      const before = await fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups);
+      const before = await fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups, undefined, ctx.fetchColumns);
       setData((d) => ({ ...d, previous: { period: { start: pv.start, end: pv.end }, platforms: before.platforms } }));
     } catch (e) {
       setMessage(e.message || 'Не вдалося отримати дані для порівняння.');
@@ -319,7 +319,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal}
+            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
             campaignMode="selected" selection={selection} onSelectionChange={(s) => { setSelection(s); setActiveGroupId(null); setDirty(true); }}
@@ -440,7 +440,8 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
         />
       )}
       {modal === 'metric' && (
-        <CustomMetricModal projectId={projectId} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}
+        <CustomMetricModal projectId={projectId} platform={platform} columnKeys={ctx.extraKeys} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}
+          onColumnsSaved={async () => { const cols = await ctx.reloadColumns(); if (data) pull(cmp, cols, true); }}
           sample={first ? { base: first.total, currency: first.currency, label: 'весь акаунт' } : null} />
       )}
       {confirmDialog}

@@ -32,6 +32,9 @@ import { campaignKey as gKey, filterCampaigns, flatCampaigns, groupCampaignKeys,
 import { groupCampaigns } from '../src/lib/periodReport.js';
 import { accountPlatforms, accountsForTab, collapseStatuses, flatten, pickReportRow, reportScope } from '../src/lib/reportScope.js';
 import { groupsForPlatform } from '../src/lib/campaignGroups.js';
+import { META_METRICS, META_METRIC_LIST, cleanColumns, countsFor, extractCounts, insightFieldsFor, pickCounts } from '../src/lib/metaColumns.js';
+import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.js';
+import { visibleKeys } from '../src/lib/periodReport.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -223,7 +226,7 @@ await ok('agent sign-in: returns a token, explains a missing setup, and reports 
 const { runProjectReport } = await import('../api/_lib/projectAgentRun.js');
 const { describeDynamics } = await import('../src/lib/reportDynamics.js');
 
-function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, existingByScope = null, locked = true, existingDeck = null, projectAccounts = accounts } = {}) {
+function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, existingByScope = null, locked = true, existingDeck = null, projectAccounts = accounts, columnsPicked = {} } = {}) {
   const log = { runs: [], events: [], reports: [], decks: [], health: [], unlocked: 0, notifications: [] };
   return {
     log,
@@ -241,6 +244,7 @@ function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { pla
     getAccounts: async () => projectAccounts,
     getGroups: async () => [],
     getCustomMetrics: async () => [],
+    getColumns: async () => columnsPicked,
     getReport: async (projectId, periodType, start, scope) => (existingByScope ? existingByScope[scope] || null : existingReport),
     getReports: async () => [],
     saveReport: async ({ projectId, periodType, period, platform = 'all', source, status, data }) => { const row = { id: 10 + log.reports.length + 1, project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, platform, source, status, data }; log.reports.push(row); return row; },
@@ -325,6 +329,47 @@ await ok('agent run (two platforms): a scope a person already made is left alone
   const all = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { meta: { id: 1, source: 'manual', status: 'draft' }, google: { id: 2, source: 'manual', status: 'draft' }, all: { id: 3, source: 'manual', status: 'draft' } } });
   assert.equal((await runProjectReport({ repo: all, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15' })).status, 'skipped');
   assert.equal(all.log.reports.length, 0);
+});
+
+// ---- Extra Meta columns («Стовпці»)
+await ok('meta columns: a picked metric asks Meta only for what it needs and reads counts from fields and action lists', () => {
+  assert.deepEqual(cleanColumns('meta', ['mx_add_to_cart', 'bogus', 'mx_add_to_cart']), ['mx_add_to_cart']);
+  assert.deepEqual(cleanColumns('google', ['mx_add_to_cart']), []);
+  assert.deepEqual(insightFieldsFor(['mx_add_to_cart']), []); // actions are always asked for
+  assert.deepEqual(insightFieldsFor(['mx_cost_link_click', 'mx_hold_rate']).sort(), ['inline_link_clicks', 'video_thruplay_watched_actions']);
+  assert.deepEqual(countsFor(['mx_hold_rate']).sort(), ['thruplay', 'video_3s']);
+  const row = { actions: [{ action_type: 'omni_add_to_cart', value: '7' }, { action_type: 'add_to_cart', value: '7' }, { action_type: 'video_view', value: '300' }], inline_link_clicks: '120', video_thruplay_watched_actions: [{ action_type: 'video_view', value: '90' }] };
+  assert.deepEqual(extractCounts(row, ['mx_add_to_cart', 'mx_link_clicks', 'mx_hold_rate']), { x_add_to_cart: 7, x_link_clicks: 120, x_thruplay: 90, x_video_3s: 300 });
+  assert.deepEqual(extractCounts(row, []), {});
+  assert.deepEqual(pickCounts({ spend: 1, x_add_to_cart: 7, x_gone: null }), { x_add_to_cart: 7 });
+});
+await ok('meta columns: counts add up across campaigns, ratios are computed from the sums, a never-fetched column is — not 0', () => {
+  const total = sumBase([{ spend: 100, impressions: 10000, reach: 5000, clicks: 200, x_add_to_cart: 4, x_link_clicks: 150 }, { spend: 50, impressions: 5000, reach: 2500, clicks: 100, x_add_to_cart: 1, x_link_clicks: 50 }]);
+  assert.equal(total.x_add_to_cart, 5);
+  assert.equal(computeMetric('mx_cost_add_to_cart', total), 30);
+  assert.equal(computeMetric('mx_link_ctr', total), (200 / 15000) * 100);
+  assert.equal(computeMetric('mx_frequency', total), 2);
+  const plain = sumBase([{ spend: 10, impressions: 100, reach: 50, clicks: 5 }]);
+  assert.equal(computeMetric('mx_cost_add_to_cart', plain), null);
+  assert.equal(computeMetric('mx_link_ctr', plain), null);
+  assert.equal(computeMetric('mx_add_to_cart', plain), null);
+  assert.equal(computeMetric('mx_cost_add_to_cart', { spend: 10, x_add_to_cart: 0 }), null); // no divide by zero
+  assert.equal(computeMetric('mx_cart_to_purchase', { purchases: 2, x_add_to_cart: 8 }), 25);
+});
+await ok('meta columns: only picked columns are shown, and only they can be used in a formula', () => {
+  assert.ok(!visibleKeys(['spend'], [], []).includes('mx_add_to_cart'));
+  assert.deepEqual(visibleKeys(['spend'], [{ key: 'custom_x' }], ['mx_add_to_cart']), ['spend', 'mx_add_to_cart', 'custom_x']);
+  assert.ok(!metricOptions([]).some((o) => o.key.startsWith('mx_')));
+  assert.ok(metricOptions([], ['mx_add_to_cart']).some((o) => o.key === 'mx_add_to_cart'));
+  assert.ok(META_METRIC_LIST.every((m) => META_METRICS[m.key] === m && m.label && m.en && ['number', 'money', 'percent', 'ratio'].includes(m.format)));
+  assert.equal(new Set(META_METRIC_LIST.map((m) => m.key)).size, META_METRIC_LIST.length);
+});
+await ok('agent run: the extra columns picked for the project are asked of the platform', async () => {
+  const seen = [];
+  const spy = async (path, body) => { if (path === '/api/meta-ads-insights' && body.level) seen.push(body.columns); return post(path, body); };
+  const repo = fakeRepo({ columnsPicked: { meta: ['mx_add_to_cart'] } });
+  await runProjectReport({ repo, post: spy, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.ok(seen.length >= 2 && seen.every((c) => c?.[0] === 'mx_add_to_cart'));
 });
 
 await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {

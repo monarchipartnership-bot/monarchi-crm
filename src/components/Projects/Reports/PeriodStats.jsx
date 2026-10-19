@@ -55,18 +55,18 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   };
   const compareRange = (range, c) => (c?.mode === 'custom' ? { from: c.from, to: c.to } : c?.mode === 'previous' ? previousOf(range) : null);
 
-  async function run(range = { from, to }, c = cmp) {
+  async function run(range = { from, to }, c = cmp, columns = ctx.fetchColumns, quiet = false) {
     if (range.from > range.to) { setState({ status: 'error', error: 'Початок періоду пізніше за кінець.' }); return; }
     setState({ status: 'loading' });
     const prev = compareRange(range, c);
     try {
       const [cur, before] = await Promise.all([
-        fetchProjectRange(ctx.accounts, range.from, range.to, ctx.kind, ctx.groups),
-        prev ? fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups) : Promise.resolve(null),
+        fetchProjectRange(ctx.accounts, range.from, range.to, ctx.kind, ctx.groups, undefined, columns),
+        prev ? fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, columns) : Promise.resolve(null),
       ]);
       setState({ status: 'ok', data: { platforms: cur.platforms, previous: before ? { platforms: before.platforms } : null }, errors: cur.errors, range, prev });
       // A new period is on screen: offer to add a comparison (unless switched off or already set).
-      if (!c && !askOff) setModal('ask');
+      if (!quiet && !c && !askOff) setModal('ask');
     } catch (e) {
       setState({ status: 'error', error: e.message || 'Не вдалося отримати дані.' });
     }
@@ -81,7 +81,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     const prev = compareRange(state.range, c);
     setState((st) => ({ ...st, comparing: true }));
     try {
-      const before = await fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups);
+      const before = await fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, ctx.fetchColumns);
       setState((st) => ({ ...st, comparing: false, data: { ...st.data, previous: { platforms: before.platforms } }, prev }));
     } catch (e) {
       setState((st) => ({ ...st, comparing: false, compareError: e.message || 'Не вдалося отримати дані для порівняння.' }));
@@ -161,7 +161,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
       {state.status === 'ok' && Object.keys(shown.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={shown} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal}
+            data={shown} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys}
             title={activeGroup ? `${ctx.project.name} · ${activeGroup.name}` : ctx.project.name} subtitle={`${fmt(state.range.from)} – ${fmt(state.range.to)}`}
             fileBase={`${ctx.project.name}${activeGroup ? '_' + activeGroup.name : ''}_${state.range.from}_${state.range.to}`}
             curLabel={`${fmt(state.range.from)}–${fmt(state.range.to)}`}
@@ -193,7 +193,8 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
       )}
       {modal === 'metric' && (
         <CustomMetricModal
-          projectId={projectId} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}
+          projectId={projectId} platform={platform} columnKeys={ctx.extraKeys} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}
+          onColumnsSaved={async () => { const cols = await ctx.reloadColumns(); if (state.status === 'ok') run(state.range, cmp, cols, true); }}
           sample={firstPlatform ? { base: firstPlatform.total, currency: firstPlatform.currency, label: 'весь акаунт' } : null}
         />
       )}

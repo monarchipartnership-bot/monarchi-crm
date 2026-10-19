@@ -10,12 +10,14 @@
 //   datePreset — Meta preset, e.g. last_7d (default), last_30d, this_month, last_month
 //   timeRange  — { since: 'YYYY-MM-DD', until: 'YYYY-MM-DD' } (wins over datePreset)
 //   daily      — true → one row per day instead of one row for the whole period
+//   columns    — extra report metrics to compute (keys of src/lib/metaColumns.js, e.g. mx_add_to_cart); only what they need is asked from Meta
 //   raw        — true → also return Meta's untouched action lists (for checking the mapping)
 //   list       — true → return every ad account the token can see (no accountId needed)
 //   activities — true → the account's change history for timeRange (who changed what)
 //   check      — true → only verify the token and return the account's name/status
 import { createClient } from '@supabase/supabase-js';
 import { formatRow, GRAPH, graphGet, LEVELS, MAX_PAGES } from './_lib/metaAdsData.js';
+import { cleanColumns, insightFieldsFor } from '../src/lib/metaColumns.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -45,6 +47,7 @@ export default async function handler(req, res) {
   }
 
   const { accountId, level = 'account', datePreset = 'last_7d', timeRange, daily = false, check = false, raw = false, list = false, activities = false } = req.body || {};
+  const columns = cleanColumns('meta', req.body?.columns);
   if (list) {
     try {
       let url = GRAPH + 'me/adaccounts?' + new URLSearchParams({
@@ -120,7 +123,7 @@ export default async function handler(req, res) {
       level,
       fields: [
         'campaign_name', 'adset_name', 'ad_name', 'spend', 'impressions', 'reach', 'clicks',
-        'actions', 'action_values', 'date_start', 'date_stop',
+        'actions', 'action_values', 'date_start', 'date_stop', ...insightFieldsFor(columns),
       ].join(','),
       limit: '200',
       access_token: metaToken,
@@ -136,7 +139,7 @@ export default async function handler(req, res) {
       rows.push(...(body.data || []));
       url = body.paging?.next || null;
     }
-    res.status(200).json({ account: act, level, rows: rows.map((r) => formatRow(r, raw)), truncated: Boolean(url) });
+    res.status(200).json({ account: act, level, rows: rows.map((r) => formatRow(r, raw, columns)), truncated: Boolean(url) });
   } catch (err) {
     res.status(err.status && err.status < 500 ? 400 : 502).json({ error: 'Meta API: ' + err.message, code: err.code });
   }

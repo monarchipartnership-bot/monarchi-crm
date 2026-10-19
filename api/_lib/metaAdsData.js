@@ -2,6 +2,8 @@
 // (api/meta-ads-insights.js) and the campaign-team agents. The token (META_ACCESS_TOKEN, a system-user token with ads_read) only
 // ever lives in the server environment; graphGet strips it from any error message.
 
+import { extractCounts } from '../../src/lib/metaColumns.js';
+
 export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v26.0';
 export const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}/`;
 export const LEVELS = ['account', 'campaign', 'adset', 'ad'];
@@ -25,7 +27,8 @@ function pickAction(list, types) {
   return 0;
 }
 
-export function formatRow(row, includeRaw = false) {
+// `columns` = the extra report metrics picked for the project (src/lib/metaColumns.js): their raw counts come back as x_<count>.
+export function formatRow(row, includeRaw = false, columns = []) {
   const spend = num(row.spend);
   const impressions = num(row.impressions);
   const clicks = num(row.clicks);
@@ -52,6 +55,7 @@ export function formatRow(row, includeRaw = false) {
     cost_per_purchase: purchases > 0 ? round2(spend / purchases) : null,
     cost_per_lead: leads > 0 ? round2(spend / leads) : null,
     // Debug aid: the untouched action lists, so a metric mapping can be checked against Meta.
+    ...(columns.length ? extractCounts(row, columns) : {}),
     ...(includeRaw ? { raw_actions: row.actions || [], raw_action_values: row.action_values || [] } : {}),
   };
 }

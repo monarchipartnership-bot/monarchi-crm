@@ -55,10 +55,10 @@ export function comparisonInfo(period, prev) {
 // ----- The numbers ------------------------------------------------------------------------------
 // accounts: the project's project_ad_accounts rows; groups: its campaign groups.
 // → { data: { platforms, previous }, errors } — `errors` has one entry per platform that failed.
-export async function pullReportData({ accounts, kind, groups, period, prev, post }) {
+export async function pullReportData({ accounts, kind, groups, period, prev, post, columns }) {
   const [cur, before] = await Promise.all([
-    fetchProjectRange(accounts, period.start, period.end, kind, groups, post),
-    prev ? fetchProjectRange(accounts, prev.start, prev.end, kind, groups, post) : Promise.resolve(null),
+    fetchProjectRange(accounts, period.start, period.end, kind, groups, post, columns),
+    prev ? fetchProjectRange(accounts, prev.start, prev.end, kind, groups, post, columns) : Promise.resolve(null),
   ]);
   return {
     data: { platforms: cur.platforms, previous: before ? { period: { start: prev.start, end: prev.end }, platforms: before.platforms } : null },

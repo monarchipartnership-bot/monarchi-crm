@@ -149,3 +149,10 @@
 .prep-seg-tab { flex: 1 1 0; min-width: 120px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 12px; background: transparent; color: #4a2a66; font: 600 14px/1 var(--font-head); white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .prep-seg-tab.on { background: linear-gradient(135deg, #b83ed4 0%, #9225bd 55%, #702094 100%); color: #fff; box-shadow: 0 6px 14px rgba(146, 37, 189, .28); }
 .prep-platforms-hint { margin: 8px 4px 0; }
+
+/* «+ Метрика» → Стовпці: the platform's extra columns, grouped like in the ad cabinet */
+.mc-columns { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.mc-group { display: flex; flex-direction: column; gap: 8px; }
+.mc-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+@media (max-width: 560px) { .mc-grid { grid-template-columns: 1fr; } }

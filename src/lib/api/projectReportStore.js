@@ -72,6 +72,19 @@ export async function deleteCampaignGroup(id) {
   if (error) throw error;
 }
 
+// ---- Extra report columns (per project + platform) ----
+// → { meta: ['mx_add_to_cart', ...], ... }; empty when nothing is picked or the table is not there yet.
+export async function fetchReportColumns(projectId) {
+  const { data, error } = await supabase.from('project_report_columns').select('platform, columns').eq('project_id', projectId);
+  if (error) { console.warn('fetchReportColumns failed', error); return {}; }
+  return Object.fromEntries((data ?? []).map((r) => [r.platform, r.columns || []]));
+}
+
+export async function saveReportColumns(projectId, platform, columns) {
+  const { error } = await supabase.from('project_report_columns').upsert({ project_id: projectId, platform, columns, updated_at: nowIso() }, { onConflict: 'project_id,platform' });
+  if (error) throw error;
+}
+
 // ---- Custom metrics ----
 // The project's own metrics plus the ones available in every project.
 export async function fetchCustomMetrics(projectId) {

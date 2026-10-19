@@ -2,6 +2,7 @@ import { authedPost } from './adAccounts.js';
 import { BASE_FIELDS, METRICS, computeMetric, metricMeta, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { computeWeeksForMonth, daysInMonth, isoDate, MONTH_NAMES } from './dateHelpers.js';
 import { groupMatches, groupsForPlatform } from './campaignGroups.js';
+import { pickCounts } from './metaColumns.js';
 
 const iso = (d) => isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 const ZERO = Object.fromEntries(BASE_FIELDS.map((f) => [f, 0]));
@@ -37,6 +38,7 @@ function metaRow(r) {
   return {
     spend: r.spend || 0, impressions: r.impressions || 0, reach: r.reach || 0, clicks: r.clicks || 0,
     purchases: r.purchases || 0, leads: r.leads || 0, revenue: r.revenue || 0,
+    ...pickCounts(r), // the extra columns picked for the project (x_...)
   };
 }
 
@@ -51,12 +53,13 @@ function googleRow(r, kind) {
 
 // One platform account for a date range: account totals + per-campaign rows.
 // `post(path, body)` is how the platforms are called: the signed-in browser call by default, the server passes its own.
-export async function fetchPlatformRange(platform, accountId, from, to, kind, post = authedPost) {
+// `columns` = the extra metric keys picked for this platform (Meta only so far).
+export async function fetchPlatformRange(platform, accountId, from, to, kind, post = authedPost, columns = []) {
   if (platform === 'meta') {
     const range = { since: from, until: to };
     const [acc, camp] = await Promise.all([
-      post('/api/meta-ads-insights', { accountId, level: 'account', timeRange: range }),
-      post('/api/meta-ads-insights', { accountId, level: 'campaign', timeRange: range }),
+      post('/api/meta-ads-insights', { accountId, level: 'account', timeRange: range, columns }),
+      post('/api/meta-ads-insights', { accountId, level: 'campaign', timeRange: range, columns }),
     ]);
     return {
       total: acc.rows?.[0] ? metaRow(acc.rows[0]) : { ...ZERO },
@@ -94,11 +97,11 @@ export function groupCampaigns(campaigns, allGroups, platform) {
 
 // All linked accounts of a project for one date range. `accounts` are
 // project_ad_accounts rows. A platform that fails is reported in `errors`, the
-// others still come back.
-export async function fetchProjectRange(accounts, from, to, kind, groups, post = authedPost) {
+// others still come back. `columns` = { platform: [extra metric keys] } picked for the project.
+export async function fetchProjectRange(accounts, from, to, kind, groups, post = authedPost, columns = {}) {
   const platforms = {};
   const errors = {};
-  const settled = await Promise.allSettled(accounts.map((a) => fetchPlatformRange(a.platform, a.account_id, from, to, kind, post)));
+  const settled = await Promise.allSettled(accounts.map((a) => fetchPlatformRange(a.platform, a.account_id, from, to, kind, post, columns?.[a.platform] || [])));
   settled.forEach((res, i) => {
     const a = accounts[i];
     if (res.status === 'fulfilled') {
@@ -133,9 +136,9 @@ export function metricRows(keys, cur, prev, custom, currency) {
 }
 
 // Which metric keys to show: the project type's default set, plus all of the
-// project's custom metrics at the end.
-export function visibleKeys(defaults, custom) {
-  return [...defaults.filter((k) => METRICS[k]), ...custom.map((c) => c.key)];
+// extra columns picked for the platform, then the project's custom metrics at the end.
+export function visibleKeys(defaults, custom, extra = []) {
+  return [...defaults.filter((k) => METRICS[k]), ...extra.filter((k) => METRICS[k]), ...custom.map((c) => c.key)];
 }
 
 // Every campaign of the project's linked accounts that had any activity in the last `days` days, for the group form (it must not depend on

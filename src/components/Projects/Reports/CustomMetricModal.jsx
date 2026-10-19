@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
-import { addCustomMetric, deleteCustomMetric } from '../../../lib/api/projectReportStore';
+import { addCustomMetric, deleteCustomMetric, saveReportColumns } from '../../../lib/api/projectReportStore';
 import { FORMAT_LABELS, OPERATIONS, metricOptions, slugKey, formatMetric, computeMetric } from '../../../lib/reportMetrics';
+import { PLATFORM_COLUMNS } from '../../../lib/metaColumns';
+import { platformInfo } from '../../../lib/adAccounts';
 import { useAuth } from '../../../contexts/AuthContext';
 import Select from '../../common/Select';
 import '../../../styles/projectReports.css';
@@ -9,13 +11,16 @@ import '../../../styles/projectReports.css';
 const FORMAT_OPTIONS = Object.entries(FORMAT_LABELS).map(([value, label]) => ({ value, label }));
 const NUMBER = '__number__';
 
-// "+ Метрика": a custom metric from two others (or a number): name = A ÷ × + − B.
-// Saved for this project, or for every project.
-export default function CustomMetricModal({ projectId, custom, sample, onClose, onChanged }) {
+// «+ Метрика»: two tabs.
+//   «Стовпці»  extra columns of the platform tab you are on, like «Стовпці» in the ad cabinet: tick what to show (and fetch) for this project.
+//   «Формули»  a custom metric from two others (or a number): name = A ÷ × + − B, for this project or for every project.
+export default function CustomMetricModal({ projectId, platform, columnKeys = [], custom, sample, onClose, onChanged, onColumnsSaved }) {
   const box = useRef(null);
   useDialogA11y(box, onClose);
   const { email } = useAuth();
-  const options = metricOptions(custom);
+  const catalog = PLATFORM_COLUMNS[platform] || null; // only some platforms have extra columns; «Разом» has none
+  const [tab, setTab] = useState(catalog ? 'columns' : 'formulas');
+  const options = metricOptions(custom, columnKeys);
   const [name, setName] = useState('');
   const [a, setA] = useState('revenue');
   const [op, setOp] = useState('/');
@@ -25,6 +30,38 @@ export default function CustomMetricModal({ projectId, custom, sample, onClose, 
   const [global, setGlobal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // the extra columns being picked (saved with the button, so the report is fetched once, not at every tick)
+  const [picked, setPicked] = useState(() => new Set(columnKeys));
+  const [query, setQuery] = useState('');
+  const [savingCols, setSavingCols] = useState(false);
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const out = [];
+    (catalog || []).filter((m) => !q || m.label.toLowerCase().includes(q) || m.en.toLowerCase().includes(q)).forEach((m) => {
+      let g = out.find((x) => x.name === m.group);
+      if (!g) { g = { name: m.group, items: [] }; out.push(g); }
+      g.items.push(m);
+    });
+    return out;
+  }, [catalog, query]);
+  const changedCols = picked.size !== columnKeys.length || columnKeys.some((k) => !picked.has(k));
+  const toggle = (k) => setPicked((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const toggleGroup = (items) => setPicked((s) => { const n = new Set(s); const all = items.every((m) => n.has(m.key)); items.forEach((m) => (all ? n.delete(m.key) : n.add(m.key))); return n; });
+
+  async function saveColumns() {
+    setSavingCols(true);
+    setError('');
+    try {
+      await saveReportColumns(projectId, platform, [...picked]);
+      await onColumnsSaved();
+      onClose();
+    } catch (e) {
+      setError((e.message || 'Не вдалося зберегти стовпці.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261029000000.');
+    } finally {
+      setSavingCols(false);
+    }
+  }
 
   const b = bKind === NUMBER ? bNumber : bKind;
   const draft = { key: 'draft', name: 'draft', formula: { a, op, b }, format };
@@ -55,52 +92,98 @@ export default function CustomMetricModal({ projectId, custom, sample, onClose, 
     <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} tabIndex={-1} className="modal-box prep-modal" role="dialog" aria-modal="true" aria-labelledby="cm-title">
         <div className="modal-head">
-          <h3 id="cm-title">Свої метрики</h3>
+          <h3 id="cm-title">Метрики</h3>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Закрити">&times;</button>
         </div>
         <div className="modal-body">
-          {custom.length > 0 && (
-            <>
-              <div className="pf-sec-label">Створені</div>
-              <ul className="prep-metric-list">
-                {custom.map((c) => (
-                  <li key={c.id}>
-                    <span><b>{c.name}</b> = {labelOf(options, c.formula.a)} {c.formula.op} {labelOf(options, c.formula.b)}{c.project_id == null ? ' · для всіх проєктів' : ''}</span>
-                    <button type="button" className="pacc-link pacc-link--danger" onClick={() => remove(c.id)}>Видалити</button>
-                  </li>
-                ))}
-              </ul>
-            </>
+          <div className="prep-seg" role="tablist" aria-label="Метрики">
+            <button type="button" role="tab" aria-selected={tab === 'columns'} className={'prep-seg-tab' + (tab === 'columns' ? ' on' : '')} onClick={() => { setTab('columns'); setError(''); }}>Стовпці{catalog ? ` · ${platformInfo(platform).label}` : ''}</button>
+            <button type="button" role="tab" aria-selected={tab === 'formulas'} className={'prep-seg-tab' + (tab === 'formulas' ? ' on' : '')} onClick={() => { setTab('formulas'); setError(''); }}>Власні формули</button>
+          </div>
+
+          {tab === 'columns' && !catalog && (
+            <div className="pacc-hint">
+              {platform === 'total'
+                ? 'Додаткові стовпці обираються на вкладці платформи (Meta Ads): у «Разом» складаються лише спільні для всіх платформ показники.'
+                : `Для ${platformInfo(platform).label} додаткових стовпців поки немає.`}
+            </div>
           )}
 
-          <div className="pf-sec-label">Нова метрика</div>
-          <div className="pf full">
-            <label>Назва</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Дохід на клік" />
-          </div>
-          <div className="prep-formula">
-            <Select value={a} onChange={setA} options={options.map((o) => ({ value: o.key, label: o.label }))} searchable />
-            <Select value={op} onChange={setOp} options={OPERATIONS} />
-            <Select value={bKind} onChange={setBKind} options={[...options.map((o) => ({ value: o.key, label: o.label })), { value: NUMBER, label: 'Число…' }]} searchable />
-            {bKind === NUMBER && <input type="number" value={bNumber} onChange={(e) => setBNumber(e.target.value)} placeholder="напр. 100" />}
-          </div>
-          <div className="pf">
-            <label>Як показувати</label>
-            <Select value={format} onChange={setFormat} options={FORMAT_OPTIONS} />
-          </div>
-          <label className="prep-check">
-            <input type="checkbox" checked={global} onChange={(e) => setGlobal(e.target.checked)} />
-            <span>Доступна в усіх проєктах</span>
-          </label>
-          {sample && (
-            <div className="pacc-hint">
-              Приклад на поточних даних ({sample.label}): <b>{formatMetric(preview, format, sample.currency)}</b>
+          {tab === 'columns' && catalog && (
+            <div className="mc-columns">
+              <div className="cg-pick-bar">
+                <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Пошук стовпця" aria-label="Пошук стовпця" />
+                <button type="button" className="btn" disabled={!picked.size} onClick={() => setPicked(new Set())}>Зняти всі</button>
+                <span className="cg-pick-count">Обрано: <b>{picked.size}</b></span>
+              </div>
+              <div className="pacc-hint">Стовпці зʼявляться в таблиці показників, у звітах і файлах цього проєкту. Ціни й відсотки рахуються з витрат та показів автоматично.</div>
+              {groups.length === 0 && <div className="pacc-hint">Нічого не знайдено.</div>}
+              {groups.map((g) => (
+                <div className="mc-group" key={g.name}>
+                  <div className="mc-group-head">
+                    <b>{g.name}</b>
+                    <button type="button" className="pacc-link" onClick={() => toggleGroup(g.items)}>{g.items.every((m) => picked.has(m.key)) ? 'Зняти групу' : 'Обрати групу'}</button>
+                  </div>
+                  <div className="mc-grid">
+                    {g.items.map((m) => (
+                      <label key={m.key} className={'cg-item' + (picked.has(m.key) ? ' on' : '')}>
+                        <input type="checkbox" checked={picked.has(m.key)} onChange={() => toggle(m.key)} />
+                        <span className="cg-item-name">{m.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
+          )}
+
+          {tab === 'formulas' && (
+            <>
+              {custom.length > 0 && (
+                <>
+                  <div className="pf-sec-label">Створені</div>
+                  <ul className="prep-metric-list">
+                    {custom.map((c) => (
+                      <li key={c.id}>
+                        <span><b>{c.name}</b> = {labelOf(options, c.formula.a)} {c.formula.op} {labelOf(options, c.formula.b)}{c.project_id == null ? ' · для всіх проєктів' : ''}</span>
+                        <button type="button" className="pacc-link pacc-link--danger" onClick={() => remove(c.id)}>Видалити</button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              <div className="pf-sec-label">Нова метрика</div>
+              <div className="pf full">
+                <label>Назва</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Дохід на клік" />
+              </div>
+              <div className="prep-formula">
+                <Select value={a} onChange={setA} options={options.map((o) => ({ value: o.key, label: o.label }))} searchable />
+                <Select value={op} onChange={setOp} options={OPERATIONS} />
+                <Select value={bKind} onChange={setBKind} options={[...options.map((o) => ({ value: o.key, label: o.label })), { value: NUMBER, label: 'Число…' }]} searchable />
+                {bKind === NUMBER && <input type="number" value={bNumber} onChange={(e) => setBNumber(e.target.value)} placeholder="напр. 100" />}
+              </div>
+              <div className="pf">
+                <label>Як показувати</label>
+                <Select value={format} onChange={setFormat} options={FORMAT_OPTIONS} />
+              </div>
+              <label className="prep-check">
+                <input type="checkbox" checked={global} onChange={(e) => setGlobal(e.target.checked)} />
+                <span>Доступна в усіх проєктах</span>
+              </label>
+              {sample && (
+                <div className="pacc-hint">
+                  Приклад на поточних даних ({sample.label}): <b>{formatMetric(preview, format, sample.currency)}</b>
+                </div>
+              )}
+            </>
           )}
           {error && <div className="form-err">{error}</div>}
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-p" onClick={save} disabled={saving}>{saving ? '...' : 'Додати метрику'}</button>
+          {tab === 'columns' && catalog && <button type="button" className="btn btn-p" onClick={saveColumns} disabled={savingCols || !changedCols}>{savingCols ? 'Зберігаємо…' : 'Застосувати стовпці'}</button>}
+          {tab === 'formulas' && <button type="button" className="btn btn-p" onClick={save} disabled={saving}>{saving ? '...' : 'Додати метрику'}</button>}
           <button type="button" className="btn" onClick={onClose}>Закрити</button>
         </div>
       </div>
