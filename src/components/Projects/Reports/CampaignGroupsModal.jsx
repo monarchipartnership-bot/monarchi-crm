@@ -1,95 +1,125 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
-import { replaceCampaignGroups } from '../../../lib/api/projectReportStore';
-import { suggestGroups } from '../../../lib/groupSuggest';
+import { createCampaignGroup, deleteCampaignGroup, updateCampaignGroup } from '../../../lib/api/projectReportStore';
+import { fetchProjectCampaigns } from '../../../lib/periodReport';
+import { campaignKey, filterCampaigns, groupCampaignKeys, mergeCampaigns } from '../../../lib/campaignGroups';
+import { platformInfo } from '../../../lib/adAccounts';
+import GroupRow from './GroupCards';
 import '../../../styles/projectReports.css';
 
-let seq = 1;
-const emptyGroup = () => ({ key: seq++, name: '', keywords: '' });
+const fromKey = (k) => { const i = k.indexOf('|'); return { platform: k.slice(0, i), name: k.slice(i + 1) }; };
 
-// "Групи кампаній": the columns of the report. A campaign goes to the first
-// group whose keyword appears in its name (any case); the rest land in "Інше".
-export default function CampaignGroupsModal({ projectId, groups, campaignNames, onClose, onSaved }) {
+// «Групи кампаній»: the groups of the project as small boxes (or «Пусто»), «Створити групу» opens the form: a name of your own and any number of
+// the project's campaigns. `startEdit` = a group id or 'new' to open straight in the form (from the buttons of the page).
+export default function CampaignGroupsModal({ projectId, groups, accounts, kind, knownCampaigns, startEdit = null, onClose, onChanged }) {
   const box = useRef(null);
   useDialogA11y(box, onClose);
-  const [rows, setRows] = useState(() => (groups.length
-    ? groups.map((g) => ({ key: seq++, name: g.name, keywords: (g.keywords || []).join(', ') }))
-    : [emptyGroup()]));
+  const [view, setView] = useState(startEdit ? 'form' : 'list');
+  const [editId, setEditId] = useState(startEdit && startEdit !== 'new' ? startEdit : null);
+  const editing = groups.find((g) => g.id === editId) || null;
+  const [name, setName] = useState('');
+  const [picked, setPicked] = useState(new Set());
+  const [query, setQuery] = useState('');
+  const [fetched, setFetched] = useState(null); // null = loading, [] = loaded
+  const [loadErrors, setLoadErrors] = useState({});
   const [saving, setSaving] = useState(false);
-  const [hints, setHints] = useState(null);
   const [error, setError] = useState('');
+  const initialised = useRef(false);
 
-  function setRow(key, patch) { setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r))); }
+  // The project's campaigns: what is on screen + a fresh look at the last 90 days, so the form never depends on a report being open.
+  useEffect(() => {
+    if (view !== 'form' || fetched) return undefined;
+    let cancelled = false;
+    fetchProjectCampaigns(accounts, kind).then((r) => { if (!cancelled) { setFetched(r.campaigns); setLoadErrors(r.errors); } }).catch((e) => { if (!cancelled) { setFetched([]); setLoadErrors({ '': e.message }); } });
+    return () => { cancelled = true; };
+  }, [view, fetched, accounts, kind]);
+
+  // campaigns already in the group but quiet for 90 days still show (and stay) in the list
+  const all = useMemo(() => {
+    const own = (editing?.campaigns || []).map(fromKey);
+    return mergeCampaigns(knownCampaigns || [], fetched || [], own);
+  }, [knownCampaigns, fetched, editing]);
+
+  useEffect(() => {
+    if (view !== 'form' || fetched === null || initialised.current) return;
+    initialised.current = true;
+    setName(editing ? editing.name : '');
+    setPicked(new Set(editing ? [...groupCampaignKeys(editing, all), ...(editing.campaigns || [])] : []));
+  }, [view, fetched, editing, all]);
+
+  const shown = useMemo(() => filterCampaigns(all, query), [all, query]);
+  const toggle = (k) => setPicked((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const allShownPicked = shown.length > 0 && shown.every((c) => picked.has(campaignKey(c.platform, c.name)));
+
+  const openForm = (id) => { initialised.current = false; setEditId(id); setName(''); setPicked(new Set()); setQuery(''); setError(''); setView('form'); };
+  async function changed() { await onChanged(); }
 
   async function save() {
-    setSaving(true);
-    setError('');
+    if (!name.trim()) { setError('Вкажіть назву групи.'); return; }
+    if (!picked.size) { setError('Оберіть хоча б одну кампанію.'); return; }
+    setSaving(true); setError('');
     try {
-      await replaceCampaignGroups(projectId, rows.map((r) => ({ name: r.name, keywords: r.keywords.split(',') })));
-      await onSaved();
-      onClose();
-    } catch (e) {
-      setError(e.message || 'Не вдалося зберегти групи.');
-    } finally {
-      setSaving(false);
-    }
+      const body = { name, campaigns: [...picked] };
+      if (editing) await updateCampaignGroup(editing.id, body); else await createCampaignGroup(projectId, body);
+      await changed();
+      if (startEdit) onClose(); else { setView('list'); setEditId(null); }
+    } catch (e) { setError(e.message || 'Не вдалося зберегти групу.'); } finally { setSaving(false); }
   }
-
-  // What each rule catches right now, so a typo in a keyword is visible at once.
-  const matchCount = (kw) => {
-    const keys = kw.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean);
-    if (!keys.length) return 0;
-    return campaignNames.filter((n) => keys.some((k) => n.toLowerCase().includes(k))).length;
-  };
+  async function remove(id) { try { await deleteCampaignGroup(id); await changed(); } catch (e) { setError(e.message || 'Не вдалося видалити.'); } }
 
   return (
     <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} tabIndex={-1} className="modal-box prep-modal" role="dialog" aria-modal="true" aria-labelledby="cg-title">
         <div className="modal-head">
-          <h3 id="cg-title">Групи кампаній</h3>
+          <h3 id="cg-title">{view === 'list' ? 'Групи кампаній' : editing ? 'Редагувати групу' : 'Нова група кампаній'}</h3>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Закрити">&times;</button>
         </div>
         <div className="modal-body">
-          <div className="pacc-hint">Кожна група стає колонкою у звіті. Вкажіть слова з назви кампанії через кому (наприклад: <i>Kinky Bang, kinky</i>). Кампанія потрапляє до першої групи, чиє слово є в її назві, решта йде в «Інше».</div>
-          <div className="prep-groups">
-            {rows.map((r) => (
-              <div className="prep-group-row" key={r.key}>
-                <input type="text" value={r.name} onChange={(e) => setRow(r.key, { name: e.target.value })} placeholder="Назва колонки" />
-                <input type="text" value={r.keywords} onChange={(e) => setRow(r.key, { keywords: e.target.value })} placeholder="слова з назви кампанії, через кому" />
-                <span className="prep-group-count" title="Скільки кампаній зараз потрапляє в групу">{campaignNames.length ? matchCount(r.keywords) : ''}</span>
-                <button type="button" className="pacc-link pacc-link--danger" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>×</button>
-              </div>
-            ))}
-          </div>
-          <div className="prep-group-btns">
-            <button type="button" className="btn" onClick={() => setRows((rs) => [...rs, emptyGroup()])}>+ Додати групу</button>
-            {campaignNames.length >= 3 && <button type="button" className="btn" onClick={() => setHints(suggestGroups(campaignNames))}>Запропонувати за назвами кампаній</button>}
-          </div>
-          {hints && (
-            <div className="prep-hints">
-              {hints.length === 0 && <span className="pacc-hint">У назвах немає слів, які повторюються у кількох кампаніях: задайте групи вручну.</span>}
-              {hints.map((h) => (
-                <button
-                  key={h.keyword} type="button" className="prep-chipbtn"
-                  disabled={rows.some((r) => r.keywords.toLowerCase().split(',').map((k) => k.trim()).includes(h.keyword))}
-                  onClick={() => setRows((rs) => [...rs.filter((r) => r.name || r.keywords), { key: seq++, name: h.name, keywords: h.keyword }])}
-                >
-                  + {h.name} · {h.count} камп.
-                </button>
-              ))}
-            </div>
+          {view === 'list' && (
+            <>
+              {groups.length === 0 && <div className="cg-empty">Пусто. Додайте першу групу: оберіть кампанії проєкту, які мають йти в звіт разом.</div>}
+              <GroupRow groups={groups} known={knownCampaigns} activeId={undefined} onEdit={openForm} onDelete={remove} onCreate={() => openForm(null)} />
+              <div className="pacc-hint">Група це кампанії, які ви обрали самі. Обравши групу на сторінці звіту, ви побачите цифри саме по цих кампаніях.</div>
+            </>
           )}
-          {campaignNames.length > 0 && (
-            <details className="prep-campaigns">
-              <summary>Кампанії, які є зараз ({campaignNames.length})</summary>
-              <ul>{campaignNames.map((n) => <li key={n}>{n}</li>)}</ul>
-            </details>
+          {view === 'form' && (
+            <div className="cg-form">
+              <div className="pk-field"><label htmlFor="cg-name">Назва групи</label><input id="cg-name" type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Наприклад: Каталог, Кінкі Бенг, Сезонні" /></div>
+              <div className="cg-pick">
+                <div className="cg-pick-bar">
+                  <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Пошук кампанії" aria-label="Пошук кампанії" />
+                  <button type="button" className="btn" disabled={!shown.length} onClick={() => setPicked((s) => { const n = new Set(s); shown.forEach((c) => { const k = campaignKey(c.platform, c.name); if (allShownPicked) n.delete(k); else n.add(k); }); return n; })}>{allShownPicked ? 'Зняти всі' : 'Обрати всі'}{query ? ' знайдені' : ''}</button>
+                  <span className="cg-pick-count">Обрано: <b>{picked.size}</b></span>
+                </div>
+                {fetched === null && <div className="pacc-hint">Завантажуємо кампанії проєкту за останні 90 днів…</div>}
+                {Object.entries(loadErrors).map(([p, m]) => <div className="pacc-err" key={p}>{p ? platformInfo(p).label + ': ' : ''}{m}</div>)}
+                {fetched !== null && all.length === 0 && <div className="pacc-hint">Кампаній не знайдено: у підключених кабінетах немає активності за 90 днів.</div>}
+                <div className="cg-list">
+                  {shown.map((c) => {
+                    const k = campaignKey(c.platform, c.name);
+                    return (
+                      <label key={k} className={'cg-item' + (picked.has(k) ? ' on' : '')}>
+                        <input type="checkbox" checked={picked.has(k)} onChange={() => toggle(k)} />
+                        <span className="cg-item-name">{c.name}</span>
+                        <span className="cg-item-meta">{platformInfo(c.platform).label}{c.spend ? ` · ${Math.round(c.spend).toLocaleString('uk-UA')}` : ''}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              {editing && (editing.keywords || []).length > 0 && <div className="pacc-hint">Ця група була задана словами ({editing.keywords.join(', ')}). Позначені кампанії це те, що вона охоплює зараз: після збереження група стане постійним списком.</div>}
+            </div>
           )}
           {error && <div className="form-err">{error}</div>}
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-p" onClick={save} disabled={saving}>{saving ? '...' : 'Зберегти'}</button>
-          <button type="button" className="btn" onClick={onClose}>Скасувати</button>
+          {view === 'list' && <button type="button" className="btn" onClick={onClose}>Закрити</button>}
+          {view === 'form' && (
+            <>
+              <button type="button" className="btn" onClick={() => (startEdit ? onClose() : (setView('list'), setEditId(null), setError('')))}>Скасувати</button>
+              <button type="button" className="btn btn-p" disabled={saving || !name.trim() || !picked.size} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти групу'}</button>
+            </>
+          )}
         </div>
       </div>
     </div>

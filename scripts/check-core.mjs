@@ -28,6 +28,8 @@ import { buildTelegramText, handleSiteLead, normalizeLead, runLeadReminders } fr
 import { botInfo, escapeHtml, peopleFromUpdate, sendMessage as tgSend, webhookSecret } from '../api/_lib/telegram.js';
 import { DEFAULT_TEMPLATE, mentionOf, renderMessage, safeTemplate } from '../src/lib/siteLeadMessage.js';
 import { buildSnippet } from '../src/lib/siteLeadSnippet.js';
+import { campaignKey as gKey, filterCampaigns, flatCampaigns, groupCampaignKeys, groupMatches, mergeCampaigns, scopeToGroup } from '../src/lib/campaignGroups.js';
+import { groupCampaigns } from '../src/lib/periodReport.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -1196,6 +1198,43 @@ await ok('site leads: the snippet for the website carries the endpoint and key a
   assert.match(js, /sendBeacon/);
   assert.doesNotMatch(js, /TELEGRAM|SECRET/);
   assert.doesNotThrow(() => new Function(js.replace(/<[/]?script>/g, ''))); // it is valid JavaScript
+});
+
+await ok('campaign groups: a group is a chosen set of campaigns, a report narrows to it, old keyword groups still work', () => {
+  const camp = (name, spend, clicks = 10) => ({ name, spend, impressions: spend * 100, reach: spend * 50, clicks, purchases: 1, leads: 0, revenue: spend * 3 });
+  const data = {
+    platforms: {
+      meta: { currency: 'USD', total: camp('acc', 600), campaigns: [camp('Catalog RTS', 100), camp('Hybrid Wig', 200), camp('MTO | broad', 300)], groups: [] },
+      google: { currency: 'USD', total: camp('acc', 70), campaigns: [camp('Catalog RTS', 30), camp('Brand', 40)], groups: [] },
+    },
+    previous: { platforms: { meta: { currency: 'USD', total: camp('acc', 500), campaigns: [camp('Catalog RTS', 80), camp('Hybrid Wig', 120)], groups: [] } } },
+  };
+  const mine = { id: 1, name: 'Каталог', campaigns: [gKey('meta', 'Catalog RTS'), gKey('google', 'Catalog RTS'), gKey('meta', 'MTO | broad')], keywords: [] };
+  assert.equal(groupMatches(mine, 'meta', 'Catalog RTS'), true);
+  assert.equal(groupMatches(mine, 'meta', 'Hybrid Wig'), false);
+  assert.equal(groupMatches(mine, 'google', 'Brand'), false);
+  assert.equal(groupMatches({ campaigns: [], keywords: ['hybrid'] }, 'meta', 'HYBRID Wig RTS'), true); // an old keyword group, any case
+  const s = scopeToGroup(data, mine);
+  assert.deepEqual(Object.keys(s.platforms), ['meta', 'google']);
+  assert.deepEqual(s.platforms.meta.campaigns.map((c) => c.name), ['Catalog RTS', 'MTO | broad']);
+  assert.equal(s.platforms.meta.total.spend, 400); // the total is the sum of the group's campaigns, not of the account
+  assert.equal(s.platforms.google.total.spend, 30);
+  assert.equal(s.previous.platforms.meta.total.spend, 80); // the previous period is narrowed the same way
+  assert.deepEqual(s.platforms.meta.groups, []);
+  assert.equal(data.platforms.meta.total.spend, 600); // the original is not touched
+  assert.deepEqual(Object.keys(scopeToGroup(data, { campaigns: [gKey('google', 'Brand')] }).platforms), ['google']); // a platform with none of the group disappears
+  assert.equal(scopeToGroup(data, null), data); // no group: everything as it was
+  assert.deepEqual(groupCampaignKeys(mine, flatCampaigns(data)), ['meta|Catalog RTS', 'meta|MTO | broad', 'google|Catalog RTS']);
+  // the group table: first group wins, the rest is «Інше», platform matters
+  const cols = groupCampaigns(data.platforms.meta.campaigns, [mine, { name: 'Wigs', campaigns: [], keywords: ['wig'] }], 'meta');
+  assert.deepEqual(cols.map((c) => [c.name, c.campaignCount, c.spend]), [['Каталог', 2, 400], ['Wigs', 1, 200]]);
+  assert.equal(groupCampaigns(data.platforms.google.campaigns, [mine], 'google').at(-1).name, 'Інше');
+  assert.deepEqual(groupCampaigns([], [], 'meta'), []);
+  // the picker of the form
+  const list = mergeCampaigns([{ platform: 'meta', name: 'A', spend: 5 }], [{ platform: 'meta', name: 'A', spend: 9 }, { platform: 'google', name: 'A', spend: 1 }, { platform: 'meta', name: 'B', spend: 0 }]);
+  assert.equal(list.length, 3); // same name on another platform is another campaign
+  assert.equal(list.find((c) => c.platform === 'meta' && c.name === 'A').spend, 9);
+  assert.deepEqual(filterCampaigns(list, 'a').map((c) => [c.platform, c.name]), [['meta', 'A'], ['google', 'A']]); // by spend, filtered by text
 });
 
 console.log(`\n${passed} checks passed`);

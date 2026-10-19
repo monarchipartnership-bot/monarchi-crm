@@ -51,14 +51,22 @@ export async function fetchCampaignGroups(projectId) {
   return data ?? [];
 }
 
-// Replaces the project's whole group list with `groups` ([{ name, keywords: [] }]).
-export async function replaceCampaignGroups(projectId, groups) {
-  const del = await supabase.from('project_campaign_groups').delete().eq('project_id', projectId);
-  if (del.error) throw del.error;
-  const rows = groups.filter((g) => g.name.trim()).map((g, i) => ({ project_id: projectId, name: g.name.trim(), keywords: (g.keywords || []).map((k) => k.trim()).filter(Boolean), sort: i }));
-  if (!rows.length) return;
-  const ins = await supabase.from('project_campaign_groups').insert(rows);
-  if (ins.error) throw ins.error;
+// A group = a name + the chosen campaigns ('platform|campaign name' keys). Old keyword groups have `keywords` and an empty `campaigns`.
+export async function createCampaignGroup(projectId, { name, campaigns }) {
+  const { data: last } = await supabase.from('project_campaign_groups').select('sort').eq('project_id', projectId).order('sort', { ascending: false }).limit(1).maybeSingle();
+  const { data, error } = await supabase.from('project_campaign_groups').insert({ project_id: projectId, name: name.trim(), campaigns, keywords: [], sort: (last?.sort ?? -1) + 1 }).select().single();
+  if (error) throw error;
+  return data;
+}
+// Saving turns an old keyword group into an explicit list: its keywords are cleared.
+export async function updateCampaignGroup(id, { name, campaigns }) {
+  const { data, error } = await supabase.from('project_campaign_groups').update({ name: name.trim(), campaigns, keywords: [] }).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
+}
+export async function deleteCampaignGroup(id) {
+  const { error } = await supabase.from('project_campaign_groups').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ---- Custom metrics ----

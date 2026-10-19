@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import CompareModal from './CompareModal';
 import ResultView from './ResultView';
 import CampaignGroupsModal from './CampaignGroupsModal';
+import GroupsStrip from './GroupsStrip';
+import { deleteCampaignGroup } from '../../../lib/api/projectReportStore';
+import { campaignKey, flatCampaigns, groupCampaignKeys } from '../../../lib/campaignGroups';
 import CustomMetricModal from './CustomMetricModal';
 import { useReportContext } from './useReportContext';
 import { useConfirm } from '../../common/ConfirmDialog';
@@ -60,6 +63,8 @@ export default function PeriodReport({ projectId, periodType }) {
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
   const [modal, setModal] = useState(null);
+  const [activeGroupId, setActiveGroupId] = useState(null); // the group whose campaigns were put into the report (cleared when the picks are changed by hand)
+  const [groupEdit, setGroupEdit] = useState(null);
   // What the numbers are compared with. Nothing until the person asks («Порівняти»):
   //   { mode: 'calendar' } the previous report period (previous week of the month / previous month)
   //   { mode: 'days' }     the same number of days right before this period
@@ -233,7 +238,14 @@ export default function PeriodReport({ projectId, periodType }) {
   if (ctx.error) return <div className="proj-empty">{ctx.error}</div>;
   if (!ctx.ready) return <div className="empty-hint">Завантаження...</div>;
 
-  const campaignNames = data ? [...new Set(Object.values(data.platforms).flatMap((p) => p.campaigns.map((c) => c.name)))] : [];
+  const known = data ? flatCampaigns(data) : [];
+  // «Вибрати» on a group: exactly its campaigns go into the report; «Усі кампанії»: every campaign of the period.
+  function pickGroup(id) {
+    const g = ctx.groups.find((x) => x.id === id);
+    setSelection(g ? groupCampaignKeys(g, known) : known.map((c) => campaignKey(c.platform, c.name)));
+    setActiveGroupId(g ? g.id : null);
+    setDirty(true);
+  }
   const first = data ? Object.values(data.platforms)[0] : null;
   const hasAccounts = ctx.accounts.length > 0;
 
@@ -283,13 +295,24 @@ export default function PeriodReport({ projectId, periodType }) {
         </div>
       )}
 
+      <section className="report-section">
+        <GroupsStrip
+          groups={ctx.groups} known={known} activeId={activeGroupId} hint="Оберіть групу, і в звіт потраплять лише її кампанії. Їх можна дообрати вручну нижче."
+          onPick={data ? pickGroup : undefined}
+          onEdit={(id) => { setGroupEdit(id); setModal('groups'); }}
+          onCreate={() => { setGroupEdit('new'); setModal('groups'); }}
+          onDelete={async (id) => { await deleteCampaignGroup(id); const g = await ctx.reloadGroups(); if (id === activeGroupId) setActiveGroupId(null); setData((d) => (d ? regroupData(d, g) : d)); setDirty(true); }}
+        />
+        {!data && ctx.groups.length > 0 && <div className="pacc-hint">Спершу підтягніть цифри за період, тоді групу можна буде вибрати.</div>}
+      </section>
+
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
             data={data} kind={ctx.kind} custom={ctx.custom}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
-            campaignMode="selected" selection={selection} onSelectionChange={(s) => { setSelection(s); setDirty(true); }}
+            campaignMode="selected" selection={selection} onSelectionChange={(s) => { setSelection(s); setActiveGroupId(null); setDirty(true); }}
             options={options} onOptionsChange={(o) => { setOptions(o); setDirty(true); }}
             curLabel={`${fmt(period.start)} – ${fmt(period.end)}`}
             prevLabel={data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній'}
@@ -400,8 +423,11 @@ export default function PeriodReport({ projectId, periodType }) {
         />
       )}
       {modal === 'groups' && (
-        <CampaignGroupsModal projectId={projectId} groups={ctx.groups} campaignNames={campaignNames} onClose={() => setModal(null)}
-          onSaved={async () => { const g = await ctx.reloadGroups(); setData((d) => (d ? regroupData(d, g) : d)); setDirty(true); }} />
+        <CampaignGroupsModal
+          projectId={projectId} groups={ctx.groups} accounts={ctx.accounts} kind={ctx.kind} knownCampaigns={known} startEdit={groupEdit}
+          onClose={() => { setModal(null); setGroupEdit(null); }}
+          onChanged={async () => { const g = await ctx.reloadGroups(); if (activeGroupId && !g.some((x) => x.id === activeGroupId)) setActiveGroupId(null); setData((d) => (d ? regroupData(d, g) : d)); setDirty(true); }}
+        />
       )}
       {modal === 'metric' && (
         <CustomMetricModal projectId={projectId} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}

@@ -1,6 +1,7 @@
 import { authedPost } from './adAccounts.js';
 import { BASE_FIELDS, METRICS, computeMetric, metricMeta, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { computeWeeksForMonth, daysInMonth, isoDate, MONTH_NAMES } from './dateHelpers.js';
+import { groupMatches } from './campaignGroups.js';
 
 const iso = (d) => isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 const ZERO = Object.fromEntries(BASE_FIELDS.map((f) => [f, 0]));
@@ -75,15 +76,14 @@ export async function fetchPlatformRange(platform, accountId, from, to, kind, po
   return { total: { ...ZERO }, campaigns: [] };
 }
 
-// Bundles campaigns into the project's report columns by keywords in their
-// names; whatever matches nothing goes to "Інше". No groups defined → no bundles.
-export function groupCampaigns(campaigns, groups) {
+// Bundles campaigns into the project's groups (the columns of the group table): a campaign goes to the first group it belongs to
+// (listed in it, or matching an old keyword); whatever belongs to none goes to "Інше". No groups defined → no bundles.
+export function groupCampaigns(campaigns, groups, platform) {
   if (!groups?.length) return [];
   const buckets = groups.map((g) => ({ name: g.name, rows: [] }));
   const rest = [];
   campaigns.forEach((c) => {
-    const lname = (c.name || '').toLowerCase();
-    const i = groups.findIndex((g) => (g.keywords || []).some((k) => k && lname.includes(String(k).trim().toLowerCase())));
+    const i = groups.findIndex((g) => groupMatches(g, platform, c.name));
     (i >= 0 ? buckets[i].rows : rest).push(c);
   });
   const out = buckets.filter((b) => b.rows.length).map((b) => ({ name: b.name, ...sumBase(b.rows), campaignCount: b.rows.length }));
@@ -101,7 +101,7 @@ export async function fetchProjectRange(accounts, from, to, kind, groups, post =
   settled.forEach((res, i) => {
     const a = accounts[i];
     if (res.status === 'fulfilled') {
-      platforms[a.platform] = { currency: a.currency, accountName: a.account_name, ...res.value, groups: groupCampaigns(res.value.campaigns, groups) };
+      platforms[a.platform] = { currency: a.currency, accountName: a.account_name, ...res.value, groups: groupCampaigns(res.value.campaigns, groups, a.platform) };
     } else {
       errors[a.platform] = res.reason?.message || 'Не вдалося отримати дані.';
     }
@@ -137,10 +137,27 @@ export function visibleKeys(defaults, custom) {
   return [...defaults.filter((k) => METRICS[k]), ...custom.map((c) => c.key)];
 }
 
+// Every campaign of the project's linked accounts that had any activity in the last `days` days, for the group form (it must not depend on
+// a report being on screen). → [{ platform, name, spend }]; a platform that fails is simply missing, with its message in `errors`.
+export async function fetchProjectCampaigns(accounts, kind, days = 90, post = authedPost) {
+  const to = new Date();
+  const from = new Date(to.getTime() - (days - 1) * 86400000);
+  const f = (d) => iso(d);
+  const errors = {};
+  const out = [];
+  const settled = await Promise.allSettled(accounts.map((a) => fetchPlatformRange(a.platform, a.account_id, f(from), f(to), kind, post)));
+  settled.forEach((res, i) => {
+    const a = accounts[i];
+    if (res.status === 'fulfilled') res.value.campaigns.forEach((c) => out.push({ platform: a.platform, name: c.name, spend: c.spend || 0 }));
+    else errors[a.platform] = res.reason?.message || 'Не вдалося отримати кампанії.';
+  });
+  return { campaigns: out, errors };
+}
+
 // Re-bundles already fetched campaigns after the project's groups changed, so
 // the tables update without asking the platforms again.
 export function regroupData(data, groups) {
-  const regroup = (platforms) => Object.fromEntries(Object.entries(platforms || {}).map(([k, p]) => [k, { ...p, groups: groupCampaigns(p.campaigns || [], groups) }]));
+  const regroup = (platforms) => Object.fromEntries(Object.entries(platforms || {}).map(([k, p]) => [k, { ...p, groups: groupCampaigns(p.campaigns || [], groups, k) }]));
   return { ...data, platforms: regroup(data.platforms), previous: data.previous ? { ...data.previous, platforms: regroup(data.previous.platforms) } : data.previous };
 }
 
