@@ -34,7 +34,7 @@ import { accountPlatforms, accountsForTab, collapseStatuses, flatten, pickReport
 import { groupsForPlatform } from '../src/lib/campaignGroups.js';
 import { META_METRICS, META_METRIC_LIST, cleanColumns, countsFor, extractCounts, insightFieldsFor, pickCounts } from '../src/lib/metaColumns.js';
 import { GOOGLE_METRIC_LIST, extractGoogleCounts, googleMetricNamesFor, cleanGoogleColumns } from '../src/lib/googleColumns.js';
-import { PLATFORM_COLUMNS, cleanColumns as cleanPlatformColumns } from '../src/lib/platformColumns.js';
+import { PLATFORM_COLUMNS, cleanColumns as cleanPlatformColumns, missingColumns } from '../src/lib/platformColumns.js';
 import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.js';
 import { visibleKeys } from '../src/lib/periodReport.js';
 
@@ -414,6 +414,35 @@ await ok('google columns: the catalog is consistent and every platform column ha
   assert.ok(GOOGLE_METRIC_LIST.filter((m) => m.needs.length).every((m) => googleMetricNamesFor([m.key]).length > 0));
 });
 
+// ---- The assistant keeps the picked columns
+await ok('assistant: picked columns are asked of the platform at every run, so a change is picked up at the next run and never dropped', async () => {
+  const seen = [];
+  const spy = async (path, body) => { if (path === '/api/meta-ads-insights' && body.level) seen.push((body.columns || []).join(',')); return post(path, body); };
+  await runProjectReport({ repo: fakeRepo({ columnsPicked: { meta: ['mx_add_to_cart'] } }), post: spy, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  await runProjectReport({ repo: fakeRepo({ columnsPicked: { meta: ['mx_add_to_cart', 'mx_link_clicks'] } }), post: spy, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  await runProjectReport({ repo: fakeRepo({ columnsPicked: {} }), post: spy, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.ok(seen.slice(0, 4).every((c) => c === 'mx_add_to_cart'));
+  assert.ok(seen.slice(4, 8).every((c) => c === 'mx_add_to_cart,mx_link_clicks'));
+  assert.ok(seen.slice(8).every((c) => c === '')); // removed in the CRM → gone from the next run
+});
+await ok('assistant: the presentation it makes carries the picked columns and formulas', async () => {
+  const repo = fakeRepo({ columnsPicked: { meta: ['mx_add_to_cart', 'mx_cost_add_to_cart'] } });
+  await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  const text = JSON.stringify(repo.log.decks[0].deck.slides);
+  assert.ok(text.includes('Adds to cart') && text.includes('Cost per add to cart'));
+  const plain = fakeRepo();
+  await runProjectReport({ repo: plain, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.ok(!JSON.stringify(plain.log.decks[0].deck.slides).includes('Adds to cart'));
+  const report = { id: 1, project_id: 3, period_type: 'weekly', period_start: '2026-10-05', period_end: '2026-10-11', data: { kind: 'ecom', platforms: { meta: { currency: 'USD', total: { spend: 100, impressions: 1000, clicks: 10, reach: 800, purchases: 2, revenue: 300, x_add_to_cart: 5 }, campaigns: [], groups: [] } }, previous: null, sections: {} } };
+  const withExtra = JSON.stringify(buildDeckFromReport({ project: { name: 'P' }, report, platform: 'meta', extraKeys: ['mx_cost_add_to_cart'] }).slides);
+  assert.ok(withExtra.includes('Cost per add to cart'));
+});
+await ok('assistant: a report made before a column was picked says which columns have no numbers yet', () => {
+  assert.deepEqual(missingColumns('meta', ['mx_add_to_cart', 'mx_frequency'], { spend: 1 }), ['mx_add_to_cart']); // a ratio of standard numbers is never missing
+  assert.deepEqual(missingColumns('meta', ['mx_add_to_cart'], { x_add_to_cart: 0 }), []); // zero is a number
+  assert.deepEqual(missingColumns('google', ['mx_g_search_is'], { x_g_search_impr: 1 }), ['mx_g_search_is']); // needs both counts
+});
+
 await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {
   const platforms = { meta: { currency: 'USD', total: { spend: 1200, impressions: 100000, clicks: 3000, purchases: 20, revenue: 4800, leads: 0 } } };
   const previous = { period: { start: '2026-09-24', end: '2026-09-30' }, platforms: { meta: { total: { spend: 1000, impressions: 90000, clicks: 2700, purchases: 25, revenue: 4500, leads: 0 } } } };
@@ -545,13 +574,13 @@ await ok('notifications: a finished draft and a problem go to the chosen people,
   await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
   assert.deepEqual(repo.log.notifications.map((n) => n.recipient_email), ['boss@x.y']);
   assert.equal(repo.log.notifications[0].type, 'project_report');
-  assert.equal(repo.log.notifications[0].link, '/projects/3?tab=weekly');
+  assert.equal(repo.log.notifications[0].link, '/projects/3?tab=weekly&platform=meta');
   assert.match(repo.log.notifications[0].body, /^Mellowdiamond: Створено чернетку/);
 
   const cron = fakeRepo({ agent: withPeople });
   await runProjectReport({ repo: cron, post, projectId: 3, periodType: 'monthly', trigger: 'cron', today: '2026-10-15' });
   assert.equal(cron.log.notifications.length, 2);
-  assert.equal(cron.log.notifications[0].link, '/projects/3?tab=monthly');
+  assert.equal(cron.log.notifications[0].link, '/projects/3?tab=monthly&platform=meta');
 
   const broken = async () => { throw new Error('Сесія недійсна'); };
   const bad = fakeRepo({ agent: withPeople });

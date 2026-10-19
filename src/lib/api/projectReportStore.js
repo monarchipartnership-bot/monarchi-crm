@@ -32,7 +32,7 @@ export async function saveProjectReport({ projectId, periodType, periodStart, pe
 
 // Reports the AI agent made that nobody has reviewed yet (status still «draft»), newest first.
 export async function fetchAgentDrafts() {
-  const { data, error } = await supabase.from('project_reports').select('id, project_id, period_type, period_start, period_end, updated_at')
+  const { data, error } = await supabase.from('project_reports').select('id, project_id, period_type, period_start, period_end, platform, updated_at')
     .eq('source', 'agent').eq('status', 'draft').order('updated_at', { ascending: false }).limit(100);
   if (error) { console.warn('fetchAgentDrafts failed', error); return []; }
   return data ?? [];

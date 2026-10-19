@@ -8,7 +8,7 @@ import { fetchProjectById } from '../../lib/api/projects';
 import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { STYLES } from '../../lib/presentation/deckModel';
 import { accountPlatforms, TOTAL_TAB } from '../../lib/reportScope';
-import { cleanColumns } from '../../lib/platformColumns';
+import { cleanColumns, missingColumns } from '../../lib/platformColumns';
 import { platformInfo } from '../../lib/adAccounts';
 import '../../styles/projectReports.css';
 
@@ -117,7 +117,7 @@ export default function ArchiveTab({ projectId }) {
       {open && (
         <ArchiveReportModal
           row={open} projectName={info.project?.name || ''} custom={info.custom}
-          extraKeys={open.platform === 'all' ? [] : cleanColumns(open.platform, info.columns[open.platform])}
+          extraKeys={open.platform === 'all' ? [] : cleanColumns(open.platform, info.columns[open.platform]).filter((k) => !missingColumns(open.platform, [k], open.data?.platforms?.[open.platform]?.total).length)}
           onClose={() => setOpenId(null)} onDelete={remove} onPresentation={presentation}
         />
       )}

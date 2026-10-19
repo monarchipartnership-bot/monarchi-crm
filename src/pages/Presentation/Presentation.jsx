@@ -11,7 +11,8 @@ import { fetchDeck, saveDeck } from '../../lib/api/projectDecks';
 import { fetchProjectReports } from '../../lib/api/projectReportStore';
 import { pickReportRow } from '../../lib/reportScope';
 import { fetchProjectById } from '../../lib/api/projects';
-import { fetchCustomMetrics } from '../../lib/api/projectReportStore';
+import { fetchCustomMetrics, fetchReportColumns } from '../../lib/api/projectReportStore';
+import { cleanColumns } from '../../lib/platformColumns';
 import { periodFromPicker } from '../../lib/periodReport';
 import { computeWeeksForMonth, defaultWeekIndexFor, isoDate } from '../../lib/dateHelpers';
 import { useAuth } from '../../contexts/AuthContext';
@@ -51,6 +52,7 @@ export default function Presentation() {
   const [reportState, setReportState] = useState('idle'); // idle | loading | ready | none
   const [project, setProject] = useState(null);
   const [custom, setCustom] = useState([]);
+  const [columnsMap, setColumnsMap] = useState({});
   const [building, setBuilding] = useState(false);
   const [message, setMessage] = useState('');
   const [saveBusy, setSaveBusy] = useState(false);
@@ -76,7 +78,7 @@ export default function Presentation() {
     setMessage('');
     (async () => {
       try {
-        const [rows, proj, cm, saved] = await Promise.all([
+        const [rows, proj, cm, saved, cols] = await Promise.all([
           fetchProjectReports(sel.projectId, sel.periodType), fetchProjectById(sel.projectId), fetchCustomMetrics(sel.projectId),
           fetchDeck(sel.projectId, sel.periodType, period.start, sel.platform),
         ]);
@@ -84,6 +86,7 @@ export default function Presentation() {
         const row = pickReportRow(rows, period.start, sel.platform);
         setProject(proj);
         setCustom(cm);
+        setColumnsMap(cols);
         setReport(row);
         setReportState(row ? 'ready' : 'none');
         if (saved?.deck?.slides?.length) {
@@ -117,7 +120,7 @@ export default function Presentation() {
     setMessage('');
     try {
       const next = buildDeckFromReport({
-        project, report, platform: sel.platform, style: deck.meta.style, lang: deck.slides.length ? deck.meta.lang : sel.lang, custom,
+        project, report, platform: sel.platform, style: deck.meta.style, lang: deck.slides.length ? deck.meta.lang : sel.lang, custom, extraKeys: cleanColumns(sel.platform, columnsMap[sel.platform]),
       });
       if (!next.slides.length) { setMessage('У звіті немає даних для цієї платформи.'); return; }
       update(() => next);

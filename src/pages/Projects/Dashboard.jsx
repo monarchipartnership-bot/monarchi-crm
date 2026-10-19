@@ -8,6 +8,7 @@ import ProjectsRegistry from '../../components/Projects/ProjectsRegistry';
 import ActionIcon from '../../components/common/ActionIcon';
 import { lastCompletedWeek } from '../../lib/periodReport';
 import { fetchProjects } from '../../lib/api/projects';
+import { platformInfo } from '../../lib/adAccounts';
 import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatuses, fetchAgentDrafts } from '../../lib/api/projectReportStore';
 import { fetchAgentsOverview } from '../../lib/api/projectAgents';
 import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, MONTH_NAMES } from '../../lib/dateHelpers';
@@ -137,7 +138,7 @@ export default function Dashboard() {
   const attention = useMemo(() => {
     const nameOf = (id) => projects.find((p) => String(p.id) === String(id))?.name || `Проєкт ${id}`;
     const problems = agentRows.filter((a) => a.health === 'problem').map((a) => ({ key: 'p' + a.project_id, kind: 'problem', project: nameOf(a.project_id), text: a.last_error || 'Агент повідомив про проблему.', to: `/projects/${a.project_id}?tab=agent`, action: 'Відкрити агента' }));
-    const reviews = agentDrafts.map((r) => ({ key: 'r' + r.id, kind: 'review', project: nameOf(r.project_id), text: `${r.period_type === 'monthly' ? 'Місячний' : 'Тижневий'} звіт за ${fmtIso(r.period_start)} – ${fmtIso(r.period_end)}: чернетка агента чекає перевірки`, to: `/projects/${r.project_id}?tab=${r.period_type}`, action: 'Перевірити' }));
+    const reviews = agentDrafts.map((r) => ({ key: 'r' + r.id, kind: 'review', project: nameOf(r.project_id), text: `${r.period_type === 'monthly' ? 'Місячний' : 'Тижневий'} звіт · ${r.platform === 'all' ? 'Разом' : platformInfo(r.platform).label} за ${fmtIso(r.period_start)} – ${fmtIso(r.period_end)}: чернетка агента чекає перевірки`, to: `/projects/${r.project_id}?tab=${r.period_type}&platform=${r.platform === 'all' ? 'total' : r.platform}`, action: 'Перевірити' }));
     return [...problems, ...reviews];
   }, [projects, agentRows, agentDrafts]);
 

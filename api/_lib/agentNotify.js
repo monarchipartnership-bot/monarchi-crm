@@ -4,7 +4,8 @@
 // started the run by hand is not told about their own run.
 
 // → rows for the notifications table (without sender: it is the agent user).
-export function buildNotifications({ projectId, projectName, periodType, status, message, config = {}, startedBy = null }) {
+// `platform` = the tab of the report to open ('meta', 'google', ... or 'total' for «Разом»).
+export function buildNotifications({ projectId, projectName, periodType, status, message, config = {}, startedBy = null, platform = null }) {
   if (config.notify === false) return [];
   if (status !== 'ok' && status !== 'problem') return [];
   const recipients = [...new Set((config.notifyEmails || []).map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
@@ -16,7 +17,7 @@ export function buildNotifications({ projectId, projectName, periodType, status,
     type: ok ? 'project_report' : 'project_agent_problem',
     title: ok ? 'Звіт готовий до перевірки' : 'Агент не зміг створити звіт',
     body: `${name}: ${message}`.slice(0, 400),
-    link: ok ? `/projects/${projectId}?tab=${periodType}` : `/projects/${projectId}?tab=agent`,
+    link: ok ? `/projects/${projectId}?tab=${periodType}${platform ? `&platform=${platform}` : ''}` : `/projects/${projectId}?tab=agent`,
     project_id: projectId,
   }));
 }

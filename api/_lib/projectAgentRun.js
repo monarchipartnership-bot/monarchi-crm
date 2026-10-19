@@ -11,6 +11,7 @@ import { PLATFORMS } from '../../src/lib/presentation/deckModel.js';
 import { computeWeeksForMonth } from '../../src/lib/dateHelpers.js';
 import { projectKind } from '../../src/lib/reportMetrics.js';
 import { accountPlatforms, accountsForTab } from '../../src/lib/reportScope.js';
+import { cleanColumns } from '../../src/lib/platformColumns.js';
 import { describeDynamics } from '../../src/lib/reportDynamics.js';
 import { PROBLEM_QUIET_HOURS, buildNotifications } from './agentNotify.js';
 import {
@@ -38,6 +39,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
   let locked = false;
   let notifyConfig = null; // who to tell, known once the agent's settings are loaded
   let projectName = '';
+  let notifyPlatform = null; // the tab of the first report made, so the notification opens it
   let periodInfo = null; // set as soon as the period is known, so even a failed run says which period it was for
 
   const finish = async (status, message, extra = {}) => {
@@ -45,7 +47,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     // Tell the chosen people (common notification bell): a draft is ready, or the agent hit a problem.
     if (notifyConfig && (status === 'ok' || status === 'problem')) {
       try {
-        let rows = buildNotifications({ projectId, projectName, periodType, status, message, config: notifyConfig, startedBy });
+        let rows = buildNotifications({ projectId, projectName, periodType, status, message, config: notifyConfig, startedBy, platform: notifyPlatform });
         if (status === 'problem' && rows.length && await repo.hasRecentNotification(projectId, 'project_agent_problem', PROBLEM_QUIET_HOURS)) rows = [];
         if (rows.length) await repo.addNotifications(rows);
       } catch (e) { notes.push('Не вдалося надіслати сповіщення: ' + (e?.message || e)); }
@@ -158,6 +160,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const made = Object.keys(reports);
     if (!made.length) throw new Error('Не вдалося створити жоден звіт: ' + (notes.join(' ') || 'даних немає.'));
     const report = reports[made[0]].row;
+    notifyPlatform = made[0] === 'all' ? 'total' : made[0];
 
     // 5. The presentation(s), one per platform with data; a deck a person has touched is left alone.
     const deckIds = [];
@@ -168,7 +171,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
         if (!hasDelivery(payload.platforms[platform]?.total)) { notes.push(`${PLATFORM_NAMES[platform] || platform}: у періоді не було показів і витрат, презентацію не створено.`); continue; }
         const old = await repo.getDeck(projectId, periodType, period.start, platform);
         if (old && old.source !== 'agent') { notes.push(`${PLATFORM_NAMES[platform] || platform}: презентація вже є (створена вручну), її не змінено.`); continue; }
-        const deck = buildDeckFromReport({ project, report: row, platform, style: config.deck.style, lang: config.deck.lang, custom });
+        const deck = buildDeckFromReport({ project, report: row, platform, style: config.deck.style, lang: config.deck.lang, custom, extraKeys: cleanColumns(platform, columns?.[platform]) });
         if (!deck.slides.length) continue;
         const saved = await repo.saveDeck({ projectId, reportId: row.id, periodType, period, platform, style: config.deck.style, lang: config.deck.lang, deck });
         deckIds.push(saved.id);

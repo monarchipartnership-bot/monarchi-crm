@@ -68,7 +68,8 @@ export function paginateParagraphs(str, style, platform) {
 const withPart = (title, i, total, L) => title + L.part(i + 1, total);
 
 // project: { name, business_type }, report: a project_reports row, custom: the project's custom metrics.
-export function buildDeckFromReport({ project, report, platform, style = 'brand-pulse', lang = 'en', custom = [], client }) {
+// extraKeys: the extra columns picked for this platform in «+ Метрика» (they go into the deck's tables like into the report).
+export function buildDeckFromReport({ project, report, platform, style = 'brand-pulse', lang = 'en', custom = [], client, extraKeys = [] }) {
   const rd = report.data || {};
   const kind = rd.kind || 'ecom';
   const L = labels(lang);
@@ -78,7 +79,7 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
   const periodText = periodLabel(periodType, report.period_start, report.period_end, lang);
   const prevTotal = rd.previous?.platforms?.[platform]?.total || null;
   const cur = plat?.total || null;
-  const keys = visibleKeys(METRIC_SETS[kind], custom);
+  const keys = visibleKeys(METRIC_SETS[kind], custom, extraKeys);
 
   const deck = emptyDeck({
     projectId: report.project_id, reportId: report.id, periodType, periodStart: report.period_start, periodEnd: report.period_end,

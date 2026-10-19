@@ -12,3 +12,7 @@ export const EXTRA_METRICS = { ...META_METRICS, ...GOOGLE_METRICS };
 
 // Only keys of the platform's catalog survive (what comes back from storage or a request is never trusted).
 export const cleanColumns = (platform, keys) => (PLATFORM_COLUMNS[platform] ? [...new Set((keys || []).filter((k) => PLATFORM_COLUMNS[platform].some((m) => m.key === k)))] : []);
+
+// The picked columns a saved report has no numbers for (it was made before they were picked): [metric keys]. Columns that need no
+// platform count (a ratio of standard numbers) are never missing.
+export const missingColumns = (platform, keys, total) => cleanColumns(platform, keys).filter((k) => (EXTRA_METRICS[k].needs || []).some((n) => total?.[`x_${n}`] == null));

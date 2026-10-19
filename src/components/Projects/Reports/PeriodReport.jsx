@@ -16,6 +16,8 @@ import { fetchProjectReports, saveProjectReport, deleteProjectReport } from '../
 import { fetchProjectDecks } from '../../../lib/api/projectDecks';
 import { EMPTY_SECTIONS, buildWhatWasDone, comparisonPeriod, pullReportData, reportPayload } from '../../../lib/reportEngine';
 import { platformInfo } from '../../../lib/adAccounts';
+import { missingColumns } from '../../../lib/platformColumns';
+import { metricMeta } from '../../../lib/reportMetrics';
 import { MONTH_NAMES, computeWeeksForMonth, defaultWeekIndexFor, todayIso, yearOptions } from '../../../lib/dateHelpers';
 import { useAuth } from '../../../contexts/AuthContext';
 import '../../../styles/projectReports.css';
@@ -261,6 +263,8 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   const platData = !isTotal && data ? data.platforms?.[platform] : null;
   const platCampaigns = platData ? [...(platData.campaigns || [])].sort((a, b) => (b.spend || 0) - (a.spend || 0)) : [];
   const platPicked = selection.filter((k) => k.startsWith(platform + '|')).length;
+  // columns picked in «+ Метрика» after this report was pulled: it has no numbers for them until it is refreshed
+  const missing = platData ? missingColumns(platform, ctx.extraKeys, platData.total) : [];
 
   return (
     <div className="prep-wrap">
@@ -324,6 +328,13 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       {data && unfinished && (
         <div className="prep-internal-note" role="note">
           <b>Тільки для внутрішнього користування.</b> Період ще не завершився: у звіті дані до сьогоднішнього дня, тому з попереднім повним періодом порівнювати суми рано. Попередження не потрапляє у презентацію та експорт.
+        </div>
+      )}
+
+      {missing.length > 0 && (
+        <div className="prep-internal-note" role="note">
+          <b>Нові стовпці без цифр.</b> Звіт зібрано до того, як додали: {missing.map((k) => metricMeta(k, ctx.custom).label).join(', ')}. Оновіть цифри з кабінетів, і вони зʼявляться в таблицях, експорті та презентації.{' '}
+          <button type="button" className="pacc-link" onClick={() => pull(cmp, ctx.fetchColumns, true)} disabled={busy === 'pull'}>Оновити зараз</button>
         </div>
       )}
 
