@@ -14,11 +14,12 @@ import { accountPlatforms, accountsForTab } from '../../src/lib/reportScope.js';
 import { cleanColumns } from '../../src/lib/platformColumns.js';
 import { describeDynamics } from '../../src/lib/reportDynamics.js';
 import { PROBLEM_QUIET_HOURS, buildNotifications } from './agentNotify.js';
+import { buildReportMessage, reportAction, reportLink } from '../../src/lib/projectReportMessage.js';
 import {
   EMPTY_SECTIONS, buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload,
 } from '../../src/lib/reportEngine.js';
 
-const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [] };
+const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [], telegram: { enabled: false, chatId: '' } };
 const PLATFORM_NAMES = Object.fromEntries(PLATFORMS.map((p) => [p.id, p.name]));
 const LABEL = { weekly: 'тижневий', monthly: 'місячний' };
 const GENITIVE = { weekly: 'тижневого', monthly: 'місячного' };
@@ -33,7 +34,8 @@ export function kyivToday(now = new Date()) {
 const hasDelivery = (t) => Boolean(t) && ((t.spend || 0) > 0 || (t.impressions || 0) > 0 || (t.clicks || 0) > 0);
 
 // → { status: 'ok' | 'problem' | 'skipped', message, runId, reportId?, deckIds?, notes[] }
-export async function runProjectReport({ repo, post, projectId, periodType, trigger = 'manual', startedBy = null, today = kyivToday() }) {
+// telegram: { send(message) } (or null when the bot is not set up on the server); crmUrl: where the buttons of the message lead.
+export async function runProjectReport({ repo, post, projectId, periodType, trigger = 'manual', startedBy = null, today = kyivToday(), telegram = null, crmUrl = 'https://crm.monarchi.agency' }) {
   const run = await repo.startRun({ projectId, trigger, periodType, startedBy });
   const notes = [];
   let locked = false;
@@ -61,7 +63,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const agent = await repo.getAgent(projectId);
     if (!agent) return await finish('skipped', 'До проєкту не підключено AI-агента.');
     if (trigger === 'cron' && !agent.enabled) return await finish('skipped', 'Агента вимкнено.');
-    const config = { ...DEFAULT_CONFIG, ...(agent.config || {}), tasks: { ...DEFAULT_CONFIG.tasks, ...(agent.config?.tasks || {}) }, deck: { ...DEFAULT_CONFIG.deck, ...(agent.config?.deck || {}) } };
+    const config = { ...DEFAULT_CONFIG, ...(agent.config || {}), tasks: { ...DEFAULT_CONFIG.tasks, ...(agent.config?.tasks || {}) }, deck: { ...DEFAULT_CONFIG.deck, ...(agent.config?.deck || {}) }, telegram: { ...DEFAULT_CONFIG.telegram, ...(agent.config?.telegram || {}) } };
     notifyConfig = config;
     if (trigger === 'cron' && !config.tasks[periodType === 'weekly' ? 'weeklyReport' : 'monthlyReport']) return await finish('skipped', `Агент не налаштований робити ${LABEL[periodType]} звіт.`);
 
@@ -181,8 +183,24 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     // «What was done» is missing when no platform report has it
     const whatWasDone = made.map((m) => reports[m].whatWasDone).join('');
 
-    const todo = [!whatWasDone.trim() && '«What was done»', '«Plans for the next period»'].filter(Boolean).join(' і ');
+    const missingBlocks = [!whatWasDone.trim() && '«What was done»', '«Plans for the next period»'].filter(Boolean);
+    const todo = missingBlocks.join(' і ');
     const message = `Створено чернетку ${GENITIVE[periodType]} звіту за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}${made.length > 1 ? `; звіти: ${made.map(scopeName).join(', ')}` : ''}. Потрібно заповнити: ${todo}; решту перевірити.`;
+    // 6. The chat of the project: one message about the new draft, a button per report (platform) under it.
+    if (config.telegram.enabled && config.telegram.chatId) {
+      if (!telegram) {
+        notes.push('Telegram: бота не налаштовано на сервері, повідомлення в чат не надіслано.');
+      } else {
+        const links = made.map((m) => ({ label: scopeName(m), url: reportLink(crmUrl, projectId, periodType, m) }));
+        const msg = buildReportMessage({ projectName: project.name, period, periodType, status: 'draft', action: reportAction(missingBlocks), links });
+        const sent = await telegram.send({ chatId: config.telegram.chatId, text: msg.text, buttons: msg.buttons }).catch((e) => ({ ok: false, error: e?.message || String(e) }));
+        if (sent?.ok) await event('telegram_sent', 'ok', 'Звіт надіслано в Telegram-чат.', { chatId: config.telegram.chatId });
+        else {
+          notes.push('Telegram: не вдалося надіслати звіт у чат: ' + (sent?.error || 'невідома помилка'));
+          await event('telegram_failed', 'problem', 'Не вдалося надіслати звіт у Telegram-чат: ' + (sent?.error || 'невідома помилка'), { chatId: config.telegram.chatId });
+        }
+      }
+    }
     await event('report_created', failed.length ? 'problem' : 'ok', message, { reportId: report.id, reportIds: made.map((m) => reports[m].row.id), deckIds, notes });
     await repo.setAgentHealth(projectId, failed.length ? { health: 'problem', last_error: failed.join(' ') } : { health: 'ok', last_error: null });
     return await finish('ok', message, { reportId: report.id, deckIds, period });

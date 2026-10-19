@@ -35,6 +35,7 @@ import { groupsForPlatform } from '../src/lib/campaignGroups.js';
 import { META_METRICS, META_METRIC_LIST, cleanColumns, countsFor, extractCounts, insightFieldsFor, pickCounts } from '../src/lib/metaColumns.js';
 import { GOOGLE_METRIC_LIST, extractGoogleCounts, googleMetricNamesFor, cleanGoogleColumns } from '../src/lib/googleColumns.js';
 import { PLATFORM_COLUMNS, cleanColumns as cleanPlatformColumns, missingColumns } from '../src/lib/platformColumns.js';
+import { buildReportMessage, reportAction, reportLink } from '../src/lib/projectReportMessage.js';
 import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.js';
 import { visibleKeys } from '../src/lib/periodReport.js';
 
@@ -441,6 +442,66 @@ await ok('assistant: a report made before a column was picked says which columns
   assert.deepEqual(missingColumns('meta', ['mx_add_to_cart', 'mx_frequency'], { spend: 1 }), ['mx_add_to_cart']); // a ratio of standard numbers is never missing
   assert.deepEqual(missingColumns('meta', ['mx_add_to_cart'], { x_add_to_cart: 0 }), []); // zero is a number
   assert.deepEqual(missingColumns('google', ['mx_g_search_is'], { x_g_search_impr: 1 }), ['mx_g_search_is']); // needs both counts
+});
+
+// ---- The report goes to a Telegram chat
+await ok('report message: project, date, type, status, action and the open button; nothing from outside is markup', () => {
+  const m = buildReportMessage({ projectName: 'A & <b>B</b>', period: { start: '2026-10-12', end: '2026-10-18' }, periodType: 'weekly', status: 'draft', action: reportAction(['«Plans»']), links: [{ label: 'Meta Ads', url: 'https://x.y/p' }] });
+  assert.match(m.text, /<b>Проєкт:<\/b> A &amp; &lt;b&gt;B&lt;\/b&gt;/);
+  assert.match(m.text, /<b>Дата:<\/b> 12\.10\.2026 – 18\.10\.2026/);
+  assert.match(m.text, /<b>Тип звіту:<\/b> Тижневий/);
+  assert.match(m.text, /<b>Статус:<\/b> Чернетка/);
+  assert.match(m.text, /<b>Потрібна дія:<\/b> Перевірити цифри, заповнити «Plans», /);
+  assert.deepEqual(m.buttons, [{ text: 'Відкрити звіт', url: 'https://x.y/p' }]); // one report: a plain button
+  const many = buildReportMessage({ projectName: 'P', period: { start: '2026-10-01', end: '2026-10-31' }, periodType: 'monthly', links: [{ label: 'Meta Ads', url: 'u1' }, { label: 'Разом', url: 'u2' }] });
+  assert.deepEqual(many.buttons.map((b) => b.text), ['Meta Ads', 'Разом']);
+  assert.match(many.text, /Місячний/);
+  assert.equal(reportLink('https://crm.x/', 3, 'weekly', 'all'), 'https://crm.x/projects/3?tab=weekly&platform=total');
+  assert.equal(reportLink('https://crm.x', 3, 'monthly', 'google'), 'https://crm.x/projects/3?tab=monthly&platform=google');
+  assert.match(buildReportMessage({ projectName: 'P', periodType: 'weekly', links: [] }).text, /Дата:<\/b> —/);
+});
+await ok('telegram: several link buttons go in one row', async () => {
+  let body = null;
+  const fetchFn = async (url, init) => { body = JSON.parse(init.body); return { ok: true, json: async () => ({ ok: true, result: {} }) }; };
+  await tgSend({ chatId: '-1', text: 't', buttons: [{ text: 'A', url: 'https://a' }, { text: 'B', url: 'https://b' }] }, { env: { TELEGRAM_BOT_TOKEN: 'tok' }, fetchFn });
+  assert.deepEqual(body.reply_markup.inline_keyboard, [[{ text: 'A', url: 'https://a' }, { text: 'B', url: 'https://b' }]]);
+  await tgSend({ chatId: '-1', text: 't', url: 'https://c' }, { env: { TELEGRAM_BOT_TOKEN: 'tok' }, fetchFn });
+  assert.equal(body.reply_markup.inline_keyboard[0][0].url, 'https://c'); // the old single button still works
+});
+await ok('agent run: the chosen chat gets one message with a button per report; off, no bot or a failed send never spoil the run', async () => {
+  const tg = (chatId = '-100') => ({ enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, telegram: { enabled: true, chatId } } });
+  const sent = [];
+  const telegram = { send: async (m) => { sent.push(m); return { ok: true }; } };
+  const two = fakeRepo({ agent: tg(), projectAccounts: [accounts[0], GOOGLE] });
+  const r = await runProjectReport({ repo: two, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15', telegram, crmUrl: 'https://crm.test' });
+  assert.equal(r.status, 'ok');
+  assert.equal(sent.length, 1); // one message for the run, not one per report
+  assert.equal(sent[0].chatId, '-100');
+  assert.match(sent[0].text, /Проєкт:<\/b> Mellowdiamond/);
+  assert.match(sent[0].text, /Тип звіту:<\/b> Тижневий/);
+  assert.deepEqual(sent[0].buttons.map((b) => b.text), ['Meta Ads', 'Google Ads', 'Разом']);
+  assert.equal(sent[0].buttons[0].url, 'https://crm.test/projects/3?tab=weekly&platform=meta');
+  assert.equal(sent[0].buttons[2].url, 'https://crm.test/projects/3?tab=weekly&platform=total');
+  assert.ok(two.log.events.some((e) => e.kind === 'telegram_sent'));
+  // one platform: a plain «Відкрити звіт»
+  sent.length = 0;
+  await runProjectReport({ repo: fakeRepo({ agent: tg() }), post, projectId: 3, periodType: 'monthly', today: '2026-10-15', telegram });
+  assert.deepEqual(sent[0].buttons.map((b) => b.text), ['Відкрити звіт']);
+  // switched off, or no chat chosen: nothing is sent
+  sent.length = 0;
+  await runProjectReport({ repo: fakeRepo(), post, projectId: 3, periodType: 'weekly', today: '2026-10-15', telegram });
+  await runProjectReport({ repo: fakeRepo({ agent: tg('') }), post, projectId: 3, periodType: 'weekly', today: '2026-10-15', telegram });
+  assert.equal(sent.length, 0);
+  // the bot is not set up / Telegram refuses: the report is still made, and the run says so
+  const noBot = await runProjectReport({ repo: fakeRepo({ agent: tg() }), post, projectId: 3, periodType: 'weekly', today: '2026-10-15', telegram: null });
+  assert.equal(noBot.status, 'ok');
+  assert.ok(noBot.notes.some((n) => /Telegram: бота не налаштовано/.test(n)));
+  const refused = fakeRepo({ agent: tg() });
+  const bad = await runProjectReport({ repo: refused, post, projectId: 3, periodType: 'weekly', today: '2026-10-15', telegram: { send: async () => ({ ok: false, error: 'chat not found' }) } });
+  assert.equal(bad.status, 'ok');
+  assert.equal(refused.log.reports.length, 1);
+  assert.ok(bad.notes.some((n) => /chat not found/.test(n)));
+  assert.ok(refused.log.events.some((e) => e.kind === 'telegram_failed' && e.status === 'problem'));
 });
 
 await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {

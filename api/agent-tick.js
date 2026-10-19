@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     try {
       result = await runDueAgents({
         repo,
-        runFor: ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor }),
+        runFor: ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor, telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }),
       });
     } catch (e) { projectsError = e.message || String(e); }
     // The agent framework (the SMM team's agents): scheduled starts and the queued tasks of the agents that are on.

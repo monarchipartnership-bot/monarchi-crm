@@ -23,9 +23,11 @@ async function call(method, payload, { env = process.env, fetchFn = fetch } = {}
 
 // text: HTML (the caller escapes). url: an optional «open» button under the message. replyTo: a message id in the same chat (a reminder
 // replies to the original lead message). silent: no sound for the people in the chat.
-export async function sendMessage({ chatId, text, url, buttonText = 'Відкрити в CRM', replyTo, silent }, deps) {
+// buttons: [{ text, url }] — several link buttons in one row (instead of `url`).
+export async function sendMessage({ chatId, text, url, buttonText = 'Відкрити в CRM', buttons, replyTo, silent }, deps) {
   const payload = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
-  if (url) payload.reply_markup = { inline_keyboard: [[{ text: buttonText, url }]] };
+  if (buttons?.length) payload.reply_markup = { inline_keyboard: [buttons.slice(0, 8).map((b) => ({ text: String(b.text).slice(0, 60), url: b.url }))] };
+  else if (url) payload.reply_markup = { inline_keyboard: [[{ text: buttonText, url }]] };
   if (replyTo) payload.reply_parameters = { message_id: Number(replyTo), allow_sending_without_reply: true };
   if (silent) payload.disable_notification = true;
   return call('sendMessage', payload, deps);

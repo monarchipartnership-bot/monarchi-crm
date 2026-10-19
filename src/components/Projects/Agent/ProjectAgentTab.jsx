@@ -12,6 +12,7 @@ import TimePicker from '../../common/TimePicker';
 import { authedPost } from '../../../lib/adAccounts';
 import { nextScheduled } from '../../../lib/agentSchedule';
 import { fetchAllProfiles, profileLabel } from '../../../lib/api/profile';
+import { fetchTgChats } from '../../../lib/api/siteLeads';
 
 // «Запустити зараз» makes a draft report on request; with the switch on, the scheduler (cron, api/agent-tick.js)
 // also starts the reports by the schedule from the settings. Keep false only if the cron is turned off.
@@ -50,7 +51,7 @@ function PagOption({ checked, onChange, title, desc, disabled = false }) {
 
 export const KIND_LABEL = {
   connected: 'Підключення', enabled: 'Увімкнення', disabled: 'Вимкнення', config_changed: 'Налаштування', disconnected: 'Відключення',
-  run_started: 'Запуск', report_created: 'Звіт', deck_created: 'Презентація', run_finished: 'Завершення', problem: 'Проблема',
+  run_started: 'Запуск', report_created: 'Звіт', deck_created: 'Презентація', run_finished: 'Завершення', problem: 'Проблема', telegram_sent: 'Telegram', telegram_failed: 'Telegram',
 };
 
 function statusOf(agent) {
@@ -78,6 +79,7 @@ function describeChanges(before, after) {
   if (!sameJson(before.schedule, after.schedule)) out.push('розклад');
   if (before.notify !== after.notify) out.push('сповіщення');
   if (JSON.stringify([...(before.notifyEmails || [])].sort()) !== JSON.stringify([...(after.notifyEmails || [])].sort())) out.push('кому надсилати сповіщення');
+  if (!sameJson(before.telegram || {}, after.telegram || {})) out.push('Telegram-чат для звітів');
   if ((before.note || '') !== (after.note || '')) out.push('нотатка для агента');
   return out;
 }
@@ -120,10 +122,13 @@ export default function ProjectAgentTab({ projectId }) {
   const [people, setPeople] = useState([]); // CRM users who can be picked to get the notifications
   const [runType, setRunType] = useState('weekly');
   const [runResult, setRunResult] = useState(null);
+  const [tgChats, setTgChats] = useState([]); // chats the bot has seen (the choice for «Telegram-чат»)
+  const [tgTest, setTgTest] = useState({ busy: false, ok: null, msg: '' });
 
   const load = useCallback(async () => {
-    const [{ agent: a, missing: m }, accs, ev, profiles] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles()]);
+    const [{ agent: a, missing: m }, accs, ev, profiles, chats] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles(), fetchTgChats()]);
     setPeople(profiles);
+    setTgChats(chats);
     setAgent(a);
     setMissing(m);
     setAccounts(accs);
@@ -156,6 +161,7 @@ export default function ProjectAgentTab({ projectId }) {
   const setEnabled = (on) => run('toggle', async () => {
     if (on && (!form.platforms.length || !Object.values(form.tasks).some(Boolean))) throw new Error('Перед вмиканням оберіть, що робить агент і на яких платформах.');
     if (on && dirty) throw new Error('Спершу збережіть налаштування, потім вмикайте агента.');
+    if (on && form.telegram?.enabled && !form.telegram?.chatId) throw new Error('Оберіть Telegram-чат для звітів або вимкніть надсилання в Telegram.');
     if (on && form.notify && !(form.notifyEmails || []).length) throw new Error('Оберіть, кому надсилати сповіщення про готові звіти, або вимкніть сповіщення.');
     // enabled_since: the scheduler only starts reports whose scheduled moment came after the agent was switched on.
     await updateAgent(projectId, { enabled: on, enabled_since: on ? new Date().toISOString() : null, ...(on ? {} : { run_state: 'idle' }) });
@@ -175,6 +181,15 @@ export default function ProjectAgentTab({ projectId }) {
     const res = await authedPost('/api/project-agent-run', { projectId: Number(projectId), periodType: runType });
     setRunResult(res);
   });
+
+  // A sample of the report message (marked «Тест») goes to the chosen chat, so the form and the buttons can be seen before the first real report.
+  const sendTgTest = async () => {
+    setTgTest({ busy: true, ok: null, msg: '' });
+    try {
+      const r = await authedPost('/api/project-agent-run', { action: 'telegram_test', projectId: Number(projectId), periodType: 'weekly', chatId: form.telegram?.chatId });
+      setTgTest({ busy: false, ok: Boolean(r.ok), msg: r.ok ? 'Тестове повідомлення надіслано в чат.' : (r.error || 'Не вдалося надіслати.') });
+    } catch (e) { setTgTest({ busy: false, ok: false, msg: e.message || 'Не вдалося надіслати.' }); }
+  };
 
   const disconnect = async () => {
     if (!(await confirm({ title: 'Відключити агента?', body: 'Відключити агента від проєкту? Налаштування буде видалено, історія дій залишиться.', confirmLabel: 'Відключити', danger: true }))) return;
@@ -315,7 +330,7 @@ export default function ProjectAgentTab({ projectId }) {
             {!form.tasks.presentation && <div className="pacc-hint">Презентації вимкнені вище: ці параметри нічого не змінюють.</div>}
           </PagSection>
 
-          <PagSection title="Сповіщення" hint="Звіт завжди зберігається як чернетка: менеджер перевіряє його, перш ніж відправити клієнту.">
+          <PagSection title="Сповіщення" hint="Хто дізнається про готовий звіт: дзвіночок CRM і Telegram-чат. Звіт завжди зберігається як чернетка: менеджер перевіряє його, перш ніж відправити клієнту.">
             <div className="pag-opts">
               <PagOption checked={form.notify} onChange={(v) => setCfg({ notify: v })} title="Сповіщати про результат" desc="Звіт готовий або агент не зміг його створити. Сповіщення зʼявляться в загальному дзвіночку CRM." />
             </div>
@@ -329,6 +344,27 @@ export default function ProjectAgentTab({ projectId }) {
                 </div>
                 {!(form.notifyEmails || []).length && <div className="pacc-hint">Нікого не обрано: сповіщень не буде, а увімкнути агента не вийде.</div>}
               </>
+            )}
+
+            <div className="pag-sub">Telegram-чат</div>
+            <div className="pag-opts">
+              <PagOption checked={Boolean(form.telegram?.enabled)} onChange={(v) => setCfg({ telegram: { ...(form.telegram || {}), enabled: v } })} title="Надсилати звіти в Telegram" desc="Коли агент створює тижневий або місячний звіт, у чат приходить повідомлення: проєкт, дата, тип звіту, статус, потрібна дія та кнопка для переходу до звіту." />
+            </div>
+            {form.telegram?.enabled && (
+              <div className="pag-box">
+                <div className="pag-sub">Чат для цього проєкту</div>
+                {tgChats.length === 0 ? (
+                  <div className="pacc-hint">Бот ще не бачив жодного чату. Додайте бота в потрібний чат і напишіть там будь-що (наприклад /start), потім оновіть сторінку. Чати та бот налаштовуються в «Налаштування → Заявки з сайту».</div>
+                ) : (
+                  <div className="pag-row">
+                    <Select value={form.telegram?.chatId || ''} onChange={(v) => setCfg({ telegram: { ...(form.telegram || {}), chatId: v } })} ariaLabel="Telegram-чат"
+                      options={[{ value: '', label: 'Оберіть чат…' }, ...tgChats.map((c) => ({ value: String(c.chat_id), label: c.title || String(c.chat_id) }))]} />
+                    <button type="button" className="btn" onClick={sendTgTest} disabled={!form.telegram?.chatId || dirty || tgTest.busy} title={dirty ? 'Спершу збережіть налаштування' : ''}>{tgTest.busy ? 'Надсилаємо…' : 'Надіслати тест'}</button>
+                  </div>
+                )}
+                {form.telegram?.enabled && !form.telegram?.chatId && tgChats.length > 0 && <div className="pacc-hint">Оберіть чат, інакше повідомлення нікуди не піде.</div>}
+                {tgTest.msg && <div className={tgTest.ok ? 'pacc-hint' : 'pacc-err'}>{tgTest.msg}</div>}
+              </div>
             )}
           </PagSection>
 
