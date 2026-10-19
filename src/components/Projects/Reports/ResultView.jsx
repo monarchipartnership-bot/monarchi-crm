@@ -174,11 +174,11 @@ export function CampaignPicker({ campaigns, platform, selection, onChange, kind,
 
 // What goes into the report besides the account totals: the group columns and / or single
 // campaigns (picked below). "Тільки загальні показники" turns both off. Outside the captured area.
-export function ContentOptions({ hasGroups, groupsOn, pickedCount, onGroups, onOnlyTotals, onEverything }) {
+export function ContentOptions({ hasGroups, groupsOn, pickedCount, onGroups, onOnlyTotals, onEverything, bare = false }) {
   const onlyTotals = !groupsOn && pickedCount === 0;
   return (
-    <div className="prep-content">
-      <div className="prep-content-title">Що входить у звіт</div>
+    <div className={'prep-content' + (bare ? ' prep-content--bare' : '')}>
+      {!bare && <div className="prep-content-title">Що входить у звіт</div>}
       <div className="prep-content-row">
         <span className="prep-chip on" aria-disabled="true">Загальні показники</span>
         {hasGroups && (

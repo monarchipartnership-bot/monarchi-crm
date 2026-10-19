@@ -179,3 +179,13 @@
 .prep-top .prep-content, .prep-top .prep-picker { margin-top: 0; }
 .prep-top .prep-picker { margin-top: 12px; }
 .prep-top .prep-picker-list { max-height: 260px; }
+
+/* inside the «Що входить у звіт» box there are no boxes of their own: one title, then plain rows */
+.prep-top .prep-content, .prep-top .prep-picker { border: 0; border-radius: 0; background: none; padding: 0; }
+.prep-top .prep-content--bare { gap: 14px; }
+.prep-top .prep-picker { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.prep-top .prep-picker summary { font-size: .92rem; }
+
+/* the status block: the same box and title as the two above, its row is not a footer of something else */
+.pw .prep-status-box .prep-save-row, .prep-status-box .prep-save-row { border: 0; padding: 0; margin: 0; align-items: flex-end; gap: 14px; }
+.prep-status-box .pk-field { min-width: 190px; }

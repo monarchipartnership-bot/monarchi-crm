@@ -300,7 +300,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
           {platData && Object.keys(platData).length ? (
             <>
               <ContentOptions
-                hasGroups={(platData.groups || []).length > 0} groupsOn={options.groups !== false} pickedCount={platPicked}
+                bare hasGroups={(platData.groups || []).length > 0} groupsOn={options.groups !== false} pickedCount={platPicked}
                 onGroups={(v) => { setOptions({ ...options, groups: v }); setDirty(true); }}
                 onOnlyTotals={() => { setOptions({ ...options, groups: false }); setSelection(selection.filter((k) => !k.startsWith(platform + '|'))); setActiveGroupId(null); setDirty(true); }}
                 onEverything={() => { setOptions({ ...options, groups: true }); setSelection([...selection.filter((k) => !k.startsWith(platform + '|')), ...platCampaigns.map((c) => campaignKey(platform, c.name))]); setActiveGroupId(null); setDirty(true); }}
@@ -346,7 +346,8 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       </section>
       )}
 
-      <section className="report-section">
+      <section className="report-section prep-box prep-status-box">
+        <div className="prep-box-title">Статус і збереження</div>
         <div className="prep-save-row">
           <div className="pk-field">
             <label>Статус</label>
