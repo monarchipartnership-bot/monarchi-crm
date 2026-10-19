@@ -6,7 +6,7 @@
   --s-ink: #21113F; --s-muted: #807394; --s-line: #E9DFEE; --s-lav: #F0E6F7; --s-sel: #F2EAFA; --s-field: #FDFBFF; --s-field-line: #D5C5E1;
   --s-btn-line: #D8C2E4; --s-focus: #B878C5; --s-plum: #782287; --s-ok: #1E9E5D; --s-bad: #C2185B; --s-warn: #B7791F;
   --s-primary: linear-gradient(115deg, #9636A1, #63176C); --s-shadow: 0 3px 12px #3821420D;
-  font-family: 'Onest', var(--font-body), system-ui, sans-serif; color: var(--s-ink); font-size: 14px; max-width: 1400px; margin-inline: auto; min-width: 0;
+  font-family: 'Onest', var(--font-body), system-ui, sans-serif; color: var(--s-ink); font-size: 14px; max-width: none; min-width: 0; display: flex; flex-direction: column; min-height: calc(100vh - 118px);
 }
 .smm-page *, .smm-page *::before, .smm-page *::after, .smm-overlay *, .smm-overlay *::before, .smm-overlay *::after { box-sizing: border-box; }
 .smm-page :is(button, a, input, textarea, select, [tabindex]):focus-visible, .smm-dialog :is(button, a, input, textarea, select):focus-visible { outline: 2px solid var(--s-focus); outline-offset: 2px; }
@@ -27,7 +27,7 @@
 .smm-tab.is-active::before { background: linear-gradient(120deg, #9C38A8, #611569); }
 .smm-tab-badge { min-width: 20px; padding: 1px 6px; border-radius: 10px; background: #fff; color: var(--s-plum); font: 700 11px/1.5 'Onest', sans-serif; text-align: center; }
 
-.smm-sheet { position: relative; min-width: 0; background: linear-gradient(130deg, #fff, #FCF9FD); border: 1px solid var(--s-line); border-radius: 18px 18px 8px 18px; box-shadow: var(--s-shadow); padding: 22px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.smm-sheet { position: relative; min-width: 0; background: linear-gradient(130deg, #fff, #FCF9FD); border: 1px solid var(--s-line); border-radius: 18px 18px 8px 18px; box-shadow: var(--s-shadow); padding: 22px 20px 24px; display: flex; flex-direction: column; gap: 16px; flex: 1 1 auto; }
 .smm-muted { color: var(--s-muted); font-size: 13px; line-height: 1.5; }
 .smm-toast { position: sticky; top: 8px; z-index: 5; align-self: stretch; padding: 10px 14px; border-radius: 10px; background: #E6F6EE; border: 1px solid #BFE5CF; color: #14633D; font-size: 13px; }
 .smm-toast.is-error { background: #FFF1F4; border-color: #EBC3CE; color: #9B1048; }
@@ -381,3 +381,17 @@ button.smm-stat { cursor: pointer; }
 /* the topic of a forum chat that gets the website leads */
 .smm-topic { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .smm-topic .ui-select { width: 260px; max-width: 100%; }
+
+/* the scheme of the team on the overview: a dark plum panel like the map of the AI Agents section, full width of the sheet */
+.smm-block--map { gap: 12px; }
+.smm-map { background: linear-gradient(160deg, #2C1035, #1C0826); border: 1px solid #4B1E58; border-radius: 16px; padding: 16px 18px 14px; overflow-x: auto; }
+.smm-map .smm-diagram { min-width: 940px; width: 100%; }
+.smm-map .cmp-node.smm-faded { opacity: .62; }
+.smm-map .cmp-node.smm-faded .cmp-node-box { stroke: color-mix(in srgb, var(--accent) 30%, transparent); }
+.smm-map .cmp-node.is-clickable { cursor: pointer; }
+.smm-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12.5px; color: var(--s-muted); }
+.smm-legend li { display: inline-flex; align-items: center; gap: 7px; }
+.smm-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #8D7A93; }
+.smm-dot--on { background: #2FC783; } .smm-dot--bad { background: #E5527A; } .smm-dot--wait { background: #E3A62E; }
+.smm-line { display: inline-block; width: 24px; height: 0; border-top: 2px dashed #B060BD; }
+.smm-line--solid { border-top-style: solid; }

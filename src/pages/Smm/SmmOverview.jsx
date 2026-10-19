@@ -1,6 +1,7 @@
 import ActionIcon from '../../components/common/ActionIcon';
 import { BRAND_FIELDS } from '../../lib/api/smm';
 import { AgentStateChip, stateOf } from './agentUi';
+import SmmChainDiagram from './SmmChainDiagram';
 
 // The state of the whole SMM team at a glance, and what to do next.
 export default function SmmOverview({ brand, competitors, posts, plans, team, go, open }) {
@@ -19,6 +20,24 @@ export default function SmmOverview({ brand, competitors, posts, plans, team, go
 
   return (
     <>
+      {team && (
+        <section className="smm-block smm-block--map">
+          <div className="smm-block-head">
+            <div><h3>Схема команди</h3><p className="smm-muted">Хто кому передає роботу. Натисніть на агента, щоб відкрити його.</p></div>
+            <button type="button" className="smm-btn" onClick={() => go('agents')}>Усі агенти</button>
+          </div>
+          <div className="smm-map"><SmmChainDiagram team={team} onSelect={open} /></div>
+          <ul className="smm-legend" aria-label="Умовні позначення">
+            <li><i className="smm-dot smm-dot--on" />працює</li>
+            <li><i className="smm-dot smm-dot--off" />вимкнено</li>
+            <li><i className="smm-dot smm-dot--bad" />зупинено: вимкнено попереднього</li>
+            <li><i className="smm-dot smm-dot--wait" />чекає доступ</li>
+            <li><i className="smm-line" />пунктир: передача результату</li>
+            <li><i className="smm-line smm-line--solid" />суцільна: обовʼязковий звʼязок</li>
+          </ul>
+        </section>
+      )}
+
       <div className="smm-stats">
         <button type="button" className="smm-stat" onClick={() => go('agents')}><b>{working} з {team?.agents.length ?? 0}</b><span>агентів працює</span></button>
         <button type="button" className="smm-stat" onClick={() => go('queue')}><b>{count('needs_review') + plans.filter((p) => p.status === 'awaiting_approval').length}</b><span>чекає вашого рішення</span></button>
