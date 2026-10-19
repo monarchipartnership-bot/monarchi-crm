@@ -1,4 +1,4 @@
-/* /projects index: folder tabs (platform), shared light plate with search / status / create, and cards.
+/* /projects index: polaroid tabs (platform), tape tabs (status), shared light plate with search / status / create, and cards.
    Scoped to .projects-page.folder-design, so the project page and the other screens that share
    projectsPage.css are not touched. Onest comes from the local font packages. */
 
@@ -9,58 +9,57 @@
 }
 .folder-design button, .folder-design input { font-family: inherit; }
 
-/* ---- Folder tabs ----
-   Three folders standing in a row on the plate: the outer edges are flush with the plate's edges, the plate's top corners are square, and the
-   tab that is open overlaps the plate's top border by 1px so it joins it without a seam. A folder is two layers behind the button: an outline
-   layer (the line colour) and a fill layer 1px smaller, both cut to the folder shape, so the slanted edges get a real border too. */
-.folder-design .proj-ptabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; align-items: end; position: relative; z-index: 3; isolation: isolate; margin: 0; padding: 0; }
+/* ---- Platform tabs: polaroids ----
+   Three photo cards lying on the desk, each at its own small angle (--r from the component). The open one straightens, lifts, gets a brand-purple
+   "photo" and a strip of tape on top. The count sits on the photo corner. First-level list: sections of the page. */
+.folder-design .proj-ptabs { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; position: relative; z-index: 3; margin: 0 0 14px; padding: 8px 6px 10px; }
 .folder-design .proj-ptab {
-  --pf-cut: polygon(0 0, 46% 0, 52% 20%, 95% 20%, 100% 100%, 0 100%);
-  position: relative; isolation: isolate; border: 0; background: none; min-width: 0; min-height: 70px; padding: 22px 22px 12px; margin-bottom: -1px;
-  display: flex; align-items: center; gap: 12px; color: var(--pf-plum); font: 700 16px/1.15 'Onest', sans-serif; text-align: left; cursor: pointer;
-  border-radius: 18px 18px 0 0; white-space: normal; transition: transform 220ms var(--pf-ease);
-  filter: drop-shadow(0 -2px 3px #68276812);
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 98px; padding: 6px 8px 7px; margin: 0;
+  background: #fff; border: 1px solid var(--pf-line); border-radius: 7px; box-shadow: 0 6px 12px #6827681f; color: var(--pf-purple);
+  transform: rotate(var(--r, 0deg)); cursor: pointer; transition: transform 400ms var(--pf-ease), box-shadow 400ms var(--pf-ease), border-color 300ms var(--pf-ease);
 }
-.folder-design .proj-ptab::before, .folder-design .proj-ptab::after { content: ''; position: absolute; z-index: -1; clip-path: var(--pf-cut); transition: background 220ms var(--pf-ease); }
-/* outline */
-.folder-design .proj-ptab::before { inset: 0; border-radius: 18px 18px 0 0; background: var(--pf-line); }
-/* fill: a closed folder sits in the shade of the plate (darker towards the bottom edge), a paper highlight runs along the top */
-.folder-design .proj-ptab::after {
-  inset: 1px 1px 0; border-radius: 17px 17px 0 0;
-  background: linear-gradient(180deg, #fff 0%, #F6E7F8 55%, #EBCDF0 100%); box-shadow: inset 0 1px 0 #fff;
+.folder-design .proj-ptab-photo { position: relative; width: 100%; height: 34px; border-radius: 4px; background: linear-gradient(150deg, #F6E8F9, #EBD0F2); display: grid; place-items: center; transition: background 300ms var(--pf-ease); }
+.folder-design .proj-ptab-ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; transition: background 300ms var(--pf-ease); }
+.folder-design .proj-ptab-ic img { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.folder-design .proj-ptab .cnt { position: absolute; right: 3px; top: 3px; margin: 0; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: linear-gradient(100deg, #B544B5, #661466); color: #fff; font: 700 10.5px/19px 'Onest', sans-serif; text-align: center; opacity: 1; }
+.folder-design .proj-ptab-label { font: 650 12.5px/1.2 'Onest', sans-serif; color: var(--pf-plum); white-space: nowrap; }
+/* tape */
+.folder-design .proj-ptab::before {
+  content: ''; position: absolute; left: 50%; top: -8px; width: 40px; height: 15px; margin-left: -20px; background-color: #B544B5aa;
+  background-image: repeating-linear-gradient(45deg, #ffffff22 0 3px, #ffffff00 3px 6px);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 25%, 100% 50%, calc(100% - 4px) 75%, 100% 100%, 0 100%, 4px 75%, 0 50%, 4px 25%);
+  transform: rotate(-3deg) scale(0); transition: transform 350ms var(--pf-ease);
 }
-/* the open folder: brand purple, lit from the top, and it runs 2px over the plate's top border so the two are one piece */
-.folder-design .proj-ptab.on { color: #fff; z-index: 3; margin-bottom: -2px; padding-bottom: 14px; filter: drop-shadow(0 -2px 4px #66146626); }
-.folder-design .proj-ptab.on::before { background: #8E2E93; }
-.folder-design .proj-ptab.on::after { background: linear-gradient(180deg, #C25AC4 0%, #A43CA8 18%, #7E2483 100%); box-shadow: inset 0 1px 0 #ffffff59; }
-.folder-design .proj-ptab:hover:not(.on) { transform: translateY(-2px); }
+.folder-design .proj-ptab.on { transform: rotate(0deg) translateY(-4px); box-shadow: 0 16px 22px -8px #66146677; border-color: #B544B5; }
+.folder-design .proj-ptab.on::before { transform: rotate(-3deg) scale(1); }
+.folder-design .proj-ptab.on .proj-ptab-photo { background: linear-gradient(100deg, #B544B5, #661466); }
+.folder-design .proj-ptab.on .proj-ptab-ic { background: #ffffff40; }
+.folder-design .proj-ptab.on .cnt { background: #fff; color: var(--pf-purple); }
 .folder-design .proj-ptab:focus-visible { outline: 3px solid #AE40AE; outline-offset: 3px; }
-.folder-design .proj-ptab img { width: 34px; height: 34px; object-fit: contain; flex: none; }
-.folder-design .proj-ptab-label { min-width: 0; overflow-wrap: anywhere; }
-.folder-design .proj-ptab .cnt { margin-left: 0; padding: 3px 9px; min-width: 26px; text-align: center; border-radius: 999px; background: #AE40AE1F; font-size: 13px; font-weight: 700; opacity: 1; flex: none; }
-.folder-design .proj-ptab.on .cnt { background: #ffffff2e; }
 
 /* ---- Light plate under the tabs ---- */
 .folder-design .proj-folder-body {
-  position: relative; z-index: 2; padding: 24px; border: 1px solid var(--pf-line); border-radius: 0 0 20px 20px; background: linear-gradient(180deg, #fff, #F9EDF9); /* square top corners: the folders sit flush on them */
+  position: relative; z-index: 2; padding: 18px; border: 1px solid var(--pf-line); border-radius: 20px; background: linear-gradient(180deg, #fff, #F9EDF9);
   box-shadow: 0 12px 32px #68276810; min-width: 0;
 }
-.folder-design .proj-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.folder-design .proj-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .folder-design .proj-search { flex: 1 1 240px; max-width: 360px; min-width: 0; border-radius: 11px; }
 .folder-design .proj-search input { min-height: 36px; border: 1px solid var(--pf-line); border-radius: 11px; background: #fff; font-size: 13px; color: var(--pf-plum); padding-left: 34px; }
 .folder-design .proj-search input:focus { border-color: var(--pf-accent); outline: 3px solid #AE40AE33; }
 .folder-design .proj-search svg { left: 11px; width: 15px; height: 15px; stroke: var(--pf-muted); }
 .folder-design .proj-divider { width: 1px; height: 22px; background: var(--pf-line); flex: none; }
-.folder-design .proj-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.folder-design .proj-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+/* second level: strips of washi tape with zig-zag ends, the open one in brand purple */
 .folder-design .proj-tab {
-  min-height: 32px; border: 1px solid var(--pf-line); border-radius: 10px; background: #fff; color: var(--pf-purple); padding: 4px 11px;
-  font: 600 13px 'Onest', sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap;
+  position: relative; height: 26px; min-height: 0; padding: 0 17px; border: 0; border-radius: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap;
+  font: 600 12.5px 'Onest', sans-serif; color: var(--pf-purple); transform: rotate(var(--r, 0deg)); transition: background 250ms var(--pf-ease), color 250ms var(--pf-ease), transform 300ms var(--pf-ease);
+  background: repeating-linear-gradient(45deg, #ffffff40 0 4px, #ffffff00 4px 8px), #EBD0F2; box-shadow: none;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 25%, 100% 50%, calc(100% - 5px) 75%, 100% 100%, 0 100%, 5px 75%, 0 50%, 5px 25%);
 }
-.folder-design .proj-tab:hover { border-color: var(--pf-line); }
 .folder-design .proj-tab:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
-.folder-design .proj-tab .cnt { margin: 0; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: #F3E3F7; font-weight: 700; font-size: 11.5px; text-align: center; opacity: 1; }
-.folder-design .proj-tab.on { background: linear-gradient(100deg, #B544B5, #661466); border-color: transparent; color: #fff; box-shadow: 0 4px 10px #66146633; }
-.folder-design .proj-tab.on .cnt { background: #ffffff33; }
+.folder-design .proj-tab .cnt { margin: 0; min-width: 20px; height: 18px; padding: 0 6px; border-radius: 999px; background: #F3E3F7; color: var(--pf-purple); font: 700 11.5px/18px 'Onest', sans-serif; text-align: center; opacity: 1; }
+.folder-design .proj-tab.on { background: repeating-linear-gradient(45deg, #ffffff1c 0 4px, #ffffff00 4px 8px), linear-gradient(100deg, #B544B5, #661466); color: #fff; transform: rotate(0deg); }
+.folder-design .proj-tab.on .cnt { background: #ffffff33; color: #fff; }
 .folder-design .proj-create { min-height: 36px; padding: 0 16px; border-radius: 11px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; background: linear-gradient(100deg, #B544B5, #661466); color: #fff; border: 0; box-shadow: 0 5px 12px #66146644; }
 .folder-design .proj-create svg { width: 16px; height: 16px; }
 .folder-design .proj-create:focus-visible { outline: 3px solid #AE40AE; outline-offset: 3px; }
@@ -102,15 +101,10 @@
 
 @media (max-width: 1100px) { .folder-design .proj-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1800px) { .folder-design .proj-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 1100px) {
-  .folder-design .proj-ptab { font-size: 15px; padding-inline: 16px; gap: 10px; }
-  .folder-design .proj-ptab img { width: 30px; height: 30px; }
-}
 @media (max-width: 900px) { .folder-design .proj-divider { display: none; } .folder-design .proj-search { max-width: none; flex-basis: 100%; } }
 @media (max-width: 768px) {
-  .folder-design .proj-ptabs { display: flex; overflow-x: auto; padding: 6px 0 0; scrollbar-width: thin; }
-  .folder-design .proj-ptab { flex: 0 0 190px; min-height: 64px; }
-  .folder-design .proj-folder-body { padding: 16px; }
+  .folder-design .proj-ptabs { gap: 12px; }
+  .folder-design .proj-folder-body { padding: 14px; }
   .folder-design .proj-grid { grid-template-columns: minmax(0, 1fr); }
   .folder-design .proj-card { padding: 14px; }
   .folder-design .proj-card-icon { width: 44px; height: 44px; }
@@ -120,8 +114,7 @@
   .folder-design .proj-create { width: 100%; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .folder-design .proj-ptab, .folder-design .proj-ptab::before, .folder-design .proj-ptab::after { transition: none; }
-  .folder-design .proj-ptab:hover:not(.on) { transform: none; }
+  .folder-design .proj-ptab, .folder-design .proj-ptab::before, .folder-design .proj-ptab-photo, .folder-design .proj-tab { transition: none; }
 }
 
 /* ---- Create dialog, matched to the page (all fields and logic unchanged) ---- */

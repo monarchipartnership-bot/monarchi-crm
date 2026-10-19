@@ -22,6 +22,8 @@ const PLATFORM_TABS = [
   { key: 'google', label: 'Google Ads', icon: PLATFORM_ICONS[PLATFORM_SYMBOL.google].src },
   { key: 'meta', label: 'Meta Ads', icon: PLATFORM_ICONS[PLATFORM_SYMBOL.meta].src },
 ];
+// Each platform "polaroid" lies at its own small angle; the open one straightens up.
+const TAB_TILT = [-2, 1.5, -1];
 // Second level: its state. Independent of the platform tab.
 const STATUS_TABS = [
   { key: 'all', label: 'Всі статуси' },
@@ -151,17 +153,19 @@ export default function Projects() {
   return (
     <div className="report-page projects-page folder-design">
       <div className="proj-ptabs" role="tablist" aria-label="Платформа" onKeyDown={onTabKey}>
-        {PLATFORM_TABS.map((t) => {
+        {PLATFORM_TABS.map((t, i) => {
           const on = platform === t.key;
           return (
             <button
               key={t.key} id={'proj-tab-' + t.key} ref={(n) => { tabRefs.current[t.key] = n; }}
               type="button" role="tab" aria-selected={on} aria-controls="proj-panel" tabIndex={on ? 0 : -1}
-              className={'proj-ptab' + (on ? ' on' : '')} onClick={() => setPlatform(t.key)}
+              className={'proj-ptab' + (on ? ' on' : '')} style={{ '--r': TAB_TILT[i % TAB_TILT.length] + 'deg' }} onClick={() => setPlatform(t.key)}
             >
-              <img src={t.icon} alt="" aria-hidden="true" draggable="false" />
+              <span className="proj-ptab-photo">
+                <span className="proj-ptab-ic"><img src={t.icon} alt="" aria-hidden="true" draggable="false" /></span>
+                <span className="cnt" aria-label={loaded && !loadError ? `${platformCounts[t.key]} проєктів` : 'кількість завантажується'}>{countText(platformCounts[t.key])}</span>
+              </span>
               <span className="proj-ptab-label">{t.label}</span>
-              <span className="cnt" aria-label={loaded && !loadError ? `${platformCounts[t.key]} проєктів` : 'кількість завантажується'}>{countText(platformCounts[t.key])}</span>
             </button>
           );
         })}
@@ -175,8 +179,8 @@ export default function Projects() {
           </div>
           <span className="proj-divider" aria-hidden="true" />
           <div className="proj-tabs" role="group" aria-label="Статус">
-            {STATUS_TABS.map((t) => (
-              <button key={t.key} type="button" aria-pressed={tab === t.key} className={'proj-tab' + (tab === t.key ? ' on' : '')} onClick={() => setTab(t.key)}>
+            {STATUS_TABS.map((t, i) => (
+              <button key={t.key} type="button" aria-pressed={tab === t.key} className={'proj-tab' + (tab === t.key ? ' on' : '')} style={{ '--r': (i % 2 ? 1 : -1) + 'deg' }} onClick={() => setTab(t.key)}>
                 {t.label} <span className="cnt" aria-label={loaded && !loadError ? `${counts[t.key]}` : ''}>{countText(counts[t.key])}</span>
               </button>
             ))}
