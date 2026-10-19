@@ -19,8 +19,6 @@ export const DEFAULT_TEMPLATE = [
   '<b>Проєкт:</b> {link}',
   '<b>Послуги:</b> {services}',
   '<b>Повідомлення:</b> {message}',
-  '<b>Сторінка:</b> {page}',
-  '<b>UTM:</b> {utm}',
   '{ping}',
 ].join('\n');
 
