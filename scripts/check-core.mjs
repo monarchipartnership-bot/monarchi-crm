@@ -1353,7 +1353,11 @@ await ok('campaign groups: a group is a chosen set of campaigns, a report narrow
   // the group table: first group wins, the rest is «Інше», platform matters
   const cols = groupCampaigns(data.platforms.meta.campaigns, [mine, { name: 'Wigs', campaigns: [], keywords: ['wig'] }], 'meta');
   assert.deepEqual(cols.map((c) => [c.name, c.campaignCount, c.spend]), [['Каталог', 2, 400], ['Wigs', 1, 200]]);
-  assert.equal(groupCampaigns(data.platforms.google.campaigns, [mine], 'google').at(-1).name, 'Інше');
+  // a campaign in no group is a column of its own (nothing hides behind «Інше»), biggest spend first
+  const gcols = groupCampaigns(data.platforms.google.campaigns, [mine], 'google');
+  assert.ok(!gcols.some((c) => c.name === 'Інше'));
+  assert.ok(gcols.filter((c) => c.single).every((c) => c.campaignCount === 1));
+  assert.equal(gcols.at(-1).name, 'Brand');
   assert.deepEqual(groupCampaigns([], [], 'meta'), []);
   // the picker of the form
   const list = mergeCampaigns([{ platform: 'meta', name: 'A', spend: 5 }], [{ platform: 'meta', name: 'A', spend: 9 }, { platform: 'google', name: 'A', spend: 1 }, { platform: 'meta', name: 'B', spend: 0 }]);

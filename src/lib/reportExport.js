@@ -46,8 +46,19 @@ export function exportXlsx(model, filename) {
   download(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename + '.xlsx');
 }
 
+// The picture shows what the tables hold, not only what fits the screen: scrolling boxes are opened up to their full width for the shot.
 async function snapshot(node) {
-  return toPng(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
+  const boxes = [...node.querySelectorAll('.prep-scroll')];
+  const wide = Math.max(node.clientWidth, ...boxes.map((b) => b.scrollWidth + (node.clientWidth - b.clientWidth)));
+  const saved = { width: node.style.width, boxes: boxes.map((b) => b.style.overflow) };
+  if (wide > node.clientWidth) node.style.width = wide + 'px';
+  boxes.forEach((b) => { b.style.overflow = 'visible'; });
+  try {
+    return await toPng(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
+  } finally {
+    node.style.width = saved.width;
+    boxes.forEach((b, i) => { b.style.overflow = saved.boxes[i]; });
+  }
 }
 
 export async function exportPng(node, filename) {

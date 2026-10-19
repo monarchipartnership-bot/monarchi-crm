@@ -2,7 +2,7 @@
 // no network): the "Презентація" page uses it, and so will the AI agent. Every figure
 // comes from computeMetric() over the report's numbers, so the deck can never show a
 // number the report does not.
-import { METRIC_SETS, computeMetric, deltaPct, metricMeta } from '../reportMetrics.js';
+import { METRIC_SETS, computeMetric, deltaPct, metricMeta, sumBase } from '../reportMetrics.js';
 import { visibleKeys } from '../periodReport.js';
 import { text, listText } from './textModel.js';
 import { paginateBlocks } from './textFit.js';
@@ -140,7 +140,7 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
   };
   if (plat?.groups?.length && rd.options?.groups !== false) {
     toc.push(L.byGroups);
-    colTable(L.byGroups, plat.groups.map((g) => ({ name: g.name === 'Інше' ? L.other : g.name, base: g })));
+    colTable(L.byGroups, deckGroupColumns(plat.groups, L.other));
   }
   const picked = (rd.selection || []).filter((s) => s.startsWith(platform + '|')).map((s) => s.slice(platform.length + 1));
   const campaigns = (plat?.campaigns || []).filter((c) => picked.includes(c.name)).sort((a, b) => (b.spend || 0) - (a.spend || 0));
@@ -183,4 +183,11 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
 
   deck.slides = slides;
   return deck;
+}
+
+// The group columns of a slide: the named groups, and every campaign that is in no group folded into one «Other» column (a slide has no room for dozens).
+function deckGroupColumns(groups, otherLabel) {
+  const named = groups.filter((g) => !g.single && g.name !== 'Інше');
+  const loose = groups.filter((g) => g.single || g.name === 'Інше');
+  return [...named.map((g) => ({ name: g.name, base: g })), ...(loose.length ? [{ name: otherLabel, base: sumBase(loose) }] : [])];
 }

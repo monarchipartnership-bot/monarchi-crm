@@ -18,13 +18,13 @@
 .prep-capture-sub { font-size: .8rem; color: var(--muted); }
 .prep-subtitle { font-family: var(--font-head); font-weight: 700; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--purple); margin: 20px 0 8px; }
 
-.prep-scroll { overflow-x: auto; }
+.prep-scroll { overflow-x: auto; scrollbar-width: thin; padding-bottom: 8px; }
 .prep-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
 .prep-table th { text-align: left; font-family: var(--font-head); font-weight: 700; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .prep-table th small { font-weight: 500; text-transform: none; letter-spacing: 0; }
 .prep-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--ink); }
 .prep-table tr:last-child td { border-bottom: 0; }
-.prep-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.prep-table .num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .prep-table .lbl { font-weight: 600; }
 .prep-table .strong { font-weight: 700; }
 .prep-table .muted { color: var(--muted); }
@@ -156,3 +156,14 @@
 .mc-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
 @media (max-width: 560px) { .mc-grid { grid-template-columns: 1fr; } }
+
+/* Wide tables (campaign groups, campaigns): every column stays reachable by sideways scroll; the metric / campaign name and the account total stay in view */
+.prep-table--wide { width: max-content; min-width: 100%; }
+.prep-table--wide th.num, .prep-table--wide td.num { min-width: 150px; }
+.prep-table--wide th { background: #F7F1FA; }
+.prep-table--wide th:first-child, .prep-table--wide td.lbl { position: sticky; left: 0; z-index: 2; min-width: 180px; max-width: 280px; background: #fff; box-shadow: 1px 0 0 var(--border); overflow-wrap: anywhere; }
+.prep-table--wide th:first-child { z-index: 3; background: #F7F1FA; }
+.prep-table--groups th.total, .prep-table--groups td.total { position: sticky; left: 180px; z-index: 1; box-shadow: 1px 0 0 var(--border); }
+.prep-table--groups th.total { z-index: 3; background: #F3EDF7; }
+
+.prep-table--groups th:first-child, .prep-table--groups td.lbl { width: 180px; min-width: 180px; max-width: 180px; }

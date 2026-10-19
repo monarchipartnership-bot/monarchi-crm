@@ -1,9 +1,37 @@
+import { useEffect, useRef } from 'react';
 import { computeMetric, formatMetric, metricMeta, deltaPct, deltaTone } from '../../../lib/reportMetrics';
 
 function Delta({ delta, tone }) {
   if (delta == null) return <span className="prep-delta prep-delta--none">—</span>;
   const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '';
   return <span className={'prep-delta prep-delta--' + tone}>{arrow} {Math.abs(delta).toLocaleString('uk-UA', { maximumFractionDigits: 1 })}%</span>;
+}
+
+// A wide table in a horizontally scrolling box: every column stays reachable. The mouse wheel scrolls it sideways while it can still
+// move that way, then hands over to the page, so the page never gets stuck.
+export function HScroll({ children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const onWheel = (e) => {
+      if (el.scrollWidth <= el.clientWidth + 1 || Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.ctrlKey) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if ((e.deltaY > 0 && el.scrollLeft >= max - 1) || (e.deltaY < 0 && el.scrollLeft <= 0)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+  return <div className="prep-scroll" ref={ref}>{children}</div>;
+}
+
+// The best value of a metric among columns: the highest (or lowest, for costs) of at least two non-zero values; none for neutral metrics.
+export function bestOf(values, goodWhen) {
+  const comparable = values.filter((v) => v != null && Number.isFinite(v) && v !== 0);
+  if (comparable.length < 2 || goodWhen === 'neutral') return null;
+  return goodWhen === 'up' ? Math.max(...comparable) : Math.min(...comparable);
 }
 
 // Metrics table for one set of numbers: value, the previous period and the change.
@@ -39,21 +67,19 @@ export function GroupsTable({ keys, total, groups, custom, currency }) {
   if (!groups.length) return null;
   const columns = [{ name: 'Весь акаунт', base: total, total: true }, ...groups.map((g) => ({ name: g.name, base: g }))];
   return (
-    <div className="prep-scroll">
-      <table className="prep-table prep-table--groups">
+    <HScroll>
+      <table className="prep-table prep-table--groups prep-table--wide">
         <thead>
           <tr>
             <th>Метрика</th>
-            {columns.map((c) => <th key={c.name} className={'num' + (c.total ? ' total' : '')}>{c.name}{c.base.campaignCount ? <small> · {c.base.campaignCount} камп.</small> : null}</th>)}
+            {columns.map((c) => <th key={c.name} className={'num' + (c.total ? ' total' : '')}>{c.name}{c.base.campaignCount && !c.base.single ? <small> · {c.base.campaignCount} камп.</small> : null}</th>)}
           </tr>
         </thead>
         <tbody>
           {keys.map((key) => {
             const m = metricMeta(key, custom);
             const values = columns.map((c) => computeMetric(key, c.base, custom));
-            const comparable = values.slice(1).filter((v) => v != null && Number.isFinite(v) && v !== 0);
-            let best = null;
-            if (comparable.length > 1 && m.goodWhen !== 'neutral') best = m.goodWhen === 'up' ? Math.max(...comparable) : Math.min(...comparable);
+            const best = bestOf(values.slice(1), m.goodWhen);
             return (
               <tr key={key}>
                 <td className="lbl">{m.label}</td>
@@ -67,7 +93,7 @@ export function GroupsTable({ keys, total, groups, custom, currency }) {
           })}
         </tbody>
       </table>
-    </div>
+    </HScroll>
   );
 }
 

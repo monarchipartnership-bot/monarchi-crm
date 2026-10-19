@@ -80,7 +80,8 @@ export async function fetchPlatformRange(platform, accountId, from, to, kind, po
 }
 
 // Bundles campaigns into the project's groups (the columns of the group table): a campaign goes to the first group it belongs to
-// (listed in it, or matching an old keyword); whatever belongs to none goes to "Інше". No groups defined → no bundles.
+// (listed in it, or matching an old keyword). Whatever belongs to none is NOT lumped together: each such campaign is a column of its own
+// (`single: true`), biggest spend first, so nothing hides behind an «Інше». No groups defined → no bundles.
 export function groupCampaigns(campaigns, allGroups, platform) {
   const groups = groupsForPlatform(allGroups, platform); // a group of another platform never takes this platform's campaigns
   if (!groups.length) return [];
@@ -91,7 +92,7 @@ export function groupCampaigns(campaigns, allGroups, platform) {
     (i >= 0 ? buckets[i].rows : rest).push(c);
   });
   const out = buckets.filter((b) => b.rows.length).map((b) => ({ name: b.name, ...sumBase(b.rows), campaignCount: b.rows.length }));
-  if (rest.length) out.push({ name: 'Інше', ...sumBase(rest), campaignCount: rest.length });
+  [...rest].sort((a, b) => (b.spend || 0) - (a.spend || 0)).forEach((c) => out.push({ name: c.name, ...sumBase([c]), campaignCount: 1, single: true }));
   return out;
 }
 

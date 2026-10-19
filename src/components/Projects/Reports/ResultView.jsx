@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { ReportMetricsTable, GroupsTable, metricsToExport, groupsToExport } from './ReportTables';
+import { ReportMetricsTable, GroupsTable, HScroll, bestOf, metricsToExport, groupsToExport } from './ReportTables';
 import ExportMenu from './ExportMenu';
 import { combinePlatforms, metricRows, visibleKeys } from '../../../lib/periodReport';
 import { METRIC_SETS, computeMetric, formatMetric, metricMeta } from '../../../lib/reportMetrics';
@@ -113,9 +113,11 @@ const CAMPAIGN_KEYS = { ecom: ['spend', 'impressions', 'clicks', 'ctr', 'cpc', '
 function CampaignsTable({ campaigns, kind, custom, currency, extraKeys = [] }) {
   const keys = [...CAMPAIGN_KEYS[kind], ...extraKeys];
   const sorted = [...campaigns].sort((a, b) => (b.spend || 0) - (a.spend || 0));
+  // the best campaign of each column is marked green, like the best group in the group table
+  const best = Object.fromEntries(keys.map((k) => [k, bestOf(sorted.map((c) => computeMetric(k, c, custom)), metricMeta(k, custom).goodWhen)]));
   return (
-    <div className="prep-scroll">
-      <table className="prep-table">
+    <HScroll>
+      <table className="prep-table prep-table--wide">
         <thead>
           <tr><th>Кампанія</th>{keys.map((k) => <th key={k} className="num">{metricMeta(k, custom).label}</th>)}</tr>
         </thead>
@@ -123,12 +125,16 @@ function CampaignsTable({ campaigns, kind, custom, currency, extraKeys = [] }) {
           {sorted.map((c) => (
             <tr key={c.name}>
               <td className="lbl">{c.name}</td>
-              {keys.map((k) => { const m = metricMeta(k, custom); return <td key={k} className="num">{formatMetric(computeMetric(k, c, custom), m.format, currency)}</td>; })}
+              {keys.map((k) => {
+                const m = metricMeta(k, custom);
+                const v = computeMetric(k, c, custom);
+                return <td key={k} className={'num' + (best[k] != null && v === best[k] ? ' best' : '')}>{formatMetric(v, m.format, currency)}</td>;
+              })}
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </HScroll>
   );
 }
 
