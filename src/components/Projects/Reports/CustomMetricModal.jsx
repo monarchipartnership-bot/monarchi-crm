@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { addCustomMetric, deleteCustomMetric, saveReportColumns } from '../../../lib/api/projectReportStore';
 import { FORMAT_LABELS, OPERATIONS, metricOptions, slugKey, formatMetric, computeMetric } from '../../../lib/reportMetrics';
-import { PLATFORM_COLUMNS } from '../../../lib/metaColumns';
+import { PLATFORM_COLUMNS } from '../../../lib/platformColumns';
 import { platformInfo } from '../../../lib/adAccounts';
 import { useAuth } from '../../../contexts/AuthContext';
 import Select from '../../common/Select';

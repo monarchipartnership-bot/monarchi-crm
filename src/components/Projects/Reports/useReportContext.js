@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchProjectById } from '../../../lib/api/projects';
 import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
 import { fetchCampaignGroups, fetchCustomMetrics, fetchReportColumns } from '../../../lib/api/projectReportStore';
-import { cleanColumns } from '../../../lib/metaColumns';
+import { cleanColumns } from '../../../lib/platformColumns';
 import { projectKind } from '../../../lib/reportMetrics';
 import { accountsForTab, reportScope } from '../../../lib/reportScope';
 import { groupsForPlatform } from '../../../lib/campaignGroups';

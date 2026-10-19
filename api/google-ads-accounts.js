@@ -10,6 +10,7 @@
 //   action 'insights' — numbers for a period: a preset (last_7d | last_30d | this_month | last_month) or from/to; level 'account' (default) or 'campaign'
 import { createClient } from '@supabase/supabase-js';
 import { GoogleAdsApi } from 'google-ads-api';
+import { cleanGoogleColumns, extractGoogleCounts, googleMetricNamesFor } from '../src/lib/googleColumns.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -163,6 +164,8 @@ export default async function handler(req, res) {
       const okDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
       const { from_date, to_date } = okDate(from) && okDate(to) ? { from_date: from, to_date: to } : periodBounds(datePreset);
       const metrics = ['metrics.impressions', 'metrics.clicks', 'metrics.cost_micros', 'metrics.conversions', 'metrics.conversions_value'];
+      // extra report columns picked for the project (src/lib/googleColumns.js): campaign level only, Google is asked only for what they need
+      const columns = cleanGoogleColumns(req.body?.columns);
       const shape = (m) => {
         const spend = m.cost_micros != null ? round2(m.cost_micros / 1e6) : 0;
         const clicks = m.clicks ?? 0;
@@ -181,14 +184,14 @@ export default async function handler(req, res) {
         const rows = await target.report({
           entity: 'campaign',
           attributes: ['campaign.id', 'campaign.name'],
-          metrics,
+          metrics: [...new Set([...metrics, ...googleMetricNamesFor(columns)])],
           from_date,
           to_date,
         });
         res.status(200).json({
           account: digits,
           period: { from_date, to_date },
-          campaigns: rows.map((r) => ({ id: String(r.campaign?.id), name: r.campaign?.name, ...shape(r.metrics || {}) })),
+          campaigns: rows.map((r) => ({ id: String(r.campaign?.id), name: r.campaign?.name, ...shape(r.metrics || {}), ...(columns.length ? extractGoogleCounts(r.metrics, columns) : {}) })),
         });
         return;
       }

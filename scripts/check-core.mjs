@@ -33,6 +33,8 @@ import { groupCampaigns } from '../src/lib/periodReport.js';
 import { accountPlatforms, accountsForTab, collapseStatuses, flatten, pickReportRow, reportScope } from '../src/lib/reportScope.js';
 import { groupsForPlatform } from '../src/lib/campaignGroups.js';
 import { META_METRICS, META_METRIC_LIST, cleanColumns, countsFor, extractCounts, insightFieldsFor, pickCounts } from '../src/lib/metaColumns.js';
+import { GOOGLE_METRIC_LIST, extractGoogleCounts, googleMetricNamesFor, cleanGoogleColumns } from '../src/lib/googleColumns.js';
+import { PLATFORM_COLUMNS, cleanColumns as cleanPlatformColumns } from '../src/lib/platformColumns.js';
 import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.js';
 import { visibleKeys } from '../src/lib/periodReport.js';
 
@@ -370,6 +372,42 @@ await ok('agent run: the extra columns picked for the project are asked of the p
   const repo = fakeRepo({ columnsPicked: { meta: ['mx_add_to_cart'] } });
   await runProjectReport({ repo, post: spy, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
   assert.ok(seen.length >= 2 && seen.every((c) => c?.[0] === 'mx_add_to_cart'));
+});
+
+// ---- Extra Google Ads columns
+await ok('google columns: only picked metrics are asked of Google; counts come from one campaign row; shares become additive impressions', () => {
+  assert.deepEqual(cleanGoogleColumns(['mx_g_interactions', 'mx_add_to_cart', 'x']), ['mx_g_interactions']);
+  assert.deepEqual(cleanPlatformColumns('google', ['mx_g_interactions', 'mx_add_to_cart']), ['mx_g_interactions']);
+  assert.deepEqual(cleanPlatformColumns('meta', ['mx_g_interactions', 'mx_add_to_cart']), ['mx_add_to_cart']);
+  assert.deepEqual(cleanPlatformColumns('tiktok', ['mx_add_to_cart']), []);
+  assert.deepEqual(googleMetricNamesFor(['mx_g_interactions']), ['metrics.interactions']);
+  assert.deepEqual(googleMetricNamesFor([]), []);
+  const names = googleMetricNamesFor(['mx_g_lost_budget_is']);
+  assert.ok(names.includes('metrics.search_budget_lost_impression_share') && names.includes('metrics.search_impression_share') && names.includes('metrics.impressions'));
+  const m = { impressions: 800, interactions: 40, search_impression_share: 0.5, search_budget_lost_impression_share: 0.3, search_rank_lost_impression_share: 0.2 };
+  const c = extractGoogleCounts(m, ['mx_g_search_is', 'mx_g_lost_budget_is', 'mx_g_interactions']);
+  assert.deepEqual(c, { x_g_search_impr: 800, x_g_search_eligible: 1600, x_g_lost_budget: 480, x_g_interactions: 40 });
+  // a campaign with no share (display, video) adds nothing to the share, never a zero share
+  assert.deepEqual(extractGoogleCounts({ impressions: 5000 }, ['mx_g_search_is']), { x_g_search_impr: 0, x_g_search_eligible: 0 });
+});
+await ok('google columns: campaigns add up to the account share correctly and a never-fetched column is —', () => {
+  const a = extractGoogleCounts({ impressions: 800, search_impression_share: 0.5, search_budget_lost_impression_share: 0.3 }, ['mx_g_search_is', 'mx_g_lost_budget_is']);
+  const b = extractGoogleCounts({ impressions: 200, search_impression_share: 1, search_budget_lost_impression_share: 0 }, ['mx_g_search_is', 'mx_g_lost_budget_is']);
+  const display = extractGoogleCounts({ impressions: 9000 }, ['mx_g_search_is', 'mx_g_lost_budget_is']);
+  const total = sumBase([{ spend: 100, impressions: 800, clicks: 40, ...a }, { spend: 50, impressions: 200, clicks: 10, ...b }, { spend: 10, impressions: 9000, clicks: 5, ...display }]);
+  assert.equal(computeMetric('mx_g_search_is', total), (1000 / 1800) * 100); // impressions of search campaigns / what they could have had
+  assert.equal(computeMetric('mx_g_lost_budget_is', total), (480 / 1800) * 100);
+  assert.equal(computeMetric('mx_g_search_is', { impressions: 5 }), null);
+  assert.equal(computeMetric('mx_g_conv_rate', { purchases: 0, leads: 6, clicks: 200 }), 3);
+  assert.equal(computeMetric('mx_cost_g_interaction', { spend: 90, x_g_interactions: 30 }), 3);
+  assert.ok(computeMetric('mx_g_view_rate', { impressions: 1000, x_g_video_views: 250 }) === 25);
+});
+await ok('google columns: the catalog is consistent and every platform column has a label, a format and the counts it needs', () => {
+  assert.ok(GOOGLE_METRIC_LIST.length >= 20);
+  assert.equal(new Set(GOOGLE_METRIC_LIST.map((m) => m.key)).size, GOOGLE_METRIC_LIST.length);
+  assert.ok(Object.values(PLATFORM_COLUMNS).flat().every((m) => m.label && m.en && m.group && ['number', 'money', 'percent', 'ratio'].includes(m.format)));
+  assert.ok(META_METRIC_LIST.every((m) => !GOOGLE_METRIC_LIST.some((g) => g.key === m.key))); // no key shared between platforms
+  assert.ok(GOOGLE_METRIC_LIST.filter((m) => m.needs.length).every((m) => googleMetricNamesFor([m.key]).length > 0));
 });
 
 await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {

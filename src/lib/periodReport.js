@@ -2,7 +2,7 @@ import { authedPost } from './adAccounts.js';
 import { BASE_FIELDS, METRICS, computeMetric, metricMeta, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { computeWeeksForMonth, daysInMonth, isoDate, MONTH_NAMES } from './dateHelpers.js';
 import { groupMatches, groupsForPlatform } from './campaignGroups.js';
-import { pickCounts } from './metaColumns.js';
+import { pickCounts } from './platformColumns.js';
 
 const iso = (d) => isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 const ZERO = Object.fromEntries(BASE_FIELDS.map((f) => [f, 0]));
@@ -48,6 +48,7 @@ function googleRow(r, kind) {
   return {
     spend: r.spend || 0, impressions: r.impressions || 0, reach: null, clicks: r.clicks || 0,
     purchases: kind === 'leadgen' ? 0 : conv, leads: kind === 'leadgen' ? conv : 0, revenue: r.revenue || 0,
+    ...pickCounts(r), // the extra columns picked for the project (x_g_...)
   };
 }
 
@@ -69,12 +70,13 @@ export async function fetchPlatformRange(platform, accountId, from, to, kind, po
   if (platform === 'google') {
     const [acc, camp] = await Promise.all([
       post('/api/google-ads-accounts', { action: 'insights', customerId: accountId, from, to }),
-      post('/api/google-ads-accounts', { action: 'insights', customerId: accountId, from, to, level: 'campaign' }),
+      post('/api/google-ads-accounts', { action: 'insights', customerId: accountId, from, to, level: 'campaign', columns }),
     ]);
-    return {
-      total: acc.row ? googleRow(acc.row, kind) : { ...ZERO },
-      campaigns: (camp.campaigns || []).map((r) => ({ name: r.name || '—', ...googleRow(r, kind) })),
-    };
+    const campaigns = (camp.campaigns || []).map((r) => ({ name: r.name || '—', ...googleRow(r, kind) }));
+    const total = acc.row ? googleRow(acc.row, kind) : { ...ZERO };
+    // the extra counts of the account are the sum of its campaigns (a share cannot be read from the account row and added up)
+    if (columns.length) Object.assign(total, pickCounts(sumBase(campaigns)));
+    return { total, campaigns };
   }
   return { total: { ...ZERO }, campaigns: [] };
 }

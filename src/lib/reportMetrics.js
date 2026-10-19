@@ -1,5 +1,5 @@
 import { formatMoney } from './adAccounts.js';
-import { META_METRICS, isExtraMetric } from './metaColumns.js';
+import { EXTRA_METRICS, isExtraMetric } from './platformColumns.js';
 
 // Every platform row is normalised to these base numbers; everything else a
 // report shows is computed from them (in code, never by the AI model).
@@ -24,7 +24,7 @@ export const METRICS = {
 };
 
 // The extra columns of a platform (src/lib/metaColumns.js) are metrics too: they get their label, format and formula here.
-Object.assign(METRICS, META_METRICS);
+Object.assign(METRICS, EXTRA_METRICS);
 
 function ratio(a, b, k = 1) {
   const x = Number(a);

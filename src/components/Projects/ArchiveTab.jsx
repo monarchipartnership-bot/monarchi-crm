@@ -8,7 +8,7 @@ import { fetchProjectById } from '../../lib/api/projects';
 import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { STYLES } from '../../lib/presentation/deckModel';
 import { accountPlatforms, TOTAL_TAB } from '../../lib/reportScope';
-import { cleanColumns } from '../../lib/metaColumns';
+import { cleanColumns } from '../../lib/platformColumns';
 import { platformInfo } from '../../lib/adAccounts';
 import '../../styles/projectReports.css';
 

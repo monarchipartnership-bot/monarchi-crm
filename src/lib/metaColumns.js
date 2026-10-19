@@ -34,18 +34,18 @@ export const COUNTS = {
 };
 
 // null when either side is missing (a column that was never fetched is «—», not a made-up 0) or the divisor is 0.
-function ratio(a, b, k = 1) {
+export function ratio(a, b, k = 1) {
   if (a == null || b == null) return null;
   const x = Number(a);
   const y = Number(b);
   if (!Number.isFinite(x) || !Number.isFinite(y) || y === 0) return null;
   return (x / y) * k;
 }
-const X = (k) => `x_${k}`;
+export const X = (k) => `x_${k}`;
 
-const count = (key, group, label, en, goodWhen = 'up') => ({ key: `mx_${key}`, group, label, en, format: 'number', goodWhen, needs: [key], calc: (b) => (b[X(key)] == null ? null : Number(b[X(key)])) });
-const cost = (id, group, label, en, countKey) => ({ key: `mx_cost_${id}`, group, label, en, format: 'money', goodWhen: 'down', needs: [countKey], calc: (b) => ratio(b.spend, b[X(countKey)]) });
-const rate = (id, group, label, en, num, den) => ({ key: `mx_${id}`, group, label, en, format: 'percent', goodWhen: 'up', needs: [num, ...(den ? [den] : [])], calc: (b) => ratio(b[X(num)], den ? b[X(den)] : b.impressions, 100) });
+export const count = (key, group, label, en, goodWhen = 'up') => ({ key: `mx_${key}`, group, label, en, format: 'number', goodWhen, needs: [key], calc: (b) => (b[X(key)] == null ? null : Number(b[X(key)])) });
+export const cost = (id, group, label, en, countKey) => ({ key: `mx_cost_${id}`, group, label, en, format: 'money', goodWhen: 'down', needs: [countKey], calc: (b) => ratio(b.spend, b[X(countKey)]) });
+export const rate = (id, group, label, en, num, den) => ({ key: `mx_${id}`, group, label, en, format: 'percent', goodWhen: 'up', needs: [num, ...(den ? [den] : [])], calc: (b) => ratio(b[X(num)], den ? b[X(den)] : b.impressions, 100) });
 
 export const G = { reach: 'Охоплення та частота', interaction: 'Взаємодія', funnel: 'Воронка сайту', messages: 'Повідомлення', video: 'Відео' };
 
@@ -98,11 +98,8 @@ export const META_METRIC_LIST = [
 export const META_METRICS = Object.fromEntries(META_METRIC_LIST.map((m) => [m.key, m]));
 export const isExtraMetric = (key) => typeof key === 'string' && key.startsWith('mx_');
 
-// Columns available per platform (only Meta has a catalog so far).
-export const PLATFORM_COLUMNS = { meta: META_METRIC_LIST };
-
 // Only keys of the platform's catalog survive (what comes back from storage or a request is never trusted).
-export const cleanColumns = (platform, keys) => (PLATFORM_COLUMNS[platform] ? [...new Set((keys || []).filter((k) => PLATFORM_COLUMNS[platform].some((m) => m.key === k)))] : []);
+export const cleanColumns = (platform, keys) => (platform === 'meta' ? [...new Set((keys || []).filter((k) => META_METRICS[k]))] : []);
 
 // The raw counts needed for these metric keys.
 export const countsFor = (keys) => [...new Set(cleanColumns('meta', keys).flatMap((k) => META_METRICS[k].needs))];
