@@ -397,6 +397,10 @@ await ok('google columns: campaigns add up to the account share correctly and a 
   const total = sumBase([{ spend: 100, impressions: 800, clicks: 40, ...a }, { spend: 50, impressions: 200, clicks: 10, ...b }, { spend: 10, impressions: 9000, clicks: 5, ...display }]);
   assert.equal(computeMetric('mx_g_search_is', total), (1000 / 1800) * 100); // impressions of search campaigns / what they could have had
   assert.equal(computeMetric('mx_g_lost_budget_is', total), (480 / 1800) * 100);
+  // a top share is weighted by its own denominator: a single campaign gives back exactly its own share
+  const topOne = extractGoogleCounts({ impressions: 1000, top_impression_percentage: 0.6, search_impression_share: 0.5, search_top_impression_share: 0.75 }, ['mx_g_search_top_is']);
+  assert.equal(computeMetric('mx_g_search_top_is', topOne), 75);
+  assert.equal(computeMetric('mx_g_search_top_is', sumBase([topOne, extractGoogleCounts({ impressions: 9000 }, ['mx_g_search_top_is'])])), 75); // a campaign with no share changes nothing
   assert.equal(computeMetric('mx_g_search_is', { impressions: 5 }), null);
   assert.equal(computeMetric('mx_g_conv_rate', { purchases: 0, leads: 6, clicks: 200 }), 3);
   assert.equal(computeMetric('mx_cost_g_interaction', { spend: 90, x_g_interactions: 30 }), 3);

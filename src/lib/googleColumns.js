@@ -25,8 +25,12 @@ export const G_COUNTS = {
   g_search_impr: { metrics: ['impressions', 'search_impression_share'], calc: (m) => (hasShare(m) ? num(m.impressions) : 0) },
   g_lost_budget: { metrics: ['impressions', 'search_impression_share', 'search_budget_lost_impression_share'], calc: (m) => eligible(m) * num(m.search_budget_lost_impression_share) },
   g_lost_rank: { metrics: ['impressions', 'search_impression_share', 'search_rank_lost_impression_share'], calc: (m) => eligible(m) * num(m.search_rank_lost_impression_share) },
-  g_search_top: { metrics: ['impressions', 'search_impression_share', 'search_top_impression_share'], calc: (m) => eligible(m) * num(m.search_top_impression_share) },
-  g_search_abs_top: { metrics: ['impressions', 'search_impression_share', 'search_absolute_top_impression_share'], calc: (m) => eligible(m) * num(m.search_absolute_top_impression_share) },
+  // The top shares have their own denominator (impressions that were eligible for the TOP position), so it is rebuilt from the measured top
+  // impressions and the share: eligible_top = top impressions / share.
+  g_stop_impr: { metrics: ['impressions', 'top_impression_percentage', 'search_top_impression_share'], calc: (m) => (num(m.search_top_impression_share) > 0 ? num(m.impressions) * num(m.top_impression_percentage) : 0) },
+  g_stop_elig: { metrics: ['impressions', 'top_impression_percentage', 'search_top_impression_share'], calc: (m) => (num(m.search_top_impression_share) > 0 ? (num(m.impressions) * num(m.top_impression_percentage)) / num(m.search_top_impression_share) : 0) },
+  g_sabs_impr: { metrics: ['impressions', 'absolute_top_impression_percentage', 'search_absolute_top_impression_share'], calc: (m) => (num(m.search_absolute_top_impression_share) > 0 ? num(m.impressions) * num(m.absolute_top_impression_percentage) : 0) },
+  g_sabs_elig: { metrics: ['impressions', 'absolute_top_impression_percentage', 'search_absolute_top_impression_share'], calc: (m) => (num(m.search_absolute_top_impression_share) > 0 ? (num(m.impressions) * num(m.absolute_top_impression_percentage)) / num(m.search_absolute_top_impression_share) : 0) },
 };
 
 const G = { interaction: 'Взаємодії', conv: 'Конверсії', share: 'Частка показів (пошук)', position: 'Позиція показів', video: 'Відео' };
@@ -48,8 +52,8 @@ export const GOOGLE_METRIC_LIST = [
   rate('g_search_is', G.share, 'Частка показів у пошуку', 'Search impression share', 'g_search_impr', 'g_search_eligible'),
   down(rate('g_lost_budget_is', G.share, 'Втрачена частка (бюджет)', 'Search lost IS (budget)', 'g_lost_budget', 'g_search_eligible')),
   down(rate('g_lost_rank_is', G.share, 'Втрачена частка (рейтинг)', 'Search lost IS (rank)', 'g_lost_rank', 'g_search_eligible')),
-  rate('g_search_top_is', G.share, 'Частка показів угорі', 'Search top impression share', 'g_search_top', 'g_search_eligible'),
-  rate('g_search_abs_top_is', G.share, 'Частка показів на 1-й позиції', 'Search absolute top IS', 'g_search_abs_top', 'g_search_eligible'),
+  rate('g_search_top_is', G.share, 'Частка показів угорі', 'Search top impression share', 'g_stop_impr', 'g_stop_elig'),
+  rate('g_search_abs_top_is', G.share, 'Частка показів на 1-й позиції', 'Search absolute top IS', 'g_sabs_impr', 'g_sabs_elig'),
 
   rate('g_top_pct', G.position, 'Покази угорі, % від усіх', 'Top impression %', 'g_top_impr'),
   rate('g_abs_top_pct', G.position, 'Покази на 1-й позиції, % від усіх', 'Absolute top impression %', 'g_abs_top_impr'),
