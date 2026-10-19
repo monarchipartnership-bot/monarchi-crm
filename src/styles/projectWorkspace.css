@@ -23,7 +23,8 @@
 .pw .pw-btn--primary, .pw .btn-p, .pw .pw-btn--selected {
   background: linear-gradient(140deg, #AE40AE, #682768); color: #fff; border-color: #99409D; box-shadow: 0 4px 12px #68276821;
 }
-.pw .pw-btn--primary:hover:not(:disabled), .pw .btn-p:hover:not(:disabled), .pw .pw-btn--selected:hover:not(:disabled) { background: #682768; color: #fff; border-color: #682768; filter: none; }
+.pw .pw-btn--selected:hover:not(:disabled) { background: #682768; color: #fff; border-color: #682768; filter: none; }
+.pw .pw-btn--primary:hover:not(:disabled), .pw .btn-p:hover:not(:disabled) { background: linear-gradient(140deg, #AE40AE, #682768); color: #fff; border-color: #99409D; filter: none; } /* the shine (motion.css) is the hover effect */
 .pw .pw-btn--danger { color: var(--pw-danger); background: #FFF9FB; border-color: #EBC3CE; }
 .pw .pw-btn--danger-quiet { color: var(--pw-danger); background: transparent; border-color: transparent; }
 .pw .pw-btn--danger-quiet:hover:not(:disabled) { background: #FFF1F4; border-color: #EBC3CE; color: var(--pw-danger); }

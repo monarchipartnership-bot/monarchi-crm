@@ -35,6 +35,7 @@ import SmmHome from './pages/Smm/SmmHome';
 import SiteLeads from './pages/SiteLeads/SiteLeads';
 import SettingsLayout from './pages/Settings/SettingsLayout';
 import './styles/pages.css';
+import './styles/motion.css';
 
 function AuthGate() {
   const { session, loading, passwordSet, profileLoading } = useAuth();

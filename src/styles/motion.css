@@ -1,0 +1,52 @@
+/* Monarchi Hub motion kit: «Чітка слива + М'який баланс» (shared-motion-kit/motion.css + INTEGRATION.md).
+   1. Icon: when the cursor enters the box that holds a badge icon, the icon lifts once (620ms): up 3px, tilts -4deg, scales 1.05, settles back.
+      The box and its text do not move. The wrapper is animated, never the asset inside it.
+   2. Button: the primary plum buttons (.btn.btn-p, .pw-btn--primary) get one white shine pass left to right (650ms, max 25% white, skewed).
+      The text stays above the shine: the shine is a z-index:-1 pseudo-element inside the button's own stacking context.
+   Opt-out / not covered: disabled, aria-disabled and aria-busy buttons; secondary, text, danger and icon-only buttons (they keep their plain
+   hover / focus); platform logos, avatars and status dots; the immersive AI Agents section (.ai-immersive). Desktop with a fine pointer on
+   hover, keyboard on focus-visible, no synthetic hover on touch. prefers-reduced-motion switches the movement off. No infinite loops, nothing
+   runs on load. Nothing here adds handlers, requests or layout changes. */
+
+/* ---- Icon: box → icon pairs. Only the wrapper of an existing icon badge is animated. ---- */
+.dash-kpi-icon, .client-kpi-icon, .client-profile-stat-icon, .client-profile-quick-ic, .tm-stat-icon, .tm-dept-card-icon, .kcard-icon,
+.proj-card-icon, .client-profile-mini-row-ic, .pw-tab img { transform-origin: 50% 65%; }
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.dash-kpi, .client-kpi-card, .client-profile-stat-card, .client-profile-quick-field, .tm-stat-card, .tm-dept-card, .kcard, .proj-card, .client-profile-mini-row, .client-profile-deal-row, .pw-tab):not(.ai-immersive *):not([aria-disabled="true"]):not(:disabled):hover
+    :is(.dash-kpi-icon, .client-kpi-icon, .client-profile-stat-icon, .client-profile-quick-ic, .tm-stat-icon, .tm-dept-card-icon, .kcard-icon, .proj-card-icon, .client-profile-mini-row-ic, img) {
+    animation: mh-icon-lift 620ms cubic-bezier(.22, .61, .36, 1) both;
+  }
+}
+:is(.client-profile-quick-field, .tm-dept-card, .client-profile-mini-row, .client-profile-deal-row, .pw-tab):not(.ai-immersive *):not([aria-disabled="true"]):not(:disabled):focus-visible
+  :is(.client-profile-quick-ic, .tm-dept-card-icon, .client-profile-mini-row-ic, img) {
+  animation: mh-icon-lift 620ms cubic-bezier(.22, .61, .36, 1) both;
+}
+
+/* ---- Button: one shine pass ---- */
+:is(.btn.btn-p, .pw-btn--primary):not(.ai-immersive *) { position: relative; isolation: isolate; overflow: hidden; }
+:is(.btn.btn-p, .pw-btn--primary):not(.ai-immersive *)::after {
+  content: ""; position: absolute; top: -40%; bottom: -40%; left: -65%; width: 45%; pointer-events: none; z-index: -1; opacity: 0;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .25), transparent); transform: skewX(-18deg);
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.btn.btn-p, .pw-btn--primary):not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]):not(.ai-immersive *):hover::after { animation: mh-button-shine 650ms ease-out both; }
+}
+:is(.btn.btn-p, .pw-btn--primary):not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]):not(.ai-immersive *):focus-visible::after { animation: mh-button-shine 650ms ease-out both; }
+
+@keyframes mh-icon-lift {
+  0%, 100% { transform: translateY(0) rotate(0) scale(1); }
+  35% { transform: translateY(-3px) rotate(-4deg) scale(1.05); }
+  68% { transform: translateY(-1px) rotate(2deg) scale(1.02); }
+}
+@keyframes mh-button-shine {
+  0% { left: -65%; opacity: 0; }
+  12% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { left: 125%; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-kpi-icon, .client-kpi-icon, .client-profile-stat-icon, .client-profile-quick-ic, .tm-stat-icon, .tm-dept-card-icon, .kcard-icon,
+  .proj-card-icon, .client-profile-mini-row-ic, .pw-tab img { animation: none !important; transform: none !important; }
+  :is(.btn.btn-p, .pw-btn--primary)::after { animation: none !important; display: none; }
+}

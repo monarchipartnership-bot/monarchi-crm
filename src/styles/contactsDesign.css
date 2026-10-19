@@ -47,7 +47,6 @@
 .contacts-design .btn:hover { background: linear-gradient(180deg, #fff, #f3eafd); border-color: #d6c3ee; color: #6c1f8c; }
 .contacts-design .btn:disabled { opacity: .55; }
 .contacts-design .btn-p, .contacts-design .btn-p:hover { background: var(--contacts-primary); border-color: transparent; color: #fff; box-shadow: var(--contacts-primary-shadow); filter: none; }
-.contacts-design .btn-p:hover { filter: brightness(1.05); }
 .contacts-design .btn .action-icon, .contacts-design button .action-icon { flex: none; }
 .contacts-design .contacts-btn-ic { display: inline-flex; flex: none; }
 .contacts-design .contacts-btn-ic svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }

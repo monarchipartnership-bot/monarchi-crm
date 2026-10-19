@@ -107,7 +107,7 @@
   border-color: transparent; color: #fff;
   box-shadow: 0 6px 16px rgba(105, 35, 159, .22);
 }
-.btn-p:hover { background: linear-gradient(90deg, #7430b3 0%, #68229e 100%); border-color: transparent; color: #fff; filter: brightness(1.06); box-shadow: 0 8px 20px rgba(105, 35, 159, .3); }
+.btn-p:hover { background: linear-gradient(90deg, #7430b3 0%, #68229e 100%); border-color: transparent; color: #fff; filter: none; box-shadow: 0 6px 16px rgba(105, 35, 159, .22); } /* the shine (motion.css) is the hover effect */
 
 /* Report-type switcher (ReportTypeSwitcher.jsx) — pinned above the hero on
    whichever report page currently doubles as the section's landing page.

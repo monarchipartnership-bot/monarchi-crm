@@ -50,7 +50,6 @@
 .deals-design .btn-p, .deals-design .btn-p:hover {
   background: var(--deals-primary); border-color: transparent; color: #fff; box-shadow: var(--deals-primary-shadow); filter: none;
 }
-.deals-design .btn-p:hover { filter: brightness(1.05); }
 .deals-design .btn svg { flex: none; }
 .deals-design .btn .action-icon, .deals-design button .action-icon { flex: none; }
 .deals-design .btn-danger { color: #b3261e; border-color: #f2cfcb; background: #fff; }
