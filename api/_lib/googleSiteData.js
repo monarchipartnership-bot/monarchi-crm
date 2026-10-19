@@ -1,6 +1,8 @@
-// What the website analyst reads: Google Analytics 4 (the Data API) and Google Search Console (the Search Analytics API) of Monarchi's site,
-// as a Google SERVICE ACCOUNT (the key lives in the server environment only: GOOGLE_SERVICE_ACCOUNT_JSON, plain JSON or base64 of it; the
-// account's e-mail is added as a reader in GA4 and in Search Console). Nothing here ever writes to Google. fetch and the clock are handed in,
+// What the website analyst reads: Google Analytics 4 (the Data API) and Google Search Console (the Search Analytics API) of Monarchi's site.
+// Two ways to sign in, both read-only and both with the secret only in the server environment:
+//   1. a Google SERVICE ACCOUNT: GOOGLE_SERVICE_ACCOUNT_JSON (plain JSON or base64 of it); its e-mail is a reader in GA4 and Search Console;
+//   2. an OAuth refresh token of a person who can see both: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN
+//      (for organisations that forbid service account keys). The service account wins when both are set. Nothing here ever writes to Google. fetch and the clock are handed in,
 // so scripts/check-core.mjs runs all of it against a stand-in network.
 //
 // Two layers: collectSiteStats() fetches the raw numbers; analyseSite() turns them into figures, changes and findings IN CODE (the model
@@ -26,10 +28,28 @@ export function serviceAccountFromEnv(env = process.env) {
   return { client_email: json.client_email, private_key: String(json.private_key).replace(/\\n/g, '\n') };
 }
 
+// The sign-in the environment offers → { kind: 'service_account', account } | { kind: 'oauth', clientId, clientSecret, refreshToken }.
+export function authFromEnv(env = process.env) {
+  if (String(env.GOOGLE_SERVICE_ACCOUNT_JSON || '').trim()) return { kind: 'service_account', account: serviceAccountFromEnv(env) };
+  const clientId = String(env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
+  const clientSecret = String(env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
+  const refreshToken = String(env.GOOGLE_OAUTH_REFRESH_TOKEN || '').trim();
+  if (clientId && clientSecret && refreshToken) return { kind: 'oauth', clientId, clientSecret, refreshToken };
+  throw new Error('Потрібен доступ до Google: додайте у Vercel або ключ сервісного акаунта (GOOGLE_SERVICE_ACCOUNT_JSON), або три змінні GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN.');
+}
+
 const b64u = (x) => Buffer.from(typeof x === 'string' ? x : JSON.stringify(x)).toString('base64url');
 
 // A signed one-hour access token for the scopes above (the standard JWT bearer flow, signed with RS256 by node's crypto: no extra library).
-export async function accessToken({ account, fetchFn = fetch, now = () => new Date() }) {
+export async function accessToken({ account, auth, fetchFn = fetch, now = () => new Date() }) {
+  const a = auth || { kind: 'service_account', account };
+  if (a.kind === 'oauth') {
+    const res = await fetchFn(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', client_id: a.clientId, client_secret: a.clientSecret, refresh_token: a.refreshToken }) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.access_token) throw new Error('Google не видав доступ за токеном оновлення: ' + String(json.error_description || json.error || res.status).slice(0, 200) + (json.error === 'invalid_grant' ? ' Токен прострочений або відкликаний: отримайте новий (якщо застосунок у режимі «Testing», токен живе лише 7 днів: опублікуйте його).' : ''));
+    return json.access_token;
+  }
+  account = a.account;
   const iat = Math.floor(now().getTime() / 1000);
   const claims = { iss: account.client_email, scope: SCOPES.join(' '), aud: TOKEN_URL, iat, exp: iat + 3600 };
   const unsigned = `${b64u({ alg: 'RS256', typ: 'JWT' })}.${b64u(claims)}`;
@@ -84,10 +104,10 @@ function ga4Rows(resp, metrics) {
 }
 
 // → { period, ga4: { total, channels, pages } | null, gsc: { total, queries, pages } | null, errors: { ga4?, gsc? } }
-export async function collectSiteStats({ account, config = {}, fetchFn = fetch, now = () => new Date(), days = 28 }) {
+export async function collectSiteStats({ account, auth, config = {}, fetchFn = fetch, now = () => new Date(), days = 28 }) {
   const cfg = { ...DEFAULT_SITE, ...Object.fromEntries(Object.entries(config).filter(([, v]) => v)) };
   const period = windows(now(), days);
-  const token = await accessToken({ account, fetchFn, now });
+  const token = await accessToken({ account, auth, fetchFn, now });
   const errors = {};
   const ranges = [{ startDate: period.cur.start, endDate: period.cur.end, name: 'cur' }, { startDate: period.prev.start, endDate: period.prev.end, name: 'prev' }];
   const ga = (extra) => post(`${GA4}${cfg.ga4PropertyId}:runReport`, token, { dateRanges: ranges, ...extra }, fetchFn, 'GA4');

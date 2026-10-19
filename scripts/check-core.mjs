@@ -20,7 +20,7 @@ import { composeSystem } from '../src/lib/agents/locked.js';
 import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
 import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
-import { analyseSite, collectSiteStats, serviceAccountFromEnv, windows as siteWindows } from '../api/_lib/googleSiteData.js';
+import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
@@ -606,6 +606,19 @@ await ok('site analyst: a signed token is requested once, GA4 and Search Console
   assert.deepEqual([raw.ga4.total.cur.activeUsers, raw.ga4.total.prev.activeUsers, raw.gsc.total.cur.clicks, raw.gsc.total.prev.clicks], [28, 31, 5, 4]);
   assert.equal(raw.ga4.channels[0].name, 'Organic Search');
   assert.equal(raw.gsc.queries.length, 3);
+});
+await ok('site analyst: without a service account key the OAuth refresh token of a person works, and the message says which variables are missing', async () => {
+  const env = { GOOGLE_OAUTH_CLIENT_ID: 'cid', GOOGLE_OAUTH_CLIENT_SECRET: 'sec', GOOGLE_OAUTH_REFRESH_TOKEN: 'rtok' };
+  assert.equal(authFromEnv(env).kind, 'oauth');
+  assert.equal(authFromEnv({ ...env, GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: 'a@b', private_key: 'k' }) }).kind, 'service_account'); // the key wins
+  assert.throws(() => authFromEnv({ GOOGLE_OAUTH_CLIENT_ID: 'cid' }), /GOOGLE_OAUTH_REFRESH_TOKEN/);
+  const { fetchFn, log } = siteFetch();
+  const wrap = async (url, init) => { if (url.includes('oauth2') && String(init.body).includes('refresh_token')) { log.push({ url, refresh: String(init.body) }); return { ok: true, status: 200, json: async () => ({ access_token: 'tok123' }) }; } return fetchFn(url, init); };
+  const raw = await collectSiteStats({ auth: authFromEnv(env), fetchFn: wrap, now: SITE_NOW });
+  assert.match(log.find((l) => l.refresh).refresh, /grant_type=refresh_token.*client_id=cid.*refresh_token=rtok/);
+  assert.equal(raw.ga4.total.cur.activeUsers, 28);
+  const dead = async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant', error_description: 'Token has been expired or revoked.' }) });
+  await assert.rejects(() => collectSiteStats({ auth: authFromEnv(env), fetchFn: dead, now: SITE_NOW }), /прострочений або відкликаний.*7 днів/);
 });
 await ok('site analyst: a failure of one source does not lose the other, both failing is one clear error', async () => {
   const half = await collectSiteStats({ account: siteAccount, fetchFn: siteFetch({ gaFail: true }).fetchFn, now: SITE_NOW });

@@ -104,7 +104,7 @@ export default function AgentSettings({ agent, notify, reload }) {
         <div className="smm-form">
           <div className="smm-field"><label htmlFor="ag-ga4">Ідентифікатор ресурсу GA4</label><input id="ag-ga4" type="text" inputMode="numeric" value={f.config.ga4PropertyId || ''} onChange={(e) => setCfg('ga4PropertyId', e.target.value.replace(/\D/g, ''))} placeholder="503944052" /></div>
           <div className="smm-field"><label htmlFor="ag-gsc">Ресурс Search Console</label><input id="ag-gsc" type="text" value={f.config.gscSiteUrl || ''} onChange={(e) => setCfg('gscSiteUrl', e.target.value.trim())} placeholder="sc-domain:monarchi.agency" /></div>
-          <p className="smm-hint smm-field--wide">Агент читає обидва сервіси від імені сервісного акаунта Google. Ключ акаунта лежить у змінній <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> на сервері (Vercel), а пошту акаунта додано читачем у GA4 і Search Console. Агент лише читає, нічого не змінює. Ідентифікатор GA4 це число з «Адміністратор → Відомості про ресурс».</p>
+          <p className="smm-hint smm-field--wide">Агент читає обидва сервіси лише на читання, нічого не змінює. Доступ задається на сервері (Vercel): або ключем сервісного акаунта <code>GOOGLE_SERVICE_ACCOUNT_JSON</code>, або трьома змінними <code>GOOGLE_OAUTH_CLIENT_ID</code>, <code>GOOGLE_OAUTH_CLIENT_SECRET</code>, <code>GOOGLE_OAUTH_REFRESH_TOKEN</code> (токен людини, яка бачить GA4 і Search Console). Ідентифікатор GA4 це число з «Адміністратор → Відомості про ресурс».</p>
         </div>
       )}
 

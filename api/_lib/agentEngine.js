@@ -13,7 +13,7 @@ import { BudgetError } from './modelClient.js';
 import { buildCopyPrompts, buildQcPrompts, buildStrategistPrompts, buildVisualPrompts, decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from './agentContent.js';
 import { analyseCompetitors } from './smmRun.js';
 import { insightLine } from './competitorAnalysis.js';
-import { DEFAULT_SITE, analyseSite, collectSiteStats, reportInput, serviceAccountFromEnv, strategistLines } from './googleSiteData.js';
+import { DEFAULT_SITE, analyseSite, authFromEnv, collectSiteStats, reportInput, strategistLines } from './googleSiteData.js';
 import { runSeoAudit } from './seoRun.js';
 import * as higgsfield from './higgsfield.js';
 import { campaignRole } from './campaignRun.js';
@@ -302,7 +302,7 @@ async function competitors({ ctx, agent, task, rec }) {
 const SITE_RULES = 'Write in Ukrainian, plain words, at most 220 words: the most useful finding first, then what grew or fell, then what deserves attention. Use ONLY the numbers in the data; where a figure has no change shown (too little data), say the volume is too small to judge and never calculate a percentage yourself. Name any cause as a hypothesis, never as a fact. End with two short lists: «Для SEO» and «Для стратега», each at most 3 lines, taken from the findings.';
 async function siteAnalyst({ ctx, agent, prompt, rec }) {
   const cfg = { ...DEFAULT_SITE, ...Object.fromEntries(Object.entries(agent.config || {}).filter(([, v]) => v)) };
-  const raw = ctx.site ? await ctx.site({ config: cfg }) : await collectSiteStats({ account: serviceAccountFromEnv(ctx.env || process.env), config: cfg, now: ctx.now });
+  const raw = ctx.site ? await ctx.site({ config: cfg }) : await collectSiteStats({ auth: authFromEnv(ctx.env || process.env), config: cfg, now: ctx.now });
   const analysis = analyseSite(raw, agent.config?.thresholds);
   let report = '';
   let modelError = null;
