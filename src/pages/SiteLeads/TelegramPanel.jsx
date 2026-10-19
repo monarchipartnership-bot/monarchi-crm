@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import ActionIcon from '../../components/common/ActionIcon';
 import Select from '../../components/common/Select';
 import { fetchTgChats, fetchTgMembers, setMemberPing, telegramChats, telegramMembers, telegramStatus, telegramTest } from '../../lib/api/siteLeads';
-import { DEFAULT_TEMPLATE, PLACEHOLDERS, renderMessage, SAMPLE_LEAD } from '../../lib/siteLeadMessage';
 import { fmtDateTime } from '../Smm/agentUi';
+import TemplateLibrary from './TemplateLibrary';
 
 const INTERVALS = [15, 30, 60, 120, 240, 480].map((m) => ({ value: String(m), label: m < 60 ? `${m} хвилин` : m === 60 ? '1 година' : `${m / 60} ${m / 60 < 5 ? 'години' : 'годин'}` }));
 const COUNTS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: n === 1 ? '1 раз' : `${n} рази` }));
@@ -17,19 +17,14 @@ export default function TelegramPanel({ settings, leads, patch, notify, busy }) 
   const [members, setMembers] = useState({}); // chat id -> people
   const [openChat, setOpenChat] = useState(null);
   const [working, setWorking] = useState('');
-  const [tpl, setTpl] = useState(settings.message_template ?? DEFAULT_TEMPLATE);
-  const tplRef = useRef(null);
 
   const chats = settings.telegram_chat_ids || [];
   const refreshStatus = useCallback(() => telegramStatus().then(setBot).catch((e) => setBot({ unreachable: true, error: e.message })), []);
   useEffect(() => { refreshStatus(); fetchTgChats().then(setSeen); }, [refreshStatus]);
-  useEffect(() => { setTpl(settings.message_template ?? DEFAULT_TEMPLATE); }, [settings.message_template]);
 
   const titleOf = (id) => seen.find((c) => c.chat_id === String(id))?.title || null;
   const lastSend = useMemo(() => leads.find((l) => l.telegram_status), [leads]);
   const pingsNow = (id) => (members[id] || []).filter((m) => m.ping).map((m) => (m.username ? '@' + m.username : m.name)).join(' ');
-  const preview = useMemo(() => renderMessage(tpl, { ...SAMPLE_LEAD, time: '19.10, 10:30', returning: '', ping: openChat ? pingsNow(openChat) : '@anna_k' }), [tpl, openChat, members]); // eslint-disable-line react-hooks/exhaustive-deps
-  const tplDirty = tpl !== (settings.message_template ?? DEFAULT_TEMPLATE);
 
   async function run(key, fn) { setWorking(key); try { await fn(); } catch (e) { notify(e.message || 'Не вдалося виконати.', true); } finally { setWorking(''); } }
   const addChat = (id, title) => { const c = String(id).trim(); if (!c) return; if (chats.includes(c)) { notify('Цей чат уже додано.', true); return; } patch({ telegram_chat_ids: [...chats, c] }, `Чат додано${title ? ': ' + title : ''}.`); setManualChat(''); };
@@ -47,15 +42,7 @@ export default function TelegramPanel({ settings, leads, patch, notify, busy }) 
     await setMemberPing(chatId, m.user_id, !m.ping);
     setMembers((all) => ({ ...all, [chatId]: all[chatId].map((x) => (x.user_id === m.user_id ? { ...x, ping: !m.ping } : x)) }));
   });
-  const test = (id) => run('test' + id, async () => { await telegramTest(id, { template: tpl, showButton: settings.show_button !== false }); notify('Тестове повідомлення надіслано: перевірте чат.'); });
-  const insert = (key) => {
-    const el = tplRef.current;
-    const at = el ? el.selectionStart : tpl.length;
-    const next = tpl.slice(0, at) + `{${key}}` + tpl.slice(el ? el.selectionEnd : at);
-    setTpl(next);
-    requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(at + key.length + 2, at + key.length + 2); } });
-  };
-
+  const test = (id, template) => run('test' + id, async () => { await telegramTest(id, { template: template ?? settings.message_template ?? undefined, showButton: settings.show_button !== false }); notify('Тестове повідомлення надіслано: перевірте чат.'); });
   return (
     <>
       <section className="smm-block">
@@ -142,31 +129,7 @@ export default function TelegramPanel({ settings, leads, patch, notify, busy }) 
         </div>
       </section>
 
-      <section className="smm-block">
-        <h3>3. Форма повідомлення в чат</h3>
-        <p className="smm-muted">Напишіть, як виглядатиме повідомлення. Місця з даними заявки вставляються кнопками нижче; рядок, у якому поле порожнє, зникає разом зі своєю підписом. З розмітки працюють лише <code>&lt;b&gt;</code> жирний, <code>&lt;i&gt;</code> курсив, <code>&lt;u&gt;</code>, <code>&lt;s&gt;</code>, <code>&lt;code&gt;</code>.</p>
-        <div className="smm-tplgrid">
-          <div className="smm-field">
-            <label htmlFor="tpl">Шаблон</label>
-            <textarea id="tpl" ref={tplRef} className="smm-code" rows={13} value={tpl} onChange={(e) => setTpl(e.target.value)} />
-            <div className="smm-chips" role="group" aria-label="Вставити поле">
-              {PLACEHOLDERS.map((p) => <button key={p.key} type="button" className="smm-chipbtn" onClick={() => insert(p.key)} title={`{${p.key}}`}>{p.label}</button>)}
-            </div>
-          </div>
-          <div className="smm-field">
-            <label>Так це виглядатиме в Telegram</label>
-            <div className="smm-bubble" dangerouslySetInnerHTML={{ __html: preview }} />
-            {settings.show_button !== false && <div className="smm-bubble-btn">Відкрити в CRM</div>}
-          </div>
-        </div>
-        <label className="smm-check"><input type="checkbox" checked={settings.show_button !== false} onChange={(e) => patch({ show_button: e.target.checked }, e.target.checked ? 'Кнопку «Відкрити в CRM» показуємо.' : 'Кнопку «Відкрити в CRM» вимкнено.')} disabled={busy} /> Кнопка «Відкрити в CRM» під повідомленням</label>
-        <div className="smm-form-foot">
-          <button type="button" className="smm-btn smm-btn--primary" disabled={!tplDirty || busy} onClick={() => patch({ message_template: tpl.trim() === DEFAULT_TEMPLATE ? null : tpl }, 'Форму повідомлення збережено.')}><ActionIcon name="save" size={18} />Зберегти форму</button>
-          <button type="button" className="smm-btn" onClick={() => setTpl(DEFAULT_TEMPLATE)}>Стандартна форма</button>
-          {chats[0] && <button type="button" className="smm-btn" disabled={!bot?.ok || working === 'test' + chats[0]} onClick={() => test(chats[0])}>Надіслати тест у «{titleOf(chats[0]) || chats[0]}»</button>}
-          {tplDirty && <span className="smm-muted">Є незбережені зміни</span>}
-        </div>
-      </section>
+      <TemplateLibrary settings={settings} patch={patch} notify={notify} busy={busy} canTest={!!bot?.ok && !!chats[0]} ping={chats[0] ? pingsNow(chats[0]) : ''} onTest={(body) => test(chats[0], body)} />
     </>
   );
 }

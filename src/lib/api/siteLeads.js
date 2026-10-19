@@ -45,4 +45,24 @@ export async function setMemberPing(chatId, userId, ping) {
   const { error } = await supabase.from('tg_members').update({ ping }).eq('chat_id', String(chatId)).eq('user_id', userId);
   if (error) throw error;
 }
+// The library of message templates (the standard one is built in, not stored).
+export async function fetchTemplates() {
+  const { data, error } = await supabase.from('site_lead_templates').select('*').order('created_at', { ascending: true });
+  if (error) { console.warn('fetchTemplates failed', error); return []; }
+  return data ?? [];
+}
+export async function createTemplate({ name, body }, email) {
+  const { data, error } = await supabase.from('site_lead_templates').insert({ name: name.trim() || 'Новий шаблон', body, created_by: email || null }).select().single();
+  if (error) throw error;
+  return data;
+}
+export async function updateTemplate(id, { name, body }) {
+  const { data, error } = await supabase.from('site_lead_templates').update({ name: name.trim() || 'Шаблон', body, updated_at: nowIso() }).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
+}
+export async function deleteTemplate(id) {
+  const { error } = await supabase.from('site_lead_templates').delete().eq('id', id);
+  if (error) throw error;
+}
 export const newSiteKey = () => (globalThis.crypto?.randomUUID?.() || String(Math.random()).slice(2) + Date.now()).replace(/-/g, '');
