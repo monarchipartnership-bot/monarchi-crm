@@ -100,6 +100,14 @@ export default function AgentSettings({ agent, notify, reload }) {
         </div>
       )}
 
+      {agent.role === 'site_analyst' && (
+        <div className="smm-form">
+          <div className="smm-field"><label htmlFor="ag-ga4">Ідентифікатор ресурсу GA4</label><input id="ag-ga4" type="text" inputMode="numeric" value={f.config.ga4PropertyId || ''} onChange={(e) => setCfg('ga4PropertyId', e.target.value.replace(/\D/g, ''))} placeholder="503944052" /></div>
+          <div className="smm-field"><label htmlFor="ag-gsc">Ресурс Search Console</label><input id="ag-gsc" type="text" value={f.config.gscSiteUrl || ''} onChange={(e) => setCfg('gscSiteUrl', e.target.value.trim())} placeholder="sc-domain:monarchi.agency" /></div>
+          <p className="smm-hint smm-field--wide">Агент читає обидва сервіси від імені сервісного акаунта Google. Ключ акаунта лежить у змінній <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> на сервері (Vercel), а пошту акаунта додано читачем у GA4 і Search Console. Агент лише читає, нічого не змінює. Ідентифікатор GA4 це число з «Адміністратор → Відомості про ресурс».</p>
+        </div>
+      )}
+
       {agent.role === 'competitors' && (
         <div className="smm-form">
           <div className="smm-field"><label htmlFor="ag-days">Оновлювати аналіз, якщо він старший за (днів)</label><input id="ag-days" type="text" inputMode="numeric" value={f.config.refreshDays ?? 6} onChange={(e) => setCfg('refreshDays', Math.max(1, Math.min(60, Number(e.target.value.replace(/\D/g, '')) || 1)))} /></div>
@@ -121,7 +129,7 @@ export default function AgentSettings({ agent, notify, reload }) {
         </div>
       )}
 
-      {!isCampaign && !hasSchedule && !['strategist', 'competitors', 'visual', 'qc'].includes(agent.role) && <p className="smm-muted">Окремих налаштувань у цього агента поки немає: він працює за завданнями від інших агентів.{meta.readyNote ? ' ' + meta.readyNote : ''}</p>}
+      {!isCampaign && !hasSchedule && !['strategist', 'competitors', 'visual', 'qc', 'site_analyst'].includes(agent.role) && <p className="smm-muted">Окремих налаштувань у цього агента поки немає: він працює за завданнями від інших агентів.{meta.readyNote ? ' ' + meta.readyNote : ''}</p>}
 
       <div className="smm-form-foot">
         <button type="submit" className="smm-btn smm-btn--primary" disabled={saving || !dirty}><ActionIcon name="save" size={18} />{saving ? 'Зберігаємо…' : 'Зберегти'}</button>

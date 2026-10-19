@@ -11,7 +11,8 @@ const SYSTEM = [
 ].join('\n');
 
 // audit: { findings, summary }, pages: parsePage results (the worst ones get their text shown), texts: Map url -> short text
-export function buildPlanPrompts(siteUrl, audit, pages, texts = new Map()) {
+// traffic: lines handed over by the site analyst (queries with shown-but-unclicked results, pages that lost views).
+export function buildPlanPrompts(siteUrl, audit, pages, texts = new Map(), traffic = []) {
   const issues = audit.findings.slice(0, 16).map((f) => `- [${f.severity}] ${f.title} (${f.count} pages)${f.pages.length ? ': ' + f.pages.slice(0, 4).join(' ; ') : ''}`).join('\n');
   const withProblems = new Set(audit.findings.filter((f) => ['title_missing', 'title_dup', 'title_len', 'desc_missing', 'desc_dup', 'desc_len', 'h1_missing'].includes(f.id)).flatMap((f) => f.pages));
   const shown = pages.filter((p) => p.status === 200 && withProblems.has(p.url)).slice(0, 8);
@@ -20,6 +21,7 @@ export function buildPlanPrompts(siteUrl, audit, pages, texts = new Map()) {
     `Site: ${siteUrl}. Pages read: ${audit.summary.pages}; with problems of high / medium / low importance: ${audit.summary.high} / ${audit.summary.medium} / ${audit.summary.low}.`,
     `Issues found:\n${issues || '(none)'}`,
     pageBlocks ? `Pages with title or description problems:\n${pageBlocks}` : '',
+    traffic.length ? `Traffic and search data from the site analyst (use it to choose what to fix first; the numbers are small, never invent others):\n${traffic.slice(0, 10).map((l) => '- ' + clip(l, 300)).join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
   return { system: SYSTEM, user };
 }

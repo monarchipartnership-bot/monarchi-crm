@@ -401,3 +401,14 @@ button.smm-stat { cursor: pointer; }
 .smm-line { display: inline-block; width: 24px; height: 0; border-top: 2px dashed #B060BD; }
 .smm-line--solid { border-top-style: solid; }
 .smm-map .cmp-node.is-clickable:hover .cmp-node-box { stroke-width: 1.2; }
+
+/* the analyst's traffic block */
+.smm-delta { display: block; margin-top: 4px; font-size: 12px; color: var(--s-muted); }
+.smm-delta--up { color: var(--s-ok); }
+.smm-delta--down { color: var(--s-bad); }
+.smm-block h4 { margin: 8px 0 4px; font-size: 13.5px; color: var(--s-ink); }
+.smm-scroll { overflow-x: auto; }
+.smm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.smm-table th { text-align: left; font-weight: 600; color: var(--s-muted); padding: 6px 10px; border-bottom: 1px solid var(--s-line); white-space: nowrap; }
+.smm-table td { padding: 7px 10px; border-bottom: 1px solid var(--s-line); }
+.smm-table td:not(:first-child), .smm-table th:not(:first-child) { text-align: right; white-space: nowrap; }

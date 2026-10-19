@@ -20,6 +20,8 @@ import { composeSystem } from '../src/lib/agents/locked.js';
 import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
 import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
+import { analyseSite, collectSiteStats, serviceAccountFromEnv, windows as siteWindows } from '../api/_lib/googleSiteData.js';
+import { generateKeyPairSync } from 'node:crypto';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
@@ -544,6 +546,117 @@ await ok('telegram topics: a website lead goes into the topic chosen for its cha
   const r = await handleSiteLead({ db, settings: topicSettings, body: form, ip: '9.9.9.9', telegram, now: () => t0 });
   assert.equal(r.status, 'created');
   assert.deepEqual(sent.map((m) => [m.chatId, m.threadId]), [['-100', 7], ['-300', undefined]]); // the chat with a chosen topic gets it there, the other one stays as it was
+});
+
+// ---- The website analyst (GA4 + Search Console)
+const siteKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' });
+const siteAccount = { client_email: 'reader@proj.iam.gserviceaccount.com', private_key: siteKey };
+function siteFetch({ gaFail = false, gscFail = false, big = false } = {}) {
+  const log = [];
+  const fetchFn = async (url, init = {}) => {
+    const body = init.body && typeof init.body === 'string' && init.body.startsWith('{') ? JSON.parse(init.body) : init.body;
+    log.push({ url, body, auth: init.headers?.Authorization });
+    const res = (status, json) => ({ ok: status < 400, status, json: async () => json });
+    if (url.includes('oauth2.googleapis.com')) return res(200, { access_token: 'tok123' });
+    if (url.includes('analyticsdata.googleapis.com')) {
+      if (gaFail) return res(403, { error: { message: 'User does not have access' } });
+      const m = (v) => ({ value: String(v) });
+      const dims = body.dimensions?.map((d) => d.name) || [];
+      const headers = [...dims.map((name) => ({ name })), { name: 'dateRange' }];
+      const row = (d, range, vals) => ({ dimensionValues: [...d.map((v) => ({ value: v })), { value: range }], metricValues: vals.map(m) });
+      if (!dims.length) return res(200, { dimensionHeaders: headers, rows: [row([], 'cur', big ? [400, 520, 900, 0.62, 3000, 12] : [28, 33, 60, 0.5, 136, 0]), row([], 'prev', big ? [300, 400, 700, 0.6, 2500, 9] : [31, 36, 70, 0.48, 150, 0])] });
+      if (dims[0] === 'sessionDefaultChannelGroup') return res(200, { dimensionHeaders: headers, rows: [row(['Organic Search'], 'cur', [20, 18]), row(['Organic Search'], 'prev', [25, 22]), row(['Direct'], 'cur', [13, 10]), row(['Direct'], 'prev', [11, 9])] });
+      return res(200, { dimensionHeaders: headers, rows: [row(['/services/'], 'cur', big ? [80, 50] : [10, 6]), row(['/services/'], 'prev', big ? [200, 90] : [14, 8]), row(['/'], 'cur', [30, 20]), row(['/'], 'prev', [28, 19])] });
+    }
+    if (url.includes('searchAnalytics/query')) {
+      if (gscFail) return res(403, { error: { message: 'Forbidden' } });
+      if (!body.dimensions) return res(200, { rows: [body.startDate < '2026-09-19' ? { clicks: big ? 60 : 4, impressions: big ? 900 : 70, ctr: 0.04, position: 12 } : { clicks: big ? 90 : 5, impressions: big ? 1300 : 80, ctr: 0.05, position: 11 }] });
+      if (body.dimensions[0] === 'query') return res(200, { rows: [{ keys: ['seo агенція'], clicks: 0, impressions: 400, ctr: 0, position: 9.2 }, { keys: ['monarchi'], clicks: 30, impressions: 60, ctr: 0.5, position: 1.2 }, { keys: ['ppc'], clicks: 1, impressions: 300, ctr: 0.003, position: 15 }] });
+      return res(200, { rows: [{ keys: ['https://www.monarchi.agency/services/'], clicks: 9, impressions: 500, ctr: 0.018, position: 8 }] });
+    }
+    return res(404, {});
+  };
+  return { fetchFn, log };
+}
+const SITE_NOW = () => new Date('2026-10-19T09:00:00Z');
+
+await ok('site analyst: the service account key is read from the environment (JSON or base64) and a bad one says what is wrong', () => {
+  const json = JSON.stringify({ client_email: 'a@b.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----\\n' });
+  assert.equal(serviceAccountFromEnv({ GOOGLE_SERVICE_ACCOUNT_JSON: json }).client_email, 'a@b.iam.gserviceaccount.com');
+  assert.match(serviceAccountFromEnv({ GOOGLE_SERVICE_ACCOUNT_JSON: json }).private_key, /BEGIN PRIVATE KEY-----\nabc\n/);
+  assert.equal(serviceAccountFromEnv({ GOOGLE_SERVICE_ACCOUNT_JSON: Buffer.from(json).toString('base64') }).client_email, 'a@b.iam.gserviceaccount.com');
+  assert.throws(() => serviceAccountFromEnv({}), /GOOGLE_SERVICE_ACCOUNT_JSON/);
+  assert.throws(() => serviceAccountFromEnv({ GOOGLE_SERVICE_ACCOUNT_JSON: '{"nope":1}' }), /невірний формат/);
+});
+await ok('site analyst: two 28-day windows end 3 days back (Search Console is that late) and never overlap', () => {
+  const w = siteWindows(new Date('2026-10-19T09:00:00Z'));
+  assert.deepEqual([w.cur.start, w.cur.end, w.prev.start, w.prev.end], ['2026-09-19', '2026-10-16', '2026-08-22', '2026-09-18']);
+});
+await ok('site analyst: a signed token is requested once, GA4 and Search Console are only ever READ with it', async () => {
+  const { fetchFn, log } = siteFetch();
+  const raw = await collectSiteStats({ account: siteAccount, fetchFn, now: SITE_NOW });
+  const tokenCall = log.find((l) => l.url.includes('oauth2'));
+  assert.match(String(tokenCall.body), /grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer/);
+  const assertion = new URLSearchParams(String(tokenCall.body)).get('assertion').split('.');
+  assert.equal(assertion.length, 3);
+  assert.equal(JSON.parse(Buffer.from(assertion[1], 'base64url').toString()).iss, 'reader@proj.iam.gserviceaccount.com');
+  assert.ok(log.filter((l) => !l.url.includes('oauth2')).every((l) => l.auth === 'Bearer tok123'));
+  assert.ok(log.some((l) => l.url.includes('/properties/503944052:runReport')));
+  assert.ok(log.some((l) => l.url.includes(encodeURIComponent('sc-domain:monarchi.agency'))));
+  assert.deepEqual([raw.ga4.total.cur.activeUsers, raw.ga4.total.prev.activeUsers, raw.gsc.total.cur.clicks, raw.gsc.total.prev.clicks], [28, 31, 5, 4]);
+  assert.equal(raw.ga4.channels[0].name, 'Organic Search');
+  assert.equal(raw.gsc.queries.length, 3);
+});
+await ok('site analyst: a failure of one source does not lose the other, both failing is one clear error', async () => {
+  const half = await collectSiteStats({ account: siteAccount, fetchFn: siteFetch({ gaFail: true }).fetchFn, now: SITE_NOW });
+  assert.equal(half.ga4, null);
+  assert.match(half.errors.ga4, /GA4: User does not have access.*читачем у GA4/);
+  assert.ok(half.gsc);
+  await assert.rejects(() => collectSiteStats({ account: siteAccount, fetchFn: siteFetch({ gaFail: true, gscFail: true }).fetchFn, now: SITE_NOW }), /Не вдалося прочитати ні GA4, ні Search Console/);
+});
+await ok('site analyst: small numbers get no percentages, missing conversions are reported, and the hand-off is made in code', async () => {
+  const small = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));
+  const users = small.ga4.metrics.find((m) => m.key === 'users');
+  assert.deepEqual([users.cur, users.prev, users.enough, users.delta], [28, 31, false, null]); // 28 people: no «-9.7%»
+  assert.ok(small.findings.some((f) => f.kind === 'low' && f.source === 'ga4'));
+  assert.ok(small.findings.some((f) => f.kind === 'low' && f.source === 'gsc'));
+  assert.ok(small.findings.some((f) => f.kind === 'setup' && /Ключових подій/.test(f.text)));
+  // queries with shown-but-unclicked results (impressions, CTR under 2%, position 4-20) go to the SEO agent
+  assert.deepEqual(small.gsc.opportunities.map((o) => o.query), ['seo агенція', 'ppc']);
+  assert.ok(small.handoff.seo.some((l) => /seo агенція/.test(l)));
+  assert.ok(small.handoff.strategist.length > 0);
+  const big = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch({ big: true }).fetchFn, now: SITE_NOW }));
+  assert.equal(big.ga4.metrics.find((m) => m.key === 'users').delta, 33.3); // 400 vs 300
+  assert.ok(big.findings.some((f) => f.kind === 'up' && f.source === 'ga4'));
+  assert.ok(!big.findings.some((f) => f.kind === 'setup')); // conversions exist now
+  assert.ok(big.handoff.seo.some((l) => /\/services\//.test(l) && /-60%/.test(l))); // 80 vs 200 views
+});
+await ok('site analyst: the agent run saves the report, hands the lines on and still works when the model fails', async () => {
+  const tables = { smm_brand: [{ id: 1 }], smm_competitors: [], smm_competitor_reports: [], smm_site_audits: [], smm_posts: [], smm_plans: [], smm_site_stats: [], ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [], notifications: [] };
+  const db = fakeDb(tables);
+  await ensureSmmTeam(db, 'a@x.com');
+  const analyst = tables.ag_agents.find((a) => a.role === 'site_analyst');
+  assert.equal(analyst.config.ga4PropertyId, '503944052');
+  let siteCalls = 0;
+  const site = async ({ config }) => { siteCalls += 1; assert.equal(config.gscSiteUrl, 'sc-domain:monarchi.agency'); return collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }); };
+  const good = { callModel: async (args) => ({ text: 'Звіт: даних мало.', usage: { input_tokens: 1, output_tokens: 1 }, costUsd: 0.001, agentKey: args.agentKey }) };
+  const r = await runNow({ db, model: good, email: 'a@x.com', trigger: 'user', hf: null, site, now: SITE_NOW }, analyst.id);
+  assert.equal(r.status, 'done');
+  assert.equal(siteCalls, 1);
+  assert.equal(tables.smm_site_stats.length, 1);
+  assert.equal(tables.smm_site_stats[0].report, 'Звіт: даних мало.');
+  assert.ok(tables.smm_site_stats[0].data.handoff.seo.length > 0);
+  // the model is down: the report is built from the findings and the run still succeeds
+  const bad = { callModel: async () => { throw new Error('overloaded'); } };
+  const r2 = await runNow({ db, model: bad, email: 'a@x.com', trigger: 'user', hf: null, site, now: SITE_NOW }, analyst.id);
+  assert.equal(r2.status, 'done');
+  assert.match(tables.smm_site_stats[1].report, /Мало даних/);
+  assert.match(tables.smm_site_stats[1].model_error, /overloaded/);
+  // no key on the server: a clear message, no report
+  const r3 = await runNow({ db, model: good, email: 'a@x.com', trigger: 'user', hf: null, env: {}, now: SITE_NOW }, analyst.id);
+  assert.equal(r3.status, 'failed');
+  assert.match(r3.error, /GOOGLE_SERVICE_ACCOUNT_JSON/);
+  assert.equal(tables.smm_site_stats.length, 2);
 });
 
 await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {

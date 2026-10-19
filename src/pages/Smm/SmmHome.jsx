@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { agentAction, fetchPlans, fetchPostTasks, kickQueue, loadTeam } from '../../lib/api/agents';
-import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, fetchSiteAudits } from '../../lib/api/smm';
+import { fetchBrand, fetchCompetitorReports, fetchCompetitors, fetchPosts, fetchSettings, fetchSiteAudits, fetchSiteStats } from '../../lib/api/smm';
 import '../../styles/projectWorkspace.css'; // the shared confirmation window (useConfirm) lives in this sheet
 import '../../styles/smmPage.css';
 import AgentPage from './AgentPage';
@@ -34,6 +34,7 @@ export default function SmmHome() {
   const [reports, setReports] = useState({});
   const [settings, setSettings] = useState(null);
   const [audits, setAudits] = useState([]);
+  const [siteStats, setSiteStats] = useState([]);
   const [team, setTeam] = useState(null);
   const [plans, setPlans] = useState([]);
   const [postTasks, setPostTasks] = useState([]);
@@ -50,10 +51,10 @@ export default function SmmHome() {
     try { setTeam(await loadTeam(email)); } catch (e) { console.warn('loadTeam failed', e); setTeam(null); }
   }, [email]);
   const reload = useCallback(async () => {
-    const [b, c, p, r, st, au, pl] = await Promise.all([fetchBrand(), fetchCompetitors(), fetchPosts(), fetchCompetitorReports(), fetchSettings(), fetchSiteAudits(), fetchPlans().catch(() => [])]);
+    const [b, c, p, r, st, au, pl, ss] = await Promise.all([fetchBrand(), fetchCompetitors(), fetchPosts(), fetchCompetitorReports(), fetchSettings(), fetchSiteAudits(), fetchPlans().catch(() => []), fetchSiteStats()]);
     const producing = p.posts.filter((x) => ['planned', 'producing', 'qc'].includes(x.status)).map((x) => x.id);
     const [pt] = await Promise.all([fetchPostTasks(producing).catch(() => []), reloadTeam()]);
-    setReports(r); setSettings(st); setAudits(au); setPlans(pl); setPostTasks(pt);
+    setReports(r); setSettings(st); setAudits(au); setSiteStats(ss); setPlans(pl); setPostTasks(pt);
     setBrand(b.brand); setCompetitors(c); setPosts(p.posts); setMissing(b.missing || p.missing); setLoading(false);
   }, [reloadTeam]);
   useEffect(() => { reload(); }, [reload]);
@@ -124,7 +125,7 @@ export default function SmmHome() {
             {tab === 'agents' && team && agentRole && <AgentPage role={agentRole} team={team} posts={posts} notify={notify} reloadTeam={reloadTeam} reloadAll={reload} back={() => go('agents')} open={openAgent} go={go} kick={kick} />}
             {tab === 'plan' && <SmmPlan {...common} onGenerate={() => openAgent('strategist')} onNew={() => setDialog({ kind: 'post', post: null })} onEdit={(post) => setDialog({ kind: 'post', post })} />}
             {tab === 'queue' && team && <SmmQueue {...common} plans={plans} postTasks={postTasks} team={team} kick={kick} onEdit={(post) => setDialog({ kind: 'post', post })} />}
-            {tab === 'site' && <SmmSite settings={settings} audits={audits} notify={notify} reload={reload} />}
+            {tab === 'site' && <SmmSite settings={settings} audits={audits} siteStats={siteStats} openAgent={openAgent} notify={notify} reload={reload} />}
             {tab === 'brand' && <SmmBrand brand={brand} competitors={competitors} reports={reports} notify={notify} reload={reload} />}
           </>
         )}

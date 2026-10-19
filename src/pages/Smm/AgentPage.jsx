@@ -19,7 +19,7 @@ const SUBTABS = [
   { key: 'history', label: 'Історія запитів' },
   { key: 'tasks', label: 'Завдання' },
 ];
-const MANUAL_RUN = ['strategist', 'seo', 'competitors'];
+const MANUAL_RUN = ['site_analyst', 'strategist', 'seo', 'competitors'];
 const canRunByHand = (agent) => agent.team === 'campaign' || MANUAL_RUN.includes(agent.role);
 const RUN_LABEL = { strategist: 'Скласти план тижня', seo: 'Запустити аудит сайту', competitors: 'Проаналізувати конкурентів' };
 const RUN_NOTE = { strategist: 'Агент складе план і покладе його в «Чергу схвалення» чекати на ваше «ок». Це займає до хвилини.', seo: 'Агент прочитає публічні сторінки сайту (до двох хвилин). Результат зʼявиться у вкладці «Сайт».', competitors: 'Агент прочитає сайти конкурентів (до двох хвилин).' };

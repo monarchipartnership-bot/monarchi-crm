@@ -24,7 +24,7 @@ const brandText = (brand) => {
 };
 
 // ------------------------------------------------------------------------------------------------------------ strategist
-// platforms: [{ platform, count }]. research: { competitors: [lines], seo: [lines], social: [lines] }.
+// platforms: [{ platform, count }]. research: { competitors: [lines], seo: [lines], site: [lines], social: [lines] }.
 export function buildStrategistPrompts({ body, brand = {}, platforms = [], language = 'en', focus = '', weekStart, recentTopics = [], rejections = [], research = {} }) {
   const total = platforms.reduce((s, p) => s + p.count, 0);
   const system = composeSystem('strategist', body, { language: LANGUAGES[language] || LANGUAGES.en, platformRules: platforms.map((p) => platformRule(p.platform)) });
@@ -35,6 +35,7 @@ export function buildStrategistPrompts({ body, brand = {}, platforms = [], langu
     brandText(brand),
     section('What the competitor agent learned from their public pages (take a different angle; never copy, never name them):', research.competitors),
     section('What the SEO review found on our site (turn content gaps into topics when they fit the pillars):', research.seo, 6),
+    section('How our website performs in traffic and search (from the site analyst; the numbers are small, do not over-read them; prefer topics people already look for):', research.site, 8),
     section('What worked and what did not in our published posts:', research.social, 6),
     recentTopics.length ? `Topics already used recently, do not repeat them:\n${recentTopics.slice(0, 40).map((t) => '- ' + clip(t, 100)).join('\n')}` : '',
     rejections.length ? `The team rejected earlier posts for these reasons, learn from them:\n${rejections.slice(0, 10).map((r) => '- ' + clip(r, 200)).join('\n')}` : '',

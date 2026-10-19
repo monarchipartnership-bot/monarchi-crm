@@ -13,6 +13,7 @@ import { BudgetError } from './modelClient.js';
 import { buildCopyPrompts, buildQcPrompts, buildStrategistPrompts, buildVisualPrompts, decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from './agentContent.js';
 import { analyseCompetitors } from './smmRun.js';
 import { insightLine } from './competitorAnalysis.js';
+import { DEFAULT_SITE, analyseSite, collectSiteStats, reportInput, serviceAccountFromEnv, strategistLines } from './googleSiteData.js';
 import { runSeoAudit } from './seoRun.js';
 import * as higgsfield from './higgsfield.js';
 import { campaignRole } from './campaignRun.js';
@@ -99,7 +100,9 @@ async function loadResearch(db) {
   const competitors = comps.map((c) => insightLine(c.name, latest.get(c.id))).filter(Boolean);
   const audit = (await db.from('smm_site_audits').select('plan, created_at').not('plan', 'is', null).order('created_at', { ascending: false }).limit(1)).data?.[0];
   const seo = audit?.plan ? [audit.plan.summary, ...(audit.plan.priorities || []).map((p) => `${p.title}: ${p.why}`)].filter(Boolean) : [];
-  return { competitors, seo, social: [] };
+  // what the site analyst found in GA4 / Search Console (the table may not exist yet: then nothing)
+  const stats = (await db.from('smm_site_stats').select('data').order('created_at', { ascending: false }).limit(1)).data?.[0];
+  return { competitors, seo, site: strategistLines(stats?.data), social: [] };
 }
 
 // Every agent of every team (the SMM team and the campaign teams of the clients) with the links between them. States are computed
@@ -294,14 +297,36 @@ async function competitors({ ctx, agent, task, rec }) {
   return { output: { analysed: ok.length, failed: failed.map((f) => ({ name: f.name, error: f.error })) }, summary: `Проаналізовано ${ok.length} із ${results.length}${failed.length ? `. Не вдалося: ${failed.map((f) => f.name).join(', ')}` : ''}.` };
 }
 
+// The website analyst: reads GA4 and Search Console as the service account, works out the figures, changes and findings IN CODE, lets the model
+// phrase a short report (it never computes), saves everything, and the strategist and the SEO agent read it next time they work.
+const SITE_RULES = 'Write in Ukrainian, plain words, at most 220 words: the most useful finding first, then what grew or fell, then what deserves attention. Use ONLY the numbers in the data; where a figure has no change shown (too little data), say the volume is too small to judge and never calculate a percentage yourself. Name any cause as a hypothesis, never as a fact. End with two short lists: «Для SEO» and «Для стратега», each at most 3 lines, taken from the findings.';
+async function siteAnalyst({ ctx, agent, prompt, rec }) {
+  const cfg = { ...DEFAULT_SITE, ...Object.fromEntries(Object.entries(agent.config || {}).filter(([, v]) => v)) };
+  const raw = ctx.site ? await ctx.site({ config: cfg }) : await collectSiteStats({ account: serviceAccountFromEnv(ctx.env || process.env), config: cfg, now: ctx.now });
+  const analysis = analyseSite(raw, agent.config?.thresholds);
+  let report = '';
+  let modelError = null;
+  try {
+    const r = await rec.callModel({ agentKey: 'smm-site-analyst', params: modelParams(agent, { max_tokens: 1200, system: `${prompt.body}\n\n${SITE_RULES}`, messages: [{ role: 'user', content: reportInput(analysis) }] }) });
+    report = String(r.text || '').trim();
+  } catch (e) { modelError = String(e?.message || e).slice(0, 300); }
+  if (!report) report = analysis.findings.map((f) => '- ' + f.text).join('\n') || 'Даних для звіту немає.';
+  const row = { period_start: raw.period.cur.start, period_end: raw.period.cur.end, data: analysis, report, model_error: modelError, created_by: ctx.email };
+  const saved = await ctx.db.from('smm_site_stats').insert(row).select('id').single();
+  if (saved.error) throw new Error(/smm_site_stats/.test(saved.error.message) ? 'Не вдалося зберегти звіт: таблицю smm_site_stats ще не створено (потрібна міграція 20261032000000).' : 'Не вдалося зберегти звіт: ' + saved.error.message);
+  const notes = [raw.errors?.ga4 && 'GA4 недоступний', raw.errors?.gsc && 'Search Console недоступний', modelError && 'текст звіту зібрано без моделі'].filter(Boolean);
+  return { output: { statsId: saved.data.id, findings: analysis.findings.length, seoLines: analysis.handoff.seo.length, strategistLines: analysis.handoff.strategist.length, notes }, summary: `Звіт за ${raw.period.cur.start} – ${raw.period.cur.end}: ${analysis.findings.length} висновків${notes.length ? '. ' + notes.join(', ') : ''}.` };
+}
+
 async function seo({ ctx, task, rec }) {
   const url = String(task.brief?.url || (await ctx.db.from('smm_settings').select('site_url').eq('id', 1).maybeSingle()).data?.site_url || '').trim();
   if (!url) throw new Error('Вкажіть адресу сайту у вкладці «Сайт».');
-  const r = await runSeoAudit({ db: ctx.db, model: rec, email: ctx.email, url, trigger: ctx.trigger, crawl: ctx.crawl });
+  const traffic = ((await ctx.db.from('smm_site_stats').select('data').order('created_at', { ascending: false }).limit(1)).data?.[0]?.data?.handoff?.seo) || [];
+  const r = await runSeoAudit({ db: ctx.db, model: rec, email: ctx.email, url, trigger: ctx.trigger, crawl: ctx.crawl, traffic });
   return { output: { auditId: r.id, pages: r.summary.pages, high: r.summary.high, medium: r.summary.medium, planError: r.planError }, summary: `Аудит: ${r.summary.pages} сторінок, проблем: ${r.summary.high} важливих, ${r.summary.medium} середніх${r.planError ? '. План не склався: ' + r.planError : ''}.` };
 }
 
-const HANDLERS = { strategist, copywriter, visual, qc: qualityControl, competitors, seo };
+const HANDLERS = { strategist, copywriter, visual, qc: qualityControl, competitors, seo, site_analyst: siteAnalyst };
 const handlerOf = (a) => (a?.team === CAMPAIGN_TEAM ? campaignRole : HANDLERS[a?.role]);
 
 // Pictures and videos that were sent to the generator: look at each, keep the finished file in our storage, record a failure.
@@ -443,7 +468,7 @@ export async function runNow(ctx, agentId, brief = {}) {
   const agent = all.byId.get(agentId);
   if (!agent) throw new Error('Агента не знайдено.');
   if (!readyOf(agent).ready) throw new Error(readyOf(agent).note || 'Цей агент ще не готовий до роботи.');
-  if (agent.team !== CAMPAIGN_TEAM && !['strategist', 'seo', 'competitors'].includes(agent.role)) throw new Error('Цей агент працює за завданнями від інших агентів.');
+  if (agent.team !== CAMPAIGN_TEAM && !['site_analyst', 'strategist', 'seo', 'competitors'].includes(agent.role)) throw new Error('Цей агент працює за завданнями від інших агентів.');
   const task = await enqueue(ctx.db, { agent, type: typeOf(agent), brief, by: ctx.email });
   const result = await runTask(ctx, subTeam(all, agent), task);
   return { taskId: task.id, ...(result || { status: 'skipped' }) };

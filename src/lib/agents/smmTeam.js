@@ -7,7 +7,7 @@ export const TEAM = 'smm';
 
 // ready: false = the agent exists and can be configured, but its work needs something that is not there yet (readyNote says what).
 export const SMM_ROLES = [
-  { role: 'site_analyst', name: 'Аналітик сайту', short: 'відвідуваність, запити', sort: 1, ready: false, readyNote: 'Потрібен доступ до Google Analytics 4 і Search Console.', schedule: { weekday: 1, time: '08:00' }, config: {},
+  { role: 'site_analyst', name: 'Аналітик сайту', short: 'відвідуваність, запити', sort: 1, ready: true, schedule: { weekday: 1, time: '08:00' }, config: { ga4PropertyId: '503944052', gscSiteUrl: 'sc-domain:monarchi.agency' },
     description: 'Збирає відвідуваність, пошукові запити й сторінки сайту та показує, що росте й падає. Передає звіт SEO-оптимізатору й стратегу.' },
   { role: 'seo', name: 'SEO-оптимізатор', short: 'прогалини й правки', sort: 2, ready: true, schedule: { weekday: 2, time: '09:00' }, config: {},
     description: 'Читає публічні сторінки сайту, знаходить технічні й контентні проблеми та пропонує нові title, description, H1. Передає прогалини в контенті стратегу.' },

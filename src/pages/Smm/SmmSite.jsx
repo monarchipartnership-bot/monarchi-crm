@@ -3,6 +3,7 @@ import ActionIcon from '../../components/common/ActionIcon';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchSiteAudits, runSeoAudit, saveSettings } from '../../lib/api/smm';
 import { fmtWhen } from '../../lib/smmDates';
+import Markdown from './Markdown';
 
 const SEV = { high: ['Критично', '#C2185B'], medium: ['Важливо', '#B7791F'], low: ['Бажано', '#807394'] };
 const EFFORT = { low: 'швидко', medium: 'помірно', high: 'довго' };
@@ -28,7 +29,69 @@ function Finding({ f }) {
 
 // The SEO agent: it reads the public pages of Monarchi's own site and writes a priority plan. It never changes the site:
 // the proposed titles and descriptions are for a person to copy into WordPress.
-export default function SmmSite({ settings, audits, notify, reload }) {
+// The website analyst's newest report: the figures of GA4 and Search Console for the last 28 days against the 28 before, what the code found,
+// and the short text the model phrased. A change in % is shown only when the volume is big enough to mean something.
+const fmtNum = (n, unit) => (n == null ? '—' : `${Number(n).toLocaleString('uk-UA', { maximumFractionDigits: 1 })}${unit || ''}`);
+function StatCard({ m }) {
+  const tone = m.delta == null ? '' : m.delta > 0 ? ' smm-delta--up' : m.delta < 0 ? ' smm-delta--down' : '';
+  return (
+    <div className="smm-stat">
+      <b>{fmtNum(m.cur, m.unit)}</b>
+      <span>{m.label}</span>
+      <small className={'smm-delta' + tone}>{m.delta != null ? `${m.delta > 0 ? '+' : ''}${m.delta}% до попередніх 28 днів` : m.enough === false ? 'мало даних для порівняння' : `було ${fmtNum(m.prev, m.unit)}`}</small>
+    </div>
+  );
+}
+
+export function TrafficBlock({ stats, openAgent }) {
+  const latest = stats?.[0];
+  if (!latest) {
+    return (
+      <section className="smm-block">
+        <h3>Трафік і пошук (Аналітик сайту)</h3>
+        <p className="smm-muted">Агент читає Google Analytics 4 і Search Console та щотижня пише, що на сайті виросло, що просіло й на що звернути увагу. Звітів ще немає: увімкніть агента або запустіть його вручну.</p>
+        <div><button type="button" className="smm-btn" onClick={() => openAgent('site_analyst')}>Відкрити агента</button></div>
+      </section>
+    );
+  }
+  const d = latest.data || {};
+  return (
+    <section className="smm-block">
+      <div className="smm-block-head">
+        <div><h3>Трафік і пошук (Аналітик сайту)</h3><p className="smm-muted">{latest.period_start} – {latest.period_end}, порівняно з попередніми 28 днями. Звіт від {fmtWhen(latest.created_at)}.</p></div>
+        <button type="button" className="smm-btn" onClick={() => openAgent('site_analyst')}>Агент</button>
+      </div>
+      {d.ga4 && <div className="smm-stats">{d.ga4.metrics.map((m) => <StatCard key={m.key} m={m} />)}</div>}
+      {d.gsc && <div className="smm-stats">{d.gsc.metrics.map((m) => <StatCard key={m.key} m={m} />)}</div>}
+      {latest.report && <Markdown text={latest.report} />}
+      {latest.model_error && <p className="smm-hint">Текст зібрано без моделі: {latest.model_error}</p>}
+      {d.gsc?.opportunities?.length > 0 && (
+        <>
+          <h4>Запити з показами, але майже без кліків</h4>
+          <div className="smm-scroll">
+            <table className="smm-table">
+              <thead><tr><th>Запит</th><th>Покази</th><th>Кліки</th><th>Позиція</th></tr></thead>
+              <tbody>{d.gsc.opportunities.map((q) => <tr key={q.query}><td>{q.query}</td><td>{fmtNum(q.impressions)}</td><td>{fmtNum(q.clicks)}</td><td>{fmtNum(q.position)}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </>
+      )}
+      {d.ga4?.pages?.length > 0 && (
+        <>
+          <h4>Сторінки за переглядами</h4>
+          <div className="smm-scroll">
+            <table className="smm-table">
+              <thead><tr><th>Сторінка</th><th>Перегляди</th><th>Було</th><th>Зміна</th></tr></thead>
+              <tbody>{d.ga4.pages.slice(0, 8).map((p) => <tr key={p.path}><td>{p.path}</td><td>{fmtNum(p.views)}</td><td>{fmtNum(p.prevViews)}</td><td>{p.delta == null ? '—' : `${p.delta > 0 ? '+' : ''}${p.delta}%`}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+export default function SmmSite({ settings, audits, siteStats, openAgent, notify, reload }) {
   const { email } = useAuth();
   const [url, setUrl] = useState(settings?.site_url || 'https://www.monarchi.agency');
   const [running, setRunning] = useState(false);
@@ -52,6 +115,8 @@ export default function SmmSite({ settings, audits, notify, reload }) {
 
   return (
     <>
+      <TrafficBlock stats={siteStats} openAgent={openAgent} />
+
       <section className="smm-block">
         <h3>SEO-оптимізатор</h3>
         <p className="smm-muted">Агент читає публічні сторінки вашого сайту (до 25, за sitemap), перевіряє заголовки, описи, H1, canonical, noindex, alt, биті посилання, robots і sitemap, а потім складає план і пропонує нові title та description. Сайт агент не змінює: правки вносите ви.</p>

@@ -146,6 +146,12 @@ export async function fetchSiteAudits(limit = 10) {
   if (error) { warn('fetchSiteAudits', error); return []; }
   return data ?? [];
 }
+// The website analyst (GA4 + Search Console): its newest reports. The table is created by migration 20261032000000.
+export async function fetchSiteStats(limit = 6) {
+  const { data, error } = await supabase.from('smm_site_stats').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (error) { warn('fetchSiteStats', error); return []; }
+  return data ?? [];
+}
 export function runSeoAudit(url) {
   return authedPost('/api/smm-seo-audit', url ? { url } : {});
 }
