@@ -384,14 +384,19 @@ button.smm-stat { cursor: pointer; }
 
 /* the scheme of the team on the overview: a dark plum panel like the map of the AI Agents section, full width of the sheet */
 .smm-block--map { gap: 12px; }
-.smm-map { background: linear-gradient(160deg, #2C1035, #1C0826); border: 1px solid #4B1E58; border-radius: 16px; padding: 16px 18px 14px; overflow-x: auto; }
+.smm-map { background: #fff; border: 1px solid var(--s-line); border-radius: 16px; padding: 16px 18px 14px; overflow-x: auto; box-shadow: 0 4px 18px rgba(80, 30, 100, .07); }
 .smm-map .smm-diagram { min-width: 940px; width: 100%; }
-.smm-map .cmp-node.smm-faded { opacity: .62; }
-.smm-map .cmp-node.smm-faded .cmp-node-box { stroke: color-mix(in srgb, var(--accent) 30%, transparent); }
+.smm-map .cmp-stage-title { fill: #883288; }
+.smm-map .cmp-edge { stroke: #DCC8E4; stroke-width: 1.7; }
+.smm-map .cmp-edge.is-lit { stroke: #AE40AE; stroke-width: 2; }
+.smm-map .cmp-edge.is-lit.is-required { stroke-width: 2.6; }
+.smm-map .cmp-node.is-lit .cmp-node-box { filter: drop-shadow(0 6px 9px rgba(102, 20, 102, .28)); }
 .smm-map .cmp-node.is-clickable { cursor: pointer; }
+.smm-map .cmp-node.is-clickable:focus-visible .cmp-node-box { stroke: #AE40AE; stroke-width: 2.4; }
 .smm-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12.5px; color: var(--s-muted); }
 .smm-legend li { display: inline-flex; align-items: center; gap: 7px; }
 .smm-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #8D7A93; }
 .smm-dot--on { background: #2FC783; } .smm-dot--bad { background: #E5527A; } .smm-dot--wait { background: #E3A62E; }
 .smm-line { display: inline-block; width: 24px; height: 0; border-top: 2px dashed #B060BD; }
 .smm-line--solid { border-top-style: solid; }
+.smm-map .cmp-node.is-clickable:hover .cmp-node-box { stroke-width: 1.2; }
