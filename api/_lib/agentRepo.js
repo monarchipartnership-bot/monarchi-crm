@@ -84,7 +84,7 @@ export function createAgentRepo(db, agentEmail) {
       return must(await db.from('project_reports').upsert({
         project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, platform,
         source, status, data, created_by: agentEmail, updated_at: nowIso(),
-      }, { onConflict: 'project_id,period_type,period_start,platform' }).select().single());
+      }, { onConflict: 'project_id,period_type,period_start,period_end,platform' }).select().single());
     },
     async getDeck(projectId, periodType, periodStart, platform) {
       return must(await db.from('project_decks').select('id, source, status').eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform).maybeSingle());

@@ -3,7 +3,7 @@ import { exportCsv, exportXlsx, exportPng, exportPdf, safeFileName } from '../..
 
 // "Завантажити" menu: CSV and XLSX come from the data model, PNG and PDF from a
 // picture of the element that holds the tables (`targetRef`).
-export default function ExportMenu({ model, targetRef, fileBase, disabled }) {
+export default function ExportMenu({ model, targetRef, fileBase, disabled, formats }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -39,7 +39,7 @@ export default function ExportMenu({ model, targetRef, fileBase, disabled }) {
       <button type="button" className="btn" onClick={() => setOpen((o) => !o)} disabled={disabled}>Завантажити ▾</button>
       {open && (
         <div className="prep-export-menu">
-          {[['xlsx', 'Excel (.xlsx)'], ['csv', 'CSV'], ['pdf', 'PDF'], ['png', 'Картинка (PNG)']].map(([k, label]) => (
+          {[['xlsx', 'Excel (.xlsx)'], ['csv', 'CSV'], ['pdf', 'PDF'], ['png', 'Картинка (PNG)']].filter(([k]) => !formats || formats.includes(k)).map(([k, label]) => (
             <button key={k} type="button" onClick={() => run(k)} disabled={Boolean(busy)}>{busy === k ? '...' : label}</button>
           ))}
           {error && <div className="pacc-err">{error}</div>}

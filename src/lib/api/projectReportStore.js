@@ -13,7 +13,8 @@ function nowIso() { return new Date().toISOString(); }
 export async function fetchProjectReports(projectId, periodType, platform) {
   let q = supabase
     .from('project_reports').select('*')
-    .eq('project_id', projectId).eq('period_type', periodType);
+    .eq('project_id', projectId);
+  if (periodType) q = q.eq('period_type', periodType); // without it: every type, the archive's list
   if (platform) q = q.eq('platform', platform);
   const { data, error } = await q.order('period_start', { ascending: false });
   if (error) { console.warn('fetchProjectReports failed', error); return []; }
@@ -24,7 +25,7 @@ export async function saveProjectReport({ projectId, periodType, periodStart, pe
   const { data: row, error } = await supabase.from('project_reports').upsert({
     project_id: projectId, period_type: periodType, period_start: periodStart, period_end: periodEnd, platform,
     source, status, data, created_by: createdBy || null, updated_at: nowIso(),
-  }, { onConflict: 'project_id,period_type,period_start,platform' }).select().single();
+  }, { onConflict: 'project_id,period_type,period_start,period_end,platform' }).select().single();
   if (error) throw error;
   return row;
 }

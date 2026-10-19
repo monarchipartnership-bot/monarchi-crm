@@ -10,7 +10,7 @@ import { STATUS_LABEL, SERVICES, fmtIsoDate } from '../../lib/projectConstants';
 import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload, fmtCost } from '../../lib/projectFields';
-import ProjectDecksTab from '../../components/Projects/ProjectDecksTab';
+import ArchiveTab from '../../components/Projects/ArchiveTab';
 import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
@@ -32,7 +32,7 @@ const TABS = [
   { key: 'period', label: 'Показники за період', icon: null },
   { key: 'weekly', label: 'Тижневий звіт', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'monthly', label: 'Місячний звіт', icon: PAGE_ICONS['page.monthly-report'].src },
-  { key: 'decks', label: 'Презентації', icon: PAGE_ICONS['page.clients-report'].src },
+  { key: 'decks', label: 'Архів звітів', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'AI Агент', icon: PAGE_ICONS['page.ai-agents'].src },
 ];
 
@@ -72,7 +72,7 @@ export default function ProjectDetail() {
   const setTab = (next) => {
     setTabState(next);
     // the chosen ad platform of the report tabs stays when moving between them
-    const platform = ['period', 'weekly', 'monthly'].includes(next) ? searchParams.get('platform') : null;
+    const platform = ['period', 'weekly', 'monthly', 'decks'].includes(next) ? searchParams.get('platform') : null;
     setSearchParams(next === 'overview' ? {} : { tab: next, ...(platform ? { platform } : {}) }, { replace: true });
   };
   const [deleting, setDeleting] = useState(false);
@@ -540,7 +540,7 @@ export default function ProjectDetail() {
       {tab === 'period' && <PlatformReports key={'period-' + id} projectId={id} mode="period" />}
       {tab === 'weekly' && <PlatformReports key={'weekly-' + id} projectId={id} mode="weekly" />}
       {tab === 'monthly' && <PlatformReports key={'monthly-' + id} projectId={id} mode="monthly" />}
-      {tab === 'decks' && <ProjectDecksTab key={'decks-' + id} projectId={id} />}
+      {tab === 'decks' && <ArchiveTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
       </div>
       {confirmDialog}
