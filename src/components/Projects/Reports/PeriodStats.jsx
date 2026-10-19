@@ -137,7 +137,6 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
           <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={state.status === 'loading' || state.comparing}>
             {state.comparing ? 'Порівняння…' : cmp && state.prev ? `Порівняння: ${fmt(state.prev.from)}–${fmt(state.prev.to)}` : cmp ? 'Порівняння додано' : 'Порівняти'}
           </button>
-          <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
         </div>
       </section>
 
@@ -166,7 +165,9 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
             fileBase={`${ctx.project.name}${activeGroup ? '_' + activeGroup.name : ''}_${state.range.from}_${state.range.to}`}
             curLabel={`${fmt(state.range.from)}–${fmt(state.range.to)}`}
             prevLabel={state.prev ? `${fmt(state.prev.from)}–${fmt(state.prev.to)}` : ''}
-          />
+          >
+            <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
+          </ResultView>
         </section>
       )}
 

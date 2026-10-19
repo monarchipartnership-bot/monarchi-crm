@@ -284,7 +284,6 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
           <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={busy === 'pull'}>
             {cmp && prev ? `Порівняння: ${fmt(prev.start)}–${fmt(prev.end)}` : 'Порівняти'}
           </button>
-          <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
           {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Огляд», щоб тягнути цифри автоматично.</span>}
         </div>
       </section>
@@ -326,7 +325,9 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
             options={options} onOptionsChange={(o) => { setOptions(o); setDirty(true); }}
             curLabel={`${fmt(period.start)} – ${fmt(period.end)}`}
             prevLabel={data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній'}
-          />
+          >
+            <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
+          </ResultView>
         </section>
       )}
 
