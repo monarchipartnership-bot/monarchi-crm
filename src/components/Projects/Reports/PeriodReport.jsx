@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CompareModal from './CompareModal';
-import ResultView from './ResultView';
+import ResultView, { CampaignPicker, ContentOptions } from './ResultView';
 import CampaignGroupsModal from './CampaignGroupsModal';
 import GroupsStrip from './GroupsStrip';
 import { deleteCampaignGroup } from '../../../lib/api/projectReportStore';
@@ -257,10 +257,16 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   const first = data ? Object.values(data.platforms)[0] : null;
   const hasAccounts = ctx.accounts.length > 0;
   const ownGroups = !isTotal;
+  // the platform tab's own numbers: what the «Що входить у звіт» box works on
+  const platData = !isTotal && data ? data.platforms?.[platform] : null;
+  const platCampaigns = platData ? [...(platData.campaigns || [])].sort((a, b) => (b.spend || 0) - (a.spend || 0)) : [];
+  const platPicked = selection.filter((k) => k.startsWith(platform + '|')).length;
 
   return (
     <div className="prep-wrap">
-      <section className="report-section">
+      <div className={'prep-top' + (isTotal ? ' prep-top--one' : '')}>
+      <section className="report-section prep-box">
+        <div className="prep-box-title">Період звіту</div>
         {periodType === 'weekly' ? (
           <WeekPicker year={picker.year} month={picker.month} weekIndex={picker.weekIndex} onChange={changePicker} years={yearOptions()} />
         ) : (
@@ -275,7 +281,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
             </div>
           </div>
         )}
-        <div className="prep-period-line">
+        <div className="prep-period-line prep-period-card">
           <b>{period.label}</b> · {fmt(period.start)} – {fmt(period.end)}{prev ? ` · порівняння з ${fmt(prev.start)} – ${fmt(prev.end)}` : ''}
           {meta.id && <span className={'pacc-pill prep-src prep-src--' + meta.source}>{meta.source === 'agent' ? 'AI-агент' : 'Вручну'}</span>}
         </div>
@@ -287,6 +293,31 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
           {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Огляд», щоб тягнути цифри автоматично.</span>}
         </div>
       </section>
+
+      {!isTotal && (
+        <section className="report-section prep-box">
+          <div className="prep-box-title">Що входить у звіт</div>
+          {platData && Object.keys(platData).length ? (
+            <>
+              <ContentOptions
+                hasGroups={(platData.groups || []).length > 0} groupsOn={options.groups !== false} pickedCount={platPicked}
+                onGroups={(v) => { setOptions({ ...options, groups: v }); setDirty(true); }}
+                onOnlyTotals={() => { setOptions({ ...options, groups: false }); setSelection(selection.filter((k) => !k.startsWith(platform + '|'))); setActiveGroupId(null); setDirty(true); }}
+                onEverything={() => { setOptions({ ...options, groups: true }); setSelection([...selection.filter((k) => !k.startsWith(platform + '|')), ...platCampaigns.map((c) => campaignKey(platform, c.name))]); setActiveGroupId(null); setDirty(true); }}
+              />
+              {platCampaigns.length > 0 && (
+                <CampaignPicker
+                  campaigns={platCampaigns} platform={platform} selection={selection} kind={ctx.kind} custom={ctx.custom} currency={platData.currency}
+                  onChange={(s) => { setSelection(s); setActiveGroupId(null); setDirty(true); }}
+                />
+              )}
+            </>
+          ) : (
+            <div className="pacc-hint">Підтягніть цифри за період: тоді тут зʼявиться вибір, що увійде у звіт, і список кампаній.</div>
+          )}
+        </section>
+      )}
+      </div>
 
       {Object.entries(errors).map(([p, msg]) => <div className="pacc-err" key={p}>{p}: {msg}</div>)}
 
@@ -314,6 +345,27 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
         {!data && ctx.groups.length > 0 && <div className="pacc-hint">Спершу підтягніть цифри за період, тоді групу можна буде вибрати.</div>}
       </section>
       )}
+
+      <section className="report-section">
+        <div className="prep-save-row">
+          <div className="pk-field">
+            <label>Статус</label>
+            <Select value={status} onChange={(v) => { setStatus(v); setDirty(true); }} ariaLabel="Статус" options={Object.entries(STATUS).map(([v, l]) => ({ value: v, label: l }))} />
+          </div>
+          <button type="button" className="btn btn-p" onClick={() => save()} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)}>
+            {busy === 'save' ? '...' : 'Зберегти звіт'}
+          </button>
+          <button
+            type="button" className="btn" disabled={!meta.id || dirty || !data || !Object.keys(data.platforms).length}
+            title={!meta.id ? 'Спершу збережіть звіт' : dirty ? 'Збережіть зміни у звіті' : 'Відкрити презентацію для клієнта з цього звіту'}
+            onClick={() => navigate(`/clients?project=${projectId}&type=${periodType}&start=${period.start}&platform=${Object.keys(data.platforms)[0]}`)}
+          >
+            Створити презентацію
+          </button>
+          {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
+          {message && <span className="pacc-hint">{message}</span>}
+        </div>
+      </section>
 
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
@@ -369,24 +421,6 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
             <div className="ov-field-label">Нотатка менеджера (контекст для AI-агента, у звіт не потрапляє)</div>
             <AutoResizeTextarea value={note} onChange={(v) => { setNote(v); setDirty(true); }} placeholder="Напр.: у вересні тестуємо Labor Day, акцент на RTS…" />
           </div>
-        </div>
-        <div className="prep-save-row">
-          <div className="pk-field">
-            <label>Статус</label>
-            <Select value={status} onChange={(v) => { setStatus(v); setDirty(true); }} ariaLabel="Статус" options={Object.entries(STATUS).map(([v, l]) => ({ value: v, label: l }))} />
-          </div>
-          <button type="button" className="btn btn-p" onClick={() => save()} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)}>
-            {busy === 'save' ? '...' : 'Зберегти звіт'}
-          </button>
-          <button
-            type="button" className="btn" disabled={!meta.id || dirty || !data || !Object.keys(data.platforms).length}
-            title={!meta.id ? 'Спершу збережіть звіт' : dirty ? 'Збережіть зміни у звіті' : 'Відкрити презентацію для клієнта з цього звіту'}
-            onClick={() => navigate(`/clients?project=${projectId}&type=${periodType}&start=${period.start}&platform=${Object.keys(data.platforms)[0]}`)}
-          >
-            Створити презентацію
-          </button>
-          {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
-          {message && <span className="pacc-hint">{message}</span>}
         </div>
       </section>
 

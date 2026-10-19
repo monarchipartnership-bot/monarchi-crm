@@ -89,21 +89,6 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
         )}
       </div>
 
-      {campaignMode === 'selected' && (campaigns.length > 0 || allGroups.length > 0) && (
-        <ContentOptions
-          hasGroups={allGroups.length > 0} groupsOn={showGroups} pickedCount={selection.filter((k) => k.startsWith(active + '|')).length}
-          onGroups={(v) => onOptionsChange({ ...options, groups: v })}
-          onOnlyTotals={() => { onOptionsChange({ ...options, groups: false }); onSelectionChange(selection.filter((k) => !k.startsWith(active + '|'))); }}
-          onEverything={() => { onOptionsChange({ ...options, groups: true }); onSelectionChange([...selection.filter((k) => !k.startsWith(active + '|')), ...campaigns.map((c) => campaignKey(active, c.name))]); }}
-        />
-      )}
-
-      {campaignMode === 'selected' && campaigns.length > 0 && (
-        <CampaignPicker
-          campaigns={campaigns} platform={active} selection={selection} onChange={onSelectionChange}
-          kind={kind} custom={custom} currency={currency}
-        />
-      )}
     </div>
   );
 }
@@ -148,7 +133,7 @@ function campaignExport(campaigns, kind, custom, currency, extraKeys = []) {
 
 // Which campaigns go into the report: tick any, all, or none. Lives outside the
 // captured area, so it never ends up in a download.
-function CampaignPicker({ campaigns, platform, selection, onChange, kind, custom, currency }) {
+export function CampaignPicker({ campaigns, platform, selection, onChange, kind, custom, currency }) {
   // Open on its own state: tying `open` to the number ticked would fold the list the moment the first box is ticked.
   const [open, setOpen] = useState(true);
   const keys = campaigns.map((c) => campaignKey(platform, c.name));
@@ -189,7 +174,7 @@ function CampaignPicker({ campaigns, platform, selection, onChange, kind, custom
 
 // What goes into the report besides the account totals: the group columns and / or single
 // campaigns (picked below). "Тільки загальні показники" turns both off. Outside the captured area.
-function ContentOptions({ hasGroups, groupsOn, pickedCount, onGroups, onOnlyTotals, onEverything }) {
+export function ContentOptions({ hasGroups, groupsOn, pickedCount, onGroups, onOnlyTotals, onEverything }) {
   const onlyTotals = !groupsOn && pickedCount === 0;
   return (
     <div className="prep-content">

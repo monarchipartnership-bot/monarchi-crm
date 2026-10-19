@@ -167,3 +167,15 @@
 .prep-table--groups th.total { z-index: 3; background: #F3EDF7; }
 
 .prep-table--groups th:first-child, .prep-table--groups td.lbl { width: 180px; min-width: 180px; max-width: 180px; }
+
+/* Weekly / monthly report: the period on the left, what goes into the report on the right, two equal boxes */
+.prep-top { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; margin-bottom: 4px; }
+.prep-top--one { grid-template-columns: 1fr; }
+.prep-top > .report-section { margin: 0; min-width: 0; }
+@media (max-width: 900px) { .prep-top { grid-template-columns: 1fr; } }
+.prep-box-title { font-family: var(--font-head); font-weight: 700; font-size: .95rem; color: var(--ink); margin-bottom: 14px; }
+.prep-top .picker { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.prep-period-card { padding: 12px 14px; border-radius: 14px; background: #F7F1FA; border: 1px solid #EADFF0; }
+.prep-top .prep-content, .prep-top .prep-picker { margin-top: 0; }
+.prep-top .prep-picker { margin-top: 12px; }
+.prep-top .prep-picker-list { max-height: 260px; }
