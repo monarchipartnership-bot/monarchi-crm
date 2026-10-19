@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { normText } from '../../src/lib/monthlyAggregation.js';
 import { splitClientName } from '../../src/lib/clientName.js';
-import { escapeHtml } from './telegram.js';
+import { DEFAULT_TEMPLATE, escapeHtml, mentionOf, renderMessage } from '../../src/lib/siteLeadMessage.js';
 
 export const SERVICE_LABELS = { service1: 'Google Ads', service2: 'Meta Ads', service3: 'TikTok Ads', service4: 'Other Ads', service5: 'Email marketing', service6: 'SEO' };
 const RATE_LIMIT = 6; // submissions per address in RATE_WINDOW_MIN minutes
@@ -39,17 +39,29 @@ export function normalizeLead(raw) {
   return { lead, errors, spam };
 }
 
-export function buildTelegramText(lead, { isReturning } = {}) {
-  const row = (label, value) => (value ? `<b>${label}:</b> ${escapeHtml(value)}` : '');
-  return [
-    `🆕 <b>Нова заявка з сайту</b>${isReturning ? ' (клієнт уже є в CRM)' : ''}`,
-    row('Імʼя', lead.name), row('E-mail', lead.email), row('Телефон', lead.phone), row('Проєкт', lead.link),
-    row('Послуги', lead.services.join(', ')),
-    lead.message ? `<b>Повідомлення:</b>\n${escapeHtml(lead.message.slice(0, 900))}` : '',
-    lead.page_url ? row('Сторінка', lead.page_url) : '',
-    Object.keys(lead.utm).length ? row('UTM', Object.entries(lead.utm).map(([k, v]) => `${k.replace('utm_', '')}=${v}`).join(', ')) : '',
-  ].filter(Boolean).join('\n');
+// The values a template can use, from a clean lead.
+const kyivTime = (d) => new Intl.DateTimeFormat('uk-UA', { timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(d);
+export function leadValues(lead, { isReturning = false, pings = '', now = new Date() } = {}) {
+  return {
+    name: lead.name, email: lead.email, phone: lead.phone, link: lead.link, services: (lead.services || []).join(', '), message: lead.message, page: lead.page_url,
+    utm: Object.entries(lead.utm || {}).map(([k, v]) => `${k.replace('utm_', '')}=${v}`).join(', '),
+    time: kyivTime(now), returning: isReturning ? ' (клієнт уже є в CRM)' : '', ping: pings,
+  };
 }
+export function buildTelegramText(lead, { template, pings = '', isReturning = false, now } = {}) {
+  return renderMessage(template || DEFAULT_TEMPLATE, leadValues(lead, { isReturning, pings, now }));
+}
+
+// The people to mention in each chat (those ticked in the settings), as the HTML Telegram needs.
+export async function loadPings(db) {
+  const rows = (await db.from('tg_members').select('chat_id, user_id, username, name').eq('ping', true)).data || [];
+  const by = {};
+  rows.forEach((m) => { (by[m.chat_id] ||= []).push(mentionOf(m)); });
+  return Object.fromEntries(Object.entries(by).map(([k, v]) => [k, v.join(' ')]));
+}
+
+// A sample lead for the «test the message form» button.
+export const SAMPLE = { name: 'Анна Коваль', email: 'anna@example.com', phone: '+380501234567', link: 'https://shop.example', services: ['Google Ads', 'SEO'], message: 'Хочемо запустити рекламу для інтернет-магазину.', page_url: 'https://www.monarchi.agency/', utm: { utm_source: 'google', utm_medium: 'cpc' } };
 
 const nowIso = (now) => now().toISOString();
 
@@ -123,22 +135,62 @@ export async function handleSiteLead({ db, settings, body, ip, telegram = null, 
     const dealUrl = `${crmUrl}/reports/deals?open=${deal.id}`;
     let tgStatus = 'skipped';
     let tgError = null;
+    let tgMessages = null;
     const chats = settings.telegram_chat_ids || [];
     if (telegram && chats.length) {
-      const text = buildTelegramText(lead, { isReturning: returning });
-      const results = await Promise.all(chats.map((chatId) => telegram.send({ chatId, text, url: dealUrl }).catch((e) => ({ ok: false, error: String(e.message || e) }))));
+      const pingsBy = await loadPings(db);
+      const results = await Promise.all(chats.map((chatId) => telegram.send({
+        chatId, text: buildTelegramText(lead, { template: settings.message_template, pings: pingsBy[String(chatId)] || '', isReturning: returning, now: now() }),
+        url: settings.show_button === false ? undefined : dealUrl,
+      }).catch((e) => ({ ok: false, error: String(e.message || e) }))));
       const bad = results.filter((r) => !r.ok);
       tgStatus = bad.length === results.length ? 'failed' : 'sent';
       if (bad.length) tgError = bad.map((r) => r.error).join('; ').slice(0, 300);
+      tgMessages = Object.fromEntries(chats.map((c, i) => [String(c), results[i]?.result?.message_id]).filter(([, id]) => id));
     }
     const emails = [...new Set((settings.notify_emails || []).map((e) => String(e).trim().toLowerCase()).filter(Boolean))];
     if (emails.length) {
       await db.from('notifications').insert(emails.map((email) => ({ recipient_email: email, sender_email: 'site', type: 'project_report', deal_id: deal.id, title: 'Нова заявка з сайту', body: `${lead.name || lead.email || lead.phone}${lead.services.length ? ': ' + lead.services.join(', ') : ''}`.slice(0, 300), link: `/reports/deals?open=${deal.id}` })));
     }
-    await db.from('site_leads').update({ client_id: client.id, deal_id: deal.id, telegram_status: tgStatus, telegram_error: tgError }).eq('id', row.id);
+    await db.from('site_leads').update({ client_id: client.id, deal_id: deal.id, telegram_status: tgStatus, telegram_error: tgError, telegram_messages: tgMessages }).eq('id', row.id);
     return { status: 'created', leadId: row.id, clientId: client.id, dealId: deal.id, telegram: tgStatus, returning };
   } catch (e) {
     await db.from('site_leads').update({ status: 'error', error: String(e.message || e).slice(0, 400) }).eq('id', row.id);
     return { status: 'error', leadId: row.id, error: String(e.message || e) };
   }
+}
+
+// ---------------------------------------------------------------------------------------------------- reminders
+// A lead counts as TAKEN when its deal has left the first stage («Новий лід»), or was archived or deleted. Until then the bot reminds in
+// every chat (as a reply to the original message, mentioning the ticked people) every `reminder_minutes`, at most `reminder_max` times.
+// Called by the cron tick (every 15 minutes), so the real interval is a multiple of that.
+export async function runLeadReminders({ db, settings, telegram, now = () => new Date(), crmUrl = 'https://crm.monarchi.agency' }) {
+  if (!settings?.reminders_enabled || !telegram || !(settings.telegram_chat_ids || []).length) return { sent: 0 };
+  const t = now().getTime();
+  const since = new Date(t - 24 * 3600000).toISOString();
+  const leads = ((await db.from('site_leads').select('*').eq('status', 'new').gte('received_at', since)).data || []).filter((l) => l.deal_id && l.telegram_messages && (l.reminders_sent || 0) < (settings.reminder_max || 3));
+  const minutes = settings.reminder_minutes || 30;
+  const firstStage = new Map();
+  const pingsBy = leads.length ? await loadPings(db) : {};
+  let sent = 0;
+  for (const l of leads) {
+    const lastAt = new Date(l.last_reminder_at || l.received_at).getTime();
+    if (t - lastAt < minutes * 60000) continue;
+    const deal = ((await db.from('deals').select('id, stage_id, pipeline_id, archived').eq('id', l.deal_id).limit(1)).data || [])[0];
+    if (!deal || deal.archived) continue;
+    if (!firstStage.has(deal.pipeline_id)) firstStage.set(deal.pipeline_id, ((await db.from('deal_stages').select('id').eq('pipeline_id', deal.pipeline_id).order('position', { ascending: true }).limit(1)).data || [])[0]?.id);
+    if (deal.stage_id !== firstStage.get(deal.pipeline_id)) continue; // taken
+    const waited = Math.round((t - new Date(l.received_at).getTime()) / 60000);
+    const who = [l.name, l.phone || l.email].filter(Boolean).join(' · ');
+    let any = false;
+    for (const chatId of settings.telegram_chat_ids) {
+      const ping = pingsBy[String(chatId)] || '';
+      const text = `⏰ <b>Заявку ще не взято в роботу</b> (${waited} хв)\n${escapeHtml(who)}\nПереведіть угоду з етапу «Новий лід», коли візьмете її.${ping ? '\n' + ping : ''}`;
+      const r = await telegram.send({ chatId, text, url: settings.show_button === false ? undefined : `${crmUrl}/reports/deals?open=${l.deal_id}`, replyTo: l.telegram_messages[String(chatId)] }).catch((e) => ({ ok: false, error: String(e.message || e) }));
+      any = any || r.ok;
+    }
+    await db.from('site_leads').update({ reminders_sent: (l.reminders_sent || 0) + 1, last_reminder_at: now().toISOString() }).eq('id', l.id);
+    if (any) sent += 1;
+  }
+  return { sent };
 }

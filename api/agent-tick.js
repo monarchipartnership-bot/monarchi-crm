@@ -8,6 +8,8 @@ import { runProjectReport } from './_lib/projectAgentRun.js';
 import { runDueAgents } from './_lib/agentTick.js';
 import { getModelClient } from './_lib/ai.js';
 import { processQueue } from './_lib/agentEngine.js';
+import { runLeadReminders } from './_lib/siteLead.js';
+import { hasToken, sendMessage } from './_lib/telegram.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -31,7 +33,13 @@ export default async function handler(req, res) {
     // The agent framework (the SMM team's agents): scheduled starts and the queued tasks of the agents that are on.
     let team = { processed: 0 };
     try { team = await processQueue({ db, model: getModelClient(agent.accessToken), email: agent.email, trigger: 'cron', now: () => new Date() }, { maxMs: 200000 }); } catch (e) { team = { error: e.message || String(e) }; }
-    res.status(projectsError ? 500 : 200).json({ ...result, team, ...(projectsError ? { error: projectsError } : {}) });
+    // Reminders about website leads nobody has taken yet (off until switched on in the settings).
+    let reminders = { sent: 0 };
+    try {
+      const settings = (await db.from('site_lead_settings').select('*').eq('id', 1).maybeSingle()).data;
+      reminders = await runLeadReminders({ db, settings, telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' });
+    } catch (e) { reminders = { error: e.message || String(e) }; }
+    res.status(projectsError ? 500 : 200).json({ ...result, team, reminders, ...(projectsError ? { error: projectsError } : {}) });
   } catch (e) {
     res.status(500).json({ error: e.message || String(e) });
   }

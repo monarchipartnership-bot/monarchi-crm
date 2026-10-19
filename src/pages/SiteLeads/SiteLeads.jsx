@@ -5,10 +5,11 @@ import Select from '../../components/common/Select';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchAllProfiles, profileLabel } from '../../lib/api/profile';
-import { fetchPipelines, fetchSiteLeads, fetchSiteLeadSettings, newSiteKey, saveSiteLeadSettings, telegramChats, telegramStatus, telegramTest } from '../../lib/api/siteLeads';
+import { fetchPipelines, fetchSiteLeads, fetchSiteLeadSettings, newSiteKey, saveSiteLeadSettings } from '../../lib/api/siteLeads';
 import { copyToClipboard } from '../../lib/clipboard';
 import { buildSnippet } from '../../lib/siteLeadSnippet';
 import { fmtDateTime } from '../Smm/agentUi';
+import TelegramPanel from './TelegramPanel';
 import '../../styles/projectWorkspace.css'; // the confirmation window lives in this sheet
 import '../../styles/smmPage.css';
 
@@ -24,9 +25,6 @@ export default function SiteLeads() {
   const [leads, setLeads] = useState([]);
   const [pipelines, setPipelines] = useState([]);
   const [people, setPeople] = useState([]);
-  const [bot, setBot] = useState(null); // { tokenSet, ok, bot, error }
-  const [found, setFound] = useState(null);
-  const [manualChat, setManualChat] = useState('');
   const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState('');
   const [missing, setMissing] = useState(false);
@@ -37,7 +35,7 @@ export default function SiteLeads() {
     if (!s) setMissing(true);
     setSettings(s); setLeads(l); setPipelines(p);
   }, []);
-  useEffect(() => { reload(); fetchAllProfiles().then((p) => setPeople(p || [])); telegramStatus().then(setBot).catch((e) => setBot({ unreachable: true, error: e.message })); }, [reload]);
+  useEffect(() => { reload(); fetchAllProfiles().then((p) => setPeople(p || [])); }, [reload]);
 
   const snippet = useMemo(() => (settings ? buildSnippet({ endpoint: ENDPOINT, key: settings.site_key }) : ''), [settings]);
   const week = Date.now() - 7 * 86400000;
@@ -49,16 +47,6 @@ export default function SiteLeads() {
   async function patch(p, okText) {
     setBusy('save');
     try { setSettings(await saveSiteLeadSettings(p, email)); if (okText) notify(okText); } catch (e) { notify(e.message || 'Не вдалося зберегти.', true); } finally { setBusy(''); }
-  }
-  const addChat = (id, title) => { const c = String(id).trim(); if (!c) return; if ((settings.telegram_chat_ids || []).includes(c)) { notify('Цей чат уже додано.', true); return; } patch({ telegram_chat_ids: [...(settings.telegram_chat_ids || []), c] }, `Чат додано${title ? ': ' + title : ''}.`); setManualChat(''); };
-  const removeChat = (c) => patch({ telegram_chat_ids: settings.telegram_chat_ids.filter((x) => x !== c) }, 'Чат прибрано.');
-  async function test(c) {
-    setBusy('test' + c);
-    try { await telegramTest(c); notify('Тестове повідомлення надіслано: перевірте чат.'); } catch (e) { notify(e.message || 'Не вдалося надіслати.', true); } finally { setBusy(''); }
-  }
-  async function findChats() {
-    setBusy('find');
-    try { const r = await telegramChats(); setFound(r.chats || []); if (!(r.chats || []).length) notify('Бот ще не бачив жодного чату: додайте його в чат і напишіть там повідомлення.', true); } catch (e) { notify(e.message || 'Не вдалося отримати чати.', true); } finally { setBusy(''); }
   }
   async function rotateKey() {
     if (!(await confirm({ title: 'Згенерувати новий ключ?', body: 'Старий скрипт на сайті одразу перестане приймати заявки. Новий код треба буде вставити на сайт.', confirmLabel: 'Згенерувати' }))) return;
@@ -86,52 +74,10 @@ export default function SiteLeads() {
           <div className={'smm-stat' + (stats.problems ? ' smm-stat--bad' : '')}><b>{stats.problems}</b><span>проблем (помилка або Telegram не доставив)</span></div>
         </div>
 
-        <section className="smm-block">
-          <h3>1. Telegram</h3>
-          {bot?.unreachable && <p className="smm-warn-banner" role="status">Не вдалося перевірити бота: {bot.error} Це не означає, що бота не підключено. Відкрийте цю сторінку на робочому сайті (crm.monarchi.agency): на локальному сервері серверні функції та токен бота недоступні.</p>}
-          {bot && !bot.unreachable && !bot.tokenSet && (
-            <div className="smm-warn-banner" role="status">
-              <b>Бота ще не підключено.</b> Зробіть чотири кроки:
-              <ol className="smm-howto">
-                <li>У Telegram відкрийте <b>@BotFather</b>, надішліть <code>/newbot</code>, придумайте імʼя й скопіюйте токен.</li>
-                <li>У Vercel: проєкт → Settings → Environment Variables → додайте <code>TELEGRAM_BOT_TOKEN</code> (Production) і перезапустіть деплой. Токен нікому не надсилайте, у чат теж.</li>
-                <li>Додайте бота в потрібний чат чи групу й напишіть там будь-яке повідомлення.</li>
-                <li>Поверніться сюди й натисніть «Знайти чати».</li>
-              </ol>
-            </div>
-          )}
-          {bot?.tokenSet && bot.ok && <p className="smm-note">Бот <b>@{bot.bot?.username}</b> підключено. Додайте його в чат, напишіть там повідомлення й натисніть «Знайти чати».</p>}
-          {bot?.tokenSet && !bot.ok && <p className="smm-error">Токен є, але Telegram його не прийняв: {bot.error}</p>}
-
-          <div className="smm-list">
-            {(settings.telegram_chat_ids || []).map((c) => (
-              <div key={c} className="smm-row">
-                <span className="smm-row-title"><b>Чат {c}</b></span>
-                <button type="button" className="smm-btn" disabled={!bot?.ok || busy === 'test' + c} onClick={() => test(c)}>{busy === 'test' + c ? 'Надсилаємо…' : 'Надіслати тест'}</button>
-                <button type="button" className="smm-btn smm-btn--danger" onClick={() => removeChat(c)}>Прибрати</button>
-              </div>
-            ))}
-            {!(settings.telegram_chat_ids || []).length && <p className="smm-empty">Чатів ще немає: заявки приходитимуть лише в CRM.</p>}
-          </div>
-          <div className="smm-form-foot">
-            <button type="button" className="smm-btn" disabled={!bot?.ok || busy === 'find'} onClick={findChats}><ActionIcon name="search" size={18} />{busy === 'find' ? 'Шукаємо…' : 'Знайти чати'}</button>
-            <input className="smm-input-inline" type="text" value={manualChat} onChange={(e) => setManualChat(e.target.value)} placeholder="або вставте chat id, напр. -1001234567890" aria-label="Chat id" />
-            <button type="button" className="smm-btn" disabled={!manualChat.trim()} onClick={() => addChat(manualChat)}>Додати</button>
-          </div>
-          {found && found.length > 0 && (
-            <div className="smm-list">
-              {found.map((c) => (
-                <div key={c.id} className="smm-row">
-                  <span className="smm-row-title"><b>{c.title}</b><span className="smm-muted">{c.type} · {c.id}</span></span>
-                  <button type="button" className="smm-btn smm-btn--primary" onClick={() => addChat(c.id, c.title)} disabled={(settings.telegram_chat_ids || []).includes(c.id)}>{(settings.telegram_chat_ids || []).includes(c.id) ? 'Додано' : 'Додати'}</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <TelegramPanel settings={settings} leads={leads} patch={patch} notify={notify} busy={busy === 'save'} />
 
         <section className="smm-block">
-          <h3>2. Що відбувається в CRM</h3>
+          <h3>4. Що відбувається в CRM</h3>
           <div className="smm-form">
             <div className="smm-field"><label>Воронка для нових угод</label><Select value={String(settings.pipeline_id || '')} onChange={(v) => patch({ pipeline_id: Number(v) }, 'Воронку збережено.')} options={pipeOptions} placeholder="Website" ariaLabel="Воронка" /></div>
             <div className="smm-field"><label>Менеджер за замовчуванням</label><Select value={settings.manager || ''} onChange={(v) => patch({ manager: v || null }, 'Менеджера збережено.')} options={[{ value: '', label: 'Без менеджера' }, ...people.map((p) => ({ value: profileLabel(p), label: profileLabel(p) }))]} ariaLabel="Менеджер" /></div>
@@ -146,7 +92,7 @@ export default function SiteLeads() {
         </section>
 
         <section className="smm-block">
-          <h3>3. Код для сайту</h3>
+          <h3>5. Код для сайту</h3>
           <p className="smm-muted">Скрипт вставляється на сайт один раз і надсилає копію кожної заявки в CRM, а форма сайту працює як раніше. Сайт на WordPress: плагін «WPCode» або «Insert Headers and Footers» → блок «Footer» → вставити код → зберегти. Або вставте перед <code>&lt;/body&gt;</code> у темі сайту.</p>
           <textarea className="smm-code" readOnly rows={12} value={snippet} onFocus={(e) => e.target.select()} aria-label="Код для сайту" />
           <div className="smm-form-foot">

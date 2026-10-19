@@ -24,8 +24,9 @@ import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
 import { buildRequest, check as hfCheck, submit as hfSubmit } from '../api/_lib/higgsfield.js';
-import { buildTelegramText, handleSiteLead, normalizeLead } from '../api/_lib/siteLead.js';
-import { botInfo, escapeHtml, recentChats, sendMessage as tgSend } from '../api/_lib/telegram.js';
+import { buildTelegramText, handleSiteLead, normalizeLead, runLeadReminders } from '../api/_lib/siteLead.js';
+import { botInfo, escapeHtml, peopleFromUpdate, sendMessage as tgSend, webhookSecret } from '../api/_lib/telegram.js';
+import { DEFAULT_TEMPLATE, mentionOf, renderMessage, safeTemplate } from '../src/lib/siteLeadMessage.js';
 import { buildSnippet } from '../src/lib/siteLeadSnippet.js';
 
 let passed = 0;
@@ -1070,6 +1071,7 @@ await ok('site leads: a submission becomes a contact and a deal, tells the chats
   assert.equal(tables.deal_activity.length, 1);
   assert.equal(sent.length, 2);
   assert.match(sent[0].url, /\/reports\/deals\?open=/);
+  assert.deepEqual(Object.keys(tables.site_leads[0].telegram_messages || {}), []); // the stand-in returns no message ids: nothing is invented
   assert.equal(tables.site_leads[0].telegram_status, 'sent'); // one chat worked
   assert.equal(tables.site_leads[0].telegram_error, 'chat not found'); // the failing one is recorded, the lead is not lost
   assert.deepEqual(tables.notifications.map((n) => n.recipient_email), ['a@x.com']); // de-duplicated, lower-cased
@@ -1110,24 +1112,80 @@ await ok('site leads: a submission becomes a contact and a deal, tells the chats
   assert.match(tables.site_leads.at(-1).error, /етапів/);
 });
 
-await ok('telegram: the token never leaks, chats are listed, messages carry the open button', async () => {
+await ok('telegram: the token never leaks, messages carry the open button, reply and silence', async () => {
   const env = { TELEGRAM_BOT_TOKEN: '123:SECRET' };
   const calls = [];
   const fetchFn = async (url, init) => {
     calls.push([url, JSON.parse(init.body)]);
-    if (url.endsWith('/getUpdates')) return { ok: true, json: async () => ({ ok: true, result: [{ message: { chat: { id: -100, title: 'Leads', type: 'group' } } }, { message: { chat: { id: -100, title: 'Leads', type: 'group' } } }, { channel_post: { chat: { id: -7, title: 'Chan', type: 'channel' } } }] }) };
     if (url.endsWith('/sendMessage') && init.body.includes('bad')) return { ok: false, status: 400, json: async () => ({ ok: false, description: 'chat not found for 123:SECRET' }) };
-    return { ok: true, json: async () => ({ ok: true, result: { username: 'monarchi_bot' } }) };
+    return { ok: true, json: async () => ({ ok: true, result: { username: 'monarchi_bot', message_id: 77 } }) };
   };
-  assert.deepEqual((await recentChats({ env, fetchFn })).chats.map((c) => c.id), ['-100', '-7']); // each chat once
   assert.equal((await botInfo({ env, fetchFn })).result.username, 'monarchi_bot');
-  await tgSend({ chatId: '1', text: 'hi', url: 'https://crm.example/deal' }, { env, fetchFn });
+  const sent = await tgSend({ chatId: '1', text: 'hi', url: 'https://crm.example/deal', replyTo: 55, silent: true }, { env, fetchFn });
+  assert.equal(sent.result.message_id, 77);
   assert.equal(calls.at(-1)[1].reply_markup.inline_keyboard[0][0].url, 'https://crm.example/deal');
-  assert.equal(calls.at(-1)[1].parse_mode, 'HTML');
+  assert.deepEqual([calls.at(-1)[1].parse_mode, calls.at(-1)[1].reply_parameters.message_id, calls.at(-1)[1].disable_notification], ['HTML', 55, true]);
   const bad = await tgSend({ chatId: 'bad', text: 'hi' }, { env, fetchFn });
   assert.equal(bad.ok, false);
   assert.doesNotMatch(bad.error, /SECRET/); // the token is stripped from error messages
   assert.equal((await tgSend({ chatId: '1', text: 'hi' }, { env: {}, fetchFn })).ok, false); // no token: a readable failure, no call
+  assert.match(webhookSecret(env), /^[0-9a-f]{40}$/);
+  assert.notEqual(webhookSecret(env), webhookSecret({ TELEGRAM_BOT_TOKEN: 'other' })); // derived from the token, never the token itself
+});
+
+await ok('telegram: the bot learns chats and people from what happens around it', () => {
+  const m = peopleFromUpdate({ message: { chat: { id: -100, title: 'Leads', type: 'group' }, from: { id: 5, first_name: 'Anna', last_name: 'K', username: 'anna_k' }, new_chat_members: [{ id: 6, first_name: 'Bot', is_bot: true }, { id: 7, first_name: 'Ivan' }] } });
+  assert.deepEqual(m.chat, { chat_id: '-100', title: 'Leads', type: 'group' });
+  assert.deepEqual(m.members.map((x) => [x.user_id, x.username, x.name]), [[5, 'anna_k', 'Anna K'], [7, null, 'Ivan']]); // bots are not people
+  const added = peopleFromUpdate({ my_chat_member: { chat: { id: -100, title: 'Leads', type: 'group' }, from: { id: 5, first_name: 'Anna' }, new_chat_member: { status: 'administrator' } } });
+  assert.equal(added.chat.bot_status, 'administrator');
+  const joined = peopleFromUpdate({ chat_member: { chat: { id: -100, title: 'Leads', type: 'supergroup' }, new_chat_member: { status: 'administrator', user: { id: 9, first_name: 'Olga' } } } });
+  assert.deepEqual([joined.members[0].user_id, joined.members[0].is_admin], [9, true]);
+  assert.deepEqual(peopleFromUpdate({ edited_message: {} }), { chat: null, members: [] });
+  assert.equal(mentionOf({ user_id: 5, username: 'anna_k', name: 'Anna' }), '@anna_k');
+  assert.equal(mentionOf({ user_id: 7, username: null, name: 'Iv<an>' }), '<a href="tg://user?id=7">Iv&lt;an&gt;</a>'); // no username: a link by id
+});
+
+await ok('site leads: the message form is a template, empty fields vanish with their label, nothing from a visitor is markup', () => {
+  const lead = { name: 'Ann <b>', email: '', phone: '+380501112233', link: '', services: ['SEO'], message: 'Hi & bye', page_url: '', utm: {} };
+  const std = buildTelegramText(lead, { pings: '@a @b' });
+  assert.match(std, /Нова заявка з сайту[\s\S]*Ann &lt;b&gt;[\s\S]*\+380501112233[\s\S]*SEO[\s\S]*Hi &amp; bye[\s\S]*@a @b$/);
+  assert.doesNotMatch(std, /E-mail|Проєкт|Сторінка|UTM/); // empty fields leave no label behind
+  const mine = buildTelegramText(lead, { template: '<b>Лід</b> {name} / {phone}\n<script>x</script> {ping}', pings: '@a' });
+  assert.equal(mine, '<b>Лід</b> Ann &lt;b&gt; / +380501112233\n&lt;script&gt;x&lt;/script&gt; @a'); // only b, i, u, s, code stay as tags
+  assert.equal(safeTemplate('<a href="x">t</a> <i>k</i>'), '&lt;a href="x"&gt;t&lt;/a&gt; <i>k</i>');
+  assert.match(renderMessage('{name} {unknown}', { name: 'A' }), /A \{unknown\}/); // an unknown placeholder is left as it is, visible
+  assert.match(renderMessage('x', { name: 'A', ping: '@z' }), /x\n@z$/); // no {ping} in the template: the people are added at the end
+  assert.ok(DEFAULT_TEMPLATE.includes('{ping}'));
+});
+
+await ok('site leads: reminders only for leads nobody took, at the chosen interval, as a reply, then they stop', async () => {
+  const t0 = new Date('2026-10-19T10:00:00Z');
+  const mk = (id, extra = {}) => ({ id, status: 'new', deal_id: 'd' + id, name: 'Lead ' + id, phone: '+380', received_at: t0.toISOString(), telegram_messages: { '-1': 500 + id }, reminders_sent: 0, last_reminder_at: null, ...extra });
+  const tables = {
+    site_leads: [mk(1), mk(2), mk(3), mk(4, { reminders_sent: 3 }), mk(5, { status: 'spam' })],
+    deals: [{ id: 'd1', stage_id: 19, pipeline_id: 7 }, { id: 'd2', stage_id: 20, pipeline_id: 7 }, { id: 'd3', stage_id: 19, pipeline_id: 7, archived: true }, { id: 'd4', stage_id: 19, pipeline_id: 7 }],
+    deal_stages: [{ id: 19, pipeline_id: 7, position: 1 }, { id: 20, pipeline_id: 7, position: 2 }],
+    tg_members: [{ chat_id: '-1', user_id: 5, username: 'anna_k', name: 'Anna', ping: true }, { chat_id: '-1', user_id: 6, username: 'ivan', name: 'Ivan', ping: false }],
+  };
+  const db = fakeDb(tables);
+  const sent = [];
+  const telegram = { send: async (m) => { sent.push(m); return { ok: true }; } };
+  const settings = { reminders_enabled: true, reminder_minutes: 30, reminder_max: 3, telegram_chat_ids: ['-1'], show_button: true };
+  const at = (min) => () => new Date(t0.getTime() + min * 60000);
+  assert.equal((await runLeadReminders({ db, settings, telegram, now: at(20) })).sent, 0); // too early
+  assert.equal((await runLeadReminders({ db, settings: { ...settings, reminders_enabled: false }, telegram, now: at(40) })).sent, 0); // switched off
+  let r = await runLeadReminders({ db, settings, telegram, now: at(40) });
+  assert.equal(r.sent, 1); // lead 1 only: 2 was taken (moved from the first stage), 3 archived, 4 out of reminders, 5 spam
+  assert.deepEqual([sent[0].chatId, sent[0].replyTo], ['-1', 501]); // a reply to the original message
+  assert.match(sent[0].text, /ще не взято[\s\S]*Lead 1[\s\S]*@anna_k/); // mentions the ticked person only
+  assert.doesNotMatch(sent[0].text, /@ivan/);
+  assert.equal(tables.site_leads[0].reminders_sent, 1);
+  assert.equal((await runLeadReminders({ db, settings, telegram, now: at(50) })).sent, 0); // 10 minutes after the last one: wait for the interval
+  assert.equal((await runLeadReminders({ db, settings, telegram, now: at(75) })).sent, 1); // second reminder
+  assert.equal((await runLeadReminders({ db, settings, telegram, now: at(110) })).sent, 1); // third
+  assert.equal((await runLeadReminders({ db, settings, telegram, now: at(150) })).sent, 0); // the maximum is reached: it stops
+  assert.equal((await runLeadReminders({ db, settings, telegram: null, now: at(500) })).sent, 0); // no bot: nothing, no crash
 });
 
 await ok('site leads: the snippet for the website carries the endpoint and key and only listens to the contact forms', () => {
