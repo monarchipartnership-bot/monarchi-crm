@@ -24,6 +24,9 @@ import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
 import { buildRequest, check as hfCheck, submit as hfSubmit } from '../api/_lib/higgsfield.js';
+import { buildTelegramText, handleSiteLead, normalizeLead } from '../api/_lib/siteLead.js';
+import { botInfo, escapeHtml, recentChats, sendMessage as tgSend } from '../api/_lib/telegram.js';
+import { buildSnippet } from '../src/lib/siteLeadSnippet.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -580,6 +583,8 @@ function fakeDb(tables) {
         in(c, vs) { q.filters.push((r) => vs.includes(r[c])); return api; },
         not(c, op, v) { q.filters.push((r) => (op === 'is' && v === null ? r[c] != null : true)); return api; },
         or(clause) { q.filters.push((r) => matchOr(r, clause)); return api; },
+        gte(c, v) { q.filters.push((r) => r[c] != null && String(r[c]) >= String(v)); return api; },
+        ilike(c, v) { q.filters.push((r) => String(r[c] || '').toLowerCase() === String(v).toLowerCase()); return api; },
         order(c, o) { q.order = c; q.asc = o?.ascending === true; return api; },
         limit(n) { q.limitN = n; return api; },
         single() { const r = run(); return Promise.resolve({ data: r.data[0] || null, error: r.data[0] ? null : { message: 'no row' } }); },
@@ -1030,6 +1035,109 @@ await ok('campaign team: launch -> research -> strategy -> analysts -> optimizer
   // a manual run of an agent works regardless, and a missing required input is a readable failure
   const r2 = await runNow(ctx, A('tiktok_analyst')?.id ?? -1, {}).catch((e) => e);
   assert.ok(r2 instanceof Error); // TikTok is not part of this campaign
+});
+
+await ok('site leads: the form data is read strictly (services, phone, e-mail, honeypot, UTM, control characters)', () => {
+  const r = normalizeLead({ name: '  Ann\u0000 Lee ', email: 'ANN@Example.COM', phone: '+38 (050) 123-45-67', link: 'https://shop.example', services: ['service1', 'service6', 'Custom'], message: 'Hi', utm: { utm_source: 'google', utm_medium: 'cpc', evil: 'x' }, page_url: 'https://www.monarchi.agency/' });
+  assert.deepEqual([r.lead.name, r.lead.email, r.lead.phone], ['Ann Lee', 'ann@example.com', '+380501234567']);
+  assert.deepEqual(r.lead.services, ['Google Ads', 'SEO', 'Custom']);
+  assert.deepEqual(r.lead.utm, { utm_source: 'google', utm_medium: 'cpc' });
+  assert.equal(r.spam, false);
+  assert.deepEqual(normalizeLead({ name: 'X', email: 'not-an-email', phone: '12' }).errors, ['Потрібен e-mail або телефон.']);
+  assert.equal(normalizeLead({ email: 'a@b.co', hp: 'bot' }).spam, true);
+  assert.equal(normalizeLead({ email: 'a@b.co', message: 'http://a http://b http://c http://d' }).spam, true);
+  assert.deepEqual(normalizeLead(JSON.stringify({ email: 'a@b.co', services: 'service2,service3' })).lead.services, ['Meta Ads', 'TikTok Ads']); // text/plain bodies and comma lists
+  assert.equal(escapeHtml('<b>&'), '&lt;b&gt;&amp;');
+  assert.match(buildTelegramText({ name: 'A<b>', email: '', phone: '', link: '', services: [], message: '<script>', page_url: '', utm: {} }), /A&lt;b&gt;[\s\S]*&lt;script&gt;/); // nothing from the form is sent to Telegram as markup
+});
+
+await ok('site leads: a submission becomes a contact and a deal, tells the chats, and survives every failure', async () => {
+  const tables = { site_leads: [], clients: [], deals: [], deal_activity: [], notifications: [], pipelines: [{ id: 7, name: 'Website', position: 7 }], deal_stages: [{ id: 22, pipeline_id: 7, position: 4 }, { id: 19, pipeline_id: 7, position: 1 }] };
+  const db = fakeDb(tables);
+  const sent = [];
+  const telegram = { send: async (m) => { sent.push(m); return m.chatId === '-200' ? { ok: false, error: 'chat not found' } : { ok: true }; } };
+  const settings = { enabled: true, pipeline_id: 7, manager: 'Anna', telegram_chat_ids: ['-100', '-200'], notify_emails: ['A@x.com', 'a@x.com'] };
+  const t0 = new Date('2026-10-19T10:00:00Z');
+  const run = (body, o = {}) => handleSiteLead({ db, settings: { ...settings, ...(o.settings || {}) }, body, ip: o.ip || '1.2.3.4', telegram: o.telegram === undefined ? telegram : o.telegram, now: () => o.now || t0 });
+  const form = { name: 'Ann Lee', email: 'ann@example.com', phone: '+380501234567', link: 'https://shop.example', services: ['service1'], message: 'Need ads', page_url: 'https://www.monarchi.agency/' };
+
+  let r = await run(form);
+  assert.equal(r.status, 'created');
+  assert.deepEqual([tables.clients.length, tables.deals.length], [1, 1]);
+  assert.deepEqual([tables.clients[0].name, tables.clients[0].last_name, tables.clients[0].source, tables.clients[0].status, tables.clients[0].manager], ['Ann', 'Lee', 'Website', 'Новий', 'Anna']);
+  assert.deepEqual([tables.deals[0].stage_id, tables.deals[0].pipeline_id, tables.deals[0].source], [19, 7, 'Website']); // the FIRST stage, not the first in the table
+  assert.match(tables.deals[0].notes, /Need ads[\s\S]*Google Ads/);
+  assert.equal(tables.deal_activity.length, 1);
+  assert.equal(sent.length, 2);
+  assert.match(sent[0].url, /\/reports\/deals\?open=/);
+  assert.equal(tables.site_leads[0].telegram_status, 'sent'); // one chat worked
+  assert.equal(tables.site_leads[0].telegram_error, 'chat not found'); // the failing one is recorded, the lead is not lost
+  assert.deepEqual(tables.notifications.map((n) => n.recipient_email), ['a@x.com']); // de-duplicated, lower-cased
+  assert.equal(tables.site_leads[0].deal_id, tables.deals[0].id);
+
+  // the same person again, a minute later: one request, no second deal or message
+  r = await run(form, { now: new Date(t0.getTime() + 60000), ip: '5.6.7.8' });
+  assert.equal(r.status, 'duplicate');
+  assert.deepEqual([tables.deals.length, sent.length], [1, 2]);
+
+  // the same person, a day later: the contact is reused, a new deal opens
+  r = await run({ ...form, email: 'ANN@example.com', message: 'Another idea' }, { now: new Date(t0.getTime() + 86400000), ip: '9.9.9.9' });
+  assert.deepEqual([r.status, r.returning, tables.clients.length, tables.deals.length], ['created', true, 1, 2]);
+
+  // another person with the same name gets their own contact (the name key is unique in the CRM)
+  r = await run({ ...form, email: 'ann.other@example.com', phone: '+4915112345678' }, { now: new Date(t0.getTime() + 2 * 86400000), ip: '8.8.8.8' });
+  assert.deepEqual([r.status, tables.clients.length], ['created', 2]);
+  assert.notEqual(tables.clients[0].name_key, tables.clients[1].name_key);
+
+  // spam, invalid, disabled, no Telegram
+  const before = tables.deals.length;
+  assert.equal((await run({ ...form, email: 'x@y.co', hp: 'bot' }, { ip: '4.4.4.4' })).status, 'spam');
+  assert.equal(tables.site_leads.at(-1).status, 'spam');
+  assert.equal((await run({ name: 'No contact' })).status, 'invalid');
+  assert.equal((await run(form, { settings: { enabled: false } })).status, 'disabled');
+  r = await run({ ...form, email: 'new@example.com', phone: '' }, { telegram: null, ip: '3.3.3.3', now: new Date(t0.getTime() + 3 * 86400000) });
+  assert.deepEqual([r.status, tables.site_leads.at(-1).telegram_status], ['created', 'skipped']);
+  assert.equal(tables.deals.length, before + 1); // only the last one made a deal
+
+  // a flood from one address is stopped
+  for (let i = 0; i < 6; i += 1) tables.site_leads.push({ id: 900 + i, ip_hash: tables.site_leads[0].ip_hash, received_at: t0.toISOString() });
+  assert.equal((await run({ ...form, email: 'flood@example.com' }, { ip: '1.2.3.4' })).status, 'limited');
+
+  // a broken pipeline is an `error` row with the reason, never an exception
+  tables.deal_stages.length = 0;
+  r = await run({ ...form, email: 'err@example.com' }, { ip: '2.2.2.2', now: new Date(t0.getTime() + 5 * 86400000) });
+  assert.equal(r.status, 'error');
+  assert.match(tables.site_leads.at(-1).error, /етапів/);
+});
+
+await ok('telegram: the token never leaks, chats are listed, messages carry the open button', async () => {
+  const env = { TELEGRAM_BOT_TOKEN: '123:SECRET' };
+  const calls = [];
+  const fetchFn = async (url, init) => {
+    calls.push([url, JSON.parse(init.body)]);
+    if (url.endsWith('/getUpdates')) return { ok: true, json: async () => ({ ok: true, result: [{ message: { chat: { id: -100, title: 'Leads', type: 'group' } } }, { message: { chat: { id: -100, title: 'Leads', type: 'group' } } }, { channel_post: { chat: { id: -7, title: 'Chan', type: 'channel' } } }] }) };
+    if (url.endsWith('/sendMessage') && init.body.includes('bad')) return { ok: false, status: 400, json: async () => ({ ok: false, description: 'chat not found for 123:SECRET' }) };
+    return { ok: true, json: async () => ({ ok: true, result: { username: 'monarchi_bot' } }) };
+  };
+  assert.deepEqual((await recentChats({ env, fetchFn })).chats.map((c) => c.id), ['-100', '-7']); // each chat once
+  assert.equal((await botInfo({ env, fetchFn })).result.username, 'monarchi_bot');
+  await tgSend({ chatId: '1', text: 'hi', url: 'https://crm.example/deal' }, { env, fetchFn });
+  assert.equal(calls.at(-1)[1].reply_markup.inline_keyboard[0][0].url, 'https://crm.example/deal');
+  assert.equal(calls.at(-1)[1].parse_mode, 'HTML');
+  const bad = await tgSend({ chatId: 'bad', text: 'hi' }, { env, fetchFn });
+  assert.equal(bad.ok, false);
+  assert.doesNotMatch(bad.error, /SECRET/); // the token is stripped from error messages
+  assert.equal((await tgSend({ chatId: '1', text: 'hi' }, { env: {}, fetchFn })).ok, false); // no token: a readable failure, no call
+});
+
+await ok('site leads: the snippet for the website carries the endpoint and key and only listens to the contact forms', () => {
+  const js = buildSnippet({ endpoint: 'https://crm.example/api/site-lead', key: 'k123' });
+  assert.match(js, /https:\/\/crm\.example\/api\/site-lead/);
+  assert.match(js, /k123/);
+  assert.match(js, /contact-section__form/);
+  assert.match(js, /sendBeacon/);
+  assert.doesNotMatch(js, /TELEGRAM|SECRET/);
+  assert.doesNotThrow(() => new Function(js.replace(/<[/]?script>/g, ''))); // it is valid JavaScript
 });
 
 console.log(`\n${passed} checks passed`);

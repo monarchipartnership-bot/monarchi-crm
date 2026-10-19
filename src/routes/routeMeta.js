@@ -155,6 +155,11 @@ export const ROUTE_META = {
     desc: 'Команда SMM-асистентів Monarchi: бренд-профіль, контент-план, черга схвалення постів для соцмереж.',
     trail: [{ label: 'Automation Department' }, { label: "Mon'Archi SMM" }],
   },
+  '/automation/site-leads': {
+    title: 'Заявки з сайту',
+    desc: 'Форма сайту Monarchi: нові заявки автоматично зʼявляються в CRM як контакт і угода й приходять у Telegram.',
+    trail: [{ label: 'Automation Department' }, { label: 'Заявки з сайту' }],
+  },
   '/tasks': {
     title: 'Task Manager',
     desc: 'Єдиний внутрішній задачник по всій платформі — відділи, статистика, список/канбан/календар.',

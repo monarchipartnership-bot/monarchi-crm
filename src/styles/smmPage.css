@@ -339,3 +339,10 @@ button.smm-stat { cursor: pointer; }
 .smm-task-result { border: 1px solid var(--s-line); border-radius: 8px; padding: 8px 12px; background: #FBF8FD; }
 .smm-task-result summary { cursor: pointer; font-size: 13px; font-weight: 500; }
 .smm-task-result .smm-md { margin-top: 8px; }
+
+/* site leads page */
+.smm-howto { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.smm-howto code, .smm-block code { padding: 1px 6px; border-radius: 5px; background: var(--s-lav); font-size: 12px; }
+.smm-code { width: 100%; padding: 12px; border: 1px solid var(--s-field-line); border-radius: 8px; background: #fff; color: var(--s-ink); font: 400 12px/1.5 ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; resize: vertical; }
+.smm-input-inline { flex: 1 1 260px; max-width: 420px; min-height: 38px; padding: 8px 12px; border: 1px solid var(--s-field-line); border-radius: 6px; background: var(--s-field); color: var(--s-ink); font: 400 14px 'Onest', sans-serif; }
+.smm-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
