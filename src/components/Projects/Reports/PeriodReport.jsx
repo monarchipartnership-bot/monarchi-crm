@@ -284,7 +284,6 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
           <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={busy === 'pull'}>
             {cmp && prev ? `Порівняння: ${fmt(prev.start)}–${fmt(prev.end)}` : 'Порівняти'}
           </button>
-          {ownGroups && <button type="button" className="btn" onClick={() => setModal('groups')}>Групи кампаній</button>}
           <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
           {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Огляд», щоб тягнути цифри автоматично.</span>}
         </div>

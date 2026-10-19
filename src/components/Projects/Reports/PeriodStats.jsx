@@ -137,7 +137,6 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
           <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={state.status === 'loading' || state.comparing}>
             {state.comparing ? 'Порівняння…' : cmp && state.prev ? `Порівняння: ${fmt(state.prev.from)}–${fmt(state.prev.to)}` : cmp ? 'Порівняння додано' : 'Порівняти'}
           </button>
-          {!isTotal && <button type="button" className="btn" onClick={() => setModal('groups')}>Групи кампаній</button>}
           <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
         </div>
       </section>

@@ -143,3 +143,8 @@
 .cg-item.on { border-color: var(--purple); background: #FBF5FD; }
 .cg-item-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cg-item-meta { flex: none; font-size: .74rem; color: var(--ink-soft); }
+
+/* The platform switcher (Meta / Google / ... / Разом): the same folder tabs as the project's sections, a size smaller */
+.pw-tabs--sub { margin-top: 6px; }
+.pw-tabs--sub .pw-tab { flex: 0 1 190px; min-width: 120px; min-height: 48px; padding: 8px 15px 10px; border-radius: 14px 20px 0 0; }
+.prep-platforms-hint { margin: 8px 4px 0; }

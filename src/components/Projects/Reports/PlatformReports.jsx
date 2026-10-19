@@ -6,6 +6,7 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
 import { accountPlatforms, TOTAL_TAB } from '../../../lib/reportScope';
 import { platformInfo } from '../../../lib/adAccounts';
+import '../../../styles/projectWorkspace.css';
 import '../../../styles/projectReports.css';
 
 // «Показники за період», «Тижневий звіт» and «Місячний звіт» are split by ad platform: a row of tabs, one per platform linked to the
@@ -17,6 +18,7 @@ export default function PlatformReports({ projectId, mode }) {
   const [accounts, setAccounts] = useState(null);
   const [confirm, confirmDialog] = useConfirm();
   const unsaved = useRef(false); // set by the report screen while it holds changes that are not saved
+  const tabRefs = useRef({});
 
   useEffect(() => {
     let off = false;
@@ -41,17 +43,33 @@ export default function PlatformReports({ projectId, mode }) {
     setParams(next, { replace: true });
   }
 
+  // Arrow keys / Home / End move between the tabs, like the project's own tabs.
+  function onKey(e) {
+    const keys = tabs.map((t) => t.key);
+    const i = keys.indexOf(tab);
+    const next = e.key === 'ArrowRight' ? keys[(i + 1) % keys.length] : e.key === 'ArrowLeft' ? keys[(i - 1 + keys.length) % keys.length] : e.key === 'Home' ? keys[0] : e.key === 'End' ? keys[keys.length - 1] : null;
+    if (!next) return;
+    e.preventDefault();
+    pick(next);
+    tabRefs.current[next]?.focus();
+  }
+
   return (
     <>
       {accounts.length > 0 && (
-        <div className="prep-platforms" role="tablist" aria-label="Рекламні кабінети проєкту">
-          <div className="pacc-tabs">
+        <>
+          <div className="pw-tabs pw-tabs--sub" role="tablist" aria-label="Рекламні кабінети проєкту" onKeyDown={onKey}>
             {tabs.map((t) => (
-              <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'pacc-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>{t.label}</button>
+              <button
+                key={t.key} ref={(n) => { tabRefs.current[t.key] = n; }} type="button" role="tab" aria-selected={t.key === tab} tabIndex={t.key === tab ? 0 : -1}
+                className={'pw-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}
+              >
+                <span>{t.label}</span>
+              </button>
             ))}
           </div>
-          {tab === TOTAL_TAB && <span className="pacc-hint">{platforms.length > 1 ? 'Сума по всіх кампаніях усіх платформ за обраний період.' : 'У проєкті одна платформа, тож тут її ж цифри.'}</span>}
-        </div>
+          {tab === TOTAL_TAB && <div className="pacc-hint prep-platforms-hint">{platforms.length > 1 ? 'Сума по всіх кампаніях усіх платформ за обраний період.' : 'У проєкті одна платформа, тож тут її ж цифри.'}</div>}
+        </>
       )}
       {mode === 'period'
         ? <PeriodStats projectId={projectId} platform={tab} />
