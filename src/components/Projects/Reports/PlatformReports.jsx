@@ -6,7 +6,6 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
 import { accountPlatforms, TOTAL_TAB } from '../../../lib/reportScope';
 import { platformInfo } from '../../../lib/adAccounts';
-import '../../../styles/projectWorkspace.css';
 import '../../../styles/projectReports.css';
 
 // «Показники за період», «Тижневий звіт» and «Місячний звіт» are split by ad platform: a row of tabs, one per platform linked to the
@@ -58,13 +57,13 @@ export default function PlatformReports({ projectId, mode }) {
     <>
       {accounts.length > 0 && (
         <>
-          <div className="pw-tabs pw-tabs--sub" role="tablist" aria-label="Рекламні кабінети проєкту" onKeyDown={onKey}>
+          <div className="prep-seg" role="tablist" aria-label="Рекламні кабінети проєкту" onKeyDown={onKey}>
             {tabs.map((t) => (
               <button
                 key={t.key} ref={(n) => { tabRefs.current[t.key] = n; }} type="button" role="tab" aria-selected={t.key === tab} tabIndex={t.key === tab ? 0 : -1}
-                className={'pw-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}
+                className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}
               >
-                <span>{t.label}</span>
+                {t.label}
               </button>
             ))}
           </div>
