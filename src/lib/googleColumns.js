@@ -18,7 +18,7 @@ export const G_COUNTS = {
   g_all_conv_value: { metrics: ['all_conversions_value'], calc: (m) => num(m.all_conversions_value) },
   g_view_through: { metrics: ['view_through_conversions'], calc: (m) => num(m.view_through_conversions) },
   g_cross_device: { metrics: ['cross_device_conversions'], calc: (m) => num(m.cross_device_conversions) },
-  g_video_views: { metrics: ['video_views'], calc: (m) => num(m.video_views) },
+  g_video_views: { metrics: ['video_trueview_views'], calc: (m) => num(m.video_trueview_views) }, // «views» of video campaigns (the API calls them TrueView views)
   g_top_impr: { metrics: ['impressions', 'top_impression_percentage'], calc: (m) => num(m.impressions) * num(m.top_impression_percentage) },
   g_abs_top_impr: { metrics: ['impressions', 'absolute_top_impression_percentage'], calc: (m) => num(m.impressions) * num(m.absolute_top_impression_percentage) },
   g_search_eligible: { metrics: ['impressions', 'search_impression_share'], calc: eligible },
