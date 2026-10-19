@@ -26,6 +26,7 @@ function fmtDisplay(iso) {
 // icon, and it matches the app's own "type-picker"-style dropdown look.
 export default function DatePicker({ value, onChange, placeholder, bare, className, style }) {
   const containerRef = useRef(null);
+  const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
   const rendered = useAnimatedOpen(open, CLOSE_MS);
   const pos = useFloatingPosition(containerRef, open);
@@ -38,7 +39,9 @@ export default function DatePicker({ value, onChange, placeholder, bare, classNa
     // several of these can be on screen at once (e.g. "Дата з"/"Дата по"),
     // and closest('.date-picker') would match a click on a *different*
     // picker's trigger too, leaving this one stuck open behind it.
-    function onDocClick(e) { if (!containerRef.current?.contains(e.target)) setOpen(false); }
+    // The calendar itself is portaled to <body>, so it is NOT inside containerRef: a press on its arrows must not count as «outside»,
+    // otherwise the month arrows close the calendar before they can switch the month.
+    function onDocClick(e) { if (!containerRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false); }
     function onKeyDown(e) { if (e.key === 'Escape') setOpen(false); }
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onKeyDown);
@@ -80,6 +83,7 @@ export default function DatePicker({ value, onChange, placeholder, bare, classNa
       </button>
       {rendered && createPortal(
         <div
+          ref={menuRef}
           className={'date-picker-menu' + ddTheme(containerRef) + (open ? '' : ' closing') + (pos.placement === 'top' ? ' placement-top' : '')}
           style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left }}
         >
