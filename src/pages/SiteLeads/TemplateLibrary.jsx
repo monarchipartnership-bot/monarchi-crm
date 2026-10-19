@@ -51,12 +51,13 @@ export default function TemplateLibrary({ settings, patch, notify, busy, onTest,
     if (activeId === t.id) await patch({ message_template: t.body });
     notify('Шаблон збережено.');
   });
-  const remove = async () => {
-    if (!(await confirm({ title: `Видалити шаблон «${current.name}»?`, body: activeId === current.id ? 'Він зараз вибраний: після видалення нові заявки йдуть у стандартній формі.' : 'Цю дію не можна скасувати.', confirmLabel: 'Видалити', danger: true }))) return;
+  const remove = async (c) => {
+    if (!(await confirm({ title: `Видалити шаблон «${c.name}»?`, body: activeId === c.id ? 'Він зараз вибраний: після видалення нові заявки йдуть у стандартній формі.' : 'Цю дію не можна скасувати.', confirmLabel: 'Видалити', danger: true }))) return;
     guard(async () => {
-      if (activeId === current.id) await patch({ active_template_id: null, message_template: null });
-      await deleteTemplate(current.id);
-      setTemplates((all) => all.filter((x) => x.id !== current.id)); setFocus(null); setEditing(false);
+      if (activeId === c.id) await patch({ active_template_id: null, message_template: null });
+      await deleteTemplate(c.id);
+      setTemplates((all) => all.filter((x) => x.id !== c.id));
+      if (focus === c.id) { setFocus(null); setEditing(false); }
       notify('Шаблон видалено.');
     });
   };
@@ -85,6 +86,7 @@ export default function TemplateLibrary({ settings, patch, notify, busy, onTest,
                 <div className="smm-tplactions">
                   <button type="button" className="smm-btn smm-btn--primary" disabled={active || busy} onClick={() => choose(c)}>{active ? 'Вибрано' : 'Вибрати'}</button>
                   <button type="button" className="smm-btn" disabled={working} onClick={() => edit(c)}>Редагувати</button>
+                  {!c.builtin && <button type="button" className="smm-btn smm-btn--danger" disabled={working} onClick={() => remove(c)}>Видалити</button>}
                 </div>
               )}
             </div>
@@ -117,7 +119,6 @@ export default function TemplateLibrary({ settings, patch, notify, busy, onTest,
             <button type="button" className="smm-btn smm-btn--primary" disabled={!dirty || working} onClick={save}><ActionIcon name="save" size={18} />Зберегти</button>
             <button type="button" className="smm-btn" disabled={!canTest || working} onClick={() => onTest(draft.body)}>Надіслати тест у чат</button>
             <button type="button" className="smm-btn" onClick={() => setEditing(false)}>Закрити редактор</button>
-            <button type="button" className="smm-btn smm-btn--danger" disabled={working} onClick={remove}>Видалити шаблон</button>
             {dirty && <span className="smm-muted">Є незбережені зміни</span>}
           </div>
         </div>

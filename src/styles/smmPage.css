@@ -364,7 +364,7 @@ button.smm-stat { cursor: pointer; }
 
 /* message template library */
 .smm-tplrow { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
-.smm-tplcol { display: flex; flex-direction: column; gap: 8px; width: 230px; }
+.smm-tplcol { display: flex; flex-direction: column; gap: 8px; width: 250px; }
 .smm-tplcard { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 12px; text-align: left; border: 1.5px solid var(--s-line); border-radius: 14px; background: #fff; color: var(--s-ink); font: inherit; cursor: pointer; }
 .smm-tplcard.is-focus { background: var(--s-sel); border-color: #CDB1DD; }
 .smm-tplcard.is-active { border-color: var(--s-plum); box-shadow: 0 0 0 3px #78228722; }
@@ -375,5 +375,5 @@ button.smm-stat { cursor: pointer; }
 .smm-tpladd { min-height: 150px; align-items: center; justify-content: center; border-style: dashed; color: var(--s-plum); font: 600 13px 'Onest', sans-serif; }
 .smm-tpladd span { font-size: 30px; line-height: 1; }
 .smm-tplactions { display: flex; gap: 8px; }
-.smm-tplactions .smm-btn { flex: 1; padding-inline: 8px; }
+.smm-tplactions .smm-btn { flex: 1; min-width: 0; padding-inline: 6px; font-size: 12.5px; }
 .smm-tpleditor { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1px solid var(--s-line); border-radius: 14px; background: #FBF8FD; }
