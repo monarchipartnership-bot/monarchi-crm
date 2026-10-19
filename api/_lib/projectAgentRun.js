@@ -19,7 +19,7 @@ import {
   EMPTY_SECTIONS, buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload,
 } from '../../src/lib/reportEngine.js';
 
-const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [], telegram: { enabled: false, chatId: '' } };
+const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [], telegram: { enabled: false, chatId: '', threadId: '' } };
 const PLATFORM_NAMES = Object.fromEntries(PLATFORMS.map((p) => [p.id, p.name]));
 const LABEL = { weekly: 'тижневий', monthly: 'місячний' };
 const GENITIVE = { weekly: 'тижневого', monthly: 'місячного' };
@@ -193,7 +193,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
       } else {
         const links = made.map((m) => ({ label: scopeName(m), url: reportLink(crmUrl, projectId, periodType, m) }));
         const msg = buildReportMessage({ projectName: project.name, period, periodType, status: 'draft', action: reportAction(missingBlocks), links });
-        const sent = await telegram.send({ chatId: config.telegram.chatId, text: msg.text, buttons: msg.buttons }).catch((e) => ({ ok: false, error: e?.message || String(e) }));
+        const sent = await telegram.send({ chatId: config.telegram.chatId, threadId: config.telegram.threadId || undefined, text: msg.text, buttons: msg.buttons }).catch((e) => ({ ok: false, error: e?.message || String(e) }));
         if (sent?.ok) await event('telegram_sent', 'ok', 'Звіт надіслано в Telegram-чат.', { chatId: config.telegram.chatId });
         else {
           notes.push('Telegram: не вдалося надіслати звіт у чат: ' + (sent?.error || 'невідома помилка'));

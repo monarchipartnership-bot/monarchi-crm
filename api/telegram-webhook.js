@@ -17,12 +17,16 @@ export default async function handler(req, res) {
   try {
     let update = req.body;
     if (typeof update === 'string') { try { update = JSON.parse(update); } catch { update = {}; } }
-    const { chat, members } = peopleFromUpdate(update || {});
+    const { chat, members, topic } = peopleFromUpdate(update || {});
     if (chat && chat.type !== 'private') {
       const agent = await signInAgent();
       const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + agent.accessToken } }, auth: { persistSession: false, autoRefreshToken: false } });
       const now = new Date().toISOString();
       await db.from('tg_chats').upsert({ ...chat, last_seen_at: now }, { onConflict: 'chat_id' });
+      if (topic) {
+        // a known title is never overwritten by a message that does not carry one
+        await db.from('tg_topics').upsert({ chat_id: topic.chat_id, thread_id: topic.thread_id, ...(topic.name ? { name: topic.name } : {}), last_seen_at: now }, { onConflict: 'chat_id,thread_id' });
+      }
       if (members.length) {
         // the `ping` flag is not in these rows, so a person who is already ticked stays ticked
         await db.from('tg_members').upsert(members.map((m) => ({ chat_id: chat.chat_id, ...m, last_seen_at: now })), { onConflict: 'chat_id,user_id' });

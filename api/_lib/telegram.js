@@ -24,8 +24,10 @@ async function call(method, payload, { env = process.env, fetchFn = fetch } = {}
 // text: HTML (the caller escapes). url: an optional «open» button under the message. replyTo: a message id in the same chat (a reminder
 // replies to the original lead message). silent: no sound for the people in the chat.
 // buttons: [{ text, url }] — several link buttons in one row (instead of `url`).
-export async function sendMessage({ chatId, text, url, buttonText = 'Відкрити в CRM', buttons, replyTo, silent }, deps) {
+// threadId: the topic of a forum supergroup to post into (empty = the General topic / a plain chat).
+export async function sendMessage({ chatId, text, url, buttonText = 'Відкрити в CRM', buttons, replyTo, silent, threadId }, deps) {
   const payload = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
+  if (threadId) payload.message_thread_id = Number(threadId);
   if (buttons?.length) payload.reply_markup = { inline_keyboard: [buttons.slice(0, 8).map((b) => ({ text: String(b.text).slice(0, 60), url: b.url }))] };
   else if (url) payload.reply_markup = { inline_keyboard: [[{ text: buttonText, url }]] };
   if (replyTo) payload.reply_parameters = { message_id: Number(replyTo), allow_sending_without_reply: true };
@@ -58,5 +60,12 @@ export function peopleFromUpdate(u) {
   if (cm) { const p = person(cm.new_chat_member?.user); if (p) members.push({ ...p, is_admin: ['administrator', 'creator'].includes(cm.new_chat_member?.status) }); }
   const chat = { chat_id: String(raw.id), title: raw.title || [raw.first_name, raw.last_name].filter(Boolean).join(' ') || raw.username || String(raw.id), type: raw.type };
   if (mcm?.new_chat_member?.status) chat.bot_status = mcm.new_chat_member.status;
-  return { chat, members: members.filter(Boolean) };
+  // A message written in a topic of a forum supergroup tells us the topic (its id, and its title when the message carries it:
+  // the service message that created the topic, a rename, or the reply pointer every message of a topic has). The General topic has no id.
+  let topic = null;
+  const tid = msg?.message_thread_id ?? (msg?.forum_topic_created ? msg.message_id : null);
+  if (msg && tid != null && (msg.is_topic_message || msg.forum_topic_created || msg.forum_topic_edited || raw.is_forum)) {
+    topic = { chat_id: String(raw.id), thread_id: Number(tid), name: msg.forum_topic_created?.name || msg.forum_topic_edited?.name || msg.reply_to_message?.forum_topic_created?.name || null };
+  }
+  return { chat, members: members.filter(Boolean), topic };
 }

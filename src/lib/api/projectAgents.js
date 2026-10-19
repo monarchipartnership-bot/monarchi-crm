@@ -14,7 +14,7 @@ export const DEFAULT_AGENT_CONFIG = {
   schedule: { weeklyDay: 1, weeklyTime: '09:00', monthlyDay: 1, monthlyTime: '09:00' },
   notify: true,
   notifyEmails: [], // who gets the notification (emails of CRM users)
-  telegram: { enabled: false, chatId: '' }, // the report goes to this Telegram chat when it is made
+  telegram: { enabled: false, chatId: '', threadId: '' }, // the report goes to this Telegram chat (and topic of it) when it is made
   note: '',
 };
 

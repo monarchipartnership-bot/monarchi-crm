@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     const { data: project } = await userDb.from('projects').select('name').eq('id', projectId).maybeSingle();
     const due = dueReportPeriod(periodType, new Date().toISOString().slice(0, 10));
     const msg = buildReportMessage({ projectName: project?.name, period: due?.period, periodType, status: 'draft', action: reportAction(['«Plans for the next period»']), links: [{ label: 'Звіт', url: reportLink(crmUrl, projectId, periodType, null) }], test: true });
-    const sent = await sendMessage({ chatId, text: msg.text, buttons: msg.buttons });
+    const sent = await sendMessage({ chatId, threadId: req.body?.threadId || undefined, text: msg.text, buttons: msg.buttons });
     res.status(200).json(sent.ok ? { ok: true } : { ok: false, error: sent.error });
     return;
   }

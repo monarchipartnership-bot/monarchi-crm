@@ -377,3 +377,7 @@ button.smm-stat { cursor: pointer; }
 .smm-tplactions { display: flex; gap: 8px; }
 .smm-tplactions .smm-btn { flex: 1; min-width: 0; padding-inline: 6px; font-size: 12.5px; }
 .smm-tpleditor { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1px solid var(--s-line); border-radius: 14px; background: #FBF8FD; }
+
+/* the topic of a forum chat that gets the website leads */
+.smm-topic { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.smm-topic .ui-select { width: 260px; max-width: 100%; }

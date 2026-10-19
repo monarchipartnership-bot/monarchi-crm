@@ -28,12 +28,18 @@ export async function fetchPipelines() {
 export const telegramStatus = () => authedPost('/api/site-lead-admin', { action: 'status' });
 export const telegramChats = () => authedPost('/api/site-lead-admin', { action: 'chats' });
 export const telegramMembers = (chatId) => authedPost('/api/site-lead-admin', { action: 'members', chatId });
-export const telegramTest = (chatId, { template, showButton } = {}) => authedPost('/api/site-lead-admin', { action: 'test', chatId, template, showButton });
+export const telegramTest = (chatId, { template, showButton, threadId } = {}) => authedPost('/api/site-lead-admin', { action: 'test', chatId, template, showButton, threadId });
 
 // The chats the bot has seen and the people in them (filled by the bot's webhook); `ping` = mentioned in every lead message and reminder.
 export async function fetchTgChats() {
   const { data, error } = await supabase.from('tg_chats').select('*');
   if (error) { console.warn('fetchTgChats failed', error); return []; }
+  return data ?? [];
+}
+// The topics of forum supergroups the bot has seen (filled by the webhook when someone writes in a topic).
+export async function fetchTgTopics() {
+  const { data, error } = await supabase.from('tg_topics').select('*').order('thread_id', { ascending: true });
+  if (error) { console.warn('fetchTgTopics failed', error); return []; }
   return data ?? [];
 }
 export async function fetchTgMembers(chatId) {

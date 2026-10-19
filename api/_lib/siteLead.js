@@ -139,8 +139,9 @@ export async function handleSiteLead({ db, settings, body, ip, telegram = null, 
     const chats = settings.telegram_chat_ids || [];
     if (telegram && chats.length) {
       const pingsBy = await loadPings(db);
+      const topicOf = (id) => (settings.telegram_topics || {})[String(id)] || undefined; // the topic chosen for the leads of this chat
       const results = await Promise.all(chats.map((chatId) => telegram.send({
-        chatId, text: buildTelegramText(lead, { template: settings.message_template, pings: pingsBy[String(chatId)] || '', isReturning: returning, now: now() }),
+        chatId, threadId: topicOf(chatId), text: buildTelegramText(lead, { template: settings.message_template, pings: pingsBy[String(chatId)] || '', isReturning: returning, now: now() }),
         url: settings.show_button === false ? undefined : dealUrl,
       }).catch((e) => ({ ok: false, error: String(e.message || e) }))));
       const bad = results.filter((r) => !r.ok);
@@ -186,7 +187,7 @@ export async function runLeadReminders({ db, settings, telegram, now = () => new
     for (const chatId of settings.telegram_chat_ids) {
       const ping = pingsBy[String(chatId)] || '';
       const text = `⏰ <b>Заявку ще не взято в роботу</b> (${waited} хв)\n${escapeHtml(who)}\nПереведіть угоду з етапу «Новий лід», коли візьмете її.${ping ? '\n' + ping : ''}`;
-      const r = await telegram.send({ chatId, text, url: settings.show_button === false ? undefined : `${crmUrl}/reports/deals?open=${l.deal_id}`, replyTo: l.telegram_messages[String(chatId)] }).catch((e) => ({ ok: false, error: String(e.message || e) }));
+      const r = await telegram.send({ chatId, text, url: settings.show_button === false ? undefined : `${crmUrl}/reports/deals?open=${l.deal_id}`, replyTo: l.telegram_messages[String(chatId)], threadId: (settings.telegram_topics || {})[String(chatId)] || undefined }).catch((e) => ({ ok: false, error: String(e.message || e) }));
       any = any || r.ok;
     }
     await db.from('site_leads').update({ reminders_sent: (l.reminders_sent || 0) + 1, last_reminder_at: now().toISOString() }).eq('id', l.id);

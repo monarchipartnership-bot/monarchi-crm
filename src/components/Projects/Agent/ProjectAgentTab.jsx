@@ -12,7 +12,7 @@ import TimePicker from '../../common/TimePicker';
 import { authedPost } from '../../../lib/adAccounts';
 import { nextScheduled } from '../../../lib/agentSchedule';
 import { fetchAllProfiles, profileLabel } from '../../../lib/api/profile';
-import { fetchTgChats } from '../../../lib/api/siteLeads';
+import { fetchTgChats, fetchTgTopics } from '../../../lib/api/siteLeads';
 
 // «Запустити зараз» makes a draft report on request; with the switch on, the scheduler (cron, api/agent-tick.js)
 // also starts the reports by the schedule from the settings. Keep false only if the cron is turned off.
@@ -122,13 +122,15 @@ export default function ProjectAgentTab({ projectId }) {
   const [people, setPeople] = useState([]); // CRM users who can be picked to get the notifications
   const [runType, setRunType] = useState('weekly');
   const [runResult, setRunResult] = useState(null);
+  const [tgTopics, setTgTopics] = useState([]); // topics of the chats (for the choice of a topic)
   const [tgChats, setTgChats] = useState([]); // chats the bot has seen (the choice for «Telegram-чат»)
   const [tgTest, setTgTest] = useState({ busy: false, ok: null, msg: '' });
 
   const load = useCallback(async () => {
-    const [{ agent: a, missing: m }, accs, ev, profiles, chats] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles(), fetchTgChats()]);
+    const [{ agent: a, missing: m }, accs, ev, profiles, chats, topics] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles(), fetchTgChats(), fetchTgTopics()]);
     setPeople(profiles);
     setTgChats(chats);
+    setTgTopics(topics);
     setAgent(a);
     setMissing(m);
     setAccounts(accs);
@@ -186,7 +188,7 @@ export default function ProjectAgentTab({ projectId }) {
   const sendTgTest = async () => {
     setTgTest({ busy: true, ok: null, msg: '' });
     try {
-      const r = await authedPost('/api/project-agent-run', { action: 'telegram_test', projectId: Number(projectId), periodType: 'weekly', chatId: form.telegram?.chatId });
+      const r = await authedPost('/api/project-agent-run', { action: 'telegram_test', projectId: Number(projectId), periodType: 'weekly', chatId: form.telegram?.chatId, threadId: form.telegram?.threadId || undefined });
       setTgTest({ busy: false, ok: Boolean(r.ok), msg: r.ok ? 'Тестове повідомлення надіслано в чат.' : (r.error || 'Не вдалося надіслати.') });
     } catch (e) { setTgTest({ busy: false, ok: false, msg: e.message || 'Не вдалося надіслати.' }); }
   };
@@ -357,10 +359,20 @@ export default function ProjectAgentTab({ projectId }) {
                   <div className="pacc-hint">Бот ще не бачив жодного чату. Додайте бота в потрібний чат і напишіть там будь-що (наприклад /start), потім оновіть сторінку. Чати та бот налаштовуються в «Налаштування → Заявки з сайту».</div>
                 ) : (
                   <div className="pag-row">
-                    <Select value={form.telegram?.chatId || ''} onChange={(v) => setCfg({ telegram: { ...(form.telegram || {}), chatId: v } })} ariaLabel="Telegram-чат"
+                    <Select value={form.telegram?.chatId || ''} onChange={(v) => setCfg({ telegram: { ...(form.telegram || {}), chatId: v, threadId: '' } })} ariaLabel="Telegram-чат"
                       options={[{ value: '', label: 'Оберіть чат…' }, ...tgChats.map((c) => ({ value: String(c.chat_id), label: c.title || String(c.chat_id) }))]} />
                     <button type="button" className="btn" onClick={sendTgTest} disabled={!form.telegram?.chatId || dirty || tgTest.busy} title={dirty ? 'Спершу збережіть налаштування' : ''}>{tgTest.busy ? 'Надсилаємо…' : 'Надіслати тест'}</button>
                   </div>
+                )}
+                {form.telegram?.chatId && tgTopics.some((t) => t.chat_id === String(form.telegram.chatId)) && (
+                  <>
+                    <div className="pag-sub">Тема в чаті</div>
+                    <Select value={String(form.telegram?.threadId || '')} onChange={(v) => setCfg({ telegram: { ...(form.telegram || {}), threadId: v } })} ariaLabel="Тема в чаті"
+                      options={[{ value: '', label: 'Загальна (без окремої теми)' }, ...tgTopics.filter((t) => t.chat_id === String(form.telegram.chatId)).map((t) => ({ value: String(t.thread_id), label: t.name || `Тема ${t.thread_id}` }))]} />
+                  </>
+                )}
+                {form.telegram?.chatId && !tgTopics.some((t) => t.chat_id === String(form.telegram.chatId)) && tgChats.find((c) => String(c.chat_id) === String(form.telegram.chatId))?.type === 'supergroup' && (
+                  <div className="pacc-hint">Якщо в групі є теми, напишіть <code>/start@імʼя_бота</code> у потрібній темі й оновіть сторінку: тоді її можна буде обрати.</div>
                 )}
                 {form.telegram?.enabled && !form.telegram?.chatId && tgChats.length > 0 && <div className="pacc-hint">Оберіть чат, інакше повідомлення нікуди не піде.</div>}
                 {tgTest.msg && <div className={tgTest.ok ? 'pacc-hint' : 'pacc-err'}>{tgTest.msg}</div>}

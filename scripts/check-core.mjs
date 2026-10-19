@@ -504,6 +504,48 @@ await ok('agent run: the chosen chat gets one message with a button per report; 
   assert.ok(refused.log.events.some((e) => e.kind === 'telegram_failed' && e.status === 'problem'));
 });
 
+// ---- Telegram topics
+await ok('telegram topics: a message in a topic tells the bot the topic; a message goes into the chosen topic only', async () => {
+  const inTopic = peopleFromUpdate({ message: { message_id: 50, message_thread_id: 7, is_topic_message: true, chat: { id: -100, title: 'G', type: 'supergroup', is_forum: true }, from: { id: 5, first_name: 'A' }, text: '/start@bot', reply_to_message: { message_id: 7, forum_topic_created: { name: 'Нові клієнти' } } } });
+  assert.deepEqual(inTopic.topic, { chat_id: '-100', thread_id: 7, name: 'Нові клієнти' });
+  assert.deepEqual(peopleFromUpdate({ message: { message_id: 9, message_thread_id: 9, is_topic_message: true, chat: { id: -100, title: 'G', type: 'supergroup', is_forum: true }, from: { id: 5, first_name: 'A' }, text: 'x' } }).topic, { chat_id: '-100', thread_id: 9, name: null }); // title unknown: the id is still learned
+  assert.deepEqual(peopleFromUpdate({ message: { message_id: 12, forum_topic_created: { name: 'Звіти' }, chat: { id: -100, title: 'G', type: 'supergroup', is_forum: true } } }).topic, { chat_id: '-100', thread_id: 12, name: 'Звіти' }); // the service message that creates a topic
+  assert.equal(peopleFromUpdate({ message: { message_id: 3, chat: { id: -100, title: 'G', type: 'supergroup', is_forum: true }, from: { id: 5, first_name: 'A' }, text: 'x' } }).topic, null); // General has no id
+  assert.equal(peopleFromUpdate({ message: { message_id: 3, message_thread_id: 2, chat: { id: -200, title: 'Plain', type: 'supergroup' }, from: { id: 5, first_name: 'A' }, text: 'reply' } }).topic, null); // a reply thread of a normal group is not a topic
+  let body = null;
+  const fetchFn = async (url, init) => { body = JSON.parse(init.body); return { ok: true, json: async () => ({ ok: true, result: {} }) }; };
+  await tgSend({ chatId: '-100', text: 't', threadId: '7' }, { env: { TELEGRAM_BOT_TOKEN: 'tok' }, fetchFn });
+  assert.equal(body.message_thread_id, 7);
+  await tgSend({ chatId: '-100', text: 't' }, { env: { TELEGRAM_BOT_TOKEN: 'tok' }, fetchFn });
+  assert.ok(!('message_thread_id' in body));
+});
+await ok('telegram topics: website leads, their reminders and the agent report each go to their own topic', async () => {
+  const sent = [];
+  const telegram = { send: async (m) => { sent.push(m); return { ok: true, result: { message_id: 1 } }; } };
+  const agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, telegram: { enabled: true, chatId: '-100', threadId: '8' } } };
+  await runProjectReport({ repo: fakeRepo({ agent }), post, projectId: 3, periodType: 'weekly', today: '2026-10-15', telegram });
+  assert.equal(sent.length, 1);
+  assert.deepEqual([sent[0].chatId, sent[0].threadId], ['-100', '8']);
+  sent.length = 0;
+  await runProjectReport({ repo: fakeRepo({ agent: { ...agent, config: { ...agent.config, telegram: { enabled: true, chatId: '-100', threadId: '' } } } }), post, projectId: 3, periodType: 'weekly', today: '2026-10-15', telegram });
+  assert.equal(sent[0].threadId, undefined); // no topic chosen: the General topic
+});
+
+await ok('telegram topics: a website lead goes into the topic chosen for its chat', async () => {
+  const tables = { site_leads: [], clients: [], deals: [], deal_activity: [], notifications: [], pipelines: [{ id: 7, name: 'Website', position: 7 }], deal_stages: [{ id: 22, pipeline_id: 7, position: 4 }, { id: 19, pipeline_id: 7, position: 1 }] };
+  const db = fakeDb(tables);
+  const sent = [];
+  const telegram = { send: async (m) => { sent.push(m); return m.chatId === '-200' ? { ok: false, error: 'chat not found' } : { ok: true }; } };
+  const settings = { enabled: true, pipeline_id: 7, manager: 'Anna', telegram_chat_ids: ['-100', '-200'], notify_emails: ['A@x.com', 'a@x.com'] };
+  const t0 = new Date('2026-10-19T10:00:00Z');
+  const run = (body, o = {}) => handleSiteLead({ db, settings: { ...settings, ...(o.settings || {}) }, body, ip: o.ip || '1.2.3.4', telegram: o.telegram === undefined ? telegram : o.telegram, now: () => o.now || t0 });
+  const form = { name: 'Ann Lee', email: 'ann@example.com', phone: '+380501234567', link: 'https://shop.example', services: ['service1'], message: 'Need ads', page_url: 'https://www.monarchi.agency/' };
+  const topicSettings = { ...settings, telegram_chat_ids: ['-100', '-300'], telegram_topics: { '-100': 7 } };
+  const r = await handleSiteLead({ db, settings: topicSettings, body: form, ip: '9.9.9.9', telegram, now: () => t0 });
+  assert.equal(r.status, 'created');
+  assert.deepEqual(sent.map((m) => [m.chatId, m.threadId]), [['-100', 7], ['-300', undefined]]); // the chat with a chosen topic gets it there, the other one stays as it was
+});
+
 await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {
   const platforms = { meta: { currency: 'USD', total: { spend: 1200, impressions: 100000, clicks: 3000, purchases: 20, revenue: 4800, leads: 0 } } };
   const previous = { period: { start: '2026-09-24', end: '2026-09-30' }, platforms: { meta: { total: { spend: 1000, impressions: 90000, clicks: 2700, purchases: 25, revenue: 4500, leads: 0 } } } };

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ActionIcon from '../../components/common/ActionIcon';
 import Select from '../../components/common/Select';
-import { fetchTgChats, fetchTgMembers, setMemberPing, telegramChats, telegramMembers, telegramStatus, telegramTest } from '../../lib/api/siteLeads';
+import { fetchTgChats, fetchTgMembers, fetchTgTopics, setMemberPing, telegramChats, telegramMembers, telegramStatus, telegramTest } from '../../lib/api/siteLeads';
 import { fmtDateTime } from '../Smm/agentUi';
 import TemplateLibrary from './TemplateLibrary';
 
@@ -12,6 +12,7 @@ const COUNTS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: n === 1 ? 
 export default function TelegramPanel({ settings, leads, patch, notify, busy }) {
   const [bot, setBot] = useState(null); // { tokenSet, ok, bot, webhook, chats, error } | { unreachable }
   const [seen, setSeen] = useState([]); // chats the bot has seen (tg_chats)
+  const [topics, setTopics] = useState([]); // topics of forum supergroups the bot has seen (tg_topics)
   const [found, setFound] = useState(null);
   const [manualChat, setManualChat] = useState('');
   const [members, setMembers] = useState({}); // chat id -> people
@@ -20,8 +21,13 @@ export default function TelegramPanel({ settings, leads, patch, notify, busy }) 
 
   const chats = settings.telegram_chat_ids || [];
   const refreshStatus = useCallback(() => telegramStatus().then(setBot).catch((e) => setBot({ unreachable: true, error: e.message })), []);
-  useEffect(() => { refreshStatus(); fetchTgChats().then(setSeen); }, [refreshStatus]);
+  useEffect(() => { refreshStatus(); fetchTgChats().then(setSeen); fetchTgTopics().then(setTopics); }, [refreshStatus]);
 
+  // The topic that gets the website leads of a chat (empty = the General topic). Only chats with topics the bot has seen offer a choice.
+  const topicsOf = (id) => topics.filter((t) => t.chat_id === String(id));
+  const topicLabel = (t) => t.name || `Тема ${t.thread_id}`;
+  const chosenTopic = (id) => (settings.telegram_topics || {})[String(id)] || '';
+  const setTopic = (id, v) => { const next = { ...(settings.telegram_topics || {}) }; if (v) next[String(id)] = Number(v); else delete next[String(id)]; patch({ telegram_topics: next }, v ? 'Тему для заявок збережено.' : 'Заявки йтимуть у загальну тему.'); };
   const titleOf = (id) => seen.find((c) => c.chat_id === String(id))?.title || null;
   const lastSend = useMemo(() => leads.find((l) => l.telegram_status), [leads]);
   const pingsNow = (id) => (members[id] || []).filter((m) => m.ping).map((m) => (m.username ? '@' + m.username : m.name)).join(' ');
@@ -42,7 +48,7 @@ export default function TelegramPanel({ settings, leads, patch, notify, busy }) 
     await setMemberPing(chatId, m.user_id, !m.ping);
     setMembers((all) => ({ ...all, [chatId]: all[chatId].map((x) => (x.user_id === m.user_id ? { ...x, ping: !m.ping } : x)) }));
   });
-  const test = (id, template) => run('test' + id, async () => { await telegramTest(id, { template: template ?? settings.message_template ?? undefined, showButton: settings.show_button !== false }); notify('Тестове повідомлення надіслано: перевірте чат.'); });
+  const test = (id, template) => run('test' + id, async () => { await telegramTest(id, { template: template ?? settings.message_template ?? undefined, showButton: settings.show_button !== false, threadId: chosenTopic(id) || undefined }); notify('Тестове повідомлення надіслано: перевірте чат.'); });
   return (
     <>
       <section className="smm-block">
@@ -85,6 +91,17 @@ export default function TelegramPanel({ settings, leads, patch, notify, busy }) 
                 <button type="button" className="smm-btn" onClick={() => openMembers(c)}>{openChat === c ? 'Сховати учасників' : 'Кого позначати'}</button>
                 <button type="button" className="smm-btn" disabled={!bot?.ok || working === 'test' + c} onClick={() => test(c)}>{working === 'test' + c ? 'Надсилаємо…' : 'Надіслати тест'}</button>
                 <button type="button" className="smm-btn smm-btn--danger" onClick={() => removeChat(c)}>Прибрати</button>
+                {(topicsOf(c).length > 0 || seen.find((x) => x.chat_id === String(c))?.type === 'supergroup') && (
+                  <div className="smm-row-note smm-topic">
+                    <span className="smm-muted">Тема для заявок</span>
+                    {topicsOf(c).length > 0 ? (
+                      <Select value={String(chosenTopic(c))} onChange={(v) => setTopic(c, v)} ariaLabel="Тема для заявок"
+                        options={[{ value: '', label: 'Загальна (без окремої теми)' }, ...topicsOf(c).map((t) => ({ value: String(t.thread_id), label: topicLabel(t) }))]} />
+                    ) : (
+                      <span className="smm-muted">Бот ще не бачив тем. Напишіть <code>/start@імʼя_бота</code> у потрібній темі й оновіть сторінку.</span>
+                    )}
+                  </div>
+                )}
                 {openChat === c && (
                   <div className="smm-row-note smm-members">
                     <p className="smm-muted">Позначені нижче люди отримують згадку в кожній новій заявці й нагадуванні, поки ви не приберете галочку.</p>

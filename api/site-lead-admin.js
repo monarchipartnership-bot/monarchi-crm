@@ -61,10 +61,10 @@ export default async function handler(req, res) {
   if (action === 'test') {
     const id = String(chatId || '').trim();
     if (!id) { res.status(400).json({ error: 'Вкажіть chat id.' }); return; }
-    const { template, showButton } = req.body || {};
+    const { template, showButton, threadId } = req.body || {};
     const pings = (await loadPings(db))[id] || '';
     const text = buildTelegramText(SAMPLE, { template: typeof template === 'string' && template.trim() ? template : undefined, pings });
-    const r = await sendMessage({ chatId: id, text: `🧪 <i>Тест форми повідомлення</i>\n\n${text}`, url: showButton === false ? undefined : (process.env.CRM_BASE_URL || 'https://crm.monarchi.agency') + '/reports/deals' });
+    const r = await sendMessage({ chatId: id, threadId: threadId || undefined, text: `🧪 <i>Тест форми повідомлення</i>\n\n${text}`, url: showButton === false ? undefined : (process.env.CRM_BASE_URL || 'https://crm.monarchi.agency') + '/reports/deals' });
     res.status(r.ok ? 200 : 502).json(r.ok ? { ok: true } : { error: r.error });
     return;
   }
