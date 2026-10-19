@@ -10,18 +10,21 @@
 
 /* ---- Icon: box → icon pairs. Only the wrapper of an existing icon badge is animated. ---- */
 .dash-kpi-icon, .client-kpi-icon, .client-profile-stat-icon, .client-profile-quick-ic, .tm-stat-icon, .tm-dept-card-icon, .kcard-icon,
-.proj-card-icon, .client-profile-mini-row-ic, .pw-tab img { transform-origin: 50% 65%; }
+.proj-card-icon, .client-profile-mini-row-ic, .pw-tab > img { transform-origin: 50% 65%; }
 
 @media (hover: hover) and (pointer: fine) {
-  :is(.dash-kpi, .client-kpi-card, .client-profile-stat-card, .client-profile-quick-field, .tm-stat-card, .tm-dept-card, .kcard, .proj-card, .client-profile-mini-row, .client-profile-deal-row, .pw-tab):not(.ai-immersive *):not([aria-disabled="true"]):not(:disabled):hover
-    :is(.dash-kpi-icon, .client-kpi-icon, .client-profile-stat-icon, .client-profile-quick-ic, .tm-stat-icon, .tm-dept-card-icon, .kcard-icon, .proj-card-icon, .client-profile-mini-row-ic, img) {
+  :is(.dash-kpi, .client-kpi-card, .client-profile-stat-card, .client-profile-quick-field, .tm-stat-card, .tm-dept-card, .kcard, .proj-card, .client-profile-mini-row, .client-profile-deal-row):not(.ai-immersive *):not([aria-disabled="true"]):not(:disabled):hover
+    :is(.dash-kpi-icon, .client-kpi-icon, .client-profile-stat-icon, .client-profile-quick-ic, .tm-stat-icon, .tm-dept-card-icon, .kcard-icon, .proj-card-icon, .client-profile-mini-row-ic) {
     animation: mh-icon-lift 620ms cubic-bezier(.22, .61, .36, 1) both;
   }
+  /* the 3D icon of a folder tab is its direct child; the platform logos in the tab bar are not animated */
+  .pw-tab:not(.ai-immersive *):not(:disabled):hover > img { animation: mh-icon-lift 620ms cubic-bezier(.22, .61, .36, 1) both; }
 }
-:is(.client-profile-quick-field, .tm-dept-card, .client-profile-mini-row, .client-profile-deal-row, .pw-tab):not(.ai-immersive *):not([aria-disabled="true"]):not(:disabled):focus-visible
-  :is(.client-profile-quick-ic, .tm-dept-card-icon, .client-profile-mini-row-ic, img) {
+:is(.client-profile-quick-field, .tm-dept-card, .client-profile-mini-row, .client-profile-deal-row):not(.ai-immersive *):not([aria-disabled="true"]):not(:disabled):focus-visible
+  :is(.client-profile-quick-ic, .tm-dept-card-icon, .client-profile-mini-row-ic) {
   animation: mh-icon-lift 620ms cubic-bezier(.22, .61, .36, 1) both;
 }
+.pw-tab:not(.ai-immersive *):not(:disabled):focus-visible > img { animation: mh-icon-lift 620ms cubic-bezier(.22, .61, .36, 1) both; }
 
 /* ---- Button: one shine pass ---- */
 :is(.btn.btn-p, .pw-btn--primary):not(.ai-immersive *) { position: relative; isolation: isolate; overflow: hidden; }
@@ -47,6 +50,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-kpi-icon, .client-kpi-icon, .client-profile-stat-icon, .client-profile-quick-ic, .tm-stat-icon, .tm-dept-card-icon, .kcard-icon,
-  .proj-card-icon, .client-profile-mini-row-ic, .pw-tab img { animation: none !important; transform: none !important; }
+  .proj-card-icon, .client-profile-mini-row-ic, .pw-tab > img { animation: none !important; transform: none !important; }
   :is(.btn.btn-p, .pw-btn--primary)::after { animation: none !important; display: none; }
 }
