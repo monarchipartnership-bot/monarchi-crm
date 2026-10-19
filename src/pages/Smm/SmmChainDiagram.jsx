@@ -75,8 +75,8 @@ export default function SmmChainDiagram({ team, onSelect }) {
       <defs>
         <marker id={`a-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill={ACCENT} /></marker>
         <marker id={`d-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#C9AED3" /></marker>
-        <linearGradient id={`on-${uid}`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#B544B5" /><stop offset="1" stopColor="#661466" /></linearGradient>
-        <linearGradient id={`off-${uid}`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#F6EAFA" /><stop offset="1" stopColor="#E8D4EF" /></linearGradient>
+        <linearGradient id={`on-${uid}`} x1="0" y1="0.4" x2="1" y2="0.6"><stop offset="0" stopColor="#B544B5" /><stop offset="1" stopColor="#661466" /></linearGradient>
+        <linearGradient id={`off-${uid}`} x1="0" y1="0.4" x2="1" y2="0.6"><stop offset="0" stopColor="#C99ECE" /><stop offset="1" stopColor="#85608F" /></linearGradient>
       </defs>
 
       {SMM_STAGES.map((s, i) => (
@@ -103,11 +103,11 @@ export default function SmmChainDiagram({ team, onSelect }) {
               onClick={() => onSelect(role)} role="button" tabIndex={0} aria-label={`${a.name}: відкрити`}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(role); } }}
             >
-              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="13" style={{ fill: `url(#${st === 'on' ? 'on' : 'off'}-${uid})`, stroke: st === 'on' ? 'transparent' : '#DCC8E4' }} />
-              <rect className="cmp-node-bar" x="0" y="10" width="4" height={NODE_H - 20} rx="2" style={{ fill: st === 'on' ? '#ffffff8c' : '#AE40AE' }} />
-              <text className="cmp-node-name" x="16" y="25" style={{ fill: st === 'on' ? '#fff' : '#4A1C54' }}>{a.name}</text>
-              <text className="cmp-node-short" x="16" y="43" style={{ fill: st === 'on' ? '#F2DAF4' : '#80608B' }}>{meta?.short || ''}</text>
-              <circle cx={NODE_W - 14} cy="14" r="5" fill={DOT[st] || DOT.off} stroke={st === 'on' ? '#ffffffb3' : 'none'} strokeWidth="1.5" />
+              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="13" style={{ fill: `url(#${st === 'on' ? 'on' : 'off'}-${uid})`, stroke: 'transparent' }} />
+              <rect className="cmp-node-bar" x="0" y="10" width="4" height={NODE_H - 20} rx="2" style={{ fill: '#ffffff8c' }} />
+              <text className="cmp-node-name" x="16" y="25" style={{ fill: '#fff' }}>{a.name}</text>
+              <text className="cmp-node-short" x="16" y="43" style={{ fill: st === 'on' ? '#F2DAF4' : '#F1E4F4' }}>{meta?.short || ''}</text>
+              <circle cx={NODE_W - 14} cy="14" r="5" fill={DOT[st] || DOT.off} stroke="#ffffffb3" strokeWidth="1.5" />
             </g>
           );
         })}
