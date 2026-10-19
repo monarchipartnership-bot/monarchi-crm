@@ -1,0 +1,14 @@
+/* «Налаштування»: a slim row of sections above the page of the chosen section. The pages below keep their own full-width design. */
+.settings-shell { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.settings-nav { display: flex; gap: 10px; flex-wrap: wrap; }
+.settings-tab {
+  display: flex; flex-direction: column; gap: 2px; min-width: 190px; padding: 11px 18px; border-radius: 14px; text-decoration: none;
+  background: var(--surface, #fff); border: 1px solid rgba(120, 34, 135, .14); color: var(--ink, #21113F);
+}
+.settings-tab-label { font: 700 14px/1.3 var(--font-head, inherit); }
+.settings-tab-hint { font-size: 12px; color: var(--ink-soft, #807394); }
+.settings-tab.is-active { background: var(--purple-tint, #F2EAFA); border-color: var(--purple, #782287); }
+.settings-tab.is-active .settings-tab-label { color: var(--purple, #782287); }
+.settings-tab:focus-visible { outline: 2px solid var(--purple, #782287); outline-offset: 2px; }
+.settings-body { min-width: 0; }
+@media (max-width: 640px) { .settings-tab { min-width: 0; flex: 1 1 100%; } }

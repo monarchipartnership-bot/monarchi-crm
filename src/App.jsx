@@ -33,6 +33,7 @@ import Presentation from './pages/Presentation/Presentation';
 import AutomationDashboard from './pages/Automation/Dashboard';
 import SmmHome from './pages/Smm/SmmHome';
 import SiteLeads from './pages/SiteLeads/SiteLeads';
+import SettingsLayout from './pages/Settings/SettingsLayout';
 import './styles/pages.css';
 
 function AuthGate() {
@@ -74,7 +75,12 @@ function AuthGate() {
         <Route path="/team/accounts" element={<TeamAccounts />} />
         <Route path="/team/members" element={<TeamMembers />} />
         <Route path="/team/members/:email" element={<TeamMemberProfile />} />
-        <Route path="/account" element={<Account />} />
+        <Route path="/account" element={<Navigate to="/settings/account" replace />} />
+        <Route path="/settings" element={<SettingsLayout />}>
+          <Route index element={<Navigate to="/settings/account" replace />} />
+          <Route path="account" element={<Account />} />
+          <Route path="site-leads" element={<SiteLeads />} />
+        </Route>
         <Route path="/tools/calculator" element={<Calculator />} />
         <Route path="/tools/image-studio" element={<ImageStudio />} />
         <Route path="/tools/followup" element={<FollowupGenerator />} />
@@ -82,7 +88,7 @@ function AuthGate() {
         <Route path="/clients" element={<Presentation />} />
         <Route path="/automation/dashboard" element={<AutomationDashboard />} />
         <Route path="/automation/smm" element={<SmmHome />} />
-        <Route path="/automation/site-leads" element={<SiteLeads />} />
+        <Route path="/automation/site-leads" element={<Navigate to="/settings/site-leads" replace />} />
         <Route path="/tasks" element={<TaskManagerPage />} />
         <Route path="/tasks/analytics" element={<TaskAnalyticsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

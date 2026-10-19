@@ -7,10 +7,10 @@ import { PAGE_ICONS } from '../lib/pageIcons';
 // to the title in TopBar — most routes don't have one yet, TopBar renders
 // fine without it.
 export const ROUTE_META = {
-  '/account': {
+  '/settings/account': {
     title: 'Мій кабінет',
     desc: "Профіль, заявки на відпустку та черга на затвердження.",
-    trail: [{ label: 'Мій кабінет' }],
+    trail: [{ label: 'Налаштування', to: '/settings' }, { label: 'Мій кабінет' }],
   },
   '/team/calendar': {
     title: 'Team Calendar',
@@ -155,10 +155,10 @@ export const ROUTE_META = {
     desc: 'Команда SMM-асистентів Monarchi: бренд-профіль, контент-план, черга схвалення постів для соцмереж.',
     trail: [{ label: 'Automation Department' }, { label: "Mon'Archi SMM" }],
   },
-  '/automation/site-leads': {
+  '/settings/site-leads': {
     title: 'Заявки з сайту',
     desc: 'Форма сайту Monarchi: нові заявки автоматично зʼявляються в CRM як контакт і угода й приходять у Telegram.',
-    trail: [{ label: 'Automation Department' }, { label: 'Заявки з сайту' }],
+    trail: [{ label: 'Налаштування', to: '/settings' }, { label: 'Заявки з сайту' }],
   },
   '/tasks': {
     title: 'Task Manager',

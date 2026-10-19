@@ -69,13 +69,16 @@ export default function TopBar() {
       <div className="topbar-slot" id="topbar-slot" />
 
       <div className="topbar-actions">
+        <Link className={'topbar-bell-btn topbar-gear-btn' + (pathname.startsWith('/settings') ? ' is-active' : '')} to="/settings" title="Налаштування" aria-label="Налаштування">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+        </Link>
         <NotificationBell />
         <div className="topbar-account">
-          <Link className="topbar-avatar" to="/account" title="Мій кабінет">
+          <Link className="topbar-avatar" to="/settings/account" title="Мій кабінет">
             {profile?.photo ? <img src={profile.photo} alt="" /> : <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }} />}
           </Link>
           <div className="topbar-user">
-            <Link className="topbar-user-name" to="/account">{profile ? profileLabel(profile) : (email ?? 'user@monarchi.agency')}</Link>
+            <Link className="topbar-user-name" to="/settings/account">{profile ? profileLabel(profile) : (email ?? 'user@monarchi.agency')}</Link>
             <button type="button" onClick={signOut}>Вийти</button>
           </div>
         </div>

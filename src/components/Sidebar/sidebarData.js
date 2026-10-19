@@ -50,7 +50,6 @@ export const DEPTS = {
       // Placeholder page for now. The icon is a stand-in (Image Studio's) —
       // the icon atlas has no SMM glyph yet.
       { key: 'smm', name: "Mon'Archi SMM", desc: 'Контент-план і черга схвалення постів для соцмереж Monarchi, бренд-профіль, конкуренти.', icon: SI.imageStudio, type: 'link', to: '/automation/smm' },
-      { key: 'site-leads', name: 'Заявки з сайту', desc: 'Форма сайту → контакт і угода в CRM та повідомлення в Telegram: налаштування, код для сайту, журнал заявок.', icon: SI.contacts, type: 'link', to: '/automation/site-leads' },
     ],
   },
   team: {

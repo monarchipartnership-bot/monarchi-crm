@@ -81,7 +81,7 @@ export default function TeamMemberProfile() {
           <p className="sub">{profile.position || 'Посада не вказана'}</p>
         </div>
         {email === myEmail && (
-          <Link to="/account" className="btn tm-edit-btn">Редагувати профіль</Link>
+          <Link to="/settings/account" className="btn tm-edit-btn">Редагувати профіль</Link>
         )}
       </section>
 

@@ -77,7 +77,7 @@ export default function TeamCalendar() {
       <div className="page-actions">
         <button type="button" className="btn" onClick={() => navigate(-1)}>&#8592; Back</button>
         <div className="sp" />
-        <Link className="btn btn-p" to="/account">Подати заявку на відпустку &#8594;</Link>
+        <Link className="btn btn-p" to="/settings/account">Подати заявку на відпустку &#8594;</Link>
       </div>
 
       <section className="rpt-hero">

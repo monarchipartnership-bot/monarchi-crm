@@ -72,6 +72,9 @@
 .topbar-bell-btn:hover { background: var(--purple-tint); color: var(--purple); transform: translateY(-1px); }
 .topbar-bell-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transform-origin: 50% 20%; }
 .topbar-bell-btn:hover svg { animation: topbarBellRing .5s ease; }
+.topbar-gear-btn:hover svg { animation: none; }
+.topbar-gear-btn.is-active { background: var(--purple-tint); color: var(--purple); }
+.topbar-gear-btn svg { transform-origin: 50% 50%; }
 @keyframes topbarBellRing {
   0%, 100% { transform: rotate(0deg); }
   15% { transform: rotate(16deg); }

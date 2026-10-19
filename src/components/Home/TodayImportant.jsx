@@ -106,7 +106,7 @@ export default function TodayImportant() {
         <StatCard icon="&#9200;" tone="danger" count={counts ? counts.overdueReports : '–'} label="Прострочені звіти" to="/reports/hub" />
         <StatCard icon="&#9989;" tone="ok" count={counts ? counts.urgentTasks : '–'} label="Термінові задачі" to="/tasks" />
         <SoonCard icon="&#128197;" tone="info" label="Зустрічі сьогодні" />
-        <StatCard icon="&#128203;" tone="warn" count={counts ? counts.pendingApprovals : '–'} label="Очікують погодження" to="/account" />
+        <StatCard icon="&#128203;" tone="warn" count={counts ? counts.pendingApprovals : '–'} label="Очікують погодження" to="/settings/account" />
         <Link to="#" className="ti-ai-btn" onClick={(e) => e.preventDefault()}>
           <span>&#10024; Запланувати день<br />з AI-помічником</span>
           <span className="ti-ai-btn__soon">Скоро</span>
