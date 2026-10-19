@@ -37,7 +37,7 @@ export default function SiteLeads() {
     if (!s) setMissing(true);
     setSettings(s); setLeads(l); setPipelines(p);
   }, []);
-  useEffect(() => { reload(); fetchAllProfiles().then((p) => setPeople(p || [])); telegramStatus().then(setBot).catch((e) => setBot({ tokenSet: false, error: e.message })); }, [reload]);
+  useEffect(() => { reload(); fetchAllProfiles().then((p) => setPeople(p || [])); telegramStatus().then(setBot).catch((e) => setBot({ unreachable: true, error: e.message })); }, [reload]);
 
   const snippet = useMemo(() => (settings ? buildSnippet({ endpoint: ENDPOINT, key: settings.site_key }) : ''), [settings]);
   const week = Date.now() - 7 * 86400000;
@@ -88,7 +88,8 @@ export default function SiteLeads() {
 
         <section className="smm-block">
           <h3>1. Telegram</h3>
-          {bot && !bot.tokenSet && (
+          {bot?.unreachable && <p className="smm-warn-banner" role="status">Не вдалося перевірити бота: {bot.error} Це не означає, що бота не підключено. Відкрийте цю сторінку на робочому сайті (crm.monarchi.agency): на локальному сервері серверні функції та токен бота недоступні.</p>}
+          {bot && !bot.unreachable && !bot.tokenSet && (
             <div className="smm-warn-banner" role="status">
               <b>Бота ще не підключено.</b> Зробіть чотири кроки:
               <ol className="smm-howto">
