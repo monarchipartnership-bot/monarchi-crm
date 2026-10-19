@@ -25,6 +25,29 @@ const TASKS = [
   ['presentation', 'Презентації для клієнта', 'Презентація по кожній платформі зі збереженого звіту, з тими ж стовпцями та формулами'],
 ];
 
+// One group of the settings: the title and a line of explanation on the left, the controls on the right.
+function PagSection({ title, hint, off = false, children }) {
+  return (
+    <div className={'pag-sec' + (off ? ' is-off' : '')}>
+      <div className="pag-sec-head">
+        <h4>{title}</h4>
+        {hint && <p>{hint}</p>}
+      </div>
+      <div className="pag-sec-body">{children}</div>
+    </div>
+  );
+}
+
+// A tick as a small card: the chosen ones are framed purple.
+function PagOption({ checked, onChange, title, desc, disabled = false }) {
+  return (
+    <label className={'pag-opt' + (checked ? ' on' : '') + (disabled ? ' off' : '')}>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange?.(e.target.checked)} />
+      <span><b>{title}</b>{desc ? <small>{desc}</small> : null}</span>
+    </label>
+  );
+}
+
 export const KIND_LABEL = {
   connected: 'Підключення', enabled: 'Увімкнення', disabled: 'Вимкнення', config_changed: 'Налаштування', disconnected: 'Відключення',
   run_started: 'Запуск', report_created: 'Звіт', deck_created: 'Презентація', run_finished: 'Завершення', problem: 'Проблема',
@@ -222,108 +245,103 @@ export default function ProjectAgentTab({ projectId }) {
         {message && <div className="pacc-err pag-error">{message}</div>}
       </section>
 
-      {/* Settings */}
+      {/* Settings: five groups in the order the agent works — what it does, when, the presentation, who is told, the note */}
       {agent && form && (
-        <section className="pag-card">
+        <section className="pag-card pag-settings">
           <div className="pag-card-head">
-            <div className="stitle">Налаштування агента</div>
+            <div>
+              <div className="stitle">Налаштування агента</div>
+              <div className="pacc-hint">Що агент робить, коли і для кого. Зміни діють після збереження.</div>
+            </div>
             <div className="pag-card-actions">
               {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
-              <button type="button" className="btn btn-p" onClick={save} disabled={!dirty || busy === 'save'}>{busy === 'save' ? '...' : 'Зберегти'}</button>
-              <button type="button" className="btn" onClick={disconnect} disabled={busy === 'disconnect'}>Відключити агента</button>
+              {dirty && <button type="button" className="btn" onClick={() => setForm({ ...DEFAULT_AGENT_CONFIG, ...(agent.config || {}) })} disabled={busy === 'save'}>Скасувати</button>}
+              <button type="button" className="btn btn-p" onClick={save} disabled={!dirty || busy === 'save'}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
             </div>
           </div>
 
-          <div className="pag-grid">
-            <div className="pag-field pag-field--wide">
-              <div className="pag-label">Що робить агент</div>
-              <div className="pag-checks">
-                {TASKS.map(([key, title, desc]) => (
-                  <label className="pag-check" key={key}>
-                    <input type="checkbox" checked={Boolean(form.tasks[key])} onChange={(e) => setCfg({ tasks: { ...form.tasks, [key]: e.target.checked } })} />
-                    <span><b>{title}</b><small>{desc}</small></span>
-                  </label>
-                ))}
-                <label className="pag-check pag-check--soon">
-                  <input type="checkbox" disabled />
-                  <span><b>Рекомендації з оптимізації кабінетів</b><small>Скоро</small></span>
-                </label>
+          <PagSection title="Що робить агент" hint="Завдання та платформи, з яких він збирає цифри.">
+            <div className="pag-opts">
+              {TASKS.map(([key, title, desc]) => (
+                <PagOption key={key} checked={Boolean(form.tasks[key])} onChange={(v) => setCfg({ tasks: { ...form.tasks, [key]: v } })} title={title} desc={desc} />
+              ))}
+              <PagOption checked={false} disabled title="Рекомендації з оптимізації кабінетів" desc="Скоро" />
+            </div>
+            <div className="pag-sub">Платформи</div>
+            {linked.length === 0 && <div className="pacc-hint">До проєкту не підключено кабінетів. Додайте їх на вкладці «Огляд».</div>}
+            <div className="pag-opts pag-opts--compact">
+              {linked.map((p) => (
+                <PagOption key={p} checked={form.platforms.includes(p)} onChange={() => toggleIn('platforms', p)} title={platformInfo(p).label} />
+              ))}
+            </div>
+          </PagSection>
+
+          <PagSection title="Розклад" hint="Час за Києвом. Агент перевіряє розклад кожні 15 хвилин, тож звіт зʼявиться в межах чверті години після вказаного часу.">
+            <div className="pag-two">
+              <div className={'pag-box' + (form.tasks.weeklyReport ? '' : ' is-off')}>
+                <div className="pag-sub">Тижневий звіт</div>
+                <div className="pacc-hint">За останній завершений тиждень</div>
+                <div className="pag-row">
+                  <Select value={Number(form.schedule.weeklyDay)} onChange={(v) => setCfg({ schedule: { ...form.schedule, weeklyDay: v } })} ariaLabel="День тижня" options={DAYS.map(([v, l]) => ({ value: v, label: l }))} />
+                  <TimePicker value={form.schedule.weeklyTime} onChange={(v) => setCfg({ schedule: { ...form.schedule, weeklyTime: v } })} />
+                </div>
+                {!form.tasks.weeklyReport && <div className="pacc-hint">Тижневі звіти вимкнені вище.</div>}
+              </div>
+              <div className={'pag-box' + (form.tasks.monthlyReport ? '' : ' is-off')}>
+                <div className="pag-sub">Місячний звіт</div>
+                <div className="pacc-hint">За останній завершений місяць, день від 1 до 28</div>
+                <div className="pag-row">
+                  <Select value={Number(form.schedule.monthlyDay)} onChange={(v) => setCfg({ schedule: { ...form.schedule, monthlyDay: v } })} ariaLabel="День місяця" options={Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${i + 1}-го числа` }))} />
+                  <TimePicker value={form.schedule.monthlyTime} onChange={(v) => setCfg({ schedule: { ...form.schedule, monthlyTime: v } })} />
+                </div>
+                {!form.tasks.monthlyReport && <div className="pacc-hint">Місячні звіти вимкнені вище.</div>}
               </div>
             </div>
+          </PagSection>
 
-            <div className="pag-field">
-              <div className="pag-label">Платформи</div>
-              {linked.length === 0 && <div className="pacc-hint">До проєкту не підключено кабінетів. Додайте їх на вкладці «Огляд».</div>}
-              <div className="pag-checks">
-                {linked.map((p) => (
-                  <label className="pag-check" key={p}>
-                    <input type="checkbox" checked={form.platforms.includes(p)} onChange={() => toggleIn('platforms', p)} />
-                    <span><b>{platformInfo(p).label}</b></span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="pag-field">
-              <div className="pag-label">Презентація</div>
-              <div className="pag-stack">
+          <PagSection title="Презентація" hint="Як виглядають слайди, які агент готує зі звіту." off={!form.tasks.presentation}>
+            <div className="pag-two">
+              <div className="pag-box">
+                <div className="pag-sub">Стиль</div>
                 <Select value={form.deck.style} onChange={(v) => setCfg({ deck: { ...form.deck, style: v } })} ariaLabel="Стиль презентації" options={STYLES.map((s) => ({ value: s.id, label: s.name }))} />
+                <div className="pacc-hint">Фон обкладинки залежить від платформи звіту.</div>
+              </div>
+              <div className="pag-box">
+                <div className="pag-sub">Мова слайдів</div>
                 <Select value={form.deck.lang} onChange={(v) => setCfg({ deck: { ...form.deck, lang: v } })} ariaLabel="Мова слайдів"
-                  options={[{ value: 'en', label: 'Слайди англійською (для клієнта)' }, { value: 'uk', label: 'Слайди українською' }]} />
-                <span className="pacc-hint">Фон обкладинки залежить від платформи звіту.</span>
+                  options={[{ value: 'en', label: 'Англійською (для клієнта)' }, { value: 'uk', label: 'Українською' }]} />
               </div>
             </div>
+            {!form.tasks.presentation && <div className="pacc-hint">Презентації вимкнені вище: ці параметри нічого не змінюють.</div>}
+          </PagSection>
 
-            <div className="pag-field">
-              <div className="pag-label">Розклад: тижневий звіт (за останній завершений тиждень)</div>
-              <div className="pag-row">
-                <Select value={Number(form.schedule.weeklyDay)} onChange={(v) => setCfg({ schedule: { ...form.schedule, weeklyDay: v } })} ariaLabel="День тижня" options={DAYS.map(([v, l]) => ({ value: v, label: l }))} />
-                <TimePicker value={form.schedule.weeklyTime} onChange={(v) => setCfg({ schedule: { ...form.schedule, weeklyTime: v } })} />
-              </div>
+          <PagSection title="Сповіщення" hint="Звіт завжди зберігається як чернетка: менеджер перевіряє його, перш ніж відправити клієнту.">
+            <div className="pag-opts">
+              <PagOption checked={form.notify} onChange={(v) => setCfg({ notify: v })} title="Сповіщати про результат" desc="Звіт готовий або агент не зміг його створити. Сповіщення зʼявляться в загальному дзвіночку CRM." />
             </div>
-
-            <div className="pag-field">
-              <div className="pag-label">Розклад: місячний звіт (за останній завершений місяць)</div>
-              <div className="pag-row">
-                <Select value={Number(form.schedule.monthlyDay)} onChange={(v) => setCfg({ schedule: { ...form.schedule, monthlyDay: v } })} ariaLabel="День місяця" options={Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${i + 1}-го числа` }))} />
-                <TimePicker value={form.schedule.monthlyTime} onChange={(v) => setCfg({ schedule: { ...form.schedule, monthlyTime: v } })} />
-              </div>
-              <div className="pacc-hint">Час за Києвом. Агент перевіряє розклад кожні 15 хвилин, тому звіт зʼявиться в межах чверті години після вказаного часу. День місяця — від 1 до 28.</div>
-            </div>
-
-            <div className="pag-field pag-field--wide">
-              <div className="pag-label">Після створення</div>
-              <div className="pag-checks">
-                <label className="pag-check">
-                  <input type="checkbox" checked disabled />
-                  <span><b>Звіт зберігається як чернетка</b><small>Менеджер перевіряє його, перш ніж відправити клієнту</small></span>
-                </label>
-                <label className="pag-check">
-                  <input type="checkbox" checked={form.notify} onChange={(e) => setCfg({ notify: e.target.checked })} />
-                  <span><b>Сповістити, що звіт готовий (або що агент не зміг його створити)</b><small>Сповіщення зʼявляться в загальному дзвіночку CRM</small></span>
-                </label>
-              </div>
-            </div>
-
             {form.notify && (
-              <div className="pag-field pag-field--wide">
-                <div className="pag-label">Кому надсилати сповіщення</div>
-                <div className="pag-checks pag-people">
+              <>
+                <div className="pag-sub">Кому надсилати</div>
+                <div className="pag-opts pag-opts--compact">
                   {recipientChoices(people, form.notifyEmails).map((p) => (
-                    <label className="pag-check" key={p.email}>
-                      <input type="checkbox" checked={(form.notifyEmails || []).includes(p.email)} onChange={() => toggleIn('notifyEmails', p.email)} />
-                      <span><b>{p.label}</b>{p.label !== p.email && <small>{p.email}</small>}</span>
-                    </label>
+                    <PagOption key={p.email} checked={(form.notifyEmails || []).includes(p.email)} onChange={() => toggleIn('notifyEmails', p.email)} title={p.label} desc={p.label !== p.email ? p.email : ''} />
                   ))}
                 </div>
                 {!(form.notifyEmails || []).length && <div className="pacc-hint">Нікого не обрано: сповіщень не буде, а увімкнути агента не вийде.</div>}
-              </div>
+              </>
             )}
+          </PagSection>
 
-            <div className="pag-field pag-field--wide">
-              <div className="pag-label">Нотатка для агента</div>
-              <AutoResizeTextarea value={form.note || ''} onChange={(v) => setCfg({ note: v })} placeholder="Контекст проєкту: акції, пріоритети, що не варто згадувати в звіті…" />
+          <PagSection title="Нотатка для агента" hint="Контекст проєкту, який агент враховує, коли пише текст звіту.">
+            <AutoResizeTextarea value={form.note || ''} onChange={(v) => setCfg({ note: v })} placeholder="Акції, пріоритети, що не варто згадувати в звіті…" />
+          </PagSection>
+
+          <div className="pag-danger">
+            <div>
+              <b>Відключити агента</b>
+              <div className="pacc-hint">Налаштування буде видалено, історія дій залишиться.</div>
             </div>
+            <button type="button" className="btn cg-danger" onClick={disconnect} disabled={busy === 'disconnect'}>Відключити</button>
           </div>
         </section>
       )}

@@ -78,3 +78,27 @@
 
 /* who gets the notifications */
 .pag-people { max-height: 260px; overflow-y: auto; padding-right: 4px; }
+
+/* Settings: groups with the title on the left and the controls on the right */
+.pag-settings { gap: 0; padding: 0; }
+.pag-settings > .pag-card-head { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.pag-sec { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 8px 32px; padding: 22px 24px; border-bottom: 1px solid var(--border); }
+.pag-sec.is-off .pag-sec-body { opacity: .55; }
+.pag-sec-head h4 { margin: 0 0 6px; font-family: var(--font-head); font-size: .98rem; color: var(--ink); }
+.pag-sec-head p { margin: 0; font-size: .8rem; line-height: 1.45; color: var(--muted); }
+.pag-sec-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.pag-sub { font-family: var(--font-head); font-weight: 700; font-size: .84rem; color: var(--ink); }
+.pag-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.pag-opts--compact { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.pag-opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; font-size: .88rem; color: var(--ink); cursor: pointer; }
+.pag-opt.on { border-color: var(--purple); background: #FBF5FD; }
+.pag-opt.off { opacity: .55; cursor: default; }
+.pag-opt input { margin-top: 3px; flex: none; }
+.pag-opt > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.pag-opt small { color: var(--muted); font-size: .78rem; line-height: 1.4; }
+.pag-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pag-box { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; min-width: 0; }
+.pag-box.is-off { opacity: .55; }
+.pag-danger { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; }
+.pag-danger b { font-size: .9rem; color: var(--ink); }
+@media (max-width: 900px) { .pag-sec { grid-template-columns: 1fr; } .pag-two { grid-template-columns: 1fr; } }
