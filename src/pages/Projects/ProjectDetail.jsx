@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AutoResizeTextarea from '../../components/Reports/AutoResizeTextarea';
-import PeriodStats from '../../components/Projects/Reports/PeriodStats';
-import PeriodReport from '../../components/Projects/Reports/PeriodReport';
+import PlatformReports from '../../components/Projects/Reports/PlatformReports';
 import ProjectAccountsPanel from '../../components/Projects/ProjectAccountsPanel';
 import ClientPicker from '../../components/Clients/ClientPicker';
 import { clientFullName } from '../../lib/clientName';
@@ -72,7 +71,9 @@ export default function ProjectDetail() {
   const [tab, setTabState] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview'));
   const setTab = (next) => {
     setTabState(next);
-    setSearchParams(next === 'overview' ? {} : { tab: next }, { replace: true });
+    // the chosen ad platform of the report tabs stays when moving between them
+    const platform = ['period', 'weekly', 'monthly'].includes(next) ? searchParams.get('platform') : null;
+    setSearchParams(next === 'overview' ? {} : { tab: next, ...(platform ? { platform } : {}) }, { replace: true });
   };
   const [deleting, setDeleting] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
@@ -536,9 +537,9 @@ export default function ProjectDetail() {
         </>
       )}
 
-      {tab === 'period' && <PeriodStats key={'period-' + id} projectId={id} />}
-      {tab === 'weekly' && <PeriodReport key={'weekly-' + id} projectId={id} periodType="weekly" />}
-      {tab === 'monthly' && <PeriodReport key={'monthly-' + id} projectId={id} periodType="monthly" />}
+      {tab === 'period' && <PlatformReports key={'period-' + id} projectId={id} mode="period" />}
+      {tab === 'weekly' && <PlatformReports key={'weekly-' + id} projectId={id} mode="weekly" />}
+      {tab === 'monthly' && <PlatformReports key={'monthly-' + id} projectId={id} mode="monthly" />}
       {tab === 'decks' && <ProjectDecksTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
       </div>

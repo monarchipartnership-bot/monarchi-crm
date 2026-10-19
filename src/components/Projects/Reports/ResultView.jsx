@@ -13,11 +13,15 @@ import { platformInfo } from '../../../lib/adAccounts';
 // builder: only the campaigns ticked in the picker go into the report and its downloads).
 export const campaignKey = (platform, name) => `${platform}|${name}`;
 
-export default function ResultView({ data, kind, custom, title, subtitle, fileBase, prevLabel, curLabel, children, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
+// lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
+// (different currencies) fall back to one tab each, with a note.
+export default function ResultView({ data, kind, custom, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
-  const tabs = [...platformKeys.map((k) => ({ key: k, label: platformInfo(k).label })), ...(combined ? [{ key: 'total', label: 'Разом' }] : [])];
+  const perPlatform = platformKeys.map((k) => ({ key: k, label: platformInfo(k).label }));
+  const tabs = lockTotal ? (combined ? [{ key: 'total', label: 'Разом' }] : perPlatform.map((t) => (perPlatform.length === 1 ? { ...t, label: 'Разом' } : t))) : [...perPlatform, ...(combined ? [{ key: 'total', label: 'Разом' }] : [])];
+  const splitByCurrency = lockTotal && !combined && perPlatform.length > 1;
   const [tab, setTab] = useState(tabs[0]?.key);
   const active = tabs.some((t) => t.key === tab) ? tab : tabs[0]?.key;
   const captureRef = useRef(null);
@@ -48,11 +52,13 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
   return (
     <div className="prep-result">
       <div className="prep-result-bar">
-        <div className="pacc-tabs" role="tablist">
-          {tabs.map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={t.key === active} className={'pacc-tab' + (t.key === active ? ' on' : '')} onClick={() => setTab(t.key)}>{t.label}</button>
-          ))}
-        </div>
+        {tabs.length > 1 ? (
+          <div className="pacc-tabs" role="tablist">
+            {tabs.map((t) => (
+              <button key={t.key} type="button" role="tab" aria-selected={t.key === active} className={'pacc-tab' + (t.key === active ? ' on' : '')} onClick={() => setTab(t.key)}>{t.label}</button>
+            ))}
+          </div>
+        ) : <span />}
         <div className="prep-result-actions">
           {children}
           <ExportMenu model={{ title, sheets }} targetRef={captureRef} fileBase={`${fileBase}_${tabLabel}`} />
@@ -65,6 +71,7 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
           <div className="prep-capture-sub">{subtitle} · {tabLabel}{cur.accountName ? ` · ${cur.accountName}` : ''}</div>
         </div>
         <ReportMetricsTable rows={rows} showPrev={showPrev} curLabel={curLabel} prevLabel={prevLabel} />
+        {splitByCurrency && <div className="pacc-hint">Кабінети у різних валютах, тому суму не порахувати: кожна платформа показана окремо.</div>}
         {isTotal && <div className="pacc-hint">Сума платформ в одній валюті. Охоплення складається простою сумою, тож люди, яких побачили обидві платформи, враховані двічі.</div>}
         {groups.length > 0 && (
           <>

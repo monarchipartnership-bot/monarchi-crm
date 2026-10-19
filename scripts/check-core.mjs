@@ -30,6 +30,8 @@ import { DEFAULT_TEMPLATE, mentionOf, renderMessage, safeTemplate } from '../src
 import { buildSnippet } from '../src/lib/siteLeadSnippet.js';
 import { campaignKey as gKey, filterCampaigns, flatCampaigns, groupCampaignKeys, groupMatches, mergeCampaigns, scopeToGroup } from '../src/lib/campaignGroups.js';
 import { groupCampaigns } from '../src/lib/periodReport.js';
+import { accountPlatforms, accountsForTab, collapseStatuses, flatten, pickReportRow, reportScope } from '../src/lib/reportScope.js';
+import { groupsForPlatform } from '../src/lib/campaignGroups.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -221,7 +223,7 @@ await ok('agent sign-in: returns a token, explains a missing setup, and reports 
 const { runProjectReport } = await import('../api/_lib/projectAgentRun.js');
 const { describeDynamics } = await import('../src/lib/reportDynamics.js');
 
-function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, locked = true, existingDeck = null } = {}) {
+function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, existingByScope = null, locked = true, existingDeck = null, projectAccounts = accounts } = {}) {
   const log = { runs: [], events: [], reports: [], decks: [], health: [], unlocked: 0, notifications: [] };
   return {
     log,
@@ -236,16 +238,94 @@ function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { pla
     setAgentHealth: async (id, patch) => { log.health.push(patch); },
     addEvent: async (e) => { log.events.push(e); },
     getProject: async () => ({ id: 3, name: 'Mellowdiamond', business_type: null }),
-    getAccounts: async () => accounts,
+    getAccounts: async () => projectAccounts,
     getGroups: async () => [],
     getCustomMetrics: async () => [],
-    getReport: async () => existingReport,
+    getReport: async (projectId, periodType, start, scope) => (existingByScope ? existingByScope[scope] || null : existingReport),
     getReports: async () => [],
-    saveReport: async ({ projectId, periodType, period, source, status, data }) => { const row = { id: 11, project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, source, status, data }; log.reports.push(row); return row; },
+    saveReport: async ({ projectId, periodType, period, platform = 'all', source, status, data }) => { const row = { id: 10 + log.reports.length + 1, project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, platform, source, status, data }; log.reports.push(row); return row; },
     getDeck: async () => existingDeck,
     saveDeck: async (d) => { log.decks.push(d); return { id: 21 + log.decks.length }; },
   };
 }
+
+// ---- Reports split by ad platform: Meta, Google, ... and «Разом»
+const GOOGLE = { platform: 'google', account_id: 'g1', currency: 'USD', account_name: 'Test G' };
+const postBoth = async (path, body) => {
+  if (path === '/api/google-ads-accounts') {
+    if (body.action === 'insights' && body.level === 'campaign') return { campaigns: [{ name: 'Brand Search', spend: 80, impressions: 4000, clicks: 160, conversions: 3, revenue: 300 }] };
+    if (body.action === 'insights') return { row: { spend: 200, impressions: 9000, clicks: 400, conversions: 7, revenue: 700 } };
+    return { items: [] };
+  }
+  return post(path, body);
+};
+
+await ok('report scope: tabs map to accounts and to where the saved reports live', () => {
+  const both = [{ platform: 'meta' }, { platform: 'google' }, { platform: 'meta' }];
+  assert.deepEqual(accountPlatforms(both), ['meta', 'google']);
+  assert.deepEqual(accountsForTab(both, 'google'), [{ platform: 'google' }]);
+  assert.equal(accountsForTab(both, 'total').length, 3);
+  assert.equal(reportScope('meta', both), 'meta');
+  assert.equal(reportScope('total', both), 'all');
+  assert.equal(reportScope('total', [{ platform: 'meta' }]), 'meta'); // one platform: «Разом» is that platform's own report
+});
+await ok('report scope: a presentation takes the platform\'s own report, else a combined one that has it', () => {
+  const rows = [
+    { id: 1, period_start: '2026-10-01', platform: 'all', data: { platforms: { meta: {}, google: {} } } },
+    { id: 2, period_start: '2026-10-01', platform: 'meta', data: { platforms: { meta: {} } } },
+  ];
+  assert.equal(pickReportRow(rows, '2026-10-01', 'meta').id, 2);
+  assert.equal(pickReportRow(rows, '2026-10-01', 'google').id, 1);
+  assert.equal(pickReportRow(rows, '2026-10-08', 'meta'), null);
+  assert.equal(pickReportRow(rows, '2026-10-01', 'tiktok'), null);
+});
+await ok('report scope: dashboards count a platform once (own report beats «Разом») and a project by its least finished report', () => {
+  const rows = [
+    { project_id: 3, period_start: '2026-10-01', platform: 'all', data: { platforms: { meta: { total: { spend: 999 } }, google: { total: { spend: 50 } } } } },
+    { project_id: 3, period_start: '2026-10-01', platform: 'meta', data: { platforms: { meta: { total: { spend: 100 } } } } },
+  ];
+  const flat = flatten(rows, () => ({}));
+  assert.equal(flat.filter((r) => r.platform === 'meta').length, 1);
+  assert.equal(flat.find((r) => r.platform === 'meta').data.spend, 100);
+  assert.equal(flat.find((r) => r.platform === 'google').data.spend, 50);
+  const one = collapseStatuses([{ project_id: 3, status: 'final' }, { project_id: 3, status: 'draft' }, { project_id: 4, status: 'reviewed' }]);
+  assert.equal(one.find((r) => r.project_id === 3).status, 'draft');
+  assert.equal(one.length, 2);
+});
+await ok('campaign groups: a group lives in one platform tab, none in «Разом»; an old group (no platform) shows everywhere', () => {
+  const groups = [{ id: 1, name: 'M', platform: 'meta', campaigns: ['meta|A'] }, { id: 2, name: 'G', platform: 'google', campaigns: ['google|B'] }, { id: 3, name: 'Old', keywords: ['x'] }];
+  assert.deepEqual(groupsForPlatform(groups, 'meta').map((g) => g.id), [1, 3]);
+  assert.deepEqual(groupsForPlatform(groups, 'google').map((g) => g.id), [2, 3]);
+  assert.deepEqual(groupsForPlatform(groups, 'total'), []);
+  // a Meta group never bundles Google campaigns, even when its old keyword matches
+  const kw = [{ id: 9, name: 'Catalog', platform: 'meta', keywords: ['catalog'] }];
+  assert.equal(groupCampaigns([{ name: 'Catalog Search', spend: 5 }], kw, 'google').length, 0);
+  assert.equal(groupCampaigns([{ name: 'Catalog Search', spend: 5 }], kw, 'meta')[0].name, 'Catalog');
+});
+await ok('agent run (two platforms): one draft report and deck per platform plus «Разом»', async () => {
+  const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] });
+  const r = await runProjectReport({ repo, post: postBoth, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
+  assert.equal(r.status, 'ok');
+  assert.deepEqual(repo.log.reports.map((x) => x.platform), ['meta', 'google', 'all']);
+  assert.deepEqual(Object.keys(repo.log.reports[0].data.platforms), ['meta']);
+  assert.deepEqual(Object.keys(repo.log.reports[1].data.platforms), ['google']);
+  assert.deepEqual(Object.keys(repo.log.reports[2].data.platforms), ['meta', 'google']);
+  assert.match(repo.log.reports[0].data.sections.conclusion, /^Meta Ads: /);
+  assert.match(repo.log.reports[1].data.sections.conclusion, /^Google Ads: /);
+  assert.deepEqual(repo.log.decks.map((d) => d.platform), ['meta', 'google']);
+  assert.ok(repo.log.reports.every((x) => x.source === 'agent' && x.status === 'draft'));
+});
+await ok('agent run (two platforms): a scope a person already made is left alone, the others are still made', async () => {
+  const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { google: { id: 5, source: 'manual', status: 'draft' } } });
+  const r = await runProjectReport({ repo, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(r.status, 'ok');
+  assert.deepEqual(repo.log.reports.map((x) => x.platform), ['meta', 'all']);
+  assert.ok(r.notes.some((n) => /Google Ads: звіт створений вручну/.test(n)));
+  assert.deepEqual(repo.log.decks.map((d) => d.platform), ['meta']);
+  const all = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { meta: { id: 1, source: 'manual', status: 'draft' }, google: { id: 2, source: 'manual', status: 'draft' }, all: { id: 3, source: 'manual', status: 'draft' } } });
+  assert.equal((await runProjectReport({ repo: all, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15' })).status, 'skipped');
+  assert.equal(all.log.reports.length, 0);
+});
 
 await ok('dynamics: neutral wording from the figures only, ratios only when the periods differ in length', () => {
   const platforms = { meta: { currency: 'USD', total: { spend: 1200, impressions: 100000, clicks: 3000, purchases: 20, revenue: 4800, leads: 0 } } };

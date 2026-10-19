@@ -1,10 +1,14 @@
 // Campaign groups of a project: a named SET of campaigns chosen by hand (any number, from any linked account). A report can be narrowed to
 // one group, so its numbers are those of exactly these campaigns. Pure code, shared by the pages and tested in scripts/check-core.mjs.
-//   group = { id, name, campaigns: ['platform|campaign name', ...], keywords?: [...] }
+//   group = { id, name, platform, campaigns: ['platform|campaign name', ...], keywords?: [...] }
+// A group belongs to ONE platform (the tab it was made in); a group without a platform is an old one and is shown in every tab.
 // Groups made before this version had only keywords; they keep working: a campaign is in a group when it is listed OR matches a keyword.
 import { sumBase } from './reportMetrics.js';
 
 export const campaignKey = (platform, name) => `${platform}|${name}`;
+
+// The groups of one platform tab. `platform` 'total' (the «Разом» tab) has no groups: it is the sum over everything.
+export const groupsForPlatform = (groups, platform) => (platform === 'total' ? [] : (groups || []).filter((g) => !g.platform || g.platform === platform));
 
 export function groupMatches(group, platform, name) {
   if ((group.campaigns || []).includes(campaignKey(platform, name))) return true;

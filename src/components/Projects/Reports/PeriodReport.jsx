@@ -39,11 +39,14 @@ function initialPicker() {
 // «Тижневий звіт» / «Місячний звіт»: pick the period, pull the numbers from the
 // project's ad accounts together with the period before it for comparison, add
 // the text, save. Reports made by hand and (later) by the AI agent sit in one list.
-export default function PeriodReport({ projectId, periodType }) {
+// `platform` is the tab of PlatformReports: that platform's own report (its accounts, its groups), or 'total' = «Разом», the report over every platform.
+// `unsavedRef` lets the tab row ask before leaving a report with unsaved changes.
+export default function PeriodReport({ projectId, periodType, platform = 'total', unsavedRef }) {
   const [confirm, confirmDialog] = useConfirm();
   const { email } = useAuth();
   const navigate = useNavigate();
-  const ctx = useReportContext(projectId);
+  const ctx = useReportContext(projectId, platform);
+  const isTotal = platform === 'total';
   const [picker, setPicker] = useState(initialPicker);
   const [saved, setSaved] = useState([]);
   const [decks, setDecks] = useState([]);
@@ -85,12 +88,17 @@ export default function PeriodReport({ projectId, periodType }) {
   const unfinished = period.end >= todayIso();
 
   const reloadSaved = useCallback(async () => {
-    const [rows, deckRows] = await Promise.all([fetchProjectReports(projectId, periodType), fetchProjectDecks(projectId)]);
+    const [rows, deckRows] = await Promise.all([fetchProjectReports(projectId, periodType, ctx.scope), fetchProjectDecks(projectId)]);
     setSaved(rows);
     setDecks(deckRows.filter((d) => d.period_type === periodType));
     setSavedLoaded(true);
-  }, [projectId, periodType]);
-  useEffect(() => { setSavedLoaded(false); setSaved([]); applied.current = ''; reloadSaved(); }, [reloadSaved]);
+  }, [projectId, periodType, ctx.scope]);
+  // Reports are kept per tab (platform, or «Разом»): another tab starts from its own saved reports, never from the previous tab's numbers.
+  useEffect(() => {
+    if (!ctx.ready) return;
+    setSavedLoaded(false); setSaved([]); setData(null); applied.current = ''; reloadSaved();
+  }, [reloadSaved, ctx.ready]);
+  useEffect(() => { if (unsavedRef) unsavedRef.current = dirty; }, [dirty, unsavedRef]);
 
   // Opening a period shows its saved report if there is one.
   useEffect(() => {
@@ -184,7 +192,7 @@ export default function PeriodReport({ projectId, periodType }) {
     setMessage('');
     try {
       const row = await saveProjectReport({
-        projectId, periodType, periodStart: period.start, periodEnd: period.end, status: nextStatus,
+        projectId, periodType, periodStart: period.start, periodEnd: period.end, platform: ctx.scope, status: nextStatus,
         source: meta.source, createdBy: email,
         data: reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note }),
       });
@@ -219,7 +227,7 @@ export default function PeriodReport({ projectId, periodType }) {
     setMessage('');
     setWork(null);
     try {
-      const weeklyRows = kind === 'weeks' ? await fetchProjectReports(projectId, 'weekly') : [];
+      const weeklyRows = kind === 'weeks' ? await fetchProjectReports(projectId, 'weekly', ctx.scope) : [];
       const result = await buildWhatWasDone({
         source: kind === 'weeks' ? 'weeks' : 'history', periodType, period, accounts: ctx.accounts, projectName: ctx.project.name, note,
         weeklyRows, expectedWeeks: computeWeeksForMonth(picker.year, picker.month).length,
@@ -248,6 +256,7 @@ export default function PeriodReport({ projectId, periodType }) {
   }
   const first = data ? Object.values(data.platforms)[0] : null;
   const hasAccounts = ctx.accounts.length > 0;
+  const ownGroups = !isTotal;
 
   return (
     <div className="prep-wrap">
@@ -275,7 +284,7 @@ export default function PeriodReport({ projectId, periodType }) {
           <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={busy === 'pull'}>
             {cmp && prev ? `Порівняння: ${fmt(prev.start)}–${fmt(prev.end)}` : 'Порівняти'}
           </button>
-          <button type="button" className="btn" onClick={() => setModal('groups')}>Групи кампаній</button>
+          {ownGroups && <button type="button" className="btn" onClick={() => setModal('groups')}>Групи кампаній</button>}
           <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
           {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Огляд», щоб тягнути цифри автоматично.</span>}
         </div>
@@ -295,6 +304,7 @@ export default function PeriodReport({ projectId, periodType }) {
         </div>
       )}
 
+      {ownGroups && (
       <section className="report-section">
         <GroupsStrip
           groups={ctx.groups} known={known} activeId={activeGroupId} hint="Оберіть групу, і в звіт потраплять лише її кампанії. Їх можна дообрати вручну нижче."
@@ -305,11 +315,12 @@ export default function PeriodReport({ projectId, periodType }) {
         />
         {!data && ctx.groups.length > 0 && <div className="pacc-hint">Спершу підтягніть цифри за період, тоді групу можна буде вибрати.</div>}
       </section>
+      )}
 
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={data} kind={ctx.kind} custom={ctx.custom}
+            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
             campaignMode="selected" selection={selection} onSelectionChange={(s) => { setSelection(s); setActiveGroupId(null); setDirty(true); }}
@@ -424,7 +435,7 @@ export default function PeriodReport({ projectId, periodType }) {
       )}
       {modal === 'groups' && (
         <CampaignGroupsModal
-          projectId={projectId} groups={ctx.groups} accounts={ctx.accounts} kind={ctx.kind} knownCampaigns={known} startEdit={groupEdit}
+          projectId={projectId} platform={platform} groups={ctx.groups} accounts={ctx.accounts} kind={ctx.kind} knownCampaigns={known} startEdit={groupEdit}
           onClose={() => { setModal(null); setGroupEdit(null); }}
           onChanged={async () => { const g = await ctx.reloadGroups(); if (activeGroupId && !g.some((x) => x.id === activeGroupId)) setActiveGroupId(null); setData((d) => (d ? regroupData(d, g) : d)); setDirty(true); }}
         />

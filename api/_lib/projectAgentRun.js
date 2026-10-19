@@ -10,6 +10,7 @@ import { buildDeckFromReport } from '../../src/lib/presentation/buildDeck.js';
 import { PLATFORMS } from '../../src/lib/presentation/deckModel.js';
 import { computeWeeksForMonth } from '../../src/lib/dateHelpers.js';
 import { projectKind } from '../../src/lib/reportMetrics.js';
+import { accountPlatforms, accountsForTab } from '../../src/lib/reportScope.js';
 import { describeDynamics } from '../../src/lib/reportDynamics.js';
 import { PROBLEM_QUIET_HOURS, buildNotifications } from './agentNotify.js';
 import {
@@ -78,14 +79,26 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const { picker, period } = due;
     periodInfo = period;
 
-    const existing = await repo.getReport(projectId, periodType, period.start);
-    if (existing && !(existing.source === 'agent' && existing.status === 'draft')) {
-      const why = existing.source === 'agent' ? 'вже перевірений менеджером' : 'створений вручну';
+    // The project's reports are kept per ad platform, plus «Разом» when there are several platforms: one report (and deck) each.
+    // A scope whose report a person made or already reviewed is never touched; the others are made as drafts.
+    const platformIds = accountPlatforms(accounts);
+    const scopes = [...platformIds, ...(platformIds.length > 1 ? ['all'] : [])];
+    const scopeName = (scope) => (scope === 'all' ? 'Разом' : PLATFORM_NAMES[scope] || scope);
+    const writable = [];
+    const kept = [];
+    for (const scope of scopes) {
+      const existing = await repo.getReport(projectId, periodType, period.start, scope);
+      if (existing && !(existing.source === 'agent' && existing.status === 'draft')) kept.push({ scope, existing, why: existing.source === 'agent' ? 'вже перевірений менеджером' : 'створений вручну' });
+      else writable.push(scope);
+    }
+    if (!writable.length) {
+      const { existing, why } = kept[0];
       await event('run_skipped', 'info', `Звіт за ${fmt(period.start)} – ${fmt(period.end)} ${why}, агент його не змінює.`);
       return await finish('skipped', `Звіт за цей період ${why}, його не змінено.`, { period, reportId: existing.id });
     }
+    kept.forEach((k) => notes.push(`${scopeName(k.scope)}: звіт ${k.why}, агент його не змінив.`));
 
-    // 1. The numbers (and the previous period for the comparison).
+    // 1. The numbers (and the previous period for the comparison), once for every platform.
     const compare = { mode: 'calendar' };
     const prev = comparisonPeriod(periodType, picker, period, compare);
     const info = comparisonInfo(period, prev);
@@ -93,54 +106,81 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const failed = Object.entries(errors).map(([p, m]) => `${PLATFORM_NAMES[p] || p}: ${m}`);
     if (!Object.keys(data.platforms).length) throw new Error('Не вдалося отримати дані з кабінетів. ' + failed.join(' '));
     failed.forEach((f) => notes.push('Не вдалося отримати дані: ' + f));
-
-    // 2. «What was done»: monthly = from the month's weekly texts (else from the history); weekly = from the history.
-    let whatWasDone = '';
-    try {
-      let result = null;
-      if (periodType === 'monthly') {
-        const weeklyRows = await repo.getReports(projectId, 'weekly');
-        result = await buildWhatWasDone({ source: 'weeks', periodType, period, accounts, projectName: project.name, note: config.note, weeklyRows, expectedWeeks: computeWeeksForMonth(picker.year, picker.month).length, post });
-      }
-      if (!result || result.empty) result = await buildWhatWasDone({ source: 'history', periodType, period, accounts, projectName: project.name, note: config.note, post });
-      whatWasDone = result.text || '';
-      if (result.empty) notes.push(result.empty);
-      else if (result.writer !== 'ai') notes.push('Автоматичне оформлення «What was done» було недоступне: у звіті сирий список дій, його варто відредагувати.');
-      Object.entries(result.info?.errors || {}).forEach(([p, m]) => notes.push(`Історія змін ${PLATFORM_NAMES[p] || p}: ${m}`));
-    } catch (e) {
-      notes.push('Не вдалося сформувати «What was done»: ' + (e.message || e));
-    }
-
-    // 3. «Conclusion»: the dynamics, from the figures only. «Plans» stays empty.
     // Totals of periods that differ by more than 10% in length (4 days vs 3) are not comparable; 30 vs 31 days are.
     const incomparable = Math.abs(info.daysCur - info.daysPrev) / Math.max(info.daysCur, info.daysPrev) > 0.1;
-    const conclusion = describeDynamics({ platforms: data.platforms, previous: data.previous, kind, custom, names: PLATFORM_NAMES, unequal: incomparable });
-    const sections = { ...EMPTY_SECTIONS, whatWasDone, conclusion, plans: '' };
     if (incomparable) notes.push(`Періоди порівняння різної тривалості (${info.daysCur} і ${info.daysPrev} дн.): у висновку порівнюються лише відносні показники.`);
+    const narrow = (scope) => (scope === 'all' ? data : {
+      platforms: { [scope]: data.platforms[scope] },
+      previous: data.previous ? { ...data.previous, platforms: data.previous.platforms?.[scope] ? { [scope]: data.previous.platforms[scope] } : {} } : null,
+    });
 
-    // 4. Save the report as a draft.
-    const payload = reportPayload({ kind, data, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '' });
-    const report = await repo.saveReport({ projectId, periodType, period, source: 'agent', status: 'draft', data: payload });
+    const reports = {};
+    const whatWasDoneBy = {};
+    for (const scope of writable) {
+      const have = scope === 'all' ? Object.keys(data.platforms) : data.platforms[scope] ? [scope] : [];
+      if (!have.length) { notes.push(`${scopeName(scope)}: даних немає, звіт не створено.`); continue; }
+      if (scope === 'all' && have.length < 2) { notes.push('Разом: дані прийшли лише з однієї платформи, окремий звіт «Разом» не створено.'); continue; }
+      const scoped = narrow(scope);
+      const scopeAccounts = scope === 'all' ? accounts : accountsForTab(accounts, scope);
+
+      // 2. «What was done»: monthly = from the month's weekly texts (else from the history); weekly = from the history.
+      // «Разом» has no history of its own: it gathers the texts of the platforms.
+      let whatWasDone = '';
+      if (scope === 'all') {
+        whatWasDone = Object.entries(whatWasDoneBy).filter(([, t]) => t.trim()).map(([p, t]) => `${scopeName(p)}:\n${t}`).join('\n\n');
+      } else {
+        try {
+          let result = null;
+          if (periodType === 'monthly') {
+            const weeklyRows = await repo.getReports(projectId, 'weekly', scope);
+            result = await buildWhatWasDone({ source: 'weeks', periodType, period, accounts: scopeAccounts, projectName: project.name, note: config.note, weeklyRows, expectedWeeks: computeWeeksForMonth(picker.year, picker.month).length, post });
+          }
+          if (!result || result.empty) result = await buildWhatWasDone({ source: 'history', periodType, period, accounts: scopeAccounts, projectName: project.name, note: config.note, post });
+          whatWasDone = result.text || '';
+          const who = platformIds.length > 1 ? `${scopeName(scope)}: ` : '';
+          if (result.empty) notes.push(who + result.empty);
+          else if (result.writer !== 'ai') notes.push(who + 'Автоматичне оформлення «What was done» було недоступне: у звіті сирий список дій, його варто відредагувати.');
+          Object.entries(result.info?.errors || {}).forEach(([p, m]) => notes.push(`Історія змін ${PLATFORM_NAMES[p] || p}: ${m}`));
+        } catch (e) {
+          notes.push(`${scopeName(scope)}: не вдалося сформувати «What was done»: ${e.message || e}`);
+        }
+        whatWasDoneBy[scope] = whatWasDone;
+      }
+
+      // 3. «Conclusion»: the dynamics, from the figures only. «Plans» stays empty.
+      const conclusion = describeDynamics({ platforms: scoped.platforms, previous: scoped.previous, kind, custom, names: PLATFORM_NAMES, unequal: incomparable });
+      const sections = { ...EMPTY_SECTIONS, whatWasDone, conclusion, plans: '' };
+
+      // 4. Save the report as a draft.
+      const payload = reportPayload({ kind, data: scoped, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '' });
+      reports[scope] = { row: await repo.saveReport({ projectId, periodType, period, platform: scope, source: 'agent', status: 'draft', data: payload }), payload, whatWasDone };
+    }
+    const made = Object.keys(reports);
+    if (!made.length) throw new Error('Не вдалося створити жоден звіт: ' + (notes.join(' ') || 'даних немає.'));
+    const report = reports[made[0]].row;
 
     // 5. The presentation(s), one per platform with data; a deck a person has touched is left alone.
     const deckIds = [];
     const madeFor = [];
     if (config.tasks.presentation) {
-      for (const platform of Object.keys(payload.platforms)) {
-        if (!hasDelivery(payload.platforms[platform].total)) { notes.push(`${PLATFORM_NAMES[platform] || platform}: у періоді не було показів і витрат, презентацію не створено.`); continue; }
+      for (const platform of made.filter((m) => m !== 'all')) {
+        const { row, payload } = reports[platform];
+        if (!hasDelivery(payload.platforms[platform]?.total)) { notes.push(`${PLATFORM_NAMES[platform] || platform}: у періоді не було показів і витрат, презентацію не створено.`); continue; }
         const old = await repo.getDeck(projectId, periodType, period.start, platform);
         if (old && old.source !== 'agent') { notes.push(`${PLATFORM_NAMES[platform] || platform}: презентація вже є (створена вручну), її не змінено.`); continue; }
-        const deck = buildDeckFromReport({ project, report, platform, style: config.deck.style, lang: config.deck.lang, custom });
+        const deck = buildDeckFromReport({ project, report: row, platform, style: config.deck.style, lang: config.deck.lang, custom });
         if (!deck.slides.length) continue;
-        const saved = await repo.saveDeck({ projectId, reportId: report.id, periodType, period, platform, style: config.deck.style, lang: config.deck.lang, deck });
+        const saved = await repo.saveDeck({ projectId, reportId: row.id, periodType, period, platform, style: config.deck.style, lang: config.deck.lang, deck });
         deckIds.push(saved.id);
         madeFor.push(PLATFORM_NAMES[platform] || platform);
       }
     }
+    // «What was done» is missing when no platform report has it
+    const whatWasDone = made.map((m) => reports[m].whatWasDone).join('');
 
     const todo = [!whatWasDone.trim() && '«What was done»', '«Plans for the next period»'].filter(Boolean).join(' і ');
-    const message = `Створено чернетку ${GENITIVE[periodType]} звіту за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}. Потрібно заповнити: ${todo}; решту перевірити.`;
-    await event('report_created', failed.length ? 'problem' : 'ok', message, { reportId: report.id, deckIds, notes });
+    const message = `Створено чернетку ${GENITIVE[periodType]} звіту за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}${made.length > 1 ? `; звіти: ${made.map(scopeName).join(', ')}` : ''}. Потрібно заповнити: ${todo}; решту перевірити.`;
+    await event('report_created', failed.length ? 'problem' : 'ok', message, { reportId: report.id, reportIds: made.map((m) => reports[m].row.id), deckIds, notes });
     await repo.setAgentHealth(projectId, failed.length ? { health: 'problem', last_error: failed.join(' ') } : { health: 'ok', last_error: null });
     return await finish('ok', message, { reportId: report.id, deckIds, period });
   } catch (e) {

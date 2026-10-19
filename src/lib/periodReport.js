@@ -1,7 +1,7 @@
 import { authedPost } from './adAccounts.js';
 import { BASE_FIELDS, METRICS, computeMetric, metricMeta, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { computeWeeksForMonth, daysInMonth, isoDate, MONTH_NAMES } from './dateHelpers.js';
-import { groupMatches } from './campaignGroups.js';
+import { groupMatches, groupsForPlatform } from './campaignGroups.js';
 
 const iso = (d) => isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 const ZERO = Object.fromEntries(BASE_FIELDS.map((f) => [f, 0]));
@@ -78,8 +78,9 @@ export async function fetchPlatformRange(platform, accountId, from, to, kind, po
 
 // Bundles campaigns into the project's groups (the columns of the group table): a campaign goes to the first group it belongs to
 // (listed in it, or matching an old keyword); whatever belongs to none goes to "Інше". No groups defined → no bundles.
-export function groupCampaigns(campaigns, groups, platform) {
-  if (!groups?.length) return [];
+export function groupCampaigns(campaigns, allGroups, platform) {
+  const groups = groupsForPlatform(allGroups, platform); // a group of another platform never takes this platform's campaigns
+  if (!groups.length) return [];
   const buckets = groups.map((g) => ({ name: g.name, rows: [] }));
   const rest = [];
   campaigns.forEach((c) => {

@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { collapseStatuses, flatten } from '../reportScope';
 
 // Storage for the redesigned project reports (migration
 // 20261008000000_project_reports.sql): saved weekly/monthly reports, the
@@ -8,20 +9,22 @@ import { supabase } from '../supabaseClient';
 function nowIso() { return new Date().toISOString(); }
 
 // ---- Reports ----
-export async function fetchProjectReports(projectId, periodType) {
-  const { data, error } = await supabase
+// `platform` (optional) = one scope: a platform id or 'all' («Разом»); without it every scope comes back.
+export async function fetchProjectReports(projectId, periodType, platform) {
+  let q = supabase
     .from('project_reports').select('*')
-    .eq('project_id', projectId).eq('period_type', periodType)
-    .order('period_start', { ascending: false });
+    .eq('project_id', projectId).eq('period_type', periodType);
+  if (platform) q = q.eq('platform', platform);
+  const { data, error } = await q.order('period_start', { ascending: false });
   if (error) { console.warn('fetchProjectReports failed', error); return []; }
   return data ?? [];
 }
 
-export async function saveProjectReport({ projectId, periodType, periodStart, periodEnd, source = 'manual', status = 'draft', data, createdBy }) {
+export async function saveProjectReport({ projectId, periodType, periodStart, periodEnd, platform = 'all', source = 'manual', status = 'draft', data, createdBy }) {
   const { data: row, error } = await supabase.from('project_reports').upsert({
-    project_id: projectId, period_type: periodType, period_start: periodStart, period_end: periodEnd,
+    project_id: projectId, period_type: periodType, period_start: periodStart, period_end: periodEnd, platform,
     source, status, data, created_by: createdBy || null, updated_at: nowIso(),
-  }, { onConflict: 'project_id,period_type,period_start' }).select().single();
+  }, { onConflict: 'project_id,period_type,period_start,platform' }).select().single();
   if (error) throw error;
   return row;
 }
@@ -51,16 +54,16 @@ export async function fetchCampaignGroups(projectId) {
   return data ?? [];
 }
 
-// A group = a name + the chosen campaigns ('platform|campaign name' keys). Old keyword groups have `keywords` and an empty `campaigns`.
-export async function createCampaignGroup(projectId, { name, campaigns }) {
+// A group = a name + the platform it was made in + the chosen campaigns ('platform|campaign name' keys). Old keyword groups have `keywords` and an empty `campaigns`.
+export async function createCampaignGroup(projectId, { name, campaigns, platform }) {
   const { data: last } = await supabase.from('project_campaign_groups').select('sort').eq('project_id', projectId).order('sort', { ascending: false }).limit(1).maybeSingle();
-  const { data, error } = await supabase.from('project_campaign_groups').insert({ project_id: projectId, name: name.trim(), campaigns, keywords: [], sort: (last?.sort ?? -1) + 1 }).select().single();
+  const { data, error } = await supabase.from('project_campaign_groups').insert({ project_id: projectId, name: name.trim(), campaigns, platform: platform || null, keywords: [], sort: (last?.sort ?? -1) + 1 }).select().single();
   if (error) throw error;
   return data;
 }
 // Saving turns an old keyword group into an explicit list: its keywords are cleared.
-export async function updateCampaignGroup(id, { name, campaigns }) {
-  const { data, error } = await supabase.from('project_campaign_groups').update({ name: name.trim(), campaigns, keywords: [] }).eq('id', id).select().single();
+export async function updateCampaignGroup(id, { name, campaigns, platform }) {
+  const { data, error } = await supabase.from('project_campaign_groups').update({ name: name.trim(), campaigns, ...(platform ? { platform } : {}), keywords: [] }).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -95,16 +98,12 @@ export async function deleteCustomMetric(id) {
 export async function fetchWeeklyReportStatuses(periodStart) {
   const { data, error } = await supabase.from('project_reports').select('project_id, status').eq('period_type', 'weekly').eq('period_start', periodStart);
   if (error) { console.warn('fetchWeeklyReportStatuses failed', error); return []; }
-  return data ?? [];
+  return collapseStatuses(data ?? []);
 }
+
 
 // The dashboard wants one row per project + platform with plain numbers in `data`,
 // so a saved report is flattened to that shape.
-function flatten(rows, extra) {
-  return rows.flatMap((r) => Object.entries(r.data?.platforms || {}).map(([platform, p]) => ({
-    project_id: r.project_id, platform, data: p.total || {}, ...extra(r),
-  })));
-}
 
 function mondayIsoOf(iso) {
   const [y, m, d] = iso.split('-').map(Number);

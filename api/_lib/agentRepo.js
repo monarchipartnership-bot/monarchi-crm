@@ -68,17 +68,18 @@ export function createAgentRepo(db, agentEmail) {
     async getCustomMetrics(projectId) { return must(await db.from('report_custom_metrics').select('*').or(`project_id.eq.${projectId},project_id.is.null`).order('id', { ascending: true })) || []; },
 
     // ---- reports and decks
-    async getReport(projectId, periodType, periodStart) {
-      return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).maybeSingle());
+    // A report belongs to a scope: one ad platform ('meta', 'google', ...) or 'all' («Разом»).
+    async getReport(projectId, periodType, periodStart, platform = 'all') {
+      return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform).maybeSingle());
     },
-    async getReports(projectId, periodType) {
-      return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).order('period_start', { ascending: false })) || [];
+    async getReports(projectId, periodType, platform = 'all') {
+      return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).eq('platform', platform).order('period_start', { ascending: false })) || [];
     },
-    async saveReport({ projectId, periodType, period, source, status, data }) {
+    async saveReport({ projectId, periodType, period, platform = 'all', source, status, data }) {
       return must(await db.from('project_reports').upsert({
-        project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end,
+        project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, platform,
         source, status, data, created_by: agentEmail, updated_at: nowIso(),
-      }, { onConflict: 'project_id,period_type,period_start' }).select().single());
+      }, { onConflict: 'project_id,period_type,period_start,platform' }).select().single());
     },
     async getDeck(projectId, periodType, periodStart, platform) {
       return must(await db.from('project_decks').select('id, source, status').eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform).maybeSingle());

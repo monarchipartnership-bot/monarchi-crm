@@ -9,6 +9,7 @@ import '../../lib/presentation/fontFaces';
 import { fontsReady } from '../../lib/presentation/fonts';
 import { fetchDeck, saveDeck } from '../../lib/api/projectDecks';
 import { fetchProjectReports } from '../../lib/api/projectReportStore';
+import { pickReportRow } from '../../lib/reportScope';
 import { fetchProjectById } from '../../lib/api/projects';
 import { fetchCustomMetrics } from '../../lib/api/projectReportStore';
 import { periodFromPicker } from '../../lib/periodReport';
@@ -80,7 +81,7 @@ export default function Presentation() {
           fetchDeck(sel.projectId, sel.periodType, period.start, sel.platform),
         ]);
         if (off) return;
-        const row = rows.find((r) => r.period_start === period.start) || null;
+        const row = pickReportRow(rows, period.start, sel.platform);
         setProject(proj);
         setCustom(cm);
         setReport(row);

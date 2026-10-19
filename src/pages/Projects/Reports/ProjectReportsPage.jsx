@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProjectPicker from '../../../components/Projects/ProjectPicker';
-import PeriodStats from '../../../components/Projects/Reports/PeriodStats';
-import PeriodReport from '../../../components/Projects/Reports/PeriodReport';
+import PlatformReports from '../../../components/Projects/Reports/PlatformReports';
 import '../../../styles/reportPage.css';
 import '../../../styles/projectReportPage.css';
 import '../../../styles/projectReports.css';
@@ -36,9 +35,9 @@ export default function ProjectReportsPage({ mode }) {
       </div>
 
       {!projectId && <div className="empty-hint">Оберіть проєкт вище, щоб продовжити.</div>}
-      {projectId && mode === 'period' && <PeriodStats key={'p' + projectId} projectId={projectId} />}
-      {projectId && mode === 'weekly' && <PeriodReport key={'w' + projectId} projectId={projectId} periodType="weekly" />}
-      {projectId && mode === 'monthly' && <PeriodReport key={'m' + projectId} projectId={projectId} periodType="monthly" />}
+      {projectId && mode === 'period' && <PlatformReports key={'p' + projectId} projectId={projectId} mode="period" />}
+      {projectId && mode === 'weekly' && <PlatformReports key={'w' + projectId} projectId={projectId} mode="weekly" />}
+      {projectId && mode === 'monthly' && <PlatformReports key={'m' + projectId} projectId={projectId} mode="monthly" />}
     </div>
   );
 }
