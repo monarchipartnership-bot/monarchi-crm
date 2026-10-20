@@ -507,3 +507,5 @@ button.smm-stat { cursor: pointer; }
 .sao-dot--good { background: #22C070; }
 .sao-dot--ok { background: #E0A21A; }
 .sao-dot--poor { background: #E5254F; }
+.sao-reports td:first-child { white-space: nowrap; }
+.sao-reports td:last-child, .sao-reports th:last-child { text-align: right; }

@@ -56,7 +56,7 @@ function Metric({ m }) {
   );
 }
 
-function Table({ head, rows }) {
+export function Table({ head, rows }) {
   return (
     <div className="smm-scroll">
       <table className="smm-table">
@@ -148,22 +148,19 @@ function SpeedCard({ title, r }) {
   );
 }
 
-function SpeedBlock({ ov }) {
-  const sp = speedOf(ov);
-  const { speedLoading, reloadSpeed } = ov;
-  const live = Boolean(ov.speed);
+function SpeedBlock({ sp, live, speedLoading, reloadSpeed }) {
   return (
     <>
       <div className="smm-block-head sao-head">
         <h4>Швидкість сайту (Google PageSpeed)</h4>
-        <button type="button" className="smm-btn" onClick={reloadSpeed} disabled={speedLoading}><ActionIcon name="regenerate" size={18} />{speedLoading ? 'Міряємо…' : 'Виміряти знову'}</button>
+        {reloadSpeed && <button type="button" className="smm-btn" onClick={reloadSpeed} disabled={speedLoading}><ActionIcon name="regenerate" size={18} />{speedLoading ? 'Міряємо…' : 'Виміряти знову'}</button>}
       </div>
       {speedLoading && !sp && <p className="smm-muted">Міряємо швидкість головної сторінки для телефона й комп’ютера, це займає до 30 секунд…</p>}
       {sp && !sp.configured && <p className="smm-warn-banner" role="status">{sp.error}</p>}
       {sp?.configured && sp.error && <p className="smm-warn-banner" role="alert">{sp.error}</p>}
       {sp && (sp.mobile || sp.desktop) && (
         <>
-          <p className="smm-muted">Перевірено {fmtWhen(sp.checkedAt)}{live ? '' : ' (збережено з останнього звіту агента)'}. {sp.url}</p>
+          <p className="smm-muted">Перевірено {fmtWhen(sp.checkedAt)}{live === false ? ' (збережено разом зі звітом)' : ''}. {sp.url}</p>
           <div className="sao-pair">
             {sp.mobile && <SpeedCard title="Телефон" r={sp.mobile} />}
             {sp.desktop && <SpeedCard title="Комп’ютер" r={sp.desktop} />}
@@ -283,23 +280,25 @@ function LeadsAndSite({ extras }) {
   );
 }
 
-// Block «Звіт»: leads and site check, the live figures, what the code found, what is handed on, and the agent's last written report.
-export function SiteReport({ ov }) {
-  const { data, loading, report } = ov;
-  const a = data?.analysis;
-  const extras = data?.extras || a?.extras;
+// The report: leads and site check, the figures, what the code found, what is handed on, and the text the agent wrote.
+// The same layout shows the live page (the figures are read just now) and a saved report (everything is as it was on that day).
+function ReportBody({ a, extras, sp, live, loading, speedLoading, reloadSpeed, saved, title, subtitle, reportText, reportAt, note, onHistory }) {
   const findings = a ? a.findings : extras?.findings || [];
+  const text = reportText ? (<><h4>{saved ? 'Текст звіту від агента' : 'Останній звіт агента'}{reportAt ? <> <span className="smm-hint">від {fmtWhen(reportAt)}</span></> : null}</h4><Markdown text={reportText} /></>) : null;
   return (
     <section className="smm-block sao">
       <div className="smm-block-head">
         <div>
-          <h3>Звіт</h3>
-          <p className="smm-muted">{a ? `${a.period.cur.start} – ${a.period.cur.end}, порівняно з попередніми ${a.period.days} днями. Дані читаються з Google просто зараз.` : loading ? 'Читаємо дані…' : 'Дані Google зʼявляться, коли запрацює підключення до Google.'}</p>
+          <h3>{title}</h3>
+          <p className="smm-muted">{subtitle || (a ? `${a.period.cur.start} – ${a.period.cur.end}, порівняно з попередніми ${a.period.days} днями. Дані читаються з Google просто зараз.` : loading ? 'Читаємо дані…' : 'Дані Google зʼявляться, коли запрацює підключення до Google.')}</p>
         </div>
+        {onHistory && <button type="button" className="smm-btn" onClick={onHistory}>Усі звіти</button>}
       </div>
+      {note && <p className="smm-hint">{note}</p>}
+      {saved && text}
 
       <LeadsAndSite extras={extras} />
-      <SpeedBlock ov={ov} />
+      <SpeedBlock sp={sp} live={live} speedLoading={speedLoading} reloadSpeed={reloadSpeed} />
 
       {a && (
         <>
@@ -347,12 +346,26 @@ export function SiteReport({ ov }) {
         </div>
       )}
 
-      {report?.report && (
-        <>
-          <h4>Останній звіт агента <span className="smm-hint">від {fmtWhen(report.created_at)}</span></h4>
-          <Markdown text={report.report} />
-        </>
-      )}
+      {!saved && text}
     </section>
+  );
+}
+
+// Block «Звіт» of the agent's main page: the live figures plus the newest written report.
+export function SiteReport({ ov, onHistory }) {
+  const { data, loading, report, speedLoading, reloadSpeed } = ov;
+  const a = data?.analysis;
+  return <ReportBody title="Звіт" a={a} extras={data?.extras || a?.extras} sp={speedOf(ov)} live={Boolean(ov.speed)} loading={loading} speedLoading={speedLoading} reloadSpeed={reloadSpeed} reportText={report?.report} reportAt={report?.created_at} onHistory={onHistory} />;
+}
+
+// One saved report (a row of smm_site_stats) exactly as it was saved: nothing is read again.
+export function SavedReport({ row }) {
+  const a = row.data?.ga4 || row.data?.gsc || row.data?.findings ? row.data : null;
+  return (
+    <ReportBody
+      saved title={`Звіт від ${fmtWhen(row.created_at)}`} a={a} extras={row.data?.extras} sp={row.data?.extras?.speed} live={false}
+      subtitle={`Період ${row.period_start} – ${row.period_end}, порівняно з попередніми ${row.data?.period?.days || 28} днями. Це збережений звіт: цифри такі, якими були в день запуску.`}
+      reportText={row.report} note={row.model_error ? `Текст зібрано без моделі: ${row.model_error}` : null}
+    />
   );
 }

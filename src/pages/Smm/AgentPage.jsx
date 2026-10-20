@@ -7,6 +7,7 @@ import AgentSettings, { LANGUAGE_OPTIONS } from './AgentSettings';
 import AgentPrompts from './AgentPrompts';
 import AgentHistory from './AgentHistory';
 import AgentTasks from './AgentTasks';
+import SiteReports from './SiteReports';
 import { SiteConnection, SiteReport, siteProblem, speedSummary, useSiteOverview } from './SiteAnalystOverview';
 import { ChainMini, HealthLight, healthOf } from './AgentCardParts';
 import { fmtDateTime, roleMeta } from './agentUi';
@@ -16,6 +17,7 @@ import { Dialog } from './smmCommon';
 
 const SUBTABS = [
   { key: 'overview', label: 'Огляд' },
+  { key: 'reports', label: 'Звіти', roles: ['site_analyst'] }, // the saved reports of the agent (only agents that write them)
   { key: 'settings', label: 'Налаштування' },
   { key: 'prompts', label: 'Промти' },
   { key: 'history', label: 'Історія запитів' },
@@ -122,7 +124,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
       </div>
 
       <div className="smm-subtabs" role="tablist" aria-label="Розділи агента">
-        {SUBTABS.map((t) => (
+        {SUBTABS.filter((t) => !t.roles || t.roles.includes(role)).map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={sub === t.key} className={'smm-subtab' + (sub === t.key ? ' is-active' : '')} onClick={() => setSub(t.key)}>
             {t.label}{t.key === 'tasks' && failed ? <span className="smm-tab-badge smm-tab-badge--bad">{failed}</span> : null}
           </button>
@@ -170,12 +172,13 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
           {role === 'site_analyst' && (
             <>
               <SiteConnection ov={siteOv} openSettings={() => setSub('settings')} />
-              <SiteReport ov={siteOv} />
+              <SiteReport ov={siteOv} onHistory={() => setSub('reports')} />
             </>
           )}
           {role === 'strategist' && <p className="smm-muted">План, який складає стратег, чекає у <button type="button" className="smm-link-btn" onClick={() => go('queue')}>черзі схвалення</button>. Після вашого «ок» стратег ставить завдання копірайтеру й візуал-агенту.</p>}
         </>
       )}
+      {sub === 'reports' && role === 'site_analyst' && <SiteReports />}
       {sub === 'settings' && <AgentSettings agent={agent} notify={notify} reload={reloadTeam} />}
       {sub === 'prompts' && <AgentPrompts agent={agent} prompts={prompts} reload={loadMine} notify={notify} />}
       {sub === 'history' && <AgentHistory agent={agent} notify={notify} />}
