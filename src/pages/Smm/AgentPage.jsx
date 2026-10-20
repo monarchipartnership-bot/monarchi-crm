@@ -7,7 +7,7 @@ import AgentSettings, { LANGUAGE_OPTIONS } from './AgentSettings';
 import AgentPrompts from './AgentPrompts';
 import AgentHistory from './AgentHistory';
 import AgentTasks from './AgentTasks';
-import { SiteConnection, SiteReport, siteProblem, useSiteOverview } from './SiteAnalystOverview';
+import { SiteConnection, SiteReport, siteProblem, speedSummary, useSiteOverview } from './SiteAnalystOverview';
 import { ChainMini, HealthLight, healthOf } from './AgentCardParts';
 import { fmtDateTime, roleMeta } from './agentUi';
 import { AgentSwitch } from './SmmAgents';
@@ -161,6 +161,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
               <div className="smm-stat"><b>{next ? fmtDateTime(next.at.toISOString()) : agent.schedule ? 'вимкнено' : 'за завданнями'}</b><span>наступний запуск за розкладом</span></div>
               <div className="smm-stat"><b>{queued}{failed ? ` + ${failed} ⚠` : ''}</b><span>у черзі{failed ? ' + помилки' : ''}</span></div>
               <div className="smm-stat"><b>${cost30.toFixed(2)}</b><span>витрати за 30 днів</span></div>
+              {role === 'site_analyst' && (() => { const sp = speedSummary(siteOv); return <div className="smm-stat"><b style={{ color: sp ? (sp.worst >= 90 ? 'var(--s-ok)' : sp.worst >= 50 ? 'var(--s-warn)' : 'var(--s-bad)') : undefined }}>{sp ? sp.text : siteOv.speedLoading ? '…' : '—'}</b><span>швидкість сайту (телефон / комп’ютер)</span></div>; })()}
             </div>
             {agent.last_message && <p className={'smm-last' + (agent.last_status === 'problem' ? ' smm-bad' : '')}>{agent.last_message}</p>}
             {running && <span className="smm-muted">Не закривайте сторінку, це займає до двох хвилин.</span>}

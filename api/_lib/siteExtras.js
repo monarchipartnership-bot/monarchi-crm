@@ -1,6 +1,9 @@
 // What the website analyst reads that is NOT from Google: the leads the site's form brought into the CRM (the log site_leads) and a plain
 // check that the site opens. Both work without any new access, and neither depends on Google being connected.
+// PageSpeed (pageSpeed.js) joins only when asked (withSpeed): it is slow, so the quick overview leaves it out.
 // The database and fetch are handed in, so scripts/check-core.mjs runs all of it against stand-ins. Nothing here writes anywhere.
+
+import { collectSpeed, speedFindings } from './pageSpeed.js';
 
 const DAY = 86400000;
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -94,13 +97,18 @@ export async function siteUrlOf(db) {
 }
 
 // → { leads, leadsError, uptime, findings, handoff: { strategist } }. Never throws: each part fails alone.
-export async function siteExtras({ db, fetchFn = fetch, now = () => new Date(), siteUrl } = {}) {
-  const out = { leads: null, leadsError: null, uptime: null, findings: [], handoff: { strategist: [] } };
+export async function siteExtras({ db, fetchFn = fetch, now = () => new Date(), siteUrl, withSpeed = false, speedKey = '' } = {}) {
+  const out = { leads: null, leadsError: null, uptime: null, speed: null, findings: [], handoff: { strategist: [], seo: [] } };
   if (db) {
     try { out.leads = await collectLeads({ db, now }); } catch (e) { out.leadsError = e.message; }
   }
   const url = siteUrl || (db ? await siteUrlOf(db) : 'https://www.monarchi.agency');
   out.uptime = await checkUptime({ url, fetchFn, now });
+
+  if (withSpeed) {
+    out.speed = await collectSpeed({ url, key: speedKey, fetchFn, now });
+    if (speedKey) { const f = speedFindings(out.speed); out.findings.push(...f.findings); out.handoff.seo.push(...f.seo); }
+  }
 
   const L = out.leads;
   if (L) {
@@ -124,7 +132,7 @@ export async function siteExtras({ db, fetchFn = fetch, now = () => new Date(), 
 // replaces the «form is not tracked in GA4» note (it would be misleading once the leads are known).
 export function applyExtras(analysis, extras) {
   if (!analysis || !extras) return analysis;
-  analysis.extras = { leads: extras.leads, leadsError: extras.leadsError, uptime: extras.uptime };
+  analysis.extras = { leads: extras.leads, leadsError: extras.leadsError, uptime: extras.uptime, speed: extras.speed };
   const L = extras.leads;
   if (L && (L.cur.leads > 0 || L.prev.leads > 0)) {
     analysis.findings = analysis.findings.filter((f) => !(f.kind === 'setup' && f.source === 'ga4'));
@@ -132,5 +140,6 @@ export function applyExtras(analysis, extras) {
   }
   analysis.findings.push(...extras.findings);
   analysis.handoff.strategist.push(...extras.handoff.strategist);
+  analysis.handoff.seo.push(...(extras.handoff.seo || []));
   return analysis;
 }

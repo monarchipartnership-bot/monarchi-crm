@@ -98,3 +98,5 @@ export const nextRunOf = (agent) => (agent.schedule?.weekday ? nextScheduled('we
 export const fetchServerStatus = () => agentAction('status');
 // The website analyst's main page: { status: { configured, auth, ga4, gsc, error, warnings, checkedAt }, analysis } (reads Google live, no model).
 export const fetchSiteOverview = () => agentAction('site_overview');
+// Google PageSpeed of the site (slow: 10-30 s): { speed: { configured, mobile, desktop, errors, error }, findings, seo }.
+export const fetchSiteSpeed = () => agentAction('site_speed');

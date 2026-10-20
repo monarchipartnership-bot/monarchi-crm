@@ -6,6 +6,7 @@
 //   POST { action: 'run_agent', agentId, brief? }    run one agent now (strategist, SEO, competitors), even if it is switched off
 //   POST { action: 'retry_task' | 'cancel_task', taskId }
 //   POST { action: 'launch_campaign', campaignId }   a campaign team goes live: its first agents get their first tasks
+//   POST { action: 'site_speed' }                    Google PageSpeed of the site's front page (phone and computer, 10-30 s)
 //   POST { action: 'site_overview' }                 the website analyst's main page: is GA4 / Search Console connected, and the live figures
 //   POST { action: 'poll_assets' }                   look at the pictures/videos being generated; { action: 'redo_visual', postId, note? }; { action: 'status' }
 // A person acts with their own session (row-level security applies); the cron signs in as the agent user. The model key stays on the server.
@@ -15,6 +16,8 @@ import { getModelClient } from './_lib/ai.js';
 import { approvePlan, cancelTask, generatorReady, launchCampaign, pollAssets, processQueue, redoVisual, rejectPlan, retryTask, runNow } from './_lib/agentEngine.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { siteOverview } from './_lib/googleSiteData.js';
+import { collectSpeed, speedFindings, speedKeyFromEnv } from './_lib/pageSpeed.js';
+import { siteUrlOf } from './_lib/siteExtras.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -51,7 +54,10 @@ export default async function handler(req, res) {
     else if (action === 'redo_visual') out = await redoVisual(ctx, Number(body.postId), body.note);
     else if (action === 'launch_campaign') out = await launchCampaign(ctx, Number(body.campaignId)); // the page then calls `process` until the queue is empty
     else if (action === 'status') out = { higgsfield: generatorReady(ctx) };
-    else if (action === 'site_overview') { // the website analyst's main page: connection status + the live figures (read-only, no model)
+    else if (action === 'site_speed') { // PageSpeed of the front page (10-30 s, so apart from the quick overview)
+      const speed = await collectSpeed({ url: await siteUrlOf(ctx.db), key: speedKeyFromEnv() });
+      out = { speed, ...speedFindings(speed) };
+    } else if (action === 'site_overview') { // the website analyst's main page: connection status + the live figures (read-only, no model)
       const cfg = (await ctx.db.from('ag_agents').select('config').eq('team', 'smm').eq('role', 'site_analyst').maybeSingle()).data?.config || {};
       out = await siteOverview({ config: cfg, db: ctx.db });
     }

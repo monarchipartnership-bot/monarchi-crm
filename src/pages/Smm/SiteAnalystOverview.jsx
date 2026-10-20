@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ActionIcon from '../../components/common/ActionIcon';
-import { fetchSiteOverview } from '../../lib/api/agents';
+import { fetchSiteOverview, fetchSiteSpeed } from '../../lib/api/agents';
 import { fetchSiteStats } from '../../lib/api/smm';
 import { fmtWhen } from '../../lib/smmDates';
 import Markdown from './Markdown';
@@ -24,16 +24,24 @@ function hintFor(source, text = '') {
   return null;
 }
 
-function Status({ ok, label, detail, hint }) {
-  const color = ok ? '#2E7D32' : '#C2185B';
+function Status({ ok, label, detail, hint, pending }) {
+  const color = pending ? '#807394' : ok ? '#2E7D32' : '#C2185B';
   return (
     <div className="smm-stat sao-conn">
-      <span className="smm-chip" style={{ '--chip': color }}><i aria-hidden="true" />{ok ? 'Підключено' : 'Не працює'}</span>
+      <span className="smm-chip" style={{ '--chip': color }}><i aria-hidden="true" />{pending ? 'Перевіряємо' : ok ? 'Підключено' : 'Не працює'}</span>
       <b className="sao-conn-name">{label}</b>
       {detail && <span className="sao-conn-detail">{detail}</span>}
       {hint && <small className="sao-conn-hint">{hint}</small>}
     </div>
   );
+}
+
+// the PageSpeed key is a separate connection: pending while measuring, working, or missing/broken with the reason
+function SpeedStatus({ ov }) {
+  const sp = ov.speed;
+  if (!sp) return <Status ok={false} pending label="Google PageSpeed" detail="Ключ PAGESPEED_API_KEY" hint={ov.speedLoading ? 'Перевіряємо ключ, це до 30 секунд…' : null} />;
+  const ok = sp.configured && Boolean(sp.mobile || sp.desktop);
+  return <Status ok={ok} label="Google PageSpeed" detail="Ключ PAGESPEED_API_KEY" hint={ok ? null : sp.error} />;
 }
 
 function Metric({ m }) {
@@ -65,6 +73,8 @@ export function useSiteOverview(active) {
   const [loading, setLoading] = useState(Boolean(active) && !data);
   const [error, setError] = useState('');
   const [report, setReport] = useState(null);
+  const [speed, setSpeed] = useState(() => (speedCache && Date.now() - speedCache.at < SPEED_TTL ? speedCache.data : null));
+  const [speedLoading, setSpeedLoading] = useState(false);
   const alive = useRef(true);
 
   const load = useCallback(async (force) => {
@@ -82,13 +92,95 @@ export function useSiteOverview(active) {
     }
   }, []);
 
+  const loadSpeed = useCallback(async (force) => {
+    if (!force && speedCache && Date.now() - speedCache.at < SPEED_TTL) { setSpeed(speedCache.data); return; }
+    setSpeedLoading(true);
+    try {
+      const out = await fetchSiteSpeed();
+      speedCache = { at: Date.now(), data: out.speed };
+      if (alive.current) setSpeed(out.speed);
+    } catch (e) {
+      if (alive.current) setSpeed({ configured: true, mobile: null, desktop: null, errors: {}, error: e.message || 'Не вдалося виміряти швидкість.', checkedAt: new Date().toISOString() });
+    } finally {
+      if (alive.current) setSpeedLoading(false);
+    }
+  }, []);
+
   useEffect(() => { alive.current = true; if (active) load(false); return () => { alive.current = false; }; }, [active, load]);
+  useEffect(() => { if (active) loadSpeed(false); }, [active, loadSpeed]);
   useEffect(() => { if (active) fetchSiteStats().then((r) => { if (alive.current) setReport(r?.[0] || null); }).catch(() => {}); }, [active]);
-  return { data, loading, error, report, reload: () => load(true) };
+  return { data, loading, error, report, reload: () => load(true), speed, speedLoading, reloadSpeed: () => loadSpeed(true) };
 }
 
 // true while the connection is known to be broken (the status light turns red)
 const connectionBroken = (ov) => Boolean(ov && (ov.error || (ov.data?.status && !(ov.data.status.configured && ov.data.status.ga4.ok && ov.data.status.gsc.ok))));
+
+// ---- PageSpeed: how fast the front page is for a phone and for a computer
+const RATING = { good: ['Добре', '#2E7D32'], ok: ['Можна краще', '#B7791F'], poor: ['Повільно', '#C2185B'] };
+const scoreRating = (s) => (s >= 90 ? 'good' : s >= 50 ? 'ok' : 'poor');
+const SPEED_TTL = 30 * 60 * 1000;
+let speedCache = null;
+
+// the speed the page can show: the live measurement if it is there, else the one saved with the agent's last report
+const speedOf = (ov) => ov.speed || ov.report?.data?.extras?.speed || null;
+// «72 / 91» (phone / computer) for the small card on the agent's status row; null when there is nothing to show
+export function speedSummary(ov) {
+  const sp = speedOf(ov);
+  if (!sp || (!sp.mobile && !sp.desktop)) return null;
+  const v = (r) => (r?.scores?.performance == null ? '—' : r.scores.performance);
+  return { text: `${v(sp.mobile)} / ${v(sp.desktop)}`, worst: Math.min(...[sp.mobile, sp.desktop].filter(Boolean).map((r) => r.scores.performance ?? 100)) };
+}
+
+function SpeedCard({ title, r }) {
+  const s = r.scores.performance;
+  const [label, color] = s == null ? ['—', '#807394'] : RATING[scoreRating(s)];
+  const small = [['SEO', r.scores.seo], ['Доступність', r.scores.accessibility], ['Практики', r.scores.bestPractices]];
+  return (
+    <div className="smm-stat sao-speed">
+      <span className="sao-speed-title">{title}</span>
+      <div className="sao-speed-main"><b style={{ color }}>{s == null ? '—' : s}</b><span className="smm-chip" style={{ '--chip': color }}><i aria-hidden="true" />{label}</span></div>
+      <span>швидкість із 100</span>
+      <div className="sao-speed-small">{small.map(([n, v]) => <div key={n}><b>{v == null ? '—' : v}</b><small>{n}</small></div>)}</div>
+      <ul className="sao-speed-metrics">
+        {r.metrics.map((m) => <li key={m.key}><i className={'sao-dot sao-dot--' + m.rating} aria-hidden="true" /><span>{m.label}</span><b>{m.display}</b></li>)}
+      </ul>
+    </div>
+  );
+}
+
+function SpeedBlock({ ov }) {
+  const sp = speedOf(ov);
+  const { speedLoading, reloadSpeed } = ov;
+  const live = Boolean(ov.speed);
+  return (
+    <>
+      <div className="smm-block-head sao-head">
+        <h4>Швидкість сайту (Google PageSpeed)</h4>
+        <button type="button" className="smm-btn" onClick={reloadSpeed} disabled={speedLoading}><ActionIcon name="regenerate" size={18} />{speedLoading ? 'Міряємо…' : 'Виміряти знову'}</button>
+      </div>
+      {speedLoading && !sp && <p className="smm-muted">Міряємо швидкість головної сторінки для телефона й комп’ютера, це займає до 30 секунд…</p>}
+      {sp && !sp.configured && <p className="smm-warn-banner" role="status">{sp.error}</p>}
+      {sp?.configured && sp.error && <p className="smm-warn-banner" role="alert">{sp.error}</p>}
+      {sp && (sp.mobile || sp.desktop) && (
+        <>
+          <p className="smm-muted">Перевірено {fmtWhen(sp.checkedAt)}{live ? '' : ' (збережено з останнього звіту агента)'}. {sp.url}</p>
+          <div className="sao-pair">
+            {sp.mobile && <SpeedCard title="Телефон" r={sp.mobile} />}
+            {sp.desktop && <SpeedCard title="Комп’ютер" r={sp.desktop} />}
+          </div>
+          {sp.mobile?.opportunities?.length > 0 && (
+            <>
+              <h4>Що сповільнює сторінку на телефоні</h4>
+              <Table head={['Що виправити', 'Можна заощадити']} rows={sp.mobile.opportunities.map((o) => [o.title, `${(o.savingsMs / 1000).toFixed(1).replace('.', ',')} с`])} />
+            </>
+          )}
+          {sp.errors?.mobile && <p className="smm-hint">Телефон: {sp.errors.mobile}</p>}
+          {sp.errors?.desktop && <p className="smm-hint">Комп’ютер: {sp.errors.desktop}</p>}
+        </>
+      )}
+    </>
+  );
+}
 
 // What turns the agent's light red: Google is not reachable, or the site itself does not answer. '' = nothing wrong.
 export function siteProblem(ov) {
@@ -127,6 +219,7 @@ export function SiteConnection({ ov, openSettings }) {
           <Status ok={st.configured} label="Вхід у Google" detail={st.auth?.label || 'не налаштовано'} />
           <Status ok={st.ga4.ok} label="Google Analytics 4" detail={`Ресурс ${st.ga4.propertyId}`} hint={st.ga4.ok ? null : hintFor('ga4', st.ga4.error) || st.ga4.error} />
           <Status ok={st.gsc.ok} label="Search Console" detail={st.gsc.siteUrl} hint={st.gsc.ok ? null : hintFor('gsc', st.gsc.error) || st.gsc.error} />
+          <SpeedStatus ov={ov} />
         </div>
       )}
       {st?.warnings?.map((w) => <p key={w} className="smm-note">{w}</p>)}
@@ -206,6 +299,7 @@ export function SiteReport({ ov }) {
       </div>
 
       <LeadsAndSite extras={extras} />
+      <SpeedBlock ov={ov} />
 
       {a && (
         <>

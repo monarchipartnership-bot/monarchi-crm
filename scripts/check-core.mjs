@@ -22,6 +22,7 @@ import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, 
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
 import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
+import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
@@ -723,6 +724,60 @@ await ok('site analyst: the site check and the leads are added to findings, the 
   assert.equal(partial.leads, null);
   assert.match(partial.leadsError, /site_leads/);
   assert.equal(partial.uptime.ok, true);
+});
+const lhJson = (perf, extra = {}) => ({ lighthouseResult: { categories: { performance: { score: perf }, seo: { score: 0.92 }, accessibility: { score: 0.81 }, 'best-practices': { score: 1 } }, audits: { 'largest-contentful-paint': { numericValue: 4800 }, 'first-contentful-paint': { numericValue: 1500 }, 'total-blocking-time': { numericValue: 350 }, 'cumulative-layout-shift': { numericValue: 0.02 }, 'speed-index': { numericValue: 3000 }, 'render-blocking-resources': { title: 'Eliminate render-blocking resources', details: { type: 'opportunity', overallSavingsMs: 1250 } }, 'uses-optimized-images': { title: 'Efficiently encode images [Learn more](https://web.dev/x)', details: { type: 'opportunity', overallSavingsMs: 2100 } }, 'tiny': { title: 'Tiny', details: { type: 'opportunity', overallSavingsMs: 100 } }, 'other': { title: 'Not an opportunity', details: { type: 'table' } } } }, ...extra });
+const speedFetch = ({ fail = null } = {}) => { const log = []; return { log, fetchFn: async (url) => { log.push(url); if (fail) return { ok: false, status: fail.status, json: async () => ({ error: { message: fail.message } }) }; return { ok: true, status: 200, json: async () => (url.includes('strategy=mobile') ? lhJson(0.42) : lhJson(0.95)) }; } }; };
+await ok('pagespeed: scores, metrics with ratings and the biggest fixes are read from the Google answer, the key never leaves the server', async () => {
+  assert.equal(speedKeyFromEnv({ PAGESPEED_API_KEY: '  abc  ' }), 'abc');
+  assert.equal(speedKeyFromEnv({}), '');
+  const r = parseSpeed(lhJson(0.42));
+  assert.deepEqual(r.scores, { performance: 42, seo: 92, accessibility: 81, bestPractices: 100 });
+  assert.deepEqual(r.metrics.map((m) => [m.key, m.rating]), [['lcp', 'poor'], ['fcp', 'good'], ['tbt', 'ok'], ['cls', 'good'], ['si', 'good']]);
+  assert.equal(r.metrics[0].display, '4,8 с');
+  assert.deepEqual(r.opportunities.map((o) => [o.title, o.savingsMs]), [['Efficiently encode images', 2100], ['Eliminate render-blocking resources', 1250]]); // the biggest first, tiny and non-opportunities left out, links cut from titles
+  assert.throws(() => parseSpeed({}), /без результатів/);
+  const { fetchFn, log } = speedFetch();
+  const s1 = await collectSpeed({ url: 'https://www.monarchi.agency', key: 'KEY1', fetchFn, now: SITE_NOW });
+  assert.equal(log.length, 2);
+  assert.ok(log.every((u) => u.startsWith('https://www.googleapis.com/pagespeedonline/v5/runPagespeed?') && u.includes('key=KEY1') && u.includes('category=seo')));
+  assert.deepEqual([s1.mobile.scores.performance, s1.desktop.scores.performance, s1.error], [42, 95, null]);
+  const f = speedFindings(s1);
+  assert.ok(f.findings.some((x) => x.kind === 'down' && /телефона: 42/.test(x.text)));
+  assert.ok(f.findings.some((x) => x.kind === 'info' && /комп’ютера: 95/.test(x.text) && /усе добре/.test(x.text)));
+  assert.equal(f.seo.length, 2); // fixes of the phone version go to the SEO agent
+});
+await ok('pagespeed: no key, a wrong key and a limit are results with the reason, never an exception; one strategy failing keeps the other', async () => {
+  const none = await collectSpeed({ url: 'https://x.test', key: '', fetchFn: async () => { throw new Error('must not be called'); } });
+  assert.equal(none.configured, false);
+  assert.match(none.error, /PAGESPEED_API_KEY/);
+  const forbidden = await collectSpeed({ url: 'https://x.test', key: 'k', fetchFn: speedFetch({ fail: { status: 403, message: 'API has not been used' } }).fetchFn });
+  assert.match(forbidden.error, /PageSpeed Insights API/);
+  const limited = await collectSpeed({ url: 'https://x.test', key: 'k', fetchFn: speedFetch({ fail: { status: 429, message: 'Quota exceeded' } }).fetchFn });
+  assert.match(limited.error, /ліміт/);
+  const half = await collectSpeed({ url: 'https://x.test', key: 'k', fetchFn: async (url) => (url.includes('strategy=desktop') ? { ok: false, status: 500, json: async () => ({}) } : { ok: true, status: 200, json: async () => lhJson(0.8) }) });
+  assert.ok(half.mobile && !half.desktop);
+  assert.equal(half.error, null);
+  assert.ok(half.errors.desktop);
+  assert.deepEqual(speedFindings(none).findings.map((x) => x.kind), ['error']);
+});
+await ok('pagespeed: the analyst run measures speed when a key is set, saves it with the report and tells the SEO agent', async () => {
+  const tables = { smm_brand: [{ id: 1 }], smm_competitors: [], smm_competitor_reports: [], smm_site_audits: [], smm_posts: [], smm_plans: [], smm_site_stats: [], site_leads: [], smm_settings: [{ id: 1, site_url: 'https://www.monarchi.agency' }], ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [] };
+  const db = fakeDb(tables);
+  await ensureSmmTeam(db, 'a@x.com');
+  const analyst = tables.ag_agents.find((a) => a.role === 'site_analyst');
+  const site = async () => collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW });
+  const good = { callModel: async (args) => ({ text: 'Звіт.', usage: { input_tokens: 1, output_tokens: 1 }, costUsd: 0.001, agentKey: args.agentKey }) };
+  const net = async (url, init) => (url.includes('pagespeedonline') ? speedFetch().fetchFn(url) : siteFetch().fetchFn(url, init));
+  const r = await runNow({ db, model: good, email: 'a@x.com', trigger: 'user', hf: null, site, extrasFetch: net, env: { PAGESPEED_API_KEY: 'KEY1' }, now: SITE_NOW }, analyst.id);
+  assert.equal(r.status, 'done');
+  const saved = tables.smm_site_stats[0].data;
+  assert.equal(saved.extras.speed.mobile.scores.performance, 42);
+  assert.ok(saved.handoff.seo.some((l) => /Швидкість \(телефон\)/.test(l)));
+  assert.ok(saved.findings.some((x) => x.source === 'speed' && x.kind === 'down'));
+  // without a key the run still works and says the key is missing, nothing is fetched from PageSpeed
+  const noKey = await runNow({ db, model: good, email: 'a@x.com', trigger: 'user', hf: null, site, extrasFetch: async (url, init) => { assert.ok(!url.includes('pagespeedonline')); return siteFetch().fetchFn(url, init); }, env: {}, now: SITE_NOW }, analyst.id);
+  assert.equal(noKey.status, 'done');
+  assert.equal(tables.smm_site_stats[1].data.extras.speed.configured, false);
 });
 await ok('site analyst: small numbers get no percentages, missing conversions are reported, and the hand-off is made in code', async () => {
   const small = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));
