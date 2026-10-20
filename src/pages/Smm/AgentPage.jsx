@@ -144,9 +144,12 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
                 <div><h3>{health.label}</h3><p className="smm-muted">{health.note}</p></div>
               </div>
               <div className="smm-state-actions">
-                <AgentSwitch agent={agent} team={team} variant="power" onChanged={async () => { await reloadTeam(); }} notify={notify} />
+                <div className="smm-power-wrap">
+                  <AgentSwitch agent={agent} team={team} variant="power" onChanged={async () => { await reloadTeam(); }} notify={notify} />
+                  <small>{agent.schedule ? (next ? `Наступний запуск: ${fmtDateTime(next.at.toISOString())}` : 'За розкладом не запускається') : 'Працює за завданнями від інших агентів'}</small>
+                </div>
                 {canRunByHand(agent) && meta.ready && (
-                  <button type="button" className="smm-btn smm-btn--primary" onClick={() => (role === 'strategist' || prompts.length > 1 ? setDialog(true) : run({}).catch((e) => notify(e.message || 'Не вдалося виконати.', true)))} disabled={running}><ActionIcon name="generate" size={18} />{running ? 'Працює…' : RUN_LABEL[role] || 'Запустити зараз'}</button>
+                  <button type="button" className="smm-btn smm-btn--primary" onClick={() => (role === 'strategist' || prompts.length > 1 ? setDialog(true) : run({}).catch((e) => notify(e.message || 'Не вдалося виконати.', true)))} disabled={running}><ActionIcon name="generate" size={18} />{running ? 'Працює…' : RUN_LABEL[role] || 'Запустити один раз'}</button>
                 )}
               </div>
             </div>

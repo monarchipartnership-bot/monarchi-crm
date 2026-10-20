@@ -39,7 +39,7 @@ export function AgentSwitch({ agent, team, onChanged, notify, compact, variant }
       <>
         <button type="button" role="switch" aria-checked={agent.enabled} className={'smm-power' + (agent.enabled ? ' is-on' : '')} disabled={disabled} onClick={toggle} title={!meta.ready && !agent.enabled ? meta.readyNote : undefined}>
           <span className="smm-power-track" aria-hidden="true"><i /></span>
-          <span>{busy ? '…' : agent.enabled ? 'Увімкнено' : 'Вимкнено'}</span>
+          <span>{busy ? '…' : `${agent.schedule ? 'Автозапуск: ' : ''}${agent.enabled ? 'увімкнено' : 'вимкнено'}`.replace(/^./, (c) => c.toUpperCase())}</span>
         </button>
         {confirmDialog}
       </>
