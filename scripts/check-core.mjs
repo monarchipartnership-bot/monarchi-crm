@@ -20,7 +20,7 @@ import { composeSystem } from '../src/lib/agents/locked.js';
 import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
 import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
-import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, windows as siteWindows } from '../api/_lib/googleSiteData.js';
+import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
@@ -626,6 +626,28 @@ await ok('site analyst: a failure of one source does not lose the other, both fa
   assert.match(half.errors.ga4, /GA4: User does not have access.*читачем у GA4/);
   assert.ok(half.gsc);
   await assert.rejects(() => collectSiteStats({ account: siteAccount, fetchFn: siteFetch({ gaFail: true, gscFail: true }).fetchFn, now: SITE_NOW }), /Не вдалося прочитати ні GA4, ні Search Console/);
+});
+await ok('site analyst: the overview page reports the connection of each source and the live figures, and says plainly when nothing is set up', async () => {
+  const env = { GOOGLE_OAUTH_CLIENT_ID: 'cid', GOOGLE_OAUTH_CLIENT_SECRET: 'sec', GOOGLE_OAUTH_REFRESH_TOKEN: 'rtok' };
+  const full = await siteOverview({ env, fetchFn: siteFetch().fetchFn, now: SITE_NOW });
+  assert.equal(full.status.configured, true);
+  assert.equal(full.status.auth.kind, 'oauth');
+  assert.deepEqual([full.status.ga4.ok, full.status.gsc.ok], [true, true]);
+  assert.equal(full.status.ga4.propertyId, '503944052');
+  assert.ok(full.analysis.ga4.metrics.length && full.analysis.gsc.metrics.length);
+  const half = await siteOverview({ env, fetchFn: siteFetch({ gaFail: true }).fetchFn, now: SITE_NOW });
+  assert.deepEqual([half.status.ga4.ok, half.status.gsc.ok], [false, true]);
+  assert.match(half.status.ga4.error, /GA4/);
+  assert.equal(half.analysis.ga4, null);
+  assert.ok(half.analysis.gsc);
+  const both = await siteOverview({ env, fetchFn: siteFetch({ gaFail: true, gscFail: true }).fetchFn, now: SITE_NOW });
+  assert.equal(both.analysis, null);
+  assert.match(both.status.error, /ні GA4, ні Search Console/);
+  const none = await siteOverview({ env: {}, now: SITE_NOW });
+  assert.equal(none.status.configured, false);
+  assert.equal(none.analysis, null);
+  assert.ok(none.status.error);
+  assert.equal((await siteOverview({ env, config: { ga4PropertyId: '42' }, fetchFn: siteFetch().fetchFn, now: SITE_NOW })).status.ga4.propertyId, '42'); // the agent's own settings win over the default
 });
 await ok('site analyst: small numbers get no percentages, missing conversions are reported, and the hand-off is made in code', async () => {
   const small = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));

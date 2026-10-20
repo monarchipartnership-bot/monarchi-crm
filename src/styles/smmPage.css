@@ -412,3 +412,18 @@ button.smm-stat { cursor: pointer; }
 .smm-table th { text-align: left; font-weight: 600; color: var(--s-muted); padding: 6px 10px; border-bottom: 1px solid var(--s-line); white-space: nowrap; }
 .smm-table td { padding: 7px 10px; border-bottom: 1px solid var(--s-line); }
 .smm-table td:not(:first-child), .smm-table th:not(:first-child) { text-align: right; white-space: nowrap; }
+
+/* website analyst: the agent's main page */
+.sao { gap: 12px; }
+.sao-head { margin-top: 6px; }
+.sao-conn { gap: 8px; align-items: flex-start; }
+.sao-conn .smm-chip { align-self: flex-start; }
+.sao-conn-name { font: 700 16px/1.3 'Onest', sans-serif !important; }
+.sao-conn-detail { font-size: 12.5px; color: var(--s-muted); word-break: break-all; }
+.sao-conn-hint { font-size: 12.5px; line-height: 1.45; color: var(--s-bad); }
+.sao-findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sao-findings li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; }
+.sao-findings .smm-chip { flex: none; }
+.sao-handoff { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.sao-handoff ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--s-ink); }
+.sao-h { font: 600 13.5px/1.3 'Onest', sans-serif !important; color: var(--s-ink); }

@@ -96,3 +96,5 @@ export const nextRunOf = (agent) => (agent.schedule?.weekday ? nextScheduled('we
 
 // What the server has connected (for the visual agent's page).
 export const fetchServerStatus = () => agentAction('status');
+// The website analyst's main page: { status: { configured, auth, ga4, gsc, error, warnings, checkedAt }, analysis } (reads Google live, no model).
+export const fetchSiteOverview = () => agentAction('site_overview');

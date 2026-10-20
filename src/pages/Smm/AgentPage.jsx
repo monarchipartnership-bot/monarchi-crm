@@ -7,6 +7,7 @@ import AgentSettings, { LANGUAGE_OPTIONS } from './AgentSettings';
 import AgentPrompts from './AgentPrompts';
 import AgentHistory from './AgentHistory';
 import AgentTasks from './AgentTasks';
+import SiteAnalystOverview from './SiteAnalystOverview';
 import { AgentStateChip, fmtDateTime, roleMeta, stateOf } from './agentUi';
 import { AgentSwitch } from './SmmAgents';
 import { nextMondayYmd } from '../../lib/smmDates';
@@ -164,6 +165,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
           {role === 'visual' && serverStatus && !serverStatus.higgsfield && <p className="smm-warn-banner" role="status">Ключі Higgsfield ще не додані на сервері, тому агент пише промти, але не запускає генерацію. Щоб підключити, додайте HF_API_KEY_ID і HF_API_KEY_SECRET у Vercel (Settings, Environment Variables) і перезапустіть розгортання. Ключі ніколи не вводяться в чат чи на сторінку.</p>}
           {role === 'visual' && serverStatus?.higgsfield && <p className="smm-note">Higgsfield підключено: після промту зображення або відео генерується автоматично й зберігається в нашому сховищі.</p>}
           <p className="smm-agent-desc">{agent.description}</p>
+          {role === 'site_analyst' && <SiteAnalystOverview openSettings={() => setSub('settings')} />}
           <div className="smm-stats">
             <div className="smm-stat"><b>{agent.last_run_at ? fmtDateTime(agent.last_run_at) : '—'}</b><span>останній запуск{agent.last_status === 'problem' ? ' (з помилкою)' : ''}</span></div>
             <div className="smm-stat"><b>{next ? fmtDateTime(next.at.toISOString()) : agent.schedule ? 'вимкнено' : 'за завданнями'}</b><span>наступний запуск за розкладом</span></div>

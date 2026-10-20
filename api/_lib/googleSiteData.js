@@ -221,6 +221,34 @@ export function analyseSite(raw, thresholds = THRESHOLDS) {
   return out;
 }
 
+// The agent's main page: is the connection healthy, and the live figures. One read of both services, no model, nothing saved.
+// → { status: { configured, auth, ga4: { ok, propertyId, error, hint }, gsc: { ok, siteUrl, error, hint }, error?, warnings: [], checkedAt }, analysis | null }
+export async function siteOverview({ config = {}, env = process.env, fetchFn = fetch, now = () => new Date() } = {}) {
+  const cfg = { ...DEFAULT_SITE, ...Object.fromEntries(Object.entries(config).filter(([, v]) => v)) };
+  const status = { configured: false, auth: null, ga4: { ok: false, propertyId: cfg.ga4PropertyId, error: null }, gsc: { ok: false, siteUrl: cfg.gscSiteUrl, error: null }, error: null, warnings: [], checkedAt: now().toISOString() };
+  let auth;
+  try {
+    auth = authFromEnv(env);
+  } catch (e) {
+    status.error = e.message;
+    return { status, analysis: null };
+  }
+  status.configured = true;
+  status.auth = auth.kind === 'service_account' ? { kind: 'service_account', label: `Сервісний акаунт ${auth.account.client_email}` } : { kind: 'oauth', label: 'Токен облікового запису Google (OAuth)' };
+  let raw;
+  try {
+    raw = await collectSiteStats({ auth, config: cfg, fetchFn, now });
+  } catch (e) {
+    status.error = e.message;
+    return { status, analysis: null };
+  }
+  status.ga4 = { ...status.ga4, ok: !!raw.ga4, error: raw.errors.ga4 || null };
+  status.gsc = { ...status.gsc, ok: !!raw.gsc, error: raw.errors.gsc || null };
+  if (raw.ga4 && !(raw.ga4.total.cur.activeUsers > 0) && !(raw.ga4.total.prev.activeUsers > 0)) status.warnings.push('GA4 підключено, але за ці 56 днів у ньому немає жодного користувача: перевірте, чи працює тег на сайті.');
+  if (raw.gsc && !(raw.gsc.total.cur.impressions > 0) && !(raw.gsc.total.prev.impressions > 0)) status.warnings.push('Search Console підключено, але показів у пошуку немає: ресурс могли додати нещодавно або вказано не той.');
+  return { status, analysis: analyseSite(raw) };
+}
+
 // The prompt data for the model: the analysed figures only, trimmed.
 export const reportInput = (analysis) => JSON.stringify({ period: analysis.period, ga4: analysis.ga4 && { metrics: analysis.ga4.metrics, channels: analysis.ga4.channels.slice(0, 6), pages: analysis.ga4.pages.slice(0, 8) }, gsc: analysis.gsc && { metrics: analysis.gsc.metrics, opportunities: analysis.gsc.opportunities, topQueries: analysis.gsc.topQueries, pages: analysis.gsc.pages }, findings: analysis.findings }, null, 1);
 
