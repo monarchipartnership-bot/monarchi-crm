@@ -5,7 +5,7 @@ import { fetchSiteStats } from '../../lib/api/smm';
 import { fmtWhen } from '../../lib/smmDates';
 import Markdown from './Markdown';
 
-// The website analyst's main page: first «is the connection healthy», then the figures it tracks right now.
+// The website analyst's main page, in two blocks: «Підключення до Google» (is the connection healthy) and «Звіт» (the figures it tracks now).
 // The figures are read live from Google (no model, nothing saved) and kept for a few minutes so switching tabs does not refetch.
 const TTL = 5 * 60 * 1000;
 let cache = null;
@@ -59,9 +59,10 @@ function Table({ head, rows }) {
   );
 }
 
-export default function SiteAnalystOverview({ openSettings }) {
+// The agent page loads the overview once and hands it to both blocks and to the agent's status light.
+export function useSiteOverview(active) {
   const [data, setData] = useState(() => (cache && Date.now() - cache.at < TTL ? cache.data : null));
-  const [loading, setLoading] = useState(!data);
+  const [loading, setLoading] = useState(Boolean(active) && !data);
   const [error, setError] = useState('');
   const [report, setReport] = useState(null);
   const alive = useRef(true);
@@ -81,14 +82,20 @@ export default function SiteAnalystOverview({ openSettings }) {
     }
   }, []);
 
-  useEffect(() => { alive.current = true; load(false); return () => { alive.current = false; }; }, [load]);
-  useEffect(() => { fetchSiteStats().then((r) => { if (alive.current) setReport(r?.[0] || null); }).catch(() => {}); }, []);
+  useEffect(() => { alive.current = true; if (active) load(false); return () => { alive.current = false; }; }, [active, load]);
+  useEffect(() => { if (active) fetchSiteStats().then((r) => { if (alive.current) setReport(r?.[0] || null); }).catch(() => {}); }, [active]);
+  return { data, loading, error, report, reload: () => load(true) };
+}
 
+// true while the connection is known to be broken (the status light turns red)
+export const connectionBroken = (ov) => Boolean(ov && (ov.error || (ov.data?.status && !(ov.data.status.configured && ov.data.status.ga4.ok && ov.data.status.gsc.ok))));
+
+// Block «Підключення до Google»
+export function SiteConnection({ ov, openSettings }) {
+  const { data, loading, error, reload } = ov;
   const st = data?.status;
-  const a = data?.analysis;
   const allOk = st && st.configured && st.ga4.ok && st.gsc.ok;
   const checked = st?.checkedAt ? fmtWhen(st.checkedAt) : null;
-
   return (
     <section className="smm-block sao">
       <div className="smm-block-head">
@@ -96,7 +103,7 @@ export default function SiteAnalystOverview({ openSettings }) {
           <h3>Підключення до Google</h3>
           <p className="smm-muted">{loading ? 'Перевіряємо зʼєднання…' : allOk ? 'Усе гаразд: агент бачить і GA4, і Search Console.' : st ? 'Є проблема з підключенням, деталі нижче.' : ''}{checked && !loading ? ` Перевірено ${checked}.` : ''}</p>
         </div>
-        <button type="button" className="smm-btn" onClick={() => load(true)} disabled={loading}><ActionIcon name="regenerate" size={18} />{loading ? 'Оновлюємо…' : 'Перевірити знову'}</button>
+        <button type="button" className="smm-btn" onClick={reload} disabled={loading}><ActionIcon name="regenerate" size={18} />{loading ? 'Оновлюємо…' : 'Перевірити знову'}</button>
       </div>
 
       {error && <p className="smm-warn-banner" role="alert">{error}</p>}
@@ -117,15 +124,24 @@ export default function SiteAnalystOverview({ openSettings }) {
       )}
       {st?.warnings?.map((w) => <p key={w} className="smm-note">{w}</p>)}
       {st && (!st.ga4.ok || !st.gsc.ok) && openSettings && <div><button type="button" className="smm-btn" onClick={openSettings}>Відкрити налаштування агента</button></div>}
+    </section>
+  );
+}
 
+// Block «Звіт»: the live figures, what the code found, what is handed on, and the agent's last written report.
+export function SiteReport({ ov }) {
+  const { data, loading, report } = ov;
+  const a = data?.analysis;
+  return (
+    <section className="smm-block sao">
+      <div className="smm-block-head">
+        <div>
+          <h3>Звіт</h3>
+          <p className="smm-muted">{a ? `${a.period.cur.start} – ${a.period.cur.end}, порівняно з попередніми ${a.period.days} днями. Дані читаються з Google просто зараз.` : loading ? 'Читаємо дані з Google…' : 'Показники зʼявляться, коли запрацює підключення до Google.'}</p>
+        </div>
+      </div>
       {a && (
         <>
-          <div className="smm-block-head sao-head">
-            <div>
-              <h3>Показники, які відстежує агент</h3>
-              <p className="smm-muted">{a.period.cur.start} – {a.period.cur.end}, порівняно з попередніми {a.period.days} днями. Дані читаються з Google просто зараз.</p>
-            </div>
-          </div>
           {a.ga4 && (<><h4>Google Analytics 4: сайт</h4><div className="smm-stats">{a.ga4.metrics.map((m) => <Metric key={m.key} m={m} />)}</div></>)}
           {a.gsc && (<><h4>Search Console: пошук Google</h4><div className="smm-stats">{a.gsc.metrics.map((m) => <Metric key={m.key} m={m} />)}</div></>)}
 

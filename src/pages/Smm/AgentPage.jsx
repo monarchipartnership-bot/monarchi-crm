@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ActionIcon from '../../components/common/ActionIcon';
 import DatePicker from '../../components/common/DatePicker';
 import Select from '../../components/common/Select';
-import { agentAction, fetchPrompts, fetchServerStatus, fetchTasks, nextRunOf, setLinkRequired } from '../../lib/api/agents';
+import { agentAction, fetchPrompts, fetchServerStatus, fetchTasks, nextRunOf } from '../../lib/api/agents';
 import AgentSettings, { LANGUAGE_OPTIONS } from './AgentSettings';
 import AgentPrompts from './AgentPrompts';
 import AgentHistory from './AgentHistory';
 import AgentTasks from './AgentTasks';
-import SiteAnalystOverview from './SiteAnalystOverview';
-import { AgentStateChip, fmtDateTime, roleMeta, stateOf } from './agentUi';
+import { SiteConnection, SiteReport, connectionBroken, useSiteOverview } from './SiteAnalystOverview';
+import { ChainMini, HealthLight, healthOf } from './AgentCardParts';
+import { fmtDateTime, roleMeta } from './agentUi';
 import { AgentSwitch } from './SmmAgents';
 import { nextMondayYmd } from '../../lib/smmDates';
 import { Dialog } from './smmCommon';
@@ -69,36 +70,6 @@ function RunDialog({ agent, prompts, onClose, onRun }) {
   );
 }
 
-function Links({ agent, team, notify, reloadTeam, open }) {
-  const up = team.links.filter((l) => l.to_agent_id === agent.id);
-  const down = team.links.filter((l) => l.from_agent_id === agent.id);
-  const byId = new Map(team.agents.map((a) => [a.id, a]));
-  async function toggle(link, required) {
-    try { await setLinkRequired(link.id, required); await reloadTeam(); notify(required ? 'Звʼязок зроблено обовʼязковим: якщо агент вимкнений, цей теж зупиняється.' : 'Звʼязок необовʼязковий: агент працює й без цих даних.'); } catch (e) { notify(e.message || 'Не вдалося змінити.', true); }
-  }
-  const row = (link, other, direction) => (
-    <li key={link.id}>
-      <button type="button" className="smm-link-btn" onClick={() => open(other.role)}>{other.name}</button>
-      <AgentStateChip state={stateOf(other, team)} />
-      <label className="smm-check" title="Якщо агент у цьому звʼязку вимкнений, залежний від нього теж зупиняється">
-        <input type="checkbox" checked={link.required} onChange={(e) => toggle(link, e.target.checked)} /> обовʼязковий
-      </label>
-    </li>
-  );
-  return (
-    <div className="smm-rep-grid">
-      <div className="smm-rep-sec">
-        <h5>Отримує завдання й дані від</h5>
-        {up.length ? <ul className="smm-linklist">{up.map((l) => row(l, byId.get(l.from_agent_id), 'up'))}</ul> : <p className="smm-muted">Нікого: стартує за розкладом або вручну.</p>}
-      </div>
-      <div className="smm-rep-sec">
-        <h5>Передає далі</h5>
-        {down.length ? <ul className="smm-linklist">{down.map((l) => row(l, byId.get(l.to_agent_id), 'down'))}</ul> : <p className="smm-muted">Нікому: це кінець ланцюжка.</p>}
-      </div>
-    </div>
-  );
-}
-
 export default function AgentPage({ role, team, posts, notify, reloadTeam, reloadAll, back, open, go, kick }) {
   const agent = team.agents.find((a) => a.role === role);
   const [sub, setSub] = useState('overview');
@@ -108,6 +79,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
   const [dialog, setDialog] = useState(false);
   const [serverStatus, setServerStatus] = useState(null);
   const headRef = useRef(null);
+  const siteOv = useSiteOverview(role === 'site_analyst');
 
   const loadMine = useCallback(async () => {
     if (!agent) return;
@@ -118,11 +90,11 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
   useEffect(() => { headRef.current?.focus(); }, [role]);
   useEffect(() => { if (role === 'visual') fetchServerStatus().then(setServerStatus).catch(() => setServerStatus(null)); }, [role]);
 
-  const st = agent ? stateOf(agent, team) : null;
   const month = Date.now() - 30 * 86400000;
   const cost30 = useMemo(() => tasks.filter((t) => new Date(t.created_at).getTime() >= month).reduce((s, t) => s + Number(t.cost_usd || 0), 0), [tasks, month]);
   if (!agent) return <p className="smm-muted">Агента не знайдено. <button type="button" className="smm-link-btn" onClick={back}>До команди</button></p>;
   const meta = roleMeta(role);
+  const health = healthOf(agent, team, agent.enabled && role === 'site_analyst' && connectionBroken(siteOv) ? 'Немає звʼязку з Google Analytics або Search Console, деталі в блоці «Підключення до Google».' : '');
   const next = agent.enabled ? nextRunOf(agent) : null;
   const queued = tasks.filter((t) => t.status === 'queued' || t.status === 'running').length;
   const failed = tasks.filter((t) => t.status === 'failed').length;
@@ -145,9 +117,8 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
         <button type="button" className="smm-btn" onClick={back}><ActionIcon name="back" size={18} />Команда</button>
         <div className="smm-agent-title">
           <h2 ref={headRef} tabIndex={-1}>{agent.name}</h2>
-          <AgentStateChip state={st} />
+          <HealthLight health={health} label />
         </div>
-        <AgentSwitch agent={agent} team={team} onChanged={async () => { await reloadTeam(); }} notify={notify} />
       </div>
 
       <div className="smm-subtabs" role="tablist" aria-label="Розділи агента">
@@ -160,26 +131,44 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
 
       {sub === 'overview' && (
         <>
-          {st.key === 'blocked' && <p className="smm-warn-banner" role="status">Агент зупинено, бо вимкнено «{st.blockedBy.name}», від якого він залежить. Його завдання чекають у черзі й продовжаться, щойно ви увімкнете «{st.blockedBy.name}».</p>}
-          {st.key === 'wait' && <p className="smm-warn-banner" role="status">{meta.readyNote} Поки цього немає, агент не може працювати, але його промт і налаштування вже можна готувати.</p>}
-          {role === 'visual' && serverStatus && !serverStatus.higgsfield && <p className="smm-warn-banner" role="status">Ключі Higgsfield ще не додані на сервері, тому агент пише промти, але не запускає генерацію. Щоб підключити, додайте HF_API_KEY_ID і HF_API_KEY_SECRET у Vercel (Settings, Environment Variables) і перезапустіть розгортання. Ключі ніколи не вводяться в чат чи на сторінку.</p>}
-          {role === 'visual' && serverStatus?.higgsfield && <p className="smm-note">Higgsfield підключено: після промту зображення або відео генерується автоматично й зберігається в нашому сховищі.</p>}
           <p className="smm-agent-desc">{agent.description}</p>
-          {role === 'site_analyst' && <SiteAnalystOverview openSettings={() => setSub('settings')} />}
-          <div className="smm-stats">
-            <div className="smm-stat"><b>{agent.last_run_at ? fmtDateTime(agent.last_run_at) : '—'}</b><span>останній запуск{agent.last_status === 'problem' ? ' (з помилкою)' : ''}</span></div>
-            <div className="smm-stat"><b>{next ? fmtDateTime(next.at.toISOString()) : agent.schedule ? 'вимкнено' : 'за завданнями'}</b><span>наступний запуск за розкладом</span></div>
-            <div className="smm-stat"><b>{queued}{failed ? ` + ${failed} ⚠` : ''}</b><span>у черзі{failed ? ' + помилки' : ''}</span></div>
-            <div className="smm-stat"><b>${cost30.toFixed(2)}</b><span>витрати за 30 днів</span></div>
-          </div>
-          {agent.last_message && <p className={'smm-last' + (agent.last_status === 'problem' ? ' smm-bad' : '')}>{agent.last_message}</p>}
-          {canRunByHand(agent) && meta.ready && (
-            <div className="smm-form-foot">
-              <button type="button" className="smm-btn smm-btn--primary" onClick={() => (role === 'strategist' || prompts.length > 1 ? setDialog(true) : run({}).catch((e) => notify(e.message || 'Не вдалося виконати.', true)))} disabled={running}><ActionIcon name="generate" size={18} />{running ? 'Працює…' : RUN_LABEL[role] || 'Запустити зараз'}</button>
-              {running && <span className="smm-muted">Не закривайте сторінку, це займає до двох хвилин.</span>}
+          <section className="smm-block">
+            <h3>Звʼязки в ланцюжку</h3>
+            <ChainMini agent={agent} team={team} notify={notify} reloadTeam={reloadTeam} open={open} />
+          </section>
+
+          <section className={'smm-block smm-state-card smm-state-card--' + health.key}>
+            <div className="smm-state-top">
+              <div className="smm-state-main">
+                <HealthLight health={health} />
+                <div><h3>{health.label}</h3><p className="smm-muted">{health.note}</p></div>
+              </div>
+              <div className="smm-state-actions">
+                <AgentSwitch agent={agent} team={team} variant="power" onChanged={async () => { await reloadTeam(); }} notify={notify} />
+                {canRunByHand(agent) && meta.ready && (
+                  <button type="button" className="smm-btn smm-btn--primary" onClick={() => (role === 'strategist' || prompts.length > 1 ? setDialog(true) : run({}).catch((e) => notify(e.message || 'Не вдалося виконати.', true)))} disabled={running}><ActionIcon name="generate" size={18} />{running ? 'Працює…' : RUN_LABEL[role] || 'Запустити зараз'}</button>
+                )}
+              </div>
             </div>
+            {health.key === 'off' && !agent.enabled && meta.ready === false && <p className="smm-warn-banner" role="status">{meta.readyNote} Поки цього немає, агент не може працювати, але його промт і налаштування вже можна готувати.</p>}
+            {role === 'visual' && serverStatus && !serverStatus.higgsfield && <p className="smm-warn-banner" role="status">Ключі Higgsfield ще не додані на сервері, тому агент пише промти, але не запускає генерацію. Щоб підключити, додайте HF_API_KEY_ID і HF_API_KEY_SECRET у Vercel (Settings, Environment Variables) і перезапустіть розгортання. Ключі ніколи не вводяться в чат чи на сторінку.</p>}
+            {role === 'visual' && serverStatus?.higgsfield && <p className="smm-note">Higgsfield підключено: після промту зображення або відео генерується автоматично й зберігається в нашому сховищі.</p>}
+            <div className="smm-stats">
+              <div className="smm-stat"><b>{agent.last_run_at ? fmtDateTime(agent.last_run_at) : '—'}</b><span>останній запуск{agent.last_status === 'problem' ? ' (з помилкою)' : ''}</span></div>
+              <div className="smm-stat"><b>{next ? fmtDateTime(next.at.toISOString()) : agent.schedule ? 'вимкнено' : 'за завданнями'}</b><span>наступний запуск за розкладом</span></div>
+              <div className="smm-stat"><b>{queued}{failed ? ` + ${failed} ⚠` : ''}</b><span>у черзі{failed ? ' + помилки' : ''}</span></div>
+              <div className="smm-stat"><b>${cost30.toFixed(2)}</b><span>витрати за 30 днів</span></div>
+            </div>
+            {agent.last_message && <p className={'smm-last' + (agent.last_status === 'problem' ? ' smm-bad' : '')}>{agent.last_message}</p>}
+            {running && <span className="smm-muted">Не закривайте сторінку, це займає до двох хвилин.</span>}
+          </section>
+
+          {role === 'site_analyst' && (
+            <>
+              <SiteConnection ov={siteOv} openSettings={() => setSub('settings')} />
+              <SiteReport ov={siteOv} />
+            </>
           )}
-          <section className="smm-block"><h3>Звʼязки в ланцюжку</h3><Links agent={agent} team={team} notify={notify} reloadTeam={reloadTeam} open={open} /></section>
           {role === 'strategist' && <p className="smm-muted">План, який складає стратег, чекає у <button type="button" className="smm-link-btn" onClick={() => go('queue')}>черзі схвалення</button>. Після вашого «ок» стратег ставить завдання копірайтеру й візуал-агенту.</p>}
         </>
       )}

@@ -14,7 +14,7 @@ const STAGES = [
   { title: 'Публікація', hint: 'Після вашого схвалення', roles: ['publisher'] },
 ];
 
-export function AgentSwitch({ agent, team, onChanged, notify, compact }) {
+export function AgentSwitch({ agent, team, onChanged, notify, compact, variant }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
   const [busy, setBusy] = useState(false);
@@ -34,6 +34,17 @@ export function AgentSwitch({ agent, team, onChanged, notify, compact }) {
     try { await setAgentEnabled(agent, !agent.enabled, email); await onChanged(); notify(turningOff ? `«${agent.name}» вимкнено.` : `«${agent.name}» увімкнено.`); } catch (e) { notify(e.message || 'Не вдалося змінити.', true); } finally { setBusy(false); }
   }
   const disabled = busy || (!meta.ready && !agent.enabled);
+  if (variant === 'power') {
+    return (
+      <>
+        <button type="button" role="switch" aria-checked={agent.enabled} className={'smm-power' + (agent.enabled ? ' is-on' : '')} disabled={disabled} onClick={toggle} title={!meta.ready && !agent.enabled ? meta.readyNote : undefined}>
+          <span className="smm-power-track" aria-hidden="true"><i /></span>
+          <span>{busy ? '…' : agent.enabled ? 'Увімкнено' : 'Вимкнено'}</span>
+        </button>
+        {confirmDialog}
+      </>
+    );
+  }
   return (
     <>
       <label className={'smm-switch' + (compact ? ' smm-switch--compact' : '')} title={!meta.ready && !agent.enabled ? meta.readyNote : undefined}>
