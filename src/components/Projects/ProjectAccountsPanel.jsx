@@ -8,6 +8,7 @@ import { fetchAllProjectAccounts, fetchProjectAccounts, addProjectAccount, refre
 import { useAuth } from '../../contexts/AuthContext';
 import '../../styles/projectAccounts.css';
 import AccountCampaigns from './AccountCampaigns';
+import { HubTitle, HUB_PATHS } from './hubIcons';
 
 const PERIODS = [{ value: 'last_7d', label: '7 днів' }, { value: 'last_30d', label: '30 днів' }];
 
@@ -124,7 +125,7 @@ export default function ProjectAccountsPanel({ projectId, services, onAddService
   return (
     <section className="report-section pacc-panel pw-card">
       <div className="pacc-panel-head">
-        <div className="stitle">Рекламні кабінети</div>
+        <HubTitle icon="plug">Рекламні кабінети</HubTitle>
         <div className="pacc-panel-actions">
           {accounts.length > 1 && (
             <div className="pw-switch" role="tablist" aria-label="Платформа кабінету">
@@ -152,8 +153,8 @@ export default function ProjectAccountsPanel({ projectId, services, onAddService
           <AdAccountPicker platform={addPlatform} value={picked} onChange={setPicked} usedKeys={usedKeys} />
           {msg && <div className="pacc-err">{msg}</div>}
           <div className="pacc-add-actions">
-            <button type="button" className="pw-btn pw-btn--primary" onClick={saveAdded} disabled={!picked || busy}>{busy ? '...' : 'Підключити'}</button>
-            <button type="button" className="pw-btn" onClick={() => setAdding(false)}>Скасувати</button>
+            <button type="button" className="pw-btn pw-btn--ok" onClick={saveAdded} disabled={!picked || busy}>{busy ? '...' : 'Підключити'}</button>
+            <button type="button" className="pw-btn pw-btn--bad" onClick={() => setAdding(false)}>Скасувати</button>
           </div>
         </div>
       )}
@@ -193,14 +194,14 @@ export default function ProjectAccountsPanel({ projectId, services, onAddService
           {insights.state === 'ok' && !d && <div className="pacc-hint">За цей період даних немає.</div>}
           {insights.state === 'ok' && d && (
             <div className="pacc-metrics">
-              <div className="pacc-metric"><span>Витрати</span><b>{formatMoney(d.spend, current.currency)}</b></div>
-              <div className="pacc-metric"><span>Покази</span><b>{fmtNum(d.impressions)}</b></div>
-              <div className="pacc-metric"><span>Кліки</span><b>{fmtNum(d.clicks)}</b></div>
-              <div className="pacc-metric"><span>CTR</span><b>{d.ctr_pct == null ? '—' : d.ctr_pct + '%'}</b></div>
-              <div className="pacc-metric"><span>CPC</span><b>{formatMoney(d.cpc, current.currency)}</b></div>
-              <div className="pacc-metric"><span>{d.resultsLabel}</span><b>{fmtNum(d.results)}</b></div>
-              <div className="pacc-metric"><span>Виручка</span><b>{formatMoney(d.revenue, current.currency)}</b></div>
-              <div className="pacc-metric"><span>ROAS</span><b>{d.roas == null ? '—' : d.roas + 'x'}</b></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.wallet}</svg></i><div><span>Витрати</span><b>{formatMoney(d.spend, current.currency)}</b></div></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.eye}</svg></i><div><span>Покази</span><b>{fmtNum(d.impressions)}</b></div></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.click}</svg></i><div><span>Кліки</span><b>{fmtNum(d.clicks)}</b></div></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.pct}</svg></i><div><span>CTR</span><b>{d.ctr_pct == null ? '—' : d.ctr_pct + '%'}</b></div></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.coin}</svg></i><div><span>CPC</span><b>{formatMoney(d.cpc, current.currency)}</b></div></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.cart}</svg></i><div><span>{d.resultsLabel}</span><b>{fmtNum(d.results)}</b></div></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.wallet}</svg></i><div><span>Виручка</span><b>{formatMoney(d.revenue, current.currency)}</b></div></div>
+              <div className="pacc-metric"><i><svg viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS.roas}</svg></i><div><span>ROAS</span><b>{d.roas == null ? '—' : d.roas + 'x'}</b></div></div>
             </div>
           )}
 

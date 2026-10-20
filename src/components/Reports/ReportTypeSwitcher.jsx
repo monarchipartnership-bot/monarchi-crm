@@ -1,35 +1,31 @@
 import { Link, useLocation } from 'react-router-dom';
-import { SECTION_ICONS, CHANNEL_ICONS } from '../../lib/reportIcons';
+import { SI } from '../Sidebar/sidebarIcons';
 
-// Compare's own icon (mirrors Sidebar/icons.js's IC.compare shape) without
-// its fixed inline color — this badge needs the icon to read as plain
-// white on top of its own gradient, same as every other "our style" badge.
-const COMPARE_ICON = '<svg viewBox="0 0 24 24"><path d="M7 7h11"/><path d="m15 4 3 3-3 3"/><path d="M17 17H6"/><path d="m9 14-3 3 3 3"/></svg>';
-
-// Same 5 gradient pairs as DealDetailModal.jsx's SectionHead sections —
-// reused rather than inventing a new palette, one distinct color per report
-// type so the row reads at a glance.
+// The report-type list of the Reports Manager in Hub style: the approved centered list of ring medallions
+// (3D page icon in the ring, plum capsule on the current one). Pinned above every report page; Daily Report is
+// the section's landing page, so switching type has to stay reachable from wherever you land.
 const REPORT_TYPES = [
-  { key: 'daily', label: 'Daily Report', to: '/reports/daily', icon: CHANNEL_ICONS.con, gradient: 'linear-gradient(135deg, #A78BFA, #7C3AED)' },
-  { key: 'weekly', label: 'Weekly Report', to: '/reports/weekly', icon: SECTION_ICONS['Тренди за місяцями'], gradient: 'linear-gradient(135deg, #60A5FA, #2563EB)' },
-  { key: 'monthly', label: 'Monthly Report', to: '/reports/monthly', icon: SECTION_ICONS['Місяці'], gradient: 'linear-gradient(135deg, #2DD4BF, #0D9488)' },
-  { key: 'annual', label: 'Annual Report', to: '/reports/annual', icon: SECTION_ICONS['Річні підсумки'], gradient: 'linear-gradient(135deg, #F472B6, #DB2777)' },
-  { key: 'compare', label: 'Compare', to: '/reports/compare', icon: COMPARE_ICON, gradient: 'linear-gradient(135deg, #94A3B8, #475569)' },
+  { key: 'daily', label: 'Daily Report', to: '/reports/daily', img: SI.dailyReport },
+  { key: 'weekly', label: 'Weekly Report', to: '/reports/weekly', img: SI.weeklyReport },
+  { key: 'monthly', label: 'Monthly Report', to: '/reports/monthly', img: SI.monthlyReport },
+  { key: 'annual', label: 'Annual Report', to: '/reports/annual', img: SI.reportsManager },
+  { key: 'compare', label: 'Compare', to: '/reports/compare', img: null },
 ];
 
-// Pinned above every report page's own hero — Daily Report now doubles as
-// the section's landing page (was a separate ReportsHub.jsx grid before),
-// so switching report type has to stay reachable from wherever you land.
 export default function ReportTypeSwitcher() {
   const { pathname } = useLocation();
   return (
-    <div className="report-type-switcher">
+    <nav className="report-type-switcher rpt-switch" aria-label="Тип звіту">
       {REPORT_TYPES.map((r) => (
-        <Link key={r.key} to={r.to} className={'report-type-card' + (pathname === r.to ? ' active' : '')}>
-          <span className="report-type-card-icon" style={{ background: r.gradient }} dangerouslySetInnerHTML={{ __html: r.icon }} />
+        <Link key={r.key} to={r.to} className={'report-type-card rpt-sw' + (pathname === r.to ? ' active' : '')} aria-current={pathname === r.to ? 'page' : undefined}>
+          <span className="hub-ring">
+            {r.img
+              ? <span className="hub-tile"><img src={r.img} alt="" draggable="false" /></span>
+              : <span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11" /><path d="m15 4 3 3-3 3" /><path d="M17 17H6" /><path d="m9 14-3 3 3 3" /></svg></span>}
+          </span>
           <span className="report-type-card-label">{r.label}</span>
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }

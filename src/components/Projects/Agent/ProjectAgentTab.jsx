@@ -14,6 +14,7 @@ import { nextScheduled } from '../../../lib/agentSchedule';
 import { fetchAllProfiles, profileLabel } from '../../../lib/api/profile';
 import { fetchTgChats, fetchTgTopics } from '../../../lib/api/siteLeads';
 
+import { HubTitle } from '../hubIcons';
 // «Запустити зараз» makes a draft report on request; with the switch on, the scheduler (cron, api/agent-tick.js)
 // also starts the reports by the schedule from the settings. Keep false only if the cron is turned off.
 export const AGENT_SCHEDULE_READY = true;
@@ -267,13 +268,13 @@ export default function ProjectAgentTab({ projectId }) {
         <section className="pag-card pag-settings">
           <div className="pag-card-head">
             <div>
-              <div className="stitle">Налаштування агента</div>
+              <HubTitle icon="edit">Налаштування агента</HubTitle>
               <div className="pacc-hint">Що агент робить, коли і для кого. Зміни діють після збереження.</div>
             </div>
             <div className="pag-card-actions">
               {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
-              {dirty && <button type="button" className="btn" onClick={() => setForm({ ...DEFAULT_AGENT_CONFIG, ...(agent.config || {}) })} disabled={busy === 'save'}>Скасувати</button>}
-              <button type="button" className="btn btn-p" onClick={save} disabled={!dirty || busy === 'save'}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
+              {dirty && <button type="button" className="btn pw-btn--bad" onClick={() => setForm({ ...DEFAULT_AGENT_CONFIG, ...(agent.config || {}) })} disabled={busy === 'save'}>Скасувати</button>}
+              <button type="button" className="btn pw-btn--ok" onClick={save} disabled={!dirty || busy === 'save'}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
             </div>
           </div>
 
@@ -389,7 +390,7 @@ export default function ProjectAgentTab({ projectId }) {
               <b>Відключити агента</b>
               <div className="pacc-hint">Налаштування буде видалено, історія дій залишиться.</div>
             </div>
-            <button type="button" className="btn cg-danger" onClick={disconnect} disabled={busy === 'disconnect'}>Відключити</button>
+            <button type="button" className="btn pw-btn--bad" onClick={disconnect} disabled={busy === 'disconnect'}>Відключити</button>
           </div>
         </section>
       )}
@@ -397,7 +398,7 @@ export default function ProjectAgentTab({ projectId }) {
       {/* History */}
       <section className="pag-card">
         <div className="pag-card-head">
-          <div className="stitle">Історія дій</div>
+          <HubTitle icon="clock">Історія дій</HubTitle>
           <div className="pag-card-actions">
             <div className="proj-tabs" role="tablist" aria-label="Фільтр історії">
               {[['all', 'Усе'], ['problem', 'Проблеми'], ['agent', 'Агент'], ['user', 'Менеджери']].map(([k, l]) => (

@@ -88,8 +88,8 @@ export default function CompareModal({ current, presets, value, offer, onApply, 
           )}
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-p" onClick={apply}>{mode === 'none' ? 'Без порівняння' : 'Порівняти'}</button>
-          <button type="button" className="btn" onClick={close}>{offer ? 'Пропустити' : 'Скасувати'}</button>
+          <button type="button" className="btn pw-btn--ok" onClick={apply}>{mode === 'none' ? 'Без порівняння' : 'Порівняти'}</button>
+          <button type="button" className="btn pw-btn--bad" onClick={close}>{offer ? 'Пропустити' : 'Скасувати'}</button>
         </div>
       </div>
     </div>

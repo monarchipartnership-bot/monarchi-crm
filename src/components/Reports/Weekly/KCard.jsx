@@ -17,7 +17,7 @@ export function MetricKCard({ metric, fields, onChange, readOnly, history, delta
   return (
     <div className="kcard">
       <div className="kcard-label">
-        <span className="kcard-icon" dangerouslySetInnerHTML={{ __html: metricIcon(metric.label) }} />
+        <span className={'kcard-icon' + (ach.barPct >= 100 ? ' ok' : ach.barPct < 50 ? ' low' : '')} style={{ '--p': ach.barPct }} dangerouslySetInnerHTML={{ __html: metricIcon(metric.label) }} />
         {metric.label}
       </div>
       <div className="kcard-main">
@@ -54,7 +54,7 @@ export function RatioKCard({ ratio, fields, onChange, readOnly, history, delta }
   return (
     <div className="kcard">
       <div className="kcard-label">
-        <span className="kcard-icon" dangerouslySetInnerHTML={{ __html: metricIcon(ratio.label) }} />
+        <span className={'kcard-icon' + (ach.barPct >= 100 ? ' ok' : ach.barPct < 50 ? ' low' : '')} style={{ '--p': ach.barPct }} dangerouslySetInnerHTML={{ __html: metricIcon(ratio.label) }} />
         {ratio.label}
       </div>
       <div className="kcard-main">

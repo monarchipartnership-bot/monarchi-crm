@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import LineChart, { CHART_COLORS } from './LineChart';
+import { HubLine as LineChart, HUB_COLORS as CHART_COLORS } from '../HubCharts';
 import DeltaBadge from '../../Automation/DeltaBadge';
 import { moneyFmt } from '../../../lib/weeklyLogic';
 
@@ -64,9 +64,9 @@ export default function TrendBlock({ title, series, unit = 'count' }) {
     });
   }
 
-  function handleDownload() {
+  async function handleDownload() {
     setMenuOpen(false);
-    const dataUrl = chartRef.current?.toBase64Image();
+    const dataUrl = await chartRef.current?.toBase64Image();
     if (!dataUrl) return;
     const link = document.createElement('a');
     link.href = dataUrl;

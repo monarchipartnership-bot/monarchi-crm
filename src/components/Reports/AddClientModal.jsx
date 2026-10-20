@@ -77,11 +77,11 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
   const missingUpworkChannel = needsUpworkChannel({ platform, upworkChannel });
 
   return (
-    <div className="tmodal-overlay daily-report-design" data-dd="plum" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tmodal-box" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="add-client-title">
+    <div className="tmodal-overlay arm-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="tmodal-box arm-dialog" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="add-client-title">
         <div className="tmodal-head">
           <div className="tmodal-head-left">
-            <span className="tmodal-head-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} />
+            <span className="hub-ring arm-md"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: SECTION_ICONS['Клієнти'] }} /></span>
             <div className="tmodal-head-text">
               <h3 id="add-client-title">{initial ? 'Редагувати клієнта' : 'Додати клієнта'}</h3>
               <p>{initial ? 'Оновіть інформацію про клієнта' : 'Додайте нового клієнта, щоб почати роботу'}</p>
@@ -92,7 +92,7 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
         <div className="tmodal-body">
           <div className="modal-field">
             <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #60A5FA, #2563EB)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
+              <span className="modal-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
               <div>
                 <label>Платформа</label>
                 <p>Оберіть платформу, звідки прийшов клієнт</p>
@@ -105,7 +105,7 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
 
           <div className="modal-field">
             <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
+              <span className="modal-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
               <div>
                 <label>Статус</label>
                 <p>Встановіть поточний статус клієнта</p>
@@ -119,7 +119,7 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
           {platform === 'Upwork' && (
             <div className="modal-field">
               <div className="modal-field-head">
-                <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #60A5FA, #2563EB)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
+                <span className="modal-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
                 <div>
                   <label>Канал Upwork *</label>
                   <p>Обов'язково для лідів з Upwork — за ним рахуються тижневі та місячні цифри</p>
@@ -133,7 +133,7 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
 
           <div className="modal-field">
             <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
+              <span className="modal-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
               <div>
                 <label>Ім'я клієнта *</label>
                 <p>Назва компанії або ім'я замовника</p>
@@ -157,7 +157,7 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
 
           <div className="modal-field">
             <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
+              <span className="modal-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.source }} />
               <div>
                 <label>Канал (Source)</label>
                 <p>Звідки прийшов лід; потрібного каналу немає — додайте його в списку</p>
@@ -170,7 +170,7 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
 
           <div className="modal-field">
             <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #F472B6, #DB2777)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.title }} />
+              <span className="modal-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.title }} />
               <div>
                 <label>Назва</label>
                 <p>Назва посту або проєкту</p>
@@ -181,9 +181,9 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
             </div>
           </div>
 
-          <div className="modal-field">
+          <div className="modal-field modal-field--wide">
             <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #94A3B8, #475569)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.document }} />
+              <span className="modal-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.document }} />
               <div>
                 <label>Інформація</label>
                 <p>Додайте деталі або наступну дію</p>
@@ -195,10 +195,10 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
           </div>
         </div>
         <div className="tmodal-foot">
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="btn pw-btn--bad" onClick={onClose}>
             Скасувати
           </button>
-          <button type="button" className="btn btn-p" onClick={handleSave} disabled={!name.trim() || missingUpworkChannel} title={missingUpworkChannel ? 'Оберіть канал Upwork' : undefined}>
+          <button type="button" className="btn pw-btn--ok" onClick={handleSave} disabled={!name.trim() || missingUpworkChannel} title={missingUpworkChannel ? 'Оберіть канал Upwork' : undefined}>
             {initial ? <ActionIcon name="save" size={18} /> : <ActionIcon name="create" size={18} />} {initial ? 'Зберегти' : 'Додати'}
           </button>
         </div>

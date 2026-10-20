@@ -5,12 +5,9 @@ import MonthlyFinanceSection from '../../../components/Reports/Monthly/MonthlyFi
 import MonthGrid from '../../../components/Reports/Annual/MonthGrid';
 import MonthDetailModal from '../../../components/Reports/Annual/MonthDetailModal';
 import TrendBlock from '../../../components/Reports/Annual/TrendBlock';
-import LineChart from '../../../components/Reports/Annual/LineChart';
-import FunnelChart from '../../../components/Reports/Annual/FunnelChart';
+import { HubLine as LineChart, HubFunnel as FunnelChart, HubBars as BarChart, HubDonut as DonutChart } from '../../../components/Reports/HubCharts';
 import ChannelEfficiencyCard from '../../../components/Reports/Annual/ChannelEfficiencyCard';
 import ChannelDetailTable from '../../../components/Reports/Annual/ChannelDetailTable';
-import BarChart from '../../../components/Reports/Weekly/BarChart';
-import DonutChart from '../../../components/Automation/DonutChart';
 import Sparkline from '../../../components/Automation/Sparkline';
 import DeltaBadge from '../../../components/Automation/DeltaBadge';
 import { fetchMonthsForYear, saveAnnualReport } from '../../../lib/api/annualReports';
@@ -31,11 +28,13 @@ import '../../../styles/reportPage.css';
 import '../../../styles/comparePage.css';
 import '../../../styles/annualPage.css';
 import '../../../styles/automationDashboard.css';
+import '../../../styles/ddHub.css';
+import '../../../styles/reportsHub.css';
 import '../../../styles/automationTasksPage.css';
 
 const WALLET_ICON = '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14" r="1.2"/></svg>';
 const SHIELD_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"/></svg>';
-const DONUT_COLORS = ['#6B2FA0', '#1E9E5D', '#B8860B', '#2F6FED', '#D14343'];
+const DONUT_COLORS = ['#8E1E8E', '#12A144', '#E08A06', '#2F6FED', '#D92D2D'];
 
 // Same "Upwork" (CHANNELS) / "Інші платформи" tab split already used in
 // Weekly/Monthly Report — only LinkedIn has a real data model wired up so
@@ -158,7 +157,7 @@ export default function AnnualCreate() {
   const contractsPerMonth = monthValuesFor(monthsByIndex, (mi, m) => channels.reduce((s, c) => s + (monthSumVal(mi, m, contractsId(c)) || 0), 0));
 
   return (
-    <div className="report-page annual-report-page" ref={pageRef}>
+    <div className="report-page annual-report-page rpt-hub" data-dd="hub" ref={pageRef}>
       {!capturing && <ReportTypeSwitcher />}
       <section className="rpt-hero">
         <div className="rpt-hero-top-row">

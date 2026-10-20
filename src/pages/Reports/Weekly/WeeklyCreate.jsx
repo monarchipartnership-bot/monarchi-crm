@@ -31,6 +31,8 @@ import redditLogo from '../../../assets/logos/reddit.png';
 import '../../../styles/reportPage.css';
 import '../../../styles/automationTasksPage.css';
 import '../../../styles/automationDashboard.css';
+import '../../../styles/ddHub.css';
+import '../../../styles/reportsHub.css';
 
 // "Інші платформи" tabs — every CLIENT_PLATFORMS entry except Upwork (which
 // already has its own dedicated tabbed section above). Only LinkedIn has a
@@ -374,7 +376,7 @@ export default function WeeklyCreate() {
   const activeChannelData = CHANNELS.find((c) => c.key === activeChannel) || CHANNELS[0];
 
   return (
-    <div className="report-page weekly-report-page" ref={pageRef}>
+    <div className="report-page weekly-report-page rpt-hub" data-dd="hub" ref={pageRef}>
       {!capturing && <ReportTypeSwitcher />}
       <section className="rpt-hero">
         <div className="rpt-hero-top-row">

@@ -117,8 +117,8 @@ export default function CampaignGroupsModal({ projectId, platform, groups, accou
           {view === 'list' && <button type="button" className="btn" onClick={onClose}>Закрити</button>}
           {view === 'form' && (
             <>
-              <button type="button" className="btn" onClick={() => (startEdit ? onClose() : (setView('list'), setEditId(null), setError('')))}>Скасувати</button>
-              <button type="button" className="btn btn-p" disabled={saving || !name.trim() || !picked.size} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти групу'}</button>
+              <button type="button" className="btn pw-btn--bad" onClick={() => (startEdit ? onClose() : (setView('list'), setEditId(null), setError('')))}>Скасувати</button>
+              <button type="button" className="btn pw-btn--ok" disabled={saving || !name.trim() || !picked.size} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти групу'}</button>
             </>
           )}
         </div>

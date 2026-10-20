@@ -9,8 +9,11 @@ import { fetchMonthlyReportByStart } from '../../lib/api/monthlyReports';
 import { computeWeeksForMonth, defaultWeekIndexFor, fmtDY, isoDate, MONTH_NAMES } from '../../lib/dateHelpers';
 import { CHANNELS, LI_CHANNEL, COST_ITEMS, INCOME_FIELDS, gv, pctVal, costLine, financeCalc, numFmt, pctFmt, moneyFmt, fp } from '../../lib/weeklyLogic';
 import { exportJPEG } from '../../lib/exportHelpers';
+import { SI } from '../../components/Sidebar/sidebarIcons';
 import '../../styles/reportPage.css';
 import '../../styles/comparePage.css';
+import '../../styles/ddHub.css';
+import '../../styles/reportsHub.css';
 
 const MAX_SLOTS = 6;
 
@@ -367,7 +370,7 @@ export default function ReportsCompare() {
   }
 
   return (
-    <div className="report-page reports-compare-page" ref={pageRef}>
+    <div className="report-page reports-compare-page rpt-hub" data-dd="hub" ref={pageRef}>
       {!exportingJPEG && <ReportTypeSwitcher />}
       <div className="page-actions">
         <button type="button" className="btn" onClick={() => (reportType ? setReportType(null) : navigate(-1))}>
@@ -389,12 +392,14 @@ export default function ReportsCompare() {
       {!reportType ? (
         <div className="compare-type-grid">
           <button type="button" className="compare-type-card" onClick={() => setReportType('weekly')}>
-            <div className="ctc-title">Weekly Report</div>
-            <div className="ctc-desc">Порівняти до {MAX_SLOTS} збережених тижнів.</div>
+            <span className="hub-ring"><span className="hub-tile"><img src={SI.weeklyReport} alt="" draggable="false" /></span></span>
+            <span><div className="ctc-title">Weekly Report</div>
+            <div className="ctc-desc">Порівняти до {MAX_SLOTS} збережених тижнів.</div></span>
           </button>
           <button type="button" className="compare-type-card" onClick={() => setReportType('monthly')}>
-            <div className="ctc-title">Monthly Report</div>
-            <div className="ctc-desc">Порівняти до {MAX_SLOTS} збережених місяців.</div>
+            <span className="hub-ring"><span className="hub-tile"><img src={SI.monthlyReport} alt="" draggable="false" /></span></span>
+            <span><div className="ctc-title">Monthly Report</div>
+            <div className="ctc-desc">Порівняти до {MAX_SLOTS} збережених місяців.</div></span>
           </button>
         </div>
       ) : reportType === 'weekly' ? (

@@ -1,4 +1,4 @@
-import { STATUS_LABEL, fmtIsoDate } from '../../lib/projectConstants';
+import { STATUS_LABEL, fmtIsoDate, periodShare } from '../../lib/projectConstants';
 import { PAGE_ICONS, PLATFORM_ICONS, SERVICE_SYMBOL } from '../../lib/pageIcons';
 
 const I = {
@@ -21,17 +21,20 @@ export default function ProjectCard({ project: p, onClick }) {
 
   return (
     <div
-      className="proj-card" role="link" tabIndex={0}
+      className={'proj-card st-' + p.status} role="link" tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
     >
       <div className="proj-card-top">
-        <span className="proj-card-icon"><img src={PAGE_ICONS['page.projects'].src} alt="" width="56" height="56" draggable="false" /></span>
+        <span className="proj-card-ring" style={{ '--p': periodShare(p) }}>
+          <span className="proj-card-icon"><img src={PAGE_ICONS['page.projects'].src} alt="" width="56" height="56" draggable="false" /></span>
+        </span>
         <div className="proj-card-title">
           <div className="proj-name">{p.name}</div>
           <span className={'status-pill ' + p.status}><i aria-hidden="true" />{STATUS_LABEL[p.status]}</span>
         </div>
       </div>
+      <div className="proj-card-body">
       {meta.length > 0 && (
         <div className="proj-meta">
           {meta.map((m) => (
@@ -58,6 +61,7 @@ export default function ProjectCard({ project: p, onClick }) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

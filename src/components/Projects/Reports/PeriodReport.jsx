@@ -23,6 +23,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import '../../../styles/projectReports.css';
 import Select from '../../common/Select';
 
+import { HubTitle } from '../hubIcons';
 const TEXT_BLOCKS = [
   { key: 'whatWasDone', title: 'What was done' },
   { key: 'conclusion', title: 'Conclusion' },
@@ -270,7 +271,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     <div className="prep-wrap">
       <div className={'prep-top' + (isTotal ? ' prep-top--one' : '')}>
       <section className="report-section prep-box">
-        <div className="prep-box-title">Період звіту</div>
+        <HubTitle icon="cal" className="prep-box-title">Період звіту</HubTitle>
         {periodType === 'weekly' ? (
           <WeekPicker year={picker.year} month={picker.month} weekIndex={picker.weekIndex} onChange={changePicker} years={yearOptions()} />
         ) : (
@@ -300,7 +301,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
 
       {!isTotal && (
         <section className="report-section prep-box">
-          <div className="prep-box-title">Що входить у звіт</div>
+          <HubTitle icon="layers" className="prep-box-title">Що входить у звіт</HubTitle>
           {platData && Object.keys(platData).length ? (
             <>
               <ContentOptions
@@ -358,13 +359,13 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       )}
 
       <section className="report-section prep-box prep-status-box">
-        <div className="prep-box-title">Статус і збереження</div>
+        <HubTitle icon="check" className="prep-box-title">Статус і збереження</HubTitle>
         <div className="prep-save-row">
           <div className="pk-field">
             <label>Статус</label>
             <Select value={status} onChange={(v) => { setStatus(v); setDirty(true); }} ariaLabel="Статус" options={Object.entries(STATUS).map(([v, l]) => ({ value: v, label: l }))} />
           </div>
-          <button type="button" className="btn btn-p" onClick={() => save()} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)}>
+          <button type="button" className="btn pw-btn--ok" onClick={() => save()} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)}>
             {busy === 'save' ? '...' : 'Зберегти звіт'}
           </button>
           <button
@@ -396,7 +397,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       )}
 
       <section className="report-section">
-        <div className="stitle">Текст звіту (англійською)</div>
+        <HubTitle icon="note">Текст звіту (англійською)</HubTitle>
         <div className="prep-texts">
           {TEXT_BLOCKS.map((b) => (
             <div className="ov-field-box" key={b.key}>
@@ -437,7 +438,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       </section>
 
       <section className="report-section">
-        <div className="stitle">Збережені звіти</div>
+        <HubTitle icon="file">Збережені звіти</HubTitle>
         {saved.length === 0 ? (
           <div className="empty-hint">Збережених звітів ще немає.</div>
         ) : (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import ClientNameField from './ClientNameField';
 import { STATUSES } from '../../lib/clientStatus';
@@ -36,6 +36,17 @@ const FIELD_ICONS = {
 // this one report — see reportClientSync.js.
 export default function EditableClientList({ items, onChange, onAdd, onRemove, capturing, iconBoxed = false }) {
   const [directory, setDirectory] = useState([]);
+  // Accordion: a row is a summary card, a click opens its fields; a freshly added row opens at once, the JPEG export shows all.
+  const [open, setOpen] = useState(() => new Set());
+  const prevCount = useRef(items.length);
+  useEffect(() => {
+    if (items.length > prevCount.current) {
+      const last = items[items.length - 1];
+      if (last) setOpen((cur) => new Set(cur).add(last.id));
+    }
+    prevCount.current = items.length;
+  }, [items]);
+  const toggle = (id) => setOpen((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   useEffect(() => { fetchClientDirectory().then(setDirectory); }, []);
 
@@ -46,13 +57,24 @@ export default function EditableClientList({ items, onChange, onAdd, onRemove, c
   return (
     <>
       <div className="items">
-        {items.map((item) => (
-          <div className="item-box" key={item.id}>
-            {!capturing && (
-              <button type="button" className="del-btn" title="Видалити" onClick={() => onRemove(item.id)}>&times;</button>
-            )}
-            {item.fromDaily && <span className="cf-daily-tag">&#8634; Із Daily Report</span>}
-            <div className={iconBoxed ? 'client-fields client-fields-boxed' : 'client-fields'}>
+        {items.map((item) => {
+          const isOpen = capturing || open.has(item.id);
+          return (
+          <div className={'item-box ecl' + (isOpen ? ' open' : '')} key={item.id}>
+            <div className="ecl-top">
+              <button type="button" className="ecl-head" aria-expanded={isOpen} onClick={() => toggle(item.id)}>
+                <span className="ecl-ava">{(item.name || '?').trim().charAt(0).toUpperCase() || '?'}</span>
+                <span className="ecl-name"><b>{item.name || 'Новий клієнт'}</b><small>{item.title || item.platform || '—'}</small></span>
+                {item.fromDaily && <span className="cf-daily-tag">&#8634; Daily</span>}
+                <span className="ecl-chip">{item.leadType}</span>
+                <span className="ecl-plat">{item.platform}</span>
+                <span className="ecl-cv"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></span>
+              </button>
+              {!capturing && (
+                <button type="button" className="del-btn" title="Видалити" onClick={() => onRemove(item.id)}>&times;</button>
+              )}
+            </div>
+            {isOpen && <div className={iconBoxed ? 'client-fields client-fields-boxed' : 'client-fields'}>
               <ClientField iconBoxed={iconBoxed} icon={FIELD_ICONS.platform} label="Платформа">
                 {capturing ? (
                   <div className="capture-text">{item.platform}</div>
@@ -121,9 +143,10 @@ export default function EditableClientList({ items, onChange, onAdd, onRemove, c
                   capturing={capturing}
                 />
               </ClientField>
-            </div>
+            </div>}
           </div>
-        ))}
+          );
+        })}
       </div>
       {!items.length && <div className="empty-hint">Немає клієнтів &mdash; додайте першого нижче</div>}
       {!capturing && (

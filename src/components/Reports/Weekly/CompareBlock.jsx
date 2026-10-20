@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import BarChart from './BarChart';
+import { HubBars as BarChart } from '../HubCharts';
 import { bestFlags } from '../../../lib/weeklyLogic';
 
 // One collapsible comparison block: a table (row per metric, column per

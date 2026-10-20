@@ -6,6 +6,7 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
 import { accountPlatforms, TOTAL_TAB } from '../../../lib/reportScope';
 import { platformInfo } from '../../../lib/adAccounts';
+import { RibbonMark } from '../hubIcons';
 import '../../../styles/projectReports.css';
 
 // «Показники за період», «Тижневий звіт» and «Місячний звіт» are split by ad platform: a row of tabs, one per platform linked to the
@@ -63,7 +64,7 @@ export default function PlatformReports({ projectId, mode }) {
                 key={t.key} ref={(n) => { tabRefs.current[t.key] = n; }} type="button" role="tab" aria-selected={t.key === tab} tabIndex={t.key === tab ? 0 : -1}
                 className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}
               >
-                {t.label}
+                <RibbonMark platform={t.key === TOTAL_TAB ? null : t.key} />{t.label}
               </button>
             ))}
           </div>

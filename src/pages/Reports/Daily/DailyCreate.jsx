@@ -33,7 +33,8 @@ import taskManagerIcon from '../../../assets/sidebar/task-manager.webp';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import Select from '../../../components/common/Select';
 import '../../../styles/reportPage.css';
-import '../../../styles/dailyReportDesign.css';
+import '../../../styles/ddHub.css';
+import '../../../styles/reportsHub.css';
 import '../../../styles/automationTasksPage.css';
 import '../../../styles/automationDashboard.css';
 import '../../../styles/dealsBoard.css';
@@ -48,14 +49,14 @@ const chipStyle = (color) => ({ ...stagePillStyle(color), '--chip': color });
 function ProgressRing({ stats }) {
   const R = 48, C = 2 * Math.PI * R;
   const arcs = [
-    { n: stats.done, color: '#1E9E5D' },
-    { n: stats.over, color: '#D14343' },
+    { n: stats.done, color: '#12A144' },
+    { n: stats.over, color: '#D92D2D' },
   ];
   let offset = 0;
   return (
     <div className="progress-ring" role="img" aria-label={`Заповненість місяця: ${stats.pct}%`}>
       <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="#D7CEDE" strokeWidth="11" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke="#EBD0F2" strokeWidth="11" />
         {stats.total > 0 && arcs.map((a, i) => {
           if (!a.n) return null;
           const len = (a.n / stats.total) * C;
@@ -419,7 +420,7 @@ export default function DailyCreate() {
   );
 
   return (
-    <div className="report-page daily-report-page daily-report-design" data-dd="plum" ref={pageRef}>
+    <div className="report-page daily-report-page rpt-hub" data-dd="hub" ref={pageRef}>
       {!capturing && <ReportTypeSwitcher />}
       <div className="report-grid">
       <div className="main-sheet">

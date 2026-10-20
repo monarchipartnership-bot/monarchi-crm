@@ -6,7 +6,7 @@ import ProjectAccountsPanel from '../../components/Projects/ProjectAccountsPanel
 import ClientPicker from '../../components/Clients/ClientPicker';
 import { clientFullName } from '../../lib/clientName';
 import { fetchProjectById, updateProject, deleteProject } from '../../lib/api/projects';
-import { STATUS_LABEL, SERVICES, fmtIsoDate } from '../../lib/projectConstants';
+import { STATUS_LABEL, SERVICES, fmtIsoDate, periodShare } from '../../lib/projectConstants';
 import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload, fmtCost } from '../../lib/projectFields';
@@ -26,10 +26,12 @@ import '@fontsource/onest/700.css';
 import '../../styles/projectWorkspace.css';
 import Select from '../../components/common/Select';
 import DatePicker from '../../components/common/DatePicker';
+import '../../styles/ddHub.css';
+import '../../styles/projectHub.css'; // Hub style, last so it wins over the older workspace styles
 
 const TABS = [
   { key: 'overview', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src },
-  { key: 'period', label: 'Показники за період', icon: null },
+  { key: 'period', label: 'Показники за період', icon: null, line: <path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6" /> },
   { key: 'weekly', label: 'Тижневий звіт', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'monthly', label: 'Місячний звіт', icon: PAGE_ICONS['page.monthly-report'].src },
   { key: 'decks', label: 'Архів звітів', icon: PAGE_ICONS['page.clients-report'].src },
@@ -423,8 +425,11 @@ export default function ProjectDetail() {
   const infoDirty = infoValue !== (project.additional_info || '');
 
   return (
-    <div className="report-page project-detail-page pw" data-dd="plum">
+    <div className="report-page project-detail-page pw" data-dd="hub">
       <div className="pd-header pw-head">
+        <span className={'hub-ring hub-ring--lg st-' + project.status} style={{ '--p': periodShare(project) }}>
+          <span className="hub-tile"><img src={PAGE_ICONS['page.projects'].src} alt="" draggable="false" /></span>
+        </span>
         <div className="pd-header-meta">
           <div className="pd-title-row">
             <input
@@ -434,7 +439,6 @@ export default function ProjectDetail() {
               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setNameValue(project.name || ''); e.currentTarget.blur(); } }}
               placeholder="Назва проєкту" aria-label="Назва проєкту"
             />
-            <button type="button" className="pw-btn pd-back" onClick={() => navigate('/projects')}><ActionIcon name="back" size={18} /> Назад</button>
           </div>
           <div className="pd-header-chips">
             {linkedAccounts.map((a) => {
@@ -458,6 +462,7 @@ export default function ProjectDetail() {
             )}
           </div>
         </div>
+        <button type="button" className="pw-btn pd-back" onClick={() => navigate('/projects')}><ActionIcon name="back" size={18} /> Назад</button>
       </div>
 
       <div className="pw-tabs" role="tablist" aria-label="Розділи проєкту" onKeyDown={onTabKey}>
@@ -467,7 +472,11 @@ export default function ProjectDetail() {
             type="button" role="tab" aria-selected={tab === t.key} aria-controls="pw-panel" tabIndex={tab === t.key ? 0 : -1}
             className={'pw-tab' + (tab === t.key ? ' on' : '')} onClick={() => setTab(t.key)}
           >
-            {t.icon && <img src={t.icon} alt="" aria-hidden="true" draggable="false" />}
+            <span className="hub-ring">
+              {t.icon
+                ? <span className="hub-tile"><img src={t.icon} alt="" aria-hidden="true" draggable="false" /></span>
+                : <span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true">{t.line}</svg></span>}
+            </span>
             <span>{t.label}</span>
           </button>
         ))}
@@ -480,13 +489,13 @@ export default function ProjectDetail() {
 
           <section className="report-section pw-card">
             <div className="ov-section-head">
-              <div className="stitle">Про проєкт</div>
+              <div className="stitle hub-title"><span className="hub-ring hub-ring--sm"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM6 6h12v14H6z" /><path d="M9 11h6M9 15h4" /></svg></span></span>Про проєкт</div>
               {!editMode ? (
                 <button type="button" className="pw-btn" onClick={startEdit}><ActionIcon name="edit" size={18} /> Редагувати</button>
               ) : (
                 <div className="ov-edit-actions">
-                  <button type="button" className="pw-btn pw-btn--primary" onClick={saveEdit} disabled={savingEdit}><ActionIcon name="save" size={18} /> {savingEdit ? '...' : 'Зберегти'}</button>
-                  <button type="button" className="pw-btn" onClick={cancelEdit}>Скасувати</button>
+                  <button type="button" className="pw-btn pw-btn--ok" onClick={saveEdit} disabled={savingEdit}><ActionIcon name="save" size={18} /> {savingEdit ? '...' : 'Зберегти'}</button>
+                  <button type="button" className="pw-btn pw-btn--bad" onClick={cancelEdit}>Скасувати</button>
                 </div>
               )}
             </div>
@@ -509,7 +518,7 @@ export default function ProjectDetail() {
               <div className="ov-field-label"><FieldIcon name="notes" />Особливості роботи з клієнтом</div>
               <AutoResizeTextarea value={notesValue} onChange={setNotesValue} placeholder="Нотатки по клієнту..." />
               {notesDirty && (
-                <button type="button" className="btn btn-p ov-notes-save" onClick={saveNotes} disabled={notesSaving}>
+                <button type="button" className="pw-btn pw-btn--ok ov-notes-save" onClick={saveNotes} disabled={notesSaving}>
                   {notesSaving ? '...' : 'Зберегти'}
                 </button>
               )}
@@ -521,7 +530,7 @@ export default function ProjectDetail() {
               <div className="ov-field-label"><FieldIcon name="info" />Додаткова інформація</div>
               <AutoResizeTextarea value={infoValue} onChange={setInfoValue} placeholder="Будь-яка додаткова інформація..." />
               {infoDirty && (
-                <button type="button" className="btn btn-p ov-notes-save" onClick={saveInfo} disabled={infoSaving}>
+                <button type="button" className="pw-btn pw-btn--ok ov-notes-save" onClick={saveInfo} disabled={infoSaving}>
                   {infoSaving ? '...' : 'Зберегти'}
                 </button>
               )}

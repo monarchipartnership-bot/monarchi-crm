@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectModal from '../../components/Projects/ProjectModal';
-import ActionIcon from '../../components/common/ActionIcon';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchProjects, createProject } from '../../lib/api/projects';
 import { addProjectAccount, fetchAllProjectAccounts } from '../../lib/api/projectAccounts';
@@ -14,6 +13,7 @@ import '@fontsource/onest/800.css';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
 import '../../styles/projectsFolder.css';
+import '../../styles/ddHub.css';
 
 // First level (folder tabs): where the project runs. Decided by the linked ad accounts, never by
 // the service tags; a project with accounts on both platforms is in both lists.
@@ -22,14 +22,12 @@ const PLATFORM_TABS = [
   { key: 'google', label: 'Google Ads', icon: PLATFORM_ICONS[PLATFORM_SYMBOL.google].src },
   { key: 'meta', label: 'Meta Ads', icon: PLATFORM_ICONS[PLATFORM_SYMBOL.meta].src },
 ];
-// Each platform "polaroid" lies at its own small angle; the open one straightens up.
-const TAB_TILT = [-2, 1.5, -1];
 // Second level: its state. Independent of the platform tab.
 const STATUS_TABS = [
-  { key: 'all', label: 'Всі статуси' },
-  { key: 'active', label: 'Поточні' },
-  { key: 'paused', label: 'На паузі' },
-  { key: 'completed', label: 'Завершені' },
+  { key: 'all', label: 'Всі статуси', icon: <><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></> },
+  { key: 'active', label: 'Поточні', icon: <><circle cx="12" cy="12" r="8.5" /><path d="M10 8.5l5 3.5-5 3.5z" /></> },
+  { key: 'paused', label: 'На паузі', icon: <><circle cx="12" cy="12" r="8.5" /><path d="M10 9v6M14 9v6" /></> },
+  { key: 'completed', label: 'Завершені', icon: <><circle cx="12" cy="12" r="8.5" /><path d="M8.5 12.3l2.6 2.6 4.6-5" /></> },
 ];
 
 export default function Projects() {
@@ -49,6 +47,7 @@ export default function Projects() {
   const [modalOpen, setModalOpen] = useState(Boolean(newForClient));
   const [saving, setSaving] = useState(false);
   const createBtn = useRef(null);
+  const searchRef = useRef(null);
   const tabRefs = useRef({});
 
   async function reload() {
@@ -137,6 +136,7 @@ export default function Projects() {
     tabRefs.current[next]?.focus();
   }
 
+  const noResults = loaded && !loadError && Boolean(term) && !filtered.length;
   const platformLabel = PLATFORM_TABS.find((t) => t.key === platform)?.label;
   const statusLabel = STATUS_TABS.find((t) => t.key === tab)?.label;
   const countText = (n) => (loaded && !loadError ? n.toLocaleString('uk-UA') : '…');
@@ -153,15 +153,17 @@ export default function Projects() {
   return (
     <div className="report-page projects-page folder-design">
       <div className="proj-ptabs" role="tablist" aria-label="Платформа" onKeyDown={onTabKey}>
-        {PLATFORM_TABS.map((t, i) => {
+        {PLATFORM_TABS.map((t) => {
           const on = platform === t.key;
+          // The ring shows this platform's share of all projects (the "all" tab is a full ring).
+          const share = t.key === 'all' || !platformCounts.all ? 100 : Math.round((platformCounts[t.key] / platformCounts.all) * 100);
           return (
             <button
               key={t.key} id={'proj-tab-' + t.key} ref={(n) => { tabRefs.current[t.key] = n; }}
               type="button" role="tab" aria-selected={on} aria-controls="proj-panel" tabIndex={on ? 0 : -1}
-              className={'proj-ptab' + (on ? ' on' : '')} style={{ '--r': TAB_TILT[i % TAB_TILT.length] + 'deg' }} onClick={() => setPlatform(t.key)}
+              className={'proj-ptab' + (on ? ' on' : '')} onClick={() => setPlatform(t.key)}
             >
-              <span className="proj-ptab-photo">
+              <span className="proj-ptab-ring" style={{ '--p': loaded && !loadError ? share : 100 }}>
                 <span className="proj-ptab-ic"><img src={t.icon} alt="" aria-hidden="true" draggable="false" /></span>
                 <span className="cnt" aria-label={loaded && !loadError ? `${platformCounts[t.key]} проєктів` : 'кількість завантажується'}>{countText(platformCounts[t.key])}</span>
               </span>
@@ -173,21 +175,32 @@ export default function Projects() {
 
       <div className="proj-folder-body" id="proj-panel" role="tabpanel" aria-labelledby={'proj-tab-' + platform} aria-busy={!loaded}>
         <div className="proj-toolbar">
-          <div className="proj-search">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" /></svg>
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Пошук за назвою чи клієнтом" aria-label="Пошук за назвою чи клієнтом" />
-          </div>
+          <label className={'proj-search' + (search ? ' has-val' : '') + (noResults ? ' no-res' : '')}>
+            <svg className="proj-search-lp" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" /></svg>
+            <input
+              ref={searchRef} type="text" value={search} placeholder="Пошук за назвою чи клієнтом" aria-label="Пошук за назвою чи клієнтом"
+              onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }}
+            />
+            {term && loaded && !loadError && <span className="proj-search-cnt" aria-label={`Знайдено ${filtered.length}`}>{filtered.length}</span>}
+            {search && (
+              <button type="button" className="proj-search-clr" aria-label="Очистити пошук" onClick={(e) => { e.preventDefault(); setSearch(''); searchRef.current?.focus(); }}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            )}
+          </label>
           <span className="proj-divider" aria-hidden="true" />
           <div className="proj-tabs" role="group" aria-label="Статус">
-            {STATUS_TABS.map((t, i) => (
-              <button key={t.key} type="button" aria-pressed={tab === t.key} className={'proj-tab' + (tab === t.key ? ' on' : '')} style={{ '--r': (i % 2 ? 1 : -1) + 'deg' }} onClick={() => setTab(t.key)}>
-                {t.label} <span className="cnt" aria-label={loaded && !loadError ? `${counts[t.key]}` : ''}>{countText(counts[t.key])}</span>
+            {STATUS_TABS.map((t) => (
+              <button key={t.key} type="button" aria-pressed={tab === t.key} className={'proj-tab' + (tab === t.key ? ' on' : '')} onClick={() => setTab(t.key)}>
+                <svg className="proj-tab-ic" viewBox="0 0 24 24" aria-hidden="true">{t.icon}</svg>
+                {t.label}
+                <span className="proj-tab-n" aria-label={loaded && !loadError ? `${counts[t.key]}` : ''}>{countText(counts[t.key])}</span>
               </button>
             ))}
           </div>
           <div className="tb-sp" />
           <button ref={createBtn} type="button" className="btn btn-p proj-create" onClick={() => setModalOpen(true)}>
-            <ActionIcon name="create" size={22} /> Створити проєкт
+            <svg className="pf-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Створити проєкт
           </button>
         </div>
 

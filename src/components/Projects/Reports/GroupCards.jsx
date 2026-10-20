@@ -31,7 +31,7 @@ export default function GroupRow({ groups, known, activeId, onPick, onEdit, onDe
       {allCard && (
         <div className="cg-col" role="listitem">
           <GroupCard title="Усі кампанії" hint="без групи" active={activeId == null} focus={focus === 'all'} onPress={() => press('all')} />
-          {focus === 'all' && onPick && <div className="cg-actions"><button type="button" className="btn btn-p" disabled={activeId == null} onClick={() => onPick(null)}>{activeId == null ? 'Вибрано' : 'Вибрати'}</button></div>}
+          {focus === 'all' && onPick && <div className="cg-actions"><button type="button" className="btn pw-btn--ok" disabled={activeId == null} onClick={() => onPick(null)}>{activeId == null ? 'Вибрано' : 'Вибрати'}</button></div>}
         </div>
       )}
       {groups.map((g) => (
@@ -39,7 +39,7 @@ export default function GroupRow({ groups, known, activeId, onPick, onEdit, onDe
           <GroupCard title={g.name} count={countOf(g, known)} platforms={platformsOf(g)} active={activeId === g.id} focus={focus === g.id} onPress={() => press(g.id)} />
           {focus === g.id && !confirming && (
             <div className="cg-actions">
-              {onPick && <button type="button" className="btn btn-p" disabled={activeId === g.id || busy} onClick={() => onPick(g.id)}>{activeId === g.id ? 'Вибрано' : 'Вибрати'}</button>}
+              {onPick && <button type="button" className="btn pw-btn--ok" disabled={activeId === g.id || busy} onClick={() => onPick(g.id)}>{activeId === g.id ? 'Вибрано' : 'Вибрати'}</button>}
               <button type="button" className="btn" disabled={busy} onClick={() => onEdit(g.id)}>Редагувати</button>
               <button type="button" className="btn cg-danger" disabled={busy} onClick={() => setConfirming(true)}>Видалити</button>
             </div>
@@ -47,8 +47,8 @@ export default function GroupRow({ groups, known, activeId, onPick, onEdit, onDe
           {focus === g.id && confirming && (
             <div className="cg-actions cg-confirm">
               <span>Видалити «{g.name}»?</span>
-              <button type="button" className="btn cg-danger" disabled={busy} onClick={async () => { await onDelete(g.id); setConfirming(false); setFocus(null); }}>Так, видалити</button>
-              <button type="button" className="btn" onClick={() => setConfirming(false)}>Скасувати</button>
+              <button type="button" className="btn pw-btn--bad" disabled={busy} onClick={async () => { await onDelete(g.id); setConfirming(false); setFocus(null); }}>Так, видалити</button>
+              <button type="button" className="btn pw-btn--bad" onClick={() => setConfirming(false)}>Скасувати</button>
             </div>
           )}
         </div>

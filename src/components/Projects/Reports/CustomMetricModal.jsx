@@ -182,8 +182,8 @@ export default function CustomMetricModal({ projectId, platform, columnKeys = []
           {error && <div className="form-err">{error}</div>}
         </div>
         <div className="modal-foot">
-          {tab === 'columns' && catalog && <button type="button" className="btn btn-p" onClick={saveColumns} disabled={savingCols || !changedCols}>{savingCols ? 'Зберігаємо…' : 'Застосувати стовпці'}</button>}
-          {tab === 'formulas' && <button type="button" className="btn btn-p" onClick={save} disabled={saving}>{saving ? '...' : 'Додати метрику'}</button>}
+          {tab === 'columns' && catalog && <button type="button" className="btn pw-btn--ok" onClick={saveColumns} disabled={savingCols || !changedCols}>{savingCols ? 'Зберігаємо…' : 'Застосувати стовпці'}</button>}
+          {tab === 'formulas' && <button type="button" className="btn pw-btn--ok" onClick={save} disabled={saving}>{saving ? '...' : 'Додати метрику'}</button>}
           <button type="button" className="btn" onClick={onClose}>Закрити</button>
         </div>
       </div>

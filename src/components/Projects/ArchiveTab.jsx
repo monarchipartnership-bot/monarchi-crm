@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../common/ConfirmDialog';
+import { HubTitle, RibbonMark } from './hubIcons';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './ArchiveReportModal';
 import { deleteProjectReport, fetchCustomMetrics, fetchProjectReports, fetchReportColumns } from '../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../lib/api/projectDecks';
@@ -72,11 +73,11 @@ export default function ArchiveTab({ projectId }) {
 
   return (
     <section className="report-section">
-      <div className="prep-box-title">Архів звітів</div>
+      <HubTitle icon="file" className="prep-box-title">Архів звітів</HubTitle>
       <div className="prep-seg" role="tablist" aria-label="Платформи">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>
-            {t.label}{rows ? ` · ${countOf(t.key)}` : ''}
+            <RibbonMark platform={t.key === TOTAL_TAB ? null : t.key} />{t.label}{rows ? <span className="rg-n">{countOf(t.key)}</span> : null}
           </button>
         ))}
       </div>
