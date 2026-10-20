@@ -88,7 +88,14 @@ export function useSiteOverview(active) {
 }
 
 // true while the connection is known to be broken (the status light turns red)
-export const connectionBroken = (ov) => Boolean(ov && (ov.error || (ov.data?.status && !(ov.data.status.configured && ov.data.status.ga4.ok && ov.data.status.gsc.ok))));
+const connectionBroken = (ov) => Boolean(ov && (ov.error || (ov.data?.status && !(ov.data.status.configured && ov.data.status.ga4.ok && ov.data.status.gsc.ok))));
+
+// What turns the agent's light red: Google is not reachable, or the site itself does not answer. '' = nothing wrong.
+export function siteProblem(ov) {
+  if (connectionBroken(ov)) return 'Немає звʼязку з Google Analytics або Search Console, деталі в блоці «Підключення до Google».';
+  const u = ov?.data?.extras?.uptime;
+  return u && !u.ok ? u.error : '';
+}
 
 // Block «Підключення до Google»
 export function SiteConnection({ ov, openSettings }) {
@@ -128,47 +135,122 @@ export function SiteConnection({ ov, openSettings }) {
   );
 }
 
-// Block «Звіт»: the live figures, what the code found, what is handed on, and the agent's last written report.
+// Weeks of sessions as small bars, the oldest first.
+function Bars({ weeks }) {
+  const max = Math.max(1, ...weeks.map((w) => w.sessions));
+  return (
+    <div className="sao-bars" role="img" aria-label="Сеанси по тижнях">
+      {weeks.map((w) => (
+        <div key={w.start} className="sao-bar" title={`${w.start} – ${w.end}: ${w.sessions} сеансів, ${w.views} переглядів`}>
+          <span>{w.sessions}</span>
+          <i style={{ height: `${Math.max(3, Math.round((w.sessions / max) * 80))}px` }} />
+          <small>{w.start.slice(8)}.{w.start.slice(5, 7)}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const money = (n) => fmtNum(n);
+const delta = (cur, prev) => (prev > 0 ? `${cur >= prev ? '+' : ''}${Math.round(((cur - prev) / prev) * 100)}%` : '—');
+
+// Leads that the site form brought into the CRM, and whether the site opens: no Google needed for these two.
+function LeadsAndSite({ extras }) {
+  const L = extras?.leads;
+  const U = extras?.uptime;
+  if (!L && !U && !extras?.leadsError) return null;
+  return (
+    <>
+      <h4>Заявки з сайту (з CRM) і доступність сайту</h4>
+      <div className="smm-stats">
+        {L && (
+          <>
+            <div className="smm-stat"><b>{money(L.cur.leads)}</b><span>заявок за {L.period.days} днів</span><small className={'smm-delta' + (L.delta > 0 ? ' smm-delta--up' : L.delta < 0 ? ' smm-delta--down' : '')}>{L.delta != null ? `${L.delta > 0 ? '+' : ''}${L.delta}% до попередніх ${L.period.days} днів` : `було ${L.prev.leads}, мало даних для порівняння`}</small></div>
+            <div className="smm-stat"><b>{money(L.cur.deals)}</b><span>стали угодами в CRM</span><small className="smm-delta">з {L.cur.leads} заявок</small></div>
+            <div className="smm-stat"><b>{money(L.cur.spam)}</b><span>спаму відсіяно</span><small className="smm-delta">дублікатів: {L.cur.duplicates}</small></div>
+          </>
+        )}
+        {U && (
+          <div className="smm-stat">
+            <b style={{ color: U.ok ? undefined : 'var(--s-bad)' }}>{U.ok ? `${U.status} · ${(U.ms / 1000).toFixed(1).replace('.', ',')} с` : 'Не відповідає'}</b>
+            <span>головна сторінка сайту</span>
+            <small className={'smm-delta' + (U.ok && !U.slow ? ' smm-delta--up' : ' smm-delta--down')}>{U.ok ? (U.slow ? 'відкривається повільно' : 'відкривається швидко') : U.error}</small>
+          </div>
+        )}
+      </div>
+      {extras?.leadsError && <p className="smm-warn-banner" role="status">{extras.leadsError}</p>}
+      {L?.sources?.length > 0 && (
+        <div className="sao-pair">
+          <div><h4>Звідки заявки</h4><Table head={['Джерело', 'Заявки', 'Було']} rows={L.sources.map((x) => [x.name, fmtNum(x.count), fmtNum(x.prevCount)])} /></div>
+          <div><h4>З яких сторінок</h4><Table head={['Сторінка', 'Заявки']} rows={L.pages.map((x) => [x.path, fmtNum(x.count)])} /></div>
+        </div>
+      )}
+      {L?.campaigns?.length > 0 && (<><h4>Рекламні кампанії (utm_campaign)</h4><Table head={['Кампанія', 'Заявки']} rows={L.campaigns.map((x) => [x.name, fmtNum(x.count)])} /></>)}
+    </>
+  );
+}
+
+// Block «Звіт»: leads and site check, the live figures, what the code found, what is handed on, and the agent's last written report.
 export function SiteReport({ ov }) {
   const { data, loading, report } = ov;
   const a = data?.analysis;
+  const extras = data?.extras || a?.extras;
+  const findings = a ? a.findings : extras?.findings || [];
   return (
     <section className="smm-block sao">
       <div className="smm-block-head">
         <div>
           <h3>Звіт</h3>
-          <p className="smm-muted">{a ? `${a.period.cur.start} – ${a.period.cur.end}, порівняно з попередніми ${a.period.days} днями. Дані читаються з Google просто зараз.` : loading ? 'Читаємо дані з Google…' : 'Показники зʼявляться, коли запрацює підключення до Google.'}</p>
+          <p className="smm-muted">{a ? `${a.period.cur.start} – ${a.period.cur.end}, порівняно з попередніми ${a.period.days} днями. Дані читаються з Google просто зараз.` : loading ? 'Читаємо дані…' : 'Дані Google зʼявляться, коли запрацює підключення до Google.'}</p>
         </div>
       </div>
+
+      <LeadsAndSite extras={extras} />
+
       {a && (
         <>
           {a.ga4 && (<><h4>Google Analytics 4: сайт</h4><div className="smm-stats">{a.ga4.metrics.map((m) => <Metric key={m.key} m={m} />)}</div></>)}
+          {a.ga4?.weekly?.length > 0 && (<><h4>Сеанси по тижнях (8 тижнів)</h4><Bars weeks={a.ga4.weekly} /></>)}
           {a.gsc && (<><h4>Search Console: пошук Google</h4><div className="smm-stats">{a.gsc.metrics.map((m) => <Metric key={m.key} m={m} />)}</div></>)}
 
-          {a.ga4?.channels?.length > 0 && (<><h4>Звідки приходять</h4><Table head={['Канал', 'Сеанси', 'Було']} rows={a.ga4.channels.map((c) => [c.name, fmtNum(c.sessions), fmtNum(c.prevSessions)])} /></>)}
-          {a.ga4?.pages?.length > 0 && (<><h4>Сторінки за переглядами</h4><Table head={['Сторінка', 'Перегляди', 'Було', 'Зміна']} rows={a.ga4.pages.slice(0, 8).map((p) => [p.path, fmtNum(p.views), fmtNum(p.prevViews), p.delta == null ? '—' : `${p.delta > 0 ? '+' : ''}${p.delta}%`])} /></>)}
-          {a.gsc?.topQueries?.length > 0 && (<><h4>Запити, за якими знаходять сайт</h4><Table head={['Запит', 'Кліки', 'Покази', 'Позиція']} rows={a.gsc.topQueries.map((q) => [q.query, fmtNum(q.clicks), fmtNum(q.impressions), fmtNum(q.position)])} /></>)}
-          {a.gsc?.opportunities?.length > 0 && (<><h4>Покази є, а кліків майже немає</h4><Table head={['Запит', 'Покази', 'Кліки', 'Позиція']} rows={a.gsc.opportunities.map((q) => [q.query, fmtNum(q.impressions), fmtNum(q.clicks), fmtNum(q.position)])} /></>)}
-
-          {a.findings.length > 0 && (
-            <>
-              <h4>На що звернути увагу</h4>
-              <ul className="sao-findings">
-                {a.findings.map((f, i) => {
-                  const [label, color] = KIND[f.kind] || KIND.info;
-                  return <li key={i}><span className="smm-chip" style={{ '--chip': color }}><i aria-hidden="true" />{label}</span><span>{f.text}</span></li>;
-                })}
-              </ul>
-            </>
-          )}
-
-          {(a.handoff.seo.length > 0 || a.handoff.strategist.length > 0) && (
-            <div className="sao-handoff">
-              {a.handoff.seo.length > 0 && <div className="smm-stat"><span><b className="sao-h">Передає SEO-оптимізатору</b></span><ul>{a.handoff.seo.map((t) => <li key={t}>{t}</li>)}</ul></div>}
-              {a.handoff.strategist.length > 0 && <div className="smm-stat"><span><b className="sao-h">Передає стратегу</b></span><ul>{a.handoff.strategist.map((t) => <li key={t}>{t}</li>)}</ul></div>}
+          {a.ga4?.sources?.length > 0 && (<><h4>Джерела трафіку (джерело / канал)</h4><Table head={['Джерело', 'Сеанси', 'Було', 'Зміна']} rows={a.ga4.sources.map((x) => [x.name, fmtNum(x.sessions), fmtNum(x.prevSessions), delta(x.sessions, x.prevSessions)])} /></>)}
+          {a.ga4?.channels?.length > 0 && !a.ga4?.sources?.length && (<><h4>Звідки приходять</h4><Table head={['Канал', 'Сеанси', 'Було']} rows={a.ga4.channels.map((c) => [c.name, fmtNum(c.sessions), fmtNum(c.prevSessions)])} /></>)}
+          {(a.ga4?.devices?.length > 0 || a.ga4?.countries?.length > 0) && (
+            <div className="sao-pair">
+              {a.ga4.devices?.length > 0 && <div><h4>Пристрої</h4><Table head={['Пристрій', 'Користувачі', 'Частка']} rows={a.ga4.devices.map((x) => [x.name, fmtNum(x.users), `${x.share}%`])} /></div>}
+              {a.ga4.countries?.length > 0 && <div><h4>Країни</h4><Table head={['Країна', 'Користувачі', 'Було']} rows={a.ga4.countries.map((x) => [x.name, fmtNum(x.users), fmtNum(x.prevUsers)])} /></div>}
             </div>
           )}
+          {a.ga4?.pages?.length > 0 && (<><h4>Сторінки за переглядами</h4><Table head={['Сторінка', 'Перегляди', 'Було', 'Зміна']} rows={a.ga4.pages.slice(0, 8).map((p) => [p.path, fmtNum(p.views), fmtNum(p.prevViews), p.delta == null ? '—' : `${p.delta > 0 ? '+' : ''}${p.delta}%`])} /></>)}
+          {a.gsc?.topQueries?.length > 0 && (<><h4>Запити, за якими знаходять сайт</h4><Table head={['Запит', 'Кліки', 'Покази', 'Позиція']} rows={a.gsc.topQueries.map((q) => [q.query, fmtNum(q.clicks), fmtNum(q.impressions), fmtNum(q.position)])} /></>)}
+          {(a.gsc?.movers?.risers?.length > 0 || a.gsc?.movers?.fallers?.length > 0) && (
+            <div className="sao-pair">
+              {a.gsc.movers.risers.length > 0 && <div><h4>Запити, що виросли</h4><Table head={['Запит', 'Кліки', 'Покази', 'Було']} rows={a.gsc.movers.risers.map((q) => [q.query, fmtNum(q.clicks), fmtNum(q.impressions), `${fmtNum(q.prevClicks)} / ${fmtNum(q.prevImpressions)}`])} /></div>}
+              {a.gsc.movers.fallers.length > 0 && <div><h4>Запити, що просіли</h4><Table head={['Запит', 'Кліки', 'Покази', 'Було']} rows={a.gsc.movers.fallers.map((q) => [q.query, fmtNum(q.clicks), fmtNum(q.impressions), `${fmtNum(q.prevClicks)} / ${fmtNum(q.prevImpressions)}`])} /></div>}
+            </div>
+          )}
+          {a.gsc?.queryPages?.length > 0 && (<><h4>Яка сторінка під який запит показується</h4><Table head={['Запит', 'Сторінка', 'Покази', 'Кліки', 'Позиція']} rows={a.gsc.queryPages.map((q) => [q.query, q.page, fmtNum(q.impressions), fmtNum(q.clicks), fmtNum(q.position)])} /></>)}
+          {a.gsc?.opportunities?.length > 0 && (<><h4>Покази є, а кліків майже немає</h4><Table head={['Запит', 'Покази', 'Кліки', 'Позиція']} rows={a.gsc.opportunities.map((q) => [q.query, fmtNum(q.impressions), fmtNum(q.clicks), fmtNum(q.position)])} /></>)}
         </>
+      )}
+
+      {findings.length > 0 && (
+        <>
+          <h4>На що звернути увагу</h4>
+          <ul className="sao-findings">
+            {findings.map((f, i) => {
+              const [label, color] = KIND[f.kind] || KIND.info;
+              return <li key={i}><span className="smm-chip" style={{ '--chip': color }}><i aria-hidden="true" />{label}</span><span>{f.text}</span></li>;
+            })}
+          </ul>
+        </>
+      )}
+
+      {a && (a.handoff.seo.length > 0 || a.handoff.strategist.length > 0) && (
+        <div className="sao-handoff">
+          {a.handoff.seo.length > 0 && <div className="smm-stat"><span><b className="sao-h">Передає SEO-оптимізатору</b></span><ul>{a.handoff.seo.map((t) => <li key={t}>{t}</li>)}</ul></div>}
+          {a.handoff.strategist.length > 0 && <div className="smm-stat"><span><b className="sao-h">Передає стратегу</b></span><ul>{a.handoff.strategist.map((t) => <li key={t}>{t}</li>)}</ul></div>}
+        </div>
       )}
 
       {report?.report && (

@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     else if (action === 'status') out = { higgsfield: generatorReady(ctx) };
     else if (action === 'site_overview') { // the website analyst's main page: connection status + the live figures (read-only, no model)
       const cfg = (await ctx.db.from('ag_agents').select('config').eq('team', 'smm').eq('role', 'site_analyst').maybeSingle()).data?.config || {};
-      out = await siteOverview({ config: cfg });
+      out = await siteOverview({ config: cfg, db: ctx.db });
     }
     else { bad(res, 400, 'Невідома дія'); return; }
     res.status(200).json(out);

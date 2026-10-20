@@ -14,6 +14,7 @@ import { buildCopyPrompts, buildQcPrompts, buildStrategistPrompts, buildVisualPr
 import { analyseCompetitors } from './smmRun.js';
 import { insightLine } from './competitorAnalysis.js';
 import { DEFAULT_SITE, analyseSite, authFromEnv, collectSiteStats, reportInput, strategistLines } from './googleSiteData.js';
+import { applyExtras, siteExtras } from './siteExtras.js';
 import { runSeoAudit } from './seoRun.js';
 import * as higgsfield from './higgsfield.js';
 import { campaignRole } from './campaignRun.js';
@@ -299,11 +300,12 @@ async function competitors({ ctx, agent, task, rec }) {
 
 // The website analyst: reads GA4 and Search Console as the service account, works out the figures, changes and findings IN CODE, lets the model
 // phrase a short report (it never computes), saves everything, and the strategist and the SEO agent read it next time they work.
-const SITE_RULES = 'Write in Ukrainian, plain words, at most 220 words: the most useful finding first, then what grew or fell, then what deserves attention. Use ONLY the numbers in the data; where a figure has no change shown (too little data), say the volume is too small to judge and never calculate a percentage yourself. Name any cause as a hypothesis, never as a fact. End with two short lists: «Для SEO» and «Для стратега», each at most 3 lines, taken from the findings.';
+const SITE_RULES = 'Write in Ukrainian, plain words, at most 220 words: the most useful finding first, then what grew or fell, then what deserves attention. Use ONLY the numbers in the data; where a figure has no change shown (too little data), say the volume is too small to judge and never calculate a percentage yourself. Name any cause as a hypothesis, never as a fact. If the data has leads (заявки з форми сайту), say how many there were and where they came from right after the main finding; if siteCheck says the site did not answer, put that first. End with two short lists: «Для SEO» and «Для стратега», each at most 3 lines, taken from the findings.';
 async function siteAnalyst({ ctx, agent, prompt, rec }) {
   const cfg = { ...DEFAULT_SITE, ...Object.fromEntries(Object.entries(agent.config || {}).filter(([, v]) => v)) };
   const raw = ctx.site ? await ctx.site({ config: cfg }) : await collectSiteStats({ auth: authFromEnv(ctx.env || process.env), config: cfg, now: ctx.now });
-  const analysis = analyseSite(raw, agent.config?.thresholds);
+  const extras = await siteExtras({ db: ctx.db, fetchFn: ctx.extrasFetch || fetch, now: ctx.now });
+  const analysis = applyExtras(analyseSite(raw, agent.config?.thresholds), extras);
   let report = '';
   let modelError = null;
   try {

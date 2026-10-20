@@ -22,6 +22,7 @@ import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, 
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
 import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
+import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
@@ -565,15 +566,22 @@ function siteFetch({ gaFail = false, gscFail = false, big = false } = {}) {
       const headers = [...dims.map((name) => ({ name })), { name: 'dateRange' }];
       const row = (d, range, vals) => ({ dimensionValues: [...d.map((v) => ({ value: v })), { value: range }], metricValues: vals.map(m) });
       if (!dims.length) return res(200, { dimensionHeaders: headers, rows: [row([], 'cur', big ? [400, 520, 900, 0.62, 3000, 12] : [28, 33, 60, 0.5, 136, 0]), row([], 'prev', big ? [300, 400, 700, 0.6, 2500, 9] : [31, 36, 70, 0.48, 150, 0])] });
+      if (dims[0] === 'sessionSource') return res(200, { dimensionHeaders: headers, rows: [row(['google', 'organic'], 'cur', [20, 18, 0]), row(['google', 'organic'], 'prev', [25, 22, 0]), row(['(direct)', '(none)'], 'cur', [13, 10, 0]), row(['(direct)', '(none)'], 'prev', [11, 9, 0]), row(['instagram', 'social'], 'cur', [4, 3, 0])] });
+      if (dims[0] === 'date') return res(200, { dimensionHeaders: [{ name: 'date' }], rows: [{ dimensionValues: [{ value: '20260901' }], metricValues: [m(5), m(9)] }, { dimensionValues: [{ value: '20261012' }], metricValues: [m(10), m(20)] }, { dimensionValues: [{ value: '20261013' }], metricValues: [m(4), m(7)] }, { dimensionValues: [{ value: '20250101' }], metricValues: [m(99), m(99)] }] });
+      if (dims[0] === 'country') return res(200, { dimensionHeaders: headers, rows: [row(['Ukraine'], 'cur', [20]), row(['Ukraine'], 'prev', [24]), row(['Poland'], 'cur', [5]), row(['Poland'], 'prev', [3])] });
+      if (dims[0] === 'deviceCategory') return res(200, { dimensionHeaders: headers, rows: [row(['mobile'], 'cur', [18]), row(['mobile'], 'prev', [15]), row(['desktop'], 'cur', [10]), row(['desktop'], 'prev', [16])] });
       if (dims[0] === 'sessionDefaultChannelGroup') return res(200, { dimensionHeaders: headers, rows: [row(['Organic Search'], 'cur', [20, 18]), row(['Organic Search'], 'prev', [25, 22]), row(['Direct'], 'cur', [13, 10]), row(['Direct'], 'prev', [11, 9])] });
       return res(200, { dimensionHeaders: headers, rows: [row(['/services/'], 'cur', big ? [80, 50] : [10, 6]), row(['/services/'], 'prev', big ? [200, 90] : [14, 8]), row(['/'], 'cur', [30, 20]), row(['/'], 'prev', [28, 19])] });
     }
     if (url.includes('searchAnalytics/query')) {
       if (gscFail) return res(403, { error: { message: 'Forbidden' } });
       if (!body.dimensions) return res(200, { rows: [body.startDate < '2026-09-19' ? { clicks: big ? 60 : 4, impressions: big ? 900 : 70, ctr: 0.04, position: 12 } : { clicks: big ? 90 : 5, impressions: big ? 1300 : 80, ctr: 0.05, position: 11 }] });
+      if (body.dimensions.length === 2) return res(200, { rows: [{ keys: ['seo агенція', 'https://www.monarchi.agency/seo/'], clicks: 0, impressions: 300, ctr: 0, position: 9.5 }, { keys: ['monarchi', 'https://www.monarchi.agency/'], clicks: 30, impressions: 60, ctr: 0.5, position: 1.2 }] });
+      if (body.dimensions[0] === 'query' && body.startDate < '2026-09-19') return res(200, { rows: [{ keys: ['seo агенція'], clicks: 0, impressions: 150, ctr: 0, position: 9 }, { keys: ['ppc'], clicks: 4, impressions: 100, ctr: 0.04, position: 12 }, { keys: ['monarchi'], clicks: 20, impressions: 50, ctr: 0.4, position: 1.1 }] });
       if (body.dimensions[0] === 'query') return res(200, { rows: [{ keys: ['seo агенція'], clicks: 0, impressions: 400, ctr: 0, position: 9.2 }, { keys: ['monarchi'], clicks: 30, impressions: 60, ctr: 0.5, position: 1.2 }, { keys: ['ppc'], clicks: 1, impressions: 300, ctr: 0.003, position: 15 }] });
       return res(200, { rows: [{ keys: ['https://www.monarchi.agency/services/'], clicks: 9, impressions: 500, ctr: 0.018, position: 8 }] });
     }
+    if (url.startsWith('https://www.monarchi.agency')) return res(200, {});
     return res(404, {});
   };
   return { fetchFn, log };
@@ -643,11 +651,78 @@ await ok('site analyst: the overview page reports the connection of each source 
   const both = await siteOverview({ env, fetchFn: siteFetch({ gaFail: true, gscFail: true }).fetchFn, now: SITE_NOW });
   assert.equal(both.analysis, null);
   assert.match(both.status.error, /ні GA4, ні Search Console/);
-  const none = await siteOverview({ env: {}, now: SITE_NOW });
+  assert.equal(both.extras.uptime.ok, true); // the site check does not need Google
+  const none = await siteOverview({ env: {}, now: SITE_NOW, fetchFn: siteFetch().fetchFn });
   assert.equal(none.status.configured, false);
   assert.equal(none.analysis, null);
   assert.ok(none.status.error);
   assert.equal((await siteOverview({ env, config: { ga4PropertyId: '42' }, fetchFn: siteFetch().fetchFn, now: SITE_NOW })).status.ga4.propertyId, '42'); // the agent's own settings win over the default
+});
+await ok('site analyst: more figures of GA4 (sources, weeks, countries, devices) and Search Console (risers, fallers, query to page) are read and analysed in code', async () => {
+  const a = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));
+  assert.deepEqual(a.ga4.sources.map((x) => [x.name, x.sessions, x.prevSessions]), [['google / organic', 20, 25], ['(direct) / (none)', 13, 11], ['instagram / social', 4, 0]]);
+  assert.equal(a.ga4.weekly.length, 8);
+  assert.equal(a.ga4.weekly[1].sessions, 5); // 1 Sep falls into the second week of the 56 days
+  assert.equal(a.ga4.weekly[7].sessions, 14); // 12 and 13 Oct: the last week; a day far outside the window is ignored
+  assert.equal(a.ga4.weekly.reduce((s, w) => s + w.sessions, 0), 19);
+  assert.deepEqual(a.ga4.devices.map((d) => [d.name, d.share]), [['mobile', 64], ['desktop', 36]]);
+  assert.equal(a.ga4.countries[0].name, 'Ukraine');
+  assert.equal(a.gsc.movers.risers[0].query, 'seo агенція'); // 150 -> 400 shown
+  assert.equal(a.gsc.movers.risers[0].prevImpressions, 150);
+  assert.ok(a.gsc.movers.fallers.some((q) => q.query === 'ppc' && q.clicks === 1 && q.prevClicks === 4));
+  assert.ok(!a.gsc.movers.risers.concat(a.gsc.movers.fallers).some((q) => /monarchi/i.test(q.query))); // our own name is not a topic
+  assert.deepEqual(a.gsc.queryPages.map((q) => [q.query, q.page]), [['seo агенція', '/seo/']]);
+  assert.ok(a.handoff.seo.some((l) => /«ppc» просів/.test(l)));
+  // an extra report that fails alone does not lose the main figures
+  const partial = async (url, init) => { const b = JSON.parse(init?.body && String(init.body).startsWith('{') ? init.body : '{}'); if (url.includes('analyticsdata') && b.dimensions?.[0]?.name === 'country') return { ok: false, status: 500, json: async () => ({}) }; return siteFetch().fetchFn(url, init); };
+  const p = await collectSiteStats({ account: siteAccount, fetchFn: partial, now: SITE_NOW });
+  assert.equal(p.ga4.countries, null);
+  assert.equal(p.ga4.total.cur.activeUsers, 28);
+});
+await ok('site leads for the analyst: counted from the CRM log by source and page, spam and duplicates apart, small numbers get no percentage', async () => {
+  const w = leadWindows(new Date('2026-10-20T10:00:00Z'));
+  assert.deepEqual([w.cur.start, w.cur.end, w.prev.start, w.prev.end], ['2026-09-23', '2026-10-20', '2026-08-26', '2026-09-22']);
+  assert.equal(leadSource({ utm: { utm_source: 'google', utm_medium: 'cpc' } }), 'google / cpc');
+  assert.equal(leadSource({ referrer: 'https://www.facebook.com/x' }), 'facebook.com');
+  assert.match(leadSource({}), /без джерела/);
+  const lead = (day, status, extra = {}) => ({ received_at: `${day}T08:00:00Z`, status, page_url: 'https://www.monarchi.agency/contact/', referrer: null, utm: null, deal_id: null, ...extra });
+  const rows = [lead('2026-10-18', 'new', { utm: { utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'brand' }, deal_id: 'd1' }), lead('2026-10-10', 'new', { page_url: 'https://www.monarchi.agency/seo/' }), lead('2026-10-09', 'duplicate'), lead('2026-10-08', 'spam'), lead('2026-09-01', 'new'), lead('2026-09-02', 'spam')];
+  const a = analyseLeads(rows, w);
+  assert.deepEqual([a.cur.leads, a.cur.duplicates, a.cur.spam, a.cur.deals, a.prev.leads, a.prev.spam], [2, 1, 1, 1, 1, 1]);
+  assert.equal(a.delta, null); // 2 against 1: noise
+  assert.equal(a.sources[0].name, 'google / cpc');
+  assert.deepEqual(a.pages.map((p) => p.path).sort(), ['/contact/', '/seo/']);
+  assert.deepEqual(a.campaigns, [{ name: 'brand', count: 1 }]);
+  const many = analyseLeads([...Array(12).fill(0).map((_, i) => lead('2026-10-1' + (i % 9), 'new')), ...Array(6).fill(0).map(() => lead('2026-09-10', 'new'))], w);
+  assert.equal(many.delta, 100); // 12 against 6, enough to say
+});
+await ok('site analyst: the site check and the leads are added to findings, the hand-off and a GA4 «not tracked» note is replaced when the CRM counts the leads', async () => {
+  const tables = { site_leads: [{ received_at: '2026-10-18T08:00:00Z', status: 'new', page_url: 'https://www.monarchi.agency/seo/', referrer: null, utm: { utm_source: 'google' }, deal_id: null }], smm_settings: [{ id: 1, site_url: 'https://www.monarchi.agency' }] };
+  const db = fakeDb(tables);
+  const extras = await siteExtras({ db, fetchFn: siteFetch().fetchFn, now: () => new Date('2026-10-20T10:00:00Z') });
+  assert.equal(extras.leads.cur.leads, 1);
+  assert.equal(extras.uptime.ok, true);
+  assert.ok(extras.handoff.strategist.some((l) => /\/seo\//.test(l)));
+  const analysis = applyExtras(analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW })), extras);
+  assert.ok(!analysis.findings.some((f) => f.kind === 'setup'));
+  assert.ok(analysis.findings.some((f) => f.source === 'ga4' && /рахуємо з CRM/.test(f.text)));
+  assert.equal(analysis.extras.leads.cur.leads, 1);
+  // the site is down: said first-class, and a slow answer is called slow
+  const down = await checkUptime({ url: 'https://x.test', fetchFn: async () => { throw new Error('ENOTFOUND'); } });
+  assert.deepEqual([down.ok, down.status], [false, null]);
+  assert.match(down.error, /недоступний.*ENOTFOUND/);
+  const err500 = await checkUptime({ url: 'https://x.test', fetchFn: async () => ({ status: 503 }) });
+  assert.match(err500.error, /503/);
+  const hung = await checkUptime({ url: 'https://x.test', timeoutMs: 20, fetchFn: (u, init) => new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(Object.assign(new Error('x'), { name: 'AbortError' })))) });
+  assert.match(hung.error, /не відповів/);
+  const downExtras = await siteExtras({ db, fetchFn: async () => ({ status: 500 }), now: () => new Date('2026-10-20T10:00:00Z') });
+  assert.ok(downExtras.findings.some((f) => f.kind === 'error' && f.source === 'site'));
+  // a missing log table is reported, the site check still runs
+  const broken = { from: () => ({ select: () => ({ gte: () => ({ order: () => ({ limit: async () => ({ data: null, error: { message: 'relation site_leads does not exist' } }) }) }) }), eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) };
+  const partial = await siteExtras({ db: broken, fetchFn: siteFetch().fetchFn });
+  assert.equal(partial.leads, null);
+  assert.match(partial.leadsError, /site_leads/);
+  assert.equal(partial.uptime.ok, true);
 });
 await ok('site analyst: small numbers get no percentages, missing conversions are reported, and the hand-off is made in code', async () => {
   const small = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));
@@ -677,7 +752,8 @@ await ok('site analyst: the agent run saves the report, hands the lines on and s
   let siteCalls = 0;
   const site = async ({ config }) => { siteCalls += 1; assert.equal(config.gscSiteUrl, 'sc-domain:monarchi.agency'); return collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }); };
   const good = { callModel: async (args) => ({ text: 'Звіт: даних мало.', usage: { input_tokens: 1, output_tokens: 1 }, costUsd: 0.001, agentKey: args.agentKey }) };
-  const r = await runNow({ db, model: good, email: 'a@x.com', trigger: 'user', hf: null, site, now: SITE_NOW }, analyst.id);
+  const extrasFetch = siteFetch().fetchFn;
+  const r = await runNow({ db, model: good, email: 'a@x.com', trigger: 'user', hf: null, site, extrasFetch, now: SITE_NOW }, analyst.id);
   assert.equal(r.status, 'done');
   assert.equal(siteCalls, 1);
   assert.equal(tables.smm_site_stats.length, 1);
@@ -685,7 +761,7 @@ await ok('site analyst: the agent run saves the report, hands the lines on and s
   assert.ok(tables.smm_site_stats[0].data.handoff.seo.length > 0);
   // the model is down: the report is built from the findings and the run still succeeds
   const bad = { callModel: async () => { throw new Error('overloaded'); } };
-  const r2 = await runNow({ db, model: bad, email: 'a@x.com', trigger: 'user', hf: null, site, now: SITE_NOW }, analyst.id);
+  const r2 = await runNow({ db, model: bad, email: 'a@x.com', trigger: 'user', hf: null, site, extrasFetch, now: SITE_NOW }, analyst.id);
   assert.equal(r2.status, 'done');
   assert.match(tables.smm_site_stats[1].report, /Мало даних/);
   assert.match(tables.smm_site_stats[1].model_error, /overloaded/);

@@ -7,7 +7,7 @@ import AgentSettings, { LANGUAGE_OPTIONS } from './AgentSettings';
 import AgentPrompts from './AgentPrompts';
 import AgentHistory from './AgentHistory';
 import AgentTasks from './AgentTasks';
-import { SiteConnection, SiteReport, connectionBroken, useSiteOverview } from './SiteAnalystOverview';
+import { SiteConnection, SiteReport, siteProblem, useSiteOverview } from './SiteAnalystOverview';
 import { ChainMini, HealthLight, healthOf } from './AgentCardParts';
 import { fmtDateTime, roleMeta } from './agentUi';
 import { AgentSwitch } from './SmmAgents';
@@ -94,7 +94,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
   const cost30 = useMemo(() => tasks.filter((t) => new Date(t.created_at).getTime() >= month).reduce((s, t) => s + Number(t.cost_usd || 0), 0), [tasks, month]);
   if (!agent) return <p className="smm-muted">Агента не знайдено. <button type="button" className="smm-link-btn" onClick={back}>До команди</button></p>;
   const meta = roleMeta(role);
-  const health = healthOf(agent, team, agent.enabled && role === 'site_analyst' && connectionBroken(siteOv) ? 'Немає звʼязку з Google Analytics або Search Console, деталі в блоці «Підключення до Google».' : '');
+  const health = healthOf(agent, team, agent.enabled && role === 'site_analyst' ? siteProblem(siteOv) : '');
   const next = agent.enabled ? nextRunOf(agent) : null;
   const queued = tasks.filter((t) => t.status === 'queued' || t.status === 'running').length;
   const failed = tasks.filter((t) => t.status === 'failed').length;
