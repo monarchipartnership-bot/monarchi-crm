@@ -246,9 +246,9 @@ export default function ProjectAgentTab({ projectId }) {
             <div className="pag-run-head">Запустити зараз</div>
             <div className="pag-run-row">
               <Select value={runType} onChange={setRunType} ariaLabel="Який звіт зробити" options={RUN_TYPES} />
-              <button type="button" className="btn btn-p" onClick={runNow} disabled={busy === 'run' || missing}>{busy === 'run' ? 'Агент працює…' : 'Створити чернетку'}</button>
+              <button type="button" className="btn btn-p" onClick={runNow} disabled={busy === 'run' || missing}>{busy === 'run' ? 'Агент працює…' : 'Створити звіт'}</button>
             </div>
-            <div className="pacc-hint">Агент збере цифри з кабінетів за останній завершений період, напише текст і підготує презентацію. Усе зберігається як чернетка: ви перевіряєте її у вкладках звітів і презентацій.</div>
+            <div className="pacc-hint">Агент збере цифри з кабінетів за останній завершений період, напише текст і підготує презентацію. Звіт одразу надходить на затвердження: відповідальні перевіряють його в розділі «Звіти на затвердження», дописують те, що агент залишив порожнім, і затверджують.</div>
             {busy === 'run' && <div className="pacc-hint">Це може тривати до хвилини-двох: агент читає кабінети й історію змін.</div>}
             {runResult && (
               <div className={'pag-run-result pag-run-result--' + runResult.status} role="status">
@@ -260,7 +260,7 @@ export default function ProjectAgentTab({ projectId }) {
           </div>
         )}
         {!AGENT_SCHEDULE_READY && (
-          <div className="pacc-hint pag-hint">Запуск за розкладом ще не ввімкнено: поки агент працює лише за кнопкою «Створити чернетку». Перемикач і розклад збережуться й почнуть діяти, коли запуск за розкладом буде ввімкнено.</div>
+          <div className="pacc-hint pag-hint">Запуск за розкладом ще не ввімкнено: поки агент працює лише за кнопкою «Створити звіт». Перемикач і розклад збережуться й почнуть діяти, коли запуск за розкладом буде ввімкнено.</div>
         )}
         {message && <div className="pacc-err pag-error">{message}</div>}
       </section>
@@ -345,7 +345,7 @@ export default function ProjectAgentTab({ projectId }) {
             {!(form.approvers || []).length && <div className="pacc-hint">Нікого не обрано: затвердити звіт може будь-хто з доступом до платформи.</div>}
           </PagSection>
 
-          <PagSection title="Сповіщення" hint="Хто дізнається про готовий звіт: дзвіночок CRM і Telegram-чат. Звіт завжди зберігається як чернетка: менеджер перевіряє його, перш ніж відправити клієнту.">
+          <PagSection title="Сповіщення" hint="Хто дізнається про готовий звіт: дзвіночок CRM і Telegram-чат. Звіт завжди чекає на затвердження: відповідальні перевіряють його, перш ніж він потрапить до клієнта.">
             <div className="pag-opts">
               <PagOption checked={form.notify} onChange={(v) => setCfg({ notify: v })} title="Сповіщати про результат" desc="Звіт готовий або агент не зміг його створити. Сповіщення зʼявляться в загальному дзвіночку CRM." />
             </div>
