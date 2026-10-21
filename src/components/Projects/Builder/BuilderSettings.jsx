@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Select from '../../common/Select';
 import DesignTodo from '../../common/DesignTodo';
 import GroupsStrip from '../Reports/GroupsStrip';
-import { deleteCampaignGroup } from '../../../lib/api/projectReportStore';
+import { useConfirm } from '../../common/ConfirmDialog';
+import { deleteCampaignGroup, deleteCustomMetric, saveReportColumns } from '../../../lib/api/projectReportStore';
 import { campaignsOutsideGroups } from '../../../lib/campaignGroups';
 import { fetchProjectCampaigns } from '../../../lib/periodReport';
 import { MAX_BLOCKS, MAX_CREATIVES, MAX_PROMPT, MAX_TITLE, PRESETS, newBlockKey } from '../../../lib/reportTemplate';
@@ -42,16 +43,50 @@ export function KindPanel({ draft, set, projectKind }) {
   );
 }
 
-export function MetricsPanel({ kind, extraKeys, custom, onOpen }) {
+export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, onOpen, onChanged }) {
+  const [confirm, confirmDialog] = useConfirm();
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
   const base = (METRIC_SETS[kind] || METRIC_SETS.ecom).map((k) => metricMeta(k, custom).label);
-  const extras = [...extraKeys.map((k) => metricMeta(k, custom).label), ...custom.map((c) => c.name)];
+  const extras = [
+    ...extraKeys.map((k) => ({ id: 'c:' + k, label: metricMeta(k, custom).label, remove: { type: 'column', key: k } })),
+    ...custom.map((c) => ({ id: 'm:' + c.id, label: c.name, remove: { type: 'custom', metric: c } })),
+  ];
+
+  async function remove(item) {
+    const r = item.remove;
+    if (r.type === 'custom') {
+      const shared = r.metric.project_id == null;
+      const ok = await confirm({
+        title: 'Видалити метрику?',
+        body: shared ? `«${r.metric.name}» є спільною: вона є в усіх проєктах, і її буде видалено скрізь. Створені раніше звіти не змінюються.` : `Видалити метрику «${r.metric.name}»? Створені раніше звіти не змінюються.`,
+        confirmLabel: 'Видалити метрику', danger: true,
+      });
+      if (!ok) return;
+    }
+    setBusy(item.id);
+    setError('');
+    try {
+      if (r.type === 'column') await saveReportColumns(projectId, platform, extraKeys.filter((k) => k !== r.key));
+      else await deleteCustomMetric(r.metric.id);
+      await onChanged();
+    } catch (e) { setError(e.message || 'Не вдалося видалити метрику.'); } finally { setBusy(''); }
+  }
+
   return (
-    <Panel title="Метрики" note="Базові метрики є завжди. Додаткові: стовпці рекламного кабінету та власні формули. Око на макеті вище вмикає чи вимикає метрику для клієнта. Додаткові метрики зберігаються одразу, окремо від кнопки «Зберегти макет».">
+    <Panel title="Метрики" note="Базові метрики є завжди. Додаткові: стовпці рекламного кабінету та власні формули; їх можна додати й прибрати. Око на макеті вище вмикає чи вимикає метрику для клієнта. Додаткові метрики зберігаються одразу, окремо від кнопки «Зберегти макет».">
       <div className="bld-chips" aria-label="Базові метрики">{base.map((l) => <span className="bld-chip" key={l}>{l}</span>)}</div>
       <div className="bld-chips" aria-label="Додаткові метрики">
-        {extras.length ? extras.map((l) => <span className="bld-chip bld-chip--extra" key={l}>{l}</span>) : <span className="ph-share-meta">Додаткових метрик ще немає.</span>}
+        {extras.length ? extras.map((it) => (
+          <span className="bld-chip bld-chip--extra" key={it.id}>
+            {it.label}
+            <button type="button" className="bld-chip-x" disabled={busy === it.id} aria-label={`Прибрати метрику ${it.label}`} title="Прибрати метрику" onClick={() => remove(it)}>&times;</button>
+          </span>
+        )) : <span className="ph-share-meta">Додаткових метрик ще немає.</span>}
       </div>
+      {error && <div className="pacc-err">{error}</div>}
       <div className="rte-row"><button type="button" className="btn" onClick={onOpen}>+ Метрика</button></div>
+      {confirmDialog}
     </Panel>
   );
 }

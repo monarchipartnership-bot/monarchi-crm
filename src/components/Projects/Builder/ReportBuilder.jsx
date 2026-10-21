@@ -162,7 +162,7 @@ export default function ReportBuilder({ projectId }) {
 
       <div className="bld-panels">
         <KindPanel draft={draft} set={set} projectKind={projectKind(ctx.project)} />
-        <MetricsPanel kind={kind} extraKeys={extraKeys} custom={ctx.custom} onOpen={() => setModal('metric')} />
+        <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} onOpen={() => setModal('metric')} onChanged={reload} />
         <GroupsPanel
           projectId={projectId} platform={platform} kind={kind} accounts={platformAccounts} groups={platformGroups}
           onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={reload}

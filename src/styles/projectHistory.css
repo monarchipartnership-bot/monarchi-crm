@@ -100,3 +100,7 @@
 .bld-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .bld-chip { padding: 3px 10px; border-radius: 999px; background: #F3E3F7; color: #682768; font-size: .8rem; font-weight: 600; }
 .bld-chip--extra { background: #E3F6E8; color: #168a3a; }
+.bld-chip--extra { display: inline-flex; align-items: center; gap: 6px; padding-right: 4px; }
+.bld-chip-x { all: unset; box-sizing: border-box; width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 14px; line-height: 1; cursor: pointer; color: #168a3a; background: #CDEFD6; }
+.bld-chip-x:disabled { opacity: .5; cursor: default; }
+.bld-chip-x:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
