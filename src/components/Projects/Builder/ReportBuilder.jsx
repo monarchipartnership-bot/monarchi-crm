@@ -28,7 +28,7 @@ import '../../../styles/projectHistory.css';
 // «Конструктор звіту»: the report of a project is set up here, once per ad platform. The layout is shown the way the client will see it (without numbers,
 // or with the numbers of the last week) and changes while you set it up; «Зберегти макет» makes it the base of every report of that platform: the manual
 // pages, the AI agent and the client's page. A platform without a saved layout is not reported by the agent.
-export default function ReportBuilder({ projectId }) {
+export default function ReportBuilder({ projectId, onConfigChanged }) {
   const { email } = useAuth();
   const [params, setParams] = useSearchParams();
   const [confirm, confirmDialog] = useConfirm();
@@ -47,6 +47,8 @@ export default function ReportBuilder({ projectId }) {
     const [c, groups] = await Promise.all([loadReportContext(projectId), fetchCampaignGroups(projectId)]);
     setCtx({ ...c, groups });
   }, [projectId]);
+  // after a change that the report pages must pick up (a saved layout, groups, metrics)
+  const changed = useCallback(async () => { await reload(); onConfigChanged?.(); }, [reload, onConfigChanged]);
   useEffect(() => { reload().catch(() => setCtx({ project: null, accounts: [], custom: [], columns: {}, groups: [] })); }, [reload]);
 
   const platforms = useMemo(() => (ctx ? accountPlatforms(ctx.accounts) : []), [ctx]);
@@ -90,6 +92,7 @@ export default function ReportBuilder({ projectId }) {
     try {
       const t = await saveReportLayout(projectId, platform, draft, email);
       setState({ saved: t, draft: t, exists: true });
+      onConfigChanged?.();
       setMessage('Макет збережено. Він діє у ручних звітах, в агента й на сторінці клієнта; створені раніше звіти не змінюються.');
     } catch (e) { setError(e.message || 'Не вдалося зберегти макет.'); } finally { setSaving(false); }
   }
@@ -163,10 +166,10 @@ export default function ReportBuilder({ projectId }) {
       <PanelContext.Provider value={{ open: openPanel, toggle: (id) => setOpenPanel((cur) => (cur === id ? '' : id)) }}>
       <div className="bld-panels">
         <KindPanel draft={draft} set={set} projectKind={projectKind(ctx.project)} />
-        <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} onOpen={() => setModal('metric')} onChanged={reload} />
+        <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} onOpen={() => setModal('metric')} onChanged={changed} />
         <GroupsPanel
           projectId={projectId} platform={platform} kind={kind} accounts={platformAccounts} groups={platformGroups}
-          onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={reload}
+          onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={changed}
         />
         <BlocksPanel draft={draft} set={set} />
         <CreativesPanel draft={draft} set={set} />
@@ -180,11 +183,11 @@ export default function ReportBuilder({ projectId }) {
       {modal === 'groups' && (
         <CampaignGroupsModal
           projectId={projectId} platform={platform} groups={platformGroups} accounts={platformAccounts} kind={kind} knownCampaigns={[]} startEdit={groupEdit}
-          onClose={() => { setModal(null); setGroupEdit(null); }} onChanged={reload}
+          onClose={() => { setModal(null); setGroupEdit(null); }} onChanged={changed}
         />
       )}
       {modal === 'metric' && (
-        <CustomMetricModal projectId={projectId} platform={platform} columnKeys={extraKeys} custom={ctx.custom} onClose={() => setModal(null)} onChanged={reload} onColumnsSaved={reload} sample={null} />
+        <CustomMetricModal projectId={projectId} platform={platform} columnKeys={extraKeys} custom={ctx.custom} onClose={() => setModal(null)} onChanged={changed} onColumnsSaved={changed} sample={null} />
       )}
       {confirmDialog}
     </section>

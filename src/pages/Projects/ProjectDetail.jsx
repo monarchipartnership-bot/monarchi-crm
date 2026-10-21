@@ -42,6 +42,7 @@ const TABS = [
 ];
 
 const STATUSES = ['active', 'paused', 'completed'];
+const KEEP_ALIVE = ['builder', 'period', 'weekly', 'monthly']; // tabs that keep their state while the card is open
 
 // The Overview fields in reading order. Empty ones are hidden while viewing.
 const FIELD_GROUPS = [
@@ -83,6 +84,10 @@ export default function ProjectDetail() {
   const [deleting, setDeleting] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
   const tabRefs = useRef({});
+  const [visited, setVisited] = useState(() => new Set([tab]));
+  const [cfgVersion, setCfgVersion] = useState(0);
+  useEffect(() => { setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab))); }, [tab]);
+  useEffect(() => { setVisited(new Set([tab])); setCfgVersion(0); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Arrow keys / Home / End move between the folder tabs (the focused one is the selected one).
   function onTabKey(e) {
@@ -476,10 +481,13 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {tab === 'builder' && <ReportBuilder key={'builder-' + id} projectId={id} />}
-      {tab === 'period' && <PlatformReports key={'period-' + id} projectId={id} mode="period" />}
-      {tab === 'weekly' && <PlatformReports key={'weekly-' + id} projectId={id} mode="weekly" />}
-      {tab === 'monthly' && <PlatformReports key={'monthly-' + id} projectId={id} mode="monthly" />}
+      {/* The builder and the report tabs stay open once visited: coming back shows the report that was loaded, and nothing is pulled again.
+          They are cleared when the card is closed or another project is opened. A change of the layout (saved in the builder) reloads the report tabs. */}
+      {KEEP_ALIVE.filter((k) => visited.has(k)).map((k) => (
+        <div key={k + '-' + id + (k === 'builder' ? '' : '-' + cfgVersion)} hidden={tab !== k}>
+          {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : <PlatformReports projectId={id} mode={k} />}
+        </div>
+      ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
       </div>
