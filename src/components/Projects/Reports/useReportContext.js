@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchProjectById } from '../../../lib/api/projects';
 import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
+import { fetchAgent } from '../../../lib/api/projectAgents';
 import { fetchCampaignGroups, fetchCustomMetrics, fetchReportColumns, fetchReportLayout } from '../../../lib/api/projectReportStore';
 import { normalizeTemplate } from '../../../lib/reportTemplate';
 import { cleanColumns } from '../../../lib/platformColumns';
@@ -19,14 +20,15 @@ export function useReportContext(projectId, tab = 'total') {
   const [columns, setColumns] = useState({});
   const [layoutState, setLayoutState] = useState({ exists: false, layout: normalizeTemplate(null), loaded: false });
   const [error, setError] = useState('');
+  const [approvers, setApprovers] = useState([]); // who may confirm reports (settings of the agent); empty: anyone
 
   useEffect(() => {
     let cancelled = false;
     setProject(null);
     setAccounts(null);
     setError('');
-    Promise.all([fetchProjectById(projectId), fetchProjectAccounts(projectId), fetchCampaignGroups(projectId), fetchCustomMetrics(projectId), fetchReportColumns(projectId)])
-      .then(([p, a, g, c, cols]) => { if (!cancelled) { setProject(p); setAccounts(a); setGroups(g); setCustom(c); setColumns(cols); } })
+    Promise.all([fetchProjectById(projectId), fetchProjectAccounts(projectId), fetchCampaignGroups(projectId), fetchCustomMetrics(projectId), fetchReportColumns(projectId), fetchAgent(projectId)])
+      .then(([p, a, g, c, cols, ag]) => { if (!cancelled) { setProject(p); setAccounts(a); setGroups(g); setCustom(c); setColumns(cols); setApprovers((ag?.agent?.config?.approvers || []).map((e) => String(e).toLowerCase())); } })
       .catch((e) => { if (!cancelled) setError(e.message || 'Не вдалося завантажити проєкт.'); });
     return () => { cancelled = true; };
   }, [projectId]);
@@ -49,7 +51,7 @@ export function useReportContext(projectId, tab = 'total') {
   const reloadColumns = useCallback(async () => { const m = await fetchReportColumns(projectId); setColumns(m); return tab === 'total' ? {} : { [tab]: cleanColumns(tab, m[tab]) }; }, [projectId, tab]);
   const every = accounts || [];
   return {
-    ready: Boolean(project && accounts && layoutState.loaded), error, project, accounts: accountsForTab(every, tab), allAccounts: every, groups: groupsForPlatform(groups, tab), allGroups: groups, scope: reportScope(tab, every), tab, custom,
+    ready: Boolean(project && accounts && layoutState.loaded), error, project, accounts: accountsForTab(every, tab), allAccounts: every, groups: groupsForPlatform(groups, tab), allGroups: groups, scope: reportScope(tab, every), tab, custom, approvers,
     kind: layoutState.layout.kind || projectKind(project), layout: layoutState.layout, layoutSaved: layoutState.exists,
     // the campaigns the layout selected (per platform), for the fetch: without a saved layout the old bundles of all groups are used
     selections: tab !== 'total' && layoutState.exists ? { [tab]: layoutState.layout.campaignSel } : null,

@@ -5,14 +5,16 @@
 // week short, see computeWeeksForMonth), the monthly report and anything else saved for the month. The «combined» document is a VIEW of
 // the card (the weeks one under another, then the month), it is not stored.
 //
-// The report status keeps its three database values and gets new names: draft = «Чернетка», reviewed = «На затвердженні»
-// (sent to the responsible people), final = «Затверджено» (the only status a client ever sees).
+// A report is a draft (Чернетка: it is being worked on in «Робота над звітами»), in rework (Доробка: it was returned from the history) or final
+// (Затверджено: it is in the history and the client sees it). The old value «reviewed» (На затвердженні) is read as a draft.
 import { computeWeeksForMonth } from './dateHelpers.js';
 
 export const DRAFT = 'draft';
-export const PENDING = 'reviewed';
+export const REWORK = 'rework';
 export const APPROVED = 'final';
-export const REPORT_STATUS = { [DRAFT]: 'Чернетка', [PENDING]: 'На затвердженні', [APPROVED]: 'Затверджено' };
+export const REPORT_STATUS = { [DRAFT]: 'Чернетка', reviewed: 'Чернетка', [REWORK]: 'Доробка', [APPROVED]: 'Затверджено' };
+// a report that is still being worked on (shown in «Робота над звітами»)
+export const inWork = (status) => status === DRAFT || status === REWORK || status === 'reviewed';
 
 const MONTHS_UK = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -51,7 +53,7 @@ export function buildMonths(rows, todayIso) {
       else others.push(r);
     });
     const count = (status) => weeks.filter((w) => w.row?.status === status).length;
-    const counts = { total: weeks.length, approved: count(APPROVED), pending: count(PENDING), draft: count(DRAFT), missing: weeks.filter((w) => !w.row).length };
+    const counts = { total: weeks.length, approved: count(APPROVED), rework: count(REWORK), draft: weeks.filter((w) => w.row && (w.row.status === DRAFT || w.row.status === 'reviewed')).length, missing: weeks.filter((w) => !w.row).length };
     return {
       key, label: monthLabel(key), ...range, weeks, monthly, others, counts,
       complete: counts.approved === counts.total && monthly?.status === APPROVED,
@@ -66,21 +68,19 @@ export function canApprove(email, approvers) {
   return !list.length || list.includes(String(email || '').toLowerCase());
 }
 
-// What the person can do with a report in this status: [{ action, label, primary? }].
+// What the person can do with a report in the history: only an approved one has an action there (return it for rework); everything else is worked on in
+// «Робота над звітами».
 export function reportActions(status, approver) {
-  if (status === DRAFT) return [{ action: 'send', label: 'На затвердження', primary: true }];
-  if (status === PENDING) return approver ? [{ action: 'approve', label: 'Затвердити', primary: true }, { action: 'return', label: 'Повернути на доопрацювання' }] : [];
-  if (status === APPROVED) return approver ? [{ action: 'reopen', label: 'Відкликати затвердження' }] : [];
+  if (status === APPROVED) return approver ? [{ action: 'return', label: 'Повернути на доопрацювання' }] : [];
   return [];
 }
 
-// The new status and the note of the review for an action. `data.review` is kept inside the report: who sent it, who approved it, why it was returned.
+// The new status and the note of the review for an action. `data.review` is kept inside the report: who approved it, who returned it and why.
+//   approve: draft / rework → final;  return: final → rework, with the note.
 export function reviewPatch(row, action, by, note = '', at = new Date().toISOString()) {
   const prev = row?.data?.review || {};
-  if (action === 'send') return { status: PENDING, review: { ...prev, sentBy: by, sentAt: at, returnedNote: '' } };
   if (action === 'approve') return { status: APPROVED, review: { ...prev, approvedBy: by, approvedAt: at } };
-  if (action === 'return') return { status: DRAFT, review: { ...prev, returnedBy: by, returnedAt: at, returnedNote: String(note || '').trim().slice(0, 1000) } };
-  if (action === 'reopen') return { status: PENDING, review: { ...prev, reopenedBy: by, reopenedAt: at, approvedBy: null, approvedAt: null } };
+  if (action === 'return') return { status: REWORK, review: { ...prev, returnedBy: by, returnedAt: at, returnedNote: String(note || '').trim().slice(0, 1000), approvedBy: null, approvedAt: null } };
   throw new Error('Невідома дія: ' + action);
 }
 

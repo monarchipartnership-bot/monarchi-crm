@@ -62,20 +62,24 @@ export async function refreshMonthTotal(projectId, monthKey) {
   try { return await authedPost('/api/project-month-refresh', { projectId, monthKey }); } catch (e) { return { error: e.message || 'Не вдалося оновити підсумок місяця.' }; }
 }
 
-// One full report (with its numbers), for opening it from the approvals list.
+// One full report (with its numbers).
 export async function fetchProjectReport(id) {
   const { data, error } = await supabase.from('project_reports').select('*').eq('id', id).maybeSingle();
   if (error) throw error;
   return data;
 }
 
-// Every report that waits for approval, with its project's name (the numbers stay out of this read).
-export async function fetchPendingReports() {
-  const { data, error } = await supabase.from('project_reports')
-    .select('id, project_id, platform, period_type, period_start, period_end, status, source, updated_at, review:data->review, projects(name)')
-    .eq('status', 'reviewed').order('updated_at', { ascending: false }).limit(300);
-  if (error) { console.warn('fetchPendingReports failed', error); return []; }
+// The reports of a project that are still worked on (drafts and reports returned for rework), newest first, with their numbers: «Робота над звітами».
+export async function fetchWorkReports(projectId) {
+  const { data, error } = await supabase.from('project_reports').select('*').eq('project_id', projectId).in('status', ['draft', 'reviewed', 'rework']).order('updated_at', { ascending: false });
+  if (error) { console.warn('fetchWorkReports failed', error); return []; }
   return data ?? [];
+}
+// How many reports of a project wait to be worked on (the badge of the tab).
+export async function countWorkReports(projectId) {
+  const { count, error } = await supabase.from('project_reports').select('id', { count: 'exact', head: true }).eq('project_id', projectId).in('status', ['draft', 'reviewed', 'rework']);
+  if (error) return 0;
+  return count || 0;
 }
 
 export async function deleteProjectReport(id) {
@@ -226,4 +230,12 @@ export async function saveReportLayout(projectId, platform, layout, by) {
   const { error } = await supabase.from('project_report_layouts').upsert({ project_id: projectId, platform, kind: t.kind, blocks: t.blocks, creatives: t.creatives, hidden_metrics: t.hiddenMetrics, campaign_selection: t.campaignSel, updated_by: by || null, updated_at: nowIso() }, { onConflict: 'project_id,platform' });
   if (error) throw error;
   return t;
+}
+
+// The workbench saves a report as it is edited: the whole `data`, and optionally a new status. A report a person has saved is theirs (source «manual»),
+// so the agent never overwrites it.
+export async function saveReportData(id, { data, status }) {
+  const patch = { data, source: 'manual', updated_at: nowIso(), ...(status ? { status } : {}) };
+  const { error } = await supabase.from('project_reports').update(patch).eq('id', id);
+  if (error) throw error;
 }

@@ -26,7 +26,7 @@ import { CREATIVE_COUNT, creativeImageUrl, creativeKind, rankAds } from '../src/
 import { collectCreatives, creativeCandidates, creativesOf, pickCreative } from '../api/_lib/metaCreatives.js';
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
-import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
+import { REPORT_STATUS, buildMonths, canApprove, clientVisible, inWork, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
 import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, normalizeTemplate, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
 import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
@@ -46,7 +46,7 @@ import { groupsForPlatform } from '../src/lib/campaignGroups.js';
 import { META_METRICS, META_METRIC_LIST, cleanColumns, countsFor, extractCounts, insightFieldsFor, pickCounts } from '../src/lib/metaColumns.js';
 import { GOOGLE_METRIC_LIST, extractGoogleCounts, googleMetricNamesFor, cleanGoogleColumns } from '../src/lib/googleColumns.js';
 import { PLATFORM_COLUMNS, cleanColumns as cleanPlatformColumns, missingColumns } from '../src/lib/platformColumns.js';
-import { buildReportMessage, reportAction, reportLink } from '../src/lib/projectReportMessage.js';
+import { buildReportMessage, reportAction, reportLink, workLink } from '../src/lib/projectReportMessage.js';
 import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.js';
 import { visibleKeys } from '../src/lib/periodReport.js';
 
@@ -332,7 +332,7 @@ await ok('agent run (two platforms): one draft report and deck per platform; «�
   assert.match(repo.log.reports[0].data.sections.conclusion, /^Meta Ads: /);
   assert.match(repo.log.reports[1].data.sections.conclusion, /^Google Ads: /);
   assert.deepEqual(repo.log.decks.map((d) => d.platform), ['meta', 'google']);
-  assert.ok(repo.log.reports.every((x) => x.source === 'agent' && x.status === 'reviewed')); // straight to approval, the people responsible finish and approve it
+  assert.ok(repo.log.reports.every((x) => x.source === 'agent' && x.status === 'draft')); // drafts: they wait in «Робота над звітами» for the people to finish and confirm them
 });
 await ok('agent run (two platforms): a scope a person already made is left alone, the others are still made', async () => {
   const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { google: { id: 5, source: 'manual', status: 'draft' } } });
@@ -468,6 +468,8 @@ await ok('report message: project, date, type, status, action and the open butto
   const many = buildReportMessage({ projectName: 'P', period: { start: '2026-10-01', end: '2026-10-31' }, periodType: 'monthly', links: [{ label: 'Meta Ads', url: 'u1' }, { label: 'Разом', url: 'u2' }] });
   assert.deepEqual(many.buttons.map((b) => b.text), ['Meta Ads', 'Разом']);
   assert.match(many.text, /Місячний/);
+  assert.equal(workLink('https://crm.x/', 3, 7), 'https://crm.x/projects/3?tab=work&report=7');
+  assert.equal(workLink('https://crm.x', 3), 'https://crm.x/projects/3?tab=work');
   assert.equal(reportLink('https://crm.x/', 3, 'weekly', 'all'), 'https://crm.x/projects/3?tab=weekly&platform=total');
   assert.equal(reportLink('https://crm.x', 3, 'monthly', 'google'), 'https://crm.x/projects/3?tab=monthly&platform=google');
   assert.match(buildReportMessage({ projectName: 'P', periodType: 'weekly', links: [] }).text, /Дата:<\/b> —/);
@@ -492,8 +494,8 @@ await ok('agent run: the chosen chat gets one message with a button per report; 
   assert.match(sent[0].text, /Проєкт:<\/b> Mellowdiamond/);
   assert.match(sent[0].text, /Тип звіту:<\/b> Тижневий/);
   assert.deepEqual(sent[0].buttons.map((b) => b.text), ['Meta Ads', 'Google Ads']);
-  assert.equal(sent[0].buttons[0].url, 'https://crm.test/projects/3?tab=weekly&platform=meta');
-  assert.equal(sent[0].buttons[1].url, 'https://crm.test/projects/3?tab=weekly&platform=google');
+  assert.equal(sent[0].buttons[0].url, 'https://crm.test/projects/3?tab=work&report=11'); // the button opens that very report in «Робота над звітами»
+  assert.equal(sent[0].buttons[1].url, 'https://crm.test/projects/3?tab=work&report=12');
   assert.ok(two.log.events.some((e) => e.kind === 'telegram_sent'));
   // one platform: a plain «Відкрити звіт»
   sent.length = 0;
@@ -794,11 +796,11 @@ await ok('project history: weeks are cut at the month borders (Monday to Sunday,
 });
 await ok('project history: reports are grouped into month cards, the current month is always there, strays are kept apart', () => {
   const r = (id, type, start, end, status, extra = {}) => ({ id, period_type: type, period_start: start, period_end: end, status, platform: 'meta', updated_at: `2026-10-0${id}T10:00:00Z`, ...extra });
-  const rows = [r(1, 'weekly', '2026-09-01', '2026-09-06', 'final'), r(2, 'weekly', '2026-09-07', '2026-09-13', 'reviewed'), r(3, 'monthly', '2026-09-01', '2026-09-30', 'draft'), r(4, 'weekly', '2026-08-31', '2026-09-06', 'final'), r(5, 'custom', '2026-09-10', '2026-09-12', 'draft')];
+  const rows = [r(1, 'weekly', '2026-09-01', '2026-09-06', 'final'), r(2, 'weekly', '2026-09-07', '2026-09-13', 'rework'), r(3, 'monthly', '2026-09-01', '2026-09-30', 'draft'), r(4, 'weekly', '2026-08-31', '2026-09-06', 'final'), r(5, 'custom', '2026-09-10', '2026-09-12', 'draft')];
   const months = buildMonths(rows, '2026-10-21');
   assert.deepEqual(months.map((m) => m.key), ['2026-10', '2026-09', '2026-08']); // newest first, October is there with nothing in it
   const sep = months[1];
-  assert.deepEqual([sep.counts.approved, sep.counts.pending, sep.counts.missing, sep.counts.total], [1, 1, 3, 5]);
+  assert.deepEqual([sep.counts.approved, sep.counts.rework, sep.counts.missing, sep.counts.total], [1, 1, 3, 5]);
   assert.equal(sep.weeks[0].row.id, 1);
   assert.equal(sep.monthly.id, 3);
   assert.deepEqual(sep.others.map((o) => o.id), [5]); // a custom period is kept, not lost
@@ -813,22 +815,19 @@ await ok('project history: who may approve, what a person can do in each status,
   assert.equal(canApprove('a@x.com', []), true); // nobody chosen yet: anyone with access, as before
   assert.equal(canApprove('A@X.com', ['a@x.com']), true);
   assert.equal(canApprove('b@x.com', ['a@x.com']), false);
-  assert.deepEqual(reportActions('draft', false).map((a) => a.action), ['send']); // anyone may send a draft for approval
-  assert.deepEqual(reportActions('reviewed', false), []);
-  assert.deepEqual(reportActions('reviewed', true).map((a) => a.action), ['approve', 'return']);
-  assert.deepEqual(reportActions('final', true).map((a) => a.action), ['reopen']);
+  assert.deepEqual(reportActions('final', true).map((a) => a.action), ['return']); // an approved report can be returned for rework by the people who approve
   assert.deepEqual(reportActions('final', false), []);
+  for (const status of ['draft', 'rework', 'reviewed']) assert.deepEqual(reportActions(status, true), []); // those are worked on in «Робота над звітами», not in the history
+  assert.deepEqual([inWork('draft'), inWork('rework'), inWork('reviewed'), inWork('final')], [true, true, true, false]);
+  assert.equal(REPORT_STATUS.reviewed, 'Чернетка'); // the old value reads as a draft
   const at = '2026-10-21T10:00:00Z';
-  let row = { status: 'draft', data: {} };
-  let p = reviewPatch(row, 'send', 'm@x.com', '', at);
-  assert.deepEqual([p.status, p.review.sentBy], ['reviewed', 'm@x.com']);
-  p = reviewPatch({ status: 'reviewed', data: { review: p.review } }, 'return', 'a@x.com', '  add the plans  ', at);
-  assert.deepEqual([p.status, p.review.returnedNote, p.review.sentBy], ['draft', 'add the plans', 'm@x.com']);
-  p = reviewPatch({ status: 'reviewed', data: {} }, 'approve', 'a@x.com', '', at);
+  let p = reviewPatch({ status: 'draft', data: {} }, 'approve', 'a@x.com', '', at);
   assert.deepEqual([p.status, p.review.approvedBy], ['final', 'a@x.com']);
-  p = reviewPatch({ status: 'final', data: { review: p.review } }, 'reopen', 'a@x.com', '', at);
-  assert.deepEqual([p.status, p.review.approvedBy], ['reviewed', null]); // withdrawn: the client stops seeing it until it is approved again
-  assert.throws(() => reviewPatch(row, 'nope', 'a'), /Невідома дія/);
+  p = reviewPatch({ status: 'final', data: { review: p.review } }, 'return', 'a@x.com', '  add the plans  ', at);
+  assert.deepEqual([p.status, p.review.returnedNote, p.review.approvedBy], ['rework', 'add the plans', null]); // the client stops seeing it until it is approved again
+  p = reviewPatch({ status: 'rework', data: { review: p.review } }, 'approve', 'b@x.com', '', at);
+  assert.deepEqual([p.status, p.review.approvedBy, p.review.returnedNote], ['final', 'b@x.com', 'add the plans']); // the note of the return stays as history
+  assert.throws(() => reviewPatch({ status: 'draft', data: {} }, 'send', 'a'), /Невідома дія/);
   assert.deepEqual(clientVisible([{ id: 1, status: 'draft' }, { id: 2, status: 'reviewed' }, { id: 3, status: 'final' }]).map((x) => x.id), [3]); // only approved reports reach a client
 });
 await ok('month to date: after an approved week the month is pulled again from the 1st, compared with the same days of the previous month, in one row', async () => {
@@ -854,7 +853,7 @@ await ok('month to date: after an approved week the month is pulled again from t
   assert.equal(saved.data.approvedThrough, '2026-10-11');
   assert.match(saved.data.label, /11\.10\.2026/);
   // a later week is approved: the same row grows, no second row
-  const running = { id: 7, period_type: 'monthly', period_start: '2026-10-01', period_end: '2026-10-11', platform: 'meta', source: 'agent', status: 'draft' };
+  const running = { id: 7, period_type: 'monthly', period_start: '2026-10-01', period_end: '2026-10-11', platform: 'meta', source: 'agent', status: 'draft', data: { toDate: true } };
   const second = mk([...rows.slice(0, 1), week('2026-10-12', '2026-10-18', 'final'), running]);
   const r2 = await refreshMonthToDate({ repo: second, post, projectId: 3, monthKey: '2026-10' });
   assert.deepEqual(r2.updated, [{ scope: 'meta', end: '2026-10-18' }]);
@@ -865,8 +864,11 @@ await ok('month to date: after an approved week the month is pulled again from t
   const r3 = await refreshMonthToDate({ repo: manual, post, projectId: 3, monthKey: '2026-10' });
   assert.deepEqual([r3.updated.length, manual.log.updated.length, manual.log.saved.length], [0, 0, 0]);
   assert.match(r3.skipped[0], /створений вручну/);
-  const pending = mk([week('2026-10-05', '2026-10-11', 'final'), { ...running, status: 'reviewed' }]);
-  assert.match((await refreshMonthToDate({ repo: pending, post, projectId: 3, monthKey: '2026-10' })).skipped[0], /на затвердженні/);
+  const pending = mk([week('2026-10-05', '2026-10-11', 'final'), { ...running, status: 'rework' }]);
+  assert.match((await refreshMonthToDate({ repo: pending, post, projectId: 3, monthKey: '2026-10' })).skipped[0], /чернетка чи доробка/);
+  // a full monthly report of the agent that is not the running row is somebody's draft: it is not overwritten either
+  const draftMonth = mk([week('2026-10-05', '2026-10-11', 'final'), { ...running, data: {} }]);
+  assert.equal((await refreshMonthToDate({ repo: draftMonth, post, projectId: 3, monthKey: '2026-10' })).updated.length, 0);
   const none = mk([week('2026-10-12', '2026-10-18', 'reviewed')]);
   const r4 = await refreshMonthToDate({ repo: none, post, projectId: 3, monthKey: '2026-10' });
   assert.deepEqual([r4.updated.length, none.log.saved.length], [0, 0]);
@@ -880,9 +882,9 @@ await ok('month to date: after an approved week the month is pulled again from t
 await ok('month to date: the monthly run moves the running row to the full month instead of adding a second row; a month with two monthly rows keeps both visible', async () => {
   const tables = { project_reports: [{ id: 1, project_id: 3, period_type: 'monthly', period_start: '2026-10-01', period_end: '2026-10-12', platform: 'meta', source: 'agent', status: 'draft', data: { toDate: true } }] };
   const repo = createAgentRepo(fakeDb(tables), 'agent@x.y');
-  const row = await repo.saveReport({ projectId: 3, periodType: 'monthly', period: { start: '2026-10-01', end: '2026-10-31' }, platform: 'meta', source: 'agent', status: 'reviewed', data: { kind: 'ecom' } });
+  const row = await repo.saveReport({ projectId: 3, periodType: 'monthly', period: { start: '2026-10-01', end: '2026-10-31' }, platform: 'meta', source: 'agent', status: 'draft', data: { kind: 'ecom' } });
   assert.equal(tables.project_reports.length, 1);
-  assert.deepEqual([row.id, tables.project_reports[0].period_end, tables.project_reports[0].status], [1, '2026-10-31', 'reviewed']);
+  assert.deepEqual([row.id, tables.project_reports[0].period_end, tables.project_reports[0].status], [1, '2026-10-31', 'draft']);
   const r = (id, end, updated) => ({ id, period_type: 'monthly', period_start: '2026-10-01', period_end: end, status: 'draft', platform: 'meta', updated_at: updated });
   const m = buildMonths([r(1, '2026-10-12', '2026-10-13T10:00:00Z'), r(2, '2026-10-31', '2026-11-01T10:00:00Z')], '2026-11-02').find((x) => x.key === '2026-10');
   assert.equal(m.monthly.id, 2);
@@ -1041,8 +1043,8 @@ await ok('agent run: makes a draft report with the dynamics text, a deck, an eve
   const r = await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
   assert.equal(r.status, 'ok');
   assert.equal(repo.log.reports[0].source, 'agent');
-  assert.equal(repo.log.reports[0].status, 'reviewed');
-  assert.equal(repo.log.reports[0].data.review.sentBy, 'AI-агент');
+  assert.equal(repo.log.reports[0].status, 'draft');
+  assert.equal(repo.log.reports[0].data.review.createdBy, 'AI-агент');
   assert.match(repo.log.reports[0].data.sections.conclusion, /^Meta Ads: /);
   assert.equal(repo.log.reports[0].data.sections.plans, '');
   assert.match(repo.log.reports[0].data.sections.whatWasDone, /Test RTS/);
@@ -1159,13 +1161,13 @@ await ok('notifications: a finished draft and a problem go to the chosen people,
   await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
   assert.deepEqual(repo.log.notifications.map((n) => n.recipient_email), ['boss@x.y']);
   assert.equal(repo.log.notifications[0].type, 'project_report');
-  assert.equal(repo.log.notifications[0].link, '/projects/approvals');
-  assert.match(repo.log.notifications[0].body, /^Mellowdiamond: Підготовлено .* і надіслано на затвердження/);
+  assert.equal(repo.log.notifications[0].link, '/projects/3?tab=work');
+  assert.match(repo.log.notifications[0].body, /^Mellowdiamond: Підготовлено .* і збережено в чернетках/);
 
   const cron = fakeRepo({ agent: withPeople });
   await runProjectReport({ repo: cron, post, projectId: 3, periodType: 'monthly', trigger: 'cron', today: '2026-10-15' });
   assert.equal(cron.log.notifications.length, 2);
-  assert.equal(cron.log.notifications[0].link, '/projects/approvals');
+  assert.equal(cron.log.notifications[0].link, '/projects/3?tab=work');
 
   const broken = async () => { throw new Error('Сесія недійсна'); };
   const bad = fakeRepo({ agent: withPeople });

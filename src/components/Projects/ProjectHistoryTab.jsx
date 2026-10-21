@@ -25,7 +25,7 @@ const Chip = ({ status, toDate }) => (toDate ? <i className="ph-chip ph-chip--to
 
 
 // «Історія проекту»: month cards, one scope (platform) at a time like the report pages. A card holds the weeks of the month, the monthly report and the
-// combined document. A report goes draft → on approval → approved; only the approved ones reach the client.
+// combined document. A report is a draft, in rework or approved; only the approved ones reach the client, the others are opened in «Робота над звітами».
 export default function ProjectHistoryTab({ projectId }) {
   const navigate = useNavigate();
   const { email } = useAuth();
@@ -79,7 +79,7 @@ export default function ProjectHistoryTab({ projectId }) {
     try {
       await setReportStatus(row.id, action, { by: email, note });
       // an approved (or withdrawn) week changes the running total of its month
-      if ((action === 'approve' || action === 'reopen') && row.period_type === 'weekly') {
+      if ((action === 'approve' || action === 'return') && row.period_type === 'weekly') {
         setNote('Оновлюємо підсумок місяця…');
         const r = await refreshMonthTotal(projectId, monthKey(row.period_start));
         if (r.error) setError('Тиждень оновлено, але підсумок місяця не вдалося перерахувати: ' + r.error);
@@ -105,17 +105,17 @@ export default function ProjectHistoryTab({ projectId }) {
       {row ? (
         <span className="ph-act">
           {(row.data?.toDate ? [] : reportActions(row.status, approver)).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
-          <button type="button" className="btn" onClick={() => setOpenId(row.id)}>Відкрити</button>
+          <button type="button" className="btn" onClick={() => (row.status === 'final' ? setOpenId(row.id) : navigate(`/projects/${projectId}?tab=work&report=${row.id}&platform=${row.platform}`))}>Відкрити</button>
         </span>
       ) : <span className="ph-missing">Зʼявиться, коли агент або менеджер створить звіт за цей період.</span>}
-      {row?.data?.review?.returnedNote && row.status === 'draft' && <span className="ph-note">Повернуто на доопрацювання: {row.data.review.returnedNote}</span>}
+      {row?.data?.review?.returnedNote && row.status === 'rework' && <span className="ph-note">Повернуто на доопрацювання: {row.data.review.returnedNote}</span>}
     </li>
   );
 
   return (
     <section className="report-section">
       <HubTitle icon="file" className="prep-box-title">Історія проекту</HubTitle>
-      <div className="pacc-hint">Місяці з тижневими звітами: чернетка, на затвердженні, затверджено. Клієнт бачить лише затверджене.</div>
+      <div className="pacc-hint">Місяці з тижневими звітами: чернетка, доробка, затверджено. Клієнт бачить лише затверджене; чернетки й доробка опрацьовуються в розділі «Робота над звітами».</div>
       <div className="prep-seg" role="tablist" aria-label="Платформи">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>
@@ -132,14 +132,14 @@ export default function ProjectHistoryTab({ projectId }) {
           {months.map((m, i) => {
             const isOpen = closed[m.key] === undefined ? i === 0 : !closed[m.key];
             const share = m.counts.total ? Math.round((m.counts.approved / m.counts.total) * 100) : 0;
-            const tone = m.counts.total && share === 100 && m.monthly?.status === 'approved' ? ' st-ok' : m.counts.pending ? ' st-paused' : '';
+            const tone = m.counts.total && share === 100 && m.monthly?.status === 'approved' ? ' st-ok' : m.counts.rework ? ' st-paused' : '';
             return (
               <article key={m.key} className={'ph-month' + (isOpen ? ' open' : '')}>
                 <header onClick={() => setClosed((c) => ({ ...c, [m.key]: isOpen }))}>
                   <span className={'hub-ring hub-ring--sm ph-ring' + tone} style={{ '--p': share }} aria-hidden="true"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2" /></svg></span></span>
                   <div className="ph-mt">
                     <h3>{m.label}</h3>
-                    <span className="ph-sum">Тижні: {m.counts.approved} з {m.counts.total} затверджено{m.counts.pending ? `, на затвердженні: ${m.counts.pending}` : ''}</span>
+                    <span className="ph-sum">Тижні: {m.counts.approved} з {m.counts.total} затверджено{m.counts.rework ? `, в доробці: ${m.counts.rework}` : ''}</span>
                   </div>
                   <Chip status={m.monthly?.status} />
                   <span className="ph-grow" />

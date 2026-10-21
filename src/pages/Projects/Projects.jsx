@@ -4,9 +4,6 @@ import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectModal from '../../components/Projects/ProjectModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchProjects, createProject } from '../../lib/api/projects';
-import { fetchPendingReports } from '../../lib/api/projectReportStore';
-import { fetchApprovers } from '../../lib/api/projectAgents';
-import { canApprove } from '../../lib/projectHistory';
 import { addProjectAccount, fetchAllProjectAccounts } from '../../lib/api/projectAccounts';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
 import '@fontsource/onest/500.css';
@@ -42,12 +39,6 @@ export default function Projects() {
   const newForClient = location.state?.newForClient || null;
 
   const [projects, setProjects] = useState([]);
-  const [pendingCount, setPendingCount] = useState(0); // reports that wait for this person's approval
-  useEffect(() => {
-    let off = false;
-    Promise.all([fetchPendingReports(), fetchApprovers()]).then(([rows, approvers]) => { if (!off) setPendingCount(rows.filter((r) => canApprove(email, approvers.get(r.project_id))).length); }).catch(() => {});
-    return () => { off = true; };
-  }, [email]);
   const [accounts, setAccounts] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -209,13 +200,6 @@ export default function Projects() {
             ))}
           </div>
           <div className="tb-sp" />
-          <button
-            type="button" className="proj-apr" onClick={() => navigate('/projects/approvals')}
-            title="Звіти на затвердження" aria-label={'Звіти на затвердження' + (pendingCount > 0 ? `: ${pendingCount}` : '')}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5" /><path d="M8 9h8M8 13h4M13.5 16.5l1.8 1.8 3.2-3.4" /></svg>
-            {pendingCount > 0 && <span className="proj-apr-n" aria-hidden="true">{pendingCount > 99 ? '99+' : pendingCount}</span>}
-          </button>
           <button ref={createBtn} type="button" className="btn btn-p proj-create" onClick={() => setModalOpen(true)}>
             <svg className="pf-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Створити проєкт
           </button>

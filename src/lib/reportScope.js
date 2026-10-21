@@ -23,7 +23,7 @@ export function pickReportRow(rows, periodStart, platform) {
 }
 
 // A project has a report per platform now: the project counts as only as far along as its least finished report.
-const STATUS_ORDER = { draft: 0, reviewed: 1, final: 2 };
+const STATUS_ORDER = { draft: 0, reviewed: 0, rework: 1, final: 2 };
 export function collapseStatuses(rows) {
   const by = new Map();
   rows.forEach((r) => {

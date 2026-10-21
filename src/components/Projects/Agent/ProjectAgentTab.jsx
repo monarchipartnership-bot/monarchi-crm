@@ -260,7 +260,7 @@ export default function ProjectAgentTab({ projectId }) {
               <Select value={runType} onChange={setRunType} ariaLabel="Який звіт зробити" options={RUN_TYPES} />
               <button type="button" className="btn btn-p" onClick={runNow} disabled={busy === 'run' || missing}>{busy === 'run' ? 'Агент працює…' : 'Створити звіт'}</button>
             </div>
-            <div className="pacc-hint">Агент збере цифри з кабінетів за останній завершений період, напише текст і підготує презентацію. Звіт одразу надходить на затвердження: відповідальні перевіряють його в розділі «Звіти на затвердження», дописують те, що агент залишив порожнім, і затверджують.</div>
+            <div className="pacc-hint">Агент збере цифри з кабінетів за останній завершений період, напише текст і підготує презентацію. Звіт зберігається в чернетках: його опрацьовують у розділі «Робота над звітами», дописують те, що агент залишив порожнім, і натискають «Підтверджено».</div>
             {busy === 'run' && <div className="pacc-hint">Це може тривати до хвилини-двох: агент читає кабінети й історію змін.</div>}
             {runResult && (
               <div className={'pag-run-result pag-run-result--' + runResult.status} role="status">
@@ -347,16 +347,16 @@ export default function ProjectAgentTab({ projectId }) {
             {!form.tasks.presentation && <div className="pacc-hint">Презентації вимкнені вище: ці параметри нічого не змінюють.</div>}
           </PagSection>
 
-          <PagSection title="Відповідальні за затвердження" hint="Ці люди бачать звіти проєкту в розділі «Звіти на затвердження», перевіряють їх, доповнюють і затверджують. Лише затверджений звіт потрапляє в історію проєкту для клієнта.">
+          <PagSection title="Відповідальні за затвердження" hint="Ці люди підтверджують звіти («Підтверджено» в розділі «Робота над звітами») і зберігають фінал; повертають звіти на доопрацювання з історії. Лише підтверджений звіт потрапляє в історію проєкту для клієнта.">
             <div className="pag-opts pag-opts--compact">
               {recipientChoices(people, form.approvers).map((p) => (
                 <PagOption key={p.email} checked={(form.approvers || []).includes(p.email)} onChange={() => toggleIn('approvers', p.email)} title={p.label} desc={p.label !== p.email ? p.email : ''} />
               ))}
             </div>
-            {!(form.approvers || []).length && <div className="pacc-hint">Нікого не обрано: затвердити звіт може будь-хто з доступом до платформи.</div>}
+            {!(form.approvers || []).length && <div className="pacc-hint">Нікого не обрано: підтвердити звіт може будь-хто з доступом до платформи.</div>}
           </PagSection>
 
-          <PagSection title="Сповіщення" hint="Хто дізнається про готовий звіт: дзвіночок CRM і Telegram-чат. Звіт завжди чекає на затвердження: відповідальні перевіряють його, перш ніж він потрапить до клієнта.">
+          <PagSection title="Сповіщення" hint="Хто дізнається про готовий звіт: дзвіночок CRM і Telegram-чат. Звіт спершу лежить у чернетках: відповідальні опрацьовують і підтверджують його, перш ніж він потрапить до клієнта.">
             <div className="pag-opts">
               <PagOption checked={form.notify} onChange={(v) => setCfg({ notify: v })} title="Сповіщати про результат" desc="Звіт готовий або агент не зміг його створити. Сповіщення зʼявляться в загальному дзвіночку CRM." />
             </div>

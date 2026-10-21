@@ -88,8 +88,8 @@ export function createAgentRepo(db, agentEmail) {
     async saveReport({ projectId, periodType, period, platform = 'all', source, status, data }) {
       // A month keeps ONE monthly row: the running one («month to date») is moved to the final period instead of a second row appearing next to it.
       if (periodType === 'monthly') {
-        const same = must(await db.from('project_reports').select('id, source, status').eq('project_id', projectId).eq('period_type', 'monthly').eq('period_start', period.start).eq('platform', platform).neq('period_end', period.end));
-        const mine = (same || []).find((r) => r.source === 'agent' && r.status === 'draft');
+        const same = must(await db.from('project_reports').select('id, source, status, data').eq('project_id', projectId).eq('period_type', 'monthly').eq('period_start', period.start).eq('platform', platform).neq('period_end', period.end));
+        const mine = (same || []).find((r) => r.source === 'agent' && r.status === 'draft' && r.data?.toDate); // only the running row moves
         if (mine) return must(await db.from('project_reports').update({ period_end: period.end, source, status, data, created_by: agentEmail, updated_at: nowIso() }).eq('id', mine.id).select().single());
       }
       return must(await db.from('project_reports').upsert({

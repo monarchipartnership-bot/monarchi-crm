@@ -7,7 +7,11 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import WeekPicker from '../../Reports/Weekly/WeekPicker';
 import { daysInRange, fetchProjectRange, periodFromPicker } from '../../../lib/periodReport';
-import { fetchProjectReports, saveProjectReport, deleteProjectReport } from '../../../lib/api/projectReportStore';
+import { fetchProjectReports, saveProjectReport, deleteProjectReport, refreshMonthTotal, setReportStatus } from '../../../lib/api/projectReportStore';
+import { suggestCreatives } from '../../../lib/api/reportCreatives';
+import CreativeGrid from '../CreativeGrid';
+import CreativePickerDialog from '../CreativePickerDialog';
+import { REPORT_STATUS, canApprove, monthKey } from '../../../lib/projectHistory';
 import { fetchProjectDecks } from '../../../lib/api/projectDecks';
 import { EMPTY_SECTIONS, buildWhatWasDone, comparisonPeriod, pullReportData, reportPayload } from '../../../lib/reportEngine';
 import { reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
@@ -21,7 +25,6 @@ import '../../../styles/projectReports.css';
 import Select from '../../common/Select';
 
 import { HubTitle } from '../hubIcons';
-const STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
 const fmt = (s) => s.split('-').reverse().join('.');
 
 function initialPicker() {
@@ -42,6 +45,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   const navigate = useNavigate();
   const ctx = useReportContext(projectId, platform);
   const isTotal = platform === 'total';
+  const approver = canApprove(email, ctx.approvers); // who may save a report as final
   const [picker, setPicker] = useState(initialPicker);
   const [saved, setSaved] = useState([]);
   const [decks, setDecks] = useState([]);
@@ -51,6 +55,11 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   const [sections, setSections] = useState(EMPTY_SECTIONS);
   // the template snapshot of the opened saved report (it keeps its own blocks and metrics); null for a new one, which takes the project's current template
   const [snap, setSnap] = useState(null);
+  const [creatives, setCreatives] = useState(null); // { count, items }: the «Most effective creatives» of this report (Meta)
+  const [picking, setPicking] = useState(null);
+  const [cbusy, setCbusy] = useState(false);
+  const [cerr, setCerr] = useState('');
+  const [savedId, setSavedId] = useState(null); // the report just saved as a draft: a link to it in «Робота над звітами»
   const [note, setNote] = useState('');
   const [selection, setSelection] = useState([]);
   const [options, setOptions] = useState({ groups: true });
@@ -107,6 +116,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     if (row) {
       setData(row.data?.platforms ? { platforms: row.data.platforms, previous: row.data.previous || null } : null);
       setSections({ ...EMPTY_SECTIONS, ...(row.data?.sections || {}) });
+      setCreatives(row.data?.creatives || null);
       setSnap(row.data?.template || snapshotOf(null, periodType)); // a report made before templates existed keeps the standard blocks, whatever the template is now
       setNote(row.data?.note || '');
       setSelection(row.data?.selection || []);
@@ -118,6 +128,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       setData(null);
       setSections(EMPTY_SECTIONS);
       setSnap(null);
+      setCreatives(null);
       setNote('');
       setSelection([]);
       setOptions({ groups: true });
@@ -184,24 +195,63 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     try { localStorage.setItem('prep-ask-compare', 'off'); } catch { /* optional */ }
   }
 
-  async function save(nextStatus = status) {
+  // Saves the report with the given status and gives the saved row back. A report a person saves is theirs (source «manual»): the agent never overwrites it.
+  async function persist(nextStatus) {
+    const payload = reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note, template: snap || newSnap(), campaignSel: ctx.selections ? ctx.selections[platform] : null });
+    if (creatives?.items?.length) payload.creatives = { count: creatives.count, items: creatives.items, source: 'manual', at: new Date().toISOString() };
+    const row = await saveProjectReport({ projectId, periodType, periodStart: period.start, periodEnd: period.end, platform: ctx.scope, status: nextStatus, source: 'manual', createdBy: email, data: payload });
+    setStatus(row.status);
+    setMeta({ source: row.source, id: row.id });
+    setDirty(false);
+    return row;
+  }
+  // «Зберегти чернетку»: the report waits in «Робота над звітами» (a report returned for rework stays in rework).
+  async function saveDraft() {
     setBusy('save');
     setMessage('');
+    setSavedId(null);
     try {
-      const row = await saveProjectReport({
-        projectId, periodType, periodStart: period.start, periodEnd: period.end, platform: ctx.scope, status: nextStatus,
-        source: meta.source, createdBy: email,
-        data: reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note, template: snap || newSnap() }),
-      });
-      setStatus(row.status);
-      setDirty(false);
+      const row = await persist(status === 'rework' ? 'rework' : 'draft');
       await reloadSaved();
-      setMessage('Звіт збережено.');
+      setSavedId(row.id);
+      setMessage('Збережено в «Робота над звітами».');
     } catch (e) {
       setMessage((e.message || 'Не вдалося зберегти.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261008000000.');
-    } finally {
-      setBusy('');
-    }
+    } finally { setBusy(''); }
+  }
+  // «Зберегти як фінал»: the report goes to the history of the project and to the client's page at once.
+  async function saveFinal() {
+    if (status !== 'final' && !(await confirm({ title: 'Зберегти як фінал?', body: 'Звіт потрапить в «Історію проекту» і на сторінку клієнта.', confirmLabel: 'Зберегти як фінал' }))) return;
+    setBusy('save');
+    setMessage('');
+    setSavedId(null);
+    try {
+      const wasFinal = status === 'final';
+      const row = await persist(wasFinal ? 'final' : 'draft');
+      if (!wasFinal) await setReportStatus(row.id, 'approve', { by: email });
+      setStatus('final');
+      if (periodType === 'weekly') {
+        const r = await refreshMonthTotal(projectId, monthKey(period.start));
+        if (r.error) setMessage('Звіт збережено як фінал, але підсумок місяця не вдалося перерахувати: ' + r.error);
+      }
+      await reloadSaved();
+      setMessage((m) => m || (wasFinal ? 'Зміни збережено.' : 'Збережено як фінал: звіт в «Історії проекту» і в клієнта.'));
+    } catch (e) {
+      setMessage(e.message || 'Не вдалося зберегти.');
+    } finally { setBusy(''); }
+  }
+
+  // ---- creatives (Meta)
+  const canCreatives = ctx.scope === 'meta' || ctx.scope === 'all';
+  const creativeCount = creatives?.count || (periodType === 'monthly' ? ctx.layout.creatives.monthly : ctx.layout.creatives.weekly) || (periodType === 'monthly' ? 4 : 3);
+  const setCreativeItems = (items) => { setCreatives({ count: creativeCount, items }); setDirty(true); };
+  async function suggestCreativeItems() {
+    setCbusy(true);
+    setCerr('');
+    try {
+      const found = await suggestCreatives({ projectId, start: period.start, end: period.end, count: creativeCount });
+      if (!found.length) setCerr('За цей період у кабінеті Meta не знайдено оголошень.'); else setCreativeItems(found);
+    } catch (e) { setCerr(e.message || 'Не вдалося підібрати креативи.'); } finally { setCbusy(false); }
   }
 
   async function remove(row) {
@@ -314,14 +364,16 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       )}
 
       <section className="report-section prep-box prep-status-box">
-        <HubTitle icon="check" className="prep-box-title">Статус і збереження</HubTitle>
+        <HubTitle icon="check" className="prep-box-title">Збереження</HubTitle>
         <div className="prep-save-row">
-          <div className="pk-field">
-            <label>Статус</label>
-            <Select value={status} onChange={(v) => { setStatus(v); setDirty(true); }} ariaLabel="Статус" options={Object.entries(STATUS).map(([v, l]) => ({ value: v, label: l }))} />
-          </div>
-          <button type="button" className="btn pw-btn--ok" onClick={() => save()} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)}>
-            {busy === 'save' ? '...' : 'Зберегти звіт'}
+          <span className="pacc-hint">{meta.id ? `Статус: ${REPORT_STATUS[status] || status}` : 'Звіт ще не збережено'}</span>
+          {status !== 'final' && (
+            <button type="button" className="btn" onClick={saveDraft} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)} title="Звіт ще дорабатується: він зʼявиться в розділі «Робота над звітами»">
+              {busy === 'save' ? '...' : 'Зберегти чернетку'}
+            </button>
+          )}
+          <button type="button" className="btn pw-btn--ok" onClick={saveFinal} disabled={busy === 'save' || !approver || !data} title={approver ? 'Звіт піде в «Історію проекту» і до клієнта' : 'Фінал зберігають лише відповідальні, обрані в налаштуваннях агента'}>
+            {busy === 'save' ? '...' : status === 'final' ? 'Зберегти зміни' : 'Зберегти як фінал'}
           </button>
           <button
             type="button" className="btn" disabled={!meta.id || dirty || !data || !Object.keys(data.platforms).length}
@@ -332,7 +384,9 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
           </button>
           {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
           {message && <span className="pacc-hint">{message}</span>}
+          {savedId && <button type="button" className="pacc-link" onClick={() => navigate(`/projects/${projectId}?tab=work&report=${savedId}&platform=${platform}`)}>Відкрити в «Робота над звітами»</button>}
         </div>
+        {!approver && <div className="pacc-hint">Фінал зберігають лише відповідальні, обрані в налаштуваннях агента; чернетку може зберегти будь-хто.</div>}
       </section>
 
       {data && Object.keys(data.platforms).length > 0 && (
@@ -390,6 +444,24 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
         </div>
       </section>
 
+      {canCreatives && (
+        <section className="report-section">
+          <HubTitle icon="layers">Most effective creatives</HubTitle>
+          {creatives?.items?.length > 0 ? <CreativeGrid items={creatives.items} onReplace={(i) => setPicking(i)} onRemove={(i) => setCreativeItems(creatives.items.filter((_, j) => j !== i))} /> : <div className="pacc-hint">Креативів у звіті ще немає.</div>}
+          <div className="crx-tools">
+            <button type="button" className="btn" disabled={cbusy} onClick={suggestCreativeItems}>{cbusy ? 'Працюємо…' : creatives?.items?.length ? 'Підібрати знову' : 'Підібрати креативи автоматично'}</button>
+            <button type="button" className="btn" onClick={() => setPicking((creatives?.items || []).length)}>+ Додати креатив</button>
+            {cerr && <span className="form-err">{cerr}</span>}
+          </div>
+        </section>
+      )}
+      {picking != null && (
+        <CreativePickerDialog
+          row={{ project_id: projectId, period_start: period.start, period_end: period.end }} taken={(creatives?.items || []).map((c) => c.adId)} onClose={() => setPicking(null)}
+          onPicked={(item) => { const at = picking; const list = creatives?.items || []; setPicking(null); setCreativeItems(at >= list.length ? [...list, item] : list.map((c, j) => (j === at ? item : c))); }}
+        />
+      )}
+
       <section className="report-section">
         <HubTitle icon="file">Збережені звіти</HubTitle>
         {saved.length === 0 ? (
@@ -402,7 +474,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
                 <tr key={r.id} className={r.period_start === period.start ? 'on' : ''}>
                   <td className="lbl"><button type="button" className="pacc-link" onClick={() => openSaved(r)}>{fmt(r.period_start)} – {fmt(r.period_end)}</button></td>
                   <td><span className={'pacc-pill prep-src prep-src--' + r.source}>{r.source === 'agent' ? 'AI-агент' : 'Вручну'}</span></td>
-                  <td>{STATUS[r.status] || r.status}</td>
+                  <td>{REPORT_STATUS[r.status] || r.status}</td>
                   <td className="muted">{new Date(r.updated_at).toLocaleString('uk-UA')}</td>
                   <td>
                     <div className="prep-deckcell">

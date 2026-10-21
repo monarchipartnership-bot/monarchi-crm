@@ -4,8 +4,11 @@
 import { escapeHtml } from './siteLeadMessage.js';
 
 export const REPORT_TYPE_LABEL = { weekly: 'Тижневий', monthly: 'Місячний', custom: 'Довільний' };
-export const REPORT_STATUS_LABEL = { draft: 'Чернетка', reviewed: 'На затвердженні', final: 'Затверджено' };
+export const REPORT_STATUS_LABEL = { draft: 'Чернетка', reviewed: 'Чернетка', rework: 'Доробка', final: 'Затверджено' };
 const fmt = (s) => String(s || '').split('-').reverse().join('.');
+
+// → the link that opens a report in «Робота над звітами» (reportId: that report; without it the section)
+export const workLink = (crmUrl, projectId, reportId) => `${String(crmUrl || '').replace(/\/+$/, '')}/projects/${projectId}?tab=work${reportId ? `&report=${reportId}` : ''}`;
 
 // → the link of a report tab: /projects/3?tab=weekly&platform=meta ('all' = «Разом» = platform=total)
 export const reportLink = (crmUrl, projectId, periodType, platform) => `${String(crmUrl || '').replace(/\/+$/, '')}/projects/${projectId}?tab=${periodType}${platform ? `&platform=${platform === 'all' ? 'total' : platform}` : ''}`;
@@ -15,7 +18,7 @@ export const reportLink = (crmUrl, projectId, periodType, platform) => `${String
 export function buildReportMessage({ projectName, period, periodType, status = 'draft', action, links = [], test = false }) {
   const dates = period?.start && period?.end ? (period.start === period.end ? fmt(period.start) : `${fmt(period.start)} – ${fmt(period.end)}`) : '—';
   const lines = [
-    `📊 <b>${test ? 'Тест: звіт чекає на затвердження' : 'Звіт чекає на затвердження'}</b>`,
+    `📊 <b>${test ? 'Тест: звіт готовий до доопрацювання' : 'Звіт готовий до доопрацювання'}</b>`,
     '',
     `<b>Проєкт:</b> ${escapeHtml(projectName || '—')}`,
     `<b>Дата:</b> ${escapeHtml(dates)}`,
@@ -30,5 +33,5 @@ export function buildReportMessage({ projectName, period, periodType, status = '
 // What the manager still has to do with a fresh draft: `missing` = the text blocks the agent left empty.
 export function reportAction(missing = []) {
   const todo = missing.length ? `заповнити ${missing.join(' і ')}, ` : '';
-  return `Перевірити цифри, ${todo}затвердити звіт у розділі «Звіти на затвердження»`;
+  return `Перевірити цифри, ${todo}натиснути «Підтверджено» у розділі «Робота над звітами»`;
 }

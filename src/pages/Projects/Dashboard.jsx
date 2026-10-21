@@ -17,9 +17,9 @@ import '../../styles/projectsDashboard.css';
 import '../../styles/projectsDashboardHub.css';
 
 const TREND_WEEKS = 8;
-const REPORT_STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
+const REPORT_STATUS = { draft: 'Чернетка', reviewed: 'Чернетка', rework: 'Доробка', final: 'Затверджено' };
 // Ring of a weekly-report card: how far the report got.
-const REPORT_RING = { final: { cls: 'ok', ring: 'st-ok', p: 100 }, reviewed: { cls: 'in', ring: 'st-in', p: 66 }, draft: { cls: 'wa', ring: 'st-paused', p: 33 }, none: { cls: 'mu', ring: 'st-mu', p: 0 } };
+const REPORT_RING = { final: { cls: 'ok', ring: 'st-ok', p: 100 }, rework: { cls: 'in', ring: 'st-in', p: 66 }, reviewed: { cls: 'wa', ring: 'st-paused', p: 33 }, draft: { cls: 'wa', ring: 'st-paused', p: 33 }, none: { cls: 'mu', ring: 'st-mu', p: 0 } };
 
 function toIso(d) {
   return isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());

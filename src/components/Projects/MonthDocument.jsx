@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ReportBody } from './ArchiveReportModal';
 import useDialogA11y from '../../lib/useDialogA11y';
-import { REPORT_STATUS, APPROVED, PENDING } from '../../lib/projectHistory';
+import { REPORT_STATUS, APPROVED, DRAFT } from '../../lib/projectHistory';
 import { scopeOf } from '../../lib/clientReport';
 import { computeMetric, formatMetric, metricMeta } from '../../lib/reportMetrics';
 import '../../styles/projectReports.css';
@@ -86,7 +86,7 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
             <h3 id="md-title">{month.label}: загальний документ</h3>
             <div className="arc-sub">
               <span className="arc-pc">{projectName}</span>
-              {!empty && <span className={'arc-chip arc-chip--' + (allApproved ? APPROVED : PENDING)}>Тижні {month.counts.approved} з {month.counts.total} затверджено</span>}
+              {!empty && <span className={'arc-chip arc-chip--' + (allApproved ? APPROVED : DRAFT)}>Тижні {month.counts.approved} з {month.counts.total} затверджено</span>}
               {!empty && (monthly
                 ? <><span className="md-lbl">місяць:</span><span className={'arc-chip arc-chip--' + monthly.status}>{REPORT_STATUS[monthly.status] || monthly.status}</span></>
                 : <span className="arc-chip">Місячного звіту ще немає</span>)}

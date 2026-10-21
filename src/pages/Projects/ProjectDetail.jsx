@@ -12,6 +12,9 @@ import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsPayload } from '../../lib/projectFields';
 import AutoField from '../../components/Projects/AutoField';
 import ProjectHistoryTab from '../../components/Projects/ProjectHistoryTab';
+import ReportWorkbench from '../../components/Projects/Workbench/ReportWorkbench';
+import '../../styles/workbench.css';
+import { countWorkReports } from '../../lib/api/projectReportStore';
 import ReportBuilder from '../../components/Projects/Builder/ReportBuilder';
 import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
@@ -35,6 +38,7 @@ const TABS = [
   { key: 'overview', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src },
   { key: 'builder', label: 'Конструктор звіту', icon: null, line: <path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z" /> },
   { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
+  { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'AI Агент', icon: PAGE_ICONS['page.ai-agents'].src },
 ];
@@ -42,7 +46,7 @@ const TABS = [
 const STATUSES = ['active', 'paused', 'completed'];
 // «Формування звіту» holds three ways to look at a period; the old tabs (and the links the agent sends) still open them.
 const COMPOSE_MODES = [['period', 'Показники за період'], ['weekly', 'Тижневий звіт'], ['monthly', 'Місячний звіт']];
-const KEEP_ALIVE = ['builder', 'compose:period', 'compose:weekly', 'compose:monthly']; // panes that keep their state while the card is open
+const KEEP_ALIVE = ['builder', 'compose:period', 'compose:weekly', 'compose:monthly', 'work']; // panes that keep their state while the card is open
 function parseTab(params) {
   const t = params.get('tab');
   if (COMPOSE_MODES.some(([k]) => k === t)) return { tab: 'compose', mode: t };
@@ -85,7 +89,7 @@ export default function ProjectDetail() {
   const setTab = (next) => {
     setTabState(next);
     // the chosen ad platform of the report tabs stays when moving between them
-    const platform = ['compose', 'decks', 'builder'].includes(next) ? searchParams.get('platform') : null;
+    const platform = ['compose', 'decks', 'builder', 'work'].includes(next) ? searchParams.get('platform') : null;
     setSearchParams(next === 'overview' ? {} : { tab: next, ...(next === 'compose' ? { mode } : {}), ...(platform ? { platform } : {}) }, { replace: true });
   };
   const setMode = (next) => {
@@ -94,11 +98,19 @@ export default function ProjectDetail() {
     setSearchParams({ tab: 'compose', mode: next, ...(platform ? { platform } : {}) }, { replace: true });
   };
   const paneKey = tab === 'compose' ? `compose:${mode}` : tab;
+  // The address can be changed from outside (a link in the history, a note on a report page): the card follows it.
+  useEffect(() => {
+    const p = parseTab(searchParams);
+    if (p.tab !== tab) setTabState(p.tab);
+    if (p.tab === 'compose' && p.mode !== mode) setModeState(p.mode);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
   const [deleting, setDeleting] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
   const tabRefs = useRef({});
   const [visited, setVisited] = useState(() => new Set([paneKey]));
   const [cfgVersion, setCfgVersion] = useState(0);
+  const [workCount, setWorkCount] = useState(0); // reports waiting in «Робота над звітами» (the badge of the tab)
+  useEffect(() => { let off = false; countWorkReports(id).then((n) => { if (!off) setWorkCount(n); }); return () => { off = true; }; }, [id, tab]);
   useEffect(() => { setVisited((v) => (v.has(paneKey) ? v : new Set(v).add(paneKey))); }, [paneKey]);
   useEffect(() => { setVisited(new Set([paneKey])); setCfgVersion(0); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -426,7 +438,7 @@ export default function ProjectDetail() {
                 ? <span className="hub-tile"><img src={t.icon} alt="" aria-hidden="true" draggable="false" /></span>
                 : <span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true">{t.line}</svg></span>}
             </span>
-            <span>{t.label}</span>
+            <span>{t.label}</span>{t.key === 'work' && workCount > 0 && <span className="pw-tab-n" aria-label={`${workCount} у роботі`}>{workCount}</span>}
           </button>
         ))}
       </div>
@@ -505,7 +517,7 @@ export default function ProjectDetail() {
       )}
       {KEEP_ALIVE.filter((k) => visited.has(k)).map((k) => (
         <div key={k + '-' + id + (k === 'builder' ? '' : '-' + cfgVersion)} hidden={paneKey !== k}>
-          {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : <PlatformReports projectId={id} mode={k.split(':')[1]} />}
+          {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : k === 'work' ? <ReportWorkbench projectId={id} onCount={setWorkCount} /> : <PlatformReports projectId={id} mode={k.split(':')[1]} />}
         </div>
       ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}

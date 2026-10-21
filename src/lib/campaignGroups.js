@@ -89,3 +89,21 @@ export function buildColumns({ platform, campaigns, groups, selection }) {
 export function selectedCampaignNames({ platform, campaigns, groups, selection }) {
   return buildColumns({ platform, campaigns: (campaigns || []).map((c) => ({ ...c })), groups, selection }).filter((c) => c.kind === 'campaign').map((c) => c.name);
 }
+
+// The selection a saved report was made with, rebuilt from its columns when the report did not keep it (older reports): a group column → that group,
+// a campaign column outside the chosen groups → that campaign; an old bundle by name → the group of that name, a single campaign → that campaign.
+export function selectionFromColumns({ platform, columns, groups }) {
+  const gs = groupsForPlatform(groups, platform);
+  const ids = new Set();
+  const campaigns = [];
+  (columns || []).forEach((c) => {
+    if (c.kind === 'group') { const id = Number(String(c.id).replace(/^g:/, '')); if (gs.some((g) => g.id === id)) ids.add(id); }
+    else if (!c.kind) {
+      if (c.single) campaigns.push(campaignKey(platform, c.name));
+      else { const g = gs.find((x) => x.name === c.name); if (g) ids.add(g.id); }
+    }
+  });
+  const chosen = gs.filter((g) => ids.has(g.id));
+  (columns || []).filter((c) => c.kind === 'campaign').forEach((c) => { if (!chosen.some((g) => groupMatches(g, platform, c.name))) campaigns.push(campaignKey(platform, c.name)); });
+  return { groups: [...ids], campaigns: [...new Set(campaigns)] };
+}

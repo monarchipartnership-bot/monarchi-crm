@@ -13,7 +13,7 @@ import { readSlideImage } from '../../lib/presentation/imageFile';
 import { MIXED, plain, text } from '../../lib/presentation/textModel';
 import Select from '../common/Select';
 
-const STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
+const STATUS = { draft: 'Чернетка', reviewed: 'Чернетка', rework: 'Доробка', final: 'Затверджено' };
 
 // ----- Дані ---------------------------------------------------------------------------------
 export function DataPanel({ sel, setSel, report, reportState, platforms, deck, hasDeck, building, message, onBuild, onClient, onPeriod, onLang }) {

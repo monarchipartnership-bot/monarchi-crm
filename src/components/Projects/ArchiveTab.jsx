@@ -14,7 +14,7 @@ import { platformInfo } from '../../lib/adAccounts';
 import '../../styles/projectReports.css';
 
 const TYPE_LABEL = { weekly: 'Тижневий', monthly: 'Місячний', custom: 'Довільний' };
-const STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
+const STATUS = { draft: 'Чернетка', reviewed: 'Чернетка', rework: 'Доробка', final: 'Затверджено' };
 const stamp = (iso) => new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 // «Архів звітів» of a project: every saved report, split by ad platform (the same tabs as the report pages, «Разом» last),

@@ -8,7 +8,7 @@
 export function buildNotifications({ projectId, projectName, periodType, status, message, config = {}, startedBy = null, platform = null }) {
   if (config.notify === false) return [];
   if (status !== 'ok' && status !== 'problem') return [];
-  // A finished report waits for approval, so the people who approve are told (anyone chosen for notifications when nobody is chosen to approve); a problem goes to the notification list.
+  // A finished report is a draft to work on, so the people who confirm reports are told (anyone chosen for notifications when nobody is chosen); a problem goes to the notification list.
   const ok0 = status === 'ok';
   const chosen = ok0 && (config.approvers || []).length ? config.approvers : config.notifyEmails;
   const recipients = [...new Set((chosen || []).map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
@@ -18,9 +18,9 @@ export function buildNotifications({ projectId, projectName, periodType, status,
   return recipients.map((email) => ({
     recipient_email: email,
     type: ok ? 'project_report' : 'project_agent_problem',
-    title: ok ? 'Звіт чекає на затвердження' : 'Агент не зміг створити звіт',
+    title: ok ? 'Звіт готовий до доопрацювання' : 'Агент не зміг створити звіт',
     body: `${name}: ${message}`.slice(0, 400),
-    link: ok ? '/projects/approvals' : `/projects/${projectId}?tab=agent`,
+    link: ok ? `/projects/${projectId}?tab=work` : `/projects/${projectId}?tab=agent`,
     project_id: projectId,
   }));
 }

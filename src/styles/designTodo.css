@@ -1,0 +1,3 @@
+/* Marker «Отдать дизайн чату» on new elements that still need the design. Temporary: removed together with <DesignTodo />. */
+.design-todo { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; border: 1.5px dashed #D6336C; background: #FFF0F6; color: #A61E4D; font: 600 11.5px/1.5 system-ui, sans-serif; letter-spacing: .01em; white-space: nowrap; vertical-align: middle; }
+.design-todo::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #D6336C; }

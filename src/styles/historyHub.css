@@ -47,3 +47,4 @@
 .project-detail-page.pw .ph-chip--todate { background: #E8F0FE; color: #1D4FB3; }
 .project-detail-page.pw .ph-chip--none { background: none; color: #a77fb0; padding-left: 0; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .project-detail-page.pw .ph-chip--none::before { display: none; }
+.project-detail-page.pw .ph-chip--rework { background: #FBF0D5; color: #946200; }

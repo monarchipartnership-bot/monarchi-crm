@@ -59,8 +59,9 @@ export async function refreshMonthToDate({ repo, post, projectId, monthKey: key 
   for (const scope of Object.keys(ends)) {
     const end = ends[scope];
     const existing = (await repo.getReports(projectId, 'monthly', scope)).filter((r) => r.period_start === monthStart);
-    const blocker = existing.find((r) => r.source !== 'agent' || r.status !== 'draft');
-    if (blocker) { out.skipped.push(`${scope === 'all' ? 'Разом' : NAMES[scope] || scope}: місячний звіт уже ${blocker.source !== 'agent' ? 'створений вручну' : blocker.status === 'final' ? 'затверджений' : 'на затвердженні'}, підсумок не змінено.`); continue; }
+    // only the running row (agent, draft, toDate) is renewed; any other monthly report of that month is somebody's work and stays
+    const blocker = existing.find((r) => !(r.source === 'agent' && r.status === 'draft' && r.data?.toDate));
+    if (blocker) { out.skipped.push(`${scope === 'all' ? 'Разом' : NAMES[scope] || scope}: місячний звіт уже ${blocker.source !== 'agent' ? 'створений вручну' : blocker.status === 'final' ? 'затверджений' : 'є (чернетка чи доробка)'}, підсумок не змінено.`); continue; }
     const period = { start: monthStart, end };
     const prev = toDateComparison(key, end);
     const kind = kindOf(scope);
@@ -74,7 +75,7 @@ export async function refreshMonthToDate({ repo, post, projectId, monthKey: key 
       previous: data.previous ? { ...data.previous, platforms: data.previous.platforms?.[scope] ? { [scope]: data.previous.platforms[scope] } : {} } : null,
     };
     const conclusion = blocksFor(layouts[scope], 'monthly').some((b) => b.kind === 'conclusion') ? describeDynamics({ platforms: scoped.platforms, previous: scoped.previous, kind, custom, names: NAMES, unequal: false }) : '';
-    const payload = reportPayload({ kind, data: scoped, compare: { mode: 'custom' }, period, prev, selection: [], options: { groups: true }, sections: { ...EMPTY_SECTIONS, conclusion }, note: config.note || '', template: snapshotOf(layouts[scope], 'monthly', { metrics: metricKeys(kind, cleanColumns(scope, columns?.[scope]), custom) }) });
+    const payload = reportPayload({ kind, data: scoped, compare: { mode: 'custom' }, period, prev, selection: [], options: { groups: true }, sections: { ...EMPTY_SECTIONS, conclusion }, note: config.note || '', campaignSel: layouts[scope].campaignSel, template: snapshotOf(layouts[scope], 'monthly', { metrics: metricKeys(kind, cleanColumns(scope, columns?.[scope]), custom) }) });
     payload.toDate = true;
     payload.approvedThrough = end;
     payload.label = `Місяць на сьогодні, по ${fmt(end)}`;

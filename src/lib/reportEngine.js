@@ -77,7 +77,7 @@ export async function pullReportData({ accounts, kind, groups, period, prev, pos
 }
 
 // What a saved report holds (project_reports.data). `compare` is internal bookkeeping and is never printed.
-export function reportPayload({ kind, data, compare, period, prev, selection = [], options = { groups: true }, sections = EMPTY_SECTIONS, note = '', template = null }) {
+export function reportPayload({ kind, data, compare, period, prev, selection = [], options = { groups: true }, sections = EMPTY_SECTIONS, note = '', template = null, campaignSel = null }) {
   const info = comparisonInfo(period, prev);
   return {
     version: 1,
@@ -89,6 +89,7 @@ export function reportPayload({ kind, data, compare, period, prev, selection = [
     options,
     sections,
     note,
+    ...(campaignSel ? { campaignSel } : {}), // which groups and campaigns the report was made with (the workbench starts from it)
     ...(template ? { template } : {}), // the blocks and metrics this report was made with; a later change of the template never touches it
     savedAt: new Date().toISOString(),
   };

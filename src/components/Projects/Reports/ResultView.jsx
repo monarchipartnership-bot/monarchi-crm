@@ -17,7 +17,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, templateMetrics = null, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
+export default function ResultView({ data, kind, custom, templateMetrics = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -70,6 +70,7 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
         <div className="prep-result-actions">
           {children}
           {(() => {
+            if (noExport) return null;
             const menu = <ExportMenu model={{ title, sheets }} targetRef={captureRef} fileBase={`${fileBase}_${tabLabel}`} formats={exportFormats} />;
             return exportPortal ? createPortal(menu, exportPortal) : menu;
           })()}
