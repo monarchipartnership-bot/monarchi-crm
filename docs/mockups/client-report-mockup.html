@@ -69,6 +69,9 @@ td.gen { background: var(--accent-soft); }
 td.best { background: var(--good-bg); color: var(--good); font-weight: 600; }
 td.worst { background: var(--bad-bg); color: var(--bad); }
 .hint { font-size: 12px; color: var(--muted); }
+.mk { display: block; font-size: 11px; font-weight: 700; line-height: 1.2; margin-top: 1px; }
+.mk.good { color: var(--good); } .mk.bad { color: var(--bad); } .mk.neutral, .mk.none { color: var(--muted); font-weight: 500; }
+td.best .mk.good, td.worst .mk.bad { color: inherit; }
 .t { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }
 .t h4 { margin: 0 0 5px; font-size: 13px; color: var(--accent-ink); font-weight: 600; }
 .t p { font-size: 13.5px; }
@@ -118,6 +121,8 @@ var WEEKS = [
     done: 'Continued monitoring and optimization of the active campaigns. Increased the budget for the Hybrid Wig campaign following the positive performance trend. Prepared new MTO creatives for the next launch.', crea: ['RTS Special Offer'], concl: 'Example text. A short final week: results held steady.', plans: 'Example text. Launch the Make To Order campaign and compare it with the RTS campaigns.' }
 ];
 var ORDER = ['kb', 'cat', 'hw', 'ld', 'so', 'wt'];
+var PREV_W1 = { label: 'the last week of August, 25.08 – 31.08 (demo figures)', gen: G(1450, 9100, 11, 1380, 33000, 11000), groups: null };
+var PREV_AUG = { label: 'August', gen: { spend: 6250, revenue: 40938, sales: 52, clicks: 6399, impr: 148810, reach: null }, groups: null };
 var MONTH = (function () {
   var gen = { spend: 0, revenue: 0, sales: 0, clicks: 0, impr: 0, reach: 0 }, groups = {};
   WEEKS.forEach(function (w) { ['spend', 'revenue', 'sales', 'clicks', 'impr'].forEach(function (k) { gen[k] += w.gen[k]; }); Object.keys(w.groups).forEach(function (id) { var g = groups[id] || (groups[id] = G(0, 0, 0, 0, 0, 0)); ['spend', 'revenue', 'sales', 'clicks', 'impr', 'reach'].forEach(function (k) { g[k] += w.groups[id][k]; }); }); });
@@ -130,27 +135,40 @@ function derive(g) { return { spend: g.spend, revenue: g.revenue, cpm: g.impr ? 
 var ROWS = [['spend', 'Spent', 'money'], ['revenue', 'Revenue', 'money'], ['cpm', 'CPM', 'money2'], ['ctr', 'CTR', 'pct'], ['cpc', 'CPC', 'money2'], ['clicks', 'Clicks', 'int'], ['impr', 'Impressions', 'int'], ['reach', 'Reach', 'int'], ['sales', 'Number of sales', 'int'], ['cpp', 'CPP', 'money'], ['roas', 'ROAS (Meta)', 'pctint'], ['aov', 'AOV', 'money']];
 function f(v, t) { if (v == null || !isFinite(v)) return '—'; if (t === 'money') return '$' + Math.round(v).toLocaleString('en-US'); if (t === 'money2') return '$' + v.toFixed(2); if (t === 'pct') return v.toFixed(2) + '%'; if (t === 'pctint') return Math.round(v) + '%'; return Math.round(v).toLocaleString('en-US'); }
 
-function metricTable(gen, groups) {
+var GOODW = { spend: 'neutral', revenue: 'up', cpm: 'down', ctr: 'up', cpc: 'down', clicks: 'up', impr: 'up', reach: 'up', sales: 'up', cpp: 'down', roas: 'up', aov: 'up' };
+function mk(key, cur, prev) {
+  if (prev == null || cur == null || !isFinite(prev) || !isFinite(cur) || prev === 0) return '<span class="mk none">—</span>';
+  var d = (cur - prev) / Math.abs(prev) * 100, tone = 'neutral';
+  if (GOODW[key] !== 'neutral' && Math.abs(d) >= 0.05) tone = ((GOODW[key] === 'up') === (d > 0)) ? 'good' : 'bad';
+  return '<span class="mk ' + tone + '">' + (d > 0 ? '▲' : d < 0 ? '▼' : '') + ' ' + Math.abs(d).toFixed(1) + '%</span>';
+}
+function metricTable(gen, groups, prev) {
   var ids = ORDER.filter(function (id) { return groups[id]; });
   var d = derive(gen), dg = {}; ids.forEach(function (id) { dg[id] = derive(groups[id]); });
+  var pd = prev && prev.gen ? derive(prev.gen) : null;
+  var pg = function (id) { return prev && prev.groups ? (prev.groups[id] ? derive(prev.groups[id]) : 'new') : null; };
   var best = function (key, hi) { var vals = ids.map(function (id) { return dg[id][key]; }).filter(function (v) { return v != null && isFinite(v) && v > 0; }); if (vals.length < 2) return null; return hi ? Math.max.apply(null, vals) : Math.min.apply(null, vals); };
   var hiRoas = best('roas', true), loCpp = best('cpp', false), hiCtr = best('ctr', true), worstRoas = (function () { var v = ids.map(function (id) { return dg[id].roas; }).filter(function (x) { return x != null && x > 0; }); return v.length > 2 ? Math.min.apply(null, v) : null; })();
   var h = '<div class="scroll"><table><thead><tr><th></th><th>General advertising metrics</th>' + ids.map(function (id) { return '<th>' + NAMES[id] + '</th>'; }).join('') + '</tr></thead><tbody>';
   ROWS.forEach(function (r) {
-    h += '<tr><td>' + r[1] + '</td><td class="gen">' + f(d[r[0]], r[2]) + '</td>' + ids.map(function (id) {
-      var v = dg[id][r[0]], cls = '';
-      if (r[0] === 'roas' && v != null && v === hiRoas) cls = 'best'; else if (r[0] === 'roas' && v != null && v > 0 && v === worstRoas) cls = 'worst';
-      else if (r[0] === 'cpp' && v != null && v === loCpp) cls = 'best'; else if (r[0] === 'ctr' && v != null && v === hiCtr) cls = 'best';
-      return '<td class="' + cls + '">' + f(v, r[2]) + '</td>';
+    var key = r[0];
+    h += '<tr><td>' + r[1] + '</td><td class="gen">' + f(d[key], r[2]) + (pd ? mk(key, d[key], pd[key]) : '') + '</td>' + ids.map(function (id) {
+      var v = dg[id][key], cls = '', p = pg(id);
+      if (key === 'roas' && v != null && v === hiRoas) cls = 'best'; else if (key === 'roas' && v != null && v > 0 && v === worstRoas) cls = 'worst';
+      else if (key === 'cpp' && v != null && v === loCpp) cls = 'best'; else if (key === 'ctr' && v != null && v === hiCtr) cls = 'best';
+      var m = p === 'new' ? '<span class="mk none">new</span>' : p ? mk(key, v, p[key]) : '';
+      return '<td class="' + cls + '">' + f(v, r[2]) + m + '</td>';
     }).join('') + '</tr>';
   });
-  return h + '</tbody></table></div><p class="hint">Green: best value among campaign groups (ROAS, CPP, CTR). Red: weakest ROAS.</p>';
+  var cmp = prev ? 'Arrows: change against ' + prev.label + ' (green is better, red is worse; for costs lower is better; grey means no comparison or no value judgement, as for spend). ' : '';
+  return h + '</tbody></table></div><p class="hint">' + cmp + 'Green cell: best value among campaign groups (ROAS, CPP, CTR). Red cell: weakest ROAS.</p>';
 }
 function crea(list) { return '<div class="crea">' + list.map(function (c) { return '<figure><div class="img">Creative image<br>(from the Meta ad)</div><figcaption>' + c + '</figcaption></figure>'; }).join('') + '</div>'; }
 function tx(t, p) { return '<div class="t"><h4>' + t + '</h4><p>' + p + '</p></div>'; }
 
-function weekRow(w) {
-  return '<section class="weekrow"><header><h2>Week ' + w.n + '</h2><span>' + w.from + ' – ' + w.to + ' · approved</span></header><div class="split"><div class="l">' + metricTable(w.gen, w.groups) + '</div><div class="r">' +
+function weekRow(w, i) {
+  var prev = i === 0 ? PREV_W1 : { label: 'Week ' + WEEKS[i - 1].n + ' (' + WEEKS[i - 1].from + ' – ' + WEEKS[i - 1].to + ')', gen: WEEKS[i - 1].gen, groups: WEEKS[i - 1].groups };
+  return '<section class="weekrow"><header><h2>Week ' + w.n + '</h2><span>' + w.from + ' – ' + w.to + ' · approved</span></header><div class="split"><div class="l">' + metricTable(w.gen, w.groups, prev) + '</div><div class="r">' +
     tx('What was done', w.done) + tx('Conclusion', w.concl) + tx('Plans for the next period', w.plans) + '<p class="sub">Most effective creatives</p>' + crea(w.crea) + '</div></div></section>';
 }
 
@@ -196,8 +214,8 @@ function september() {
   h += '<div class="kpis">' + kp.map(function (k) { return '<div class="kpi"><span class="l">' + k[0] + '</span><b>' + k[1] + '</b>' + k[2] + (k[2] ? '<span class="vs">vs August</span>' : '') + '</div>'; }).join('') + '</div>';
   h += '<div class="charts3"><div class="card"><h3>Weeks of September: spend, revenue and ROAS</h3>' + combo({ title: 'Weekly spend, revenue and ROAS', labels: WEEKS.map(function (w) { return 'W' + w.n; }), bars: [{ name: 'Spend', vals: WEEKS.map(function (w) { return w.gen.spend; }), color: 'var(--bar2)' }, { name: 'Revenue', vals: WEEKS.map(function (w) { return w.gen.revenue; }), color: 'var(--accent)' }], maxBar: 16000, ticks: [0, 4000, 8000, 12000, 16000], fmtBar: function (v) { return '$' + v / 1000 + 'k'; }, line: { name: 'ROAS', vals: WEEKS.map(function (w) { return w.gen.revenue / w.gen.spend * 100; }), fmt: function (v) { return Math.round(v) + '%'; } }, maxLine: 1000, lineTicks: [0, 500, 1000] }) + '</div>' +
     '<div class="card"><h3>Spend by campaign group</h3>' + donut() + '</div><div class="card"><h3>ROAS by campaign group</h3>' + groupsRoas() + '</div></div>';
-  h += WEEKS.map(weekRow).join('');
-  h += '<section class="weekrow"><header><h2>September summary</h2><span>01.09 – 30.09 · final</span></header><div class="split"><div class="l">' + metricTable(MONTH.gen, MONTH.groups) +
+  h += WEEKS.map(function (w, i) { return weekRow(w, i); }).join('');
+  h += '<section class="weekrow"><header><h2>September summary</h2><span>01.09 – 30.09 · final</span></header><div class="split"><div class="l">' + metricTable(MONTH.gen, MONTH.groups, PREV_AUG) +
     '<p class="hint">Reach of the month (' + f(MONTH.gen.reach, 'int') + ') is counted for the whole month, not summed from the weeks (' + f(WEEKS.reduce(function (a, w) { return a + w.gen.reach; }, 0), 'int') + '): the same person is seen in several weeks.</p></div><div class="r">' +
     tx('What was done', 'Throughout the month we scaled the Catalog RTS campaign, tested the Labor Day offer, launched the RTS Special Offer and prepared Make To Order creatives.') +
     tx('Conclusion', 'In September the account maintained a strong overall level of efficiency despite active scaling across several directions. Total ad spend increased from about $6.3K to $6.7K, while the account generated 54 purchases compared to 52 in August. Overall CPA increased from $117 to $129, while ROAS decreased from 655% to 530%.') +
