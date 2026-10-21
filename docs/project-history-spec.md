@@ -32,3 +32,6 @@
 
 ## Источник
 Таблица клиента: «Weekly report_mellowdiamond», лист «Meta | September (weekly, monthly)»: блоки недель друг под другом (Spent, Revenue, CPM, CTR, CPC, Clicks, Impressions, Reach, Number of sales, CPP, ROAS (Meta), AOV; столбцы «General advertising metrics» и группы кампаний), справа What was done, Most effective creatives, Conclusion, Plans; внизу «SEPTEMBER SUMMARY» тем же макетом за месяц.
+
+## Макет клиентской страницы
+Кликабельный макет (сентябрь mellowdiamond, часть цифр демонстрационная): `docs/mockups/client-report-mockup.html` (открыть в браузере) и приватный артефакт https://claude.ai/artifact/5YYipMycUVaTZaUtp8KDkH. Решения по виду на 2026-10-21: страница на всю ширину; логотип Mon'Archi в правом верхнем углу; недели открыты сразу, в каждой строке таблицы цифр слева, тексты и креативы справа; вкладка «All months» со сравнительными графиками за всё время работы с клиентом (новые месяцы добавляются сами); два варианта оформления (A светлый, B сливовый) ждут выбора. Дальше над внешним видом работает чат «Дизайн Hub».
