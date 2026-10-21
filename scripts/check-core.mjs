@@ -22,6 +22,7 @@ import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, 
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
 import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
+import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
@@ -778,6 +779,50 @@ await ok('pagespeed: the analyst run measures speed when a key is set, saves it 
   const noKey = await runNow({ db, model: good, email: 'a@x.com', trigger: 'user', hf: null, site, extrasFetch: async (url, init) => { assert.ok(!url.includes('pagespeedonline')); return siteFetch().fetchFn(url, init); }, env: {}, now: SITE_NOW }, analyst.id);
   assert.equal(noKey.status, 'done');
   assert.equal(tables.smm_site_stats[1].data.extras.speed.configured, false);
+});
+await ok('project history: weeks are cut at the month borders (Monday to Sunday, the first and the last short)', () => {
+  assert.deepEqual(monthWeeks('2026-09').map((w) => [w.n, w.start, w.end]), [[1, '2026-09-01', '2026-09-06'], [2, '2026-09-07', '2026-09-13'], [3, '2026-09-14', '2026-09-20'], [4, '2026-09-21', '2026-09-27'], [5, '2026-09-28', '2026-09-30']]);
+  assert.deepEqual(monthWeeks('2026-10').map((w) => [w.start, w.end]), [['2026-10-01', '2026-10-04'], ['2026-10-05', '2026-10-11'], ['2026-10-12', '2026-10-18'], ['2026-10-19', '2026-10-25'], ['2026-10-26', '2026-10-31']]);
+  assert.equal(monthLabel('2026-09'), 'Вересень 2026');
+});
+await ok('project history: reports are grouped into month cards, the current month is always there, strays are kept apart', () => {
+  const r = (id, type, start, end, status, extra = {}) => ({ id, period_type: type, period_start: start, period_end: end, status, platform: 'meta', updated_at: `2026-10-0${id}T10:00:00Z`, ...extra });
+  const rows = [r(1, 'weekly', '2026-09-01', '2026-09-06', 'final'), r(2, 'weekly', '2026-09-07', '2026-09-13', 'reviewed'), r(3, 'monthly', '2026-09-01', '2026-09-30', 'draft'), r(4, 'weekly', '2026-08-31', '2026-09-06', 'final'), r(5, 'custom', '2026-09-10', '2026-09-12', 'draft')];
+  const months = buildMonths(rows, '2026-10-21');
+  assert.deepEqual(months.map((m) => m.key), ['2026-10', '2026-09', '2026-08']); // newest first, October is there with nothing in it
+  const sep = months[1];
+  assert.deepEqual([sep.counts.approved, sep.counts.pending, sep.counts.missing, sep.counts.total], [1, 1, 3, 5]);
+  assert.equal(sep.weeks[0].row.id, 1);
+  assert.equal(sep.monthly.id, 3);
+  assert.deepEqual(sep.others.map((o) => o.id), [5]); // a custom period is kept, not lost
+  assert.equal(months[2].others[0].id, 4); // an old Monday-based week belongs to the month it starts in
+  assert.equal(sep.complete, false);
+  assert.equal(months[0].counts.missing, 5);
+  const all = [1, 2, 3, 4, 5].map((n, i) => r(10 + n, 'weekly', monthWeeks('2026-09')[i].start, monthWeeks('2026-09')[i].end, 'final'));
+  const done = buildMonths([...all, r(20, 'monthly', '2026-09-01', '2026-09-30', 'final')], '2026-10-21').find((m) => m.key === '2026-09');
+  assert.equal(done.complete, true);
+});
+await ok('project history: who may approve, what a person can do in each status, and the review notes', () => {
+  assert.equal(canApprove('a@x.com', []), true); // nobody chosen yet: anyone with access, as before
+  assert.equal(canApprove('A@X.com', ['a@x.com']), true);
+  assert.equal(canApprove('b@x.com', ['a@x.com']), false);
+  assert.deepEqual(reportActions('draft', false).map((a) => a.action), ['send']); // anyone may send a draft for approval
+  assert.deepEqual(reportActions('reviewed', false), []);
+  assert.deepEqual(reportActions('reviewed', true).map((a) => a.action), ['approve', 'return']);
+  assert.deepEqual(reportActions('final', true).map((a) => a.action), ['reopen']);
+  assert.deepEqual(reportActions('final', false), []);
+  const at = '2026-10-21T10:00:00Z';
+  let row = { status: 'draft', data: {} };
+  let p = reviewPatch(row, 'send', 'm@x.com', '', at);
+  assert.deepEqual([p.status, p.review.sentBy], ['reviewed', 'm@x.com']);
+  p = reviewPatch({ status: 'reviewed', data: { review: p.review } }, 'return', 'a@x.com', '  add the plans  ', at);
+  assert.deepEqual([p.status, p.review.returnedNote, p.review.sentBy], ['draft', 'add the plans', 'm@x.com']);
+  p = reviewPatch({ status: 'reviewed', data: {} }, 'approve', 'a@x.com', '', at);
+  assert.deepEqual([p.status, p.review.approvedBy], ['final', 'a@x.com']);
+  p = reviewPatch({ status: 'final', data: { review: p.review } }, 'reopen', 'a@x.com', '', at);
+  assert.deepEqual([p.status, p.review.approvedBy], ['reviewed', null]); // withdrawn: the client stops seeing it until it is approved again
+  assert.throws(() => reviewPatch(row, 'nope', 'a'), /Невідома дія/);
+  assert.deepEqual(clientVisible([{ id: 1, status: 'draft' }, { id: 2, status: 'reviewed' }, { id: 3, status: 'final' }]).map((x) => x.id), [3]); // only approved reports reach a client
 });
 await ok('site analyst: small numbers get no percentages, missing conversions are reported, and the hand-off is made in code', async () => {
   const small = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));

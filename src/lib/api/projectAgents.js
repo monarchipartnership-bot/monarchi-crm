@@ -14,6 +14,7 @@ export const DEFAULT_AGENT_CONFIG = {
   schedule: { weeklyDay: 1, weeklyTime: '09:00', monthlyDay: 1, monthlyTime: '09:00' },
   notify: true,
   notifyEmails: [], // who gets the notification (emails of CRM users)
+  approvers: [], // who approves the project's reports (emails of CRM users); empty = anyone with access
   telegram: { enabled: false, chatId: '', threadId: '' }, // the report goes to this Telegram chat (and topic of it) when it is made
   note: '',
 };
@@ -26,7 +27,7 @@ export async function fetchAgent(projectId) {
 
 // Every project's agent in one read (for the dashboard's «потрібна увага»).
 export async function fetchAgentsOverview() {
-  const { data, error } = await supabase.from('project_agents').select('project_id, enabled, health, last_error, last_run_at, run_state');
+  const { data, error } = await supabase.from('project_agents').select('project_id, enabled, health, last_error, last_run_at, run_state, config');
   if (error) { console.warn('fetchAgentsOverview failed', error); return []; }
   return data ?? [];
 }
@@ -59,4 +60,11 @@ export async function fetchAgentEvents(projectId, limit = 100) {
 export async function addAgentEvent({ projectId, kind, status = 'info', message, details = null, actor = 'user', createdBy }) {
   const { error } = await supabase.from('project_agent_events').insert({ project_id: projectId, actor, kind, status, message, details, created_by: createdBy || null });
   if (error) console.warn('addAgentEvent failed', error);
+}
+
+// project id → emails of the people who approve its reports (an empty list: anyone with access may approve).
+export async function fetchApprovers() {
+  const { data, error } = await supabase.from('project_agents').select('project_id, config');
+  if (error) { console.warn('fetchApprovers failed', error); return new Map(); }
+  return new Map((data ?? []).map((r) => [r.project_id, (r.config?.approvers || []).map((e) => String(e).toLowerCase())]));
 }

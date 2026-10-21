@@ -79,6 +79,7 @@ function describeChanges(before, after) {
   if (!sameJson(before.deck, after.deck)) out.push('стиль і мова презентації');
   if (!sameJson(before.schedule, after.schedule)) out.push('розклад');
   if (before.notify !== after.notify) out.push('сповіщення');
+  if (JSON.stringify([...(before.approvers || [])].sort()) !== JSON.stringify([...(after.approvers || [])].sort())) out.push('відповідальні за затвердження');
   if (JSON.stringify([...(before.notifyEmails || [])].sort()) !== JSON.stringify([...(after.notifyEmails || [])].sort())) out.push('кому надсилати сповіщення');
   if (!sameJson(before.telegram || {}, after.telegram || {})) out.push('Telegram-чат для звітів');
   if ((before.note || '') !== (after.note || '')) out.push('нотатка для агента');
@@ -331,6 +332,15 @@ export default function ProjectAgentTab({ projectId }) {
               </div>
             </div>
             {!form.tasks.presentation && <div className="pacc-hint">Презентації вимкнені вище: ці параметри нічого не змінюють.</div>}
+          </PagSection>
+
+          <PagSection title="Відповідальні за затвердження" hint="Ці люди бачать звіти проєкту в розділі «Звіти на затвердження», перевіряють їх, доповнюють і затверджують. Лише затверджений звіт потрапляє в історію проєкту для клієнта.">
+            <div className="pag-opts pag-opts--compact">
+              {recipientChoices(people, form.approvers).map((p) => (
+                <PagOption key={p.email} checked={(form.approvers || []).includes(p.email)} onChange={() => toggleIn('approvers', p.email)} title={p.label} desc={p.label !== p.email ? p.email : ''} />
+              ))}
+            </div>
+            {!(form.approvers || []).length && <div className="pacc-hint">Нікого не обрано: затвердити звіт може будь-хто з доступом до платформи.</div>}
           </PagSection>
 
           <PagSection title="Сповіщення" hint="Хто дізнається про готовий звіт: дзвіночок CRM і Telegram-чат. Звіт завжди зберігається як чернетка: менеджер перевіряє його, перш ніж відправити клієнту.">

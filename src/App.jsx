@@ -11,6 +11,7 @@ import MonthlyCreate from './pages/Reports/Monthly/MonthlyCreate';
 import AnnualCreate from './pages/Reports/Annual/AnnualCreate';
 import ReportsCompare from './pages/Reports/Compare';
 import ClientsDirectory from './pages/Reports/ClientsDirectory';
+import ReportApprovals from './pages/Projects/ReportApprovals';
 import ClientProfile from './pages/Reports/ClientProfile';
 import TaskManagerPage from './pages/TaskManager/TaskManagerPage';
 import TaskAnalyticsPage from './pages/TaskManager/TaskAnalyticsPage';
@@ -67,6 +68,7 @@ function AuthGate() {
         <Route path="/reports/deal-tasks" element={<DealTasksPage />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/dashboard" element={<ProjectsDashboard />} />
+        <Route path="/projects/approvals" element={<ReportApprovals />} />
         <Route path="/projects/reports/daily" element={<Navigate to="/projects/reports/period" replace />} />
         <Route path="/projects/reports/period" element={<ProjectReportsPage mode="period" />} />
         <Route path="/projects/reports/weekly" element={<ProjectReportsPage mode="weekly" />} />

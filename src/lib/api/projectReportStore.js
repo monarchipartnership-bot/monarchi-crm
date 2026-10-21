@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { collapseStatuses, flatten } from '../reportScope';
+import { reviewPatch } from '../projectHistory';
 
 // Storage for the redesigned project reports (migration
 // 20261008000000_project_reports.sql): saved weekly/monthly reports, the
@@ -41,6 +42,32 @@ export async function fetchAgentDrafts() {
 export async function updateReportStatus(id, status) {
   const { error } = await supabase.from('project_reports').update({ status, updated_at: nowIso() }).eq('id', id);
   if (error) throw error;
+}
+
+// One step of the approval flow: send / approve / return / reopen (see projectHistory.reviewPatch). The note and who did it are kept in data.review.
+export async function setReportStatus(id, action, { by, note } = {}) {
+  const { data: row, error } = await supabase.from('project_reports').select('id, status, data').eq('id', id).single();
+  if (error) throw error;
+  const patch = reviewPatch(row, action, by || null, note);
+  const { error: e2 } = await supabase.from('project_reports').update({ status: patch.status, data: { ...(row.data || {}), review: patch.review }, updated_at: nowIso() }).eq('id', id);
+  if (e2) throw e2;
+  return patch.status;
+}
+
+// One full report (with its numbers), for opening it from the approvals list.
+export async function fetchProjectReport(id) {
+  const { data, error } = await supabase.from('project_reports').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// Every report that waits for approval, with its project's name (the numbers stay out of this read).
+export async function fetchPendingReports() {
+  const { data, error } = await supabase.from('project_reports')
+    .select('id, project_id, platform, period_type, period_start, period_end, status, source, updated_at, review:data->review, projects(name)')
+    .eq('status', 'reviewed').order('updated_at', { ascending: false }).limit(300);
+  if (error) { console.warn('fetchPendingReports failed', error); return []; }
+  return data ?? [];
 }
 
 export async function deleteProjectReport(id) {

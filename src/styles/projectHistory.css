@@ -1,0 +1,37 @@
+/* «Історія проекту» and «Звіти на затвердження»: month cards, status chips, rows of reports. Structure only: the look (Hub style) is set by the design chat. */
+.ph-months { display: flex; flex-direction: column; gap: 14px; }
+.ph-month { border: 1px solid var(--border, #E3E1EA); border-radius: 14px; background: var(--card, #fff); }
+.ph-month > header { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; padding: 14px 18px; cursor: pointer; }
+.ph-month > header h3 { margin: 0; font-size: 1.05rem; }
+.ph-month > header .ph-sum { color: var(--muted, #6A6577); font-size: .85rem; }
+.ph-month > header .ph-grow { flex: 1; }
+.ph-month > header .ph-chev { transition: transform .15s; color: var(--muted, #6A6577); }
+.ph-month.open > header .ph-chev { transform: rotate(90deg); }
+.ph-month-body { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 6px; }
+.ph-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ph-rows li { display: grid; grid-template-columns: 120px 150px 150px 1fr; gap: 8px 12px; align-items: center; padding: 8px 4px; border-top: 1px solid var(--border, #E3E1EA); }
+.ph-rows li:first-child { border-top: 0; }
+.ph-rows .ph-name { font-weight: 600; }
+.ph-rows .ph-dates { color: var(--muted, #6A6577); font-size: .88rem; }
+.ph-rows .ph-act { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ph-rows .ph-missing { color: var(--muted, #6A6577); font-size: .88rem; grid-column: 3 / -1; }
+.ph-note { grid-column: 2 / -1; font-size: .85rem; color: #B7791F; }
+.ph-chip { font-style: normal; display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.ph-chip--draft { background: #ECEBF1; color: #5C5870; }
+.ph-chip--reviewed { background: #FBF0DA; color: #96610A; }
+.ph-chip--final { background: #E6F4EC; color: #1E7A4D; }
+.ph-chip--none { background: transparent; color: var(--muted, #6A6577); font-weight: 500; padding-left: 0; }
+.ph-doc-block { margin-bottom: 28px; }
+.ph-doc-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 10px; font-size: 1rem; }
+.ph-doc-title span { color: var(--muted, #6A6577); font-weight: 400; font-size: .88rem; }
+.ph-queue { display: flex; flex-direction: column; gap: 10px; }
+.ph-queue-row { display: grid; grid-template-columns: minmax(160px, 1.2fr) 110px minmax(180px, 1.2fr) minmax(160px, 1fr) auto; gap: 8px 14px; align-items: center; padding: 12px 16px; border: 1px solid var(--border, #E3E1EA); border-radius: 12px; background: var(--card, #fff); }
+.ph-queue-row .ph-sub { color: var(--muted, #6A6577); font-size: .85rem; }
+.ph-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px; border-radius: 999px; background: #D9534F; color: #fff; font-size: .75rem; font-weight: 700; }
+@media (max-width: 900px) {
+  .ph-rows li { grid-template-columns: 1fr 1fr; }
+  .ph-rows .ph-act { grid-column: 1 / -1; justify-content: flex-start; }
+  .ph-rows .ph-missing { grid-column: 1 / -1; }
+  .ph-queue-row { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .ph-month > header .ph-chev { transition: none; } }
