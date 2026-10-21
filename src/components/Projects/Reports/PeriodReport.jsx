@@ -147,7 +147,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     setBusy('pull');
     setMessage('');
     try {
-      const pulled = await pullReportData({ accounts: ctx.accounts, kind: ctx.kind, groups: ctx.groups, period, prev: pv, columns });
+      const pulled = await pullReportData({ accounts: ctx.accounts, kind: ctx.kind, groups: ctx.groups, period, prev: pv, columns, selections: ctx.selections });
       setErrors(pulled.errors);
       setData(pulled.data);
       setDirty(true);
@@ -170,7 +170,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     const pv = prevFor(c);
     setBusy('pull');
     try {
-      const before = await fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups, undefined, ctx.fetchColumns);
+      const before = await fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups, undefined, ctx.fetchColumns, ctx.selections);
       setData((d) => ({ ...d, previous: { period: { start: pv.start, end: pv.end }, platforms: before.platforms } }));
     } catch (e) {
       setMessage(e.message || 'Не вдалося отримати дані для порівняння.');

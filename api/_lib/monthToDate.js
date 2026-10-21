@@ -65,7 +65,7 @@ export async function refreshMonthToDate({ repo, post, projectId, monthKey: key 
     const prev = toDateComparison(key, end);
     const kind = kindOf(scope);
     const pulledKey = `${end}|${kind}`;
-    if (!pulled.has(pulledKey)) pulled.set(pulledKey, await pullReportData({ accounts: accounts.filter((a) => scopes.some((sc) => sc === a.platform && kindOf(sc) === kind)), kind, groups, period, prev, post, columns }));
+    if (!pulled.has(pulledKey)) pulled.set(pulledKey, await pullReportData({ accounts: accounts.filter((a) => scopes.some((sc) => sc === a.platform && kindOf(sc) === kind)), kind, groups, period, prev, post, columns, selections: Object.fromEntries(scopes.filter((sc) => kindOf(sc) === kind).map((p) => [p, layouts[p].campaignSel])) }));
     const { data, errors } = pulled.get(pulledKey);
     const have = scope === 'all' ? Object.keys(data.platforms) : data.platforms[scope] ? [scope] : [];
     if (!have.length || (scope === 'all' && have.length < 2)) { out.skipped.push(`${scope === 'all' ? 'Разом' : NAMES[scope] || scope}: даних немає${Object.keys(errors || {}).length ? ' (кабінет не відповів)' : ''}.`); continue; }

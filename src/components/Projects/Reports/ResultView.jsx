@@ -48,7 +48,8 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
   const allGroups = isTotal ? [] : cur.groups || [];
   const groups = showGroups ? allGroups : [];
   const campaigns = isTotal ? [] : [...(cur.campaigns || [])].sort((a, b) => (b.spend || 0) - (a.spend || 0));
-  const shownCampaigns = campaignMode === 'all' ? campaigns : campaigns.filter((c) => selection.includes(campaignKey(active, c.name)));
+  // with the columns of a layout the campaigns are already columns of the table above: no second list of the same campaigns
+  const shownCampaigns = cur.explicit ? [] : campaignMode === 'all' ? campaigns : campaigns.filter((c) => selection.includes(campaignKey(active, c.name)));
 
   const metricsExport = metricsToExport(rows, showPrev);
   const sheets = [{ name: 'Показники', ...metricsExport }];
@@ -85,7 +86,7 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
         {isTotal && <div className="pacc-hint">Сума платформ в одній валюті. Охоплення складається простою сумою, тож люди, яких побачили обидві платформи, враховані двічі.</div>}
         {groups.length > 0 && (
           <>
-            <div className="prep-subtitle">По групах кампаній</div>
+            <div className="prep-subtitle">{cur.explicit ? 'Кампанії та групи' : 'По групах кампаній'}</div>
             <GroupsTable keys={keys} total={cur.total} groups={groups} custom={custom} currency={currency} />
           </>
         )}

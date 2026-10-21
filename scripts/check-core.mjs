@@ -39,7 +39,7 @@ import { buildTelegramText, handleSiteLead, normalizeLead, runLeadReminders } fr
 import { botInfo, escapeHtml, peopleFromUpdate, sendMessage as tgSend, webhookSecret } from '../api/_lib/telegram.js';
 import { DEFAULT_TEMPLATE, mentionOf, renderMessage, safeTemplate } from '../src/lib/siteLeadMessage.js';
 import { buildSnippet } from '../src/lib/siteLeadSnippet.js';
-import { campaignKey as gKey, campaignsOutsideGroups, filterCampaigns, flatCampaigns, groupCampaignKeys, groupMatches, mergeCampaigns, scopeToGroup } from '../src/lib/campaignGroups.js';
+import { campaignKey as gKey, buildColumns, campaignsOutsideGroups, filterCampaigns, flatCampaigns, groupCampaignKeys, groupMatches, mergeCampaigns, scopeToGroup, selectedCampaignNames } from '../src/lib/campaignGroups.js';
 import { groupCampaigns } from '../src/lib/periodReport.js';
 import { accountPlatforms, accountsForTab, collapseStatuses, flatten, pickReportRow, reportScope } from '../src/lib/reportScope.js';
 import { groupsForPlatform } from '../src/lib/campaignGroups.js';
@@ -2377,6 +2377,80 @@ await ok('campaign groups: a rule by name takes new campaigns in by itself; the 
   assert.deepEqual(campaignsOutsideGroups([], known).length, 5);
   assert.deepEqual(campaignsOutsideGroups(groups, []), []);
   assert.equal(groupMatches(groups[0], 'meta', 'NEW rts campaign'), true);
+});
+
+await ok('report columns: a selected group is one highlighted sum column followed by its campaigns, then the campaigns picked by hand; the rest is not in the report', () => {
+  const camps = [
+    { name: 'Catalog A', spend: 100, revenue: 400, purchases: 4 },
+    { name: 'Catalog B', spend: 50, revenue: 100, purchases: 1 },
+    { name: 'Kinky Bang', spend: 80, revenue: 160, purchases: 2 },
+    { name: 'Website Traffic', spend: 20, revenue: 0, purchases: 0 },
+  ];
+  const groups = [{ id: 1, name: 'Catalog', platform: 'meta', campaigns: [], keywords: ['catalog'] }, { id: 2, name: 'Brand', platform: 'google', campaigns: [], keywords: ['catalog'] }];
+  const cols = buildColumns({ platform: 'meta', campaigns: camps, groups, selection: { groups: [1, 2], campaigns: ['meta|Kinky Bang', 'meta|Catalog A', 'google|Website Traffic', 'meta|Gone campaign'] } });
+  assert.deepEqual(cols.map((c) => [c.kind, c.name]), [['group', 'Catalog'], ['campaign', 'Catalog A'], ['campaign', 'Catalog B'], ['campaign', 'Kinky Bang']]);
+  assert.equal(cols[0].spend, 150); // the sum of the whole group
+  assert.equal(cols[0].campaignCount, 2);
+  assert.equal(cols[1].spend, 100); // each campaign keeps its own numbers
+  assert.deepEqual(cols.map((c) => c.id), ['g:1', 'c:Catalog A', 'c:Catalog B', 'c:Kinky Bang']);
+  // the group of another platform adds nothing; Catalog A picked by hand AND through the group is one column; an unknown campaign is skipped
+  assert.deepEqual(buildColumns({ platform: 'meta', campaigns: camps, groups, selection: { groups: [], campaigns: [] } }), []);
+  assert.deepEqual(buildColumns({ platform: 'meta', campaigns: camps, groups, selection: null }), []);
+  // a rule takes in a campaign that appears later, without anyone editing the group
+  const later = buildColumns({ platform: 'meta', campaigns: [...camps, { name: 'NEW catalog test', spend: 10 }], groups, selection: { groups: [1], campaigns: [] } });
+  assert.deepEqual(later.filter((c) => c.kind === 'campaign').map((c) => c.name), ['Catalog A', 'Catalog B', 'NEW catalog test']);
+  // a selected group with no campaign in the period gives no empty column
+  assert.deepEqual(buildColumns({ platform: 'meta', campaigns: [{ name: 'Other', spend: 1 }], groups, selection: { groups: [1], campaigns: [] } }), []);
+  assert.deepEqual(selectedCampaignNames({ platform: 'meta', campaigns: camps, groups, selection: { groups: [1], campaigns: ['meta|Kinky Bang'] } }), ['Catalog A', 'Catalog B', 'Kinky Bang']);
+});
+await ok('report layout: the campaign selection is cleaned (ids, names), limited, and empty by default', () => {
+  assert.deepEqual(normalizeTemplate(null).campaignSel, { groups: [], campaigns: [] });
+  const t = normalizeTemplate({ campaignSel: { groups: [3, '4', 3, 'x', -1, 2.5], campaigns: ['meta|A', 'meta|A', 'no separator', 7] } });
+  assert.deepEqual(t.campaignSel.groups, [3, 4]);
+  assert.deepEqual(t.campaignSel.campaigns, ['meta|A']);
+});
+await ok('agent run (selection): the report columns are the ones the layout selected: the group sum and its campaigns, plus campaigns picked by hand', async () => {
+  const rule = { id: 1, name: 'RTS', platform: 'meta', campaigns: [], keywords: ['rts'] };
+  const repo = fakeRepo({ layouts: { meta: { campaignSel: { groups: [1], campaigns: [] } } } });
+  repo.getGroups = async () => [rule];
+  await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  const meta = repo.log.reports[0].data.platforms.meta;
+  assert.equal(meta.explicit, true);
+  assert.deepEqual(meta.groups.map((c) => [c.kind, c.name]), [['group', 'RTS'], ['campaign', 'Kinky Bang RTS']]);
+  assert.equal(meta.groups[0].spend, meta.groups[1].spend); // one campaign: the sum equals it
+  // nothing selected: the report has the totals only
+  const bare = fakeRepo({ layouts: { meta: {} } });
+  bare.getGroups = async () => [rule];
+  await runProjectReport({ repo: bare, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.deepEqual(bare.log.reports[0].data.platforms.meta.groups, []);
+  // picked by hand without any group
+  const hand = fakeRepo({ layouts: { meta: { campaignSel: { groups: [], campaigns: ['meta|Kinky Bang RTS'] } } } });
+  await runProjectReport({ repo: hand, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.deepEqual(hand.log.reports[0].data.platforms.meta.groups.map((c) => [c.kind, c.name]), [['campaign', 'Kinky Bang RTS']]);
+});
+
+await ok('client model (selected columns): group sum first and highlighted, its campaigns after it in their own columns, nothing folded, charts use campaigns only', () => {
+  const col = (id, name, kind, spend, revenue, extra = {}) => ({ id, name, kind, campaignCount: kind === 'group' ? 2 : 1, spend, revenue, purchases: Math.round(revenue / 100), impressions: spend * 25, clicks: spend / 3, reach: spend * 9, ...extra });
+  const cols = [col('g:1', 'Catalog', 'group', 150, 500), col('c:Catalog A', 'Catalog A', 'campaign', 100, 400), col('c:Catalog B', 'Catalog B', 'campaign', 50, 100), col('c:Kinky', 'Kinky Bang', 'campaign', 80, 160),
+    ...Array.from({ length: 6 }, (_, i) => col(`c:X${i}`, `Extra ${i}`, 'campaign', 10 + i, 20))];
+  const row = { id: 1, type: 'weekly', start: '2026-10-05', end: '2026-10-11', status: 'final', toDate: false, updatedAt: '2026-10-12T09:00:00Z', data: { kind: 'ecom', sections: {}, creatives: [], platforms: { meta: { currency: 'USD', total: { spend: 400, revenue: 900, purchases: 9, impressions: 10000, clicks: 130, reach: 3600 }, explicit: true, groups: cols } }, previous: { period: { start: '2026-09-28', end: '2026-10-04' }, platforms: { meta: { total: { spend: 300, revenue: 600, purchases: 6, impressions: 9000, clicks: 100, reach: 3000 }, explicit: true, groups: [col('g:1', 'Catalog', 'group', 100, 300), col('c:Catalog A', 'Catalog A', 'campaign', 60, 200)] } } } } };
+  const m = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [row] });
+  const v = m.months[0].weeks[0].view;
+  assert.equal(v.explicit, true);
+  assert.deepEqual(v.groups.map((g) => g.name).slice(0, 4), ['Catalog', 'Catalog A', 'Catalog B', 'Kinky Bang']); // the order of the selection, not by spend
+  const t = metricTable(v, { keys: metricKeys('ecom') });
+  assert.equal(t.columns.length, 1 + 10); // every selected column; nothing is folded into «Other»
+  assert.equal(t.foldable, false);
+  assert.deepEqual(t.columns.slice(0, 3).map((c) => [c.kind, c.label]), [['general', 'General advertising metrics'], ['sum', 'Catalog · group total'], ['group', 'Catalog A']]);
+  const spent = t.rows.find((r) => r.key === 'spend');
+  assert.equal(spent.cells[1].text, '$150');
+  assert.equal(spent.cells[1].change.arrow, '▲'); // the group total is compared with the previous group total
+  assert.equal(spent.cells[3].isNew, true); // Catalog B was not in the previous report
+  const roas = t.rows.find((r) => r.key === 'roas');
+  assert.ok(!roas.cells[1].cls); // a group total is never the «best» cell
+  assert.deepEqual(spendSlices(v).map((s) => s.label).slice(0, 2), ['Catalog A', 'Kinky Bang']); // campaigns by spend, no group sum
+  assert.equal(spendSlices(v).at(-1).label, 'Other campaigns'); // the rest of the account (unselected campaigns and the small ones)
+  assert.ok(!roasBars(v).some((b) => b.label === 'Catalog'));
 });
 
 console.log(`\n${passed} checks passed`);

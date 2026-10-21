@@ -88,7 +88,7 @@ function hintText(view, folded) {
 export function MetricTable({ view, keys, custom, platformLabel, builder = null }) {
   const [showAll, setShowAll] = useState(false);
   const t = metricTable(view, { keys, custom, platformLabel, showAll });
-  const canToggle = t.total > 6;
+  const canToggle = t.foldable;
   return (
     <>
       <div className="scroll">
@@ -99,7 +99,7 @@ export function MetricTable({ view, keys, custom, platformLabel, builder = null 
               <tr key={r.key} className={builder && builder.hidden.includes(r.key) ? 'crh-off' : undefined}>
                 <td>{builder && <EyeToggle on={!builder.hidden.includes(r.key)} onToggle={() => builder.onToggle(r.key)} label={r.label} />}{r.label}</td>
                 {r.cells.map((c, i) => (
-                  <td key={t.columns[i].id} className={i === 0 ? 'gen' : c.cls}>
+                  <td key={t.columns[i].id} className={i === 0 || t.columns[i].kind === 'sum' ? 'gen' : c.cls}>
                     {c.text}
                     {c.isNew ? <span className="dm none">new</span> : view.prev || c.change ? <Mark change={c.change} /> : null}
                   </td>

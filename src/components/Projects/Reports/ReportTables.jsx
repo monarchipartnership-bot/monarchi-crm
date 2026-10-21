@@ -65,26 +65,28 @@ export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей �
 // column per campaign group; the best group in each row is marked green.
 export function GroupsTable({ keys, total, groups, custom, currency }) {
   if (!groups.length) return null;
-  const columns = [{ name: 'Весь акаунт', base: total, total: true }, ...groups.map((g) => ({ name: g.name, base: g }))];
+  // a group's column is its total (highlighted, like the account's); campaigns are columns of their own
+  const columns = [{ id: 'all', name: 'Весь акаунт', base: total, total: true }, ...groups.map((g) => ({ id: g.id ?? g.name, name: g.name, base: g, total: g.kind === 'group', own: g.kind === 'group' ? 'сума групи' : null }))];
   return (
     <HScroll>
       <table className="prep-table prep-table--groups prep-table--wide">
         <thead>
           <tr>
             <th>Метрика</th>
-            {columns.map((c) => <th key={c.name} className={'num' + (c.total ? ' total' : '')}>{c.name}{c.base.campaignCount && !c.base.single ? <small> · {c.base.campaignCount} камп.</small> : null}</th>)}
+            {columns.map((c) => <th key={c.id} className={'num' + (c.total ? ' total' : '')}>{c.name}{c.own ? <small> · {c.own}, {c.base.campaignCount} камп.</small> : c.base.campaignCount && !c.base.single && c.base.kind !== 'campaign' ? <small> · {c.base.campaignCount} камп.</small> : null}</th>)}
           </tr>
         </thead>
         <tbody>
           {keys.map((key) => {
             const m = metricMeta(key, custom);
             const values = columns.map((c) => computeMetric(key, c.base, custom));
-            const best = bestOf(values.slice(1), m.goodWhen);
+            // the best one is picked among single campaigns / groups, not among group totals
+            const best = bestOf(values.filter((v, i) => i > 0 && !columns[i].own), m.goodWhen);
             return (
               <tr key={key}>
                 <td className="lbl">{m.label}</td>
                 {values.map((v, i) => (
-                  <td key={columns[i].name} className={'num' + (columns[i].total ? ' total' : '') + (best != null && i > 0 && v === best ? ' best' : '')}>
+                  <td key={columns[i].id} className={'num' + (columns[i].total ? ' total' : '') + (best != null && i > 0 && !columns[i].own && v === best ? ' best' : '')}>
                     {formatMetric(v, m.format, currency)}
                   </td>
                 ))}
@@ -107,7 +109,7 @@ export function metricsToExport(rows, showPrev = true) {
 }
 
 export function groupsToExport(keys, total, groups, custom, currency) {
-  const cols = [{ name: 'Весь акаунт', base: total }, ...groups.map((g) => ({ name: g.name, base: g }))];
+  const cols = [{ name: 'Весь акаунт', base: total }, ...groups.map((g) => ({ name: g.kind === 'group' ? `${g.name} (сума групи)` : g.name, base: g }))];
   return {
     columns: ['Метрика', ...cols.map((c) => c.name)],
     rows: keys.map((k) => {

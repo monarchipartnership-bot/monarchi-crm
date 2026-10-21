@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ResultView from './ResultView';
 import CompareModal from './CompareModal';
 import { saveProjectReport } from '../../../lib/api/projectReportStore';
 import { reportPayload } from '../../../lib/reportEngine';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useReportContext } from './useReportContext';
-import { fetchProjectRange } from '../../../lib/periodReport';
+import { fetchProjectRange, regroupData } from '../../../lib/periodReport';
+import { campaignKey } from '../../../lib/campaignGroups';
 import { isoDate } from '../../../lib/dateHelpers';
 import '../../../styles/projectReports.css';
 import DatePicker from '../../common/DatePicker';
@@ -59,8 +60,8 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     const prev = compareRange(range, c);
     try {
       const [cur, before] = await Promise.all([
-        fetchProjectRange(ctx.accounts, range.from, range.to, ctx.kind, ctx.groups, undefined, columns),
-        prev ? fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, columns) : Promise.resolve(null),
+        fetchProjectRange(ctx.accounts, range.from, range.to, ctx.kind, ctx.groups, undefined, columns, ctx.selections),
+        prev ? fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, columns, ctx.selections) : Promise.resolve(null),
       ]);
       setState({ status: 'ok', data: { platforms: cur.platforms, previous: before ? { platforms: before.platforms } : null }, errors: cur.errors, range, prev });
       // A new period is on screen: offer to add a comparison (unless switched off or already set).
@@ -79,7 +80,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     const prev = compareRange(state.range, c);
     setState((st) => ({ ...st, comparing: true }));
     try {
-      const before = await fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, ctx.fetchColumns);
+      const before = await fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, ctx.fetchColumns, ctx.selections);
       setState((st) => ({ ...st, comparing: false, data: { ...st.data, previous: { platforms: before.platforms } }, prev }));
     } catch (e) {
       setState((st) => ({ ...st, comparing: false, compareError: e.message || 'Не вдалося отримати дані для порівняння.' }));
@@ -103,23 +104,30 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   useEffect(() => {
     if (tabSeen.current === platform) return;
     tabSeen.current = platform;
-    setActiveGroupId(null);
     setModal(null);
-    setGroupEdit(null);
     if (state.status === 'ok' && ctx.ready) run(state.range); else setState({ status: 'idle' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
 
-  const shown = state.status === 'ok' ? state.data : null; // the groups are columns of the table; they are set up in the «Конструктор звіту»
+  // The campaigns of the table are the ones the layout selected (the «Конструктор звіту»). «Показати всі кампанії» adds every other campaign of the
+  // period as a column too, without changing the layout.
+  const [allCampaigns, setAllCampaigns] = useState(false);
+  const canShowAll = Boolean(ctx.selections);
+  const shown = useMemo(() => {
+    if (state.status !== 'ok') return null;
+    if (!allCampaigns || !ctx.selections) return state.data;
+    const own = ctx.selections[platform];
+    const all = (state.data.platforms[platform]?.campaigns || []).map((c) => campaignKey(platform, c.name));
+    return regroupData(state.data, ctx.groups, { [platform]: { groups: own.groups, campaigns: [...own.campaigns, ...all] } });
+  }, [state, allCampaigns, ctx.selections, ctx.groups, platform]);
 
-  // «Зберегти в архів»: the period on screen (narrowed to the chosen group, if any) becomes a report of type «Довільний»
+  // «Зберегти в архів»: the period on screen becomes a report of type «Довільний»
   async function saveToArchive() {
     setArchive({ busy: true, msg: '' });
     try {
       const period = { start: state.range.from, end: state.range.to };
       const prev = state.prev ? { start: state.prev.from, end: state.prev.to } : null;
-      const selection = Object.entries(shown.platforms).flatMap(([p, v]) => (v.campaigns || []).map((c) => campaignKey(p, c.name)));
-      const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection, options: { groups: true } });
+      const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection: [], options: { groups: true } });
       await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'draft', data: { ...payload, label: null }, createdBy: email });
       setArchive({ busy: false, msg: 'Збережено в «Архів звітів».' });
     } catch (e) {
@@ -163,6 +171,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
             curLabel={`${fmt(state.range.from)}–${fmt(state.range.to)}`}
             prevLabel={state.prev ? `${fmt(state.prev.from)}–${fmt(state.prev.to)}` : ''}
           >
+            {canShowAll && <button type="button" className="btn" onClick={() => setAllCampaigns((v) => !v)} aria-pressed={allCampaigns}>{allCampaigns ? 'Лише обрані в макеті' : 'Показати всі кампанії'}</button>}
             <button type="button" className="btn" onClick={saveToArchive} disabled={archive.busy}>{archive.busy ? 'Зберігаємо…' : 'Зберегти в архів'}</button>
           </ResultView>
           {archive.msg && <div className="pacc-hint prep-archive-msg">{archive.msg}</div>}

@@ -3,8 +3,7 @@ import Select from '../../common/Select';
 import GroupsStrip from '../Reports/GroupsStrip';
 import { useConfirm } from '../../common/ConfirmDialog';
 import { deleteCampaignGroup, deleteCustomMetric, saveReportColumns } from '../../../lib/api/projectReportStore';
-import { campaignsOutsideGroups } from '../../../lib/campaignGroups';
-import { fetchProjectCampaigns } from '../../../lib/periodReport';
+import { buildColumns, filterCampaigns, groupMatches, campaignKey } from '../../../lib/campaignGroups';
 import { MAX_BLOCKS, MAX_CREATIVES, MAX_PROMPT, MAX_TITLE, PRESETS, newBlockKey } from '../../../lib/reportTemplate';
 import { METRIC_SETS, metricMeta } from '../../../lib/reportMetrics';
 import '../../../styles/projectHistory.css';
@@ -122,34 +121,71 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, onO
   );
 }
 
-export function GroupsPanel({ projectId, platform, kind, accounts, groups, onEdit, onCreate, onChanged }) {
-  const [campaigns, setCampaigns] = useState(null); // null: loading; [] none or not available
-  const [problem, setProblem] = useState('');
-
-  useEffect(() => {
-    let off = false;
-    setCampaigns(null);
-    setProblem('');
-    fetchProjectCampaigns(accounts, kind).then((r) => { if (!off) { setCampaigns(r.campaigns); setProblem(Object.values(r.errors || {})[0] || ''); } }).catch((e) => { if (!off) { setCampaigns([]); setProblem(e.message || 'не вдалося отримати кампанії'); } });
-    return () => { off = true; };
-  }, [accounts, kind, groups]);
-
-  const outside = useMemo(() => (campaigns ? campaignsOutsideGroups(groups, campaigns) : []), [groups, campaigns]);
+// What is in the report: groups (a highlighted column with the total of the group, then its campaigns) and campaigns picked by hand, one column
+// each, one after another. Everything not selected is not in the report. Saved with the layout.
+export function SelectionPanel({ platform, groups, campaigns, problem, draft, set }) {
+  const sel = draft.campaignSel;
+  const [query, setQuery] = useState('');
+  const chosenGroups = groups.filter((g) => sel.groups.includes(g.id));
+  const viaGroup = (name) => chosenGroups.find((g) => groupMatches(g, platform, name));
+  const shown = useMemo(() => filterCampaigns(campaigns || [], query), [campaigns, query]);
+  const keyOf = (c) => campaignKey(platform, c.name);
+  const picked = (c) => Boolean(viaGroup(c.name)) || sel.campaigns.includes(keyOf(c));
+  const columns = useMemo(() => buildColumns({ platform, campaigns: campaigns || [], groups, selection: sel }), [platform, campaigns, groups, sel]);
+  const toggleGroup = (id) => set({ campaignSel: { ...sel, groups: sel.groups.includes(id) ? sel.groups.filter((x) => x !== id) : [...sel.groups, id] } });
+  const toggleCampaign = (c) => set({ campaignSel: { ...sel, campaigns: sel.campaigns.includes(keyOf(c)) ? sel.campaigns.filter((k) => k !== keyOf(c)) : [...sel.campaigns, keyOf(c)] } });
+  const free = shown.filter((c) => !viaGroup(c.name));
+  const allFreePicked = free.length > 0 && free.every((c) => sel.campaigns.includes(keyOf(c)));
+  const setFree = (on) => {
+    const keys = new Set(sel.campaigns);
+    free.forEach((c) => (on ? keys.add(keyOf(c)) : keys.delete(keyOf(c))));
+    set({ campaignSel: { ...sel, campaigns: [...keys] } });
+  };
+  const outside = (campaigns || []).filter((c) => !picked(c)).length;
   return (
-    <Panel id="groups" title="Кампанії та групи" summary={`${groups.length} ${groups.length === 1 ? 'група' : 'груп'}`} note="Кожна група це колонка таблиці; кампанії поза групами йдуть в «Other campaigns». Групи зберігаються одразу.">
+    <Panel id="selection" icon="groups" title="Що в звіті: групи та кампанії" summary={`колонок: ${columns.length}`} note="Кожна кампанія у власній колонці; група додає колонку із сумою групи. Не обране у звіт не потрапляє.">
+      <div className="pacc-hint">Загальні показники завжди за весь кабінет. Нові кампанії самі в звіт не потрапляють: додайте їх тут і збережіть макет, або візьміть групу з правилом за назвою.</div>
+      <div className="pk-field"><label>Групи у звіті</label></div>
+      <div className="bld-chips" aria-label="Групи у звіті">
+        {groups.length ? groups.map((g) => (
+          <button key={g.id} type="button" className={'bld-toggle' + (sel.groups.includes(g.id) ? ' on' : '')} aria-pressed={sel.groups.includes(g.id)} onClick={() => toggleGroup(g.id)}>{g.name}</button>
+        )) : <span className="ph-share-meta">Груп ще немає: створіть групу нижче, і її можна буде підключити одним кліком.</span>}
+      </div>
+      <div className="pk-field"><label>Кампанії у звіті</label></div>
+      <div className="cg-pick-bar">
+        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Пошук кампанії" aria-label="Пошук кампанії" />
+        <button type="button" className="btn" disabled={!free.length} onClick={() => setFree(!allFreePicked)}>{allFreePicked ? 'Зняти всі' : 'Обрати всі'}{query ? ' знайдені' : ''}</button>
+        <span className="cg-pick-count">У звіті колонок: <b>{columns.length}</b></span>
+      </div>
+      {campaigns === null && <div className="pacc-hint">Завантажуємо кампанії з кабінету…</div>}
+      {problem && <div className="pacc-hint">Кампанії не вдалося завантажити: {problem} (це працює на робочому сайті).</div>}
+      {campaigns && campaigns.length === 0 && !problem && <div className="pacc-hint">За 90 днів у кабінеті немає кампаній з активністю.</div>}
+      <div className="cg-list bld-camps">
+        {shown.map((c) => {
+          const g = viaGroup(c.name);
+          return (
+            <label key={keyOf(c)} className={'cg-item' + (picked(c) ? ' on' : '')}>
+              <input type="checkbox" checked={picked(c)} disabled={Boolean(g)} onChange={() => toggleCampaign(c)} />
+              <span className="cg-item-name">{c.name}</span>
+              <span className="cg-item-meta">{g ? `через групу «${g.name}»` : c.spend ? Math.round(c.spend).toLocaleString('uk-UA') : ''}</span>
+            </label>
+          );
+        })}
+      </div>
+      {campaigns && outside > 0 && <div className="pacc-hint">Не в звіті: {outside} з {campaigns.length} кампаній.</div>}
+    </Panel>
+  );
+}
+
+// The groups themselves: a set of campaigns (and, if wanted, a rule by name) that can be switched into a report in one click above. Only create, edit, delete here.
+export function GroupsPanel({ groups, campaigns, onEdit, onCreate, onChanged }) {
+  return (
+    <Panel id="groups" title="Групи кампаній" summary={`${groups.length}`} note="Набір кампаній, який підключається до звіту одним кліком вище; правило за назвою додає нові. Зберігаються одразу.">
       <GroupsStrip
         groups={groups} known={campaigns || []} activeId={undefined} hideAll hint="Оберіть групу, щоб змінити чи видалити її."
         onEdit={onEdit} onCreate={onCreate}
         onDelete={async (id) => { await deleteCampaignGroup(id); await onChanged(); }}
       />
-      {campaigns === null && <div className="pacc-hint">Перевіряємо кампанії в кабінеті…</div>}
-      {campaigns && outside.length > 0 && (
-        <div className="prep-internal-note" role="note">
-          <b>Кампаній поза групами: {outside.length}.</b> У звіті вони підуть в «Other campaigns»: {outside.slice(0, 8).map((c) => c.name).join('; ')}{outside.length > 8 ? '…' : ''}. Додайте їх у групу або створіть групу з правилом.
-        </div>
-      )}
-      {campaigns && campaigns.length > 0 && outside.length === 0 && <div className="pacc-hint">Усі кампанії за 90 днів входять у групи.</div>}
-      {problem && <div className="pacc-hint">Перевірити кампанії не вдалося: {problem} (це працює на робочому сайті).</div>}
     </Panel>
   );
 }

@@ -1,7 +1,7 @@
 import { authedPost } from './adAccounts.js';
 import { BASE_FIELDS, METRICS, computeMetric, metricMeta, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { computeWeeksForMonth, daysInMonth, isoDate, MONTH_NAMES } from './dateHelpers.js';
-import { groupMatches, groupsForPlatform } from './campaignGroups.js';
+import { buildColumns, groupMatches, groupsForPlatform } from './campaignGroups.js';
 import { pickCounts } from './platformColumns.js';
 
 const iso = (d) => isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
@@ -101,14 +101,21 @@ export function groupCampaigns(campaigns, allGroups, platform) {
 // All linked accounts of a project for one date range. `accounts` are
 // project_ad_accounts rows. A platform that fails is reported in `errors`, the
 // others still come back. `columns` = { platform: [extra metric keys] } picked for the project.
-export async function fetchProjectRange(accounts, from, to, kind, groups, post = authedPost, columns = {}) {
+// What a platform's `groups` are in the report: with a layout selection (`selections[platform]`) they are the columns of that selection (see
+// buildColumns; `explicit` marks it), without one they are the old bundles of all groups.
+export function groupsOf(campaigns, allGroups, platform, selections) {
+  const selection = selections?.[platform];
+  return selection ? { groups: buildColumns({ platform, campaigns, groups: allGroups, selection }), explicit: true } : { groups: groupCampaigns(campaigns, allGroups, platform), explicit: false };
+}
+
+export async function fetchProjectRange(accounts, from, to, kind, groups, post = authedPost, columns = {}, selections = null) {
   const platforms = {};
   const errors = {};
   const settled = await Promise.allSettled(accounts.map((a) => fetchPlatformRange(a.platform, a.account_id, from, to, kind, post, columns?.[a.platform] || [])));
   settled.forEach((res, i) => {
     const a = accounts[i];
     if (res.status === 'fulfilled') {
-      platforms[a.platform] = { currency: a.currency, accountName: a.account_name, ...res.value, groups: groupCampaigns(res.value.campaigns, groups, a.platform) };
+      platforms[a.platform] = { currency: a.currency, accountName: a.account_name, ...res.value, ...groupsOf(res.value.campaigns, groups, a.platform, selections) };
     } else {
       errors[a.platform] = res.reason?.message || 'Не вдалося отримати дані.';
     }
@@ -163,8 +170,8 @@ export async function fetchProjectCampaigns(accounts, kind, days = 90, post = au
 
 // Re-bundles already fetched campaigns after the project's groups changed, so
 // the tables update without asking the platforms again.
-export function regroupData(data, groups) {
-  const regroup = (platforms) => Object.fromEntries(Object.entries(platforms || {}).map(([k, p]) => [k, { ...p, groups: groupCampaigns(p.campaigns || [], groups, k) }]));
+export function regroupData(data, groups, selections = null) {
+  const regroup = (platforms) => Object.fromEntries(Object.entries(platforms || {}).map(([k, p]) => [k, { ...p, ...groupsOf(p.campaigns || [], groups, k, selections) }]));
   return { ...data, platforms: regroup(data.platforms), previous: data.previous ? { ...data.previous, platforms: regroup(data.previous.platforms) } : data.previous };
 }
 

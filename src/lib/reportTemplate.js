@@ -12,6 +12,7 @@ export const MAX_BLOCKS = 12;
 export const MAX_TITLE = 60;
 export const MAX_PROMPT = 800;
 export const MAX_HIDDEN = 60;
+export const MAX_SELECTED = 300;
 export const MAX_CREATIVES = { weekly: 6, monthly: 8 };
 
 // The three blocks every project has. They can be switched off per period type, but not deleted.
@@ -35,6 +36,7 @@ export const DEFAULT_TEMPLATE = Object.freeze({
   creatives: { weekly: CREATIVE_COUNT.weekly, monthly: CREATIVE_COUNT.monthly },
   kind: null, // 'ecom' | 'leadgen'; null: from the project's business type
   hiddenMetrics: [], // metrics the client does not see (the team always sees the full report)
+  campaignSel: { groups: [], campaigns: [] }, // the campaigns of the report: groups (ids) and campaigns ('platform|name') the layout selected
 });
 
 const clampInt = (v, min, max, fallback) => {
@@ -68,6 +70,10 @@ export function normalizeTemplate(raw) {
     creatives: { weekly: clampInt(r.creatives?.weekly, 0, MAX_CREATIVES.weekly, CREATIVE_COUNT.weekly), monthly: clampInt(r.creatives?.monthly, 0, MAX_CREATIVES.monthly, CREATIVE_COUNT.monthly) },
     kind: r.kind === 'ecom' || r.kind === 'leadgen' ? r.kind : null,
     hiddenMetrics,
+    campaignSel: {
+      groups: [...new Set((Array.isArray(r.campaignSel?.groups) ? r.campaignSel.groups : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_SELECTED),
+      campaigns: [...new Set((Array.isArray(r.campaignSel?.campaigns) ? r.campaignSel.campaigns : []).map((k) => cleanText(k, 200)).filter((k) => k.includes('|')))].slice(0, MAX_SELECTED),
+    },
   };
 }
 

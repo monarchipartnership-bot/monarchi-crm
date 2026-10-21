@@ -8,12 +8,13 @@ import CustomMetricModal from '../Reports/CustomMetricModal';
 import { Box, Pill } from '../../ClientReport/kit';
 import { Creatives, MetricTable, ReportTexts } from '../../ClientReport/parts';
 import { Kpis } from '../../ClientReport/MonthView';
-import { BlocksPanel, CreativesPanel, GroupsPanel, KindPanel, MetricsPanel, PanelContext } from './BuilderSettings';
+import { BlocksPanel, CreativesPanel, GroupsPanel, KindPanel, MetricsPanel, PanelContext, SelectionPanel } from './BuilderSettings';
 import '../../../styles/builderHub.css';
 import { loadReportContext } from '../../../lib/projectReportContext';
 import { fetchCampaignGroups, fetchReportLayout, saveReportLayout } from '../../../lib/api/projectReportStore';
 import { accountPlatforms, accountsForTab } from '../../../lib/reportScope';
-import { groupsForPlatform } from '../../../lib/campaignGroups';
+import { buildColumns, groupsForPlatform } from '../../../lib/campaignGroups';
+import { fetchProjectCampaigns } from '../../../lib/periodReport';
 import { builderView, viewKeys } from '../../../lib/clientReport';
 import { normalizeTemplate } from '../../../lib/reportTemplate';
 import { cleanColumns } from '../../../lib/platformColumns';
@@ -61,11 +62,18 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
     setState(null);
     setReal({ data: null, period: null, busy: false, error: '' });
     setMessage('');
-    fetchReportLayout(projectId, platform).then((r) => { if (!off) setState({ saved: r.layout, draft: r.layout, exists: r.exists }); });
+    fetchReportLayout(projectId, platform).then((r) => {
+      if (off) return;
+      // a layout that is not saved yet starts from what the project showed so far: all its groups of this platform
+      const layout = r.exists ? r.layout : { ...r.layout, campaignSel: { ...r.layout.campaignSel, groups: groupsForPlatform(ctx.groups, platform).map((g) => g.id) } };
+      setState({ saved: r.exists ? r.layout : normalizeTemplate(null), draft: layout, exists: r.exists });
+    });
     return () => { off = true; };
   }, [projectId, platform]);
 
   const draft = state?.draft;
+  const [campaignList, setCampaignList] = useState(null); // the campaigns of the last 90 days in the cabinet; null while loading
+  const [campaignProblem, setCampaignProblem] = useState('');
   const dirty = Boolean(state) && JSON.stringify(normalizeTemplate(state.draft)) !== JSON.stringify(state.saved);
   const set = (patch) => { setState((s) => ({ ...s, draft: { ...s.draft, ...patch } })); setMessage(''); };
 
@@ -75,7 +83,27 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
   const extraKeys = useMemo(() => (ctx && platform ? cleanColumns(platform, ctx.columns?.[platform]) : []), [ctx, platform]);
   const model = useMemo(() => ({ kind, columns: extraKeys, custom: ctx?.custom || [] }), [kind, extraKeys, ctx]);
 
-  const view = useMemo(() => (draft ? builderView({ layout: draft, periodType, kind, groupNames: platformGroups.map((g) => g.name), data: real.data, period: real.period }) : null), [draft, periodType, kind, platformGroups, real.data, real.period]);
+  useEffect(() => {
+    if (!platform || !ctx) return undefined;
+    let off = false;
+    setCampaignList(null);
+    setCampaignProblem('');
+    fetchProjectCampaigns(platformAccounts, kind).then((r) => { if (!off) { setCampaignList(r.campaigns); setCampaignProblem(Object.values(r.errors || {})[0] || ''); } }).catch((e) => { if (!off) { setCampaignList([]); setCampaignProblem(e.message || 'не вдалося отримати кампанії'); } });
+    return () => { off = true; };
+  }, [platform, platformAccounts, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The columns of the layout without numbers: the real campaigns when they are known, else the names the layout holds.
+  const skeleton = useMemo(() => {
+    if (!draft) return [];
+    const sel = draft.campaignSel;
+    const strip = (c) => ({ id: c.id, name: c.name, kind: c.kind, campaignCount: c.campaignCount });
+    if (campaignList && campaignList.length) return buildColumns({ platform, campaigns: campaignList.map((c) => ({ name: c.name })), groups: platformGroups, selection: sel }).map(strip);
+    return [
+      ...platformGroups.filter((g) => sel.groups.includes(g.id)).map((g) => ({ id: `g:${g.id}`, name: g.name, kind: 'group' })),
+      ...sel.campaigns.filter((k) => k.startsWith(platform + '|')).map((k) => ({ id: `c:${k}`, name: k.slice(platform.length + 1), kind: 'campaign' })),
+    ];
+  }, [draft, campaignList, platform, platformGroups]);
+  const view = useMemo(() => (draft ? builderView({ layout: draft, periodType, kind, columns: skeleton, data: real.data, period: real.period }) : null), [draft, periodType, kind, skeleton, real.data, real.period]);
   const keys = useMemo(() => (view ? viewKeys(view, model, { all: true }) : []), [view, model]);
 
   async function pick(next) {
@@ -102,7 +130,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
     try {
       const due = dueReportPeriod(periodType, todayIso());
       const prev = comparisonPeriod(periodType, due.picker, due.period, { mode: 'calendar' });
-      const { data, errors } = await pullReportData({ accounts: platformAccounts, kind, groups: platformGroups, period: due.period, prev, columns: { [platform]: extraKeys } });
+      const { data, errors } = await pullReportData({ accounts: platformAccounts, kind, groups: platformGroups, period: due.period, prev, columns: { [platform]: extraKeys }, selections: { [platform]: draft.campaignSel } });
       if (!data.platforms[platform]) throw new Error(Object.values(errors)[0] || 'Кабінет не повернув даних за цей період.');
       setReal({ data, period: due.period, busy: false, error: '' });
     } catch (e) { setReal({ data: null, period: null, busy: false, error: (e.message || 'Не вдалося отримати дані.') + ' Цифри підтягуються лише на робочому сайті.' }); }
@@ -167,10 +195,8 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
       <div className="bld-panels">
         <KindPanel draft={draft} set={set} projectKind={projectKind(ctx.project)} />
         <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} onOpen={() => setModal('metric')} onChanged={changed} />
-        <GroupsPanel
-          projectId={projectId} platform={platform} kind={kind} accounts={platformAccounts} groups={platformGroups}
-          onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={changed}
-        />
+        <SelectionPanel platform={platform} groups={platformGroups} campaigns={campaignList} problem={campaignProblem} draft={draft} set={set} />
+        <GroupsPanel groups={platformGroups} campaigns={campaignList} onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={changed} />
         <BlocksPanel draft={draft} set={set} />
         <CreativesPanel draft={draft} set={set} />
       </div>

@@ -62,14 +62,17 @@ export function scopeOf(platforms) {
   if (!keys.length) return null;
   if (keys.length === 1) {
     const p = platforms[keys[0]];
-    return { currency: p.currency || 'USD', total: p.total || {}, groups: foldSingles((p.groups || []).map((g) => ({ ...g }))) };
+    const explicit = Boolean(p.explicit); // the columns the layout selected (campaigns and the sums of groups) are shown as they are
+    return { currency: p.currency || 'USD', total: p.total || {}, explicit, groups: explicit ? (p.groups || []).map((g) => ({ ...g })) : foldSingles((p.groups || []).map((g) => ({ ...g }))) };
   }
   const byName = new Map();
-  keys.forEach((k) => foldSingles(platforms[k].groups || []).forEach((g) => byName.set(g.name, [...(byName.get(g.name) || []), g])));
+  const explicit = keys.every((k) => platforms[k].explicit);
+  keys.forEach((k) => (explicit ? (platforms[k].groups || []) : foldSingles(platforms[k].groups || [])).forEach((g) => byName.set(g.name, [...(byName.get(g.name) || []), g])));
   return {
     currency: platforms[keys[0]].currency || 'USD',
     total: sumBase(keys.map((k) => platforms[k].total || {})),
-    groups: [...byName.entries()].map(([name, list]) => ({ name, ...sumBase(list) })),
+    explicit,
+    groups: [...byName.entries()].map(([name, list]) => ({ name, kind: list[0].kind, id: list[0].id, campaignCount: list.reduce((a, g) => a + (g.campaignCount || 0), 0) || undefined, ...sumBase(list) })),
   };
 }
 
@@ -100,7 +103,8 @@ export function reportView(report, ctx) {
     updatedAt: report.updatedAt || null,
     currency: cur.currency,
     total: cur.total,
-    groups: cur.groups.filter(active).sort(bySpend),
+    explicit: cur.explicit,
+    groups: cur.explicit ? cur.groups : cur.groups.filter(active).sort(bySpend), // the selected columns keep their order
     prev: prevScope && prevPeriod ? { period: prevPeriod, total: prevScope.total, groups: prevScope.groups } : null,
     sections: report.data?.sections || {},
     // the text blocks of the template this report was made with, and only those the client may see; its own metric list, if it had one
@@ -152,17 +156,20 @@ function extreme(list, high) {
 // `showAll`: every group by name. Otherwise the top TOP_GROUPS and one «Other (N groups)» column (its numbers are the sum of the rest, no arrows).
 export function metricTable(view, { keys, custom = [], platformLabel = '', showAll = false }) {
   const groups = view.groups;
-  const folded = !showAll && groups.length > TOP_GROUPS + 1; // «Other» of a single group would be that group
+  const explicit = Boolean(view.explicit);
+  const folded = !explicit && !showAll && groups.length > TOP_GROUPS + 1; // «Other» of a single group would be that group (the selected columns are never folded)
   const shown = folded ? groups.slice(0, TOP_GROUPS) : groups;
   const rest = folded ? groups.slice(TOP_GROUPS) : [];
-  const prevByName = view.prev ? new Map(view.prev.groups.map((g) => [g.name, g])) : null;
-  const columns = [{ id: 'general', label: 'General advertising metrics', kind: 'general' }, ...shown.map((g) => ({ id: g.name, label: g.name, kind: 'group' }))];
+  const idOf = (g) => g.id ?? g.name;
+  const prevByName = view.prev ? new Map(view.prev.groups.map((g) => [idOf(g), g])) : null;
+  // a group's own column is its total (highlighted); the campaigns of the report are columns of their own
+  const columns = [{ id: 'general', label: 'General advertising metrics', kind: 'general' }, ...shown.map((g) => (g.kind === 'group' ? { id: idOf(g), label: `${g.name} · group total`, kind: 'sum' } : { id: idOf(g), label: g.name, kind: 'group' }))];
   const bases = [view.total, ...shown];
   if (rest.length) { columns.push({ id: '__other', label: `Other (${rest.length} groups)`, kind: 'other' }); bases.push(mergeBase(rest)); }
-  const prevs = [view.prev ? view.prev.total : null, ...shown.map((g) => (prevByName ? prevByName.get(g.name) || 'new' : null))];
+  const prevs = [view.prev ? view.prev.total : null, ...shown.map((g) => (prevByName ? prevByName.get(idOf(g)) || 'new' : null))];
   if (rest.length) prevs.push(null);
   // the best / the weakest group cells (only among the groups shown by name)
-  const groupBases = shown;
+  const groupBases = shown.filter((g, i) => columns[i + 1].kind === 'group'); // the best / weakest are picked among single campaigns, not group totals
   const roasOf = (b) => computeMetric('roas', b);
   const best = { roas: extreme(groupBases.map(roasOf), true), cpp: extreme(groupBases.map((b) => computeMetric('cpp', b)), false), ctr: extreme(groupBases.map((b) => computeMetric('ctr', b)), true) };
   const roases = groupBases.map(roasOf).filter(hasValue);
@@ -187,12 +194,19 @@ export function metricTable(view, { keys, custom = [], platformLabel = '', showA
       }),
     };
   });
-  return { columns, rows, hidden: rest.length, folded, total: groups.length };
+  return { columns, rows, hidden: rest.length, folded, foldable: !explicit && groups.length > TOP_GROUPS + 1, total: groups.length, explicit };
 }
 
 // ---- charts of a month / a week ----
 // Slices of the spend by group: the top ones and «Other».
 export function spendSlices(view, top = TOP_GROUPS) {
+  if (view.explicit) {
+    // the campaigns of the report (group totals would count the same money twice); what is not among them is «Other campaigns»
+    const c = view.groups.filter((x) => x.kind !== 'group' && (Number(x.spend) || 0) > 0).sort(bySpend);
+    const shownCampaigns = c.slice(0, top).map((x) => ({ label: x.name, value: Math.round(Number(x.spend) || 0) }));
+    const rest = Math.round((Number(view.total.spend) || 0) - shownCampaigns.reduce((a, x) => a + x.value, 0));
+    return rest > 0 ? [...shownCampaigns, { label: 'Other campaigns', value: rest }] : shownCampaigns;
+  }
   const g = view.groups.filter((x) => (Number(x.spend) || 0) > 0);
   const named = g.length > top + 1 ? g.slice(0, top) : g;
   const rest = g.length > top + 1 ? g.slice(top) : [];
@@ -202,18 +216,18 @@ export function spendSlices(view, top = TOP_GROUPS) {
 }
 // ROAS of the groups, best first (the top ones by spend; the rest are not drawn as bars).
 export function roasBars(view, top = TOP_GROUPS) {
-  return view.groups.filter((x) => (Number(x.spend) || 0) > 0).slice(0, top).map((x) => ({ label: x.name, value: computeMetric('roas', x) })).filter((x) => x.value != null).sort((a, b) => b.value - a.value);
+  return view.groups.filter((x) => !view.explicit || x.kind !== 'group').filter((x) => (Number(x.spend) || 0) > 0).slice(0, top).map((x) => ({ label: x.name, value: computeMetric('roas', x) })).filter((x) => x.value != null).sort((a, b) => b.value - a.value);
 }
 
 // The address a client opens (the token is the only secret in it: long, random, never shown anywhere else).
 export const shareUrl = (origin, token) => `${String(origin).replace(/\/+$/, '')}/r/${token}`;
 
 // ---- the «Конструктор звіту»: the report as the layout will make it ----
-// A view for the live preview. Without `data` it is the skeleton: the project's groups as columns, every number a dash. With `data` (a fetched
+// A view for the live preview. Without `data` it is the skeleton: the selected columns ({ id, name, kind }), every number a dash. With `data` (a fetched
 // period: { platforms, previous }) the same view carries real numbers. The text blocks, creatives and hidden metrics always come from the draft layout.
-export function builderView({ layout, periodType = 'weekly', kind, groupNames = [], data = null, period = null }) {
+export function builderView({ layout, periodType = 'weekly', kind, columns = [], data = null, period = null }) {
   const real = data ? reportView({ id: 0, type: periodType, start: period?.start || '', end: period?.end || '', status: 'final', data: { kind, platforms: data.platforms, previous: data.previous || null } }, { kind }) : null;
-  const base = real || { id: 0, type: periodType, start: '', end: '', toDate: false, status: 'final', updatedAt: null, currency: 'USD', total: {}, groups: groupNames.map((name) => ({ name })), prev: null, sections: {}, kind };
+  const base = real || { id: 0, type: periodType, start: '', end: '', toDate: false, status: 'final', updatedAt: null, currency: 'USD', total: {}, explicit: true, groups: columns, prev: null, sections: {}, kind };
   const blocks = (layout.blocks || []).filter((b) => b[periodType === 'monthly' ? 'monthly' : 'weekly']).map((b) => ({ key: b.key, title: b.title, client: b.client !== false }));
   return { ...base, kind, blocks, hiddenMetrics: layout.hiddenMetrics || [], templateMetrics: null, creatives: [], sections: base.sections || {} };
 }

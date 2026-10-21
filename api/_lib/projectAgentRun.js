@@ -123,7 +123,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const errors = {};
     for (const k of [...new Set(scopes.map(kindOf))]) {
       const mine = scopes.filter((sc) => kindOf(sc) === k);
-      const r = await pullReportData({ accounts: accounts.filter((a) => mine.includes(a.platform)), kind: k, groups, period, prev, post, columns });
+      const r = await pullReportData({ accounts: accounts.filter((a) => mine.includes(a.platform)), kind: k, groups, period, prev, post, columns, selections: Object.fromEntries(mine.map((p) => [p, layouts[p].campaignSel])) });
       pulled[k] = r.data;
       Object.assign(errors, r.errors);
     }

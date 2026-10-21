@@ -59,3 +59,33 @@ export function mergeCampaigns(...lists) {
 export function campaignsOutsideGroups(groups, campaigns) {
   return (campaigns || []).filter((c) => !groupsForPlatform(groups, c.platform).some((g) => groupMatches(g, c.platform, c.name))).sort((a, b) => (b.spend || 0) - (a.spend || 0));
 }
+
+// ---- the columns of a report: what the layout selected ----
+// selection = { groups: [group ids], campaigns: ['platform|campaign name', ...] } (see the «Конструктор звіту»).
+// A selected group gives ONE highlighted column with the sum of the whole group, then each of its campaigns in a column of its own; the campaigns
+// selected by hand follow. A campaign that is in a group and also selected by hand is shown once. A campaign that is not selected, directly or
+// through a group, is not in the report (the totals of the report stay those of the whole account).
+// → [{ id, name, kind: 'group' | 'campaign', campaignCount, ...numbers }], in the order they are drawn.
+export function buildColumns({ platform, campaigns, groups, selection }) {
+  const sel = { groups: selection?.groups || [], campaigns: selection?.campaigns || [] };
+  const byName = new Map((campaigns || []).map((c) => [c.name, c]));
+  const out = [];
+  const used = new Set();
+  const asCampaign = (c) => ({ ...c, id: `c:${c.name}`, kind: 'campaign', campaignCount: 1 });
+  groupsForPlatform(groups, platform).filter((g) => sel.groups.includes(g.id)).forEach((g) => {
+    const members = (campaigns || []).filter((c) => groupMatches(g, platform, c.name));
+    if (!members.length) return;
+    out.push({ id: `g:${g.id}`, name: g.name, kind: 'group', campaignCount: members.length, ...sumBase(members) });
+    members.forEach((c) => { if (!used.has(c.name)) { used.add(c.name); out.push(asCampaign(c)); } });
+  });
+  sel.campaigns.filter((k) => k.startsWith(platform + '|')).forEach((k) => {
+    const c = byName.get(k.slice(platform.length + 1));
+    if (c && !used.has(c.name)) { used.add(c.name); out.push(asCampaign(c)); }
+  });
+  return out;
+}
+
+// The campaigns a layout selection takes in (for the preview and for «what is in the report»): the same rule as buildColumns, by name only.
+export function selectedCampaignNames({ platform, campaigns, groups, selection }) {
+  return buildColumns({ platform, campaigns: (campaigns || []).map((c) => ({ ...c })), groups, selection }).filter((c) => c.kind === 'campaign').map((c) => c.name);
+}
