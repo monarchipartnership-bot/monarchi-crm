@@ -36,3 +36,26 @@
   .ph-queue-row { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .ph-month > header .ph-chev { transition: none; } }
+/* creatives of a report */
+.arc-creatives { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.crx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.crx-item { margin: 0; border: 1px solid var(--border, #E3E1EA); border-radius: 12px; overflow: hidden; background: var(--card, #fff); display: flex; flex-direction: column; text-align: left; }
+.crx-img { all: unset; display: block; cursor: zoom-in; aspect-ratio: 4 / 5; background: #ECEBF1; }
+.crx-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.crx-img--empty { cursor: default; display: grid; place-content: center; text-align: center; gap: 4px; padding: 12px; color: #5C5870; font-size: .85rem; }
+.crx-img--empty small { color: var(--muted, #6A6577); font-size: .75rem; }
+.crx-item figcaption { padding: 8px 10px; font-size: .85rem; display: flex; flex-direction: column; gap: 6px; }
+.crx-actions { display: flex; gap: 4px 12px; flex-wrap: wrap; }
+.crx-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.crx-lb { position: fixed; inset: 0; z-index: 60; background: rgba(8, 10, 14, .84); display: grid; place-items: center; padding: 24px; }
+.crx-lb figure { margin: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.crx-lb img { height: min(84vh, 900px); width: auto; max-width: 92vw; object-fit: contain; border-radius: 12px; background: #fff; }
+.crx-lb figcaption { color: #fff; font-size: .95rem; text-align: center; }
+.crx-lb-x { position: absolute; top: 16px; right: 20px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .4); background: rgba(0, 0, 0, .3); color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer; }
+.crx-picker { max-width: 820px; width: calc(100vw - 32px); }
+.crx-grid--pick { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); max-height: 60vh; overflow: auto; }
+.crx-item--pick { cursor: pointer; padding: 0; font: inherit; text-align: left; }
+.crx-item--pick:disabled { opacity: .5; cursor: default; }
+.crx-item--pick .crx-img { cursor: pointer; }
+.crx-cap { padding: 8px 10px; font-size: .82rem; display: flex; flex-direction: column; gap: 3px; }
+.crx-cap small { color: var(--muted, #6A6577); }

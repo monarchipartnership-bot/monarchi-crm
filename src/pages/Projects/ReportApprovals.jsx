@@ -81,6 +81,7 @@ export default function ReportApprovals() {
         <ArchiveReportModal
           row={openRow.row} projectName={openRow.ctx.project?.name || ''} custom={openRow.ctx.custom} extraKeys={extraKeysOf(openRow.ctx.columns, openRow.row)}
           actions={reportActions(openRow.row.status, canApprove(email, openRow.ctx.approvers))} onAction={onAction}
+          onChanged={async () => { const fresh = await fetchProjectReport(openRow.row.id); if (fresh) setOpenRow((o) => ({ ...o, row: fresh })); }}
           onClose={() => setOpenRow(null)}
         />
       )}

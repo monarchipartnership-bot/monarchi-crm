@@ -5,6 +5,7 @@ import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { createAgentRepo } from './_lib/agentRepo.js';
 import { makeInternalPost } from './_lib/internalPost.js';
 import { runProjectReport } from './_lib/projectAgentRun.js';
+import { makeCreativesCollector } from './_lib/metaCreatives.js';
 import { runDueAgents } from './_lib/agentTick.js';
 import { getModelClient } from './_lib/ai.js';
 import { processQueue } from './_lib/agentEngine.js';
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
     try {
       result = await runDueAgents({
         repo,
-        runFor: ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor, telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }),
+        runFor: ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor, creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN), telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }),
       });
     } catch (e) { projectsError = e.message || String(e); }
     // The agent framework (the SMM team's agents): scheduled starts and the queued tasks of the agents that are on.

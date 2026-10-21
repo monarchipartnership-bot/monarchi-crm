@@ -22,6 +22,8 @@ import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, 
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
 import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
+import { CREATIVE_COUNT, creativeImageUrl, creativeKind, rankAds } from '../src/lib/creatives.js';
+import { collectCreatives, creativeCandidates, pickCreative } from '../api/_lib/metaCreatives.js';
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
@@ -876,6 +878,87 @@ await ok('month to date: the monthly run moves the running row to the full month
   const m = buildMonths([r(1, '2026-10-12', '2026-10-13T10:00:00Z'), r(2, '2026-10-31', '2026-11-01T10:00:00Z')], '2026-11-02').find((x) => x.key === '2026-10');
   assert.equal(m.monthly.id, 2);
   assert.deepEqual(m.others.map((o) => o.id), [1]);
+});
+const adRow = (id, name, spend, buys, revenue, campaign = 'Camp') => ({ ad_id: id, ad_name: name, campaign_name: campaign, spend: String(spend), impressions: '1000', clicks: '40', actions: buys ? [{ action_type: 'purchase', value: String(buys) }] : [], action_values: buys ? [{ action_type: 'purchase', value: String(revenue) }] : [] });
+const creaStub = () => {
+  const insights = [adRow('1', 'Hybrid Wig RTS -15%', 300, 12, 3600), adRow('2', 'Same picture, other audience', 200, 6, 1500), adRow('3', 'Catalog dynamic', 400, 10, 2000), adRow('4', 'Tiny test', 3, 1, 90), adRow('5', 'Burned money', 150, 0, 0), adRow('6', 'Kinky Bang', 120, 8, 2400)];
+  const creatives = { c1: { id: 'c1', image_url: 'https://meta.cdn/c1.png', thumbnail_url: 'https://meta.cdn/t1.jpg' }, c3: { id: 'c3', product_set_id: '77', thumbnail_url: '' }, c4: { id: 'c4', thumbnail_url: 'https://meta.cdn/t4.jpg' }, c5: { id: 'c5', video_id: 'v5', thumbnail_url: 'https://meta.cdn/t5.jpg' }, c6: { id: 'c6', object_story_spec: { link_data: { picture: 'https://meta.cdn/p6.jpg' } } } };
+  const adToCreative = { 1: 'c1', 2: 'c1', 3: 'c3', 4: 'c4', 5: 'c5', 6: 'c6' };
+  const log = { urls: [], uploads: [] };
+  const graphFn = async (url) => {
+    log.urls.push(url);
+    const u = new URL(url);
+    if (u.pathname.endsWith('/insights')) return { data: insights };
+    const ids = (u.searchParams.get('ids') || '').split(',');
+    if (u.searchParams.get('fields') === 'creative') return Object.fromEntries(ids.map((id) => [id, { creative: { id: adToCreative[id] } }]));
+    return Object.fromEntries(ids.map((id) => [id, creatives[id]]));
+  };
+  const fetchFn = async (url) => (url.includes('fail') ? { ok: false } : { ok: true, headers: { get: () => 'image/png' }, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer });
+  const db = { storage: { from: () => ({ upload: async (path, bytes, opts) => { log.uploads.push([path, bytes.length, opts.contentType]); return { error: null }; }, getPublicUrl: (path) => ({ data: { publicUrl: 'https://store.test/' + path } }) }) } };
+  return { graphFn, fetchFn, db, log };
+};
+await ok('creatives: ads are ranked in code, two ads of one picture show it once, a catalog ad has no picture, the picture is copied to our storage', async () => {
+  const ranked = rankAds([adRow('1', 'a', 300, 12, 3600), adRow('4', 'tiny', 3, 1, 90), adRow('5', 'burn', 150, 0, 0), adRow('6', 'b', 120, 8, 2400)].map((r) => ({ adId: r.ad_id, adName: r.ad_name, spend: Number(r.spend), purchases: Number(r.actions[0]?.value || 0), roas: r.actions.length ? Number(r.action_values[0].value) / Number(r.spend) : null })));
+  assert.deepEqual(ranked.map((r) => [r.adId, r.reason]), [['6', 'roas'], ['1', 'roas'], ['4', 'purchases'], ['5', 'spend']]); // solid ads by ROAS, then small ones that sold, then the rest by spend
+  assert.deepEqual([CREATIVE_COUNT.weekly, CREATIVE_COUNT.monthly], [3, 4]);
+  assert.equal(creativeKind({ image_url: 'x' }), 'image');
+  assert.equal(creativeKind({ video_id: '1', thumbnail_url: 't' }), 'video');
+  assert.equal(creativeKind({ product_set_id: '7' }), 'catalog');
+  assert.equal(creativeKind(null), 'unknown');
+  assert.equal(creativeImageUrl({ image_url: 'full', thumbnail_url: 'thumb' }), 'full');
+  assert.equal(creativeImageUrl({ thumbnail_url: 'thumb' }), 'thumb');
+  assert.equal(creativeImageUrl({ product_set_id: '7' }), null);
+
+  const { graphFn, fetchFn, db, log } = creaStub();
+  const accountsMeta = [{ platform: 'meta', account_id: '123' }, { platform: 'google', account_id: 'g' }];
+  const items = await collectCreatives({ db, token: 'T', accounts: accountsMeta, projectId: 3, period: { start: '2026-10-05', end: '2026-10-11' }, count: 3, graphFn, fetchFn });
+  assert.deepEqual(items.map((i) => i.adId), ['6', '1', '3']); // ad 2 shares ad 1's picture and is skipped; the next solid ad (catalog) comes in
+  assert.equal(items[0].imageUrl, 'https://store.test/report-creatives/3/2026-10-05_2026-10-11/6.png');
+  assert.equal(items[0].caption, 'Kinky Bang · ROAS 20.00');
+  assert.deepEqual([items[2].kind, items[2].imageUrl], ['catalog', null]); // no single picture: the item stays, the page shows a placeholder
+  assert.equal(log.uploads.length, 2);
+  assert.ok(log.urls.some((u) => u.includes('thumbnail_width=640')));
+  assert.ok(log.urls.every((u) => !u.includes('act_google')));
+  // a picture that cannot be copied does not lose the creative
+  const bad = creaStub();
+  const failFetch = async () => ({ ok: false });
+  const kept = await collectCreatives({ db: bad.db, token: 'T', accounts: accountsMeta, projectId: 3, period: { start: '2026-10-05', end: '2026-10-11' }, count: 3, graphFn: bad.graphFn, fetchFn: failFetch });
+  assert.deepEqual(kept.map((i) => i.imageUrl), [null, null, null]);
+  await assert.rejects(() => collectCreatives({ db, token: 'T', accounts: [{ platform: 'google', account_id: 'g' }], projectId: 3, period: { start: 'a', end: 'b' }, count: 3, graphFn, fetchFn }), /немає кабінетів Meta/);
+});
+await ok('creatives: a person can see the best ads of the period and pick one, which is then copied', async () => {
+  const { graphFn, fetchFn, db, log } = creaStub();
+  const meta = [{ platform: 'meta', account_id: '123' }];
+  const period = { start: '2026-10-05', end: '2026-10-11' };
+  const list = await creativeCandidates({ token: 'T', accounts: meta, period, limit: 4, graphFn });
+  assert.deepEqual(list.map((c) => c.adId), ['6', '1', '3', '4']);
+  assert.equal(list[0].preview, 'https://meta.cdn/p6.jpg');
+  assert.equal(log.uploads.length, 0); // nothing is copied just for looking
+  const item = await pickCreative({ db, token: 'T', accounts: meta, projectId: 3, period, adId: '1', graphFn, fetchFn });
+  assert.deepEqual([item.adId, item.kind, item.imageUrl], ['1', 'image', 'https://store.test/report-creatives/3/2026-10-05_2026-10-11/1.png']);
+  await assert.rejects(() => pickCreative({ db, token: 'T', accounts: meta, projectId: 3, period, adId: '999', graphFn, fetchFn }), /не знайдено/);
+});
+await ok('agent run: the creatives of the Meta accounts go into the report (3 a week, 4 a month); a failure is only a note', async () => {
+  const items = [{ adId: '1', adName: 'A', caption: 'A · ROAS 3.00', kind: 'image', imageUrl: 'https://s/1.png', metrics: {} }];
+  const asked = [];
+  const repo = fakeRepo();
+  const r = await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', today: '2026-10-15', creatives: async (a) => { asked.push(a); return items; } });
+  assert.equal(r.status, 'ok');
+  assert.deepEqual([asked.length, asked[0].count, asked[0].projectId], [1, 3, 3]);
+  assert.deepEqual(asked[0].accounts.map((a) => a.platform), ['meta']);
+  const saved = repo.log.reports[0].data.creatives;
+  assert.deepEqual([saved.count, saved.source, saved.items], [3, 'auto', items]);
+  const monthly = [];
+  await runProjectReport({ repo: fakeRepo(), post, projectId: 3, periodType: 'monthly', today: '2026-10-15', creatives: async (a) => { monthly.push(a.count); return items; } });
+  assert.deepEqual(monthly, [4]);
+  const broken = fakeRepo();
+  const b = await runProjectReport({ repo: broken, post, projectId: 3, periodType: 'weekly', today: '2026-10-15', creatives: async () => { throw new Error('Meta API: token expired'); } });
+  assert.equal(b.status, 'ok');
+  assert.ok(b.notes.some((n) => /Креативи: Meta API: token expired/.test(n)));
+  assert.equal(broken.log.reports[0].data.creatives, undefined);
+  const none = fakeRepo();
+  await runProjectReport({ repo: none, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(none.log.reports[0].data.creatives, undefined); // no collector (no Meta token on the server): the report is as before
 });
 await ok('site analyst: small numbers get no percentages, missing conversions are reported, and the hand-off is made in code', async () => {
   const small = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));

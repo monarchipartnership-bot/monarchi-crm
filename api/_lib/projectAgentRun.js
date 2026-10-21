@@ -13,6 +13,7 @@ import { projectKind } from '../../src/lib/reportMetrics.js';
 import { accountPlatforms, accountsForTab } from '../../src/lib/reportScope.js';
 import { cleanColumns } from '../../src/lib/platformColumns.js';
 import { describeDynamics } from '../../src/lib/reportDynamics.js';
+import { CREATIVE_COUNT } from '../../src/lib/creatives.js';
 import { PROBLEM_QUIET_HOURS, buildNotifications } from './agentNotify.js';
 import { buildReportMessage, reportAction, reportLink } from '../../src/lib/projectReportMessage.js';
 import {
@@ -35,7 +36,8 @@ const hasDelivery = (t) => Boolean(t) && ((t.spend || 0) > 0 || (t.impressions |
 
 // → { status: 'ok' | 'problem' | 'skipped', message, runId, reportId?, deckIds?, notes[] }
 // telegram: { send(message) } (or null when the bot is not set up on the server); crmUrl: where the buttons of the message lead.
-export async function runProjectReport({ repo, post, projectId, periodType, trigger = 'manual', startedBy = null, today = kyivToday(), telegram = null, crmUrl = 'https://crm.monarchi.agency' }) {
+// creatives: async ({ projectId, accounts, period, count }) => items, or null: the «Most effective creatives» of the Meta accounts (see api/_lib/metaCreatives.js).
+export async function runProjectReport({ repo, post, projectId, periodType, trigger = 'manual', startedBy = null, today = kyivToday(), telegram = null, crmUrl = 'https://crm.monarchi.agency', creatives = null }) {
   const run = await repo.startRun({ projectId, trigger, periodType, startedBy });
   const notes = [];
   let locked = false;
@@ -118,6 +120,22 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
       previous: data.previous ? { ...data.previous, platforms: data.previous.platforms?.[scope] ? { [scope]: data.previous.platforms[scope] } : {} } : null,
     });
 
+    // «Most effective creatives»: asked once for the Meta accounts, used by the Meta report and by «Разом». A failure is a note, never a failed run.
+    let metaCreatives; // undefined: not asked yet
+    const creativesFor = async (scope) => {
+      if (!creatives) return null;
+      if (metaCreatives === undefined) {
+        metaCreatives = null;
+        if (platformIds.includes('meta')) {
+          try {
+            const items = await creatives({ projectId, accounts: accountsForTab(accounts, 'meta'), period, count: CREATIVE_COUNT[periodType] || 3 });
+            if (items.length) metaCreatives = items; else notes.push('Креативи: за період немає оголошень з витратами.');
+          } catch (e) { notes.push('Креативи: ' + (e?.message || e)); }
+        }
+      }
+      return scope === 'meta' || scope === 'all' ? metaCreatives : null;
+    };
+
     const reports = {};
     const whatWasDoneBy = {};
     for (const scope of writable) {
@@ -159,6 +177,8 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
       const payload = reportPayload({ kind, data: scoped, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '' });
       // The agent sends the report straight to approval (status «reviewed»): the people responsible check it, fill in what is missing and approve it.
       payload.review = { sentBy: 'AI-агент', sentAt: new Date().toISOString() };
+      const picked = await creativesFor(scope);
+      if (picked) payload.creatives = { count: CREATIVE_COUNT[periodType] || 3, items: picked, source: 'auto', at: new Date().toISOString() };
       reports[scope] = { row: await repo.saveReport({ projectId, periodType, period, platform: scope, source: 'agent', status: 'reviewed', data: payload }), payload, whatWasDone };
     }
     const made = Object.keys(reports);

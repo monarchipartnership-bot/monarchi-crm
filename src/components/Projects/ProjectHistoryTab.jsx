@@ -157,7 +157,7 @@ export default function ProjectHistoryTab({ projectId }) {
       {open && (
         <ArchiveReportModal
           row={open} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, open)}
-          actions={open.data?.toDate ? [] : reportActions(open.status, approver)} onAction={onAction}
+          actions={open.data?.toDate ? [] : reportActions(open.status, approver)} onAction={onAction} onChanged={load}
           onClose={() => setOpenId(null)} onDelete={remove} onPresentation={presentation}
         />
       )}
