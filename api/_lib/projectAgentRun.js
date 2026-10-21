@@ -13,11 +13,12 @@ import { projectKind } from '../../src/lib/reportMetrics.js';
 import { accountPlatforms, accountsForTab } from '../../src/lib/reportScope.js';
 import { cleanColumns } from '../../src/lib/platformColumns.js';
 import { describeDynamics } from '../../src/lib/reportDynamics.js';
-import { CREATIVE_COUNT } from '../../src/lib/creatives.js';
+import { blocksFor, creativeCount, normalizeTemplate, snapshotOf } from '../../src/lib/reportTemplate.js';
+import { figuresText } from '../../src/lib/clientReport.js';
 import { PROBLEM_QUIET_HOURS, buildNotifications } from './agentNotify.js';
 import { buildReportMessage, reportAction, reportLink } from '../../src/lib/projectReportMessage.js';
 import {
-  EMPTY_SECTIONS, buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload,
+  EMPTY_SECTIONS, buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload, writeTemplateBlock,
 } from '../../src/lib/reportEngine.js';
 
 const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [], telegram: { enabled: false, chatId: '', threadId: '' } };
@@ -73,8 +74,13 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     if (!locked) return await finish('skipped', 'Агент уже працює над цим проєктом.');
     await event('run_started', 'info', `Запуск: ${LABEL[periodType]} звіт.`, { trigger });
 
-    const [project, allAccounts, groups, custom, columns] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId), repo.getColumns(projectId)]);
+    const [project, allAccounts, groups, custom, columns, savedTemplate] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId), repo.getColumns(projectId), repo.getTemplate ? repo.getTemplate(projectId) : null]);
     if (!project) throw new Error('Проєкт не знайдено.');
+    // The project's report template: which text blocks this report has, how many creatives. A report keeps a snapshot of it.
+    const template = normalizeTemplate(savedTemplate);
+    const blocks = blocksFor(template, periodType);
+    const has = (blockKind) => blocks.some((b) => b.kind === blockKind);
+    const creativeTotal = creativeCount(template, periodType);
     projectName = project.name || '';
     const accounts = config.platforms?.length ? allAccounts.filter((a) => config.platforms.includes(a.platform)) : allAccounts;
     if (!accounts.length) throw new Error('До проєкту не підключено рекламних кабінетів' + (config.platforms?.length ? ' для обраних платформ.' : '.'));
@@ -123,12 +129,12 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     // «Most effective creatives»: asked once for the Meta accounts, used by the Meta report and by «Разом». A failure is a note, never a failed run.
     let metaCreatives; // undefined: not asked yet
     const creativesFor = async (scope) => {
-      if (!creatives) return null;
+      if (!creatives || !creativeTotal) return null;
       if (metaCreatives === undefined) {
         metaCreatives = null;
         if (platformIds.includes('meta')) {
           try {
-            const items = await creatives({ projectId, accounts: accountsForTab(accounts, 'meta'), period, count: CREATIVE_COUNT[periodType] || 3 });
+            const items = await creatives({ projectId, accounts: accountsForTab(accounts, 'meta'), period, count: creativeTotal });
             if (items.length) metaCreatives = items; else notes.push('Креативи: за період немає оголошень з витратами.');
           } catch (e) { notes.push('Креативи: ' + (e?.message || e)); }
         }
@@ -150,7 +156,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
       let whatWasDone = '';
       if (scope === 'all') {
         whatWasDone = Object.entries(whatWasDoneBy).filter(([, t]) => t.trim()).map(([p, t]) => `${scopeName(p)}:\n${t}`).join('\n\n');
-      } else {
+      } else if (has('whatWasDone')) {
         try {
           let result = null;
           if (periodType === 'monthly') {
@@ -170,15 +176,24 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
       }
 
       // 3. «Conclusion»: the dynamics, from the figures only. «Plans» stays empty.
-      const conclusion = describeDynamics({ platforms: scoped.platforms, previous: scoped.previous, kind, custom, names: PLATFORM_NAMES, unequal: incomparable });
+      const conclusion = has('conclusion') ? describeDynamics({ platforms: scoped.platforms, previous: scoped.previous, kind, custom, names: PLATFORM_NAMES, unequal: incomparable }) : '';
       const sections = { ...EMPTY_SECTIONS, whatWasDone, conclusion, plans: '' };
+      // The extra blocks of the template: the agent writes each one by the manager's instruction, from the figures and the actions only.
+      // A block without an instruction is left for a person; one that could not be written is a note, never a failed run.
+      for (const b of blocks.filter((x) => x.kind === 'custom')) {
+        sections[b.key] = '';
+        if (!b.prompt) continue;
+        const written = await writeTemplateBlock({ block: b, figures: figuresText(scoped, kind), whatWasDone, conclusion, projectName: project.name, period, periodType, post });
+        sections[b.key] = written.text;
+        if (written.error) notes.push(`${scopeName(scope)}: не вдалося написати блок «${b.title}»: ${written.error}`);
+      }
 
       // 4. Save the report as a draft.
-      const payload = reportPayload({ kind, data: scoped, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '' });
+      const payload = reportPayload({ kind, data: scoped, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '', template: snapshotOf(template, periodType) });
       // The agent sends the report straight to approval (status «reviewed»): the people responsible check it, fill in what is missing and approve it.
       payload.review = { sentBy: 'AI-агент', sentAt: new Date().toISOString() };
       const picked = await creativesFor(scope);
-      if (picked) payload.creatives = { count: CREATIVE_COUNT[periodType] || 3, items: picked, source: 'auto', at: new Date().toISOString() };
+      if (picked) payload.creatives = { count: creativeTotal, items: picked, source: 'auto', at: new Date().toISOString() };
       reports[scope] = { row: await repo.saveReport({ projectId, periodType, period, platform: scope, source: 'agent', status: 'reviewed', data: payload }), payload, whatWasDone };
     }
     const made = Object.keys(reports);
@@ -203,9 +218,9 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
       }
     }
     // «What was done» is missing when no platform report has it
-    const whatWasDone = made.map((m) => reports[m].whatWasDone).join('');
-
-    const missingBlocks = [!whatWasDone.trim() && '«What was done»', '«Plans for the next period»'].filter(Boolean);
+    // what a person still has to write: the plans, and every block the agent left empty (not the conclusion: the code always writes it)
+    const filled = (key) => made.some((m) => String(reports[m].payload.sections?.[key] || '').trim());
+    const missingBlocks = blocks.filter((b) => b.kind === 'plans' || (b.kind !== 'conclusion' && !filled(b.key))).map((b) => `«${b.title}»`);
     const todo = missingBlocks.join(' і ');
     const message = `Підготовлено ${GENITIVE[periodType]} звіт за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}${made.length > 1 ? `; звіти: ${made.map(scopeName).join(', ')}` : ''} і надіслано на затвердження. Потрібно заповнити: ${todo}; решту перевірити.`;
     // 6. The chat of the project: one message about the report that waits for approval, a button per report (platform) under it.

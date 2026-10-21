@@ -4,6 +4,7 @@ import { ReportMetricsTable, GroupsTable, HScroll, bestOf, metricsToExport, grou
 import ExportMenu from './ExportMenu';
 import { combinePlatforms, metricRows, visibleKeys } from '../../../lib/periodReport';
 import { METRIC_SETS, computeMetric, formatMetric, metricMeta } from '../../../lib/reportMetrics';
+import { metricKeysOf } from '../../../lib/reportTemplate';
 import { platformInfo } from '../../../lib/adAccounts';
 
 // A fetched period shown as tables: a switcher (each platform + the sum of them
@@ -16,7 +17,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
+export default function ResultView({ data, kind, custom, templateMetrics = null, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -29,7 +30,10 @@ export default function ResultView({ data, kind, custom, title, subtitle, fileBa
 
   const extraId = extraKeys.join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const keys = useMemo(() => visibleKeys(METRIC_SETS[kind], custom, extraKeys), [kind, custom, extraId]);
+  const metricsId = (templateMetrics || []).join(',');
+  // the template's own metric list (when the project has one) replaces the standard rows
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const keys = useMemo(() => metricKeysOf({ metrics: templateMetrics }, visibleKeys(METRIC_SETS[kind], custom, extraKeys), [...extraKeys, ...custom.map((c) => c.key)]), [kind, custom, extraId, metricsId]);
 
   if (!tabs.length) return null;
 

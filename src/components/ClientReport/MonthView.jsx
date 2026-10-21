@@ -1,6 +1,6 @@
 import { Box, DeltaPill, GB, GP, HBars, Legend, Medallion, Pill, PALETTE, Wave, Donut } from './kit';
 import { Creatives, MetricTable, ReportTexts } from './parts';
-import { dmy, fmtValue, kpiCards, metricKeys, prevName, rangeText, roasBars, spendSlices } from '../../lib/clientReport';
+import { dmy, fmtValue, kpiCards, prevName, rangeText, roasBars, spendSlices, viewKeys } from '../../lib/clientReport';
 import { computeMetric } from '../../lib/reportMetrics';
 
 const Stamps = ({ items }) => (
@@ -24,13 +24,13 @@ function Kpis({ view }) {
 }
 
 // One approved week.
-function Week({ week, ctx }) {
+function Week({ week, ctx, model }) {
   const v = week.view;
   return (
     <Box icon="cal" title={`Week ${week.n}`} sub={week.label} right={<Pill tone="ok">Approved</Pill>}>
       <div className="split">
-        <div className="l"><MetricTable view={v} {...ctx} /></div>
-        <div className="r"><ReportTexts sections={v.sections} /><Creatives items={v.creatives} /></div>
+        <div className="l"><MetricTable view={v} keys={viewKeys(v, model)} {...ctx} /></div>
+        <div className="r"><ReportTexts view={v} /><Creatives items={v.creatives} /></div>
       </div>
     </Box>
   );
@@ -40,7 +40,7 @@ function Week({ week, ctx }) {
 export default function MonthView({ month, model }) {
   const kind = model.kind;
   const platformLabel = model.platform === 'meta' ? 'Meta' : model.platform === 'google' ? 'Google' : '';
-  const ctx = { keys: metricKeys(kind, model.columns, model.custom), custom: model.custom, platformLabel };
+  const ctx = { custom: model.custom, platformLabel };
   const total = month.monthly;
   const weeksSum = (key) => month.weeks.reduce((a, w) => a + (Number(w.view.total[key]) || 0), 0);
   const money = (key) => (v) => fmtValue(key, v, 'money', total?.currency || month.weeks[0]?.view.currency);
@@ -84,17 +84,17 @@ export default function MonthView({ month, model }) {
           {bars.length > 0 && <Box icon="bars" title="ROAS by campaign group"><div className="gx"><HBars items={bars} /></div></Box>}
         </div>
       )}
-      {month.weeks.map((w) => <Week key={w.n} week={w} ctx={ctx} />)}
+      {month.weeks.map((w) => <Week key={w.n} week={w} ctx={ctx} model={model} />)}
       {total ? (
         <Box icon="file" title={`${month.name} ${month.running ? 'so far' : 'summary'}`} sub={rangeText(total.start, total.end)} right={<Pill tone={month.running ? 'wa' : 'ok'}>{month.running ? 'To date' : 'Final'}</Pill>}>
           <div className="split">
             <div className="l">
-              <MetricTable view={total} {...ctx} />
+              <MetricTable view={total} keys={viewKeys(total, model)} {...ctx} />
               {reachMonth > 0 && reachSumWeeks > 0 && Math.round(reachMonth) !== Math.round(reachSumWeeks) && (
                 <p className="hint">Reach of the month ({fmtValue('reach', reachMonth, 'number')}) is counted for the whole month, not summed from the weeks ({fmtValue('reach', reachSumWeeks, 'number')}): the same person is seen in several weeks.</p>
               )}
             </div>
-            <div className="r"><ReportTexts sections={total.sections} /><Creatives items={total.creatives} /></div>
+            <div className="r"><ReportTexts view={total} /><Creatives items={total.creatives} /></div>
           </div>
         </Box>
       ) : (

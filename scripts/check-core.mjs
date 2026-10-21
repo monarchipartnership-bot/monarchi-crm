@@ -27,7 +27,8 @@ import { collectCreatives, creativeCandidates, pickCreative } from '../api/_lib/
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
-import { TOP_GROUPS, buildClientModel, change, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices } from '../src/lib/clientReport.js';
+import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, metricKeysOf, normalizeTemplate, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
+import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
@@ -2085,6 +2086,18 @@ await ok('client model: several platforms of one scope are added together, group
   assert.equal(v.total.spend, 15);
   assert.deepEqual(v.groups.map((x) => [x.name, x.spend]), [['A', 15], ['B', 1]]);
 });
+await ok('client model: a report shows the blocks and metrics of its own template snapshot; an old report shows the standard ones', () => {
+  const g = [shareGroup('Catalog', 100, 500, 5)];
+  const snap = shareRow(1, 'weekly', '2026-10-05', '2026-10-11', g, { sections: { whatWasDone: 'a', conclusion: 'c', b_why: 'w', b_int: 'i' } });
+  snap.data.template = { blocks: [{ key: 'whatWasDone', title: 'Work', client: true }, { key: 'b_why', title: 'Why', client: true }, { key: 'b_int', title: 'Internal', client: false }], metrics: ['spend', 'roas'] };
+  const old = shareRow(2, 'weekly', '2026-10-12', '2026-10-18', g, { sections: { whatWasDone: 'a' } });
+  const m = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', columns: [], custom: [], reports: [snap, old] });
+  const [a, b] = m.months[0].weeks.map((w) => w.view);
+  assert.deepEqual(a.blocks.map((x) => x.title), ['Work', 'Why']); // «Internal» is not for the client, «Conclusion» was not in this report's template
+  assert.deepEqual(viewKeys(a, m), ['spend', 'roas']);
+  assert.deepEqual(b.blocks.map((x) => x.key), ['whatWasDone', 'conclusion', 'plans']);
+  assert.ok(viewKeys(b, m).length > 5);
+});
 await ok('client model: campaigns outside every group (one column each, or the old «Інше») fold into «Other campaigns», no campaign name is shown', () => {
   const g = [shareGroup('Catalog', 100, 500, 5), shareGroup('SECRET camp A', 30, 60, 1, { single: true, campaignCount: 1 }), shareGroup('SECRET camp B', 20, 10, 0, { single: true, campaignCount: 1 }), shareGroup('Інше', 10, 0, 0, { campaignCount: 3 })];
   const v = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'weekly', '2026-10-05', '2026-10-11', g)] }).months[0].weeks[0].view;
@@ -2166,6 +2179,151 @@ await ok('group charts: spend slices fold the tail into «Other», ROAS bars lis
   const bars = roasBars(v);
   assert.equal(bars.length, TOP_GROUPS);
   assert.deepEqual(bars.map((b) => b.value), [...bars.map((b) => b.value)].sort((a, b) => b - a));
+});
+
+// ---- the report template of a project ----
+await ok('report template: nothing saved → the three standard blocks, 3 / 4 creatives, the standard metrics', () => {
+  const t = normalizeTemplate(null);
+  assert.deepEqual(t.blocks.map((b) => [b.key, b.weekly, b.monthly]), [['whatWasDone', true, true], ['conclusion', true, true], ['plans', true, true]]);
+  assert.deepEqual(t.creatives, { weekly: 3, monthly: 4 });
+  assert.equal(t.metrics, null);
+  assert.deepEqual(normalizeTemplate(undefined), normalizeTemplate({}));
+});
+await ok('report template: custom blocks keep their title and prompt; bad keys, duplicates and too many blocks are dropped; the system blocks cannot be removed', () => {
+  const t = normalizeTemplate({
+    blocks: [
+      { key: 'whatWasDone', title: 'Work done', weekly: true, monthly: true, prompt: 'ignored for a system block' },
+      { key: 'b_one', title: '  Why we see such results  ', prompt: 'Explain.', weekly: false, monthly: true },
+      { key: 'b_one', title: 'duplicate' },
+      { key: 'bad key!', title: 'bad' },
+      { key: 'b_two', title: '' },
+      { key: 'b_three', title: 'Hidden from client', client: false },
+    ],
+    creatives: { weekly: 99, monthly: -5 },
+  });
+  assert.deepEqual(t.blocks.map((b) => b.key), ['whatWasDone', 'b_one', 'b_three', 'conclusion', 'plans']);
+  assert.equal(t.blocks[0].title, 'Work done'); // a system block can be renamed
+  assert.equal(t.blocks[0].prompt, ''); // but it has no prompt: the agent writes it from the history
+  assert.equal(t.blocks[1].title, 'Why we see such results');
+  assert.equal(t.blocks[1].kind, 'custom');
+  assert.deepEqual([t.blocks[1].weekly, t.blocks[1].monthly], [false, true]);
+  assert.equal(t.blocks[2].client, false);
+  // a system block missing from a saved list was switched off, not forgotten
+  assert.deepEqual(t.blocks.filter((b) => b.key === 'conclusion' || b.key === 'plans').map((b) => [b.weekly, b.monthly]), [[false, false], [false, false]]);
+  assert.deepEqual(t.creatives, { weekly: 6, monthly: 0 }); // clamped
+  const many = normalizeTemplate({ blocks: Array.from({ length: 30 }, (_, i) => ({ key: `b_${i}`, title: `Block ${i}` })) });
+  assert.ok(many.blocks.filter((b) => b.kind === 'custom').length <= MAX_BLOCKS);
+  assert.ok(['whatWasDone', 'conclusion', 'plans'].every((k) => many.blocks.some((b) => b.key === k)));
+  assert.ok(normalizeTemplate({ blocks: [{ key: 'b_x', title: 'T', prompt: 'x'.repeat(5000) }] }).blocks[0].prompt.length <= MAX_PROMPT);
+});
+await ok('report template: blocks and creatives by period type, the snapshot a report keeps', () => {
+  const tpl = { blocks: [{ key: 'whatWasDone' }, { key: 'conclusion', weekly: false }, { key: 'plans' }, { key: 'b_p', title: 'Why', prompt: 'p', weekly: false, client: false }], creatives: { weekly: 2, monthly: 5 }, metrics: ['spend', 'roas'] };
+  assert.deepEqual(blocksFor(tpl, 'weekly').map((b) => b.key), ['whatWasDone', 'plans']);
+  assert.deepEqual(blocksFor(tpl, 'monthly').map((b) => b.key), ['whatWasDone', 'conclusion', 'plans', 'b_p']);
+  assert.equal(creativeCount(tpl, 'weekly'), 2);
+  assert.equal(creativeCount(tpl, 'monthly'), 5);
+  assert.equal(creativeCount(null, 'monthly'), 4);
+  const snap = snapshotOf(tpl, 'monthly');
+  assert.deepEqual(snap.blocks.map((b) => [b.key, b.title, b.client]), [['whatWasDone', 'What was done', true], ['conclusion', 'Conclusion', true], ['plans', 'Plans for the next period', true], ['b_p', 'Why', false]]);
+  assert.deepEqual(snap.metrics, ['spend', 'roas']);
+  assert.ok(!('prompt' in snap.blocks[3])); // the prompt is the agent's instruction, not part of the report
+});
+await ok('report template: a saved report draws its own snapshot; an old report has the standard blocks; no text is lost', () => {
+  const own = reportBlocks({ template: { blocks: [{ key: 'whatWasDone', title: 'Work', client: true }, { key: 'b_x', title: 'Why', client: false }] }, sections: { whatWasDone: 'a', b_x: 'b', old_key: 'kept' } });
+  assert.deepEqual(own.map((b) => [b.key, b.title, b.client]), [['whatWasDone', 'Work', true], ['b_x', 'Why', false], ['old_key', 'old_key', false]]);
+  assert.deepEqual(reportBlocks({ sections: { whatWasDone: 'a' } }).map((b) => b.key), ['whatWasDone', 'conclusion', 'plans']);
+  assert.deepEqual(reportBlocks(null).map((b) => b.key), ['whatWasDone', 'conclusion', 'plans']);
+});
+await ok('report template: the metric list replaces the standard one in its own order; unknown keys are ignored', () => {
+  const defaults = ['spend', 'revenue', 'roas'];
+  assert.deepEqual(metricKeysOf(null, defaults), defaults);
+  assert.deepEqual(metricKeysOf({ metrics: ['roas', 'spend', 'nonsense', 'custom_x'] }, defaults, ['custom_x']), ['roas', 'spend', 'custom_x']);
+  assert.deepEqual(metricKeysOf({ metrics: ['nonsense'] }, defaults), defaults);
+  assert.deepEqual(metricKeysOf({ metrics: ['mx_add_to_cart'] }, defaults), ['mx_add_to_cart']); // the extra column of a platform is a known metric
+});
+await ok('report template: the figures handed to the agent are lines with changes, the top groups only, and never a campaign name', () => {
+  const g = Array.from({ length: 10 }, (_, i) => shareGroup(`G${i + 1}`, 1000 - i * 50, (1000 - i * 50) * 3, 10));
+  g.push(shareGroup('SECRET camp', 5, 5, 0, { single: true }));
+  const row = shareRow(1, 'weekly', '2026-10-05', '2026-10-11', g, { prev: { period: { start: '2026-09-28', end: '2026-10-04' }, total: { spend: 4000, revenue: 9000, purchases: 50, impressions: 100000, clicks: 3000, reach: 40000 }, groups: [] }, campaigns: [{ name: 'SECRET campaign' }] });
+  const text = figuresText(row.data, 'ecom');
+  const lines = text.split('\n');
+  assert.ok(lines[0].startsWith('Total: Spent $'));
+  assert.match(lines[0], /ROAS 300%/);
+  assert.match(lines[0], /\(\+\d/); // the change against the previous period
+  assert.equal(lines.length, 1 + 8); // total + at most 8 groups
+  assert.ok(lines[1].startsWith('- G1:'));
+  assert.ok(!text.includes('SECRET'));
+  assert.equal(figuresText({ platforms: {} }), '');
+  assert.match(figuresText({ platforms: { meta: { currency: 'USD', total: { spend: 10, leads: 2, clicks: 5, impressions: 100, reach: 50 }, groups: [] } } }, 'leadgen'), /Leads 2/);
+});
+
+// ---- the agent writes a report by the project's template ----
+const TEMPLATE = {
+  blocks: [
+    { key: 'whatWasDone', title: 'What was done' },
+    { key: 'conclusion', title: 'Conclusion', weekly: false },
+    { key: 'plans', title: 'Plans for the next period' },
+    { key: 'b_why', title: 'Why we see such results', prompt: 'Explain the change.', client: true },
+    { key: 'b_hand', title: 'Notes of the manager' },
+  ],
+  creatives: { weekly: 1, monthly: 4 },
+};
+const withBlockWriter = (calls, fail = false) => async (path, body) => {
+  if (path === '/api/report-work-summary' && body.action === 'block') {
+    calls.push(body);
+    if (fail) throw new Error('model unavailable');
+    return { text: 'The change coincided with the budget increase.' };
+  }
+  return post(path, body);
+};
+await ok('agent run (template): extra blocks are written by their instruction from the figures, a block without one is left for a person, the report keeps a snapshot', async () => {
+  const calls = [];
+  const repo = fakeRepo();
+  repo.getTemplate = async () => TEMPLATE;
+  const r = await runProjectReport({ repo, post: withBlockWriter(calls), projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(r.status, 'ok');
+  const rep = repo.log.reports[0].data;
+  assert.equal(rep.sections.b_why, 'The change coincided with the budget increase.');
+  assert.equal(rep.sections.b_hand, ''); // no instruction: nobody asks the model
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].title, 'Why we see such results');
+  assert.equal(calls[0].instruction, 'Explain the change.');
+  assert.match(calls[0].figures, /^Total: Spent \$/);
+  assert.ok(calls[0].whatWasDone.includes('Launched the Test RTS campaign'));
+  assert.equal(rep.sections.conclusion, ''); // switched off for weekly reports
+  assert.deepEqual(rep.template.blocks.map((b) => b.key), ['whatWasDone', 'plans', 'b_why', 'b_hand']);
+  // what a person still has to write: the plans and the block without an instruction
+  assert.match(r.message, /«Plans for the next period» і «Notes of the manager»/);
+  assert.ok(!r.message.includes('Why we see'));
+});
+await ok('agent run (template): a block the model could not write is a note and stays empty; the run still succeeds and names the block as to do', async () => {
+  const calls = [];
+  const repo = fakeRepo();
+  repo.getTemplate = async () => TEMPLATE;
+  const r = await runProjectReport({ repo, post: withBlockWriter(calls, true), projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(r.status, 'ok');
+  assert.equal(repo.log.reports[0].data.sections.b_why, '');
+  assert.ok(r.notes.some((n) => n.includes('Why we see such results') && n.includes('model unavailable')));
+  assert.match(r.message, /«Why we see such results»/);
+});
+await ok('agent run (template): the number of creatives and the blocks follow the period type; no template means the standard blocks', async () => {
+  const asked = [];
+  const repo = fakeRepo();
+  repo.getTemplate = async () => TEMPLATE;
+  await runProjectReport({ repo, post: withBlockWriter([]), projectId: 3, periodType: 'weekly', today: '2026-10-15', creatives: async (a) => { asked.push(a.count); return []; } });
+  const monthlyRepo = fakeRepo();
+  monthlyRepo.getTemplate = async () => TEMPLATE;
+  await runProjectReport({ repo: monthlyRepo, post: withBlockWriter([]), projectId: 3, periodType: 'monthly', today: '2026-10-15', creatives: async (a) => { asked.push(a.count); return []; } });
+  assert.deepEqual(asked, [1, 4]);
+  assert.ok(monthlyRepo.log.reports[0].data.sections.conclusion.length > 0); // the conclusion is on for the month
+  const none = fakeRepo();
+  const none0 = fakeRepo();
+  none0.getTemplate = async () => ({ blocks: [], creatives: { weekly: 0, monthly: 0 } });
+  let zero = 0;
+  await runProjectReport({ repo: none0, post, projectId: 3, periodType: 'weekly', today: '2026-10-15', creatives: async () => { zero += 1; return []; } });
+  assert.equal(zero, 0); // 0 creatives: the collector is not even asked
+  await runProjectReport({ repo: none, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.deepEqual(none.log.reports[0].data.template.blocks.map((b) => b.key), ['whatWasDone', 'conclusion', 'plans']);
 });
 
 console.log(`\n${passed} checks passed`);

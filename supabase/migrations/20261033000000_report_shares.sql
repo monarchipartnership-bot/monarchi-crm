@@ -95,6 +95,7 @@ begin
             'period', r.data->'previous'->'period',
             'platforms', share_strip_platforms(r.data->'previous'->'platforms')) end,
           'sections', coalesce(r.data->'sections', '{}'::jsonb),
+          'template', r.data->'template',
           'creatives', (select coalesce(jsonb_agg(jsonb_build_object('caption', i->>'caption', 'imageUrl', i->>'imageUrl', 'kind', i->>'kind')), '[]'::jsonb) from jsonb_array_elements(coalesce(r.data->'creatives'->'items', '[]'::jsonb)) i)
         )
       ) order by r.period_start, r.period_end)

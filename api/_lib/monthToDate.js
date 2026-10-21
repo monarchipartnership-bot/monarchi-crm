@@ -13,6 +13,7 @@ import { describeDynamics } from '../../src/lib/reportDynamics.js';
 import { daysInRange } from '../../src/lib/periodReport.js';
 import { PLATFORMS } from '../../src/lib/presentation/deckModel.js';
 import { monthRange } from '../../src/lib/projectHistory.js';
+import { blocksFor, normalizeTemplate, snapshotOf } from '../../src/lib/reportTemplate.js';
 
 const NAMES = Object.fromEntries(PLATFORMS.map((p) => [p.id, p.name]));
 const fmt = (s) => s.split('-').reverse().join('.');
@@ -32,7 +33,9 @@ export async function refreshMonthToDate({ repo, post, projectId, monthKey: key 
   const out = { updated: [], skipped: [] };
   const agent = await repo.getAgent(projectId);
   const config = agent?.config || {};
-  const [project, allAccounts, groups, custom, columns] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId), repo.getColumns(projectId)]);
+  const [project, allAccounts, groups, custom, columns, savedTemplate] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId), repo.getColumns(projectId), repo.getTemplate ? repo.getTemplate(projectId) : null]);
+  const template = normalizeTemplate(savedTemplate);
+  const monthBlocks = blocksFor(template, 'monthly');
   if (!project) throw new Error('Проєкт не знайдено.');
   const accounts = config.platforms?.length ? allAccounts.filter((a) => config.platforms.includes(a.platform)) : allAccounts;
   if (!accounts.length) { out.skipped.push('До проєкту не підключено рекламних кабінетів.'); return out; }
@@ -64,8 +67,8 @@ export async function refreshMonthToDate({ repo, post, projectId, monthKey: key 
       platforms: { [scope]: data.platforms[scope] },
       previous: data.previous ? { ...data.previous, platforms: data.previous.platforms?.[scope] ? { [scope]: data.previous.platforms[scope] } : {} } : null,
     };
-    const conclusion = describeDynamics({ platforms: scoped.platforms, previous: scoped.previous, kind, custom, names: NAMES, unequal: false });
-    const payload = reportPayload({ kind, data: scoped, compare: { mode: 'custom' }, period, prev, selection: [], options: { groups: true }, sections: { ...EMPTY_SECTIONS, conclusion }, note: config.note || '' });
+    const conclusion = monthBlocks.some((b) => b.kind === 'conclusion') ? describeDynamics({ platforms: scoped.platforms, previous: scoped.previous, kind, custom, names: NAMES, unequal: false }) : '';
+    const payload = reportPayload({ kind, data: scoped, compare: { mode: 'custom' }, period, prev, selection: [], options: { groups: true }, sections: { ...EMPTY_SECTIONS, conclusion }, note: config.note || '', template: snapshotOf(template, 'monthly') });
     payload.toDate = true;
     payload.approvedThrough = end;
     payload.label = `Місяць на сьогодні, по ${fmt(end)}`;

@@ -2,6 +2,7 @@ import { supabase } from '../supabaseClient';
 import { collapseStatuses, flatten } from '../reportScope';
 import { reviewPatch } from '../projectHistory';
 import { authedPost } from '../adAccounts';
+import { normalizeTemplate } from '../reportTemplate';
 
 // Storage for the redesigned project reports (migration
 // 20261008000000_project_reports.sql): saved weekly/monthly reports, the
@@ -204,4 +205,18 @@ export async function issueReportShare(projectId, platform, by) {
 export async function revokeReportShare(projectId, platform) {
   const { error } = await supabase.from('report_shares').update({ active: false, revoked_at: nowIso() }).eq('project_id', projectId).eq('platform', platform).eq('active', true);
   if (error) throw error;
+}
+
+// ---- The report template of a project (migration 20261034000000_report_templates.sql) ----
+// → a normalized template; the standard one when nothing is saved (or the table is not there yet).
+export async function fetchReportTemplate(projectId) {
+  const { data, error } = await supabase.from('project_report_templates').select('blocks, creatives, metrics').eq('project_id', projectId).maybeSingle();
+  if (error) { console.warn('fetchReportTemplate failed', error); return normalizeTemplate(null); }
+  return normalizeTemplate(data);
+}
+export async function saveReportTemplate(projectId, template, by) {
+  const t = normalizeTemplate(template);
+  const { error } = await supabase.from('project_report_templates').upsert({ project_id: projectId, blocks: t.blocks, creatives: t.creatives, metrics: t.metrics, updated_by: by || null, updated_at: nowIso() }, { onConflict: 'project_id' });
+  if (error) throw error;
+  return t;
 }

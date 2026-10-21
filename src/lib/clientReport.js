@@ -4,6 +4,7 @@
 // The client sees ONLY what the function returned: approved weeks plus the running total of the current month. Nothing here fetches or invents numbers.
 import { METRICS, METRIC_SETS, computeMetric, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { monthKey, monthRange, monthWeeks } from './projectHistory.js';
+import { metricKeysOf, reportBlocks } from './reportTemplate.js';
 
 export const TOP_GROUPS = 5; // groups shown by name; the rest fold into «Other (N groups)» until the client asks to see all
 
@@ -102,10 +103,16 @@ export function reportView(report, ctx) {
     groups: cur.groups.filter(active).sort(bySpend),
     prev: prevScope && prevPeriod ? { period: prevPeriod, total: prevScope.total, groups: prevScope.groups } : null,
     sections: report.data?.sections || {},
+    // the text blocks of the template this report was made with, and only those the client may see; its own metric list, if it had one
+    blocks: reportBlocks(report.data).filter((b) => b.client),
+    templateMetrics: report.data?.template?.metrics || null,
     creatives: (report.data?.creatives || []).slice(0, report.type === 'monthly' ? 4 : 3),
     kind: ctx.kind,
   };
 }
+
+// The metric rows of one report's table: its template's own list, else the standard set + the project's extra columns and formulas.
+export const viewKeys = (view, model) => metricKeysOf({ metrics: view.templateMetrics }, metricKeys(model.kind, model.columns, model.custom), [...model.columns, ...model.custom.map((c) => c.key)]);
 
 // The name of the compared period: «August» for a month, «previous week» for a week.
 export function prevName(view) {
@@ -225,4 +232,28 @@ export function buildClientModel(payload) {
   });
   const stamps = months.map((m) => m.asOf).filter(Boolean).sort();
   return { project: payload.project || { name: '' }, platform: payload.platform, kind, columns: payload.columns || [], custom: payload.custom || [], months, history, asOf: stamps.length ? stamps[stamps.length - 1] : null };
+}
+
+// ---- what the agent writes a custom block of the report template from ----
+// The report's numbers as plain lines for the model: the total and the top groups, with the change against the previous period.
+export function figuresText(data, kind = 'ecom') {
+  const cur = scopeOf(data?.platforms);
+  if (!cur) return '';
+  const prev = data?.previous ? scopeOf(data.previous.platforms) : null;
+  const keys = kind === 'leadgen' ? ['spend', 'leads', 'cpl', 'clicks', 'ctr', 'reach'] : ['spend', 'revenue', 'roas', 'purchases', 'cpp', 'aov', 'ctr', 'cpm'];
+  const line = (name, base, before) => {
+    const parts = keys.map((k) => {
+      const v = computeMetric(k, base);
+      if (v == null) return null;
+      const m = METRICS[k];
+      let text = `${m.en || m.label} ${fmtValue(k, v, m.format, cur.currency)}`;
+      const c = before ? change(k, v, computeMetric(k, before), m.goodWhen) : null;
+      if (c) text += ` (${c.arrow === '▲' ? '+' : c.arrow === '▼' ? '-' : ''}${c.pct})`;
+      return text;
+    }).filter(Boolean);
+    return `${name}: ${parts.join(', ')}`;
+  };
+  const prevByName = prev ? new Map(prev.groups.map((g) => [g.name, g])) : new Map();
+  const groups = cur.groups.filter((g) => (Number(g.spend) || 0) > 0).sort((a, b) => (Number(b.spend) || 0) - (Number(a.spend) || 0)).slice(0, 8);
+  return [line('Total', cur.total, prev?.total), ...groups.map((g) => `- ${line(g.name, g, prevByName.get(g.name))}`)].join('\n');
 }

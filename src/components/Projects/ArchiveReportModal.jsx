@@ -5,6 +5,7 @@ import { platformInfo } from '../../lib/adAccounts';
 import { periodLabel } from '../../lib/presentation/deckModel';
 import { REPORT_STATUS } from '../../lib/projectHistory';
 import CreativeGrid from './CreativeGrid';
+import { reportBlocks } from '../../lib/reportTemplate';
 import DesignTodo from '../common/DesignTodo';
 import CreativePickerDialog from './CreativePickerDialog';
 import { saveReportCreatives, suggestCreatives } from '../../lib/api/reportCreatives';
@@ -12,7 +13,8 @@ import '../../styles/projectReports.css';
 
 const TYPE_LABEL = { weekly: 'Тижневий', monthly: 'Місячний', custom: 'Довільний' };
 const STATUS = REPORT_STATUS;
-const SECTIONS = [['whatWasDone', 'What was done'], ['conclusion', 'Conclusion'], ['plans', 'Plans for the next period']];
+// the text blocks of a report: its own snapshot of the project's template (an old report has the three standard ones)
+const sectionsOf = (data) => reportBlocks(data).map((b) => [b.key, b.title]).filter(([k]) => (data.sections?.[k] || '').trim());
 const fmt = (s) => s.split('-').reverse().join('.');
 
 export const reportPlatformLabel = (p) => (p === 'all' ? 'Разом' : platformInfo(p).label);
@@ -49,7 +51,7 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
   const platforms = Object.keys(data.platforms || {});
   const isCombined = row.platform === 'all';
   const label = data.label ? ` · ${data.label}` : '';
-  const sections = SECTIONS.filter(([k]) => (data.sections?.[k] || '').trim());
+  const sections = sectionsOf(data);
 
   return (
     <div className="arc-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -97,12 +99,12 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
   const platforms = Object.keys(data.platforms || {});
   const isCombined = row.platform === 'all';
   const label = data.label ? ` · ${data.label}` : '';
-  const sections = SECTIONS.filter(([k]) => (data.sections?.[k] || '').trim());
+  const sections = sectionsOf(data);
   return (
     <>
       {platforms.length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
         <ResultView
-          data={{ platforms: data.platforms, previous: data.previous || null }} kind={data.kind || 'ecom'} custom={custom}
+          data={{ platforms: data.platforms, previous: data.previous || null }} kind={data.kind || 'ecom'} custom={custom} templateMetrics={data.template?.metrics || null}
           lockTotal={isCombined} extraKeys={isCombined ? [] : extraKeys}
           title={projectName + label} subtitle={TYPE_LABEL[row.period_type] + ' · ' + reportPeriodText(row)}
           fileBase={`${projectName}_${row.period_type}_${row.period_start}_${row.platform}`}

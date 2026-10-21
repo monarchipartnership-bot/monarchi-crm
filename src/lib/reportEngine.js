@@ -12,6 +12,16 @@ import { collectFacts, describeWork, mergeWeeks } from './workHistory.js';
 
 export const EMPTY_SECTIONS = { whatWasDone: '', conclusion: '', plans: '' };
 
+// One extra block of the project's report template, written from the report's own figures and the actions of the period.
+// → { text, writer: 'ai' | 'none', error? }; never throws: a block that could not be written is simply left for a person.
+export async function writeTemplateBlock({ block, figures, whatWasDone, conclusion, projectName, period, periodType, post }) {
+  if (!block?.prompt?.trim() || !figures?.trim()) return { text: '', writer: 'none' };
+  try {
+    const r = await post('/api/report-work-summary', { action: 'block', title: block.title, instruction: block.prompt, figures, whatWasDone: whatWasDone || '', conclusion: conclusion || '', projectName, from: period.start, to: period.end, periodType });
+    return r?.text ? { text: r.text, writer: 'ai' } : { text: '', writer: 'none', error: 'порожня відповідь' };
+  } catch (e) { return { text: '', writer: 'none', error: e?.message || String(e) }; }
+}
+
 const iso = (d) => isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 const fmt = (s) => s.split('-').reverse().join('.');
 
@@ -67,7 +77,7 @@ export async function pullReportData({ accounts, kind, groups, period, prev, pos
 }
 
 // What a saved report holds (project_reports.data). `compare` is internal bookkeeping and is never printed.
-export function reportPayload({ kind, data, compare, period, prev, selection = [], options = { groups: true }, sections = EMPTY_SECTIONS, note = '' }) {
+export function reportPayload({ kind, data, compare, period, prev, selection = [], options = { groups: true }, sections = EMPTY_SECTIONS, note = '', template = null }) {
   const info = comparisonInfo(period, prev);
   return {
     version: 1,
@@ -79,6 +89,7 @@ export function reportPayload({ kind, data, compare, period, prev, selection = [
     options,
     sections,
     note,
+    ...(template ? { template } : {}), // the blocks and metrics this report was made with; a later change of the template never touches it
     savedAt: new Date().toISOString(),
   };
 }

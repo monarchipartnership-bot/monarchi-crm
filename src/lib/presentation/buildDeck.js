@@ -4,6 +4,7 @@
 // number the report does not.
 import { METRIC_SETS, computeMetric, deltaPct, metricMeta, sumBase } from '../reportMetrics.js';
 import { visibleKeys } from '../periodReport.js';
+import { metricKeysOf } from '../reportTemplate.js';
 import { text, listText } from './textModel.js';
 import { paginateBlocks } from './textFit.js';
 import { PLATFORMS, emptyDeck, labels, periodLabel, platformName, uid } from './deckModel.js';
@@ -79,7 +80,8 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
   const periodText = periodLabel(periodType, report.period_start, report.period_end, lang);
   const prevTotal = rd.previous?.platforms?.[platform]?.total || null;
   const cur = plat?.total || null;
-  const keys = visibleKeys(METRIC_SETS[kind], custom, extraKeys);
+  // the metrics of the template the report was made with (when it had its own list), else the standard set
+  const keys = metricKeysOf({ metrics: rd.template?.metrics }, visibleKeys(METRIC_SETS[kind], custom, extraKeys), [...extraKeys, ...custom.map((c) => c.key)]);
 
   const deck = emptyDeck({
     projectId: report.project_id, reportId: report.id, periodType, periodStart: report.period_start, periodEnd: report.period_end,

@@ -17,10 +17,15 @@ export function TextCard({ icon, title, text }) {
   );
 }
 
-// The three texts of a report, in the order of the sheet.
-export const TEXT_BLOCKS = [['whatWasDone', 'note', 'What was done'], ['conclusion', 'check', 'Conclusion'], ['plans', 'arrow', 'Plans for the next period']];
-export function ReportTexts({ sections }) {
-  return TEXT_BLOCKS.map(([key, icon, title]) => <TextCard key={key} icon={icon} title={title} text={sections?.[key]} />);
+// The text blocks of a report (its own template snapshot, only those the client may see), in the template's order.
+const BLOCK_ICONS = { whatWasDone: 'note', conclusion: 'check', plans: 'arrow' };
+const EXTRA_ICONS = ['layers', 'spark', 'stat', 'alert'];
+export function ReportTexts({ view }) {
+  let extra = 0;
+  return view.blocks.map((b) => {
+    const icon = BLOCK_ICONS[b.key] || EXTRA_ICONS[extra++ % EXTRA_ICONS.length];
+    return <TextCard key={b.key} icon={icon} title={b.title} text={view.sections?.[b.key]} />;
+  });
 }
 
 export function Creatives({ items }) {

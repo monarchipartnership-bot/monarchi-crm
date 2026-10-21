@@ -15,6 +15,7 @@ import { daysInRange, fetchProjectRange, periodFromPicker, regroupData } from '.
 import { fetchProjectReports, saveProjectReport, deleteProjectReport } from '../../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../../lib/api/projectDecks';
 import { EMPTY_SECTIONS, buildWhatWasDone, comparisonPeriod, pullReportData, reportPayload } from '../../../lib/reportEngine';
+import { normalizeTemplate, reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
 import { platformInfo } from '../../../lib/adAccounts';
 import { missingColumns } from '../../../lib/platformColumns';
 import { metricMeta } from '../../../lib/reportMetrics';
@@ -24,11 +25,6 @@ import '../../../styles/projectReports.css';
 import Select from '../../common/Select';
 
 import { HubTitle } from '../hubIcons';
-const TEXT_BLOCKS = [
-  { key: 'whatWasDone', title: 'What was done' },
-  { key: 'conclusion', title: 'Conclusion' },
-  { key: 'plans', title: 'Plans for the next period' },
-];
 const STATUS = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
 const fmt = (s) => s.split('-').reverse().join('.');
 
@@ -57,6 +53,8 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   const applied = useRef('');
   const [data, setData] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
+  // the template snapshot of the opened saved report (it keeps its own blocks and metrics); null for a new one, which takes the project's current template
+  const [snap, setSnap] = useState(null);
   const [note, setNote] = useState('');
   const [selection, setSelection] = useState([]);
   const [options, setOptions] = useState({ groups: true });
@@ -115,6 +113,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     if (row) {
       setData(row.data?.platforms ? { platforms: row.data.platforms, previous: row.data.previous || null } : null);
       setSections({ ...EMPTY_SECTIONS, ...(row.data?.sections || {}) });
+      setSnap(row.data?.template || snapshotOf(null, periodType)); // a report made before templates existed keeps the standard blocks, whatever the template is now
       setNote(row.data?.note || '');
       setSelection(row.data?.selection || []);
       setOptions({ groups: true, ...(row.data?.options || {}) });
@@ -124,6 +123,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     } else {
       setData(null);
       setSections(EMPTY_SECTIONS);
+      setSnap(null);
       setNote('');
       setSelection([]);
       setOptions({ groups: true });
@@ -197,7 +197,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       const row = await saveProjectReport({
         projectId, periodType, periodStart: period.start, periodEnd: period.end, platform: ctx.scope, status: nextStatus,
         source: meta.source, createdBy: email,
-        data: reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note }),
+        data: reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note, template: snap || snapshotOf(ctx.template, periodType) }),
       });
       setStatus(row.status);
       setDirty(false);
@@ -259,6 +259,8 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   }
   const first = data ? Object.values(data.platforms)[0] : null;
   const hasAccounts = ctx.accounts.length > 0;
+  // the text blocks of this report: its own snapshot, or the project's template for a new one (a text under a key outside the list is still shown)
+  const textBlocks = reportBlocks({ template: snap || snapshotOf(ctx.template, periodType), sections });
   const ownGroups = !isTotal;
   // the platform tab's own numbers: what the «Що входить у звіт» box works on
   const platData = !isTotal && data ? data.platforms?.[platform] : null;
@@ -383,7 +385,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys}
+            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={(snap || normalizeTemplate(ctx.template)).metrics || null}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
             campaignMode="selected" selection={selection} onSelectionChange={(s) => { setSelection(s); setActiveGroupId(null); setDirty(true); }}
@@ -399,10 +401,10 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       <section className="report-section">
         <HubTitle icon="note">Текст звіту (англійською)</HubTitle>
         <div className="prep-texts">
-          {TEXT_BLOCKS.map((b) => (
+          {textBlocks.map((b) => (
             <div className="ov-field-box" key={b.key}>
               <div className="ov-field-label">{b.title}</div>
-              <AutoResizeTextarea value={sections[b.key]} onChange={(v) => { setSections((s) => ({ ...s, [b.key]: v })); setDirty(true); }} placeholder={b.title + '…'} />
+              <AutoResizeTextarea value={sections[b.key] || ''} onChange={(v) => { setSections((s) => ({ ...s, [b.key]: v })); setDirty(true); }} placeholder={b.title + '…'} />
               {b.key === 'whatWasDone' && (
                 <div className="prep-work">
                   <div className="prep-work-actions">

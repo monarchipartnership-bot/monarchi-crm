@@ -7,6 +7,8 @@
 //       facts = what people really changed in the ad accounts (already filtered, in plain English)
 //   { action: 'merge', weeks: [{ label, text }], projectName, note?, from, to }
 //       weeks = the weekly "What was done" lists of one month, to become one monthly list
+//   { action: 'block', title, instruction, figures, whatWasDone?, conclusion?, projectName, from, to, periodType }
+//       one extra text block of the project's report template (see src/lib/reportTemplate.js), written from the figures and the actions only
 // Returns { text } — a "- item" list in English. The model may only reword and group what it is
 // given: no invented reasons, results or numbers.
 import { createClient } from '@supabase/supabase-js';
@@ -63,6 +65,14 @@ const STYLE = [
   'Output only the lines, nothing before or after them.',
 ].join(' ') + '\n\n' + EXAMPLES;
 
+// An extra block of a report template («Why we see such results» and the like). The manager's instruction says WHAT to write; this says what is allowed.
+const BLOCK_STYLE = [
+  'You write one text block of an advertising performance report that a marketing agency sends to its client, in natural business English, past tense, first person plural where it fits.',
+  'The manager gives the title of the block and an instruction. Use ONLY the supplied material: the figures of the period with their change against the previous period, the list of actions taken, and a neutral description of the dynamics.',
+  'Never invent numbers, actions, causes or results that the material does not show. If the material does not support something the instruction asks for, leave it out instead of guessing. Keep every number exactly as given.',
+  'Do not mention people, internal tools, "the material" or "the figures provided". Plain text: no markdown headings, no title line, no bullet characters unless the instruction asks for a list. At most 120 words. Output only the text.',
+].join(' ');
+
 function bad(res, code, error) { res.status(code).json({ error }); }
 
 export default async function handler(req, res) {
@@ -75,7 +85,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) { bad(res, 500, 'ANTHROPIC_API_KEY не налаштовано'); return; }
 
-  const { action, facts, weeks, projectName, note, from, to, periodType } = req.body || {};
+  const { action, facts, weeks, projectName, note, from, to, periodType, title, instruction, figures, whatWasDone, conclusion } = req.body || {};
   const kind = periodType === 'monthly' ? 'monthly' : 'weekly';
   let prompt;
   if (action === 'describe') {
@@ -84,15 +94,35 @@ export default async function handler(req, res) {
   } else if (action === 'merge') {
     if (!Array.isArray(weeks) || !weeks.length || weeks.length > 6) { bad(res, 400, 'weeks: 1–6 тижнів'); return; }
     prompt = `Project: ${String(projectName || '').slice(0, 120)}\nMonth: ${from} to ${to}\n${note ? `Manager's context (use only to choose wording, do not quote): ${String(note).slice(0, 600)}\n` : ''}\nThe weekly "What was done" lists of this month. Combine them into ONE list for the whole month: merge repeated actions into one bullet (for example the same campaign touched in several weeks), keep every distinct action, keep the concrete details, and do not add anything that is not in the weekly lists.\n\n${weeks.map((w) => `Week ${String(w.label || '').slice(0, 60)}:\n${String(w.text).slice(0, 3000)}`).join('\n\n')}`;
-  } else { bad(res, 400, 'action: describe | merge'); return; }
+  } else if (action === 'block') {
+    if (typeof title !== 'string' || !title.trim() || typeof instruction !== 'string' || !instruction.trim()) { bad(res, 400, 'title та instruction обовʼязкові'); return; }
+    if (typeof figures !== 'string' || !figures.trim() || figures.length > 5000) { bad(res, 400, 'figures: текст до 5000 символів'); return; }
+    prompt = [
+      `Project: ${String(projectName || '').slice(0, 120)}`,
+      `Period (${kind}): ${from} to ${to}`,
+      `Block title: ${title.slice(0, 80)}`,
+      `Manager's instruction: ${instruction.slice(0, 900)}`,
+      '',
+      'Figures of the period (the change in brackets is against the previous period):',
+      figures,
+      ...(whatWasDone ? ['', 'Actions taken in the period:', String(whatWasDone).slice(0, 3000)] : []),
+      ...(conclusion ? ['', 'Neutral description of the dynamics:', String(conclusion).slice(0, 1500)] : []),
+    ].join('\n');
+  } else { bad(res, 400, 'action: describe | merge | block'); return; }
 
   try {
     // Through the shared client: retries, usage log, spending limits.
     const result = await getModelClient(token).callModel({
       agentKey: 'report-work-summary', trigger: 'user', actor: userData.user.email || null,
-      params: { model: MODEL, max_tokens: 1500, thinking: { type: 'disabled' }, system: STYLE, messages: [{ role: 'user', content: prompt }] },
+      params: { model: MODEL, max_tokens: 1500, thinking: { type: 'disabled' }, system: action === 'block' ? BLOCK_STYLE : STYLE, messages: [{ role: 'user', content: prompt }] },
     });
     const text = result.text;
+    if (action === 'block') {
+      // the model sometimes opens with the title again or wraps the text in markdown: take that off
+      const clean = text.replace(/^#+\s.*\n+/, '').replace(/^\*\*(.+?)\*\*\s*\n+/, (m, t) => (t.trim().toLowerCase() === title.trim().toLowerCase() ? '' : m)).replace(/\*\*/g, '').trim();
+      res.status(200).json({ text: clean });
+      return;
+    }
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => (l.startsWith('-') ? l : '- ' + l.replace(/^[•*]\s*/, '')));
     // The model sometimes adds a platform the source never named; take such phrases out again.
     const source = (action === 'merge' ? weeks.map((w) => w.text).join('\n') : facts.join('\n')).toLowerCase();
