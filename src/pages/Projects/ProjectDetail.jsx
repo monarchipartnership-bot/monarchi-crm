@@ -6,10 +6,11 @@ import ProjectAccountsPanel from '../../components/Projects/ProjectAccountsPanel
 import ClientPicker from '../../components/Clients/ClientPicker';
 import { clientFullName } from '../../lib/clientName';
 import { fetchProjectById, updateProject, deleteProject } from '../../lib/api/projects';
-import { STATUS_LABEL, SERVICES, fmtIsoDate, periodShare } from '../../lib/projectConstants';
+import { STATUS_LABEL, SERVICES, periodShare } from '../../lib/projectConstants';
 import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
-import { EXTRA_PROJECT_FIELDS, extraFieldsForm, extraFieldsPayload, fmtCost } from '../../lib/projectFields';
+import { EXTRA_PROJECT_FIELDS, extraFieldsPayload } from '../../lib/projectFields';
+import AutoField from '../../components/Projects/AutoField';
 import ProjectHistoryTab from '../../components/Projects/ProjectHistoryTab';
 import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
@@ -102,9 +103,9 @@ export default function ProjectDetail() {
   // The project name in the header is a field that saves itself (like the deal title).
   const [nameValue, setNameValue] = useState('');
 
-  const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState(null);
-  const [savingEdit, setSavingEdit] = useState(false);
+  // The fields of the card are always editable and save themselves (like the deal card): 'idle' | 'saving' | 'saved' | 'error'
+  const [saveState, setSaveState] = useState('idle');
+  const savedTimer = useRef(null);
 
   const [notesValue, setNotesValue] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -144,29 +145,21 @@ export default function ProjectDetail() {
     }
   }, [project]);
 
-  function startEdit() {
-    setEditForm({
-      manager: project.manager || '',
-      client: project.client || '',
-      client_id: project.client_id || null,
-      country: project.country || '',
-      website: project.website || '',
-      start_date: project.start_date || '',
-      end_date: project.end_date || '',
-      status: project.status || 'active',
-      services: project.services || [],
-      ...extraFieldsForm(project),
-    });
-    setEditMode(true);
-  }
-
-  function cancelEdit() {
-    setEditMode(false);
-    setEditForm(null);
-  }
-
-  function setEditField(field, value) {
-    setEditForm((f) => ({ ...f, [field]: value }));
+  // Saves one change at once. The card shows it straight away; if the database refuses, the old value comes back and the person is told.
+  async function commit(patch) {
+    const before = project;
+    clearTimeout(savedTimer.current);
+    setSaveState('saving');
+    setProject((p) => ({ ...p, ...patch }));
+    try {
+      await updateProject(id, patch);
+      setSaveState('saved');
+      savedTimer.current = setTimeout(() => setSaveState('idle'), 2500);
+    } catch (e) {
+      console.warn('saveProject failed', e);
+      setProject((p) => ({ ...p, ...Object.fromEntries(Object.keys(patch).map((k) => [k, before[k]])) }));
+      setSaveState('error');
+    }
   }
 
   async function saveName() {
@@ -181,36 +174,6 @@ export default function ProjectDetail() {
       console.warn('saveName failed', e);
       setNameValue(project.name || '');
       alert('Не вдалося зберегти назву проєкту.');
-    }
-  }
-
-  function toggleEditService(s) {
-    setEditForm((f) => ({ ...f, services: f.services.includes(s) ? f.services.filter((x) => x !== s) : [...f.services, s] }));
-  }
-
-  async function saveEdit() {
-    setSavingEdit(true);
-    try {
-      await updateProject(id, {
-        manager: editForm.manager.trim() || null,
-        client: editForm.client.trim() || null,
-        client_id: editForm.client_id || null,
-        country: editForm.country.trim() || null,
-        website: editForm.website.trim() || null,
-        start_date: editForm.start_date || null,
-        end_date: editForm.end_date || null,
-        status: editForm.status,
-        services: editForm.services,
-        ...extraFieldsPayload(editForm),
-      });
-      setEditMode(false);
-      setEditForm(null);
-      await reload();
-    } catch (e) {
-      console.warn('saveProject failed', e);
-      alert('Не вдалося зберегти проєкт.');
-    } finally {
-      setSavingEdit(false);
     }
   }
 
@@ -290,29 +253,18 @@ export default function ProjectDetail() {
   function renderExtra(key) {
     const f = EXTRA_PROJECT_FIELDS.find((x) => x.key === key);
     if (!f) return null;
+    const raw = project[f.key];
+    const save = (v) => commit({ [f.key]: extraFieldsPayload({ [f.key]: v })[f.key] });
+    const link = (f.key === 'worksection_link' || f.type === 'url') && !isEmpty(raw) ? <a className="ov-link ov-open" href={raw} target="_blank" rel="noreferrer">Відкрити ↗</a> : null;
     return (
       <div className="ov-field-box" key={key}>
-        <div className="ov-field-label">{f.label}</div>
-        {editMode ? (
-          f.type === 'select' ? (
-            <Select value={editForm[f.key] || ''} onChange={(v) => setEditField(f.key, v)} ariaLabel={f.label}
-              options={[{ value: '', label: 'Не вказано' }, ...f.options.map((o) => ({ value: o, label: o }))]} />
-          ) : (
-            <input
-              type={f.type === 'url' ? 'text' : f.type} value={editForm[f.key]} placeholder={f.placeholder}
-              step={f.type === 'number' ? '0.01' : undefined}
-              onChange={(e) => setEditField(f.key, e.target.value)}
-              onClick={f.type === 'date' ? (e) => e.currentTarget.showPicker?.() : undefined}
-            />
-          )
-        ) : isEmpty(project[f.key]) ? (
-          <div className="ov-field-value ov-empty">—</div>
-        ) : f.key === 'worksection_link' ? (
-          <a className="ov-field-value ov-link" href={project[f.key]} target="_blank" rel="noreferrer">Відкрити в Worksection</a>
+        <div className="ov-field-label">{f.label}{link}</div>
+        {f.type === 'select' ? (
+          <Select value={raw || ''} onChange={save} ariaLabel={f.label} options={[{ value: '', label: 'Не вказано' }, ...f.options.map((o) => ({ value: o, label: o }))]} />
+        ) : f.type === 'date' ? (
+          <input type="date" value={raw || ''} aria-label={f.label} onChange={(e) => save(e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} />
         ) : (
-          <div className="ov-field-value">
-            {f.key === 'cost' ? fmtCost(project.cost) : f.type === 'date' ? (fmtIsoDate(project[f.key]) || '—') : project[f.key]}
-          </div>
+          <AutoField type={f.type === 'url' ? 'text' : f.type} value={raw} placeholder={f.placeholder} step={f.type === 'number' ? '0.01' : undefined} ariaLabel={f.label} onCommit={save} />
         )}
       </div>
     );
@@ -324,96 +276,73 @@ export default function ProjectDetail() {
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="manager" />Продакт (менеджер)</div>
-            {editMode
-              ? <input type="text" value={editForm.manager} onChange={(e) => setEditField('manager', e.target.value)} placeholder="Ім'я менеджера" />
-              : <div className={'ov-field-value' + (isEmpty(project.manager) ? ' ov-empty' : '')}>{isEmpty(project.manager) ? '—' : project.manager}</div>}
+            <AutoField value={project.manager} placeholder="Ім'я менеджера" ariaLabel="Продакт (менеджер)" onCommit={(v) => commit({ manager: v.trim() || null })} />
           </div>
         );
       case 'status':
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="status" />Статус</div>
-            {editMode ? (
-              <div className="status-picker">
-                {STATUSES.map((s) => (
-                  <button key={s} type="button" className={'status-btn' + (editForm.status === s ? ` on ${s}` : '')} onClick={() => setEditField('status', s)}>
-                    {STATUS_LABEL[s]}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <span className={'status-pill ' + project.status}>{STATUS_LABEL[project.status]}</span>
-            )}
+            <div className="status-picker" role="group" aria-label="Статус проєкту">
+              {STATUSES.map((st) => (
+                <button key={st} type="button" aria-pressed={project.status === st} className={'status-btn' + (project.status === st ? ` on ${st}` : '')} onClick={() => { if (project.status !== st) commit({ status: st }); }}>
+                  {STATUS_LABEL[st]}
+                </button>
+              ))}
+            </div>
           </div>
         );
       case 'period':
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="period" />Початок роботи над стратегією – завершення співпраці</div>
-            {editMode ? (
-              <div className="ov-date-row">
-                <DatePicker value={editForm.start_date} onChange={(v) => setEditField('start_date', v)} />
-                <span>–</span>
-                <DatePicker value={editForm.end_date} onChange={(v) => setEditField('end_date', v)} />
-              </div>
-            ) : (
-              <div className={'ov-field-value' + (!project.start_date && !project.end_date ? ' ov-empty' : '')}>{!project.start_date && !project.end_date ? '—' : `${fmtIsoDate(project.start_date) || '—'} – ${fmtIsoDate(project.end_date) || '—'}`}</div>
-            )}
+            <div className="ov-date-row">
+              <DatePicker value={project.start_date || ''} onChange={(v) => commit({ start_date: v || null })} />
+              <span>–</span>
+              <DatePicker value={project.end_date || ''} onChange={(v) => commit({ end_date: v || null })} />
+            </div>
           </div>
         );
       case 'services':
         return (
           <div className="ov-field-box ov-field-box-wide" key={key}>
             <div className="ov-field-label"><FieldIcon name="services" />Послуги (канал роботи)</div>
-            {editMode ? (
-              <div className="svc-picker">
-                {SERVICES.map((s) => (
-                  <label className="svc-opt" key={s}>
-                    <input type="checkbox" checked={editForm.services.includes(s)} onChange={() => toggleEditService(s)} />
-                    <span>{s}</span>
+            <div className="svc-picker">
+              {SERVICES.map((sv) => {
+                const have = (project.services || []).includes(sv);
+                return (
+                  <label className="svc-opt" key={sv}>
+                    <input type="checkbox" checked={have} onChange={() => commit({ services: have ? (project.services || []).filter((x) => x !== sv) : [...(project.services || []), sv] })} />
+                    <span>{sv}</span>
                   </label>
-                ))}
-              </div>
-            ) : (
-              isEmpty(project.services)
-                ? <div className="ov-field-value ov-empty">—</div>
-                : <div className="proj-tags">{project.services.map((x) => <span className="svc-tag" key={x}>{x}</span>)}</div>
-            )}
+                );
+              })}
+            </div>
           </div>
         );
       case 'client':
         return (
           <div className="ov-field-box" key={key}>
-            <div className="ov-field-label"><FieldIcon name="client" />Клієнт</div>
-            {editMode ? (
-              <ClientPicker
-                value={editForm.client_id}
-                placeholder={editForm.client || 'Пошук клієнта або створити нового...'}
-                onChange={(c) => setEditForm((f) => ({ ...f, client_id: c ? c.id : null, client: c ? (c.company || clientFullName(c)) : '' }))}
-              />
-            ) : project.client_id ? (
-              <Link className="ov-field-value ov-link" to={'/reports/clients-directory/' + project.client_id}>{project.client || 'Відкрити контакт'}</Link>
-            ) : (
-              <div className={'ov-field-value' + (isEmpty(project.client) ? ' ov-empty' : '')}>{isEmpty(project.client) ? '—' : project.client}</div>
-            )}
+            <div className="ov-field-label"><FieldIcon name="client" />Клієнт{project.client_id ? <Link className="ov-link ov-open" to={'/reports/clients-directory/' + project.client_id}>Відкрити контакт ↗</Link> : null}</div>
+            <ClientPicker
+              value={project.client_id || null}
+              placeholder={project.client || 'Пошук клієнта або створити нового...'}
+              onChange={(c) => commit({ client_id: c ? c.id : null, client: c ? (c.company || clientFullName(c)) : null })}
+            />
           </div>
         );
       case 'country':
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="country" />Гео (країна)</div>
-            {editMode
-              ? <input type="text" value={editForm.country} onChange={(e) => setEditField('country', e.target.value)} placeholder="напр. USA" />
-              : <div className={'ov-field-value' + (isEmpty(project.country) ? ' ov-empty' : '')}>{isEmpty(project.country) ? '—' : project.country}</div>}
+            <AutoField value={project.country} placeholder="напр. USA" ariaLabel="Гео (країна)" onCommit={(v) => commit({ country: v.trim() || null })} />
           </div>
         );
       case 'website':
         return (
           <div className="ov-field-box" key={key}>
-            <div className="ov-field-label"><FieldIcon name="website" />Сайт</div>
-            {editMode
-              ? <input type="text" value={editForm.website} onChange={(e) => setEditField('website', e.target.value)} placeholder="https://..." />
-              : (isEmpty(project.website) ? <div className="ov-field-value ov-empty">—</div> : <a className="ov-field-value ov-link" href={project.website} target="_blank" rel="noreferrer">{project.website}</a>)}
+            <div className="ov-field-label"><FieldIcon name="website" />Сайт{!isEmpty(project.website) ? <a className="ov-link ov-open" href={project.website} target="_blank" rel="noreferrer">Відкрити ↗</a> : null}</div>
+            <AutoField value={project.website} placeholder="https://..." ariaLabel="Сайт" onCommit={(v) => commit({ website: v.trim() || null })} />
           </div>
         );
       default:
@@ -490,14 +419,9 @@ export default function ProjectDetail() {
           <section className="report-section pw-card">
             <div className="ov-section-head">
               <div className="stitle hub-title"><span className="hub-ring hub-ring--sm"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM6 6h12v14H6z" /><path d="M9 11h6M9 15h4" /></svg></span></span>Про проєкт</div>
-              {!editMode ? (
-                <button type="button" className="pw-btn" onClick={startEdit}><ActionIcon name="edit" size={18} /> Редагувати</button>
-              ) : (
-                <div className="ov-edit-actions">
-                  <button type="button" className="pw-btn pw-btn--ok" onClick={saveEdit} disabled={savingEdit}><ActionIcon name="save" size={18} /> {savingEdit ? '...' : 'Зберегти'}</button>
-                  <button type="button" className="pw-btn pw-btn--bad" onClick={cancelEdit}>Скасувати</button>
-                </div>
-              )}
+              <span className={'ov-save-state ' + saveState} role="status" aria-live="polite">
+                {saveState === 'saving' ? 'Зберігаємо…' : saveState === 'saved' ? 'Збережено' : saveState === 'error' ? 'Не вдалося зберегти, спробуйте ще раз' : 'Зміни зберігаються автоматично'}
+              </span>
             </div>
 
             <div className="pw-groups">
@@ -538,11 +462,9 @@ export default function ProjectDetail() {
           </section>
           </div>
 
-          {!editMode && (
-            <button type="button" className="pw-btn pw-btn--danger-quiet ov-delete-link" onClick={handleDelete} disabled={deleting}>
-              <ActionIcon name="delete" size={18} /> {deleting ? '...' : 'Видалити проєкт'}
-            </button>
-          )}
+          <button type="button" className="pw-btn pw-btn--danger-quiet ov-delete-link" onClick={handleDelete} disabled={deleting}>
+            <ActionIcon name="delete" size={18} /> {deleting ? '...' : 'Видалити проєкт'}
+          </button>
         </>
       )}
 

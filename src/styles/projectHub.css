@@ -23,7 +23,7 @@
 .project-detail-page.pw .hub-tile--ln svg { width: 50%; height: 50%; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---- Head: a ring-frame box with the project's medallion ---- */
-.project-detail-page.pw .pd-header.pw-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 0 0 6px; padding: 14px 18px; border: 2px solid transparent; border-radius: 28px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box; }
+.project-detail-page.pw .pd-header.pw-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 0 0 6px; padding: 14px 18px; border: 1.5px solid transparent; border-radius: 28px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
 .project-detail-page.pw .pd-header-meta { flex: 1; min-width: 260px; }
 .project-detail-page.pw .pd-title-row { margin-bottom: 8px; }
 .project-detail-page.pw input.pd-title-input:not([type=checkbox]):not([type=radio]) { height: 44px; padding: 0 18px; font: 800 24px/1.1 'Onest', sans-serif; letter-spacing: -.3px; border: 0; border-radius: 999px; background: transparent; box-shadow: none; color: #270827; }
@@ -53,7 +53,7 @@
 .project-detail-page.pw .pw-workspace { background: none; border: 0; border-radius: 0; padding: 0; min-height: 0; box-shadow: none; }
 
 /* ---- Boxes: ring frame ---- */
-.project-detail-page.pw .report-section, .project-detail-page.pw .pw-card { border: 2px solid transparent; border-radius: 24px; padding: 14px 18px 18px; margin: 0 0 14px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box; }
+.project-detail-page.pw .report-section, .project-detail-page.pw .pw-card { border: 1.5px solid transparent; border-radius: 24px; padding: 14px 18px 18px; margin: 0 0 14px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
 .project-detail-page.pw .stitle { font: 750 16px/1.2 'Onest', sans-serif; letter-spacing: 0; margin: 0 0 12px; gap: 12px; color: #270827; }
 .project-detail-page.pw .hub-title { display: flex; align-items: center; gap: 12px; }
 .project-detail-page.pw .hub-title small { display: block; font: 500 12px 'Onest', sans-serif; color: #883288; margin-top: 1px; }
@@ -138,7 +138,7 @@
 
 /* ---- Accounts panel ---- */
 .project-detail-page.pw .pacc-panel-actions { gap: 10px; }
-.project-detail-page.pw .pacc-card { border: 2px solid transparent; border-radius: 20px; padding: 12px 14px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box; }
+.project-detail-page.pw .pacc-card { border: 1.5px solid transparent; border-radius: 20px; padding: 12px 14px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
 .project-detail-page.pw .pacc-card-top { gap: 12px; }
 .project-detail-page.pw .pacc-platform-img { width: 44px; height: 44px; padding: 3px; border-radius: 50%; background: linear-gradient(150deg, #F6E8F9, #EBD0F2); box-shadow: 0 0 0 3.5px #fff, 0 0 0 5.5px #D9A6DF; margin: 4px; }
 .project-detail-page.pw .pacc-card-name { font: 750 15px 'Onest', sans-serif; }
@@ -157,7 +157,7 @@
 .project-detail-page.pw .pacc-metric span { display: block; margin: 0; font-size: 11.5px; color: #883288; line-height: 1.2; }
 .project-detail-page.pw .pacc-metric b { font: 800 15px/1.2 'Onest', sans-serif; font-variant-numeric: tabular-nums; }
 .project-detail-page.pw .pacc-card-actions { margin-top: 14px; padding-top: 12px; border-top: 1px solid #EBC6EB80; }
-.project-detail-page.pw .pacc-add-box { border: 2px solid transparent; border-radius: 22px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box; padding: 12px 14px; }
+.project-detail-page.pw .pacc-add-box { border: 1.5px solid transparent; border-radius: 22px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; padding: 12px 14px; }
 .project-detail-page.pw .pacc-empty { color: #883288; }
 .project-detail-page.pw .pacc-camps { margin-top: 16px; }
 .project-detail-page.pw .pw-notice, .project-detail-page.pw .prep-internal-note { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; padding: 10px 16px; border: 0; border-radius: 20px; background: #FBF0D5; color: #6b4a00; font-size: 13px; line-height: 1.45; }
@@ -283,7 +283,7 @@
 .project-detail-page.pw .arc-row-actions { gap: 6px; }
 .project-detail-page.pw .arc-table th, .project-detail-page.pw .arc-table td { text-align: left; }
 .arc-overlay { background: rgba(39, 8, 39, .55); }
-.arc-win { border: 2px solid transparent; border-radius: 30px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box; box-shadow: 0 24px 80px #27082766; }
+.arc-win { border: 1.5px solid transparent; border-radius: 30px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; box-shadow: 0 24px 80px #27082766; }
 .arc-head { padding: 16px 22px 14px; background: linear-gradient(180deg, #fff, #F9EDF9); border-bottom: 1px solid #EBC6EB99; }
 .arc-title h3 { font: 800 19px/1.15 'Onest', sans-serif; color: #270827; }
 .arc-sub { color: #883288; font-size: 12.5px; }
@@ -349,7 +349,7 @@
 
 /* ---- Windows inside the page: compare, groups, metrics (a ring-frame dialog) ---- */
 .project-detail-page.pw .modal-overlay.show { background: rgba(39, 8, 39, .55); }
-.project-detail-page.pw .modal-box { border: 2px solid transparent; border-radius: 30px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box; box-shadow: 0 24px 80px #27082766; }
+.project-detail-page.pw .modal-box { border: 1.5px solid transparent; border-radius: 30px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; box-shadow: 0 24px 80px #27082766; }
 .project-detail-page.pw .modal-head { padding: 16px 20px 14px; background: linear-gradient(180deg, #fff, #F9EDF9); border-bottom: 1px solid #EBC6EB99; }
 .project-detail-page.pw .modal-head h3 { font: 800 19px/1.15 'Onest', sans-serif; letter-spacing: 0; color: #270827; }
 .project-detail-page.pw .modal-body { padding: 16px 20px 18px; }
@@ -363,7 +363,7 @@
 .project-detail-page.pw .prep-metric-list li { border: 0; border-radius: 18px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
 .project-detail-page.pw .form-err { border-radius: 18px; background: #FBEAEA; color: #8F2A2A; padding: 10px 14px; }
 /* the confirmation dialog lives in <body> */
-.pw-dialog { border: 2px solid transparent; border-radius: 30px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box; box-shadow: 0 24px 80px #27082766; }
+.pw-dialog { border: 1.5px solid transparent; border-radius: 30px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; box-shadow: 0 24px 80px #27082766; }
 .pw-dialog-head { background: linear-gradient(180deg, #fff, #F9EDF9); border-bottom: 1px solid #EBC6EB99; }
 .pw-dialog-head h2 { font: 800 19px/1.15 'Onest', sans-serif; letter-spacing: 0; }
 .pw-dialog-foot { border-top: 1px solid #EBC6EB99; gap: 12px; }
@@ -379,3 +379,9 @@
 @media (prefers-reduced-motion: reduce) {
   .project-detail-page.pw .pw-tab, .project-detail-page.pw .pag-switch-track, .project-detail-page.pw .pag-switch-knob, .project-detail-page.pw .prep-seg-tab, .project-detail-page.pw .proj-tab { transition: none; }
 }
+
+/* the project card saves every field by itself */
+.project-detail-page.pw .ov-save-state { font-size: 12.5px; font-weight: 600; color: #883288; }
+.project-detail-page.pw .ov-save-state.saved { color: #168a3a; }
+.project-detail-page.pw .ov-save-state.error { color: #C23232; }
+.project-detail-page.pw .ov-open { margin-left: 10px; font-size: 12px; font-weight: 600; }
