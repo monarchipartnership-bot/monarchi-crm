@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Select from '../../components/common/Select';
+import DatePicker from '../../components/common/DatePicker';
 import TagInput from '../../components/Automation/TagInput';
 import { createTask, updateTaskFields } from '../../lib/api/tasks';
 import { fetchTaskStages } from '../../lib/api/taskStages';
@@ -8,6 +9,8 @@ import { fetchAllProfiles, profileLabel } from '../../lib/api/profile';
 import { colorForTag } from '../../lib/tagColors';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { todayIso } from '../../lib/dateHelpers';
+import '../../styles/ddHub.css';
+import '../../styles/taskDialogsHub.css';
 
 const PRIORITY_OPTIONS = [
   { value: '', label: 'Без пріоритету' },
@@ -45,6 +48,7 @@ export default function TaskFormModal({
   const [priority, setPriority] = useState(initial?.priority || '');
   const [taskDate, setTaskDate] = useState(initial?.task_date || defaultTaskDate || todayIso());
   const [saving, setSaving] = useState(false);
+  const [section, setSection] = useState(0);
 
   useEffect(() => { fetchAllProfiles().then(setProfiles); }, []);
 
@@ -87,116 +91,92 @@ export default function TaskFormModal({
 
   const categoryColor = (label) => categories.find((c) => c.label === label)?.color || colorForTag(label);
 
+  const sections = [
+    { key: 'task', label: 'Задача', sub: 'Назва й опис', icon: FIELD_ICONS.document },
+    { key: 'plan', label: 'Планування', sub: 'Відділ, етап, категорії', icon: FIELD_ICONS.briefcase },
+    { key: 'work', label: 'Виконання', sub: 'Виконавець, пріоритет, дедлайн', icon: FIELD_ICONS.assignee },
+  ];
+  const cur = sections[section];
+  const field = (icon, label, hint, control) => (
+    <div className="thd-field">
+      <div className="thd-field-head">
+        <span className="thd-ic" dangerouslySetInnerHTML={{ __html: icon }} />
+        <div><label>{label}</label><p>{hint}</p></div>
+      </div>
+      <div className="thd-field-control">{control}</div>
+    </div>
+  );
+
   return (
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tmodal-box">
-        <div className="tmodal-head">
-          <div className="tmodal-head-left">
-            <span className="tmodal-head-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.checklist }} />
-            <div className="tmodal-head-text">
-              <h3>{initial ? 'Редагувати задачу' : 'Додати задачу'}</h3>
-              <p>{initial ? 'Оновіть інформацію про задачу' : 'Нова задача в Task Manager'}</p>
-            </div>
+    <div className="tmodal-overlay thd-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="tmodal-box thd-dialog thd-dialog--side" role="dialog" aria-modal="true" aria-labelledby="task-form-title">
+        <aside className="thd-rail">
+          <div className="thd-brand">
+            <span className="thd-md thd-md--lg"><span className="thd-mi" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.checklist }} /></span>
+            <div><b id="task-form-title">{initial ? 'Редагувати задачу' : 'Нова задача'}</b><small>Task Manager</small></div>
           </div>
-          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>
-        </div>
-        <div className="tmodal-body">
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.title }} />
-              <div><label>Заголовок</label><p>Коротка назва задачі — виділяється жирним у списку</p></div>
-            </div>
-            <div className="modal-field-control">
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Напр. Підготувати SEO-стратегію на Q2" autoFocus />
-            </div>
+          <nav className="thd-nav" aria-label="Розділи форми">
+            {sections.map((sec, i) => (
+              <button key={sec.key} type="button" className={'thd-rn' + (i === section ? ' on' : '')} aria-current={i === section ? 'true' : undefined} onClick={() => setSection(i)}>
+                <span className="thd-md thd-md--sm"><span className="thd-mi" dangerouslySetInnerHTML={{ __html: sec.icon }} /></span>
+                <span>{sec.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="thd-note">Заголовок і відділ обов'язкові, решту можна заповнити пізніше.</div>
+        </aside>
+        <div className="thd-main">
+          <div className="thd-head">
+            <div><h3>{cur.label}</h3><small>{cur.sub}</small></div>
+            <button type="button" className="thd-close" onClick={onClose} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
           </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #818CF8, #4F46E5)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.document }} />
-              <div><label>Опис</label><p>Додаткові деталі — необов'язково</p></div>
-            </div>
-            <div className="modal-field-control">
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Деталі, кроки, посилання..." />
-            </div>
+          <div className="thd-body">
+            {section === 0 && (
+              <>
+                {field(FIELD_ICONS.title, 'Заголовок', 'Коротка назва задачі, виділяється жирним у списку',
+                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Напр. Підготувати SEO-стратегію на Q2" autoFocus />)}
+                {field(FIELD_ICONS.document, 'Опис', "Додаткові деталі, необов'язково",
+                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Деталі, кроки, посилання..." />)}
+              </>
+            )}
+            {section === 1 && (
+              <>
+                {field(FIELD_ICONS.briefcase, 'Відділ', 'Визначає доступні етапи та категорії',
+                  <Select value={departmentId} onChange={setDepartmentId} options={departments.map((d) => ({ value: d.id, label: d.name }))} />)}
+                {field(FIELD_ICONS.status, 'Етап', 'Стадія пайплайну обраного відділу',
+                  <Select value={stageId} onChange={setStageId} options={stages.map((st) => ({ value: st.id, label: st.label }))} disabled={!stages.length} />)}
+                {field(FIELD_ICONS.tag, 'Категорії', 'Власні для кожного відділу',
+                  <TagInput
+                    tags={tags} onChange={setTags}
+                    suggestions={categories.map((c) => c.label)}
+                    colorFor={categoryColor}
+                    onNewTag={(label) => { if (departmentId) createTaskCategory({ label, departmentId }).then((c) => c && setCategories((cs) => [...cs, c])); }}
+                    placeholder="Категорія..."
+                  />)}
+              </>
+            )}
+            {section === 2 && (
+              <>
+                {field(FIELD_ICONS.assignee, 'Виконавець', 'Хто відповідає за задачу',
+                  <Select
+                    value={assigneeEmail} onChange={setAssigneeEmail} placeholder="Не призначено"
+                    options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.email, label: profileLabel(p) }))]}
+                  />)}
+                {field(FIELD_ICONS.priority, 'Пріоритет', 'Наскільки це термінова задача',
+                  <Select value={priority} onChange={setPriority} options={PRIORITY_OPTIONS} />)}
+                {field(FIELD_ICONS.day, 'Дедлайн', 'Дата, на яку запланована задача',
+                  <DatePicker value={taskDate} onChange={setTaskDate} placeholder="Оберіть дату" />)}
+              </>
+            )}
           </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #60A5FA, #2563EB)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
-              <div><label>Відділ</label><p>Визначає доступні етапи та категорії</p></div>
-            </div>
-            <div className="modal-field-control">
-              <Select value={departmentId} onChange={setDepartmentId} options={departments.map((d) => ({ value: d.id, label: d.name }))} />
-            </div>
+          <div className="thd-foot">
+            <button type="button" className="btn thd-btn-bad" onClick={onClose}>
+              <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Скасувати
+            </button>
+            <button type="button" className="btn thd-btn-ok" onClick={handleSave} disabled={!title.trim() || !departmentId || saving}>
+              <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> {saving ? '...' : (initial ? 'Зберегти' : 'Додати')}
+            </button>
           </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.status }} />
-              <div><label>Етап</label><p>Стадія пайплайну обраного відділу</p></div>
-            </div>
-            <div className="modal-field-control">
-              <Select value={stageId} onChange={setStageId} options={stages.map((s) => ({ value: s.id, label: s.label }))} disabled={!stages.length} />
-            </div>
-          </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #F472B6, #DB2777)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
-              <div><label>Категорії</label><p>Власні для кожного відділу</p></div>
-            </div>
-            <div className="modal-field-control">
-              <TagInput
-                tags={tags} onChange={setTags}
-                suggestions={categories.map((c) => c.label)}
-                colorFor={categoryColor}
-                onNewTag={(label) => { if (departmentId) createTaskCategory({ label, departmentId }).then((c) => c && setCategories((cs) => [...cs, c])); }}
-                placeholder="Категорія..."
-              />
-            </div>
-          </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #94A3B8, #475569)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
-              <div><label>Виконавець</label><p>Хто відповідає за задачу</p></div>
-            </div>
-            <div className="modal-field-control">
-              <Select
-                value={assigneeEmail} onChange={setAssigneeEmail} placeholder="Не призначено"
-                options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.email, label: profileLabel(p) }))]}
-              />
-            </div>
-          </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #FBBF24, #D97706)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.priority }} />
-              <div><label>Пріоритет</label><p>Наскільки це термінова задача</p></div>
-            </div>
-            <div className="modal-field-control">
-              <Select value={priority} onChange={setPriority} options={PRIORITY_OPTIONS} />
-            </div>
-          </div>
-
-          <div className="modal-field">
-            <div className="modal-field-head">
-              <span className="modal-field-icon" style={{ background: 'linear-gradient(135deg, #F87171, #DC2626)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.day }} />
-              <div><label>Дедлайн</label><p>Дата, на яку запланована задача</p></div>
-            </div>
-            <div className="modal-field-control">
-              <input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} />
-            </div>
-          </div>
-        </div>
-        <div className="tmodal-foot">
-          <button type="button" className="btn" onClick={onClose}>
-            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Скасувати
-          </button>
-          <button type="button" className="btn btn-p" onClick={handleSave} disabled={!title.trim() || !departmentId || saving}>
-            <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> {saving ? '...' : (initial ? 'Зберегти' : 'Додати')}
-          </button>
         </div>
       </div>
     </div>

@@ -6,10 +6,10 @@ import { periodLabel } from '../../lib/presentation/deckModel';
 import { REPORT_STATUS } from '../../lib/projectHistory';
 import CreativeGrid from './CreativeGrid';
 import { reportBlocks } from '../../lib/reportTemplate';
-import DesignTodo from '../common/DesignTodo';
 import CreativePickerDialog from './CreativePickerDialog';
 import { saveReportCreatives, suggestCreatives } from '../../lib/api/reportCreatives';
 import '../../styles/projectReports.css';
+import '../../styles/reportWinHub.css';
 
 const TYPE_LABEL = { weekly: 'Тижневий', monthly: 'Місячний', custom: 'Довільний' };
 const STATUS = REPORT_STATUS;
@@ -57,18 +57,24 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
     <div className="arc-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} tabIndex={-1} className="arc-win" role="dialog" aria-modal="true" aria-labelledby="arc-title">
         <div className="arc-head">
+          <span className="arc-md"><span className="arc-mi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></svg></span></span>
           <div className="arc-title">
             <h3 id="arc-title">{TYPE_LABEL[row.period_type] || row.period_type} звіт · {reportPeriodText(row)}{label}</h3>
-            <div className="arc-sub">{projectName} · {reportPlatformLabel(row.platform)} · {STATUS[row.status] || row.status} · оновлено {new Date(row.updated_at).toLocaleString('uk-UA')}</div>
+            <div className="arc-sub">
+              <span className="arc-pc">{projectName}</span>
+              <span className={'arc-plt arc-plt--' + row.platform}>{reportPlatformLabel(row.platform)}</span>
+              <span className={'arc-chip arc-chip--' + row.status}>{STATUS[row.status] || row.status}</span>
+              <span className="arc-upd">оновлено {new Date(row.updated_at).toLocaleString('uk-UA')}</span>
+            </div>
           </div>
           <div className="arc-actions">
-            {actions.map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} onClick={() => onAction && onAction(row, a.action)}>{a.label}</button>)}
+            {actions.map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' arc-ok' : '')} onClick={() => onAction && onAction(row, a.action)}>{a.label}</button>)}
             {onPresentation && (<>
             {row.period_type === 'custom' ? (
               <button type="button" className="btn" disabled title="Презентацію можна зробити зі збереженого тижневого або місячного звіту">Зробити презентацію</button>
             ) : platforms.length > 1 ? (
               <div className="prep-export">
-                <button type="button" className="btn btn-p" onClick={() => setMenu((m) => !m)}>Зробити презентацію ▾</button>
+                <button type="button" className="btn" onClick={() => setMenu((m) => !m)}>Зробити презентацію ▾</button>
                 {menu && (
                   <div className="prep-export-menu">
                     {platforms.map((p) => <button key={p} type="button" onClick={() => onPresentation(row, p)}>{platformInfo(p).label}</button>)}
@@ -76,12 +82,12 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
                 )}
               </div>
             ) : (
-              <button type="button" className="btn btn-p" disabled={!platforms.length} onClick={() => onPresentation(row, platforms[0])}>Зробити презентацію</button>
+              <button type="button" className="btn" disabled={!platforms.length} onClick={() => onPresentation(row, platforms[0])}>Зробити презентацію</button>
             )}
             </>)}
             <span ref={setSlot} className="arc-slot" />
-            {onDelete && <button type="button" className="btn cg-danger" onClick={() => onDelete(row)}>Видалити</button>}
-            <button type="button" className="btn" onClick={onClose} aria-label="Закрити">Закрити ✕</button>
+            {onDelete && <button type="button" className="btn arc-del" onClick={() => onDelete(row)}>Видалити</button>}
+            <button type="button" className="arc-x" onClick={onClose} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
           </div>
         </div>
         <div className="arc-body">
@@ -116,7 +122,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
       )}
       {(data.creatives?.items?.length > 0 || edit) && (
         <div className="arc-creatives">
-          <div className="arc-text-title">Most effective creatives <DesignTodo note="Блок креативів звіту: сітка, збільшення, кнопки «Замінити», «Прибрати», «Підібрати»" /></div>
+          <div className="arc-block-title"><span className="arc-bi"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-8 8" /></svg></span>Most effective creatives</div>
           {data.creatives?.items?.length > 0 ? (
             <CreativeGrid items={data.creatives.items} onReplace={edit ? edit.onReplace : undefined} onRemove={edit ? edit.onRemove : undefined} />
           ) : (

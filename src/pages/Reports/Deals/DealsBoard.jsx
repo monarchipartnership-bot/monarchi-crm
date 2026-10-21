@@ -24,6 +24,9 @@ import '../../../styles/comparePage.css';
 import '../../../styles/clientsDirectory.css';
 import '../../../styles/dealsBoard.css';
 import '../../../styles/dealsDesign.css';
+import '../../../styles/ddHub.css';
+import '../../../styles/reportsHub.css';
+import '../../../styles/dealsHub.css';
 
 const TABS = [
   { key: 'kanban', label: 'Канбан', icon: FIELD_ICONS.kanban },
@@ -123,7 +126,7 @@ export default function DealsBoard() {
   }
 
   return (
-    <div className="report-page deals-page deals-design">
+    <div className="report-page deals-page deals-hub rpt-hub" data-dd="hub">
       <section className="rpt-hero deals-actions-row">
         <div className="deals-header-actions">
           <div className="pipeline-switcher">

@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { HubTitle, RibbonMark } from './hubIcons';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './ArchiveReportModal';
 import MonthDocument from './MonthDocument';
-import DesignTodo from '../common/DesignTodo';
 import ReportReturnDialog from './ReportReturnDialog';
 import ShareLinkBox from './ShareLinkBox';
 import { deleteProjectReport, fetchProjectReports, refreshMonthTotal, setReportStatus } from '../../lib/api/projectReportStore';
@@ -16,6 +15,7 @@ import { platformInfo } from '../../lib/adAccounts';
 import { buildMonths, canApprove, monthKey, reportActions, REPORT_STATUS } from '../../lib/projectHistory';
 import '../../styles/projectReports.css';
 import '../../styles/projectHistory.css';
+import '../../styles/historyHub.css';
 
 const fmt = (s) => s.split('-').reverse().join('.');
 const today = () => new Date().toISOString().slice(0, 10);
@@ -115,7 +115,7 @@ export default function ProjectHistoryTab({ projectId }) {
   return (
     <section className="report-section">
       <HubTitle icon="file" className="prep-box-title">Історія проекту</HubTitle>
-      <div><DesignTodo note="Вкладка «Історія проекту»: карточки місяців, рядки тижнів, статуси, кнопки дій, вікно «Загальний документ»" /></div>
+      <div className="pacc-hint">Місяці з тижневими звітами: чернетка, на затвердженні, затверджено. Клієнт бачить лише затверджене.</div>
       <div className="prep-seg" role="tablist" aria-label="Платформи">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>
@@ -131,16 +131,23 @@ export default function ProjectHistoryTab({ projectId }) {
         <div className="ph-months">
           {months.map((m, i) => {
             const isOpen = closed[m.key] === undefined ? i === 0 : !closed[m.key];
+            const share = m.counts.total ? Math.round((m.counts.approved / m.counts.total) * 100) : 0;
+            const tone = m.counts.total && share === 100 && m.monthly?.status === 'approved' ? ' st-ok' : m.counts.pending ? ' st-paused' : '';
             return (
               <article key={m.key} className={'ph-month' + (isOpen ? ' open' : '')}>
                 <header onClick={() => setClosed((c) => ({ ...c, [m.key]: isOpen }))}>
-                  <span className="ph-chev" aria-hidden="true">›</span>
-                  <h3>{m.label}</h3>
-                  <span className="ph-sum">Тижні: {m.counts.approved} з {m.counts.total} затверджено{m.counts.pending ? `, на затвердженні: ${m.counts.pending}` : ''}</span>
+                  <span className={'hub-ring hub-ring--sm ph-ring' + tone} style={{ '--p': share }} aria-hidden="true"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2" /></svg></span></span>
+                  <div className="ph-mt">
+                    <h3>{m.label}</h3>
+                    <span className="ph-sum">Тижні: {m.counts.approved} з {m.counts.total} затверджено{m.counts.pending ? `, на затвердженні: ${m.counts.pending}` : ''}</span>
+                  </div>
                   <Chip status={m.monthly?.status} />
                   <span className="ph-grow" />
                   {m.updatedAt && <span className="ph-sum">оновлено {stamp(m.updatedAt)}</span>}
-                  <button type="button" className="btn" onClick={(e) => { e.stopPropagation(); setDocKey(m.key); }} disabled={!m.weeks.some((w) => w.row) && !m.monthly}>Загальний документ</button>
+                  <button type="button" className="btn" onClick={(e) => { e.stopPropagation(); setDocKey(m.key); }} disabled={!m.weeks.some((w) => w.row) && !m.monthly}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></svg>Загальний документ
+                  </button>
+                  <span className="ph-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg></span>
                 </header>
                 {isOpen && (
                   <div className="ph-month-body">

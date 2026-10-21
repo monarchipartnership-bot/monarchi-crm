@@ -151,7 +151,7 @@ export function HubBars({ labels, series }) {
           <span className="hc-bar-name">{lb}</span>
           <div className="hc-bar-stack">
             {series.map((s, si) => {
-              const v = s.data[li]; const color = HUB_COLORS[si % 6];
+              const v = s.data[li]; const color = s.color || HUB_COLORS[si % 6];
               return (
                 <div className="hc-bar-track" key={s.label + si} title={`${s.label}: ${fmtN(v)}`}>
                   <div className={'hc-bar' + (v ? '' : ' nil')} style={{ width: v ? Math.max((v / mx) * 100, 14) + '%' : undefined, background: v ? `linear-gradient(100deg,${mix(color, 0.3)},${color})` : undefined }}>
@@ -164,7 +164,7 @@ export function HubBars({ labels, series }) {
         </div>
       ))}
       {series.length > 1 && (
-        <div className="hc-legend">{series.map((s, i) => <span key={s.label + i}><i style={{ background: HUB_COLORS[i % 6] }} />{s.label}</span>)}</div>
+        <div className="hc-legend">{series.map((s, i) => <span key={s.label + i}><i style={{ background: s.color || HUB_COLORS[i % 6] }} />{s.label}</span>)}</div>
       )}
     </div>
   );

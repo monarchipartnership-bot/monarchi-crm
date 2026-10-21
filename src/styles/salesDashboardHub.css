@@ -1,0 +1,78 @@
+/* Sales Dashboard (/reports/dashboard) in Hub style: ring KPI cards with a trend line, funnel as pill steps, pill tables with green best capsules, Hub charts
+   (pill bars, waves) and pill cards for leads and contracts. Scoped to .sdh, loaded after reportsHub.css (the shared Hub base). Soft palette B as in Угоди.
+   Specs: docs/design-decisions.md (section 16). */
+
+.main:has(.sdh) { background: #FAF7FB; padding-bottom: 28px; }
+.sdh { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sdh *, .sdh *::before, .sdh *::after { box-sizing: border-box; }
+.sdh .report-section { margin: 0; }
+.sdh .sd-note { margin: -4px 0 12px; max-width: none; font: 500 12.5px/1.5 'Onest', sans-serif; color: #883288; }
+
+/* ---- KPI ---- */
+.sdh .dash-kpi-row { gap: 14px; margin: 0; }
+.sdh .sdh-k3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sdh .sdh-k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .sdh .sdh-k4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sdh .sdh-k3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); } }
+@media (max-width: 520px) { .sdh .sdh-k4 { grid-template-columns: minmax(0, 1fr); } }
+.sdh .dash-kpi { gap: 8px; padding: 12px 14px; box-shadow: none; }
+.sdh .dash-kpi-icon.ok { --c1: #4BE07F; --c2: #12A144; }
+.sdh .sdh-kpi-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.sdh .dash-kpi-value { font: 800 22px/1.2 'Onest', sans-serif; }
+.sdh .sdh-kpi-spark { flex: none; width: 96px; height: 38px; }
+.sdh .sdh-kpi-spark .dash-sparkline { width: 100%; height: 100%; display: block; }
+.sdh .dash-kpi-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.sdh .dash-kpi-sub > span { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+
+/* ---- funnel: pill steps ---- */
+.sdh .sd-funnel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .sdh .sd-funnel-grid { grid-template-columns: minmax(0, 1fr); } }
+.sdh .sd-funnel-card { padding: 14px 16px; border: 0; border-radius: 22px; background: #F9EDF9; }
+.sdh .sd-funnel-title { margin: 0 0 10px; font: 750 14px 'Onest', sans-serif; color: #270827; }
+.sdh .sd-fsteps { display: grid; justify-items: center; gap: 4px; }
+.sdh .sd-fn { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 40px; min-width: 150px; padding: 0 20px; border-radius: 999px; color: #fff; text-shadow: 0 1px 1px #00000026; box-shadow: inset 0 0 0 2px #ffffff40, 0 6px 12px -6px #27082755; }
+.sdh .sd-fn b { font: 700 13px 'Onest', sans-serif; }
+.sdh .sd-fn em { font: 800 14px 'Onest', sans-serif; font-style: normal; font-variant-numeric: tabular-nums; }
+.sdh .sd-fn--1 { background: linear-gradient(100deg, #C25AC4, #7E2483); }
+.sdh .sd-fn--2 { background: linear-gradient(100deg, #8FB2FF, #2F6FED); }
+.sdh .sd-fn--3 { background: linear-gradient(100deg, #FBBF24, #E08A06); }
+.sdh .sd-fn--4 { background: linear-gradient(100deg, #4BE07F, #12A144); }
+.sdh .sd-funnel-conv { margin: 0; font: 600 12px 'Onest', sans-serif; color: #883288; }
+.sdh .sd-funnel-conv span { font-weight: 800; }
+.sdh .sd-funnel-conv em { font-style: normal; color: #9a7aa5; }
+.sdh .sd-funnel-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid #EBC6EB99; font: 500 13px 'Onest', sans-serif; color: #6b4a73; }
+.sdh .sd-funnel-foot b { font-weight: 800; color: #661466; }
+
+/* ---- tables: pill header, hairline rows, total capsule ---- */
+.sdh .sd-table-wrap { overflow-x: auto; padding: 2px 2px 6px; border: 0; border-radius: 0; background: none; }
+.sdh .sd-table { width: 100%; border-collapse: separate; border-spacing: 0; font: 500 13px 'Onest', sans-serif; font-variant-numeric: tabular-nums; }
+.sdh .sd-table th, .sdh .sd-table td { padding: 9px 14px; border: 0; border-bottom: 1px solid #EBC6EB66; background: none; color: #270827; }
+.sdh .sd-table thead th { padding: 9px 14px; border: 0; background: #F3E3F7; color: #883288; font: 700 11px 'Onest', sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+.sdh .sd-table thead tr th:first-child { border-radius: 999px 0 0 999px; padding-left: 18px; }
+.sdh .sd-table thead tr th:last-child { border-radius: 0 999px 999px 0; }
+.sdh .sd-table thead tr:first-child .sd-table-group { margin: 0; background: #EBD0F2; color: #682768; text-align: center; border-radius: 0; }
+.sdh .sd-table thead tr:first-child .sd-table-group + .sd-table-group { border-left: 3px solid #fff; }
+.sdh .sd-table thead tr:first-child .sd-table-group:last-child { border-radius: 0 999px 999px 0; }
+.sdh .sd-table tbody td:first-child { padding-left: 18px; font-weight: 600; }
+.sdh .sd-table tbody tr:last-child td { border-bottom: 0; }
+.sdh .sd-table .sd-table-total td { border: 0; background: #F9EDF9; font-weight: 800; }
+.sdh .sd-table .sd-table-total td:first-child { border-radius: 999px 0 0 999px; }
+.sdh .sd-table .sd-table-total td:last-child { border-radius: 0 999px 999px 0; }
+.sdh .sd-table td.sd-best span { display: inline-block; padding: 2px 10px; margin: -2px 0; border-radius: 999px; background: #DCF5E5; color: #166534; font-weight: 700; }
+.sdh .sd-neg { color: #C23232; }
+
+/* ---- charts ---- */
+.sdh .sdh-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 900px) { .sdh .sdh-two { grid-template-columns: minmax(0, 1fr); } }
+.sdh .sdh-charts { gap: 14px; }
+.sdh .sdh-sub { margin: 0 0 6px 4px; font: 700 11px 'Onest', sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #883288; }
+
+/* ---- leads and closed contracts: pill cards ---- */
+.sdh .sdh-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.sdh .sd-client-card { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 10px 14px 10px 10px; border: 0; border-radius: 22px; background: #F9EDF9; }
+.sdh .sd-client-card > .dash-kpi-icon { margin-top: 2px; }
+.sdh .sd-client-body { min-width: 0; }
+.sdh .sd-client-name { margin: 0; font: 700 13.5px/1.3 'Onest', sans-serif; color: #270827; overflow-wrap: anywhere; }
+.sdh .sd-client-tag { margin: 1px 0 0; font: 600 11.5px 'Onest', sans-serif; letter-spacing: 0; text-transform: none; color: #883288; }
+.sdh .sd-client-text { margin-top: 4px; font: 500 12.5px/1.45 'Onest', sans-serif; color: #4a2a66; overflow-wrap: anywhere; }
+.sdh .sd-client-card .client-avatar { flex: none; border-radius: 50%; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #C25AC4; }
+.sdh .empty-hint { grid-column: 1 / -1; padding: 14px; border-radius: 18px; background: #F9EDF9; color: #883288; font: 500 13px 'Onest', sans-serif; text-align: center; }

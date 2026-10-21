@@ -7,6 +7,9 @@ import { deriveDueStatus, DUE_STATUS_LABELS } from '../../lib/dueStatus';
 import { DUE_STATUS_ICONS } from '../../lib/dueStatusIcons';
 import { colorForTag } from '../../lib/tagColors';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
+import DatePicker from '../common/DatePicker';
+import '../../styles/ddHub.css';
+import '../../styles/taskDialogsHub.css';
 
 const PRIORITY_OPTIONS = [
   { value: '', label: 'Без пріоритету' },
@@ -61,177 +64,155 @@ export default function TaskDetailModal({
     })).finally(() => { setSaving(false); setMode('view'); });
   }
 
+  const firstLine = (task.text || '').split('\n')[0];
+  const STATUS_TONE = { done: 'ok', pending: 'wa', moved: 'in', cancelled: 'bad', canceled: 'bad' };
+  const DUE_TONE = { overdue: 'bad', due_today: 'wa', upcoming: 'in', no_date: 'mu', done: 'ok', cancelled: 'bad' };
+  const closeIc = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const field = (icon, label, control) => (
+    <div className="thd-field">
+      <div className="thd-field-head"><span className="thd-ic" dangerouslySetInnerHTML={{ __html: icon }} /><div><label>{label}</label></div></div>
+      <div className="thd-field-control">{control}</div>
+    </div>
+  );
+  const tile = (icon, label, value) => (
+    <div className="thd-tile">
+      <span className="thd-ic" dangerouslySetInnerHTML={{ __html: icon }} />
+      <div><small>{label}</small><b>{value}</b></div>
+    </div>
+  );
+  const goBack = () => setMode('view');
+
   return (
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tmodal-box task-detail-modal">
-        <div className="tmodal-head">
-          <div className={'tmodal-head-left' + (mode === 'cancel' ? ' tmodal-head-left--center' : '')}>
-            {mode === 'cancel' && (
-              <span className="tmodal-head-icon" style={{ background: 'linear-gradient(135deg, #F87171, #DC2626)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} />
-            )}
-            <div className="tmodal-head-text">
-              <h3>{mode === 'cancel' ? 'Скасування задачі' : 'Задача'}</h3>
-            </div>
+    <div className="tmodal-overlay thd-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="tmodal-box thd-dialog task-detail-modal" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
+        <div className="thd-head thd-head--row">
+          <span className={'thd-md thd-md--lg' + (mode === 'cancel' ? ' thd-md--bad' : '')}>
+            <span className="thd-mi" dangerouslySetInnerHTML={{ __html: mode === 'cancel' ? FIELD_ICONS.close : FIELD_ICONS.checklist }} />
+          </span>
+          <div className="thd-head-text">
+            <h3 id="task-detail-title">{mode === 'cancel' ? 'Скасування задачі' : mode === 'edit' ? 'Редагування задачі' : 'Задача'}</h3>
+            <small>{mode === 'cancel' ? 'Вкажіть причину, її побачить команда' : firstLine}</small>
           </div>
-          <div className="task-detail-head-actions">
-            {mode === 'view' && <button type="button" className="btn" onClick={() => setMode('edit')}>Редагувати</button>}
-            <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>
+          <div className="thd-head-actions">
+            {mode === 'view' && (
+              <button type="button" className="btn" onClick={() => setMode('edit')}><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }} /> Редагувати</button>
+            )}
+            <button type="button" className="thd-close" onClick={onClose} aria-label="Закрити"><span dangerouslySetInnerHTML={{ __html: closeIc }} /></button>
           </div>
         </div>
 
-        {mode !== 'edit' && mode !== 'cancel' && (
-          <div className="task-detail-actions">
-            <button type="button" className={'btn' + (done ? ' btn-p' : '')} onClick={() => onToggleDone(task)}>
-              {done ? '↺ Повернути' : '✓ Виконати'}
+        {(mode === 'view' || mode === 'move') && (
+          <div className="thd-actions">
+            <button type="button" className="btn thd-btn-ok" onClick={() => onToggleDone(task)}>
+              <span dangerouslySetInnerHTML={{ __html: done ? FIELD_ICONS.undo : FIELD_ICONS.check }} /> {done ? 'Повернути' : 'Виконати'}
             </button>
-            <button type="button" className="btn btn-move" onClick={() => setMode(mode === 'move' ? 'view' : 'move')}>⇄ Перенести</button>
-            <button type="button" className="btn btn-danger" onClick={() => setMode(mode === 'cancel' ? 'view' : 'cancel')}>✕ Скасувати</button>
+            <button type="button" className={'btn' + (mode === 'move' ? ' thd-btn-on' : '')} onClick={() => setMode(mode === 'move' ? 'view' : 'move')}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11M15 4l3 3-3 3M17 17H6M9 14l-3 3 3 3" /></svg> Перенести
+            </button>
+            <button type="button" className="btn thd-btn-bad" onClick={() => setMode('cancel')}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M6 6l12 12" /></svg> Скасувати
+            </button>
           </div>
         )}
 
         {mode === 'move' && (
-          <div className="tmodal-body">
-            <label>Новий день</label>
-            <input type="date" value={moveDate} onChange={(e) => setMoveDate(e.target.value)} />
-            <label>Причина переносу (необов'язково)</label>
-            <textarea value={moveReason} onChange={(e) => setMoveReason(e.target.value)} placeholder="Вкажіть причину..." />
-            <div className="task-detail-inline-actions">
-              <button type="button" className="btn" onClick={() => setMode('view')}>Назад</button>
-              <button type="button" className="btn btn-p" onClick={() => { onMove(task, moveDate, moveReason.trim()); setMode('view'); }} disabled={!moveDate}>Підтвердити</button>
+          <>
+            <div className="thd-body">
+              {field(FIELD_ICONS.day, 'Новий день', <DatePicker value={moveDate} onChange={setMoveDate} placeholder="Оберіть дату" />)}
+              {field(FIELD_ICONS.document, 'Причина переносу', <textarea value={moveReason} onChange={(e) => setMoveReason(e.target.value)} placeholder="Вкажіть причину (необов'язково)..." />)}
             </div>
-          </div>
+            <div className="thd-foot">
+              <button type="button" className="btn" onClick={goBack}><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Назад</button>
+              <button type="button" className="btn thd-btn-ok" onClick={() => { onMove(task, moveDate, moveReason.trim()); setMode('view'); }} disabled={!moveDate}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> Підтвердити
+              </button>
+            </div>
+          </>
         )}
 
         {mode === 'cancel' && (
-          <div className="tmodal-body">
-            <label>Причина скасування</label>
-            <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Вкажіть причину..." />
-            <div className="task-detail-inline-actions">
-              <button type="button" className="btn" onClick={() => setMode('view')}>
-                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Назад
-              </button>
-              <button type="button" className="btn btn-p" onClick={() => { onCancel(task, cancelReason.trim()); onClose(); }}>
-                <span className="deal-action-ic deal-action-ic--ghost" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> Підтвердити скасування
+          <>
+            <div className="thd-body">
+              {field(FIELD_ICONS.document, 'Причина скасування', <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Вкажіть причину..." />)}
+            </div>
+            <div className="thd-foot">
+              <button type="button" className="btn" onClick={goBack}><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Назад</button>
+              <button type="button" className="btn thd-btn-bad" onClick={() => { onCancel(task, cancelReason.trim()); onClose(); }}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Підтвердити скасування
               </button>
             </div>
-          </div>
+          </>
         )}
 
-        {mode === 'edit' ? (
-          <div className="tmodal-body">
-            <label>Текст задачі</label>
-            <textarea value={edit.text} onChange={(e) => setEdit((s) => ({ ...s, text: e.target.value }))} />
-
-            <div className="task-detail-edit-fields">
-              <div className="wk-field-box">
-                <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
-                <div className="wk-field-body">
-                  <label>Відповідальний</label>
-                  <select
-                    value={edit.assignee_email}
-                    title={assigneeOptions.find((o) => o.value === edit.assignee_email)?.label || 'Не призначено'}
-                    onChange={(e) => setEdit((s) => ({ ...s, assignee_email: e.target.value }))}
-                  >
-                    <option value="">Не призначено</option>
-                    {assigneeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="wk-field-box">
-                <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.priority }} />
-                <div className="wk-field-body">
-                  <label>Пріоритет</label>
-                  <select value={edit.priority} onChange={(e) => setEdit((s) => ({ ...s, priority: e.target.value }))}>
-                    {PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="wk-field-box wk-field-box-tag">
-                <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
-                <div className="wk-field-body">
-                  <label>Теги</label>
-                  <TagInput tags={edit.tags} onChange={(tags) => setEdit((s) => ({ ...s, tags }))} />
-                </div>
-              </div>
+        {mode === 'edit' && (
+          <>
+            <div className="thd-body thd-body--grid">
+              <div className="thd-wide">{field(FIELD_ICONS.title, 'Текст задачі', <textarea value={edit.text} onChange={(e) => setEdit((st) => ({ ...st, text: e.target.value }))} />)}</div>
+              {field(FIELD_ICONS.assignee, 'Відповідальний',
+                <select
+                  value={edit.assignee_email}
+                  title={assigneeOptions.find((o) => o.value === edit.assignee_email)?.label || 'Не призначено'}
+                  onChange={(e) => setEdit((st) => ({ ...st, assignee_email: e.target.value }))}
+                >
+                  <option value="">Не призначено</option>
+                  {assigneeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>)}
+              {field(FIELD_ICONS.priority, 'Пріоритет',
+                <select value={edit.priority} onChange={(e) => setEdit((st) => ({ ...st, priority: e.target.value }))}>
+                  {PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>)}
+              <div className="thd-wide">{field(FIELD_ICONS.tag, 'Теги', <TagInput tags={edit.tags} onChange={(tags) => setEdit((st) => ({ ...st, tags }))} />)}</div>
             </div>
-
-            <div className="task-detail-inline-actions">
-              <button type="button" className="btn" onClick={() => setMode('view')}>Скасувати</button>
-              <button type="button" className="btn btn-p" onClick={saveEdits} disabled={saving}>{saving ? '...' : 'Зберегти'}</button>
+            <div className="thd-foot">
+              <button type="button" className="btn thd-btn-bad" onClick={goBack}><span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Скасувати</button>
+              <button type="button" className="btn thd-btn-ok" onClick={saveEdits} disabled={saving}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> {saving ? '...' : 'Зберегти'}
+              </button>
             </div>
-          </div>
-        ) : mode === 'cancel' ? null : (
-          <div className="tmodal-body task-detail-view">
-            <p className="wk-view-text">{task.text}</p>
+          </>
+        )}
 
-            <TaskSubtasks
-              subtasks={task.subtasks}
-              onChange={(next) => onSubtasksChange(task, next)}
-              forceOpen
-            />
+        {mode === 'view' && (
+          <>
+            <div className="thd-body task-detail-view">
+              <div className="thd-text"><p>{task.text}</p></div>
 
-            <div className="task-detail-fields">
-              <div className="task-detail-field">
-                <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} />
-                <div className="task-detail-field-body">
-                  <span>Відповідальний</span>
-                  <b>{profile ? profileLabel(profile) : (task.assignee_email || '—')}</b>
-                </div>
-              </div>
-              <div className="task-detail-field">
-                <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.priority }} />
-                <div className="task-detail-field-body">
-                  <span>Пріоритет</span>
-                  <b>{PRIORITY_OPTIONS.find((o) => o.value === (task.priority || ''))?.label}</b>
-                </div>
-              </div>
-              <div className="task-detail-field">
-                <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.status }} />
-                <div className="task-detail-field-body">
-                  <span>Статус</span>
-                  <b>{STATUS_LABELS[status]}</b>
-                </div>
-              </div>
-              <div className="task-detail-field">
-                <span className={'due-badge ' + dueStatus} dangerouslySetInnerHTML={{ __html: DUE_STATUS_ICONS[dueStatus] }} />
-                <div className="task-detail-field-body">
-                  <span>Терміновість</span>
-                  <b>{DUE_STATUS_LABELS[dueStatus]}</b>
-                </div>
-              </div>
-              {task.recurrence_rule && (
-                <div className="task-detail-field">
-                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.repeat }} />
-                  <div className="task-detail-field-body">
-                    <span>Повторення</span>
-                    <b>{recurrenceLabel(task.recurrence_rule)}</b>
-                  </div>
-                </div>
-              )}
-              {task.tags?.length > 0 && (
-                <div className="task-detail-field">
-                  <span className="wk-field-icon" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
-                  <div className="task-detail-field-body">
-                    <span>Теги</span>
-                    <div className="task-detail-tag-list">
-                      {task.tags.map((tag) => <span key={tag} className="task-tag-chip" style={{ background: colorForTag(tag) }}>{tag}</span>)}
+              <TaskSubtasks
+                subtasks={task.subtasks}
+                onChange={(next) => onSubtasksChange(task, next)}
+                forceOpen
+              />
+
+              <div className="thd-tiles">
+                {tile(FIELD_ICONS.assignee, 'Відповідальний', profile ? profileLabel(profile) : (task.assignee_email || '—'))}
+                {tile(FIELD_ICONS.priority, 'Пріоритет', PRIORITY_OPTIONS.find((o) => o.value === (task.priority || ''))?.label)}
+                {tile(FIELD_ICONS.status, 'Статус', <span className={'thd-pill thd-pill--' + (STATUS_TONE[status] || 'mu')}><i />{STATUS_LABELS[status]}</span>)}
+                {tile(FIELD_ICONS.day, 'Терміновість', <span className={'thd-pill thd-pill--' + (DUE_TONE[dueStatus] || 'mu')}><i />{DUE_STATUS_LABELS[dueStatus]}</span>)}
+                {task.recurrence_rule && tile(FIELD_ICONS.repeat, 'Повторення', recurrenceLabel(task.recurrence_rule))}
+                {task.tags?.length > 0 && (
+                  <div className="thd-tile thd-tile--wide">
+                    <span className="thd-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.tag }} />
+                    <div>
+                      <small>Теги</small>
+                      <div className="task-detail-tag-list">
+                        {task.tags.map((tag) => <span key={tag} className="task-tag-chip" style={{ background: colorForTag(tag) }}>{tag}</span>)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-
-            <div className="task-detail-del-row">
-              <button type="button" className="task-series-del" onClick={() => { onDelete(task); onClose(); }}>
-                Видалити задачу
+            <div className="thd-foot thd-foot--start">
+              <button type="button" className="thd-del" onClick={() => { onDelete(task); onClose(); }}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" /></svg> Видалити задачу
               </button>
               {task.series_id && (
-                <button type="button" className="task-series-del" onClick={() => { onDeleteSeries(task); onClose(); }}>
-                  Видалити всю серію
+                <button type="button" className="thd-del" onClick={() => { onDeleteSeries(task); onClose(); }}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" /></svg> Видалити всю серію
                 </button>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

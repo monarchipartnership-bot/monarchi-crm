@@ -7,7 +7,8 @@ import Select from '../common/Select';
 import DatePicker from '../common/DatePicker';
 import TimePicker from '../common/TimePicker';
 import DealPicker from './DealPicker';
-import ActionIcon from '../common/ActionIcon';
+import '../../styles/ddHub.css';
+import '../../styles/taskDialogsHub.css';
 
 const DIAMOND_ICON = '<svg viewBox="0 0 24 24"><path d="M12 2l10 10-10 10L2 12z"/></svg>';
 const CROWN_ICON = '<svg viewBox="0 0 24 24"><path d="M4 8l4 3 4-6 4 6 4-3-1.5 10h-13z"/><path d="M6.5 19h11"/></svg>';
@@ -62,7 +63,7 @@ function initDateTime(iso) {
 // task doesn't move it to a different deal), and saving calls
 // `updateTaskFields` instead of `createTask`. `onSaved(patch)` replaces
 // `onCreated(row)` as the edit-mode completion callback.
-// `hub` opts into the Sales «Задачі» page's light form styling (dealTasksPage.css);
+// `hub` opts into the Hub-style form with side navigation (Sales «Задачі» page);
 // without it the form looks as before (the deal card's own popup).
 export default function CreateDealTaskModal({ deals, profiles, myEmail, task, deal: fixedDeal, onClose, onCreated, onSaved, hub }) {
   const editing = !!task;
@@ -76,6 +77,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
   const [createdBy, setCreatedBy] = useState(editing ? (task.created_by_email || '') : (myEmail || ''));
   const [assignee, setAssignee] = useState(editing ? (task.assignee_email || '') : '');
   const [adding, setAdding] = useState(false);
+  const [section, setSection] = useState(0);
 
   const meta = metaFor(type);
 
@@ -151,8 +153,111 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
     }
   }
 
+
+  if (hub) {
+    const sections = [
+      { key: 'task', label: 'Задача', sub: editing ? 'Тип, опис' : 'Тип, угода, опис', icon: FIELD_ICONS[meta.icon] },
+      { key: 'plan', label: 'Планування', sub: 'Дата й пріоритет', icon: FIELD_ICONS.day },
+      { key: 'work', label: 'Виконання', sub: 'Хто ставить і кому', icon: FIELD_ICONS.assignee },
+    ];
+    const cur = sections[section];
+    const field = (icon, label, hint, control) => (
+      <div className="thd-field">
+        <div className="thd-field-head">
+          <span className="thd-ic" dangerouslySetInnerHTML={{ __html: icon }} />
+          <div><label>{label}</label><p>{hint}</p></div>
+        </div>
+        <div className="thd-field-control">{control}</div>
+      </div>
+    );
+    const noun = type === 'call' ? 'дзвінок' : 'задача';
+    return createPortal(
+      <div className="tmodal-overlay thd-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <div className="tmodal-box thd-dialog thd-dialog--side" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="deal-task-form-title">
+          <aside className="thd-rail">
+            <div className="thd-brand">
+              <span className="thd-md thd-md--lg"><span className="thd-mi" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[meta.icon] }} /></span>
+              <div><b id="deal-task-form-title">{editing ? meta.editTitle : meta.title}</b><small>Задачі по угодах</small></div>
+            </div>
+            <nav className="thd-nav" aria-label="Розділи форми">
+              {sections.map((sec, i) => (
+                <button key={sec.key} type="button" className={'thd-rn' + (i === section ? ' on' : '')} aria-current={i === section ? 'true' : undefined} onClick={() => setSection(i)}>
+                  <span className="thd-md thd-md--sm"><span className="thd-mi" dangerouslySetInnerHTML={{ __html: sec.icon }} /></span>
+                  <span>{sec.label}</span>
+                </button>
+              ))}
+            </nav>
+            <div className="thd-note">{editing ? "Опис обов'язковий, решту можна змінити пізніше." : "Угода й опис обов'язкові, решту можна заповнити пізніше."}</div>
+          </aside>
+          <div className="thd-main">
+            <div className="thd-head">
+              <div><h3>{cur.label}</h3><small>{cur.sub}</small></div>
+              <button type="button" className="thd-close" onClick={onClose} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+            </div>
+            <div className="thd-body">
+              {section === 0 && (
+                <>
+                  {(!editing || type !== 'email') && field(FIELD_ICONS[meta.icon], 'Тип', 'Задача чи дзвінок',
+                    <div className="dth-types" role="group" aria-label="Тип">
+                      {Object.entries(TYPE_META).map(([key, m]) => (
+                        <button key={key} type="button" className={'dth-type' + (type === key ? ' on' : '')} aria-pressed={type === key} onClick={() => setType(key)} disabled={editing}>
+                          <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[m.icon] }} /> {m.label}
+                        </button>
+                      ))}
+                    </div>)}
+                  {!editing && field(FIELD_ICONS.pipeline, 'Угода', `Оберіть угоду, до якої відноситься ${noun}`,
+                    <DealPicker value={deal?.id} onChange={setDeal} deals={deals} />)}
+                  {field(FIELD_ICONS.document, meta.label, 'Опишіть, що потрібно зробити; перший рядок стане назвою',
+                    <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Що потрібно зробити..." autoFocus />)}
+                </>
+              )}
+              {section === 1 && (
+                <>
+                  {field(FIELD_ICONS.day, type === 'call' ? 'Дата та час' : 'Дата', 'Оберіть дату виконання',
+                    <div className="dth-datetime">
+                      <DatePicker value={date} onChange={setDate} placeholder="Оберіть дату" />
+                      {type === 'call' && <TimePicker value={time} onChange={setTime} />}
+                    </div>)}
+                  {field(FIELD_ICONS.priority, 'Пріоритет', 'Визначте важливість, клік по активному знімає',
+                    <div className="dth-pri">
+                      {PRIORITY_CHIPS_HUB.map((p) => {
+                        const active = priority === p.value;
+                        return (
+                          <button key={p.value} type="button" className={'dth-pri-chip' + (active ? ' on' : '')} aria-pressed={active}
+                            style={{ '--c': p.color, '--t': p.tint }} onClick={() => setPriority(active ? '' : p.value)}>
+                            <i />{p.label}
+                          </button>
+                        );
+                      })}
+                    </div>)}
+                </>
+              )}
+              {section === 2 && (
+                <>
+                  {field(CROWN_ICON, 'Хто ставить задачу', 'Автор задачі',
+                    <Select value={createdBy} onChange={setCreatedBy} options={profiles.map((p) => ({ value: p.email, label: p.label }))} />)}
+                  {field(FIELD_ICONS.assignee, 'Кому призначено', 'Виконавець задачі',
+                    <Select value={assignee} onChange={setAssignee} options={[{ value: '', label: 'Не призначено' }, ...profiles.map((p) => ({ value: p.email, label: p.label }))]} />)}
+                </>
+              )}
+            </div>
+            <div className="thd-foot">
+              <button type="button" className="btn thd-btn-bad" onClick={onClose}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Скасувати
+              </button>
+              <button type="button" className="btn thd-btn-ok" onClick={handleSubmit} disabled={adding || !text.trim() || (!editing && !deal)}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> {adding ? (editing ? 'Зберігаємо...' : 'Додаємо...') : (editing ? 'Зберегти' : meta.addLabel)}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
   return createPortal(
-    <div className={'tmodal-overlay' + (hub ? ' task-modal-hub' : '')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="tmodal-box task-modal-box" ref={boxRef} role="dialog" aria-modal="true" aria-label={editing ? meta.editTitle : meta.title}>
         <div className="tmodal-head">
           <div className="pipeline-modal-head">
@@ -162,7 +267,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
               <p>{meta.sub}</p>
             </div>
           </div>
-          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">{hub ? <ActionIcon name="close" size={20} /> : <>&times;</>}</button>
+          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>
         </div>
         <div className="tmodal-body">
           {/* Switching type is only a create-time choice — an existing task
@@ -222,7 +327,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
                 </div>
               </div>
               <div className="task-priority-chips">
-                {(hub ? PRIORITY_CHIPS_HUB : PRIORITY_CHIPS).map((p) => {
+                {PRIORITY_CHIPS.map((p) => {
                   const active = priority === p.value;
                   return (
                     <button
@@ -281,7 +386,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
         <div className="tmodal-foot">
           <button type="button" className="btn" onClick={onClose}>Скасувати</button>
           <button type="button" className="btn btn-p" onClick={handleSubmit} disabled={adding || !text.trim() || (!editing && !deal)}>
-            {hub && !editing ? <ActionIcon name="create" size={18} /> : <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[editing ? 'check' : 'plus'] }} />}
+            <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS[editing ? 'check' : 'plus'] }} />
             {adding ? (editing ? 'Зберігаємо...' : 'Додаємо...') : (editing ? 'Зберегти' : meta.addLabel)}
           </button>
         </div>

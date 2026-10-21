@@ -82,11 +82,14 @@ export default function CreateClientModal({ onClose, onCreated }) {
   );
 
   return (
-    <div className="tmodal-overlay contacts-design" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tmodal-box create-client-modal">
+    <div className="tmodal-overlay arm-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="tmodal-box arm-dialog create-client-modal" role="dialog" aria-modal="true" aria-labelledby="create-client-title">
         <div className="tmodal-head">
-          <h3>Створити контакт</h3>
-          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>
+          <div className="tmodal-head-left">
+            <span className="hub-ring arm-md"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.assignee }} /></span>
+            <div className="tmodal-head-text"><h3 id="create-client-title">Створити контакт</h3><p>Додайте нового клієнта в картотеку</p></div>
+          </div>
+          <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
         </div>
         <div className="tmodal-body">
           <div className="task-detail-edit-fields">
@@ -109,8 +112,8 @@ export default function CreateClientModal({ onClose, onCreated }) {
           {error && <p className="import-error">{error}</p>}
         </div>
         <div className="tmodal-foot">
-          <button type="button" className="btn" onClick={onClose}>Скасувати</button>
-          <button type="button" className="btn btn-p" onClick={handleSave} disabled={!name.trim() || saving}>{saving ? '...' : 'Створити'}</button>
+          <button type="button" className="btn pw-btn--bad" onClick={onClose}>Скасувати</button>
+          <button type="button" className="btn pw-btn--ok" onClick={handleSave} disabled={!name.trim() || saving}>{saving ? '...' : 'Створити'}</button>
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import BarChart from '../../components/Reports/Weekly/BarChart';
-import LineChart from '../../components/Reports/Annual/LineChart';
+import { HubBars, HubLine } from '../../components/Reports/HubCharts';
 import DeltaBadge from '../../components/Automation/DeltaBadge';
+import Sparkline from '../../components/Automation/Sparkline';
+import ClientAvatar from '../../components/Clients/ClientAvatar';
+import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { fetchReportByWeekStart, fetchWeeklyRowsBetween } from '../../lib/api/weeklyReports';
 import { fetchMonthlyReportByStart, fetchWeeklyRowsForMonth } from '../../lib/api/monthlyReports';
 import { computeSums } from '../../lib/monthlyLogic';
@@ -18,6 +19,35 @@ import '../../styles/reportPage.css';
 import '../../styles/comparePage.css';
 import '../../styles/automationDashboard.css';
 import '../../styles/salesDashboard.css';
+import '../../styles/ddHub.css';
+import '../../styles/reportsHub.css';
+import '../../styles/salesDashboardHub.css';
+
+const TREND_UP_ICON = '<svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9M15 7h5v5"/></svg>';
+const KPI_ICON = {
+  ql: FIELD_ICONS.assignee,
+  co: FIELD_ICONS.document,
+  income: FIELD_ICONS.amount,
+  profit: TREND_UP_ICON,
+};
+
+// One KPI card: ring medallion + label, big value with an optional 8-point trend line,
+// and the change against the previous period (pill) with the previous value beside it.
+function Kpi({ icon, tone, label, value, delta, prev, trend, trendColor }) {
+  return (
+    <div className="dash-kpi sdh-kpi">
+      <div className="dash-kpi-head">
+        <span className={'dash-kpi-icon' + (tone ? ' ' + tone : '')} style={{ '--p': 100 }} dangerouslySetInnerHTML={{ __html: icon }} />
+        <div className="dash-kpi-label">{label}</div>
+      </div>
+      <div className="sdh-kpi-main">
+        <div className="dash-kpi-value">{value}</div>
+        {trend && trend.length > 1 && <span className="sdh-kpi-spark"><Sparkline values={trend} color={trendColor} /></span>}
+      </div>
+      <div className="dash-kpi-sub">{delta}<span>{prev}</span></div>
+    </div>
+  );
+}
 
 const TREND_WEEKS = 8;
 const RECENT_CONTRACTS = 6;
@@ -67,7 +97,6 @@ function toIso(d) {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [thisWeekRow, setThisWeekRow] = useState(null);
   const [lastWeekRow, setLastWeekRow] = useState(null);
@@ -146,6 +175,7 @@ export default function Dashboard() {
     const weekRowByStart = new Map(recentWeeklyRows.map((r) => [r.week_start, r]));
     const weeklyQlTrend = weekLabels.map((iso) => weekTotals(weekRowByStart.get(iso)).ql);
     const weeklyCoTrend = weekLabels.map((iso) => weekTotals(weekRowByStart.get(iso)).co);
+    const weeklyIncTrend = weekLabels.map((iso) => weekTotals(weekRowByStart.get(iso)).income);
 
     const recentClients = (thisWeekRow?.data?.clients?.length ? thisWeekRow.data.clients : lastWeekRow?.data?.clients) || [];
 
@@ -156,7 +186,7 @@ export default function Dashboard() {
     const weekFunnel = funnelFrom(weekGet);
     const monthFunnel = funnelFrom(monthGet);
 
-    return { weekGet, monthGet, weekFunnel, monthFunnel, thisWeek, lastWeek, thisMonth, prevMonth, channelRows, leadChannelRows, monthlyIncomeTrend, monthlyProfitTrend, weekLabels, weeklyQlTrend, weeklyCoTrend, recentClients };
+    return { weekGet, monthGet, weekFunnel, monthFunnel, thisWeek, lastWeek, thisMonth, prevMonth, channelRows, leadChannelRows, monthlyIncomeTrend, monthlyProfitTrend, weekLabels, weeklyQlTrend, weeklyCoTrend, weeklyIncTrend, recentClients };
   }, [thisWeekRow, lastWeekRow, thisMonthRow, prevMonthRow, monthsByIndex, recentWeeklyRows, thisWeekStartIso, liveMonthSums]);
 
   const weekCmpLabels = ['Qualified Leads', 'Contracts'];
@@ -185,152 +215,134 @@ export default function Dashboard() {
     { label: 'Contracts', values: stats.weeklyCoTrend ?? [] },
   ];
 
+  const monthTrend = (arr) => (arr || []).slice(0, m).filter((v) => v != null);
+  const monthLabel = MONTH_NAMES[m - 1];
+  const stitle = (icon, text) => (
+    <div className="stitle"><span className="stitle-icon" dangerouslySetInnerHTML={{ __html: icon }} />{text}</div>
+  );
+
   return (
-    <div className="report-page sales-dashboard-page">
-      <div className="page-actions">
-        <button type="button" className="btn" onClick={() => navigate(-1)}>&#8592; Back</button>
-      </div>
-
-      <section className="rpt-hero">
-        <h1>Sales Dashboard</h1>
-        <p className="sub">Загальна картина по лідах, контрактах і доході: цей тиждень, цей місяць, канали та тренди.</p>
-      </section>
-
+    <div className="report-page sales-dashboard-page sdh rpt-hub" data-dd="hub">
       {loading ? (
         <div className="empty-hint">Завантаження...</div>
       ) : (
         <>
           <section className="report-section">
-            <div className="stitle">Цей тиждень</div>
-            <div className="dash-kpi-row">
-              <div className="dash-kpi">
-                <div className="dash-kpi-label">Qualified Leads</div>
-                <div className="dash-kpi-value">{stats.thisWeek.ql}</div>
-                <div className="dash-kpi-sub">vs минулий тиждень ({stats.lastWeek.ql}) <DeltaBadge diff={stats.thisWeek.ql - stats.lastWeek.ql} /></div>
-              </div>
-              <div className="dash-kpi">
-                <div className="dash-kpi-label">Contracts</div>
-                <div className="dash-kpi-value">{stats.thisWeek.co}</div>
-                <div className="dash-kpi-sub">vs минулий тиждень ({stats.lastWeek.co}) <DeltaBadge diff={stats.thisWeek.co - stats.lastWeek.co} /></div>
-              </div>
-              <div className="dash-kpi">
-                <div className="dash-kpi-label">Дохід</div>
-                <div className="dash-kpi-value">{moneyFmt(stats.thisWeek.income)}</div>
-                <div className="dash-kpi-sub">vs минулий тиждень ({moneyFmt(stats.lastWeek.income)}) <DeltaBadge diff={Math.round(stats.thisWeek.income - stats.lastWeek.income)} suffix=" $" /></div>
-              </div>
+            {stitle(FIELD_ICONS.day, 'Цей тиждень')}
+            <div className="dash-kpi-row sdh-k3">
+              <Kpi icon={KPI_ICON.ql} label="Qualified Leads" value={stats.thisWeek.ql} trend={stats.weeklyQlTrend} trendColor="#8E1E8E"
+                delta={<DeltaBadge diff={stats.thisWeek.ql - stats.lastWeek.ql} />} prev={`минулий тиждень ${stats.lastWeek.ql}`} />
+              <Kpi icon={KPI_ICON.co} tone="ok" label="Contracts" value={stats.thisWeek.co} trend={stats.weeklyCoTrend}
+                delta={<DeltaBadge diff={stats.thisWeek.co - stats.lastWeek.co} />} prev={`минулий тиждень ${stats.lastWeek.co}`} />
+              <Kpi icon={KPI_ICON.income} tone="ok" label="Дохід" value={moneyFmt(stats.thisWeek.income)} trend={stats.weeklyIncTrend}
+                delta={<DeltaBadge diff={Math.round(stats.thisWeek.income - stats.lastWeek.income)} suffix=" $" />} prev={`минулий тиждень ${moneyFmt(stats.lastWeek.income)}`} />
             </div>
           </section>
 
           <section className="report-section">
-            <div className="stitle">Цей місяць — {MONTH_NAMES[m - 1]}</div>
-            <div className="dash-kpi-row">
-              <div className="dash-kpi">
-                <div className="dash-kpi-label">Qualified Leads</div>
-                <div className="dash-kpi-value">{stats.thisMonth.ql}</div>
-                <div className="dash-kpi-sub">vs минулий місяць ({stats.prevMonth.ql}) <DeltaBadge diff={stats.thisMonth.ql - stats.prevMonth.ql} /></div>
-              </div>
-              <div className="dash-kpi">
-                <div className="dash-kpi-label">Contracts</div>
-                <div className="dash-kpi-value">{stats.thisMonth.co}</div>
-                <div className="dash-kpi-sub">vs минулий місяць ({stats.prevMonth.co}) <DeltaBadge diff={stats.thisMonth.co - stats.prevMonth.co} /></div>
-              </div>
-              <div className="dash-kpi">
-                <div className="dash-kpi-label">Дохід</div>
-                <div className="dash-kpi-value">{moneyFmt(stats.thisMonth.income)}</div>
-                <div className="dash-kpi-sub">vs минулий місяць ({moneyFmt(stats.prevMonth.income)}) <DeltaBadge diff={Math.round(stats.thisMonth.income - stats.prevMonth.income)} suffix=" $" /></div>
-              </div>
-              <div className="dash-kpi">
-                <div className="dash-kpi-label">Прибуток</div>
-                <div className="dash-kpi-value">{moneyFmt(stats.thisMonth.profit)}</div>
-                <div className="dash-kpi-sub">vs минулий місяць ({moneyFmt(stats.prevMonth.profit)}) <DeltaBadge diff={Math.round(stats.thisMonth.profit - stats.prevMonth.profit)} suffix=" $" /></div>
-              </div>
+            {stitle(FIELD_ICONS.day, `Цей місяць — ${monthLabel}`)}
+            <div className="dash-kpi-row sdh-k4">
+              <Kpi icon={KPI_ICON.ql} label="Qualified Leads" value={stats.thisMonth.ql}
+                delta={<DeltaBadge diff={stats.thisMonth.ql - stats.prevMonth.ql} />} prev={`минулий місяць ${stats.prevMonth.ql}`} />
+              <Kpi icon={KPI_ICON.co} tone="ok" label="Contracts" value={stats.thisMonth.co}
+                delta={<DeltaBadge diff={stats.thisMonth.co - stats.prevMonth.co} />} prev={`минулий місяць ${stats.prevMonth.co}`} />
+              <Kpi icon={KPI_ICON.income} tone="ok" label="Дохід" value={moneyFmt(stats.thisMonth.income)} trend={monthTrend(stats.monthlyIncomeTrend)}
+                delta={<DeltaBadge diff={Math.round(stats.thisMonth.income - stats.prevMonth.income)} suffix=" $" />} prev={`минулий місяць ${moneyFmt(stats.prevMonth.income)}`} />
+              <Kpi icon={KPI_ICON.profit} tone="ok" label="Прибуток" value={moneyFmt(stats.thisMonth.profit)} trend={monthTrend(stats.monthlyProfitTrend)}
+                delta={<DeltaBadge diff={Math.round(stats.thisMonth.profit - stats.prevMonth.profit)} suffix=" $" />} prev={`минулий місяць ${moneyFmt(stats.prevMonth.profit)}`} />
             </div>
           </section>
 
           <section className="report-section">
-            <div className="stitle">Воронка продажів</div>
+            {stitle(FIELD_ICONS.target, 'Воронка продажів')}
             <p className="sd-note">Лід → дзвінок → кваліфікований → контракт за цифрами тижневих і місячних звітів. Лід — це відповіді (Upwork), вхідні звернення (органіка) або ліди LinkedIn.</p>
-            <FunnelSection weekFunnel={stats.weekFunnel} monthFunnel={stats.monthFunnel} monthLabel={MONTH_NAMES[m - 1]} />
+            <FunnelSection weekFunnel={stats.weekFunnel} monthFunnel={stats.monthFunnel} monthLabel={monthLabel} />
           </section>
 
           <section className="report-section">
-            <div className="stitle">Воронка по каналах — {MONTH_NAMES[m - 1]}</div>
+            {stitle(FIELD_ICONS.megaphone, `Воронка по каналах — ${monthLabel}`)}
+            <p className="sd-note">Зелена капсула — найкраща конверсія серед каналів.</p>
             <ChannelFunnelTable funnel={stats.monthFunnel} />
           </section>
 
           <section className="report-section">
-            <div className="stitle">Інвестиції в канали продажів</div>
+            {stitle(FIELD_ICONS.amount, 'Інвестиції в канали продажів')}
             <p className="sd-note">Інвестиції — витрати з фінансового блоку звітів за вирахуванням повернень; дохід — з полів доходу за каналами.</p>
-            <InvestmentsTable weekGet={stats.weekGet} monthGet={stats.monthGet} monthLabel={MONTH_NAMES[m - 1]} />
+            <InvestmentsTable weekGet={stats.weekGet} monthGet={stats.monthGet} monthLabel={monthLabel} />
           </section>
 
           <section className="report-section">
-            <div className="stitle">Тиждень: цей vs минулий</div>
-            <div className="dash-chart">
-              <BarChart labels={weekCmpLabels} series={weekCmpSeries} />
+            {stitle(FIELD_ICONS.barChart, 'Тиждень: цей vs минулий')}
+            <HubBars labels={weekCmpLabels} series={weekCmpSeries} />
+          </section>
+
+          <section className="report-section">
+            {stitle(FIELD_ICONS.megaphone, 'Канали цього місяця')}
+            <div className="sdh-two">
+              <div>
+                <div className="sdh-sub">Qualified Leads</div>
+                <HubBars labels={channelLabels} series={[{ label: 'Qualified Leads', data: channelSeries[0].data }]} />
+              </div>
+              <div>
+                <div className="sdh-sub">Contracts</div>
+                <HubBars labels={channelLabels} series={[{ label: 'Contracts', data: channelSeries[1].data, color: '#12A144' }]} />
+              </div>
             </div>
           </section>
 
           <section className="report-section">
-            <div className="stitle">Канали цього місяця</div>
-            <div className="dash-chart">
-              <BarChart labels={channelLabels} series={channelSeries} />
-            </div>
-          </section>
-
-          <section className="report-section">
-            <div className="stitle">Ліди за каналами цього місяця</div>
+            {stitle(FIELD_ICONS.assignee, 'Ліди за каналами цього місяця')}
             {stats.leadChannelRows.length === 0 ? (
               <div className="empty-hint">Немає лідів у місячному звіті. Канал обирається у «Клієнтах» денного, тижневого чи місячного звіту.</div>
             ) : (
-              <div className="dash-chart">
-                <BarChart
-                  labels={stats.leadChannelRows.map((r) => r.label)}
-                  series={[{ label: 'Ліди', data: stats.leadChannelRows.map((r) => r.count) }]}
-                />
-              </div>
+              <HubBars
+                labels={stats.leadChannelRows.map((r) => r.label)}
+                series={[{ label: 'Ліди', data: stats.leadChannelRows.map((r) => r.count) }]}
+              />
             )}
           </section>
 
-          <div className="dash-chart-grid">
+          <div className="sdh-two sdh-charts">
             <section className="report-section">
-              <div className="stitle">Дохід і прибуток за місяцями ({y})</div>
-              <div className="dash-chart">
-                <LineChart series={monthlyTrendSeries} />
-              </div>
+              {stitle(FIELD_ICONS.barChart, `Дохід і прибуток за місяцями (${y})`)}
+              <HubLine series={[{ label: 'Дохід', values: monthlyTrendSeries[0].values, color: '#8E1E8E' }, { label: 'Прибуток', values: monthlyTrendSeries[1].values, color: '#12A144' }]} />
             </section>
 
             <section className="report-section">
-              <div className="stitle">Ліди та контракти за {TREND_WEEKS} тижнів</div>
-              <div className="dash-chart">
-                <LineChart labels={weeklyTrendLabels} series={weeklyTrendSeries} />
-              </div>
+              {stitle(FIELD_ICONS.barChart, `Ліди та контракти за ${TREND_WEEKS} тижнів`)}
+              <HubLine labels={weeklyTrendLabels} series={[{ label: 'Qualified Leads', values: weeklyTrendSeries[0].values, color: '#8E1E8E' }, { label: 'Contracts', values: weeklyTrendSeries[1].values, color: '#2F6FED' }]} />
             </section>
           </div>
 
           <section className="report-section">
-            <div className="stitle">Ліди</div>
-            <div className="sd-client-list">
+            {stitle(FIELD_ICONS.assignee, 'Ліди')}
+            <div className="sdh-cards">
               {stats.recentClients.length === 0 && <div className="empty-hint">Немає лідів у збережених звітах останнього тижня.</div>}
               {stats.recentClients.map((c, i) => (
                 <div className="sd-client-card" key={i}>
-                  <div className="sd-client-name">{c.name || '—'}</div>
-                  <div className="sd-client-tag">{c.platform} · {c.leadType}</div>
-                  {c.text && <div className="sd-client-text">{c.text}</div>}
+                  <ClientAvatar name={c.name || '—'} size={36} />
+                  <div className="sd-client-body">
+                    <div className="sd-client-name">{c.name || '—'}</div>
+                    <div className="sd-client-tag">{c.platform} · {c.leadType}</div>
+                    {c.text && <div className="sd-client-text">{c.text}</div>}
+                  </div>
                 </div>
               ))}
             </div>
           </section>
 
           <section className="report-section">
-            <div className="stitle">Останні закриті контракти</div>
-            <div className="sd-client-list">
+            {stitle(FIELD_ICONS.check, 'Останні закриті контракти')}
+            <div className="sdh-cards">
               {wonDeals.length === 0 && <div className="empty-hint">Закритих контрактів поки немає.</div>}
               {wonDeals.map((d) => (
                 <div className="sd-client-card" key={d.id}>
-                  <div className="sd-client-name">{d.clients?.name || d.title || '—'}</div>
-                  <div className="sd-client-tag">{d.pipelines?.name || '—'} · {d.deal_stages?.label || 'Виграно'}</div>
-                  <div className="sd-client-text">{fmtMoneyCur(d.amount, d.currency)}{fmtDay(d.closed_at || d.updated_at) ? ` · ${fmtDay(d.closed_at || d.updated_at)}` : ''}</div>
+                  <span className="dash-kpi-icon ok" style={{ '--p': 100 }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} />
+                  <div className="sd-client-body">
+                    <div className="sd-client-name">{d.clients?.name || d.title || '—'}</div>
+                    <div className="sd-client-tag">{d.pipelines?.name || '—'} · {d.deal_stages?.label || 'Виграно'}</div>
+                    <div className="sd-client-text">{fmtMoneyCur(d.amount, d.currency)}{fmtDay(d.closed_at || d.updated_at) ? ` · ${fmtDay(d.closed_at || d.updated_at)}` : ''}</div>
+                  </div>
                 </div>
               ))}
             </div>

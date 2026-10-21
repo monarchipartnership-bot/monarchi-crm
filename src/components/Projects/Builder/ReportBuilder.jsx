@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useConfirm } from '../../common/ConfirmDialog';
-import DesignTodo from '../../common/DesignTodo';
 import { RibbonMark } from '../hubIcons';
 import CampaignGroupsModal from '../Reports/CampaignGroupsModal';
 import CustomMetricModal from '../Reports/CustomMetricModal';
 import { Box, Pill } from '../../ClientReport/kit';
 import { Creatives, MetricTable, ReportTexts } from '../../ClientReport/parts';
 import { Kpis } from '../../ClientReport/MonthView';
-import { BlocksPanel, CreativesPanel, GroupsPanel, KindPanel, MetricsPanel } from './BuilderSettings';
+import { BlocksPanel, CreativesPanel, GroupsPanel, KindPanel, MetricsPanel, PanelContext } from './BuilderSettings';
+import '../../../styles/builderHub.css';
 import { loadReportContext } from '../../../lib/projectReportContext';
 import { fetchCampaignGroups, fetchReportLayout, saveReportLayout } from '../../../lib/api/projectReportStore';
 import { accountPlatforms, accountsForTab } from '../../../lib/reportScope';
@@ -41,6 +41,7 @@ export default function ReportBuilder({ projectId }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [openPanel, setOpenPanel] = useState('blocks'); // the settings panels are an accordion: one open at a time
 
   const reload = useCallback(async () => {
     const [c, groups] = await Promise.all([loadReportContext(projectId), fetchCampaignGroups(projectId)]);
@@ -126,22 +127,21 @@ export default function ReportBuilder({ projectId }) {
         ))}
       </div>
 
-      <div className="bld-head">
-        <h3>Конструктор звіту · {label} <DesignTodo note="Розділ «Конструктор звіту»: живий макет, панелі налаштувань, кнопка збереження" /></h3>
-        <div className="bld-actions">
-          <div className="prep-seg bld-seg" role="group" aria-label="Тип звіту для перегляду">
-            <button type="button" className={'prep-seg-tab' + (periodType === 'weekly' ? ' on' : '')} aria-pressed={periodType === 'weekly'} onClick={() => setPeriodType('weekly')}>Тижневий</button>
-            <button type="button" className={'prep-seg-tab' + (periodType === 'monthly' ? ' on' : '')} aria-pressed={periodType === 'monthly'} onClick={() => setPeriodType('monthly')}>Місячний</button>
-          </div>
-          <button type="button" className="btn" disabled={real.busy} onClick={real.data ? () => setReal({ data: null, period: null, busy: false, error: '' }) : loadReal}>
-            {real.busy ? 'Завантажуємо…' : real.data ? 'Показати без цифр' : 'Показати з даними останнього періоду'}
-          </button>
-          <button type="button" className="btn btn-p" disabled={saving || (!dirty && state.exists)} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти макет'}</button>
+      <div className="bld-bar">
+        <span className="bld-md bld-md--lg"><span className="bld-mi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></svg></span></span>
+        <div className="bld-bar-title"><b>Конструктор звіту · {label}</b><small>Так бачитиме звіт клієнт; команда завжди бачить повний</small></div>
+        <span className={'bld-state ' + (dirty || !state.exists ? 'dirty' : 'saved')}><i />{dirty ? 'Є незбережені зміни' : state.exists ? 'Макет збережено' : 'Макет не збережено'}</span>
+        <div className="prep-seg bld-seg" role="group" aria-label="Тип звіту для перегляду">
+          <button type="button" className={'prep-seg-tab' + (periodType === 'weekly' ? ' on' : '')} aria-pressed={periodType === 'weekly'} onClick={() => setPeriodType('weekly')}>Тижневий</button>
+          <button type="button" className={'prep-seg-tab' + (periodType === 'monthly' ? ' on' : '')} aria-pressed={periodType === 'monthly'} onClick={() => setPeriodType('monthly')}>Місячний</button>
         </div>
+        <button type="button" className="btn" disabled={real.busy} onClick={real.data ? () => setReal({ data: null, period: null, busy: false, error: '' }) : loadReal}>
+          {real.busy ? 'Завантажуємо…' : real.data ? 'Показати без цифр' : 'Показати з даними'}
+        </button>
+        <button type="button" className="btn bld-save" disabled={saving || (!dirty && state.exists)} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти макет'}</button>
       </div>
 
       {!state.exists && <div className="prep-internal-note" role="note"><b>Макет {label} ще не збережено.</b> Нижче стандартний вигляд і те, що вже налаштовано в проєкті (групи, додаткові метрики). Натисніть «Зберегти макет»: поки його немає, AI-агент для цієї платформи не складає звіти.</div>}
-      {dirty && <div className="pacc-hint" role="status">Є незбережені зміни.</div>}
       {message && <div className="pacc-hint" role="status">{message}</div>}
       {error && <div className="pacc-err">{error}</div>}
       {real.error && <div className="pacc-err">{real.error}</div>}
@@ -160,6 +160,7 @@ export default function ReportBuilder({ projectId }) {
         </Box>
       </div>
 
+      <PanelContext.Provider value={{ open: openPanel, toggle: (id) => setOpenPanel((cur) => (cur === id ? '' : id)) }}>
       <div className="bld-panels">
         <KindPanel draft={draft} set={set} projectKind={projectKind(ctx.project)} />
         <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} onOpen={() => setModal('metric')} onChanged={reload} />
@@ -170,9 +171,10 @@ export default function ReportBuilder({ projectId }) {
         <BlocksPanel draft={draft} set={set} />
         <CreativesPanel draft={draft} set={set} />
       </div>
+      </PanelContext.Provider>
       <div className="bld-actions bld-actions--end">
-        <button type="button" className="btn btn-p" disabled={saving || (!dirty && state.exists)} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти макет'}</button>
-        <button type="button" className="btn" disabled={saving || !dirty} onClick={() => { setState((s) => ({ ...s, draft: s.saved })); setMessage(''); }}>Скасувати зміни</button>
+        <button type="button" className="btn bld-save" disabled={saving || (!dirty && state.exists)} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти макет'}</button>
+        <button type="button" className="btn bld-undo" disabled={saving || !dirty} onClick={() => { setState((s) => ({ ...s, draft: s.saved })); setMessage(''); }}>Скасувати зміни</button>
       </div>
 
       {modal === 'groups' && (

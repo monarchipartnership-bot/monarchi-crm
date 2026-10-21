@@ -162,7 +162,7 @@ export default function DealsKanbanTab({ deals, stages, reload, onAddDeal, onMan
       </div>
 
       {lostModal && (
-        <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) setLostModal(null); }}>
+        <div className="tmodal-overlay deals-design" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) setLostModal(null); }}>
           <div className="tmodal-box">
             <div className="tmodal-head">
               <h3>Причина програшу</h3>

@@ -1,0 +1,320 @@
+/* Контакти (list /reports/clients-directory and the client card) in Hub style. Scoped to .contacts-hub, loaded after reportsHub.css (the shared Hub base:
+   ring boxes, halo fields and buttons, round menus, KPI cards, pager, accordion). New here: pill table of clients, directory toolbar and filter, client
+   card header, stat cards, ribbon of ten tabs, info rows, side cards, deals master/detail, activity timeline, notes, dialogs. Specs: docs/design-decisions.md. */
+
+/* ======================= Directory ======================= */
+.contacts-hub .dash-kpi-icon.ok { --c1: #4BE07F; --c2: #12A144; }
+.contacts-hub .dash-kpi-icon.low { --c1: #FBBF24; --c2: #E08A06; }
+.contacts-hub .dash-kpi-value .delta-badge { font-size: 12px; }
+.contacts-hub .client-directory-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; width: 100%; margin: 0 0 14px; }
+.contacts-hub .mc-client-search { position: relative; display: flex; align-items: center; flex: 1 1 260px; width: auto; max-width: 460px; min-width: 220px; margin: 0; }
+.contacts-hub .mc-client-search > :is(svg, img, span) { position: absolute; left: 14px; z-index: 1; width: 16px; height: 16px; pointer-events: none; color: #883288; stroke: #883288; }
+.contacts-hub .mc-client-search input { width: 100%; padding-left: 40px; }
+.contacts-hub .dash-period-select { min-width: 190px; width: auto; }
+.contacts-hub .task-filter-wrap { position: relative; }
+.contacts-hub .task-filter-btn { display: inline-flex; align-items: center; gap: 8px; }
+.contacts-hub .task-filter-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .task-filter-btn.has-active { background: #F1DCF5; box-shadow: inset 0 0 0 1.5px #D9A6DF, 0 0 0 4px #AE40AE14; }
+.contacts-hub .task-filter-popover { position: absolute; top: 44px; left: 0; z-index: 30; width: 310px; padding: 14px; border: 1.5px solid var(--hb-line); border-radius: 24px; background: #fff; box-shadow: 0 18px 44px #68276833; display: grid; gap: 10px; }
+.contacts-hub .task-filter-row { display: grid; gap: 4px; }
+.contacts-hub .task-filter-row label { margin: 0 0 0 6px; font: 600 12px/1.2 'Onest', sans-serif; letter-spacing: 0; text-transform: none; color: #883288; }
+.contacts-hub .task-filter-reset { margin-top: 4px; width: 100%; box-shadow: none; background: none; color: #C23232; }
+.contacts-hub .contacts-btn-ic { display: inline-grid; place-items: center; }
+.contacts-hub .contacts-btn-ic svg, .contacts-hub .btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.contacts-hub .placeholder { padding: 22px; border-radius: 22px; background: #F9EDF9; color: #883288; text-align: center; font-size: 13.5px; }
+.contacts-hub .placeholder p { margin: 0; }
+
+/* the pill table */
+.contacts-hub .client-grid { display: block; overflow-x: auto; padding: 2px 2px 6px; }
+.contacts-hub .client-grid-header, .contacts-hub .client-grid-row { display: grid; grid-template-columns: 1.7fr .95fr 1fr .95fr .9fr .5fr .95fr; align-items: center; gap: 12px; min-width: 860px; }
+.contacts-hub .client-grid-header { padding: 8px 16px; border-radius: 999px; background: #F3E3F7; font: 700 11px 'Onest', sans-serif; letter-spacing: .05em; text-transform: uppercase; color: #883288; }
+.contacts-hub .client-grid-row { display: grid; padding: 9px 16px; border: 0; border-bottom: 1px solid #EBC6EB66; border-radius: 0; background: none; box-shadow: none; cursor: pointer; transform: none; }
+.contacts-hub .client-grid-row:last-child { border-bottom: 0; }
+.contacts-hub .client-grid-row:focus-visible { outline: 3px solid #AE40AE; outline-offset: -3px; border-radius: 18px; }
+.contacts-hub .client-grid-name-text .ink { font: 700 13.5px/1.2 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-grid-subtitle { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-grid-badge { padding: 3px 12px 3px 4px; border-radius: 999px; font: 700 12px 'Onest', sans-serif; }
+.contacts-hub .client-grid-status-badge { padding: 3px 12px 3px 9px; }
+.contacts-hub .client-grid-badge--platform { box-shadow: none !important; }
+.contacts-hub .client-grid-plain, .contacts-hub .client-grid-date { font: 500 13px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-grid-date svg { color: #883288; }
+.contacts-hub .client-grid-country span[class^="fi"] { box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px #EBC6EB; }
+
+/* pager */
+.contacts-hub .month-pagination { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.contacts-hub .month-pagination button { display: inline-grid; place-items: center; min-width: 34px; height: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: #fff; color: #682768; font: 700 13px 'Onest', sans-serif; font-variant-numeric: tabular-nums; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
+.contacts-hub .month-pagination button.on { background: var(--hb-grad); color: #fff; text-shadow: 0 1px 1px #00000026; box-shadow: 0 5px 12px #66146644, inset 0 0 0 2px #ffffff40, 0 0 0 4px #AE40AE38; }
+.contacts-hub .month-pagination .mp-arrow { padding: 0; background: #F3E3F7; box-shadow: none; }
+.contacts-hub .month-pagination .mp-arrow svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.contacts-hub .month-pagination button:disabled { opacity: .4; cursor: default; }
+.contacts-hub .mp-gap { color: #883288; font-weight: 700; }
+.contacts-hub .month-pagination-hint { margin-left: 10px; font: 500 12px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .mc-client-search { padding: 0; border: 0; background: none; box-shadow: none; gap: 0; height: auto; }
+.contacts-hub .mc-client-search input { flex: 1; }
+.contacts-hub .mc-client-search input { padding-left: 42px !important; }
+.contacts-hub .task-filter-popover { left: auto; right: 0; }
+
+/* ======================= Client card: header ======================= */
+.contacts-hub .client-profile-top-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+.contacts-hub .client-profile-top-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.contacts-hub .client-profile-top-row .btn { height: 36px; padding: 0 18px; font-size: 13px; }
+.contacts-hub .client-profile-btn-danger { background: none; color: #C23232; box-shadow: none; padding: 0 12px; }
+.contacts-hub .client-profile-top-row .btn:disabled { opacity: .45; }
+.contacts-hub .client-profile-card { margin: 0 0 14px; padding: 16px 18px 16px; border: 1.5px solid transparent; border-radius: 28px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.contacts-hub .client-profile-card-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.contacts-hub .client-profile-avatar-wrap { position: relative; flex: none; }
+.contacts-hub .client-profile-avatar-wrap .client-avatar { width: 72px !important; height: 72px !important; font-size: 24px; border-radius: 50%; box-shadow: 0 0 0 4px #fff, 0 0 0 8px #C25AC4; }
+.contacts-hub .client-profile-avatar-cam { position: absolute; right: -6px; bottom: -6px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #fff; color: #682768; box-shadow: inset 0 0 0 1.5px var(--hb-line), 0 3px 8px #6827681f; }
+.contacts-hub .client-profile-avatar-cam svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .client-profile-avatar-menu, .contacts-hub .client-profile-status-menu { padding: 8px; border: 1.5px solid var(--hb-line); border-radius: 22px; background: #fff; box-shadow: 0 18px 44px #68276833; }
+.contacts-hub .client-profile-avatar-menu button { display: block; width: 100%; padding: 8px 14px; border: 0; border-radius: 999px; background: none; text-align: left; font: 500 13.5px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-name-block { min-width: 0; }
+.contacts-hub .client-profile-name-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.contacts-hub .client-profile-name-row h1 { margin: 0; font: 800 24px/1.15 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-status-trigger { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px 0 10px; border-radius: 999px; border-width: 0; font: 700 12px 'Onest', sans-serif; }
+.contacts-hub .client-profile-status-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.contacts-hub .client-profile-status-chevron svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.6; }
+.contacts-hub .client-profile-name-block .sub { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font: 500 13px 'Onest', sans-serif; color: #6b4a73; }
+.contacts-hub .client-profile-name-block .sub svg { width: 14px; height: 14px; stroke: #883288; fill: none; stroke-width: 2; }
+.contacts-hub .client-profile-quickrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 14px; }
+.contacts-hub .client-profile-quick-field { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 14px 8px 8px; border-radius: 26px; background: #F9EDF9; }
+.contacts-hub .client-profile-quick-body { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.contacts-hub .client-profile-quick-body > label { margin: 0; font: 600 11.5px/1.2 'Onest', sans-serif; letter-spacing: 0; text-transform: none; color: #883288; }
+.contacts-hub .client-profile-readonly { font: 700 13.5px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-quick-body :is(.ui-select-trigger, .platform-picker-trigger) { height: 26px; padding: 0 4px 0 0; box-shadow: none; background: none; font: 700 13.5px 'Onest', sans-serif; }
+.contacts-hub .client-profile-quick-body .ui-select-chevron { display: none; }
+.contacts-hub .client-profile-quick-tags { grid-column: span 2; }
+@media (max-width: 760px) { .contacts-hub .client-profile-quick-tags { grid-column: auto; } }
+
+/* round badges with inline gradients: ring look */
+.contacts-hub :is(.client-profile-quick-ic, .client-profile-stat-icon, .client-profile-section-ic, .client-profile-row-ic, .client-profile-mini-row-ic) { flex: none; display: inline-grid; place-items: center; border-radius: 50%; background: radial-gradient(circle closest-side at 50% 50%, #8E2A93 0, #7E2483 60%, #fff 62%, #fff 74%, transparent 75%), conic-gradient(#B544B5, #661466) !important; color: #fff; box-shadow: none; }
+.contacts-hub :is(.client-profile-quick-ic, .client-profile-stat-icon, .client-profile-section-ic, .client-profile-row-ic, .client-profile-mini-row-ic) svg { stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.contacts-hub .client-profile-quick-ic { width: 34px; height: 34px; }
+.contacts-hub .client-profile-quick-ic svg { width: 15px; height: 15px; }
+.contacts-hub .client-profile-stat-icon { width: 34px; height: 34px; }
+.contacts-hub .client-profile-stat-icon svg { width: 15px; height: 15px; }
+
+/* stat cards */
+.contacts-hub .client-profile-stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 0 0 14px; }
+.contacts-hub .client-profile-stat-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.contacts-hub .client-profile-stat-head { display: flex; align-items: center; gap: 10px; }
+.contacts-hub .client-profile-stat-label { font: 600 12px/1.25 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-stat-value { font: 800 22px/1.2 'Onest', sans-serif; color: #270827; font-variant-numeric: tabular-nums; }
+.contacts-hub .client-profile-stat-sub { font: 500 12px 'Onest', sans-serif; color: #883288; }
+
+/* ribbon of tabs */
+.contacts-hub .client-profile-tabs { margin: 0 0 14px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; }
+.contacts-hub .client-profile-tabs::-webkit-scrollbar { display: none; }
+.contacts-hub .client-profile-tabs .proj-tabs { flex-wrap: nowrap; }
+.contacts-hub .cp-tab-ic { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.contacts-hub .proj-tab.soon { opacity: .55; cursor: default; }
+.contacts-hub .proj-tab .rg-n { margin-left: 1px; padding-left: 8px; border-left: 1.5px solid #D9A6DF99; font-weight: 700; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; }
+
+.contacts-hub .client-profile-avatar-wrap .client-avatar { box-shadow: none; }
+.contacts-hub .client-profile-card-top { border: 0; padding: 0; margin: 0; }
+
+/* ======================= Info tab ======================= */
+.contacts-hub .client-profile-section { margin: 0; padding: 14px 16px 16px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.contacts-hub .client-profile-info-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+@media (max-width: 1000px) { .contacts-hub .client-profile-info-layout { grid-template-columns: minmax(0, 1fr); } }
+.contacts-hub .client-profile-info-main, .contacts-hub .client-profile-info-sidebar { display: grid; gap: 10px; min-width: 0; }
+.contacts-hub .client-profile-section-card { margin: 0; padding: 0; border: 0; border-radius: 24px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
+.contacts-hub .client-profile-section-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 14px 8px 10px; border: 0; border-radius: 24px; background: none; box-shadow: none; text-align: left; }
+.contacts-hub .client-profile-section-ic { width: 38px; height: 38px; }
+.contacts-hub .client-profile-section-ic svg { width: 16px; height: 16px; }
+.contacts-hub .client-profile-section-titles { flex: 1; min-width: 0; display: grid; line-height: 1.2; }
+.contacts-hub .client-profile-section-title { font: 700 14.5px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-section-sub { font: 500 12px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-section-chevron { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #F3E3F7; color: #682768; flex: none; transition: transform 300ms var(--hb-ease); }
+.contacts-hub .client-profile-section-chevron svg { width: 11px; height: 11px; stroke: currentColor; stroke-width: 2.6; fill: none; }
+.contacts-hub .client-profile-section-chevron.open { transform: rotate(180deg); }
+.contacts-hub .client-profile-section-body { display: grid; gap: 8px; padding: 4px 14px 14px; }
+.contacts-hub .client-profile-row { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 14px 7px 8px; border: 0; border-radius: 999px; background: #F9EDF9; }
+.contacts-hub .client-profile-row:has(textarea, .tag-input, .multi-text-field, .multi-country-field, .client-profile-chips) { align-items: flex-start; border-radius: 22px; }
+.contacts-hub .client-profile-row-ic { width: 28px; height: 28px; }
+.contacts-hub .client-profile-row-ic svg { width: 13px; height: 13px; }
+.contacts-hub .client-profile-row-label { flex: none; min-width: 150px; font: 600 12.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-row-value { flex: 1; min-width: 0; font: 600 13.5px 'Onest', sans-serif; color: #270827; overflow-wrap: anywhere; }
+.contacts-hub .client-profile-row-value:empty::after, .contacts-hub .client-profile-row-value.empty { content: '—'; color: #a77fb0; font-weight: 500; }
+.contacts-hub .client-profile-row-platform { display: inline-flex; align-items: center; gap: 8px; }
+.contacts-hub .client-profile-row-platform img { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+@media (max-width: 760px) { .contacts-hub .client-profile-row { flex-wrap: wrap; border-radius: 22px; } .contacts-hub .client-profile-row-label { min-width: 0; } }
+
+/* side cards */
+.contacts-hub .client-profile-side-card { margin: 0; padding: 14px 16px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.contacts-hub .client-profile-side-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+.contacts-hub .client-profile-side-title { display: block; margin: 0 0 10px; font: 750 15px/1.2 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-side-head .client-profile-side-title { margin: 0; }
+.contacts-hub .client-profile-side-link { padding: 3px 12px; border: 0; border-radius: 999px; background: #F3E3F7; color: #682768; font: 700 12px 'Onest', sans-serif; box-shadow: none; }
+.contacts-hub .client-history-empty { margin: 0; padding: 12px 14px; border-radius: 18px; background: #F9EDF9; color: #883288; font-size: 12.5px; }
+.contacts-hub .client-profile-quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.contacts-hub .client-profile-quick-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 999px; background: #fff; color: #682768; font: 700 12.5px/1.2 'Onest', sans-serif; box-shadow: inset 0 0 0 1.5px var(--hb-line), 0 0 0 4px #AE40AE14; }
+.contacts-hub .client-profile-quick-action:disabled { opacity: .5; }
+.contacts-hub .client-profile-quick-action svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; flex: none; }
+.contacts-hub .client-profile-subtabs { display: inline-flex; gap: 2px; padding: 3px; margin: 0 0 10px; border-radius: 999px; background: #F3E3F7; }
+.contacts-hub .client-profile-subtab { height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: none; box-shadow: none; color: #7a5a85; font: 600 12.5px 'Onest', sans-serif; }
+.contacts-hub .client-profile-subtab.active { background: #fff; color: #682768; font-weight: 700; box-shadow: inset 0 0 0 1.5px #D9A6DF, 0 3px 8px #6827681f; }
+.contacts-hub .client-profile-mini-list { display: grid; gap: 8px; }
+.contacts-hub .client-profile-mini-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 12px 6px 6px; border: 0; border-radius: 999px; background: #F9EDF9; box-shadow: none; text-align: left; font-family: 'Onest', sans-serif; }
+.contacts-hub .client-profile-mini-row-ic { width: 30px; height: 30px; }
+.contacts-hub .client-profile-mini-row-ic svg { width: 13px; height: 13px; }
+.contacts-hub .client-profile-mini-row-body { flex: 1; min-width: 0; display: grid; line-height: 1.25; }
+.contacts-hub .client-profile-mini-row-go { color: #682768; }
+.contacts-hub .client-profile-mini-row-go svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .client-profile-side-empty { display: grid; justify-items: center; gap: 4px; padding: 14px; border-radius: 20px; background: #F9EDF9; text-align: center; }
+.contacts-hub .client-profile-side-empty-title { margin: 0; font: 700 13px 'Onest', sans-serif; }
+.contacts-hub .client-profile-side-empty-sub { margin: 0 0 6px; font-size: 12px; color: #883288; }
+.contacts-hub .client-profile-side-empty-ic svg { width: 26px; height: 26px; stroke: #B544B5; fill: none; stroke-width: 1.8; }
+
+/* note editor */
+.contacts-hub .deal-note-editor-wrap { display: grid; gap: 8px; padding: 10px; border-radius: 22px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
+.contacts-hub .deal-note-editor { min-height: 52px; padding: 6px 8px; border: 0; outline: none; font: 500 13px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .deal-note-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.contacts-hub .deal-note-toolbar-icons { display: flex; flex-wrap: wrap; gap: 4px; }
+.contacts-hub .deal-note-toolbar-icons button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #F3E3F7; color: #682768; box-shadow: none; }
+.contacts-hub .deal-note-toolbar-icons svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .deal-note-toolbar-actions { display: flex; gap: 8px; }
+.contacts-hub .deal-note-toolbar-actions .btn { height: 30px; padding: 0 14px; font-size: 12.5px; }
+.contacts-hub .client-profile-row-value { text-align: left; }
+
+/* ======================= Deals and projects: master / detail ======================= */
+.contacts-hub .client-profile-info { padding: 0; }
+.contacts-hub .client-profile-deals-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px; align-items: start; }
+@media (max-width: 1000px) { .contacts-hub .client-profile-deals-layout { grid-template-columns: minmax(0, 1fr); } }
+.contacts-hub .client-profile-deals-list-card, .contacts-hub .client-profile-deal-detail-card { min-width: 0; padding: 14px 16px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.contacts-hub .client-profile-deals-list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+.contacts-hub .client-profile-deals-list-head h3 { margin: 0; font: 750 16px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-deals-search { position: relative; margin: 0 0 10px; }
+.contacts-hub .client-profile-deals-search > span { position: absolute; left: 14px; top: 11px; width: 16px; height: 16px; z-index: 1; pointer-events: none; }
+.contacts-hub .client-profile-deals-search > span svg { width: 16px; height: 16px; stroke: #883288; fill: none; stroke-width: 2.2; }
+.contacts-hub .client-profile-deals-search input { width: 100%; padding-left: 42px !important; }
+.contacts-hub .client-profile-deals-list { display: grid; gap: 8px; }
+.contacts-hub .client-profile-deal-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px 8px 8px; border: 0; border-radius: 26px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); text-align: left; font-family: 'Onest', sans-serif; transform: none; }
+.contacts-hub .client-profile-deal-row.active { background: #F1DCF5; box-shadow: inset 0 0 0 1.5px #D9A6DF; }
+.contacts-hub .client-profile-deal-row .client-profile-mini-row-ic { width: 34px; height: 34px; }
+.contacts-hub .client-profile-deal-row-body { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.contacts-hub .client-profile-deal-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.contacts-hub .client-profile-deal-row-title { font: 700 13.5px/1.2 'Onest', sans-serif; color: #270827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contacts-hub .client-profile-deal-row-stage, .contacts-hub .client-profile-deal-detail-stage { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px; font: 700 11.5px 'Onest', sans-serif; white-space: nowrap; }
+.contacts-hub .client-profile-deal-row-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-deal-row-meta > span { display: inline-flex; align-items: center; gap: 5px; }
+.contacts-hub .client-profile-deal-row-meta svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+.contacts-hub .client-profile-deal-row-chevron { color: #682768; }
+.contacts-hub .client-profile-deal-row-chevron svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .client-profile-deal-row-avatar { width: 22px; height: 22px; border-radius: 50%; }
+.contacts-hub .client-profile-deal-detail-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.contacts-hub .client-profile-deal-detail-title { margin: 0 0 8px; font: 800 20px/1.2 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-deal-detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.contacts-hub .client-profile-deal-detail-tags > span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px; background: #F9EDF9; color: #682768; font: 600 12px 'Onest', sans-serif; }
+.contacts-hub .client-profile-deal-detail-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 12px; }
+.contacts-hub .client-profile-deal-detail-stats > div { padding: 8px 16px; border-radius: 22px; background: #F9EDF9; }
+.contacts-hub .client-profile-deal-detail-stat-label { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-deal-detail-stat-value { font: 800 16px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .client-profile-deal-detail-stat-value--sm { font-size: 13.5px; }
+.contacts-hub .client-profile-deal-detail-stat-sub { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-deal-detail-owner-row { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.contacts-hub .client-profile-deal-detail-owner-name { font: 700 13.5px 'Onest', sans-serif; }
+.contacts-hub .client-profile-deal-detail-owner-role { font: 500 12px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-deal-detail-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.contacts-hub .client-profile-deal-mini-card { padding: 10px 14px; border-radius: 22px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
+.contacts-hub .client-profile-deal-mini-card-head { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.contacts-hub .client-profile-deal-mini-card-head svg { width: 14px; height: 14px; stroke: #682768; fill: none; stroke-width: 2; }
+.contacts-hub .client-profile-deal-mini-card-title { font: 700 13px 'Onest', sans-serif; }
+.contacts-hub .client-profile-deal-mini-card-time { margin-left: auto; font: 500 11px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-deal-mini-card-text { margin: 0; font-size: 13px; line-height: 1.45; color: #270827; }
+.contacts-hub .client-profile-deal-mini-card-author { display: flex; align-items: center; gap: 6px; margin-top: 8px; font: 500 12px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-action-ic { display: inline-grid; place-items: center; }
+.contacts-hub .pacc-pill { display: inline-flex; align-items: center; padding: 3px 11px; border: 0; border-radius: 999px; font: 700 11px 'Onest', sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+.contacts-hub .pacc-pill--ok { background: #E3F6E8; color: #168a3a; } .contacts-hub .pacc-pill--warn { background: #FBF0D5; color: #946200; }
+.contacts-hub .pacc-pill--bad { background: #FBEAEA; color: #C23232; } .contacts-hub .pacc-pill--muted { background: #EFE6F3; color: #7a5a85; }
+.contacts-hub .pacc-found { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border: 0; border-radius: 26px; background: #F9EDF9; }
+.contacts-hub .pacc-badge--sm { width: 30px; height: 30px; border-radius: 50%; }
+.contacts-hub .pacc-found-name { font: 700 13px 'Onest', sans-serif; } .contacts-hub .pacc-found-meta { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+
+/* ======================= Activity timeline ======================= */
+.contacts-hub .client-profile-activity-header { display: grid; gap: 12px; margin: 0 0 12px; }
+.contacts-hub .client-profile-activity-heading h3 { display: flex; align-items: center; gap: 10px; margin: 0; font: 750 16px 'Onest', sans-serif; }
+.contacts-hub .client-profile-activity-heading p { margin: 2px 0 0; font: 500 12.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-activity-count { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 8px; border-radius: 999px; background: #F1DCF5; color: #682768; font: 800 12px 'Onest', sans-serif; }
+.contacts-hub .client-profile-activity-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.contacts-hub .client-profile-activity-search { position: relative; flex: 1 1 240px; max-width: 380px; }
+.contacts-hub .client-profile-activity-search > span { position: absolute; left: 14px; top: 11px; width: 16px; height: 16px; z-index: 1; pointer-events: none; }
+.contacts-hub .client-profile-activity-search > span svg { width: 16px; height: 16px; stroke: #883288; fill: none; stroke-width: 2.2; }
+.contacts-hub .client-profile-activity-search input { width: 100%; padding-left: 42px !important; }
+.contacts-hub .client-profile-activity-filters { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 999px; background: #F3E3F7; }
+.contacts-hub .client-profile-activity-filter { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; box-shadow: none; color: #7a5a85; font: 600 13px 'Onest', sans-serif; }
+.contacts-hub .client-profile-activity-filter.active { background: #fff; color: #682768; font-weight: 700; box-shadow: inset 0 0 0 1.5px #D9A6DF, 0 3px 8px #6827681f; }
+.contacts-hub .client-profile-activity-sort { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; border: 0; border-radius: 999px; background: #fff; color: #682768; font: 700 13px 'Onest', sans-serif; box-shadow: inset 0 0 0 1.5px var(--hb-line), 0 0 0 4px #AE40AE14; }
+.contacts-hub .client-profile-activity-sort svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .client-profile-activity-group-head { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 8px; padding: 6px 14px; border-radius: 999px; background: #F3E3F7; }
+.contacts-hub .client-profile-activity-group-date { font: 750 13px 'Onest', sans-serif; }
+.contacts-hub .client-profile-activity-group-count { font: 600 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-activity-timeline { position: relative; display: grid; gap: 8px; margin: 0; padding: 0; }
+.contacts-hub .client-profile-activity-timeline::before { content: ''; position: absolute; left: 13px; top: 8px; bottom: 8px; width: 2px; background: linear-gradient(#EBC6EB, #F3E3F7); }
+.contacts-hub .client-profile-activity-tl-row { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 0; }
+.contacts-hub .client-profile-activity-tl-dot { position: relative; z-index: 1; flex: none; width: 28px; height: 28px; border-radius: 50%; background: #fff; display: grid; place-items: center; }
+.contacts-hub .client-profile-activity-tl-dot::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: #B544B5; box-shadow: 0 0 0 4px #B544B538; }
+.contacts-hub .client-profile-activity-tl-main { flex: 1; min-width: 0; padding: 8px 14px; border-radius: 18px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
+.contacts-hub .client-profile-activity-tl-ic { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #F3E3F7 !important; color: #682768; }
+.contacts-hub .client-profile-activity-tl-ic svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .client-profile-activity-tl-title { font: 700 13.5px 'Onest', sans-serif; }
+.contacts-hub .client-profile-activity-tl-time { font: 600 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-activity-tl-user { font: 500 12px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-profile-activity-tl-diff { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 12.5px; color: #6b4a73; }
+.contacts-hub .client-profile-activity-tl-diff-field { font-weight: 800; color: #682768; }
+.contacts-hub .client-profile-activity-tl-pill { display: inline-flex; padding: 2px 10px; border-radius: 999px; font: 700 12px 'Onest', sans-serif; }
+.contacts-hub .client-profile-activity-tl-mention-text { font-size: 13px; color: #270827; }
+
+/* ======================= Notes, files, AI history ======================= */
+.contacts-hub .deal-note-add-row { display: grid; gap: 12px; margin: 0 0 14px; }
+.contacts-hub .deal-note-author-field { display: grid; gap: 4px; max-width: 320px; }
+.contacts-hub .deal-note-author-field label { margin: 0 0 0 6px; font: 600 12px 'Onest', sans-serif; letter-spacing: 0; text-transform: none; color: #883288; }
+.contacts-hub .client-history-list, .contacts-hub .client-files-list, .contacts-hub .ai-history-list { display: grid; gap: 8px; }
+.contacts-hub .deal-history-row, .contacts-hub .client-file-row, .contacts-hub .ai-history-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; border: 0; border-radius: 22px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
+.contacts-hub .ai-history-row.active { background: #F1DCF5; box-shadow: inset 0 0 0 1.5px #D9A6DF; }
+.contacts-hub .deal-history-ic { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: radial-gradient(circle closest-side, #8E2A93 0 60%, #fff 62% 74%, transparent 75%), conic-gradient(#B544B5, #661466) !important; }
+.contacts-hub .deal-history-ic svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2.2; }
+.contacts-hub .deal-history-body { flex: 1; min-width: 0; }
+.contacts-hub .deal-history-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.contacts-hub .deal-history-type { font: 700 13.5px 'Onest', sans-serif; }
+.contacts-hub .client-history-week { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .client-history-text { margin-top: 2px; font-size: 13px; line-height: 1.45; color: #270827; }
+.contacts-hub .deal-history-meta { font: 500 12px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .deal-history-actions { display: flex; gap: 6px; }
+.contacts-hub .deal-field-icon-btn, .contacts-hub .client-file-del { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #F3E3F7; color: #682768; font: 700 15px/1 'Onest', sans-serif; box-shadow: none; }
+.contacts-hub .deal-field-icon-btn.active { background: #F1DCF5; box-shadow: inset 0 0 0 1.5px #D9A6DF; }
+.contacts-hub .deal-field-icon-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.contacts-hub .deal-history-actions .deal-field-icon-btn:last-child, .contacts-hub .client-file-del { background: #FBEAEA; color: #C23232; }
+.contacts-hub .client-files-upload-btn { display: inline-flex; align-items: center; gap: 8px; }
+.contacts-hub .client-file-name { font: 700 13.5px 'Onest', sans-serif; color: #682768; text-decoration: none; }
+.contacts-hub .client-file-meta { font: 500 12px 'Onest', sans-serif; color: #883288; margin-left: auto; }
+.contacts-hub .ai-history-tab { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 900px) { .contacts-hub .ai-history-tab { grid-template-columns: minmax(0, 1fr); } }
+.contacts-hub .ai-history-row { width: 100%; text-align: left; font-family: 'Onest', sans-serif; display: grid; gap: 2px; }
+.contacts-hub .ai-history-row-agent { font: 700 11px 'Onest', sans-serif; letter-spacing: .05em; text-transform: uppercase; color: #883288; }
+.contacts-hub .ai-history-row-title { font: 700 13.5px 'Onest', sans-serif; color: #270827; }
+.contacts-hub .ai-history-row-date { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.contacts-hub .ai-history-transcript { min-width: 0; padding: 14px; border-radius: 22px; background: #F9EDF9; }
+
+/* ======================= Dialogs: create contact, CSV import ======================= */
+.contacts-hub .create-client-modal .task-detail-edit-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+@media (max-width: 640px) { .contacts-hub .create-client-modal .task-detail-edit-fields { grid-template-columns: 1fr; } }
+.contacts-hub .create-client-modal .tmodal-body, .contacts-hub .import-contacts-modal .tmodal-body { display: block; padding: 16px 20px 20px; }
+.contacts-hub .create-client-modal.arm-dialog { max-width: 760px; }
+.contacts-hub .import-contacts-modal.arm-dialog { max-width: 720px; }
+.contacts-hub .create-client-deal-toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 8px 14px; border-radius: 999px; background: #F9EDF9; font: 600 13px 'Onest', sans-serif; color: #682768; cursor: pointer; }
+.contacts-hub .import-error { margin: 10px 0 0; padding: 8px 14px; border-radius: 18px; background: #FBEAEA; color: #8F2A2A; font-size: 13px; }
+.contacts-hub .arm-foot-sp { flex: 1; }
+.contacts-hub .import-contacts-modal .tmodal-foot { gap: 10px; }
+.contacts-hub .import-map-list { display: grid; gap: 8px; }
+.contacts-hub .import-map-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; align-items: center; padding: 6px 8px 6px 16px; border-radius: 999px; background: #F9EDF9; }
+.contacts-hub .import-map-header { font: 700 13px 'Onest', sans-serif; overflow-wrap: anywhere; }
+.contacts-hub .import-preview-wrap { overflow-x: auto; }
+.contacts-hub .chip.have, .contacts-hub .chip.missing { display: inline-flex; padding: 2px 10px; border-radius: 999px; font: 700 11px 'Onest', sans-serif; letter-spacing: .05em; text-transform: uppercase; border: 0; }
+.contacts-hub .chip.have { background: #E3F6E8; color: #168a3a; } .contacts-hub .chip.missing { background: #FBEAEA; color: #C23232; }
+.contacts-hub .import-progress { height: 12px; border-radius: 999px; background: #F3E3F7; overflow: hidden; }
+.contacts-hub .import-progress-bar { height: 100%; border-radius: 999px; background: linear-gradient(100deg, #4BE07F, #12A144); }
+.contacts-hub .import-skip-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: #6b4a73; }
+.contacts-hub .import-file-btn { margin-top: 10px; }
+.contacts-hub :is(.client-profile-deals-search, .client-profile-activity-search) { padding: 0; border: 0; background: none; box-shadow: none; height: auto; }
+.contacts-hub :is(.client-profile-deals-search, .client-profile-activity-search) > span { top: 11px; }

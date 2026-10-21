@@ -11,7 +11,6 @@ import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsPayload } from '../../lib/projectFields';
 import AutoField from '../../components/Projects/AutoField';
-import DesignTodo from '../../components/common/DesignTodo';
 import ProjectHistoryTab from '../../components/Projects/ProjectHistoryTab';
 import ReportBuilder from '../../components/Projects/Builder/ReportBuilder';
 import ActionIcon from '../../components/common/ActionIcon';
@@ -416,59 +415,65 @@ export default function ProjectDetail() {
 
       <div className="pw-workspace" id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + tab}>
       {tab === 'overview' && (
-        <>
-          <ProjectAccountsPanel projectId={id} services={project.services} onAddService={addService} onAccountsChange={setLinkedAccounts} />
+        <div className="pw-ov">
+          <aside className="pw-ov-side">
+            <section className="report-section pw-card pw-about">
+              <div className="ov-section-head">
+                <div className="stitle hub-title"><span className="hub-ring hub-ring--sm"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM6 6h12v14H6z" /><path d="M9 11h6M9 15h4" /></svg></span></span>Про проєкт</div>
+                <span className={'ov-save-state ' + saveState} role="status" aria-live="polite">
+                  <i aria-hidden="true" />
+                  {saveState === 'saving' ? 'Зберігаємо…' : saveState === 'saved' ? 'Збережено' : saveState === 'error' ? 'Не вдалося зберегти, спробуйте ще раз' : 'Зміни зберігаються автоматично'}
+                </span>
+              </div>
 
-          <section className="report-section pw-card">
-            <div className="ov-section-head">
-              <div className="stitle hub-title"><span className="hub-ring hub-ring--sm"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM6 6h12v14H6z" /><path d="M9 11h6M9 15h4" /></svg></span></span>Про проєкт <DesignTodo note="Розділ «Про проєкт»: поля, що зберігаються самі, індикатор збереження, перемикач статусу" /></div>
-              <span className={'ov-save-state ' + saveState} role="status" aria-live="polite">
-                {saveState === 'saving' ? 'Зберігаємо…' : saveState === 'saved' ? 'Збережено' : saveState === 'error' ? 'Не вдалося зберегти, спробуйте ще раз' : 'Зміни зберігаються автоматично'}
-              </span>
-            </div>
-
-            <div className="pw-groups">
-              {FIELD_GROUPS.map((group) => (
-                <div className="ov-group" key={group.title}>
-                  <div className="ov-group-head">
-                    <div className="ov-group-title">{group.title}</div>
+              <div className="pw-groups">
+                {FIELD_GROUPS.map((group) => (
+                  <div className="ov-group" key={group.title}>
+                    <div className="ov-group-head">
+                      <div className="ov-group-title">{group.title}</div>
+                      <div className="ov-group-hint">{group.hint}</div>
+                    </div>
+                    <div className="ov-field-grid">{group.items.map(renderItem).filter(Boolean)}</div>
                   </div>
-                  <div className="ov-field-grid">{group.items.map(renderItem).filter(Boolean)}</div>
+                ))}
+              </div>
+            </section>
+          </aside>
+
+          <div className="pw-ov-main">
+            <ProjectAccountsPanel projectId={id} services={project.services} onAddService={addService} onAccountsChange={setLinkedAccounts} />
+
+            <div className="pw-notes">
+              <section className="report-section pw-card">
+                <div className="ov-field-box ov-notes-box">
+                  <div className="ov-field-label"><FieldIcon name="notes" />Особливості роботи з клієнтом</div>
+                  <AutoResizeTextarea value={notesValue} onChange={setNotesValue} placeholder="Нотатки по клієнту..." />
+                  {notesDirty && (
+                    <button type="button" className="pw-btn pw-btn--ok ov-notes-save" onClick={saveNotes} disabled={notesSaving}>
+                      {notesSaving ? '...' : 'Зберегти'}
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          </section>
+              </section>
 
-          <div className="pw-notes">
-          <section className="report-section pw-card">
-            <div className="ov-field-box ov-notes-box">
-              <div className="ov-field-label"><FieldIcon name="notes" />Особливості роботи з клієнтом</div>
-              <AutoResizeTextarea value={notesValue} onChange={setNotesValue} placeholder="Нотатки по клієнту..." />
-              {notesDirty && (
-                <button type="button" className="pw-btn pw-btn--ok ov-notes-save" onClick={saveNotes} disabled={notesSaving}>
-                  {notesSaving ? '...' : 'Зберегти'}
-                </button>
-              )}
+              <section className="report-section pw-card">
+                <div className="ov-field-box ov-notes-box">
+                  <div className="ov-field-label"><FieldIcon name="info" />Додаткова інформація</div>
+                  <AutoResizeTextarea value={infoValue} onChange={setInfoValue} placeholder="Будь-яка додаткова інформація..." />
+                  {infoDirty && (
+                    <button type="button" className="pw-btn pw-btn--ok ov-notes-save" onClick={saveInfo} disabled={infoSaving}>
+                      {infoSaving ? '...' : 'Зберегти'}
+                    </button>
+                  )}
+                </div>
+              </section>
             </div>
-          </section>
 
-          <section className="report-section pw-card">
-            <div className="ov-field-box ov-notes-box">
-              <div className="ov-field-label"><FieldIcon name="info" />Додаткова інформація</div>
-              <AutoResizeTextarea value={infoValue} onChange={setInfoValue} placeholder="Будь-яка додаткова інформація..." />
-              {infoDirty && (
-                <button type="button" className="pw-btn pw-btn--ok ov-notes-save" onClick={saveInfo} disabled={infoSaving}>
-                  {infoSaving ? '...' : 'Зберегти'}
-                </button>
-              )}
-            </div>
-          </section>
+            <button type="button" className="pw-btn pw-btn--danger-quiet ov-delete-link" onClick={handleDelete} disabled={deleting}>
+              <ActionIcon name="delete" size={18} /> {deleting ? '...' : 'Видалити проєкт'}
+            </button>
           </div>
-
-          <button type="button" className="pw-btn pw-btn--danger-quiet ov-delete-link" onClick={handleDelete} disabled={deleting}>
-            <ActionIcon name="delete" size={18} /> {deleting ? '...' : 'Видалити проєкт'}
-          </button>
-        </>
+        </div>
       )}
 
       {tab === 'builder' && <ReportBuilder key={'builder-' + id} projectId={id} />}

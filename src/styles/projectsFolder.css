@@ -88,14 +88,18 @@
   box-shadow: 0 5px 12px -2px #D92D2D88, inset 0 0 0 2px #ffffff40, 0 0 0 4px color-mix(in srgb, #FF7A7A 22%, transparent);
 }
 .proj-modal-folder .pacc-add { background: #fff; color: #682768; box-shadow: inset 0 0 0 1.5px #EBC6EB, 0 0 0 4px #AE40AE14; }
+.folder-design .proj-apr { position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; background: #fff; color: #682768; box-shadow: inset 0 0 0 1.5px var(--pf-line, #EBC6EB), 0 0 0 4px #AE40AE14; }
+.folder-design .proj-apr svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.folder-design .proj-apr-n { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: linear-gradient(100deg, #FF7A7A, #D92D2D); color: #fff; font: 800 11px 'Onest', sans-serif; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px #fff; }
+.folder-design .proj-apr:focus-visible { outline: 3px solid #AE40AE; outline-offset: 3px; }
 .folder-design .proj-create:disabled, .proj-modal-folder .pf-ok:disabled { opacity: .45; cursor: default; }
 .folder-design .proj-create:focus-visible, .proj-modal-folder .pf-ok:focus-visible, .proj-modal-folder .pf-bad:focus-visible, .proj-modal-folder .pacc-add:focus-visible { outline: 3px solid #AE40AE; outline-offset: 3px; }
 
 /* ---- Cards ---- */
 .folder-design .proj-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
 .folder-design .proj-card {
-  --b1: #EBC6EB; --b2: #B544B5; --r1: #B544B5; --r2: #661466;
-  min-width: 0; max-width: none; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 2px solid transparent; border-radius: 24px; cursor: pointer; transform: none;
+  --b1: #F0DDF0; --b2: #D9A6DF; --r1: #B544B5; --r2: #661466;
+  min-width: 0; max-width: none; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1.5px solid transparent; border-radius: 24px; cursor: pointer; transform: none;
   background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, var(--b1), var(--b2) 55%, var(--b1)) border-box; box-shadow: 0 4px 14px #68276810;
 }
 /* ring-border: the frame and the medallion ring take the colour of the project's status */
@@ -154,8 +158,8 @@
 /* ---- Create dialog, Hub style: a side rail of ring medallions switches the sections, the active one fills the right side (all fields and logic unchanged) ---- */
 .proj-modal-folder.modal-box.pmh-dialog {
   flex-direction: row; max-width: 880px; width: 100%; height: min(660px, calc(100vh - 40px)); max-height: none; overflow: hidden;
-  border: 2px solid transparent; border-radius: 30px; box-shadow: 0 24px 80px #27082766; font-family: 'Onest', var(--font-body), sans-serif;
-  background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box;
+  border: 1.5px solid transparent; border-radius: 30px; box-shadow: 0 24px 80px #27082766; font-family: 'Onest', var(--font-body), sans-serif;
+  background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box;
 }
 /* medallion: a ring (brand gradient), a white disc, the icon on a tile */
 .proj-modal-folder .pmh-md { --s: 36px; --r: 3px; position: relative; width: var(--s); height: var(--s); border-radius: 50%; flex: none; display: grid; place-items: center; background: conic-gradient(#B544B5, #661466, #B544B5); }
@@ -241,8 +245,8 @@
 /* ad accounts: a small ring-frame box per platform */
 .proj-modal-folder .pacc-rows { gap: 12px; }
 .proj-modal-folder .pacc-row {
-  gap: 12px; padding: 12px 14px; border: 2px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810;
-  background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #EBC6EB, #B544B5 55%, #EBC6EB) border-box;
+  gap: 12px; padding: 12px 14px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810;
+  background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box;
 }
 .proj-modal-folder .pacc-row-head { justify-content: flex-start; gap: 12px; }
 .proj-modal-folder .pacc-row-platform { width: 210px; }

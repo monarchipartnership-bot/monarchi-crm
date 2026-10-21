@@ -1,0 +1,49 @@
+/* «Історія проекту» (project tab) in Hub style: the client-link box, month cards as an accordion with a progress ring, report rows with status pills and all the action
+   buttons visible. Scoped to the project page (.project-detail-page.pw), which already carries the Hub base (halo buttons and fields, round menus).
+   Specs: docs/design-decisions.md (section 20). */
+.project-detail-page.pw .ph-share-title { margin: 0; font: 750 16px/1.2 'Onest', sans-serif; display: flex; align-items: center; gap: 12px; color: #270827; }
+
+/* ---- the client link ---- */
+.project-detail-page.pw .ph-share { display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; padding: 14px 18px 16px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .ph-share-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.project-detail-page.pw .ph-share-url { flex: 1 1 320px; min-width: 0; height: 38px; padding: 0 16px; border: 0; border-radius: 999px; background: #fff; color: #270827; font: 500 13px 'Onest', sans-serif; box-shadow: inset 0 0 0 1.5px #EBC6EB, 0 0 0 4px #AE40AE14; outline: none; }
+.project-detail-page.pw .ph-share-url:focus { box-shadow: inset 0 0 0 1.5px #B544B5, 0 0 0 4px #AE40AE33; }
+.project-detail-page.pw .ph-share-row .btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.project-detail-page.pw .ph-share-meta { font: 500 12px 'Onest', sans-serif; color: #883288; }
+
+/* ---- month cards ---- */
+.project-detail-page.pw .ph-months { display: grid; gap: 12px; }
+.project-detail-page.pw .ph-month { padding: 0; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 4px 14px #68276810; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .ph-month > header { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px 14px 10px 10px; }
+.project-detail-page.pw .ph-ring { --s: 44px; --r: 3.5px; }
+.project-detail-page.pw .ph-mt { display: grid; gap: 1px; min-width: 0; }
+.project-detail-page.pw .ph-month > header h3 { margin: 0; font: 750 15px/1.25 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .ph-month > header .ph-sum { font: 500 12px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .ph-month > header .btn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; font-size: 13px; }
+.project-detail-page.pw .ph-month > header .btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .ph-month > header .ph-chev { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #F3E3F7; color: #682768; flex: none; transform: none; transition: transform 300ms; }
+.project-detail-page.pw .ph-month > header .ph-chev svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .ph-month.open > header .ph-chev { transform: rotate(180deg); }
+.project-detail-page.pw .ph-month-body { padding: 0 14px 14px; gap: 0; }
+@media (prefers-reduced-motion: reduce) { .project-detail-page.pw .ph-month > header .ph-chev { transition: none; } }
+
+/* ---- rows of reports ---- */
+.project-detail-page.pw .ph-rows li { grid-template-columns: 130px 140px 150px minmax(0, 1fr); gap: 6px 12px; padding: 9px 6px; border-top: 1px solid #EBC6EB88; }
+.project-detail-page.pw .ph-rows li:first-child { border-top: 0; }
+.project-detail-page.pw .ph-rows .ph-name { font: 700 13.5px 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .ph-rows .ph-dates { font: 500 12.5px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .ph-rows .ph-act { gap: 8px; }
+.project-detail-page.pw .ph-rows .ph-act .btn { height: 32px; padding: 0 16px; font-size: 13px; }
+.project-detail-page.pw .ph-rows .ph-act .btn-p { color: #fff; text-shadow: 0 1px 1px #00000026; background: linear-gradient(135deg, #4BE07F, #12A144); box-shadow: 0 5px 12px -2px #12A14488, inset 0 0 0 2px #ffffff40, 0 0 0 4px color-mix(in srgb, #4BE07F 22%, transparent); }
+.project-detail-page.pw .ph-rows .ph-missing { font: 500 12.5px 'Onest', sans-serif; color: #a77fb0; }
+.project-detail-page.pw .ph-note { display: inline-flex; align-items: center; gap: 8px; justify-self: start; padding: 6px 14px; border-radius: 999px; background: #FFF1D6; color: #7a4a00; font: 600 12.5px 'Onest', sans-serif; }
+
+/* status pills (also in the month document) */
+.project-detail-page.pw .ph-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px 3px 9px; border-radius: 999px; font: 700 11px 'Onest', sans-serif; font-style: normal; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.project-detail-page.pw .ph-chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent); }
+.project-detail-page.pw .ph-chip--draft { background: #EFE6F3; color: #7a5a85; }
+.project-detail-page.pw .ph-chip--reviewed { background: #FBF0D5; color: #946200; }
+.project-detail-page.pw .ph-chip--final { background: #E3F6E8; color: #168a3a; }
+.project-detail-page.pw .ph-chip--todate { background: #E8F0FE; color: #1D4FB3; }
+.project-detail-page.pw .ph-chip--none { background: none; color: #a77fb0; padding-left: 0; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.project-detail-page.pw .ph-chip--none::before { display: none; }

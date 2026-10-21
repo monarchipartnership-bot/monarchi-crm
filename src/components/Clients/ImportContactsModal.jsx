@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import Select from '../common/Select';
+import { FIELD_ICONS } from '../../lib/taskFieldIcons';
 import { fetchClientDirectory, createClientDirectoryEntry, updateClientDirectoryEntry } from '../../lib/api/clients';
 import { fetchClientNotes, addClientNote } from '../../lib/api/clientNotes';
 import { normText } from '../../lib/monthlyAggregation';
@@ -249,18 +250,21 @@ export default function ImportContactsModal({ onClose, onImported }) {
   }
 
   return (
-    <div className="tmodal-overlay contacts-design" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
-      <div className="tmodal-box import-contacts-modal">
+    <div className="tmodal-overlay arm-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget && step !== 'importing') onClose(); }}>
+      <div className="tmodal-box arm-dialog import-contacts-modal" role="dialog" aria-modal="true" aria-labelledby="import-contacts-title">
         <div className="tmodal-head">
-          <h3>Імпорт контактів з CSV</h3>
-          {step !== 'importing' && <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити">&times;</button>}
+          <div className="tmodal-head-left">
+            <span className="hub-ring arm-md"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.upload }} /></span>
+            <div className="tmodal-head-text"><h3 id="import-contacts-title">Імпорт контактів з CSV</h3><p>Файл, зіставлення колонок, перегляд і імпорт</p></div>
+          </div>
+          {step !== 'importing' && <button type="button" className="tmodal-close" onClick={onClose} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>}
         </div>
 
         <div className="tmodal-body">
           {step === 'upload' && (
             <>
               <p>Завантажте CSV-файл з контактами — далі ви самі зіставите його колонки з полями картки клієнта. Підходить для експорту з NetHunt чи будь-якої іншої CRM.</p>
-              <label className="btn btn-p import-file-btn">
+              <label className="btn pw-btn--ok import-file-btn">
                 Обрати файл
                 <input type="file" accept=".csv" onChange={handleFile} style={{ display: 'none' }} />
               </label>
@@ -339,12 +343,13 @@ export default function ImportContactsModal({ onClose, onImported }) {
         </div>
 
         <div className="tmodal-foot">
+          {(step === 'upload' || step === 'map' || step === 'preview') && <button type="button" className="btn pw-btn--bad" onClick={onClose}>Скасувати</button>}
+          <span className="arm-foot-sp" />
           {step === 'map' && <button type="button" className="btn" onClick={() => setStep('upload')}>Назад</button>}
           {step === 'preview' && <button type="button" className="btn" onClick={() => setStep('map')}>Назад</button>}
-          {(step === 'upload' || step === 'map' || step === 'preview') && <button type="button" className="btn" onClick={onClose}>Скасувати</button>}
-          {step === 'map' && <button type="button" className="btn btn-p" onClick={goToPreview}>Далі</button>}
-          {step === 'preview' && <button type="button" className="btn btn-p" onClick={handleImport} disabled={!validCount}>Імпортувати {validCount}</button>}
-          {step === 'done' && <button type="button" className="btn btn-p" onClick={onClose}>Готово</button>}
+          {step === 'map' && <button type="button" className="btn pw-btn--ok" onClick={goToPreview}>Далі</button>}
+          {step === 'preview' && <button type="button" className="btn pw-btn--ok" onClick={handleImport} disabled={!validCount}>Імпортувати {validCount}</button>}
+          {step === 'done' && <button type="button" className="btn pw-btn--ok" onClick={onClose}>Готово</button>}
         </div>
       </div>
     </div>

@@ -1,0 +1,84 @@
+/* «Конструктор звіту» (project tab) in Hub style: a sticky bar with the state of the layout and the save button, the live layout as the client sees it, and the
+   settings as an accordion of ring panels (one open at a time). Text blocks are cards with switches. Scoped to .bld inside the project page (it already carries the
+   Hub base: halo buttons, fields, round menus). Specs: docs/design-decisions.md (section 19). */
+.project-detail-page.pw .bld { display: flex; flex-direction: column; gap: 12px; }
+
+/* medallion */
+.bld-md { --s: 40px; --r: 3.5px; position: relative; width: var(--s); height: var(--s); border-radius: 50%; flex: none; display: grid; place-items: center; background: conic-gradient(#B544B5, #661466, #B544B5); }
+.bld-md::before { content: ''; position: absolute; inset: var(--r); border-radius: 50%; background: #fff; }
+.bld-md--lg { --s: 46px; --r: 4px; }
+.bld-mi { position: relative; width: calc(var(--s, 40px) - var(--r, 3.5px) * 2 - 6px); height: calc(var(--s, 40px) - var(--r, 3.5px) * 2 - 6px); border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #C25AC4, #7E2483); }
+.bld-md--lg .bld-mi { width: 34px; height: 34px; }
+.bld-mi svg { width: 48%; height: 48%; stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* the sticky bar */
+.project-detail-page.pw .bld-bar { position: sticky; top: 8px; z-index: 6; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px 14px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 6px 18px #6827681c; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.bld-bar-title { flex: 1 1 220px; min-width: 0; }
+.bld-bar-title b { display: block; font: 750 14.5px/1.25 'Onest', sans-serif; color: #270827; }
+.bld-bar-title small { display: block; margin-top: 1px; font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.bld-state { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border-radius: 999px; font: 700 12px 'Onest', sans-serif; white-space: nowrap; }
+.bld-state i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent); }
+.bld-state.saved { background: #E3F6E8; color: #168a3a; }
+.bld-state.dirty { background: #FBF0D5; color: #946200; }
+.project-detail-page.pw .bld-bar .prep-seg { margin: 0; }
+.project-detail-page.pw .bld .bld-save, .project-detail-page.pw .bld .bld-save:hover:not(:disabled) { color: #fff; text-shadow: 0 1px 1px #00000026; background: linear-gradient(135deg, #4BE07F, #12A144); box-shadow: 0 5px 12px -2px #12A14488, inset 0 0 0 2px #ffffff40, 0 0 0 4px color-mix(in srgb, #4BE07F 22%, transparent); }
+.project-detail-page.pw .bld .bld-save:disabled { opacity: .45; }
+.bld-actions--end { justify-content: flex-start; }
+
+/* the live layout: no dashed frame, it is the client's page */
+.project-detail-page.pw .bld-preview { border: 0; border-radius: 0; padding: 0; background: none; }
+
+/* accordion of settings */
+.project-detail-page.pw .bld-panels { display: flex; flex-direction: column; gap: 10px; }
+.project-detail-page.pw .bld-panel { gap: 0; padding: 0; border: 1.5px solid transparent; border-radius: 24px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; overflow: hidden; }
+.bld-panel-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px 10px 10px; border: 0; background: none; text-align: left; font-family: 'Onest', sans-serif; color: #270827; cursor: pointer; }
+.bld-panel-titles { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.bld-panel-titles b { font: 750 14px/1.25 'Onest', sans-serif; }
+.bld-panel-titles small { font: 500 11.5px/1.35 'Onest', sans-serif; color: #883288; }
+.bld-sum { padding: 2px 12px; border-radius: 999px; background: #F3E3F7; color: #682768; font: 700 12px 'Onest', sans-serif; white-space: nowrap; }
+.bld-cv { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #F3E3F7; color: #682768; flex: none; transition: transform 300ms; }
+.bld-cv svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.bld-panel.open .bld-cv { transform: rotate(180deg); }
+.bld-panel-body { display: grid; gap: 10px; padding: 2px 16px 16px; }
+@media (prefers-reduced-motion: reduce) { .bld-cv { transition: none; } }
+
+/* report type: option pills */
+.bld-opts { display: grid; gap: 8px; }
+.bld-opt { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 16px 9px 10px; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1.5px #EBC6EB; font: 600 13.5px/1.3 'Onest', sans-serif; cursor: pointer; }
+.bld-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.bld-ck { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none; background: #fff; box-shadow: inset 0 0 0 1.5px #D9A6DF; }
+.bld-opt.on { background: #F9EDF9; box-shadow: inset 0 0 0 1.5px #D9A6DF, 0 0 0 4px #AE40AE14; font-weight: 700; }
+.bld-opt.on .bld-ck { background: linear-gradient(100deg, #B544B5, #661466); box-shadow: none; }
+.bld-opt.on .bld-ck::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+.bld-opt:has(input:focus-visible) { outline: 3px solid #AE40AE; outline-offset: 2px; }
+
+/* metrics */
+.bld-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bld-chip { padding: 3px 12px; border-radius: 999px; background: #F3E3F7; color: #682768; font: 700 12px 'Onest', sans-serif; }
+.bld-chip--extra { display: inline-flex; align-items: center; gap: 6px; padding-right: 5px; background: #F1DCF5; box-shadow: inset 0 0 0 1.5px #D9A6DF; }
+.bld-chip-x { all: unset; box-sizing: border-box; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #ffffff99; color: #682768; font-size: 14px; line-height: 1; cursor: pointer; }
+
+/* text blocks: cards with switches */
+.bld-blocks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bld-block { display: grid; gap: 8px; padding: 10px 12px; border-radius: 22px; background: #F9EDF9; }
+.bld-block.off { opacity: .6; }
+.bld-block-head { display: flex; align-items: center; gap: 8px; }
+.bld-block-title { flex: 1; min-width: 0; }
+.bld-moves { display: flex; gap: 4px; flex: none; }
+.bld-ib { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #fff; color: #682768; box-shadow: inset 0 0 0 1.5px #EBC6EB; cursor: pointer; }
+.bld-ib svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.bld-ib:disabled { opacity: .4; cursor: default; }
+.bld-ib--bad { background: #FBEAEA; color: #C23232; box-shadow: none; }
+.bld-block-sw { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.bld-switch { display: inline-flex; align-items: center; gap: 8px; font: 600 12.5px 'Onest', sans-serif; cursor: pointer; }
+.bld-tgl { position: relative; width: 34px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: #E3D2EA; transition: background 250ms; cursor: pointer; }
+.bld-tgl i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003; transition: transform 250ms; }
+.bld-tgl.on { background: linear-gradient(100deg, #4BE07F, #12A144); }
+.bld-tgl.on i { transform: translateX(14px); }
+.bld-how { font: 500 12px 'Onest', sans-serif; color: #883288; }
+@media (prefers-reduced-motion: reduce) { .bld-tgl, .bld-tgl i { transition: none; } }
+
+/* creatives */
+.bld-crn { display: flex; flex-wrap: wrap; gap: 16px; }
+.bld-crn label { display: grid; gap: 4px; font: 600 12.5px 'Onest', sans-serif; }
+.bld-crn input[type="number"] { width: 110px; }

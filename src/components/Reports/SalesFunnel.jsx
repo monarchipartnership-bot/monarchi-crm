@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { FUNNEL_CHANNELS, STAGES, conversions, pctOf, investmentsFrom } from '../../lib/salesFunnel';
 import { moneyFmt, pctFmt, numFmt } from '../../lib/weeklyLogic';
 
@@ -14,18 +15,14 @@ function FunnelCard({ title, funnel }) {
   return (
     <div className="sd-funnel-card">
       <div className="sd-funnel-title">{title}</div>
-      <div className="sd-funnel">
+      <div className="sd-fsteps">
         {STAGES.map((s, i) => (
-          <div key={s.key}>
+          <Fragment key={s.key}>
             {i > 0 && <div className="sd-funnel-conv"><span>↓</span> {pctFmt(stepConv[i])}<em> конверсія</em></div>}
-            <div className="sd-funnel-row">
-              <span className="sd-funnel-label">{s.label}</span>
-              <span className="sd-funnel-track">
-                <span className={'sd-funnel-bar sd-funnel-bar--' + (i + 1)} style={{ width: Math.max(4, (total[s.key] / max) * 100) + '%' }} />
-              </span>
-              <span className="sd-funnel-value">{numFmt(total[s.key])}</span>
+            <div className={'sd-fn sd-fn--' + (i + 1)} style={{ width: Math.max(30, (total[s.key] / max) * 100) + '%' }}>
+              <b>{s.label}</b><em>{numFmt(total[s.key])}</em>
             </div>
-          </div>
+          </Fragment>
         ))}
       </div>
       <div className="sd-funnel-foot">Від ліда до контракту: <b>{pctFmt(conv.leadsToCo)}</b></div>
@@ -43,6 +40,16 @@ export function FunnelSection({ weekFunnel, monthFunnel, monthLabel }) {
 }
 
 export function ChannelFunnelTable({ funnel }) {
+  const convs = [['calls', 'leads'], ['ql', 'calls'], ['co', 'ql']];
+  const best = convs.map(([n, d]) => {
+    let top = 0;
+    FUNNEL_CHANNELS.forEach((c) => { const v = pctOf(funnel.byChannel[c.key][n], funnel.byChannel[c.key][d]); if (v != null && v > top) top = v; });
+    return top;
+  });
+  const cell = (r, k) => {
+    const v = pctOf(r[convs[k][0]], r[convs[k][1]]);
+    return <td className={v != null && v > 0 && v === best[k] ? 'sd-best' : ''}><span>{pctFmt(v)}</span></td>;
+  };
   return (
     <div className="sd-table-wrap">
       <table className="sd-table">
@@ -62,9 +69,9 @@ export function ChannelFunnelTable({ funnel }) {
               <tr key={c.key}>
                 <td>{c.title}</td>
                 {STAGES.map((s) => <td key={s.key}>{numFmt(r[s.key])}</td>)}
-                <td>{pctFmt(pctOf(r.calls, r.leads))}</td>
-                <td>{pctFmt(pctOf(r.ql, r.calls))}</td>
-                <td>{pctFmt(pctOf(r.co, r.ql))}</td>
+                {cell(r, 0)}
+                {cell(r, 1)}
+                {cell(r, 2)}
               </tr>
             );
           })}

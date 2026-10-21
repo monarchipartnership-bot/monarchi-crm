@@ -149,13 +149,13 @@
 .project-detail-page.pw .pacc-facts b { font-weight: 700; font-size: 13.5px; color: #270827; }
 .project-detail-page.pw .pacc-metrics-head { margin: 4px 0 10px; }
 .project-detail-page.pw .pacc-metrics-title { font: 750 14px 'Onest', sans-serif; }
-.project-detail-page.pw .pacc-metrics { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
-.project-detail-page.pw .pacc-metric { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border: 0; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
-.project-detail-page.pw .pacc-metric > i { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; flex: none; background: linear-gradient(135deg, #C25AC4, #7E2483); box-shadow: 0 0 0 3px #fff, 0 0 0 4.5px #D9A6DF; margin: 2px; }
-.project-detail-page.pw .pacc-metric > i svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.project-detail-page.pw .pacc-metric > div { display: flex; flex-direction: column; min-width: 0; }
-.project-detail-page.pw .pacc-metric span { display: block; margin: 0; font-size: 11.5px; color: #883288; line-height: 1.2; }
-.project-detail-page.pw .pacc-metric b { font: 800 15px/1.2 'Onest', sans-serif; font-variant-numeric: tabular-nums; }
+.project-detail-page.pw .pacc-metrics { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.project-detail-page.pw .pacc-metric { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 9px; padding: 5px 14px 5px 5px; border: 0; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1.5px var(--hb-line); }
+.project-detail-page.pw .pacc-metric > i { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; flex: none; background: linear-gradient(135deg, #C25AC4, #7E2483); box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #D9A6DF; margin: 2px; }
+.project-detail-page.pw .pacc-metric > i svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .pacc-metric > div { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+.project-detail-page.pw .pacc-metric span { display: block; margin: 0; font: 600 10.5px/1.2 'Onest', sans-serif; letter-spacing: .04em; color: #883288; }
+.project-detail-page.pw .pacc-metric b { font: 800 14px/1.2 'Onest', sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .project-detail-page.pw .pacc-card-actions { margin-top: 14px; padding-top: 12px; border-top: 1px solid #EBC6EB80; }
 .project-detail-page.pw .pacc-add-box { border: 1.5px solid transparent; border-radius: 22px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; padding: 12px 14px; }
 .project-detail-page.pw .pacc-empty { color: #883288; }
@@ -385,3 +385,26 @@
 .project-detail-page.pw .ov-save-state.saved { color: #168a3a; }
 .project-detail-page.pw .ov-save-state.error { color: #C23232; }
 .project-detail-page.pw .ov-open { margin-left: 10px; font-size: 12px; font-weight: 600; }
+
+/* ---- Overview recomposed (decision 18): «Про проєкт» as a side column, cabinets, notes and delete on the main side ---- */
+.project-detail-page.pw .pw-ov { display: grid; grid-template-columns: minmax(330px, 400px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.project-detail-page.pw .pw-ov-side, .project-detail-page.pw .pw-ov-main { min-width: 0; }
+.project-detail-page.pw .pw-ov-main { display: grid; gap: 14px; }
+.project-detail-page.pw .pw-ov-side > *, .project-detail-page.pw .pw-ov-main > * { margin: 0; }
+.project-detail-page.pw .pw-ov-main .pw-notes { margin: 0; }
+.project-detail-page.pw .pw-ov-main .ov-delete-link { justify-self: start; margin-top: 0; }
+@media (max-width: 1100px) { .project-detail-page.pw .pw-ov { grid-template-columns: minmax(0, 1fr); } }
+.project-detail-page.pw .pw-about .pw-groups { gap: 12px; }
+.project-detail-page.pw .pw-about .ov-group { padding: 12px 14px 14px; border-radius: 22px; background: #F9EDF9; }
+.project-detail-page.pw .pw-about .ov-group-head { display: block; margin: 0 0 10px 4px; }
+.project-detail-page.pw .pw-about .ov-group-title { margin: 0; font: 750 14px 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .pw-about .ov-group-hint { margin-top: 1px; font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .pw-about .ov-field-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.project-detail-page.pw .pw-about .ov-field-box:has(input, .ui-select, .date-picker, .status-picker, .svc-picker, .client-picker, textarea) .ov-field-icon { display: inline-grid; width: 24px; height: 24px; }
+.project-detail-page.pw .pw-about .ov-field-box:has(input, .ui-select, .date-picker, .status-picker, .svc-picker, .client-picker, textarea) { gap: 5px; }
+.project-detail-page.pw .pw-about .ov-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.project-detail-page.pw .ov-save-state { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border-radius: 999px; background: #F3E3F7; color: #883288; font: 700 12px 'Onest', sans-serif; }
+.project-detail-page.pw .ov-save-state i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent); }
+.project-detail-page.pw .ov-save-state.saved { background: #E3F6E8; color: #168a3a; }
+.project-detail-page.pw .ov-save-state.saving { background: #FBF0D5; color: #946200; }
+.project-detail-page.pw .ov-save-state.error { background: #FBEAEA; color: #C23232; }

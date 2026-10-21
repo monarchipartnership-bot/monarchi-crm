@@ -37,13 +37,16 @@ import PlatformPicker from '../../components/common/PlatformPicker';
 import Select from '../../components/common/Select';
 import MultiTextField from '../../components/common/MultiTextField';
 import { FIELD_ICONS } from '../../lib/taskFieldIcons';
+import { HUB_PATHS } from '../../components/Projects/hubIcons';
 import '../../styles/reportPage.css';
 import '../../styles/automationTasksPage.css';
 import '../../styles/comparePage.css';
 import '../../styles/clientsDirectory.css';
 import '../../styles/clientProfile.css';
-import '../../styles/contactsDesign.css';
 import '../../styles/dealsBoard.css';
+import '../../styles/ddHub.css';
+import '../../styles/reportsHub.css';
+import '../../styles/contactsHub.css';
 
 const CAMERA_ICON = '<svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.5"/></svg>';
 
@@ -229,6 +232,7 @@ const TABS = [
   { key: 'bot', label: 'Bot communication', soon: true },
   { key: 'ai', label: 'AI Team work history' },
 ];
+const TAB_ICONS = { info: 'info', companies: 'layers', projects: 'layers', notes: 'note', activity: 'clock', deals: 'roas', tasks: 'check', files: 'file', bot: 'spark', ai: 'spark' };
 
 export default function ClientProfile() {
   const { id } = useParams();
@@ -513,7 +517,7 @@ export default function ClientProfile() {
   });
 
   return (
-    <div className="report-page contacts-design">
+    <div className="report-page contacts-hub rpt-hub" data-dd="hub">
       <div className="client-profile-top-row">
         <button type="button" className="btn client-profile-back" onClick={() => navigate('/reports/clients-directory')}>
           <ActionIcon name="back" size={18} />
@@ -652,18 +656,6 @@ export default function ClientProfile() {
           </div>
           <div className="client-profile-stat-value">{activeDealsCount}</div>
           <div className="client-profile-stat-sub">Відкриті угоди в роботі</div>
-          <svg className="client-profile-stat-wave" viewBox="0 0 200 90" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="statWavePurple" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#7C3AED" stopOpacity=".32" />
-                <stop offset="100%" stopColor="#7C3AED" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={STAT_WAVE_PATH + ' L196,90 L4,90 Z'} fill="url(#statWavePurple)" stroke="none" />
-            <path d={STAT_WAVE_PATH} fill="none" stroke="#7C3AED" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="196" cy="8" r="7" fill="#7C3AED" opacity=".18" />
-            <circle cx="196" cy="8" r="3.5" fill="#7C3AED" />
-          </svg>
         </div>
         <div className="client-profile-stat-card">
           <div className="client-profile-stat-head">
@@ -671,52 +663,31 @@ export default function ClientProfile() {
             <span className="client-profile-stat-label">Кількість активних задач</span>
           </div>
           <div className="client-profile-stat-value">{activeTasksCount}</div>
-          <div className="client-profile-stat-sub">Задачі, що в роботі</div>
-          <div className="client-profile-stat-bars">
-            {STAT_BAR_HEIGHTS.map((h, i) => (
-              <span
-                key={i} className="client-profile-stat-bar"
-                style={{ height: h + '%', background: 'linear-gradient(180deg, #93C5FD, #2563EB)', opacity: .55 + (i / STAT_BAR_HEIGHTS.length) * .45 }}
-              />
-            ))}
-          </div>
-        </div>
+          <div className="client-profile-stat-sub">Задачі, що в роботі</div>        </div>
         <div className="client-profile-stat-card">
           <div className="client-profile-stat-head">
             <span className="client-profile-stat-icon" style={{ background: 'linear-gradient(135deg, #2DD4BF, #0D9488)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.company }} />
             <span className="client-profile-stat-label">Кількість компаній</span>
           </div>
           <div className="client-profile-stat-value">—</div>
-          <div className="client-profile-stat-sub">Скоро</div>
-          <div className="client-profile-stat-donut">
-            <svg viewBox="0 0 100 100">
-              <defs>
-                <linearGradient id="statDonutTeal" x1="0" y1="1" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#5EEAD4" />
-                  <stop offset="100%" stopColor="#0D9488" />
-                </linearGradient>
-              </defs>
-              <circle cx="50" cy="50" r="40" fill="none" stroke="#0D948826" strokeWidth="11" />
-              <circle
-                cx="50" cy="50" r="40" fill="none" stroke="url(#statDonutTeal)" strokeWidth="11" strokeLinecap="round"
-                strokeDasharray="150 251.2" transform="rotate(-90 50 50)"
-              />
-            </svg>
-            <span className="client-profile-stat-donut-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.company }} />
-          </div>
-        </div>
+          <div className="client-profile-stat-sub">Скоро</div>        </div>
       </div>
 
-      <div className="client-panel-tabs client-profile-tabs">
-        {TABS.map((t) => (
-          t.soon ? (
-            <button key={t.key} type="button" className="client-panel-tab" disabled title="Скоро">{t.label}</button>
-          ) : (
-            <button key={t.key} type="button" className={'client-panel-tab' + (activeTab === t.key ? ' active' : '')} onClick={() => setActiveTab(t.key)}>
+      <div className="client-profile-tabs">
+        <div className="proj-tabs" role="tablist" aria-label="Розділи картки">
+          {TABS.map((t) => (
+            <button
+              key={t.key} type="button" role="tab" aria-selected={!t.soon && activeTab === t.key}
+              className={'proj-tab' + (!t.soon && activeTab === t.key ? ' on' : '') + (t.soon ? ' soon' : '')}
+              disabled={t.soon} title={t.soon ? 'Скоро' : undefined}
+              onClick={() => { if (!t.soon) setActiveTab(t.key); }}
+            >
+              <svg className="cp-tab-ic" viewBox="0 0 24 24" aria-hidden="true">{HUB_PATHS[TAB_ICONS[t.key]] || HUB_PATHS.info}</svg>
               {t.label}
+              {t.soon ? <span className="rg-n">Скоро</span> : null}
             </button>
-          )
-        ))}
+          ))}
+        </div>
       </div>
 
       <section className={'report-section client-profile-section' + (activeTab === 'info' || activeTab === 'deals' || activeTab === 'projects' || activeTab === 'activity' ? ' client-profile-section--wide' : '')}>

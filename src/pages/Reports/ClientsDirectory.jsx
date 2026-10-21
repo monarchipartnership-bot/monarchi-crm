@@ -19,8 +19,10 @@ import '../../styles/automationTasksPage.css';
 import '../../styles/automationDashboard.css';
 import '../../styles/comparePage.css';
 import '../../styles/clientsDirectory.css';
-import '../../styles/contactsDesign.css';
 import '../../styles/dealsBoard.css';
+import '../../styles/ddHub.css';
+import '../../styles/reportsHub.css';
+import '../../styles/contactsHub.css';
 
 const FILTER_ICON = '<svg viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8v6l-3 1.5v-7.5z"/></svg>';
 const TREND_UP_ICON = '<svg viewBox="0 0 24 24"><path d="M4 16l6-6 4 4 6-8"/><path d="M15 6h5v5"/></svg>';
@@ -33,14 +35,13 @@ const KPI_ICONS = {
   newClients: TREND_UP_ICON,
 };
 
-// Two hand-authored decorative wave shapes (rising, distinctly different
-// curvature) — same "illustration, not a real chart" approach as the
-// KPI_WAVES bars on the Задачі page; there's no daily-granularity client
-// count to plot for real, so this is purely visual.
-const KPI_WAVE_PATHS = {
-  purple: 'M0,46 C14,42 22,30 38,32 C54,34 58,20 74,17 C90,14 100,9 120,4 L120,60 L0,60 Z',
-  green: 'M0,40 C13,45 24,48 34,39 C48,28 54,24 68,19 C84,13 96,17 120,7 L120,60 L0,60 Z',
-};
+// A page number list: all of them up to 7, otherwise the first, the last and a window around the current one.
+function pageList(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, k) => k + 1);
+  const set = new Set([1, pages, page - 1, page, page + 1]);
+  const list = [...set].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  return list.flatMap((n, k) => (k && n - list[k - 1] > 1 ? ['…' + n, n] : [n]));
+}
 
 const SORT_OPTIONS = [
   { value: 'updated', label: 'За оновленням' },
@@ -180,94 +181,39 @@ export default function ClientsDirectory() {
   const rangeEnd = Math.min(clampedPage * PAGE_SIZE, filtered.length);
 
   return (
-    <div className="report-page contacts-design">
-      <div className="client-kpi-row">
-        <div className="client-kpi-card">
-          <div className="client-kpi-left">
-            <div className="client-kpi-head">
-              <span className="client-kpi-icon blue" dangerouslySetInnerHTML={{ __html: KPI_ICONS.total }} />
-              <span className="client-kpi-label">Всього клієнтів</span>
-            </div>
-            <div className="client-kpi-value-row">
-              <span className="client-kpi-value">{kpis.total}</span>
-              {kpis.newLast30 > 0 && <span className="client-kpi-delta">&#8599; +{kpis.newLast30}</span>}
-            </div>
-            <div className="client-kpi-sub">{kpis.newPct > 0 ? `+${kpis.newPct}% за останні 30 днів` : 'за останні 30 днів'}</div>
+    <div className="report-page contacts-hub rpt-hub" data-dd="hub">
+      <div className="dash-kpi-row client-kpi-hub">
+        <div className="dash-kpi">
+          <div className="dash-kpi-head">
+            <span className="dash-kpi-icon" style={{ '--p': 100 }} dangerouslySetInnerHTML={{ __html: KPI_ICONS.total }} />
+            <div className="dash-kpi-label">Всього клієнтів</div>
           </div>
-          <svg className="client-kpi-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="clientKpiWavePurple" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#7C3AED" stopOpacity=".35" />
-                <stop offset="100%" stopColor="#7C3AED" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={KPI_WAVE_PATHS.purple} fill="url(#clientKpiWavePurple)" stroke="#7C3AED" strokeWidth="2" />
-          </svg>
+          <div className="dash-kpi-value">{kpis.total}{kpis.newLast30 > 0 && <span className="delta-badge up">&#8599; +{kpis.newLast30}</span>}</div>
+          <div className="dash-kpi-sub">{kpis.newPct > 0 ? `+${kpis.newPct}% за останні 30 днів` : 'за останні 30 днів'}</div>
         </div>
-
-        <div className="client-kpi-card">
-          <div className="client-kpi-left">
-            <div className="client-kpi-head">
-              <span className="client-kpi-icon blue" dangerouslySetInnerHTML={{ __html: KPI_ICONS.openDeal }} />
-              <span className="client-kpi-label">Активних угод</span>
-            </div>
-            <div className="client-kpi-value-row">
-              <span className="client-kpi-value">{kpis.withOpenDeal}</span>
-              {kpis.openDealsNew30 > 0 && <span className="client-kpi-delta">&#8599; +{kpis.openDealsNew30}</span>}
-            </div>
-            <div className="client-kpi-sub">В роботі зараз</div>
+        <div className="dash-kpi">
+          <div className="dash-kpi-head">
+            <span className="dash-kpi-icon ok" style={{ '--p': kpis.total ? Math.round((kpis.withOpenDeal / kpis.total) * 100) : 0 }} dangerouslySetInnerHTML={{ __html: KPI_ICONS.openDeal }} />
+            <div className="dash-kpi-label">Активних угод</div>
           </div>
-          <svg className="client-kpi-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="clientKpiWaveGreen" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#16A34A" stopOpacity=".35" />
-                <stop offset="100%" stopColor="#16A34A" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={KPI_WAVE_PATHS.green} fill="url(#clientKpiWaveGreen)" stroke="#16A34A" strokeWidth="2" />
-          </svg>
+          <div className="dash-kpi-value">{kpis.withOpenDeal}{kpis.openDealsNew30 > 0 && <span className="delta-badge up">&#8599; +{kpis.openDealsNew30}</span>}</div>
+          <div className="dash-kpi-sub">В роботі зараз</div>
         </div>
-
-        <div className="client-kpi-card">
-          <div className="client-kpi-left">
-            <div className="client-kpi-head">
-              <span className="client-kpi-icon orange" dangerouslySetInnerHTML={{ __html: KPI_ICONS.topPlatform }} />
-              <span className="client-kpi-label">Топ платформа</span>
-            </div>
-            <div className="client-kpi-value-row">
-              <span className="client-kpi-value client-kpi-value--text">{kpis.topPlatform || '—'}</span>
-              {kpis.topPlatform && <span className="client-kpi-delta">{kpis.topPct}%</span>}
-            </div>
-            <div className="client-kpi-sub">{kpis.topPlatform ? `${kpis.topCount} з ${kpis.total} клієнтів` : 'Немає даних'}</div>
+        <div className="dash-kpi">
+          <div className="dash-kpi-head">
+            <span className="dash-kpi-icon" style={{ '--p': kpis.topPct || 0 }} dangerouslySetInnerHTML={{ __html: KPI_ICONS.topPlatform }} />
+            <div className="dash-kpi-label">Топ платформа</div>
           </div>
-          <div className="client-kpi-donut">
-            <svg viewBox="0 0 80 80">
-              <circle cx="40" cy="40" r="32" fill="none" stroke="#EDE7FB" strokeWidth="9" />
-              <circle
-                cx="40" cy="40" r="32" fill="none" stroke="#7C3AED" strokeWidth="9" strokeLinecap="round"
-                strokeDasharray={`${(kpis.topPct / 100) * 201.06} 201.06`}
-                transform="rotate(-90 40 40)"
-              />
-            </svg>
-            <span className="client-kpi-donut-center">{kpis.topPct}%</span>
-          </div>
+          <div className="dash-kpi-value">{kpis.topPlatform || '—'}{kpis.topPlatform && <span className="delta-badge neutral">{kpis.topPct}%</span>}</div>
+          <div className="dash-kpi-sub">{kpis.topPlatform ? `${kpis.topCount} з ${kpis.total} клієнтів` : 'Немає даних'}</div>
         </div>
-
-        <div className="client-kpi-card">
-          <div className="client-kpi-left">
-            <div className="client-kpi-head">
-              <span className="client-kpi-icon blue" dangerouslySetInnerHTML={{ __html: KPI_ICONS.newClients }} />
-              <span className="client-kpi-label">Нові клієнти</span>
-            </div>
-            <div className="client-kpi-value-row">
-              <span className="client-kpi-value">+{kpis.newLast30}</span>
-              {kpis.newPct > 0 && <span className="client-kpi-delta">&#8599; +{kpis.newPct}%</span>}
-            </div>
-            <div className="client-kpi-sub">За останні 30 днів</div>
+        <div className="dash-kpi">
+          <div className="dash-kpi-head">
+            <span className="dash-kpi-icon low" style={{ '--p': Math.min(100, Math.max(0, kpis.newPct || 0)) }} dangerouslySetInnerHTML={{ __html: KPI_ICONS.newClients }} />
+            <div className="dash-kpi-label">Нові клієнти</div>
           </div>
-          <div className="client-kpi-bars">
-            {[30, 45, 40, 60, 55, 80].map((h, i) => <span key={i} className="client-kpi-bar" style={{ height: h + '%', opacity: .4 + i * 0.1 }} />)}
-          </div>
+          <div className="dash-kpi-value">+{kpis.newLast30}{kpis.newPct > 0 && <span className="delta-badge up">&#8599; +{kpis.newPct}%</span>}</div>
+          <div className="dash-kpi-sub">За останні 30 днів</div>
         </div>
       </div>
 
@@ -409,16 +355,14 @@ export default function ClientsDirectory() {
                 })}
               </div>
               {filtered.length > PAGE_SIZE && (
-                <div className="month-pagination">
-                  <div className="month-pagination-hint">{rangeStart}-{rangeEnd} з {filtered.length} клієнтів</div>
-                  <div className="month-pagination-pages">
-                    <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={clampedPage === 1} aria-label="Попередня сторінка">&#8249;</button>
-                    {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-                      <button key={n} type="button" className={n === clampedPage ? 'on' : ''} onClick={() => setPage(n)}>{n}</button>
-                    ))}
-                    <button type="button" onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={clampedPage === pageCount} aria-label="Наступна сторінка">&#8250;</button>
-                  </div>
-                </div>
+                <nav className="month-pagination" aria-label="Сторінки">
+                  <button type="button" className="mp-arrow" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={clampedPage === 1} aria-label="Попередня сторінка"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
+                  {pageList(clampedPage, pageCount).map((n) => (typeof n === 'string'
+                    ? <span className="mp-gap" key={n}>…</span>
+                    : <button key={n} type="button" className={n === clampedPage ? 'on' : ''} aria-current={n === clampedPage ? 'page' : undefined} onClick={() => setPage(n)}>{n}</button>))}
+                  <button type="button" className="mp-arrow" onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={clampedPage === pageCount} aria-label="Наступна сторінка"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+                  <span className="month-pagination-hint">{rangeStart}–{rangeEnd} з {filtered.length}</span>
+                </nav>
               )}
             </div>
           </div>

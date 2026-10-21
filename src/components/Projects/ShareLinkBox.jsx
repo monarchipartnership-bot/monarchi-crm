@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../common/ConfirmDialog';
-import DesignTodo from '../common/DesignTodo';
+import { HubTitle } from './hubIcons';
 import { fetchReportShare, issueReportShare, revokeReportShare } from '../../lib/api/projectReportStore';
 import { shareUrl } from '../../lib/clientReport';
 import '../../styles/projectHistory.css';
@@ -45,7 +45,7 @@ export default function ShareLinkBox({ projectId, scope, label }) {
 
   return (
     <div className="ph-share">
-      <h3>Посилання для клієнта · {label} <DesignTodo note="Блок «Посилання для клієнта»: поле з адресою, кнопки «Копіювати», «Відкрити», «Нове посилання», «Вимкнути»" /></h3>
+      <HubTitle icon="link" as="h3" className="ph-share-title">Посилання для клієнта · {label}</HubTitle>
       <div className="pacc-hint">Клієнт бачить лише затверджені тижні та поточний підсумок місяця. Посилання одне й те саме: нові тижні зʼявляються на сторінці самі. Пароля немає, доступу до рекламного кабінету теж.</div>
       {error && <div className="pacc-err">{error}</div>}
       {share === undefined && <div className="empty-hint">Завантаження…</div>}

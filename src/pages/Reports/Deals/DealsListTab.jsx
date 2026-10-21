@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { fmtDate } from '../../../lib/dateHelpers';
 import Select from '../../../components/common/Select';
-import { stagePillStyle } from '../../../lib/stagePillStyle';
 import ActionIcon from '../../../components/common/ActionIcon';
 import ClientAvatar from '../../../components/Clients/ClientAvatar';
 
@@ -132,7 +131,7 @@ export default function DealsListTab({ deals, stages, onViewDeal, mode = 'active
                           </span>
                         </td>
                         <td>{d.title || '—'}</td>
-                        <td><span className="deal-stage-pill" style={stagePillStyle(stage?.color)}>{stage?.label || '—'}</span></td>
+                        <td><span className="deal-stage-pill" style={{ '--sc': stage?.color || '#8E5AA8' }}>{stage?.label || '—'}</span></td>
                         <td>{d.amount ? `${Number(d.amount).toLocaleString('uk-UA')} ${d.currency}` : '—'}</td>
                         <td>{d.manager ? <span className="deals-client-cell"><ClientAvatar name={d.manager} size={28} /><span>{d.manager}</span></span> : '—'}</td>
                         <td>{fmtShort(d.created_at)}</td>

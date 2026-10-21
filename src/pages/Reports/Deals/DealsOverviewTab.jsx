@@ -1,13 +1,10 @@
 import { useMemo, useState } from 'react';
 import DeltaBadge from '../../../components/Automation/DeltaBadge';
 import Sparkline from '../../../components/Automation/Sparkline';
-import DonutChart from '../../../components/Automation/DonutChart';
-import LineChart from '../../../components/Reports/Annual/LineChart';
-import FunnelChart from '../../../components/Reports/Annual/FunnelChart';
+import { HubDonut, HubLine, HubFunnel } from '../../../components/Reports/HubCharts';
 import ClientAvatar from '../../../components/Clients/ClientAvatar';
 import DateRangePicker, { presetRange } from '../../../components/Deals/DateRangePicker';
 import { addDaysIso, fmtDate } from '../../../lib/dateHelpers';
-import { stagePillStyle } from '../../../lib/stagePillStyle';
 
 function toIsoDay(dt) {
   return (dt || '').slice(0, 10);
@@ -124,7 +121,7 @@ export default function DealsOverviewTab({ deals, stages, onViewDeal }) {
           {funnelStages.every((s) => s.value === 0) ? (
             <div className="empty-hint">Немає угод за цей період.</div>
           ) : (
-            <FunnelChart stages={funnelStages} />
+            <HubFunnel stages={funnelStages} />
           )}
         </section>
         <section className="report-section">
@@ -133,18 +130,18 @@ export default function DealsOverviewTab({ deals, stages, onViewDeal }) {
             <div className="empty-hint">Немає угод за цей період.</div>
           ) : (
             <div className="dash-chart dash-donut-chart">
-              <DonutChart slices={donutSlices} centerValue={String(filtered.length)} centerLabel="усіх угод" />
+              <HubDonut slices={donutSlices} centerValue={String(filtered.length)} centerLabel="усіх угод" />
             </div>
           )}
         </section>
         <section className="report-section">
           <div className="stitle">Динаміка угод</div>
           <div className="dash-chart">
-            <LineChart
+            <HubLine
               labels={dynamics.labels}
               series={[
-                { label: 'Створено', values: dynamics.created, color: 'var(--purple)' },
-                { label: 'Виграно', values: dynamics.won, color: 'var(--ok)' },
+                { label: 'Створено', values: dynamics.created, color: '#8E1E8E' },
+                { label: 'Виграно', values: dynamics.won, color: '#12A144' },
               ]}
             />
           </div>
@@ -165,7 +162,7 @@ export default function DealsOverviewTab({ deals, stages, onViewDeal }) {
                   return (
                     <tr key={d.id} className="client-row" onClick={() => onViewDeal(d)}>
                       <td className="ink">{d.clients?.company || d.clients?.name || '—'}</td>
-                      <td><span className="deal-stage-pill" style={stagePillStyle(stage?.color)}>{stage?.label || '—'}</span></td>
+                      <td><span className="deal-stage-pill" style={{ '--sc': stage?.color || '#8E5AA8' }}>{stage?.label || '—'}</span></td>
                       <td>{d.amount ? `${Number(d.amount).toLocaleString('uk-UA')} ${d.currency}` : '—'}</td>
                       <td>{fmtShort(toIsoDay(d.created_at))}</td>
                       <td>

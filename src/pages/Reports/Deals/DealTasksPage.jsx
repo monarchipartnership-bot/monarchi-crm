@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchAllDealTasks, setTaskStatus, deleteTask, ACTIVITY_TYPES } from '../../../lib/api/tasks';
@@ -14,11 +14,16 @@ import ActionIcon from '../../../components/common/ActionIcon';
 import Select from '../../../components/common/Select';
 import DatePicker from '../../../components/common/DatePicker';
 import ProfileAvatar from '../../../components/common/ProfileAvatar';
-import CreateDealTaskModal from '../../../components/Deals/CreateDealTaskModal';
 import '../../../styles/reportPage.css';
 import '../../../styles/automationTasksPage.css';
 import '../../../styles/dealsBoard.css';
 import '../../../styles/dealTasksPage.css';
+import '../../../styles/ddHub.css';
+import '../../../styles/reportsHub.css';
+import '../../../styles/taskDialogsHub.css';
+import '../../../styles/dealTasksHub.css';
+// after the stylesheets: the form shares taskDialogsHub.css and must not load it before dealsBoard.css (.tmodal-box)
+import CreateDealTaskModal from '../../../components/Deals/CreateDealTaskModal';
 
 // Sales — Задачі (update "sales tasks" kit): one working area with three views of
 // the same filtered data — Список, Календар, Канбан за пріоритетом. Order is the
@@ -105,6 +110,26 @@ function daysAgoIso(n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// The list is grouped by how soon things are due; groups come in this order, tasks inside a
+// group by date (finished ones, newest first). "Найближчі дні" = up to 3 days ahead.
+const GROUPS = [
+  { key: 'over', label: 'Прострочені', icon: 'deadline', tone: 'bad' },
+  { key: 'today', label: 'Сьогодні', icon: 'day', tone: 'wa' },
+  { key: 'soon', label: 'Найближчі дні', icon: 'history', tone: 'in' },
+  { key: 'later', label: 'Пізніше', icon: 'list', tone: 'mu' },
+  { key: 'nodate', label: 'Без дати', icon: 'archive', tone: 'mu' },
+  { key: 'fin', label: 'Завершені та скасовані', icon: 'check', tone: 'ok' },
+];
+const GROUP_ORDER = Object.fromEntries(GROUPS.map((g, i) => [g.key, i]));
+
+function groupOf(row, soonLimit) {
+  if (row.dueStatus === 'overdue') return 'over';
+  if (row.dueStatus === 'due_today') return 'today';
+  if (row.dueStatus === 'no_date') return 'nodate';
+  if (row.dueStatus === 'done' || row.dueStatus === 'cancelled') return 'fin';
+  return row.dateIso <= soonLimit ? 'soon' : 'later';
+}
+
 const TABS = [
   { key: 'all', label: 'Усі задачі' },
   { key: 'mine', label: 'Мої задачі' },
@@ -165,6 +190,8 @@ export default function DealTasksPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [rowMenu, setRowMenu] = useState(null); // { id, top, right } — fixed-position popover
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [taskDetailId, setTaskDetailId] = useState(null);
@@ -213,6 +240,19 @@ export default function DealTasksPage() {
       window.removeEventListener('resize', close);
     };
   }, [rowMenu]);
+
+  useEffect(() => {
+    if (!filterOpen) return undefined;
+    function onDown(e) {
+      if (!(e.target instanceof Element)) return;
+      if (filterRef.current?.contains(e.target) || e.target.closest('.ui-select-menu, .date-picker-menu, .dd-hub')) return;
+      setFilterOpen(false);
+    }
+    function onKey(e) { if (e.key === 'Escape') setFilterOpen(false); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [filterOpen]);
 
   const dealsById = useMemo(() => {
     const map = {};
@@ -320,9 +360,24 @@ export default function DealTasksPage() {
     setCalYear(y);
   }
 
+  const grouped = useMemo(() => {
+    const soonLimit = daysAgoIso(-3);
+    const stamp = (r) => r.task.scheduled_at || r.task.task_date || '';
+    const list = filtered.map((r) => ({ r, g: groupOf(r, soonLimit) }));
+    list.sort((a, b) => {
+      if (a.g !== b.g) return GROUP_ORDER[a.g] - GROUP_ORDER[b.g];
+      if (a.g === 'nodate') return 0;
+      if (a.g === 'fin') return (b.r.task.completed_at || '').localeCompare(a.r.task.completed_at || '');
+      return stamp(a.r).localeCompare(stamp(b.r));
+    });
+    const totals = {};
+    list.forEach((x) => { totals[x.g] = (totals[x.g] || 0) + 1; });
+    return { list, totals };
+  }, [filtered]);
+
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
-  const paged = filtered.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
+  const paged = grouped.list.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
   const rangeStart = filtered.length ? (clampedPage - 1) * pageSize + 1 : 0;
   const rangeEnd = Math.min(clampedPage * pageSize, filtered.length);
   const taskDetailRow = taskDetailId ? rows.find((r) => r.task.id === taskDetailId) : null;
@@ -376,6 +431,16 @@ export default function DealTasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskDetailRow?.task.id]);
 
+  const fmtDay = (iso) => iso.split('-').reverse().join('.');
+  const activeChips = [
+    statusFilter && { key: 'status', label: `Статус: ${STATUS_META[statusFilter]?.label}`, clear: () => setStatusFilter('') },
+    typeFilter && { key: 'type', label: `Тип: ${ACTIVITY_TYPES.find((t) => t.value === typeFilter)?.label || typeFilter}`, clear: () => setTypeFilter('') },
+    pipelineFilter && { key: 'pipeline', label: `Джерело: ${pipelines.find((p) => String(p.id) === pipelineFilter)?.name || '—'}`, clear: () => setPipelineFilter('') },
+    assigneeFilter && { key: 'assignee', label: `Виконавець: ${profileLabel(profilesByEmail[assigneeFilter] || { email: assigneeFilter })}`, clear: () => setAssigneeFilter('') },
+    dateFrom && { key: 'from', label: `Від ${fmtDay(dateFrom)}`, clear: () => setDateFrom('') },
+    dateTo && { key: 'to', label: `До ${fmtDay(dateTo)}`, clear: () => setDateTo('') },
+  ].filter(Boolean);
+
   const num = (v) => (loading || loadError ? '—' : v);
   const hasNoTasks = !loading && !loadError && rows.length === 0;
   const noMatches = !loading && !loadError && rows.length > 0 && filtered.length === 0;
@@ -389,10 +454,10 @@ export default function DealTasksPage() {
   ];
 
   return (
-    <div className="dtp-page">
+    <div className="dtp-page dtp-hub rpt-hub" data-dd="hub">
       <section className="dtp-summary" aria-label="Підсумок задач">
         {summary.map((s) => (
-          <div className={'dtp-metric' + (s.tone ? ' ' + s.tone : '')} key={s.key}>
+          <div className={'dtp-metric dtp-metric--' + s.key + (s.tone ? ' ' + s.tone : '')} key={s.key}>
             <span className="dtp-metric-ic"><Icon html={s.icon} /></span>
             <div>
               <div className="dtp-metric-label">{s.label}</div>
@@ -416,61 +481,66 @@ export default function DealTasksPage() {
         </button>
       </div>
 
-      <section className="dtp-filters" aria-label="Фільтри">
-        <div className="dtp-field dtp-field--search">
-          <label htmlFor="dtp-search">Пошук</label>
-          <div className="dtp-search">
-            <ActionIcon name="search" size={18} />
-            <input
-              id="dtp-search" type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="За задачею, угодою чи клієнтом"
-            />
-          </div>
-        </div>
-        <div className="dtp-field">
-          <label>Статус</label>
-          <Select
-            value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} placeholder="Усі статуси" ariaLabel="Статус"
-            options={[{ value: '', label: 'Усі статуси' }, ...Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))]}
+      <div className="dtp-toolbar">
+        <div className="dtp-search">
+          <ActionIcon name="search" size={18} />
+          <input
+            id="dtp-search" type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="За задачею, угодою чи клієнтом" aria-label="Пошук"
           />
         </div>
-        <div className="dtp-field">
-          <label>Тип</label>
-          <Select
-            value={typeFilter} onChange={(v) => { setTypeFilter(v); setPage(1); }} placeholder="Усі типи" ariaLabel="Тип"
-            options={[{ value: '', label: 'Усі типи' }, ...ACTIVITY_TYPES.map((t) => ({ value: t.value, label: t.label }))]}
-          />
-        </div>
-        <div className="dtp-field">
-          <label>Джерело</label>
-          <Select
-            value={pipelineFilter} onChange={(v) => { setPipelineFilter(v); setPage(1); }} placeholder="Усі джерела" ariaLabel="Джерело"
-            options={[{ value: '', label: 'Усі джерела' }, ...pipelines.map((p) => ({ value: String(p.id), label: p.name }))]}
-          />
-        </div>
-        <div className="dtp-field">
-          <label>Виконавець</label>
-          <Select
-            value={assigneeFilter} onChange={(v) => { setAssigneeFilter(v); setPage(1); }} placeholder="Усі виконавці" ariaLabel="Виконавець"
-            options={[{ value: '', label: 'Усі виконавці' }, ...profiles.map((p) => ({ value: p.email, label: profileLabel(p) }))]}
-          />
-        </div>
-        <div className="dtp-field"><label>Дата з</label><DatePicker value={dateFrom} onChange={(v) => { setDateFrom(v); setPage(1); }} /></div>
-        <div className="dtp-field"><label>Дата по</label><DatePicker value={dateTo} onChange={(v) => { setDateTo(v); setPage(1); }} /></div>
-        <div className="dtp-field dtp-field--reset">
-          <label aria-hidden="true">&nbsp;</label>
-          <button type="button" className="btn dtp-reset" onClick={handleReset}>
-            <Icon html={FIELD_ICONS.undo} /> Скинути
+        <div className="dtp-filter-wrap" ref={filterRef}>
+          <button type="button" className={'btn dtp-filter-btn' + (activeChips.length ? ' has-active' : '')} aria-expanded={filterOpen} onClick={() => setFilterOpen((o) => !o)}>
+            <Icon html={FIELD_ICONS.settings} /> Фільтри{activeChips.length ? ` (${activeChips.length})` : ''}
           </button>
+          {filterOpen && (
+            <div className="dtp-pop" role="dialog" aria-label="Фільтри">
+              <div className="dtp-field"><label>Статус</label>
+                <Select
+                  value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} placeholder="Усі статуси" ariaLabel="Статус"
+                  options={[{ value: '', label: 'Усі статуси' }, ...Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))]}
+                />
+              </div>
+              <div className="dtp-field"><label>Тип</label>
+                <Select
+                  value={typeFilter} onChange={(v) => { setTypeFilter(v); setPage(1); }} placeholder="Усі типи" ariaLabel="Тип"
+                  options={[{ value: '', label: 'Усі типи' }, ...ACTIVITY_TYPES.map((t) => ({ value: t.value, label: t.label }))]}
+                />
+              </div>
+              <div className="dtp-field"><label>Джерело</label>
+                <Select
+                  value={pipelineFilter} onChange={(v) => { setPipelineFilter(v); setPage(1); }} placeholder="Усі джерела" ariaLabel="Джерело"
+                  options={[{ value: '', label: 'Усі джерела' }, ...pipelines.map((p) => ({ value: String(p.id), label: p.name }))]}
+                />
+              </div>
+              <div className="dtp-field"><label>Виконавець</label>
+                <Select
+                  value={assigneeFilter} onChange={(v) => { setAssigneeFilter(v); setPage(1); }} placeholder="Усі виконавці" ariaLabel="Виконавець"
+                  options={[{ value: '', label: 'Усі виконавці' }, ...profiles.map((p) => ({ value: p.email, label: profileLabel(p) }))]}
+                />
+              </div>
+              <div className="dtp-field"><label>Дата з</label><DatePicker value={dateFrom} onChange={(v) => { setDateFrom(v); setPage(1); }} /></div>
+              <div className="dtp-field"><label>Дата по</label><DatePicker value={dateTo} onChange={(v) => { setDateTo(v); setPage(1); }} /></div>
+              <div className="dtp-pop-actions">
+                <button type="button" className="btn dtp-reset" onClick={handleReset}><Icon html={FIELD_ICONS.undo} /> Скинути</button>
+                <button type="button" className="btn dtp-apply" onClick={() => setFilterOpen(false)}><Icon html={FIELD_ICONS.check} /> Застосувати</button>
+              </div>
+            </div>
+          )}
         </div>
-      </section>
-
-      <div className="dtp-views" role="group" aria-label="Подання">
-        {VIEWS.map((v) => (
-          <button key={v.key} type="button" className="dtp-view" aria-pressed={viewMode === v.key} onClick={() => setViewMode(v.key)}>
-            <Icon html={FIELD_ICONS[v.icon]} /> {v.label}
-          </button>
+        {activeChips.map((c) => (
+          <span className="dtp-chip" key={c.key}>
+            {c.label}
+            <button type="button" onClick={() => { c.clear(); setPage(1); }} aria-label={`Прибрати: ${c.label}`}><ActionIcon name="close" size={12} /></button>
+          </span>
         ))}
+        <div className="dtp-views" role="group" aria-label="Подання">
+          {VIEWS.map((v) => (
+            <button key={v.key} type="button" className="dtp-view" aria-pressed={viewMode === v.key} onClick={() => setViewMode(v.key)}>
+              <Icon html={FIELD_ICONS[v.icon]} /> {v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -526,8 +596,9 @@ export default function DealTasksPage() {
                     <div className="dtp-cal-items">
                       {shown.map((r) => {
                         const type = TYPE_META[r.task.activity_type] || TYPE_META.task;
+                        const pr = PRIORITY_META[r.task.priority] || NO_PRIORITY;
                         return (
-                          <button key={r.task.id} type="button" className="dtp-cal-chip" onClick={(e) => openDetail(r.task.id, e)} title={r.title}>
+                          <button key={r.task.id} type="button" className="dtp-cal-chip" style={{ '--c': pr.color, '--t': pr.tint }} onClick={(e) => openDetail(r.task.id, e)} title={`${r.title} · ${pr.label}`}>
                             <span className="dtp-cal-chip-ic"><Icon html={FIELD_ICONS[type.icon]} /></span>
                             <span className="dtp-cal-chip-text">{r.title}</span>
                           </button>
@@ -546,7 +617,7 @@ export default function DealTasksPage() {
         <div className="dtp-board-scroll">
           <div className="dtp-board" style={{ '--cols': boardColumns.length }}>
             {boardColumns.map((col) => (
-              <section className="dtp-col" key={col.key} aria-label={`Пріоритет: ${col.label}`}>
+              <section className="dtp-col" key={col.key} style={{ '--sc': col.color }} aria-label={`Пріоритет: ${col.label}`}>
                 <header className="dtp-col-head">
                   <span className="dtp-col-ic" style={{ color: col.color, background: col.tint }}><Icon html={col.icon} /></span>
                   <h3>{col.label}</h3>
@@ -611,15 +682,29 @@ export default function DealTasksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((r) => {
+                  {paged.map(({ r, g }, idx) => {
                     const type = TYPE_META[r.task.activity_type] || TYPE_META.task;
                     const priority = PRIORITY_META[r.task.priority] || NO_PRIORITY;
                     const status = STATUS_META[r.dueStatus];
+                    const grp = GROUPS[GROUP_ORDER[g]];
+                    const showHead = idx === 0 || paged[idx - 1].g !== g;
                     const assignee = r.task.assignee_email ? profilesByEmail[r.task.assignee_email] : null;
                     const assigneeName = assignee ? profileLabel(assignee) : r.task.assignee_email;
                     return (
+                      <Fragment key={r.task.id}>
+                      {showHead && (
+                        <tr className="dtp-group-row">
+                          <td colSpan={7}>
+                            <span className={'dtp-group dtp-group--' + grp.tone}>
+                              <span className="dtp-group-ic"><Icon html={FIELD_ICONS[grp.icon]} /></span>
+                              <b>{grp.label}</b>
+                              <span className="dtp-group-count">{grouped.totals[g]}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      )}
                       <tr
-                        key={r.task.id} tabIndex={0}
+                        tabIndex={0}
                         onClick={(e) => openDetail(r.task.id, e)}
                         onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetail(r.task.id, e); } }}
                       >
@@ -639,7 +724,7 @@ export default function DealTasksPage() {
                               {r.dealLabel}{r.pipelineName ? ` · ${r.pipelineName}` : ''} <Icon html={FIELD_ICONS.externalLink} />
                             </Link>
                           ) : <span className="dtp-deal-missing">{r.dealLabel}</span>}
-                          {r.clientLabel && <div className="dtp-sub">Client: {r.clientLabel}</div>}
+                          {r.clientLabel && <div className="dtp-sub">Клієнт: {r.clientLabel}</div>}
                         </td>
                         <td data-label="Виконавець">
                           {assignee || r.task.assignee_email ? (
@@ -678,6 +763,7 @@ export default function DealTasksPage() {
                           )}
                         </td>
                       </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -716,73 +802,92 @@ export default function DealTasksPage() {
       )}
 
       {taskDetailRow && createPortal(
-        <div className="tmodal-overlay dtp-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeDetail(); }}>
-          <div className="tmodal-box dtp-detail" role="dialog" aria-modal="true" aria-labelledby="dtp-detail-title" ref={detailRef}>
-            <div className="tmodal-head">
-              <div className="dtp-detail-head">
-                <span className="dtp-title-ic"><Icon html={FIELD_ICONS[(TYPE_META[taskDetailRow.task.activity_type] || TYPE_META.task).icon]} /></span>
-                <div>
-                  <h3 id="dtp-detail-title">{(TYPE_META[taskDetailRow.task.activity_type] || TYPE_META.task).label}</h3>
-                  <p className="dtp-detail-when">
-                    <Icon html={FIELD_ICONS.history} />
-                    {taskDetailRow.dateIso ? fmtDate(taskDetailRow.task.scheduled_at || taskDetailRow.task.task_date) : 'Без дати'}
-                  </p>
-                </div>
+        <div className="tmodal-overlay thd-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) closeDetail(); }}>
+          <div className="tmodal-box thd-dialog dtp-detail" role="dialog" aria-modal="true" aria-labelledby="dtp-detail-title" ref={detailRef}>
+            <div className="thd-head thd-head--row">
+              <span className="thd-md thd-md--lg">
+                <span className="thd-mi" dangerouslySetInnerHTML={{ __html: FIELD_ICONS[(TYPE_META[taskDetailRow.task.activity_type] || TYPE_META.task).icon] }} />
+              </span>
+              <div className="thd-head-text">
+                <h3 id="dtp-detail-title">{(TYPE_META[taskDetailRow.task.activity_type] || TYPE_META.task).label}</h3>
+                <small className="dtp-detail-when">
+                  <Icon html={FIELD_ICONS.history} />
+                  {taskDetailRow.dateIso ? fmtDate(taskDetailRow.task.scheduled_at || taskDetailRow.task.task_date) : 'Без дати'}
+                </small>
               </div>
-              <button type="button" className="dtp-icon-btn" onClick={closeDetail} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
+              <div className="thd-head-actions">
+                <button type="button" className="thd-close" onClick={closeDetail} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+              </div>
             </div>
-            <div className="tmodal-body">
+            <div className="thd-actions">
+              {taskDetailRow.task.status === 'pending' ? (
+                <>
+                  <button type="button" className="btn thd-btn-ok" onClick={() => handleSetStatus(taskDetailRow, 'done')}>
+                    <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /> Виконано
+                  </button>
+                  <button type="button" className="btn" onClick={() => setEditTaskRow(taskDetailRow)}>
+                    <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }} /> Редагувати
+                  </button>
+                  <button type="button" className="btn thd-btn-bad" onClick={() => handleSetStatus(taskDetailRow, 'cancelled')}>
+                    <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Скасувати
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="btn" onClick={() => handleSetStatus(taskDetailRow, 'pending')}>
+                    <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.undo }} /> Повернути в роботу
+                  </button>
+                  <button type="button" className="btn" onClick={() => setEditTaskRow(taskDetailRow)}>
+                    <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.edit }} /> Редагувати
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="thd-body">
               {taskDetailRow.deal && (
                 <button
                   type="button" className="dtp-detail-deal"
                   onClick={() => { setTaskDetailId(null); navigate(`/reports/deals?open=${taskDetailRow.deal.id}`); }}
                 >
-                  <span className="dtp-detail-deal-ic"><Icon html={FIELD_ICONS.briefcase} /></span>
+                  <span className="thd-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
                   <span className="dtp-detail-deal-text">
-                    <span className="dtp-deal-link">{taskDetailRow.dealLabel}{taskDetailRow.pipelineName ? ` · ${taskDetailRow.pipelineName}` : ''}</span>
-                    {taskDetailRow.clientLabel && <span className="dtp-sub">Client: {taskDetailRow.clientLabel}</span>}
+                    <b>{taskDetailRow.dealLabel}{taskDetailRow.pipelineName ? ` · ${taskDetailRow.pipelineName}` : ''}</b>
+                    {taskDetailRow.clientLabel && <small>Клієнт: {taskDetailRow.clientLabel}</small>}
                   </span>
                   <Icon html={FIELD_ICONS.externalLink} />
                 </button>
               )}
 
               <div className="dtp-detail-label">Опис задачі</div>
-              <p className="dtp-detail-text">{taskDetailRow.task.text || '—'}</p>
+              <div className="thd-text"><p>{taskDetailRow.task.text || '—'}</p></div>
 
-              <div className="dtp-detail-meta">
-                {taskDetailRow.task.priority && PRIORITY_META[taskDetailRow.task.priority] && (
-                  <span className="dtp-pill">
-                    <Icon html={PRIORITY_META[taskDetailRow.task.priority].icon} />
-                    Пріоритет: <b style={{ color: PRIORITY_META[taskDetailRow.task.priority].color }}>{PRIORITY_META[taskDetailRow.task.priority].label}</b>
-                  </span>
-                )}
+              <div className="thd-tiles dtp-detail-tiles">
+                <div className="thd-tile">
+                  <span className="thd-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.priority }} />
+                  <div><small>Пріоритет</small><b><Badge meta={PRIORITY_META[taskDetailRow.task.priority] || NO_PRIORITY} icon={(PRIORITY_META[taskDetailRow.task.priority] || NO_PRIORITY).icon} /></b></div>
+                </div>
+                <div className="thd-tile">
+                  <span className="thd-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.status }} />
+                  <div><small>Статус</small><b><Badge meta={STATUS_META[taskDetailRow.dueStatus]} icon={DUE_STATUS_ICONS[taskDetailRow.dueStatus]} /></b></div>
+                </div>
                 {taskDetailRow.task.created_by_email && (
-                  <span className="dtp-pill">
-                    <Icon html={FIELD_ICONS.user} />
-                    Поставив: <b>{profileLabel(profilesByEmail[taskDetailRow.task.created_by_email] || { email: taskDetailRow.task.created_by_email })}</b>
-                  </span>
+                  <div className="thd-tile">
+                    <span className="thd-ic" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.user }} />
+                    <div><small>Поставив</small><b>{profileLabel(profilesByEmail[taskDetailRow.task.created_by_email] || { email: taskDetailRow.task.created_by_email })}</b></div>
+                  </div>
                 )}
                 {taskDetailRow.task.assignee_email && (
-                  <span className="dtp-pill">
-                    <Icon html={PEOPLE_ICON} />
-                    Призначено: <b>{profileLabel(profilesByEmail[taskDetailRow.task.assignee_email] || { email: taskDetailRow.task.assignee_email })}</b>
-                  </span>
+                  <div className="thd-tile">
+                    <span className="thd-ic" dangerouslySetInnerHTML={{ __html: PEOPLE_ICON }} />
+                    <div><small>Призначено</small><b>{profileLabel(profilesByEmail[taskDetailRow.task.assignee_email] || { email: taskDetailRow.task.assignee_email })}</b></div>
+                  </div>
                 )}
               </div>
             </div>
-            <div className="tmodal-foot">
-              <button type="button" className="btn btn-danger" style={{ marginRight: 'auto' }} onClick={() => handleDeleteTask(taskDetailRow)}>Видалити</button>
-              <button type="button" className="btn" onClick={() => setEditTaskRow(taskDetailRow)}><ActionIcon name="edit" size={18} /> Редагувати</button>
-              {taskDetailRow.task.status === 'pending' ? (
-                <>
-                  <button type="button" className="btn dtp-cancel-task" onClick={() => handleSetStatus(taskDetailRow, 'cancelled')}>Скасувати</button>
-                  <button type="button" className="btn btn-p" onClick={() => handleSetStatus(taskDetailRow, 'done')}>Виконано</button>
-                </>
-              ) : (
-                <button type="button" className="btn" onClick={() => handleSetStatus(taskDetailRow, 'pending')}>
-                  <Icon html={FIELD_ICONS.undo} /> Повернути в роботу
-                </button>
-              )}
+            <div className="thd-foot thd-foot--start">
+              <button type="button" className="thd-del" onClick={() => handleDeleteTask(taskDetailRow)}>
+                <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /> Видалити
+              </button>
             </div>
           </div>
         </div>,

@@ -72,9 +72,10 @@ function DealStageBar({ stages, currentStageId, onSelect }) {
         <button
           key={s.id} type="button"
           className={'deal-stage-seg' + (i === currentIndex ? ' active' : i < currentIndex ? ' done' : '')}
+          style={{ '--sc': s.color || '#7C8CF2' }}
           onClick={() => onSelect(s.id)}
         >
-          {s.label}
+          <i>{i < currentIndex ? '✓' : i + 1}</i>{s.label}
         </button>
       ))}
     </div>
@@ -569,7 +570,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   const stageDays = daysInStage(deal);
 
   return (
-    <div className="report-page deal-page deals-design" ref={dealPageRef}>
+    <div className="report-page deal-page deals-hub rpt-hub" data-dd="hub" ref={dealPageRef}>
       <section className="rpt-hero deal-page-hero">
         <span className="deal-section-icon deal-detail-head-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
         <div className="deal-detail-head-text">
@@ -1029,7 +1030,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
       </div>
 
       {historyDetail && createPortal(
-        <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) setHistoryDetail(null); }}>
+        <div className="tmodal-overlay deals-design" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) setHistoryDetail(null); }}>
           <div className="tmodal-box task-detail-box">
             <div className="tmodal-head">
               <div className="pipeline-modal-head">
@@ -1111,7 +1112,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
       )}
 
       {activityModalOpen && createPortal(
-        <div className="tmodal-overlay deals-design" onClick={(e) => { if (e.target === e.currentTarget) closeActivityModal(); }}>
+        <div className="tmodal-overlay deals-design" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) closeActivityModal(); }}>
           <div className="tmodal-box task-modal-box">
             <div className="tmodal-head">
               <div className="pipeline-modal-head">
