@@ -23,7 +23,7 @@ import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '.
 import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { CREATIVE_COUNT, creativeImageUrl, creativeKind, rankAds } from '../src/lib/creatives.js';
-import { collectCreatives, creativeCandidates, pickCreative } from '../api/_lib/metaCreatives.js';
+import { collectCreatives, creativeCandidates, creativesOf, pickCreative } from '../api/_lib/metaCreatives.js';
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
@@ -898,9 +898,12 @@ const creaStub = () => {
     log.urls.push(url);
     const u = new URL(url);
     if (u.pathname.endsWith('/insights')) return { data: insights };
-    const ids = (u.searchParams.get('ids') || '').split(',');
-    if (u.searchParams.get('fields') === 'creative') return Object.fromEntries(ids.map((id) => [id, { creative: { id: adToCreative[id] } }]));
-    return Object.fromEntries(ids.map((id) => [id, creatives[id]]));
+    // Graph v26 refuses the batch read «?ids=»: every ad and every creative is read on its own
+    if (u.searchParams.has('ids')) throw new Error('The ids query parameter is deprecated in v26.0+.');
+    const id = u.pathname.split('/').filter(Boolean).pop();
+    if (u.searchParams.get('fields') === 'creative{id}') return adToCreative[id] ? { id, creative: { id: adToCreative[id] } } : { id };
+    if (!creatives[id]) throw new Error('(#100) Object does not exist');
+    return creatives[id];
   };
   const fetchFn = async (url) => (url.includes('fail') ? { ok: false } : { ok: true, headers: { get: () => 'image/png' }, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer });
   const db = { storage: { from: () => ({ upload: async (path, bytes, opts) => { log.uploads.push([path, bytes.length, opts.contentType]); return { error: null }; }, getPublicUrl: (path) => ({ data: { publicUrl: 'https://store.test/' + path } }) }) } };
@@ -2451,6 +2454,18 @@ await ok('client model (selected columns): group sum first and highlighted, its 
   assert.deepEqual(spendSlices(v).map((s) => s.label).slice(0, 2), ['Catalog A', 'Kinky Bang']); // campaigns by spend, no group sum
   assert.equal(spendSlices(v).at(-1).label, 'Other campaigns'); // the rest of the account (unselected campaigns and the small ones)
   assert.ok(!roasBars(v).some((b) => b.label === 'Catalog'));
+});
+
+await ok('creatives: no request uses the deprecated «ids» batch read; a refused token is an error, one missing ad only loses its own picture', async () => {
+  const { graphFn, log } = creaStub();
+  const map = await creativesOf(['1', '2', '3', '999'], { token: 'T', graphFn });
+  assert.deepEqual([...map.keys()].sort(), ['1', '2', '3']); // ad 999 has no creative: it is just left out
+  assert.ok(log.urls.length >= 5 && log.urls.every((u) => !u.includes('ids=')));
+  assert.equal(log.urls.filter((u) => u.includes('/c1?')).length, 1); // ads 1 and 2 share a creative: read once
+  await assert.rejects(() => creativesOf(['1', '2'], { token: 'bad', graphFn: async () => { throw new Error('Invalid OAuth access token'); } }), /Invalid OAuth/);
+  const flaky = async (url, t) => { if (url.includes('/2?')) throw new Error('(#100) boom'); return graphFn(url, t); };
+  assert.deepEqual([...(await creativesOf(['1', '2'], { token: 'T', graphFn: flaky })).keys()], ['1']);
+  assert.equal((await creativesOf([], { token: 'T', graphFn })).size, 0);
 });
 
 console.log(`\n${passed} checks passed`);

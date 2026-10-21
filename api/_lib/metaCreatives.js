@@ -22,21 +22,34 @@ export async function topAds({ accountId, start, end, token, graphFn = graphGet 
   return rows.map((r) => ({ ...formatRow(r), adId: String(r.ad_id), adName: r.ad_name || '', campaign: r.campaign_name || '' }));
 }
 
-const chunks = (list, n) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n));
+// Runs `fn` over `items`, at most `limit` at a time.
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next; next += 1; out[i] = await fn(items[i], i); }
+  }));
+  return out;
+}
 
-// → Map adId → creative (the fields of FIELDS), two light reads: ad → creative id, creative id → its fields (the thumbnail asked at a size fit to show).
+// → Map adId → creative (the fields of FIELDS). Two light reads, one object at a time: ad → creative id, creative id → its fields (the thumbnail asked at a
+// size fit to show). The batch read with `?ids=` is deprecated since Graph v26 and refused, so every object is its own request. When EVERY request
+// fails the error is thrown (a bad token must not look like «no pictures»); a single missing ad only leaves that ad without a picture.
 export async function creativesOf(adIds, { token, graphFn = graphGet }) {
-  const byAd = new Map();
+  const errors = [];
+  const attempt = async (path, params) => {
+    try { return await graphFn(`${GRAPH}${path}?${new URLSearchParams({ ...params, access_token: token })}`, token); } catch (e) { errors.push(e); return null; }
+  };
   const creativeIds = new Map();
-  for (const part of chunks([...new Set(adIds)], 40)) {
-    const res = await graphFn(`${GRAPH}?${new URLSearchParams({ ids: part.join(','), fields: 'creative', access_token: token })}`, token);
-    part.forEach((id) => { const c = res[id]?.creative?.id; if (c) creativeIds.set(id, String(c)); });
-  }
+  const ads = [...new Set(adIds)];
+  const first = await mapLimit(ads, 6, (id) => attempt(id, { fields: 'creative{id}' }));
+  ads.forEach((id, i) => { const c = first[i]?.creative?.id; if (c) creativeIds.set(id, String(c)); });
+  const unique = [...new Set(creativeIds.values())];
+  const second = await mapLimit(unique, 6, (cid) => attempt(cid, { fields: FIELDS, thumbnail_width: '640', thumbnail_height: '800' }));
   const details = new Map();
-  for (const part of chunks([...new Set(creativeIds.values())], 40)) {
-    const res = await graphFn(`${GRAPH}?${new URLSearchParams({ ids: part.join(','), fields: FIELDS, thumbnail_width: '640', thumbnail_height: '800', access_token: token })}`, token);
-    part.forEach((id) => { if (res[id]) details.set(id, res[id]); });
-  }
+  unique.forEach((cid, i) => { if (second[i]) details.set(cid, second[i]); });
+  if (ads.length && !details.size && errors.length) throw errors[0];
+  const byAd = new Map();
   creativeIds.forEach((cid, adId) => { if (details.has(cid)) byAd.set(adId, details.get(cid)); });
   return byAd;
 }
