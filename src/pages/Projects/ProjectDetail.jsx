@@ -11,6 +11,7 @@ import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsPayload } from '../../lib/projectFields';
 import AutoField from '../../components/Projects/AutoField';
+import DesignTodo from '../../components/common/DesignTodo';
 import ProjectHistoryTab from '../../components/Projects/ProjectHistoryTab';
 import ReportBuilder from '../../components/Projects/Builder/ReportBuilder';
 import ActionIcon from '../../components/common/ActionIcon';
@@ -420,7 +421,7 @@ export default function ProjectDetail() {
 
           <section className="report-section pw-card">
             <div className="ov-section-head">
-              <div className="stitle hub-title"><span className="hub-ring hub-ring--sm"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM6 6h12v14H6z" /><path d="M9 11h6M9 15h4" /></svg></span></span>Про проєкт</div>
+              <div className="stitle hub-title"><span className="hub-ring hub-ring--sm"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM6 6h12v14H6z" /><path d="M9 11h6M9 15h4" /></svg></span></span>Про проєкт <DesignTodo note="Розділ «Про проєкт»: поля, що зберігаються самі, індикатор збереження, перемикач статусу" /></div>
               <span className={'ov-save-state ' + saveState} role="status" aria-live="polite">
                 {saveState === 'saving' ? 'Зберігаємо…' : saveState === 'saved' ? 'Збережено' : saveState === 'error' ? 'Не вдалося зберегти, спробуйте ще раз' : 'Зміни зберігаються автоматично'}
               </span>
