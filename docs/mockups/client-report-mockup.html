@@ -85,7 +85,7 @@ td.best .mk.good, td.worst .mk.bad { color: inherit; }
 .crea .zoom { font-size: 11.5px; color: var(--muted); display: block; margin-top: 1px; }
 .lb { position: fixed; inset: 0; z-index: 50; background: rgba(8, 10, 14, .84); display: grid; place-items: center; padding: 24px; }
 .lb figure { margin: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; }
-.lb img { max-height: 82vh; max-width: min(92vw, 720px); border-radius: 12px; display: block; }
+.lb img { height: min(84vh, 900px); width: auto; aspect-ratio: 4 / 5; max-width: 92vw; object-fit: contain; border-radius: 12px; display: block; background: #fff; }
 .lb figcaption { color: #fff; font-size: 14px; text-align: center; }
 .lb-x { position: absolute; top: 16px; right: 20px; font: inherit; font-size: 26px; line-height: 1; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .4); background: rgba(0, 0, 0, .3); color: #fff; cursor: pointer; }
 .sub { font-size: 13px; font-weight: 600; color: var(--accent-ink); margin: 0; }
@@ -184,7 +184,7 @@ var ARTS = [
 ];
 function art(i) {
   var A = ARTS[i % ARTS.length];
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000"><rect width="800" height="1000" fill="' + A.bg + '"/><circle cx="560" cy="400" r="300" fill="' + A.shape + '" opacity="0.55"/><path d="M300 1000 C300 770 410 650 520 650 C630 650 740 770 740 1000Z" fill="' + A.cloth + '"/><circle cx="520" cy="480" r="112" fill="' + A.skin + '"/><path d="M395 470 C395 320 470 285 535 285 C640 285 695 370 655 540 C645 430 600 390 535 390 C465 390 425 425 395 470Z" fill="' + A.hair + '"/><text x="50" y="130" font-family="Georgia, serif" font-size="52" font-weight="700" fill="' + A.ink + '">' + A.title + '</text><text x="50" y="190" font-family="Arial, sans-serif" font-size="32" fill="' + A.ink + '">' + A.sub + '</text><rect x="50" y="860" width="270" height="76" rx="38" fill="' + A.ink + '"/><text x="185" y="909" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="' + A.bg + '">SHOP NOW</text><text x="50" y="975" font-family="Arial, sans-serif" font-size="24" fill="' + A.ink + '">mellowdiamond.com</text></svg>';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000"><rect width="800" height="1000" fill="' + A.bg + '"/><circle cx="560" cy="400" r="300" fill="' + A.shape + '" opacity="0.55"/><path d="M300 1000 C300 770 410 650 520 650 C630 650 740 770 740 1000Z" fill="' + A.cloth + '"/><circle cx="520" cy="480" r="112" fill="' + A.skin + '"/><path d="M395 470 C395 320 470 285 535 285 C640 285 695 370 655 540 C645 430 600 390 535 390 C465 390 425 425 395 470Z" fill="' + A.hair + '"/><text x="50" y="130" font-family="Georgia, serif" font-size="52" font-weight="700" fill="' + A.ink + '">' + A.title + '</text><text x="50" y="190" font-family="Arial, sans-serif" font-size="32" fill="' + A.ink + '">' + A.sub + '</text><rect x="50" y="860" width="270" height="76" rx="38" fill="' + A.ink + '"/><text x="185" y="909" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="' + A.bg + '">SHOP NOW</text><text x="50" y="975" font-family="Arial, sans-serif" font-size="24" fill="' + A.ink + '">mellowdiamond.com</text></svg>';
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 function crea(list) {
