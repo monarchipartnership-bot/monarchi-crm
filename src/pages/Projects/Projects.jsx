@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectModal from '../../components/Projects/ProjectModal';
+import DesignTodo from '../../components/common/DesignTodo';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchProjects, createProject } from '../../lib/api/projects';
 import { fetchPendingReports } from '../../lib/api/projectReportStore';
@@ -210,6 +211,7 @@ export default function Projects() {
           </div>
           <div className="tb-sp" />
           <button type="button" className="btn" onClick={() => navigate('/projects/approvals')}>Звіти на затвердження{pendingCount > 0 && <span className="ph-count">{pendingCount}</span>}</button>
+          <DesignTodo note="Кнопка «Звіти на затвердження» зі лічильником у шапці розділу «Проєкти»" />
           <button ref={createBtn} type="button" className="btn btn-p proj-create" onClick={() => setModalOpen(true)}>
             <svg className="pf-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Створити проєкт
           </button>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from '../../components/Projects/ArchiveReportModal';
 import ReportReturnDialog from '../../components/Projects/ReportReturnDialog';
+import DesignTodo from '../../components/common/DesignTodo';
 import { fetchPendingReports, fetchProjectReport, setReportStatus } from '../../lib/api/projectReportStore';
 import { fetchApprovers } from '../../lib/api/projectAgents';
 import { loadReportContext, extraKeysOf } from '../../lib/projectReportContext';
@@ -50,6 +51,7 @@ export default function ReportApprovals() {
       <div className="ph-queue-head" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
         <button type="button" className="btn" onClick={() => navigate('/projects')}>← Проєкти</button>
         <h2 style={{ margin: 0 }}>Звіти на затвердження</h2>
+        <DesignTodo note="Сторінка «Звіти на затвердження»: шапка, список звітів, кнопки" />
       </div>
       {error && <div className="pacc-err">{error}</div>}
       {rows == null && <div className="empty-hint">Завантаження...</div>}

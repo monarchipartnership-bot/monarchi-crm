@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import useDialogA11y from '../../lib/useDialogA11y';
+import DesignTodo from '../common/DesignTodo';
 import '../../styles/projectReports.css';
 
 // «Повернути на доопрацювання»: the approver says what is wrong. The note is kept with the report and shown to whoever opens it next.
@@ -22,6 +23,7 @@ export default function ReportReturnDialog({ title, onSubmit, onClose }) {
       <form ref={box} tabIndex={-1} className="modal-box prep-modal" role="dialog" aria-modal="true" aria-labelledby="rrd-title" onSubmit={submit}>
         <div className="modal-head">
           <h3 id="rrd-title">Повернути на доопрацювання</h3>
+          <DesignTodo note="Вікно «Повернути на доопрацювання»" />
           <button type="button" className="modal-close" onClick={onClose} disabled={busy} aria-label="Закрити">&times;</button>
         </div>
         <div className="modal-body">

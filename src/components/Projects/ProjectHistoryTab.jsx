@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { HubTitle, RibbonMark } from './hubIcons';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './ArchiveReportModal';
 import MonthDocument from './MonthDocument';
+import DesignTodo from '../common/DesignTodo';
 import ReportReturnDialog from './ReportReturnDialog';
 import { deleteProjectReport, fetchProjectReports, setReportStatus } from '../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../lib/api/projectDecks';
@@ -102,6 +103,7 @@ export default function ProjectHistoryTab({ projectId }) {
   return (
     <section className="report-section">
       <HubTitle icon="file" className="prep-box-title">Історія проекту</HubTitle>
+      <div><DesignTodo note="Вкладка «Історія проекту»: карточки місяців, рядки тижнів, статуси, кнопки дій, вікно «Загальний документ»" /></div>
       <div className="prep-seg" role="tablist" aria-label="Платформи">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>

@@ -1,3 +1,4 @@
+import DesignTodo from '../../common/DesignTodo';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -335,6 +336,7 @@ export default function ProjectAgentTab({ projectId }) {
           </PagSection>
 
           <PagSection title="Відповідальні за затвердження" hint="Ці люди бачать звіти проєкту в розділі «Звіти на затвердження», перевіряють їх, доповнюють і затверджують. Лише затверджений звіт потрапляє в історію проєкту для клієнта.">
+            <div><DesignTodo note="Секція «Відповідальні за затвердження» у налаштуваннях агента" /></div>
             <div className="pag-opts pag-opts--compact">
               {recipientChoices(people, form.approvers).map((p) => (
                 <PagOption key={p.email} checked={(form.approvers || []).includes(p.email)} onChange={() => toggleIn('approvers', p.email)} title={p.label} desc={p.label !== p.email ? p.email : ''} />

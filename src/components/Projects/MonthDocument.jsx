@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { ReportBody } from './ArchiveReportModal';
 import useDialogA11y from '../../lib/useDialogA11y';
+import DesignTodo from '../common/DesignTodo';
 import { REPORT_STATUS } from '../../lib/projectHistory';
 import '../../styles/projectReports.css';
 import '../../styles/projectHistory.css';
@@ -22,6 +23,7 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
         <div className="arc-head">
           <div className="arc-title">
             <h3 id="md-title">{month.label}: загальний документ</h3>
+            <DesignTodo note="Вікно «Загальний документ»: тижні та підсумок місяця. Фінальний вигляд — клієнтська сторінка за макетом docs/mockups/client-report-mockup.html" />
             <div className="arc-sub">{projectName} · тижні {month.counts.approved} з {month.counts.total} затверджено{monthly ? ` · місяць: ${REPORT_STATUS[monthly.status] || monthly.status}` : ' · місячного звіту ще немає'}</div>
           </div>
           <div className="arc-actions"><button type="button" className="btn" onClick={onClose} aria-label="Закрити">Закрити ✕</button></div>
