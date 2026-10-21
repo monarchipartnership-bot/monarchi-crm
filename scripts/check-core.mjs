@@ -22,6 +22,8 @@ import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, 
 import { approvePlan, launchCampaign, pollAssets, processQueue, runNow } from '../api/_lib/agentEngine.js';
 import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
+import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
+import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
@@ -325,7 +327,7 @@ await ok('agent run (two platforms): one draft report and deck per platform plus
   assert.match(repo.log.reports[0].data.sections.conclusion, /^Meta Ads: /);
   assert.match(repo.log.reports[1].data.sections.conclusion, /^Google Ads: /);
   assert.deepEqual(repo.log.decks.map((d) => d.platform), ['meta', 'google']);
-  assert.ok(repo.log.reports.every((x) => x.source === 'agent' && x.status === 'draft'));
+  assert.ok(repo.log.reports.every((x) => x.source === 'agent' && x.status === 'reviewed')); // straight to approval, the people responsible finish and approve it
 });
 await ok('agent run (two platforms): a scope a person already made is left alone, the others are still made', async () => {
   const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { google: { id: 5, source: 'manual', status: 'draft' } } });
@@ -824,6 +826,57 @@ await ok('project history: who may approve, what a person can do in each status,
   assert.throws(() => reviewPatch(row, 'nope', 'a'), /Невідома дія/);
   assert.deepEqual(clientVisible([{ id: 1, status: 'draft' }, { id: 2, status: 'reviewed' }, { id: 3, status: 'final' }]).map((x) => x.id), [3]); // only approved reports reach a client
 });
+await ok('month to date: after an approved week the month is pulled again from the 1st, compared with the same days of the previous month, in one row', async () => {
+  assert.deepEqual(toDateComparison('2026-10', '2026-10-11'), { start: '2026-09-01', end: '2026-09-11', label: '' });
+  assert.equal(toDateComparison('2026-03', '2026-03-31').end, '2026-02-28'); // never past the end of the shorter previous month
+  const week = (start, end, status, extra = {}) => ({ id: start, period_type: 'weekly', period_start: start, period_end: end, status, platform: 'meta', ...extra });
+  const mk = (rows) => {
+    const log = { saved: [], updated: [] };
+    return { log, getAgent: async () => ({ config: {} }), getProject: async () => ({ id: 3, name: 'M', business_type: null }), getAccounts: async () => [accounts[0]], getGroups: async () => [], getCustomMetrics: async () => [], getColumns: async () => ({}),
+      getReports: async (pid, type, scope) => rows.filter((r) => r.period_type === type && r.platform === scope),
+      saveReport: async (r) => { log.saved.push(r); return { id: 99, ...r }; }, updateReport: async (id, patch) => { log.updated.push([id, patch]); return { id, ...patch }; } };
+  };
+  const ranges = [];
+  const spy = async (path, body) => { if (path === '/api/meta-ads-insights' && body.level === 'account' && body.timeRange) ranges.push([body.timeRange.since, body.timeRange.until]); return post(path, body); };
+  const rows = [week('2026-10-05', '2026-10-11', 'final'), week('2026-10-12', '2026-10-18', 'reviewed'), week('2026-09-28', '2026-09-30', 'final')];
+  const first = mk(rows);
+  const r1 = await refreshMonthToDate({ repo: first, post: spy, projectId: 3, monthKey: '2026-10' });
+  assert.deepEqual(r1.updated, [{ scope: 'meta', end: '2026-10-11' }]); // only the approved week of October counts, the one waiting for approval does not
+  assert.deepEqual(ranges.sort(), [['2026-09-01', '2026-09-11'], ['2026-10-01', '2026-10-11']]);
+  const saved = first.log.saved[0];
+  assert.deepEqual([saved.periodType, saved.period.start, saved.period.end, saved.source, saved.status], ['monthly', '2026-10-01', '2026-10-11', 'agent', 'draft']);
+  assert.equal(saved.data.toDate, true);
+  assert.equal(saved.data.approvedThrough, '2026-10-11');
+  assert.match(saved.data.label, /11\.10\.2026/);
+  // a later week is approved: the same row grows, no second row
+  const running = { id: 7, period_type: 'monthly', period_start: '2026-10-01', period_end: '2026-10-11', platform: 'meta', source: 'agent', status: 'draft' };
+  const second = mk([...rows.slice(0, 1), week('2026-10-12', '2026-10-18', 'final'), running]);
+  const r2 = await refreshMonthToDate({ repo: second, post, projectId: 3, monthKey: '2026-10' });
+  assert.deepEqual(r2.updated, [{ scope: 'meta', end: '2026-10-18' }]);
+  assert.equal(second.log.saved.length, 0);
+  assert.deepEqual([second.log.updated[0][0], second.log.updated[0][1].period_end], [7, '2026-10-18']);
+  // a month report a person made, or one that waits for approval, is left alone; a month without approved weeks has nothing to add up
+  const manual = mk([week('2026-10-05', '2026-10-11', 'final'), { ...running, source: 'manual' }]);
+  const r3 = await refreshMonthToDate({ repo: manual, post, projectId: 3, monthKey: '2026-10' });
+  assert.deepEqual([r3.updated.length, manual.log.updated.length, manual.log.saved.length], [0, 0, 0]);
+  assert.match(r3.skipped[0], /створений вручну/);
+  const pending = mk([week('2026-10-05', '2026-10-11', 'final'), { ...running, status: 'reviewed' }]);
+  assert.match((await refreshMonthToDate({ repo: pending, post, projectId: 3, monthKey: '2026-10' })).skipped[0], /на затвердженні/);
+  const none = mk([week('2026-10-12', '2026-10-18', 'reviewed')]);
+  const r4 = await refreshMonthToDate({ repo: none, post, projectId: 3, monthKey: '2026-10' });
+  assert.deepEqual([r4.updated.length, none.log.saved.length], [0, 0]);
+});
+await ok('month to date: the monthly run moves the running row to the full month instead of adding a second row; a month with two monthly rows keeps both visible', async () => {
+  const tables = { project_reports: [{ id: 1, project_id: 3, period_type: 'monthly', period_start: '2026-10-01', period_end: '2026-10-12', platform: 'meta', source: 'agent', status: 'draft', data: { toDate: true } }] };
+  const repo = createAgentRepo(fakeDb(tables), 'agent@x.y');
+  const row = await repo.saveReport({ projectId: 3, periodType: 'monthly', period: { start: '2026-10-01', end: '2026-10-31' }, platform: 'meta', source: 'agent', status: 'reviewed', data: { kind: 'ecom' } });
+  assert.equal(tables.project_reports.length, 1);
+  assert.deepEqual([row.id, tables.project_reports[0].period_end, tables.project_reports[0].status], [1, '2026-10-31', 'reviewed']);
+  const r = (id, end, updated) => ({ id, period_type: 'monthly', period_start: '2026-10-01', period_end: end, status: 'draft', platform: 'meta', updated_at: updated });
+  const m = buildMonths([r(1, '2026-10-12', '2026-10-13T10:00:00Z'), r(2, '2026-10-31', '2026-11-01T10:00:00Z')], '2026-11-02').find((x) => x.key === '2026-10');
+  assert.equal(m.monthly.id, 2);
+  assert.deepEqual(m.others.map((o) => o.id), [1]);
+});
 await ok('site analyst: small numbers get no percentages, missing conversions are reported, and the hand-off is made in code', async () => {
   const small = analyseSite(await collectSiteStats({ account: siteAccount, fetchFn: siteFetch().fetchFn, now: SITE_NOW }));
   const users = small.ga4.metrics.find((m) => m.key === 'users');
@@ -893,7 +946,8 @@ await ok('agent run: makes a draft report with the dynamics text, a deck, an eve
   const r = await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
   assert.equal(r.status, 'ok');
   assert.equal(repo.log.reports[0].source, 'agent');
-  assert.equal(repo.log.reports[0].status, 'draft');
+  assert.equal(repo.log.reports[0].status, 'reviewed');
+  assert.equal(repo.log.reports[0].data.review.sentBy, 'AI-агент');
   assert.match(repo.log.reports[0].data.sections.conclusion, /^Meta Ads: /);
   assert.equal(repo.log.reports[0].data.sections.plans, '');
   assert.match(repo.log.reports[0].data.sections.whatWasDone, /Test RTS/);
@@ -987,10 +1041,17 @@ await ok('tick: starts due reports with the scheduled day as their date, a few p
   const repo = { listEnabledAgents: async () => agents, getRecentRuns: async () => [] };
   const r = await runDueAgents({ repo, now: NOW, batch: 4, runFor: async (job) => { started.push(job); return { status: 'ok', message: 'done' }; } });
   assert.equal(r.checked, 5);
-  assert.equal(r.due, 5);
+  assert.equal(r.due, 10); // each project: the week 1-4 Oct (Monday 5 Oct) and the week 28-30 Sep that ended with the month (the 1st)
   assert.equal(r.started.length, 4);
-  assert.equal(r.waiting, 1);
-  assert.ok(started.every((j) => j.periodType === 'weekly' && j.scheduledFor === '2026-10-05'));
+  assert.equal(r.waiting, 6);
+  assert.ok(started.every((j) => j.periodType === 'weekly' && ['2026-10-05', '2026-10-01'].includes(j.scheduledFor)));
+  // the week that ends mid-week with the month is reported on the 1st, once, and is not asked again when it is done
+  const one = { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [] };
+  const jobs = [];
+  await runDueAgents({ repo: one, now: NOW, batch: 10, runFor: async (job) => { jobs.push([job.scheduledFor, job.periodStart]); return { status: 'ok' }; } });
+  assert.deepEqual(jobs.sort(), [['2026-10-01', '2026-09-28'], ['2026-10-05', '2026-10-01']]);
+  const done = { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [{ status: 'ok', period_start: '2026-09-28' }, { status: 'ok', period_start: '2026-10-01' }] };
+  assert.equal((await runDueAgents({ repo: done, now: NOW, runFor: async () => { throw new Error('must not run'); } })).due, 0);
   const none = await runDueAgents({ repo: { listEnabledAgents: async () => [], getRecentRuns: async () => [] }, now: NOW, runFor: async () => { throw new Error('must not run'); } });
   assert.deepEqual([none.checked, none.due, none.started.length], [0, 0, 0]);
   const boom = await runDueAgents({ repo: { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [] }, now: NOW, runFor: async () => { throw new Error('x'); } });
@@ -1003,13 +1064,13 @@ await ok('notifications: a finished draft and a problem go to the chosen people,
   await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
   assert.deepEqual(repo.log.notifications.map((n) => n.recipient_email), ['boss@x.y']);
   assert.equal(repo.log.notifications[0].type, 'project_report');
-  assert.equal(repo.log.notifications[0].link, '/projects/3?tab=weekly&platform=meta');
-  assert.match(repo.log.notifications[0].body, /^Mellowdiamond: Створено чернетку/);
+  assert.equal(repo.log.notifications[0].link, '/projects/approvals');
+  assert.match(repo.log.notifications[0].body, /^Mellowdiamond: Підготовлено .* і надіслано на затвердження/);
 
   const cron = fakeRepo({ agent: withPeople });
   await runProjectReport({ repo: cron, post, projectId: 3, periodType: 'monthly', trigger: 'cron', today: '2026-10-15' });
   assert.equal(cron.log.notifications.length, 2);
-  assert.equal(cron.log.notifications[0].link, '/projects/3?tab=monthly&platform=meta');
+  assert.equal(cron.log.notifications[0].link, '/projects/approvals');
 
   const broken = async () => { throw new Error('Сесія недійсна'); };
   const bad = fakeRepo({ agent: withPeople });

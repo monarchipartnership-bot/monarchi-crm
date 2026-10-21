@@ -15,8 +15,13 @@ export async function runDueAgents({ repo, runFor, now = new Date(), batch = 4 }
   for (const agent of agents) {
     for (const periodType of TYPES) {
       const runs = await repo.getRecentRuns(agent.project_id, periodType);
-      const verdict = isDue({ periodType, agent, runs, now, dueStartOf: (date) => dueReportPeriod(periodType, date)?.period.start });
-      if (verdict.due) due.push({ projectId: agent.project_id, periodType, scheduledFor: verdict.scheduledFor });
+      // A weekly report is also due on the monthly moment (the 1st): the week that ended with the month, often mid-week, would otherwise wait for Monday and
+      // then be skipped. The same period asked twice in one tick is started once.
+      const schedTypes = periodType === 'weekly' ? ['weekly', 'monthly'] : [periodType];
+      for (const schedType of schedTypes) {
+        const verdict = isDue({ periodType, schedType, agent, runs, now, dueStartOf: (date) => dueReportPeriod(periodType, date)?.period.start });
+        if (verdict.due && !due.some((d) => d.projectId === agent.project_id && d.periodType === periodType && d.periodStart === verdict.periodStart)) due.push({ projectId: agent.project_id, periodType, scheduledFor: verdict.scheduledFor, periodStart: verdict.periodStart });
+      }
     }
   }
   const chosen = due.slice(0, batch);

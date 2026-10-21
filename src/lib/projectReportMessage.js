@@ -4,7 +4,7 @@
 import { escapeHtml } from './siteLeadMessage.js';
 
 export const REPORT_TYPE_LABEL = { weekly: 'Тижневий', monthly: 'Місячний', custom: 'Довільний' };
-export const REPORT_STATUS_LABEL = { draft: 'Чернетка', reviewed: 'Перевірено', final: 'Фінал' };
+export const REPORT_STATUS_LABEL = { draft: 'Чернетка', reviewed: 'На затвердженні', final: 'Затверджено' };
 const fmt = (s) => String(s || '').split('-').reverse().join('.');
 
 // → the link of a report tab: /projects/3?tab=weekly&platform=meta ('all' = «Разом» = platform=total)
@@ -15,7 +15,7 @@ export const reportLink = (crmUrl, projectId, periodType, platform) => `${String
 export function buildReportMessage({ projectName, period, periodType, status = 'draft', action, links = [], test = false }) {
   const dates = period?.start && period?.end ? (period.start === period.end ? fmt(period.start) : `${fmt(period.start)} – ${fmt(period.end)}`) : '—';
   const lines = [
-    `📊 <b>${test ? 'Тест: звіт готовий до перевірки' : 'Звіт готовий до перевірки'}</b>`,
+    `📊 <b>${test ? 'Тест: звіт чекає на затвердження' : 'Звіт чекає на затвердження'}</b>`,
     '',
     `<b>Проєкт:</b> ${escapeHtml(projectName || '—')}`,
     `<b>Дата:</b> ${escapeHtml(dates)}`,
@@ -30,5 +30,5 @@ export function buildReportMessage({ projectName, period, periodType, status = '
 // What the manager still has to do with a fresh draft: `missing` = the text blocks the agent left empty.
 export function reportAction(missing = []) {
   const todo = missing.length ? `заповнити ${missing.join(' і ')}, ` : '';
-  return `Перевірити цифри, ${todo}змінити статус і за потреби створити презентацію`;
+  return `Перевірити цифри, ${todo}затвердити звіт у розділі «Звіти на затвердження»`;
 }

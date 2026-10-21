@@ -69,12 +69,13 @@ const RETRY_AFTER_MIN = 60; // …at least this long after the previous failure
 // A run is due when its scheduled moment has passed, the agent was already switched on at that moment,
 // and no run for that period finished (ok / skipped) or is still being retried. Missing a cron tick
 // therefore only delays a report, it never loses one.
-export function isDue({ periodType, agent, runs, now = new Date(), dueStartOf }) {
+// schedType: whose schedule is used (the weekly report can also be started by the monthly moment: the week that ends with the month is reported on the 1st).
+export function isDue({ periodType, schedType = periodType, agent, runs, now = new Date(), dueStartOf }) {
   const cfg = agent.config || {};
   const task = periodType === 'weekly' ? cfg.tasks?.weeklyReport : cfg.tasks?.monthlyReport;
   if (!agent.enabled) return { due: false, reason: 'вимкнено' };
   if (task === false) return { due: false, reason: 'цей звіт не увімкнено' };
-  const sched = lastScheduled(periodType, cfg.schedule || {}, now);
+  const sched = lastScheduled(schedType, cfg.schedule || {}, now);
   if (agent.enabled_since && sched.at < new Date(agent.enabled_since)) return { due: false, reason: 'запланований момент був до вмикання агента' };
   const periodStart = dueStartOf(sched.date);
   const mine = runs.filter((r) => r.period_start === periodStart);

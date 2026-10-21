@@ -81,10 +81,20 @@ export function createAgentRepo(db, agentEmail) {
       return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).eq('platform', platform).order('period_start', { ascending: false })) || [];
     },
     async saveReport({ projectId, periodType, period, platform = 'all', source, status, data }) {
+      // A month keeps ONE monthly row: the running one («month to date») is moved to the final period instead of a second row appearing next to it.
+      if (periodType === 'monthly') {
+        const same = must(await db.from('project_reports').select('id, source, status').eq('project_id', projectId).eq('period_type', 'monthly').eq('period_start', period.start).eq('platform', platform).neq('period_end', period.end));
+        const mine = (same || []).find((r) => r.source === 'agent' && r.status === 'draft');
+        if (mine) return must(await db.from('project_reports').update({ period_end: period.end, source, status, data, created_by: agentEmail, updated_at: nowIso() }).eq('id', mine.id).select().single());
+      }
       return must(await db.from('project_reports').upsert({
         project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, platform,
         source, status, data, created_by: agentEmail, updated_at: nowIso(),
       }, { onConflict: 'project_id,period_type,period_start,period_end,platform' }).select().single());
+    },
+    // The running monthly report: the same row, a longer period.
+    async updateReport(id, patch) {
+      return must(await db.from('project_reports').update({ ...patch, updated_at: nowIso() }).eq('id', id).select().single());
     },
     async getDeck(projectId, periodType, periodStart, platform) {
       return must(await db.from('project_decks').select('id, source, status').eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform).maybeSingle());

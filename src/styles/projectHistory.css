@@ -20,6 +20,7 @@
 .ph-chip--draft { background: #ECEBF1; color: #5C5870; }
 .ph-chip--reviewed { background: #FBF0DA; color: #96610A; }
 .ph-chip--final { background: #E6F4EC; color: #1E7A4D; }
+.ph-chip--todate { background: #E7EEFB; color: #2B58A8; }
 .ph-chip--none { background: transparent; color: var(--muted, #6A6577); font-weight: 500; padding-left: 0; }
 .ph-doc-block { margin-bottom: 28px; }
 .ph-doc-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 10px; font-size: 1rem; }

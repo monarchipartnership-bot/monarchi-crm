@@ -45,7 +45,9 @@ export function buildMonths(rows, todayIso) {
       // a week belongs to the card when it starts on the card's week and does not run past the month (an old Monday-based week that spans two months stays among the others)
       const week = r.period_type === 'weekly' && r.period_end <= range.end ? weeks.find((w) => w.start === r.period_start) : null;
       if (week) week.row = week.row ? newest(week.row, r) : r;
-      else if (r.period_type === 'monthly' && r.period_start === `${key}-01`) monthly = monthly ? newest(monthly, r) : r;
+      else if (r.period_type === 'monthly' && r.period_start === `${key}-01`) {
+        if (monthly) { const keep = newest(monthly, r); others.push(keep === monthly ? r : monthly); monthly = keep; } else monthly = r;
+      }
       else others.push(r);
     });
     const count = (status) => weeks.filter((w) => w.row?.status === status).length;

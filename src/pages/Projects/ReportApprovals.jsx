@@ -4,10 +4,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from '../../components/Projects/ArchiveReportModal';
 import ReportReturnDialog from '../../components/Projects/ReportReturnDialog';
 import DesignTodo from '../../components/common/DesignTodo';
-import { fetchPendingReports, fetchProjectReport, setReportStatus } from '../../lib/api/projectReportStore';
+import { fetchPendingReports, fetchProjectReport, refreshMonthTotal, setReportStatus } from '../../lib/api/projectReportStore';
 import { fetchApprovers } from '../../lib/api/projectAgents';
 import { loadReportContext, extraKeysOf } from '../../lib/projectReportContext';
-import { canApprove, reportActions } from '../../lib/projectHistory';
+import { canApprove, monthKey, reportActions } from '../../lib/projectHistory';
 import '../../styles/reportPage.css';
 import '../../styles/projectReports.css';
 import '../../styles/projectHistory.css';
@@ -42,7 +42,15 @@ export default function ReportApprovals() {
   async function act(row, action, note) {
     setBusy(true);
     setError('');
-    try { await setReportStatus(row.id, action, { by: email, note }); setOpenRow(null); await load(); } catch (e) { setError(e.message || 'Не вдалося змінити статус.'); } finally { setBusy(false); }
+    try {
+      await setReportStatus(row.id, action, { by: email, note });
+      setOpenRow(null);
+      if (action === 'approve' && row.period_type === 'weekly') {
+        const r = await refreshMonthTotal(row.project_id, monthKey(row.period_start));
+        if (r.error) setError('Тиждень затверджено, але підсумок місяця не вдалося перерахувати: ' + r.error);
+      }
+      await load();
+    } catch (e) { setError(e.message || 'Не вдалося змінити статус.'); } finally { setBusy(false); }
   }
   const onAction = (row, action) => (action === 'return' ? setReturning(row) : act(row, action));
 

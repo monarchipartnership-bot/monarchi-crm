@@ -92,7 +92,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const kept = [];
     for (const scope of scopes) {
       const existing = await repo.getReport(projectId, periodType, period.start, scope);
-      if (existing && !(existing.source === 'agent' && existing.status === 'draft')) kept.push({ scope, existing, why: existing.source === 'agent' ? 'вже перевірений менеджером' : 'створений вручну' });
+      if (existing && !(existing.source === 'agent' && existing.status === 'draft')) kept.push({ scope, existing, why: existing.source === 'agent' ? (existing.status === 'reviewed' ? 'вже на затвердженні' : existing.status === 'final' ? 'вже затверджений' : 'вже перевірений менеджером') : 'створений вручну' });
       else writable.push(scope);
     }
     if (!writable.length) {
@@ -157,7 +157,9 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
 
       // 4. Save the report as a draft.
       const payload = reportPayload({ kind, data: scoped, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '' });
-      reports[scope] = { row: await repo.saveReport({ projectId, periodType, period, platform: scope, source: 'agent', status: 'draft', data: payload }), payload, whatWasDone };
+      // The agent sends the report straight to approval (status «reviewed»): the people responsible check it, fill in what is missing and approve it.
+      payload.review = { sentBy: 'AI-агент', sentAt: new Date().toISOString() };
+      reports[scope] = { row: await repo.saveReport({ projectId, periodType, period, platform: scope, source: 'agent', status: 'reviewed', data: payload }), payload, whatWasDone };
     }
     const made = Object.keys(reports);
     if (!made.length) throw new Error('Не вдалося створити жоден звіт: ' + (notes.join(' ') || 'даних немає.'));
@@ -185,14 +187,14 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
 
     const missingBlocks = [!whatWasDone.trim() && '«What was done»', '«Plans for the next period»'].filter(Boolean);
     const todo = missingBlocks.join(' і ');
-    const message = `Створено чернетку ${GENITIVE[periodType]} звіту за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}${made.length > 1 ? `; звіти: ${made.map(scopeName).join(', ')}` : ''}. Потрібно заповнити: ${todo}; решту перевірити.`;
-    // 6. The chat of the project: one message about the new draft, a button per report (platform) under it.
+    const message = `Підготовлено ${GENITIVE[periodType]} звіт за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}${made.length > 1 ? `; звіти: ${made.map(scopeName).join(', ')}` : ''} і надіслано на затвердження. Потрібно заповнити: ${todo}; решту перевірити.`;
+    // 6. The chat of the project: one message about the report that waits for approval, a button per report (platform) under it.
     if (config.telegram.enabled && config.telegram.chatId) {
       if (!telegram) {
         notes.push('Telegram: бота не налаштовано на сервері, повідомлення в чат не надіслано.');
       } else {
         const links = made.map((m) => ({ label: scopeName(m), url: reportLink(crmUrl, projectId, periodType, m) }));
-        const msg = buildReportMessage({ projectName: project.name, period, periodType, status: 'draft', action: reportAction(missingBlocks), links });
+        const msg = buildReportMessage({ projectName: project.name, period, periodType, status: 'reviewed', action: reportAction(missingBlocks), links });
         const sent = await telegram.send({ chatId: config.telegram.chatId, threadId: config.telegram.threadId || undefined, text: msg.text, buttons: msg.buttons }).catch((e) => ({ ok: false, error: e?.message || String(e) }));
         if (sent?.ok) await event('telegram_sent', 'ok', 'Звіт надіслано в Telegram-чат.', { chatId: config.telegram.chatId });
         else {

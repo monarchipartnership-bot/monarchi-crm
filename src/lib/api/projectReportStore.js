@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { collapseStatuses, flatten } from '../reportScope';
 import { reviewPatch } from '../projectHistory';
+import { authedPost } from '../adAccounts';
 
 // Storage for the redesigned project reports (migration
 // 20261008000000_project_reports.sql): saved weekly/monthly reports, the
@@ -52,6 +53,12 @@ export async function setReportStatus(id, action, { by, note } = {}) {
   const { error: e2 } = await supabase.from('project_reports').update({ status: patch.status, data: { ...(row.data || {}), review: patch.review }, updated_at: nowIso() }).eq('id', id);
   if (e2) throw e2;
   return patch.status;
+}
+
+// After a week is approved (or its approval withdrawn) the running total of its month is pulled again (api/project-month-refresh.js).
+// It never blocks the approval: a failure comes back as { error } for the page to tell the person.
+export async function refreshMonthTotal(projectId, monthKey) {
+  try { return await authedPost('/api/project-month-refresh', { projectId, monthKey }); } catch (e) { return { error: e.message || 'Не вдалося оновити підсумок місяця.' }; }
 }
 
 // One full report (with its numbers), for opening it from the approvals list.

@@ -7,12 +7,12 @@ import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './Arc
 import MonthDocument from './MonthDocument';
 import DesignTodo from '../common/DesignTodo';
 import ReportReturnDialog from './ReportReturnDialog';
-import { deleteProjectReport, fetchProjectReports, setReportStatus } from '../../lib/api/projectReportStore';
+import { deleteProjectReport, fetchProjectReports, refreshMonthTotal, setReportStatus } from '../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../lib/api/projectDecks';
 import { loadReportContext, extraKeysOf } from '../../lib/projectReportContext';
 import { accountPlatforms, TOTAL_TAB } from '../../lib/reportScope';
 import { platformInfo } from '../../lib/adAccounts';
-import { buildMonths, canApprove, reportActions, REPORT_STATUS } from '../../lib/projectHistory';
+import { buildMonths, canApprove, monthKey, reportActions, REPORT_STATUS } from '../../lib/projectHistory';
 import '../../styles/projectReports.css';
 import '../../styles/projectHistory.css';
 
@@ -20,7 +20,8 @@ const fmt = (s) => s.split('-').reverse().join('.');
 const today = () => new Date().toISOString().slice(0, 10);
 const stamp = (iso) => (iso ? new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
-const Chip = ({ status }) => (status ? <i className={'ph-chip ph-chip--' + status}>{REPORT_STATUS[status] || status}</i> : <i className="ph-chip ph-chip--none">ще не створено</i>);
+const Chip = ({ status, toDate }) => (toDate ? <i className="ph-chip ph-chip--todate">Оновлюється</i> : status ? <i className={'ph-chip ph-chip--' + status}>{REPORT_STATUS[status] || status}</i> : <i className="ph-chip ph-chip--none">ще не створено</i>);
+
 
 // «Історія проекту»: month cards, one scope (platform) at a time like the report pages. A card holds the weeks of the month, the monthly report and the
 // combined document. A report goes draft → on approval → approved; only the approved ones reach the client.
@@ -38,6 +39,7 @@ export default function ProjectHistoryTab({ projectId }) {
   const [closed, setClosed] = useState({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
     const [r, d] = await Promise.all([fetchProjectReports(projectId), fetchProjectDecks(projectId)]);
@@ -73,7 +75,16 @@ export default function ProjectHistoryTab({ projectId }) {
   async function act(row, action, note) {
     setBusy(true);
     setError('');
-    try { await setReportStatus(row.id, action, { by: email, note }); await load(); } catch (e) { setError(e.message || 'Не вдалося змінити статус.'); } finally { setBusy(false); }
+    try {
+      await setReportStatus(row.id, action, { by: email, note });
+      // an approved (or withdrawn) week changes the running total of its month
+      if ((action === 'approve' || action === 'reopen') && row.period_type === 'weekly') {
+        setNote('Оновлюємо підсумок місяця…');
+        const r = await refreshMonthTotal(projectId, monthKey(row.period_start));
+        if (r.error) setError('Тиждень оновлено, але підсумок місяця не вдалося перерахувати: ' + r.error);
+      }
+      await load();
+    } catch (e) { setError(e.message || 'Не вдалося змінити статус.'); } finally { setBusy(false); setNote(''); }
   }
   function onAction(row, action) {
     if (action === 'return') { setReturning(row); return; }
@@ -87,12 +98,12 @@ export default function ProjectHistoryTab({ projectId }) {
 
   const rowLine = (row, name, dates, key) => (
     <li key={key}>
-      <span className="ph-name">{name}</span>
-      <span className="ph-dates">{dates}</span>
-      {row ? <Chip status={row.status} /> : <Chip />}
+      <span className="ph-name">{row?.data?.toDate ? `${name} · на сьогодні` : name}</span>
+      <span className="ph-dates">{row?.data?.toDate ? `${fmt(row.period_start)} – ${fmt(row.period_end)}` : dates}</span>
+      {row ? <Chip status={row.status} toDate={row.data?.toDate} /> : <Chip />}
       {row ? (
         <span className="ph-act">
-          {reportActions(row.status, approver).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
+          {(row.data?.toDate ? [] : reportActions(row.status, approver)).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
           <button type="button" className="btn" onClick={() => setOpenId(row.id)}>Відкрити</button>
         </span>
       ) : <span className="ph-missing">Зʼявиться, коли агент або менеджер створить звіт за цей період.</span>}
@@ -112,6 +123,7 @@ export default function ProjectHistoryTab({ projectId }) {
         ))}
       </div>
       {error && <div className="pacc-err">{error}</div>}
+      {note && <div className="pacc-hint" role="status">{note}</div>}
       {rows == null && <div className="empty-hint">Завантаження...</div>}
       {rows && (
         <div className="ph-months">
@@ -145,7 +157,7 @@ export default function ProjectHistoryTab({ projectId }) {
       {open && (
         <ArchiveReportModal
           row={open} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, open)}
-          actions={reportActions(open.status, approver)} onAction={onAction}
+          actions={open.data?.toDate ? [] : reportActions(open.status, approver)} onAction={onAction}
           onClose={() => setOpenId(null)} onDelete={remove} onPresentation={presentation}
         />
       )}
