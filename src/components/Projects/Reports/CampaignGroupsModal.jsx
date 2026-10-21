@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { createCampaignGroup, deleteCampaignGroup, updateCampaignGroup } from '../../../lib/api/projectReportStore';
 import { fetchProjectCampaigns } from '../../../lib/periodReport';
-import { campaignKey, filterCampaigns, groupCampaignKeys, mergeCampaigns } from '../../../lib/campaignGroups';
+import { campaignKey, filterCampaigns, groupMatches, mergeCampaigns } from '../../../lib/campaignGroups';
 import { platformInfo } from '../../../lib/adAccounts';
 import GroupRow from './GroupCards';
 import '../../../styles/projectReports.css';
@@ -20,6 +20,7 @@ export default function CampaignGroupsModal({ projectId, platform, groups, accou
   const editing = groups.find((g) => g.id === editId) || null;
   const [name, setName] = useState('');
   const [picked, setPicked] = useState(new Set());
+  const [rule, setRule] = useState(''); // «назва містить»: words separated by commas; campaigns with such a name join the group by themselves
   const [query, setQuery] = useState('');
   const [fetched, setFetched] = useState(null); // null = loading, [] = loaded
   const [loadErrors, setLoadErrors] = useState({});
@@ -45,22 +46,25 @@ export default function CampaignGroupsModal({ projectId, platform, groups, accou
     if (view !== 'form' || fetched === null || initialised.current) return;
     initialised.current = true;
     setName(editing ? editing.name : '');
-    setPicked(new Set(editing ? [...groupCampaignKeys(editing, all), ...(editing.campaigns || [])].filter((k) => k.startsWith(platform + '|')) : []));
+    setRule(editing ? (editing.keywords || []).join(', ') : '');
+    setPicked(new Set(editing ? (editing.campaigns || []).filter((k) => k.startsWith(platform + '|')) : []));
   }, [view, fetched, editing, all]);
 
   const shown = useMemo(() => filterCampaigns(all, query), [all, query]);
   const toggle = (k) => setPicked((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const allShownPicked = shown.length > 0 && shown.every((c) => picked.has(campaignKey(c.platform, c.name)));
 
-  const openForm = (id) => { initialised.current = false; setEditId(id); setName(''); setPicked(new Set()); setQuery(''); setError(''); setView('form'); };
+  const keywords = useMemo(() => [...new Set(rule.split(',').map((k) => k.trim()).filter(Boolean))], [rule]);
+  const ruleMatches = useMemo(() => (keywords.length ? all.filter((c) => c.platform === platform && groupMatches({ keywords }, c.platform, c.name)) : []), [all, keywords, platform]);
+  const openForm = (id) => { initialised.current = false; setEditId(id); setName(''); setRule(''); setPicked(new Set()); setQuery(''); setError(''); setView('form'); };
   async function changed() { await onChanged(); }
 
   async function save() {
     if (!name.trim()) { setError('Вкажіть назву групи.'); return; }
-    if (!picked.size) { setError('Оберіть хоча б одну кампанію.'); return; }
+    if (!picked.size && !keywords.length) { setError('Оберіть хоча б одну кампанію або вкажіть правило за назвою.'); return; }
     setSaving(true); setError('');
     try {
-      const body = { name, platform, campaigns: [...picked].filter((k) => k.startsWith(platform + '|')) };
+      const body = { name, platform, keywords, campaigns: [...picked].filter((k) => k.startsWith(platform + '|')) };
       if (editing) await updateCampaignGroup(editing.id, body); else await createCampaignGroup(projectId, body);
       await changed();
       if (startEdit) onClose(); else { setView('list'); setEditId(null); }
@@ -80,12 +84,17 @@ export default function CampaignGroupsModal({ projectId, platform, groups, accou
             <>
               {groups.length === 0 && <div className="cg-empty">Пусто. Додайте першу групу: оберіть кампанії {platformInfo(platform).label}, які мають йти в звіт разом.</div>}
               <GroupRow groups={groups} known={knownCampaigns} activeId={undefined} onEdit={openForm} onDelete={remove} onCreate={() => openForm(null)} />
-              <div className="pacc-hint">Група це кампанії, які ви обрали самі. Обравши групу на сторінці звіту, ви побачите цифри саме по цих кампаніях.</div>
+              <div className="pacc-hint">Група це кампанії, які ви обрали самі, і, за бажанням, правило за назвою: нові кампанії з такою назвою потрапляють у групу самі. У звіті кожна група окрема колонка таблиці.</div>
             </>
           )}
           {view === 'form' && (
             <div className="cg-form">
               <div className="pk-field"><label htmlFor="cg-name">Назва групи</label><input id="cg-name" type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Наприклад: Каталог, Кінкі Бенг, Сезонні" /></div>
+              <div className="pk-field">
+                <label htmlFor="cg-rule">Правило: назва містить (необовʼязково)</label>
+                <input id="cg-rule" type="text" value={rule} onChange={(e) => setRule(e.target.value)} maxLength={120} placeholder="Наприклад: RTS, catalog (слова через кому)" />
+                {keywords.length > 0 && <span className="pacc-hint">{ruleMatches.length ? `Правило зараз охоплює кампаній: ${ruleMatches.length}` : fetched === null ? 'Рахуємо кампанії…' : 'Зараз жодна кампанія не підходить під правило, але нові з такою назвою потраплять у групу.'}</span>}
+              </div>
               <div className="cg-pick">
                 <div className="cg-pick-bar">
                   <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Пошук кампанії" aria-label="Пошук кампанії" />
@@ -108,7 +117,6 @@ export default function CampaignGroupsModal({ projectId, platform, groups, accou
                   })}
                 </div>
               </div>
-              {editing && (editing.keywords || []).length > 0 && <div className="pacc-hint">Ця група була задана словами ({editing.keywords.join(', ')}). Позначені кампанії це те, що вона охоплює зараз: після збереження група стане постійним списком.</div>}
             </div>
           )}
           {error && <div className="form-err">{error}</div>}
@@ -118,7 +126,7 @@ export default function CampaignGroupsModal({ projectId, platform, groups, accou
           {view === 'form' && (
             <>
               <button type="button" className="btn pw-btn--bad" onClick={() => (startEdit ? onClose() : (setView('list'), setEditId(null), setError('')))}>Скасувати</button>
-              <button type="button" className="btn pw-btn--ok" disabled={saving || !name.trim() || !picked.size} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти групу'}</button>
+              <button type="button" className="btn pw-btn--ok" disabled={saving || !name.trim() || (!picked.size && !keywords.length)} onClick={save}>{saving ? 'Зберігаємо…' : 'Зберегти групу'}</button>
             </>
           )}
         </div>

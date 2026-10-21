@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CompareModal from './CompareModal';
-import ResultView, { CampaignPicker, ContentOptions } from './ResultView';
-import CampaignGroupsModal from './CampaignGroupsModal';
-import GroupsStrip from './GroupsStrip';
-import { deleteCampaignGroup } from '../../../lib/api/projectReportStore';
-import { campaignKey, flatCampaigns, groupCampaignKeys } from '../../../lib/campaignGroups';
-import CustomMetricModal from './CustomMetricModal';
+import ResultView from './ResultView';
 import { useReportContext } from './useReportContext';
 import { useConfirm } from '../../common/ConfirmDialog';
 import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import WeekPicker from '../../Reports/Weekly/WeekPicker';
-import { daysInRange, fetchProjectRange, periodFromPicker, regroupData } from '../../../lib/periodReport';
+import { daysInRange, fetchProjectRange, periodFromPicker } from '../../../lib/periodReport';
 import { fetchProjectReports, saveProjectReport, deleteProjectReport } from '../../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../../lib/api/projectDecks';
 import { EMPTY_SECTIONS, buildWhatWasDone, comparisonPeriod, pullReportData, reportPayload } from '../../../lib/reportEngine';
-import { normalizeTemplate, reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
+import { reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
+import { metricKeys } from '../../../lib/clientReport';
 import { platformInfo } from '../../../lib/adAccounts';
 import { missingColumns } from '../../../lib/platformColumns';
 import { metricMeta } from '../../../lib/reportMetrics';
@@ -67,8 +63,6 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
   const [modal, setModal] = useState(null);
-  const [activeGroupId, setActiveGroupId] = useState(null); // the group whose campaigns were put into the report (cleared when the picks are changed by hand)
-  const [groupEdit, setGroupEdit] = useState(null);
   // What the numbers are compared with. Nothing until the person asks («Порівняти»):
   //   { mode: 'calendar' } the previous report period (previous week of the month / previous month)
   //   { mode: 'days' }     the same number of days right before this period
@@ -197,7 +191,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       const row = await saveProjectReport({
         projectId, periodType, periodStart: period.start, periodEnd: period.end, platform: ctx.scope, status: nextStatus,
         source: meta.source, createdBy: email,
-        data: reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note, template: snap || snapshotOf(ctx.template, periodType) }),
+        data: reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note, template: snap || newSnap() }),
       });
       setStatus(row.status);
       setDirty(false);
@@ -249,29 +243,17 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   if (ctx.error) return <div className="proj-empty">{ctx.error}</div>;
   if (!ctx.ready) return <div className="empty-hint">Завантаження...</div>;
 
-  const known = data ? flatCampaigns(data) : [];
-  // «Вибрати» on a group: exactly its campaigns go into the report; «Усі кампанії»: every campaign of the period.
-  function pickGroup(id) {
-    const g = ctx.groups.find((x) => x.id === id);
-    setSelection(g ? groupCampaignKeys(g, known) : known.map((c) => campaignKey(c.platform, c.name)));
-    setActiveGroupId(g ? g.id : null);
-    setDirty(true);
-  }
-  const first = data ? Object.values(data.platforms)[0] : null;
   const hasAccounts = ctx.accounts.length > 0;
   // the text blocks of this report: its own snapshot, or the project's template for a new one (a text under a key outside the list is still shown)
-  const textBlocks = reportBlocks({ template: snap || snapshotOf(ctx.template, periodType), sections });
-  const ownGroups = !isTotal;
-  // the platform tab's own numbers: what the «Що входить у звіт» box works on
+  const newSnap = () => snapshotOf(ctx.layout, periodType, { metrics: metricKeys(ctx.kind, ctx.extraKeys, ctx.custom) });
+  const textBlocks = reportBlocks({ template: snap || newSnap(), sections });
   const platData = !isTotal && data ? data.platforms?.[platform] : null;
-  const platCampaigns = platData ? [...(platData.campaigns || [])].sort((a, b) => (b.spend || 0) - (a.spend || 0)) : [];
-  const platPicked = selection.filter((k) => k.startsWith(platform + '|')).length;
   // columns picked in «+ Метрика» after this report was pulled: it has no numbers for them until it is refreshed
   const missing = platData ? missingColumns(platform, ctx.extraKeys, platData.total) : [];
 
   return (
     <div className="prep-wrap">
-      <div className={'prep-top' + (isTotal ? ' prep-top--one' : '')}>
+      <div className="prep-top prep-top--one">
       <section className="report-section prep-box">
         <HubTitle icon="cal" className="prep-box-title">Період звіту</HubTitle>
         {periodType === 'weekly' ? (
@@ -301,29 +283,6 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
         </div>
       </section>
 
-      {!isTotal && (
-        <section className="report-section prep-box">
-          <HubTitle icon="layers" className="prep-box-title">Що входить у звіт</HubTitle>
-          {platData && Object.keys(platData).length ? (
-            <>
-              <ContentOptions
-                bare hasGroups={(platData.groups || []).length > 0} groupsOn={options.groups !== false} pickedCount={platPicked}
-                onGroups={(v) => { setOptions({ ...options, groups: v }); setDirty(true); }}
-                onOnlyTotals={() => { setOptions({ ...options, groups: false }); setSelection(selection.filter((k) => !k.startsWith(platform + '|'))); setActiveGroupId(null); setDirty(true); }}
-                onEverything={() => { setOptions({ ...options, groups: true }); setSelection([...selection.filter((k) => !k.startsWith(platform + '|')), ...platCampaigns.map((c) => campaignKey(platform, c.name))]); setActiveGroupId(null); setDirty(true); }}
-              />
-              {platCampaigns.length > 0 && (
-                <CampaignPicker
-                  campaigns={platCampaigns} platform={platform} selection={selection} kind={ctx.kind} custom={ctx.custom} currency={platData.currency}
-                  onChange={(s) => { setSelection(s); setActiveGroupId(null); setDirty(true); }}
-                />
-              )}
-            </>
-          ) : (
-            <div className="pacc-hint">Підтягніть цифри за період: тоді тут зʼявиться вибір, що увійде у звіт, і список кампаній.</div>
-          )}
-        </section>
-      )}
       </div>
 
       {Object.entries(errors).map(([p, msg]) => <div className="pacc-err" key={p}>{p}: {msg}</div>)}
@@ -347,17 +306,11 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
         </div>
       )}
 
-      {ownGroups && (
-      <section className="report-section">
-        <GroupsStrip
-          groups={ctx.groups} known={known} activeId={activeGroupId} hint="Оберіть групу, і в звіт потраплять лише її кампанії. Їх можна дообрати вручну нижче."
-          onPick={data ? pickGroup : undefined}
-          onEdit={(id) => { setGroupEdit(id); setModal('groups'); }}
-          onCreate={() => { setGroupEdit('new'); setModal('groups'); }}
-          onDelete={async (id) => { await deleteCampaignGroup(id); const g = await ctx.reloadGroups(); if (id === activeGroupId) setActiveGroupId(null); setData((d) => (d ? regroupData(d, g) : d)); setDirty(true); }}
-        />
-        {!data && ctx.groups.length > 0 && <div className="pacc-hint">Спершу підтягніть цифри за період, тоді групу можна буде вибрати.</div>}
-      </section>
+      {!isTotal && ctx.ready && !ctx.layoutSaved && (
+        <div className="prep-internal-note" role="note">
+          <b>Макет звіту не налаштовано.</b> Звіт збирається за стандартним виглядом, а AI-агент для цієї платформи не працює, поки макет не створено.{' '}
+          <button type="button" className="pacc-link" onClick={() => navigate(`/projects/${projectId}?tab=builder&platform=${platform}`)}>Відкрити «Конструктор звіту»</button>
+        </div>
       )}
 
       <section className="report-section prep-box prep-status-box">
@@ -385,16 +338,14 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={(snap || normalizeTemplate(ctx.template)).metrics || null}
+            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={snap?.metrics || null}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
-            campaignMode="selected" selection={selection} onSelectionChange={(s) => { setSelection(s); setActiveGroupId(null); setDirty(true); }}
-            options={options} onOptionsChange={(o) => { setOptions(o); setDirty(true); }}
+            campaignMode="selected" selection={selection}
+            options={options}
             curLabel={`${fmt(period.start)} – ${fmt(period.end)}`}
             prevLabel={data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній'}
-          >
-            <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
-          </ResultView>
+          />
         </section>
       )}
 
@@ -481,18 +432,6 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
           offer={modal === 'ask'} current={{ from: period.start, to: period.end }} presets={comparePresets} value={cmp}
           onApply={applyCompare} onClose={() => setModal(null)} onNeverAsk={neverAsk}
         />
-      )}
-      {modal === 'groups' && (
-        <CampaignGroupsModal
-          projectId={projectId} platform={platform} groups={ctx.groups} accounts={ctx.accounts} kind={ctx.kind} knownCampaigns={known} startEdit={groupEdit}
-          onClose={() => { setModal(null); setGroupEdit(null); }}
-          onChanged={async () => { const g = await ctx.reloadGroups(); if (activeGroupId && !g.some((x) => x.id === activeGroupId)) setActiveGroupId(null); setData((d) => (d ? regroupData(d, g) : d)); setDirty(true); }}
-        />
-      )}
-      {modal === 'metric' && (
-        <CustomMetricModal projectId={projectId} platform={platform} columnKeys={ctx.extraKeys} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}
-          onColumnsSaved={async () => { const cols = await ctx.reloadColumns(); if (data) pull(cmp, cols, true); }}
-          sample={first ? { base: first.total, currency: first.currency, label: 'весь акаунт' } : null} />
       )}
       {confirmDialog}
     </div>

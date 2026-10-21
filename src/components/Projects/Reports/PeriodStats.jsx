@@ -1,16 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ResultView from './ResultView';
 import CompareModal from './CompareModal';
-import CampaignGroupsModal from './CampaignGroupsModal';
-import GroupsStrip from './GroupsStrip';
-import { deleteCampaignGroup, saveProjectReport } from '../../../lib/api/projectReportStore';
+import { saveProjectReport } from '../../../lib/api/projectReportStore';
 import { reportPayload } from '../../../lib/reportEngine';
 import { useAuth } from '../../../contexts/AuthContext';
-import { campaignKey } from '../../../lib/campaignGroups';
-import { flatCampaigns, scopeToGroup } from '../../../lib/campaignGroups';
-import CustomMetricModal from './CustomMetricModal';
 import { useReportContext } from './useReportContext';
-import { fetchProjectRange, regroupData } from '../../../lib/periodReport';
+import { fetchProjectRange } from '../../../lib/periodReport';
 import { isoDate } from '../../../lib/dateHelpers';
 import '../../../styles/projectReports.css';
 import DatePicker from '../../common/DatePicker';
@@ -49,8 +44,6 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   const [cmp, setCmp] = useState(null);
   const [state, setState] = useState({ status: 'idle' });
   const [modal, setModal] = useState(null);
-  const [activeGroupId, setActiveGroupId] = useState(null); // the group the report is narrowed to (null = all campaigns)
-  const [groupEdit, setGroupEdit] = useState(null); // opens the groups window straight in the form: a group id or 'new'
   const [askOff, setAskOff] = useState(() => { try { return localStorage.getItem('prep-ask-compare') === 'off'; } catch { return false; } });
 
   const previousOf = (range) => {
@@ -117,9 +110,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
 
-  const activeGroup = ctx.groups?.find((g) => g.id === activeGroupId) || null;
-  const shown = useMemo(() => (state.status === 'ok' ? scopeToGroup(state.data, activeGroup) : null), [state, activeGroup]);
-  const known = useMemo(() => (state.status === 'ok' ? flatCampaigns(state.data) : []), [state]);
+  const shown = state.status === 'ok' ? state.data : null; // the groups are columns of the table; they are set up in the «Конструктор звіту»
 
   // «Зберегти в архів»: the period on screen (narrowed to the chosen group, if any) becomes a report of type «Довільний»
   async function saveToArchive() {
@@ -129,7 +120,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
       const prev = state.prev ? { start: state.prev.from, end: state.prev.to } : null;
       const selection = Object.entries(shown.platforms).flatMap(([p, v]) => (v.campaigns || []).map((c) => campaignKey(p, c.name)));
       const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection, options: { groups: true } });
-      await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'draft', data: { ...payload, label: activeGroup?.name || null }, createdBy: email });
+      await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'draft', data: { ...payload, label: null }, createdBy: email });
       setArchive({ busy: false, msg: 'Збережено в «Архів звітів».' });
     } catch (e) {
       setArchive({ busy: false, msg: (e.message || 'Не вдалося зберегти.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261030000000.' });
@@ -142,7 +133,6 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     return <div className="empty-hint">До проєкту не підключено рекламних кабінетів. Підключіть Meta або Google на вкладці «Огляд», і тут зʼявляться цифри.</div>;
   }
 
-  const firstPlatform = state.status === 'ok' ? Object.values(state.data.platforms)[0] : null;
 
   return (
     <div className="prep-wrap">
@@ -160,33 +150,19 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
         </div>
       </section>
 
-      {!isTotal && (
-      <section className="report-section">
-        <GroupsStrip
-          groups={ctx.groups} known={known} activeId={activeGroupId}
-          onPick={(id) => setActiveGroupId(id)}
-          onEdit={(id) => { setGroupEdit(id); setModal('groups'); }}
-          onCreate={() => { setGroupEdit('new'); setModal('groups'); }}
-          onDelete={async (id) => { await deleteCampaignGroup(id); const g = await ctx.reloadGroups(); if (id === activeGroupId) setActiveGroupId(null); setState((st) => (st.status === 'ok' ? { ...st, data: regroupData(st.data, g) } : st)); }}
-        />
-      </section>
-      )}
-
       {state.status === 'error' && <div className="pacc-err">{state.error}</div>}
       {state.compareError && <div className="pacc-err">{state.compareError}</div>}
       {state.status === 'ok' && Object.entries(state.errors).map(([p, msg]) => <div className="pacc-err" key={p}>{p}: {msg}</div>)}
 
-      {state.status === 'ok' && activeGroup && Object.keys(shown.platforms).length === 0 && <div className="empty-hint">У групі «{activeGroup.name}» немає кампаній з даними за цей період.</div>}
       {state.status === 'ok' && Object.keys(shown.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
             data={shown} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys}
-            title={activeGroup ? `${ctx.project.name} · ${activeGroup.name}` : ctx.project.name} subtitle={`${fmt(state.range.from)} – ${fmt(state.range.to)}`}
-            fileBase={`${ctx.project.name}${activeGroup ? '_' + activeGroup.name : ''}_${state.range.from}_${state.range.to}`}
+            title={ctx.project.name} subtitle={`${fmt(state.range.from)} – ${fmt(state.range.to)}`}
+            fileBase={`${ctx.project.name}_${state.range.from}_${state.range.to}`}
             curLabel={`${fmt(state.range.from)}–${fmt(state.range.to)}`}
             prevLabel={state.prev ? `${fmt(state.prev.from)}–${fmt(state.prev.to)}` : ''}
           >
-            <button type="button" className="btn" onClick={() => setModal('metric')}>+ Метрика</button>
             <button type="button" className="btn" onClick={saveToArchive} disabled={archive.busy}>{archive.busy ? 'Зберігаємо…' : 'Зберегти в архів'}</button>
           </ResultView>
           {archive.msg && <div className="pacc-hint prep-archive-msg">{archive.msg}</div>}
@@ -204,21 +180,6 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
           onApply={applyCompare}
           onClose={() => setModal(null)}
           onNeverAsk={neverAsk}
-        />
-      )}
-
-      {modal === 'groups' && (
-        <CampaignGroupsModal
-          projectId={projectId} platform={platform} groups={ctx.groups} accounts={ctx.accounts} kind={ctx.kind} knownCampaigns={known} startEdit={groupEdit}
-          onClose={() => { setModal(null); setGroupEdit(null); }}
-          onChanged={async () => { const g = await ctx.reloadGroups(); if (activeGroupId && !g.some((x) => x.id === activeGroupId)) setActiveGroupId(null); setState((st) => (st.status === 'ok' ? { ...st, data: regroupData(st.data, g) } : st)); }}
-        />
-      )}
-      {modal === 'metric' && (
-        <CustomMetricModal
-          projectId={projectId} platform={platform} columnKeys={ctx.extraKeys} custom={ctx.custom} onClose={() => setModal(null)} onChanged={ctx.reloadCustom}
-          onColumnsSaved={async () => { const cols = await ctx.reloadColumns(); if (state.status === 'ok') run(state.range, cmp, cols, true); }}
-          sample={firstPlatform ? { base: firstPlatform.total, currency: firstPlatform.currency, label: 'весь акаунт' } : null}
         />
       )}
     </div>

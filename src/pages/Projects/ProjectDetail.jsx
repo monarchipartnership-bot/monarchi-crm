@@ -12,6 +12,7 @@ import { platformInfo } from '../../lib/adAccounts';
 import { EXTRA_PROJECT_FIELDS, extraFieldsPayload } from '../../lib/projectFields';
 import AutoField from '../../components/Projects/AutoField';
 import ProjectHistoryTab from '../../components/Projects/ProjectHistoryTab';
+import ReportBuilder from '../../components/Projects/Builder/ReportBuilder';
 import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
@@ -32,6 +33,7 @@ import '../../styles/projectHub.css'; // Hub style, last so it wins over the old
 
 const TABS = [
   { key: 'overview', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src },
+  { key: 'builder', label: 'Конструктор звіту', icon: null, line: <path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z" /> },
   { key: 'period', label: 'Показники за період', icon: null, line: <path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6" /> },
   { key: 'weekly', label: 'Тижневий звіт', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'monthly', label: 'Місячний звіт', icon: PAGE_ICONS['page.monthly-report'].src },
@@ -468,6 +470,7 @@ export default function ProjectDetail() {
         </>
       )}
 
+      {tab === 'builder' && <ReportBuilder key={'builder-' + id} projectId={id} />}
       {tab === 'period' && <PlatformReports key={'period-' + id} projectId={id} mode="period" />}
       {tab === 'weekly' && <PlatformReports key={'weekly-' + id} projectId={id} mode="weekly" />}
       {tab === 'monthly' && <PlatformReports key={'monthly-' + id} projectId={id} mode="monthly" />}

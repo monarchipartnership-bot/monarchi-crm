@@ -70,8 +70,11 @@ export function createAgentRepo(db, agentEmail) {
       const rows = must(await db.from('project_report_columns').select('platform, columns').eq('project_id', projectId)) || [];
       return Object.fromEntries(rows.map((r) => [r.platform, r.columns || []]));
     },
-    // The project's report template (null: none saved, the standard one applies).
-    async getTemplate(projectId) { return must(await db.from('project_report_templates').select('blocks, creatives, metrics').eq('project_id', projectId).maybeSingle()); },
+    // The report layout of one platform of the project (null: not set up yet, so the agent does not report that platform).
+    async getLayout(projectId, platform) {
+      const row = must(await db.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics').eq('project_id', projectId).eq('platform', platform).maybeSingle());
+      return row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics } : null;
+    },
     async getCustomMetrics(projectId) { return must(await db.from('report_custom_metrics').select('*').or(`project_id.eq.${projectId},project_id.is.null`).order('id', { ascending: true })) || []; },
 
     // ---- reports and decks

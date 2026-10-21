@@ -9,11 +9,11 @@ const Stamps = ({ items }) => (
   </div>
 );
 
-function Kpis({ view }) {
+export function Kpis({ view, all = false }) {
   const vs = prevName(view);
   return (
     <div className="kp k6">
-      {kpiCards(view).map((k) => (
+      {kpiCards(view, { all }).map((k) => (
         <div className="rf mc" key={k.key}>
           <div className="mch"><Medallion icon={k.icon} cls="sm" /><div className="mct"><small>{k.label}</small><b className="v">{k.value}</b></div></div>
           <div className="mcf">{k.change && <><DeltaPill change={k.change} /><span className="sub">vs {vs}</span></>}</div>
@@ -45,15 +45,21 @@ export default function MonthView({ month, model }) {
   const weeksSum = (key) => month.weeks.reduce((a, w) => a + (Number(w.view.total[key]) || 0), 0);
   const money = (key) => (v) => fmtValue(key, v, 'money', total?.currency || month.weeks[0]?.view.currency);
   const primary = kind === 'leadgen' ? ['leads', 'Leads'] : ['revenue', 'Revenue'];
-  const wave = month.weeks.length > 1 ? (
-    <Box icon="roas" title={`Weeks of ${month.name}`} sub={kind === 'leadgen' ? 'Spend and leads' : 'Spend, revenue and ROAS'} right={<Legend items={[[primary[1], GP], ['Spend', GB]]} />}>
+  const hide = (key) => (total?.hiddenMetrics || month.weeks[0]?.view.hiddenMetrics || []).includes(key);
+  const series = [
+    ...(hide(primary[0]) ? [] : [{ name: primary[1], values: month.weeks.map((w) => Number(w.view.total[primary[0]]) || 0), g: GP }]),
+    ...(hide('spend') ? [] : [{ name: 'Spend', values: month.weeks.map((w) => Number(w.view.total.spend) || 0), g: GB }]),
+  ];
+  const showRoas = kind !== 'leadgen' && !hide('roas');
+  const wave = month.weeks.length > 1 && series.length ? (
+    <Box icon="roas" title={`Weeks of ${month.name}`} sub={kind === 'leadgen' ? 'Spend and leads' : 'Spend, revenue and ROAS'} right={<Legend items={series.map((x) => [x.name, x.g])} />}>
       <div className="gx">
         <Wave
           labels={month.weeks.map((w) => `W${w.n}`)}
-          series={[{ name: primary[1], values: month.weeks.map((w) => Number(w.view.total[primary[0]]) || 0), g: GP }, { name: 'Spend', values: month.weeks.map((w) => Number(w.view.total.spend) || 0), g: GB }]}
+          series={series}
           w={620} h={240} fmt={kind === 'leadgen' ? (v) => String(Math.round(v)) : money('revenue')}
         />
-        {kind !== 'leadgen' && (
+        {showRoas && (
           <div className="rstrip" style={{ gridTemplateColumns: `repeat(${month.weeks.length},minmax(0,1fr))` }}>
             {month.weeks.map((w) => <div className="rp" key={w.n}><small>W{w.n} ROAS</small><b>{fmtValue('roas', computeMetric('roas', w.view.total), 'ratio')}</b></div>)}
           </div>
@@ -62,7 +68,7 @@ export default function MonthView({ month, model }) {
     </Box>
   ) : null;
   const slices = total ? spendSlices(total).map((s, i) => ({ ...s, g: PALETTE[i % PALETTE.length] })) : [];
-  const bars = total && kind !== 'leadgen' ? roasBars(total).map((b, i) => ({ label: b.label, value: b.value, text: fmtValue('roas', b.value, 'ratio'), g: PALETTE[i % PALETTE.length] })) : [];
+  const bars = total && showRoas ? roasBars(total).map((b, i) => ({ label: b.label, value: b.value, text: fmtValue('roas', b.value, 'ratio'), g: PALETTE[i % PALETTE.length] })) : [];
   const spent = slices.reduce((a, s) => a + s.value, 0);
   const complete = month.weeksApproved === month.weeksTotal;
   const reachSumWeeks = weeksSum('reach');

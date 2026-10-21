@@ -91,15 +91,15 @@ export async function fetchCampaignGroups(projectId) {
 }
 
 // A group = a name + the platform it was made in + the chosen campaigns ('platform|campaign name' keys). Old keyword groups have `keywords` and an empty `campaigns`.
-export async function createCampaignGroup(projectId, { name, campaigns, platform }) {
+export async function createCampaignGroup(projectId, { name, campaigns, platform, keywords = [] }) {
   const { data: last } = await supabase.from('project_campaign_groups').select('sort').eq('project_id', projectId).order('sort', { ascending: false }).limit(1).maybeSingle();
-  const { data, error } = await supabase.from('project_campaign_groups').insert({ project_id: projectId, name: name.trim(), campaigns, platform: platform || null, keywords: [], sort: (last?.sort ?? -1) + 1 }).select().single();
+  const { data, error } = await supabase.from('project_campaign_groups').insert({ project_id: projectId, name: name.trim(), campaigns, platform: platform || null, keywords, sort: (last?.sort ?? -1) + 1 }).select().single();
   if (error) throw error;
   return data;
 }
-// Saving turns an old keyword group into an explicit list: its keywords are cleared.
-export async function updateCampaignGroup(id, { name, campaigns, platform }) {
-  const { data, error } = await supabase.from('project_campaign_groups').update({ name: name.trim(), campaigns, ...(platform ? { platform } : {}), keywords: [] }).eq('id', id).select().single();
+// A group is its listed campaigns plus, when it has `keywords`, every campaign whose name contains one of them (new campaigns with such a name join by themselves).
+export async function updateCampaignGroup(id, { name, campaigns, platform, keywords = [] }) {
+  const { data, error } = await supabase.from('project_campaign_groups').update({ name: name.trim(), campaigns, ...(platform ? { platform } : {}), keywords }).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -207,16 +207,23 @@ export async function revokeReportShare(projectId, platform) {
   if (error) throw error;
 }
 
-// ---- The report template of a project (migration 20261034000000_report_templates.sql) ----
-// → a normalized template; the standard one when nothing is saved (or the table is not there yet).
-export async function fetchReportTemplate(projectId) {
-  const { data, error } = await supabase.from('project_report_templates').select('blocks, creatives, metrics').eq('project_id', projectId).maybeSingle();
-  if (error) { console.warn('fetchReportTemplate failed', error); return normalizeTemplate(null); }
-  return normalizeTemplate(data);
+// ---- The report layout of a project, one per ad platform (migration 20261035000000_report_layouts.sql) ----
+// → { exists, layout }: the saved layout, or the standard one (exists false) when nothing is saved yet (or the table is not there yet).
+const fromRow = (row) => (row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics } : null);
+export async function fetchReportLayout(projectId, platform) {
+  const { data, error } = await supabase.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics').eq('project_id', projectId).eq('platform', platform).maybeSingle();
+  if (error) { console.warn('fetchReportLayout failed', error); return { exists: false, layout: normalizeTemplate(null) }; }
+  return { exists: Boolean(data), layout: normalizeTemplate(fromRow(data)) };
 }
-export async function saveReportTemplate(projectId, template, by) {
-  const t = normalizeTemplate(template);
-  const { error } = await supabase.from('project_report_templates').upsert({ project_id: projectId, blocks: t.blocks, creatives: t.creatives, metrics: t.metrics, updated_by: by || null, updated_at: nowIso() }, { onConflict: 'project_id' });
+// platform → the layout, only for the platforms that have one saved.
+export async function fetchReportLayouts(projectId) {
+  const { data, error } = await supabase.from('project_report_layouts').select('platform, kind, blocks, creatives, hidden_metrics').eq('project_id', projectId);
+  if (error) { console.warn('fetchReportLayouts failed', error); return {}; }
+  return Object.fromEntries((data ?? []).map((r) => [r.platform, normalizeTemplate(fromRow(r))]));
+}
+export async function saveReportLayout(projectId, platform, layout, by) {
+  const t = normalizeTemplate(layout);
+  const { error } = await supabase.from('project_report_layouts').upsert({ project_id: projectId, platform, kind: t.kind, blocks: t.blocks, creatives: t.creatives, hidden_metrics: t.hiddenMetrics, updated_by: by || null, updated_at: nowIso() }, { onConflict: 'project_id,platform' });
   if (error) throw error;
   return t;
 }

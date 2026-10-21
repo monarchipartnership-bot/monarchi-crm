@@ -27,7 +27,7 @@ import { collectCreatives, creativeCandidates, pickCreative } from '../api/_lib/
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
-import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, metricKeysOf, normalizeTemplate, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
+import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, normalizeTemplate, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
 import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
@@ -39,7 +39,7 @@ import { buildTelegramText, handleSiteLead, normalizeLead, runLeadReminders } fr
 import { botInfo, escapeHtml, peopleFromUpdate, sendMessage as tgSend, webhookSecret } from '../api/_lib/telegram.js';
 import { DEFAULT_TEMPLATE, mentionOf, renderMessage, safeTemplate } from '../src/lib/siteLeadMessage.js';
 import { buildSnippet } from '../src/lib/siteLeadSnippet.js';
-import { campaignKey as gKey, filterCampaigns, flatCampaigns, groupCampaignKeys, groupMatches, mergeCampaigns, scopeToGroup } from '../src/lib/campaignGroups.js';
+import { campaignKey as gKey, campaignsOutsideGroups, filterCampaigns, flatCampaigns, groupCampaignKeys, groupMatches, mergeCampaigns, scopeToGroup } from '../src/lib/campaignGroups.js';
 import { groupCampaigns } from '../src/lib/periodReport.js';
 import { accountPlatforms, accountsForTab, collapseStatuses, flatten, pickReportRow, reportScope } from '../src/lib/reportScope.js';
 import { groupsForPlatform } from '../src/lib/campaignGroups.js';
@@ -240,7 +240,7 @@ await ok('agent sign-in: returns a token, explains a missing setup, and reports 
 const { runProjectReport } = await import('../api/_lib/projectAgentRun.js');
 const { describeDynamics } = await import('../src/lib/reportDynamics.js');
 
-function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, existingByScope = null, locked = true, existingDeck = null, projectAccounts = accounts, columnsPicked = {} } = {}) {
+function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { platforms: [], deck: { style: 'brand-pulse', lang: 'en' } } }, existingReport = null, existingByScope = null, locked = true, existingDeck = null, projectAccounts = accounts, columnsPicked = {}, layouts = null } = {}) {
   const log = { runs: [], events: [], reports: [], decks: [], health: [], unlocked: 0, notifications: [] };
   return {
     log,
@@ -259,6 +259,8 @@ function fakeRepo({ recentNotice = false, agent = { enabled: true, config: { pla
     getGroups: async () => [],
     getCustomMetrics: async () => [],
     getColumns: async () => columnsPicked,
+    // layouts null: every platform has the standard layout; an object: only the listed platforms have one (value = the layout)
+    getLayout: async (projectId, platform) => (layouts === null ? {} : layouts[platform] ?? null),
     getReport: async (projectId, periodType, start, scope) => (existingByScope ? existingByScope[scope] || null : existingReport),
     getReports: async () => [],
     saveReport: async ({ projectId, periodType, period, platform = 'all', source, status, data }) => { const row = { id: 10 + log.reports.length + 1, project_id: projectId, period_type: periodType, period_start: period.start, period_end: period.end, platform, source, status, data }; log.reports.push(row); return row; },
@@ -320,14 +322,13 @@ await ok('campaign groups: a group lives in one platform tab, none in «Разо
   assert.equal(groupCampaigns([{ name: 'Catalog Search', spend: 5 }], kw, 'google').length, 0);
   assert.equal(groupCampaigns([{ name: 'Catalog Search', spend: 5 }], kw, 'meta')[0].name, 'Catalog');
 });
-await ok('agent run (two platforms): one draft report and deck per platform plus «Разом»', async () => {
+await ok('agent run (two platforms): one draft report and deck per platform; «Разом» is switched off', async () => {
   const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] });
   const r = await runProjectReport({ repo, post: postBoth, projectId: 3, periodType: 'weekly', trigger: 'manual', startedBy: 'me@x.y', today: '2026-10-15' });
   assert.equal(r.status, 'ok');
-  assert.deepEqual(repo.log.reports.map((x) => x.platform), ['meta', 'google', 'all']);
+  assert.deepEqual(repo.log.reports.map((x) => x.platform), ['meta', 'google']);
   assert.deepEqual(Object.keys(repo.log.reports[0].data.platforms), ['meta']);
   assert.deepEqual(Object.keys(repo.log.reports[1].data.platforms), ['google']);
-  assert.deepEqual(Object.keys(repo.log.reports[2].data.platforms), ['meta', 'google']);
   assert.match(repo.log.reports[0].data.sections.conclusion, /^Meta Ads: /);
   assert.match(repo.log.reports[1].data.sections.conclusion, /^Google Ads: /);
   assert.deepEqual(repo.log.decks.map((d) => d.platform), ['meta', 'google']);
@@ -337,10 +338,10 @@ await ok('agent run (two platforms): a scope a person already made is left alone
   const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { google: { id: 5, source: 'manual', status: 'draft' } } });
   const r = await runProjectReport({ repo, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
   assert.equal(r.status, 'ok');
-  assert.deepEqual(repo.log.reports.map((x) => x.platform), ['meta', 'all']);
+  assert.deepEqual(repo.log.reports.map((x) => x.platform), ['meta']);
   assert.ok(r.notes.some((n) => /Google Ads: звіт створений вручну/.test(n)));
   assert.deepEqual(repo.log.decks.map((d) => d.platform), ['meta']);
-  const all = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { meta: { id: 1, source: 'manual', status: 'draft' }, google: { id: 2, source: 'manual', status: 'draft' }, all: { id: 3, source: 'manual', status: 'draft' } } });
+  const all = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], existingByScope: { meta: { id: 1, source: 'manual', status: 'draft' }, google: { id: 2, source: 'manual', status: 'draft' } } });
   assert.equal((await runProjectReport({ repo: all, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15' })).status, 'skipped');
   assert.equal(all.log.reports.length, 0);
 });
@@ -490,9 +491,9 @@ await ok('agent run: the chosen chat gets one message with a button per report; 
   assert.equal(sent[0].chatId, '-100');
   assert.match(sent[0].text, /Проєкт:<\/b> Mellowdiamond/);
   assert.match(sent[0].text, /Тип звіту:<\/b> Тижневий/);
-  assert.deepEqual(sent[0].buttons.map((b) => b.text), ['Meta Ads', 'Google Ads', 'Разом']);
+  assert.deepEqual(sent[0].buttons.map((b) => b.text), ['Meta Ads', 'Google Ads']);
   assert.equal(sent[0].buttons[0].url, 'https://crm.test/projects/3?tab=weekly&platform=meta');
-  assert.equal(sent[0].buttons[2].url, 'https://crm.test/projects/3?tab=weekly&platform=total');
+  assert.equal(sent[0].buttons[1].url, 'https://crm.test/projects/3?tab=weekly&platform=google');
   assert.ok(two.log.events.some((e) => e.kind === 'telegram_sent'));
   // one platform: a plain «Відкрити звіт»
   sent.length = 0;
@@ -834,9 +835,9 @@ await ok('month to date: after an approved week the month is pulled again from t
   assert.deepEqual(toDateComparison('2026-10', '2026-10-11'), { start: '2026-09-01', end: '2026-09-11', label: '' });
   assert.equal(toDateComparison('2026-03', '2026-03-31').end, '2026-02-28'); // never past the end of the shorter previous month
   const week = (start, end, status, extra = {}) => ({ id: start, period_type: 'weekly', period_start: start, period_end: end, status, platform: 'meta', ...extra });
-  const mk = (rows) => {
+  const mk = (rows, layouts = null) => {
     const log = { saved: [], updated: [] };
-    return { log, getAgent: async () => ({ config: {} }), getProject: async () => ({ id: 3, name: 'M', business_type: null }), getAccounts: async () => [accounts[0]], getGroups: async () => [], getCustomMetrics: async () => [], getColumns: async () => ({}),
+    return { log, getLayout: async (pid, platform) => (layouts === null ? {} : layouts[platform] ?? null), getAgent: async () => ({ config: {} }), getProject: async () => ({ id: 3, name: 'M', business_type: null }), getAccounts: async () => [accounts[0]], getGroups: async () => [], getCustomMetrics: async () => [], getColumns: async () => ({}),
       getReports: async (pid, type, scope) => rows.filter((r) => r.period_type === type && r.platform === scope),
       saveReport: async (r) => { log.saved.push(r); return { id: 99, ...r }; }, updateReport: async (id, patch) => { log.updated.push([id, patch]); return { id, ...patch }; } };
   };
@@ -869,6 +870,12 @@ await ok('month to date: after an approved week the month is pulled again from t
   const none = mk([week('2026-10-12', '2026-10-18', 'reviewed')]);
   const r4 = await refreshMonthToDate({ repo: none, post, projectId: 3, monthKey: '2026-10' });
   assert.deepEqual([r4.updated.length, none.log.saved.length], [0, 0]);
+  // a platform without a report layout is not added up (the agent asks for the layout), and the row of a layout carries its snapshot
+  const bare = mk(rows, {});
+  const r5 = await refreshMonthToDate({ repo: bare, post, projectId: 3, monthKey: '2026-10' });
+  assert.deepEqual([r5.updated.length, bare.log.saved.length], [0, 0]);
+  assert.match(r5.skipped.join(' '), /макет звіту не налаштовано/);
+  assert.deepEqual(first.log.saved[0].data.template.blocks.map((b) => b.key), ['whatWasDone', 'conclusion', 'plans']);
 });
 await ok('month to date: the monthly run moves the running row to the full month instead of adding a second row; a month with two monthly rows keeps both visible', async () => {
   const tables = { project_reports: [{ id: 1, project_id: 3, period_type: 'monthly', period_start: '2026-10-01', period_end: '2026-10-12', platform: 'meta', source: 'agent', status: 'draft', data: { toDate: true } }] };
@@ -2186,7 +2193,8 @@ await ok('report template: nothing saved → the three standard blocks, 3 / 4 cr
   const t = normalizeTemplate(null);
   assert.deepEqual(t.blocks.map((b) => [b.key, b.weekly, b.monthly]), [['whatWasDone', true, true], ['conclusion', true, true], ['plans', true, true]]);
   assert.deepEqual(t.creatives, { weekly: 3, monthly: 4 });
-  assert.equal(t.metrics, null);
+  assert.equal(t.kind, null);
+  assert.deepEqual(t.hiddenMetrics, []);
   assert.deepEqual(normalizeTemplate(undefined), normalizeTemplate({}));
 });
 await ok('report template: custom blocks keep their title and prompt; bad keys, duplicates and too many blocks are dropped; the system blocks cannot be removed', () => {
@@ -2217,15 +2225,22 @@ await ok('report template: custom blocks keep their title and prompt; bad keys, 
   assert.ok(normalizeTemplate({ blocks: [{ key: 'b_x', title: 'T', prompt: 'x'.repeat(5000) }] }).blocks[0].prompt.length <= MAX_PROMPT);
 });
 await ok('report template: blocks and creatives by period type, the snapshot a report keeps', () => {
-  const tpl = { blocks: [{ key: 'whatWasDone' }, { key: 'conclusion', weekly: false }, { key: 'plans' }, { key: 'b_p', title: 'Why', prompt: 'p', weekly: false, client: false }], creatives: { weekly: 2, monthly: 5 }, metrics: ['spend', 'roas'] };
+  const tpl = { blocks: [{ key: 'whatWasDone' }, { key: 'conclusion', weekly: false }, { key: 'plans' }, { key: 'b_p', title: 'Why', prompt: 'p', weekly: false, client: false }], creatives: { weekly: 2, monthly: 5 }, kind: 'leadgen', hiddenMetrics: ['roas', 'roas', 'bad key!'] };
   assert.deepEqual(blocksFor(tpl, 'weekly').map((b) => b.key), ['whatWasDone', 'plans']);
   assert.deepEqual(blocksFor(tpl, 'monthly').map((b) => b.key), ['whatWasDone', 'conclusion', 'plans', 'b_p']);
   assert.equal(creativeCount(tpl, 'weekly'), 2);
   assert.equal(creativeCount(tpl, 'monthly'), 5);
   assert.equal(creativeCount(null, 'monthly'), 4);
-  const snap = snapshotOf(tpl, 'monthly');
+  assert.equal(normalizeTemplate(tpl).kind, 'leadgen');
+  assert.equal(normalizeTemplate({ kind: 'nonsense' }).kind, null);
+  assert.deepEqual(normalizeTemplate(tpl).hiddenMetrics, ['roas']); // deduplicated, bad keys dropped
+  const snap = snapshotOf(tpl, 'monthly', { metrics: ['spend', 'roas', 'aov'] });
   assert.deepEqual(snap.blocks.map((b) => [b.key, b.title, b.client]), [['whatWasDone', 'What was done', true], ['conclusion', 'Conclusion', true], ['plans', 'Plans for the next period', true], ['b_p', 'Why', false]]);
-  assert.deepEqual(snap.metrics, ['spend', 'roas']);
+  assert.deepEqual(snap.metrics, ['spend', 'roas', 'aov']); // the metrics the report was made with
+  assert.deepEqual(snap.hiddenMetrics, ['roas']); // the client does not see these
+  assert.equal(snapshotOf(tpl, 'weekly').metrics, null);
+  assert.deepEqual(hiddenMetricsOf({ template: snap }), ['roas']);
+  assert.deepEqual(hiddenMetricsOf({}), []);
   assert.ok(!('prompt' in snap.blocks[3])); // the prompt is the agent's instruction, not part of the report
 });
 await ok('report template: a saved report draws its own snapshot; an old report has the standard blocks; no text is lost', () => {
@@ -2278,8 +2293,7 @@ const withBlockWriter = (calls, fail = false) => async (path, body) => {
 };
 await ok('agent run (template): extra blocks are written by their instruction from the figures, a block without one is left for a person, the report keeps a snapshot', async () => {
   const calls = [];
-  const repo = fakeRepo();
-  repo.getTemplate = async () => TEMPLATE;
+  const repo = fakeRepo({ layouts: { meta: TEMPLATE } });
   const r = await runProjectReport({ repo, post: withBlockWriter(calls), projectId: 3, periodType: 'weekly', today: '2026-10-15' });
   assert.equal(r.status, 'ok');
   const rep = repo.log.reports[0].data;
@@ -2298,8 +2312,7 @@ await ok('agent run (template): extra blocks are written by their instruction fr
 });
 await ok('agent run (template): a block the model could not write is a note and stays empty; the run still succeeds and names the block as to do', async () => {
   const calls = [];
-  const repo = fakeRepo();
-  repo.getTemplate = async () => TEMPLATE;
+  const repo = fakeRepo({ layouts: { meta: TEMPLATE } });
   const r = await runProjectReport({ repo, post: withBlockWriter(calls, true), projectId: 3, periodType: 'weekly', today: '2026-10-15' });
   assert.equal(r.status, 'ok');
   assert.equal(repo.log.reports[0].data.sections.b_why, '');
@@ -2308,22 +2321,62 @@ await ok('agent run (template): a block the model could not write is a note and 
 });
 await ok('agent run (template): the number of creatives and the blocks follow the period type; no template means the standard blocks', async () => {
   const asked = [];
-  const repo = fakeRepo();
-  repo.getTemplate = async () => TEMPLATE;
+  const repo = fakeRepo({ layouts: { meta: TEMPLATE } });
   await runProjectReport({ repo, post: withBlockWriter([]), projectId: 3, periodType: 'weekly', today: '2026-10-15', creatives: async (a) => { asked.push(a.count); return []; } });
-  const monthlyRepo = fakeRepo();
-  monthlyRepo.getTemplate = async () => TEMPLATE;
+  const monthlyRepo = fakeRepo({ layouts: { meta: TEMPLATE } });
   await runProjectReport({ repo: monthlyRepo, post: withBlockWriter([]), projectId: 3, periodType: 'monthly', today: '2026-10-15', creatives: async (a) => { asked.push(a.count); return []; } });
   assert.deepEqual(asked, [1, 4]);
   assert.ok(monthlyRepo.log.reports[0].data.sections.conclusion.length > 0); // the conclusion is on for the month
   const none = fakeRepo();
-  const none0 = fakeRepo();
-  none0.getTemplate = async () => ({ blocks: [], creatives: { weekly: 0, monthly: 0 } });
+  const none0 = fakeRepo({ layouts: { meta: { blocks: [], creatives: { weekly: 0, monthly: 0 } } } });
   let zero = 0;
   await runProjectReport({ repo: none0, post, projectId: 3, periodType: 'weekly', today: '2026-10-15', creatives: async () => { zero += 1; return []; } });
   assert.equal(zero, 0); // 0 creatives: the collector is not even asked
   await runProjectReport({ repo: none, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
   assert.deepEqual(none.log.reports[0].data.template.blocks.map((b) => b.key), ['whatWasDone', 'conclusion', 'plans']);
+});
+
+await ok('agent run (layouts): a platform without a layout is not reported, and with none at all the agent asks to create one', async () => {
+  // no layout at all: nothing is made, nothing is pulled, the run is a problem that says what to do
+  let pulledSomething = false;
+  const spy = async (path, body) => { pulledSomething = true; return post(path, body); };
+  const none = fakeRepo({ layouts: {}, agent: { enabled: true, config: { platforms: [], notify: true, notifyEmails: ['boss@x.y'] } } });
+  const r = await runProjectReport({ repo: none, post: spy, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(r.status, 'problem');
+  assert.match(r.message, /Конструктор звіту/);
+  assert.equal(none.log.reports.length, 0);
+  assert.equal(pulledSomething, false);
+  assert.ok(none.log.events.some((e) => e.kind === 'layout_missing'));
+  assert.ok(none.log.notifications.length > 0); // the people responsible are told
+  // two platforms, one layout: only that platform is reported, the other is named in the notes
+  const half = fakeRepo({ projectAccounts: [accounts[0], GOOGLE], layouts: { google: {} } });
+  const h = await runProjectReport({ repo: half, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  assert.equal(h.status, 'ok');
+  assert.deepEqual(half.log.reports.map((x) => x.platform), ['google']);
+  assert.ok(h.notes.some((n) => /Meta Ads: макет звіту не налаштовано/.test(n)));
+});
+await ok('agent run (layouts): the report type and the metrics of the layout go into the report and its snapshot', async () => {
+  const repo = fakeRepo({ layouts: { meta: { kind: 'leadgen', hiddenMetrics: ['cpm'] } }, columnsPicked: { meta: ['mx_add_to_cart'] } });
+  await runProjectReport({ repo, post, projectId: 3, periodType: 'weekly', today: '2026-10-15' });
+  const rep0 = repo.log.reports[0].data;
+  assert.equal(rep0.kind, 'leadgen'); // the layout decides, not the project's business type
+  assert.deepEqual(rep0.template.hiddenMetrics, ['cpm']);
+  assert.ok(rep0.template.metrics.includes('leads') && rep0.template.metrics.includes('mx_add_to_cart') && !rep0.template.metrics.includes('purchases'));
+});
+
+await ok('campaign groups: a rule by name takes new campaigns in by itself; the ones in no group are listed (they fall into «Other campaigns»)', () => {
+  const groups = [{ id: 1, name: 'RTS', platform: 'meta', campaigns: [gKey('meta', 'Catalog')], keywords: ['rts'] }, { id: 2, name: 'Brand', platform: 'google', campaigns: [], keywords: ['brand'] }];
+  const known = [
+    { platform: 'meta', name: 'Catalog', spend: 50 }, // listed
+    { platform: 'meta', name: 'Hybrid Wig RTS', spend: 80 }, // by the rule, and no one had to add it
+    { platform: 'meta', name: 'Website Traffic', spend: 20 }, // in no group
+    { platform: 'meta', name: 'Brand awareness', spend: 5 }, // «brand» is a Google rule: it does not take a Meta campaign
+    { platform: 'google', name: 'Brand Search', spend: 70 },
+  ];
+  assert.deepEqual(campaignsOutsideGroups(groups, known).map((c) => c.name), ['Website Traffic', 'Brand awareness']);
+  assert.deepEqual(campaignsOutsideGroups([], known).length, 5);
+  assert.deepEqual(campaignsOutsideGroups(groups, []), []);
+  assert.equal(groupMatches(groups[0], 'meta', 'NEW rts campaign'), true);
 });
 
 console.log(`\n${passed} checks passed`);

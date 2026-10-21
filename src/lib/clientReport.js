@@ -4,7 +4,7 @@
 // The client sees ONLY what the function returned: approved weeks plus the running total of the current month. Nothing here fetches or invents numbers.
 import { METRICS, METRIC_SETS, computeMetric, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { monthKey, monthRange, monthWeeks } from './projectHistory.js';
-import { metricKeysOf, reportBlocks } from './reportTemplate.js';
+import { hiddenMetricsOf, metricKeysOf, reportBlocks } from './reportTemplate.js';
 
 export const TOP_GROUPS = 5; // groups shown by name; the rest fold into «Other (N groups)» until the client asks to see all
 
@@ -107,12 +107,16 @@ export function reportView(report, ctx) {
     blocks: reportBlocks(report.data).filter((b) => b.client),
     templateMetrics: report.data?.template?.metrics || null,
     creatives: (report.data?.creatives || []).slice(0, report.type === 'monthly' ? 4 : 3),
-    kind: ctx.kind,
+    kind: report.data?.kind || ctx.kind, // the type the report was made with
+    hiddenMetrics: hiddenMetricsOf(report.data), // what the client does not see (the team sees everything)
   };
 }
 
 // The metric rows of one report's table: its template's own list, else the standard set + the project's extra columns and formulas.
-export const viewKeys = (view, model) => metricKeysOf({ metrics: view.templateMetrics }, metricKeys(model.kind, model.columns, model.custom), [...model.columns, ...model.custom.map((c) => c.key)]);
+export function viewKeys(view, model, { all = false } = {}) {
+  const keys = metricKeysOf({ metrics: view.templateMetrics }, metricKeys(view.kind || model.kind, model.columns, model.custom), [...model.columns, ...model.custom.map((c) => c.key)]);
+  return all ? keys : keys.filter((k) => !(view.hiddenMetrics || []).includes(k));
+}
 
 // The name of the compared period: «August» for a month, «previous week» for a week.
 export function prevName(view) {
@@ -126,8 +130,9 @@ const KPI_SETS = {
   ecom: [['spend', 'Spent', 'wallet'], ['revenue', 'Revenue', 'coin'], ['roas', 'ROAS', 'roas'], ['purchases', 'Purchases', 'cart'], ['cpp', 'Cost per purchase', 'pct'], ['reach', 'Reach', 'eye']],
   leadgen: [['spend', 'Spent', 'wallet'], ['leads', 'Leads', 'coin'], ['cpl', 'Cost per lead', 'pct'], ['clicks', 'Clicks', 'click'], ['ctr', 'CTR', 'roas'], ['reach', 'Reach', 'eye']],
 };
-export function kpiCards(view) {
-  return (KPI_SETS[view.kind] || KPI_SETS.ecom).map(([key, label, icon]) => {
+// A metric switched off for the client takes its card with it (`all`: the team's own view).
+export function kpiCards(view, { all = false } = {}) {
+  return (KPI_SETS[view.kind] || KPI_SETS.ecom).filter(([key]) => all || !(view.hiddenMetrics || []).includes(key)).map(([key, label, icon]) => {
     const info = metricInfo(key);
     const cur = computeMetric(key, view.total);
     const prev = view.prev ? computeMetric(key, view.prev.total) : null;
@@ -203,13 +208,24 @@ export function roasBars(view, top = TOP_GROUPS) {
 // The address a client opens (the token is the only secret in it: long, random, never shown anywhere else).
 export const shareUrl = (origin, token) => `${String(origin).replace(/\/+$/, '')}/r/${token}`;
 
+// ---- the «Конструктор звіту»: the report as the layout will make it ----
+// A view for the live preview. Without `data` it is the skeleton: the project's groups as columns, every number a dash. With `data` (a fetched
+// period: { platforms, previous }) the same view carries real numbers. The text blocks, creatives and hidden metrics always come from the draft layout.
+export function builderView({ layout, periodType = 'weekly', kind, groupNames = [], data = null, period = null }) {
+  const real = data ? reportView({ id: 0, type: periodType, start: period?.start || '', end: period?.end || '', status: 'final', data: { kind, platforms: data.platforms, previous: data.previous || null } }, { kind }) : null;
+  const base = real || { id: 0, type: periodType, start: '', end: '', toDate: false, status: 'final', updatedAt: null, currency: 'USD', total: {}, groups: groupNames.map((name) => ({ name })), prev: null, sections: {}, kind };
+  const blocks = (layout.blocks || []).filter((b) => b[periodType === 'monthly' ? 'monthly' : 'weekly']).map((b) => ({ key: b.key, title: b.title, client: b.client !== false }));
+  return { ...base, kind, blocks, hiddenMetrics: layout.hiddenMetrics || [], templateMetrics: null, creatives: [], sections: base.sections || {} };
+}
+
 // ---- the whole page ----
 // payload = get_shared_report(...) → { project, platform, months: [...], history: [...], asOf }
 export function buildClientModel(payload) {
   if (!payload) return null;
-  const kind = payload.project?.kind || 'ecom';
-  const ctx = { kind };
+  const ctx = { kind: payload.project?.kind || 'ecom' };
   const views = (payload.reports || []).map((r) => reportView(r, ctx)).filter(Boolean);
+  const kind = views.length ? views[views.length - 1].kind : ctx.kind; // the page follows the type of the newest report
+  const hidden = views.length ? views[views.length - 1].hiddenMetrics : [];
   const keys = [...new Set(views.map((v) => monthKey(v.start)))].sort();
   const months = keys.map((key) => {
     const range = monthRange(key);
@@ -231,7 +247,7 @@ export function buildClientModel(payload) {
     return { key: m.key, short: m.short, partial: m.running, spend: val('spend'), revenue: val('revenue'), purchases: val('purchases'), leads: val('leads'), ctr: val('ctr'), cpm: val('cpm'), cpa: val('cpp'), cpl: val('cpl'), aov: val('aov'), roas: val('roas'), currency: m.monthly.currency };
   });
   const stamps = months.map((m) => m.asOf).filter(Boolean).sort();
-  return { project: payload.project || { name: '' }, platform: payload.platform, kind, columns: payload.columns || [], custom: payload.custom || [], months, history, asOf: stamps.length ? stamps[stamps.length - 1] : null };
+  return { project: payload.project || { name: '' }, platform: payload.platform, kind, hidden, columns: payload.columns || [], custom: payload.custom || [], months, history, asOf: stamps.length ? stamps[stamps.length - 1] : null };
 }
 
 // ---- what the agent writes a custom block of the report template from ----

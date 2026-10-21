@@ -54,3 +54,8 @@ export function mergeCampaigns(...lists) {
   });
   return [...by.values()];
 }
+
+// The campaigns ([{ platform, name, spend }]) that belong to none of the groups of their platform: in a report they fall into «Other campaigns».
+export function campaignsOutsideGroups(groups, campaigns) {
+  return (campaigns || []).filter((c) => !groupsForPlatform(groups, c.platform).some((g) => groupMatches(g, c.platform, c.name))).sort((a, b) => (b.spend || 0) - (a.spend || 0));
+}

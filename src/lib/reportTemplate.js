@@ -1,8 +1,9 @@
-// The report template of a project: which text blocks its reports have (their titles, which periods, what the agent is told to write), how many creatives,
-// and which metrics the tables show. Pure functions (no database, no network), tested in scripts/check-core.mjs; the agent, the report pages and the
-// client page all read it through here. (The numbers the agent writes a custom block from live in clientReport.js: figuresText.)
+// The report layout of a project, one per ad platform (set up in the «Конструктор звіту»): which text blocks its reports have (their titles, which periods,
+// what the agent is told to write), how many creatives, the report type and which metrics the client does not see. Pure functions (no database, no
+// network), tested in scripts/check-core.mjs; the agent, the report pages and the client page all read it through here. (The code still calls it
+// «template»; its snapshot lives in a report as data.template. The numbers the agent writes a custom block from live in clientReport.js: figuresText.)
 //
-// A report keeps a SNAPSHOT of the template it was made with (data.template). Changing the template later never changes a report that already exists:
+// A report keeps a SNAPSHOT of the layout it was made with (data.template). Changing the layout later never changes a report that already exists:
 // an approved report keeps its own titles, blocks and metrics.
 import { METRICS } from './reportMetrics.js';
 import { CREATIVE_COUNT } from './creatives.js';
@@ -10,7 +11,7 @@ import { CREATIVE_COUNT } from './creatives.js';
 export const MAX_BLOCKS = 12;
 export const MAX_TITLE = 60;
 export const MAX_PROMPT = 800;
-export const MAX_METRICS = 20;
+export const MAX_HIDDEN = 60;
 export const MAX_CREATIVES = { weekly: 6, monthly: 8 };
 
 // The three blocks every project has. They can be switched off per period type, but not deleted.
@@ -32,7 +33,8 @@ export const PRESETS = [
 export const DEFAULT_TEMPLATE = Object.freeze({
   blocks: SYSTEM_BLOCKS,
   creatives: { weekly: CREATIVE_COUNT.weekly, monthly: CREATIVE_COUNT.monthly },
-  metrics: null, // null: the standard set of the project type
+  kind: null, // 'ecom' | 'leadgen'; null: from the project's business type
+  hiddenMetrics: [], // metrics the client does not see (the team always sees the full report)
 });
 
 const clampInt = (v, min, max, fallback) => {
@@ -60,11 +62,12 @@ export function normalizeTemplate(raw) {
   });
   // the three system blocks are always there; one that is missing in the saved list is simply switched off
   SYSTEM_BLOCKS.forEach((s) => { if (!seen.has(s.key)) blocks.push(raw && Array.isArray(r.blocks) && r.blocks.length ? { ...s, weekly: false, monthly: false } : { ...s }); });
-  const metrics = Array.isArray(r.metrics) ? [...new Set(r.metrics.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))].slice(0, MAX_METRICS) : [];
+  const hiddenMetrics = Array.isArray(r.hiddenMetrics) ? [...new Set(r.hiddenMetrics.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))].slice(0, MAX_HIDDEN) : [];
   return {
     blocks,
     creatives: { weekly: clampInt(r.creatives?.weekly, 0, MAX_CREATIVES.weekly, CREATIVE_COUNT.weekly), monthly: clampInt(r.creatives?.monthly, 0, MAX_CREATIVES.monthly, CREATIVE_COUNT.monthly) },
-    metrics: metrics.length ? metrics : null,
+    kind: r.kind === 'ecom' || r.kind === 'leadgen' ? r.kind : null,
+    hiddenMetrics,
   };
 }
 
@@ -75,11 +78,15 @@ export const blocksFor = (template, periodType) => normalizeTemplate(template).b
 
 export const creativeCount = (template, periodType) => normalizeTemplate(template).creatives[periodFlag(periodType)];
 
-// What a report remembers of the template: the blocks (key, title, whether the client sees it) and the metrics.
-export function snapshotOf(template, periodType) {
+// What a report remembers of the layout: the blocks (key, title, whether the client sees it), the metrics it was made with (`metrics`: the keys of its
+// table, base + the platform's extra columns + the project's own metrics, or null for the standard set) and the ones the client does not see.
+export function snapshotOf(template, periodType, { metrics = null } = {}) {
   const t = normalizeTemplate(template);
-  return { blocks: t.blocks.filter((b) => b[periodFlag(periodType)]).map((b) => ({ key: b.key, title: b.title, client: b.client })), metrics: t.metrics };
+  return { blocks: t.blocks.filter((b) => b[periodFlag(periodType)]).map((b) => ({ key: b.key, title: b.title, client: b.client })), metrics: metrics && metrics.length ? [...metrics] : null, hiddenMetrics: [...t.hiddenMetrics] };
 }
+
+// The metrics the client does not see in a saved report.
+export const hiddenMetricsOf = (data) => (Array.isArray(data?.template?.hiddenMetrics) ? data.template.hiddenMetrics : []);
 
 // The blocks to draw for a SAVED report: its own snapshot; a report made before templates existed has the three standard ones.
 // A text that exists under a key the snapshot does not list is still shown (under its key), never lost.
@@ -90,11 +97,11 @@ export function reportBlocks(data) {
   return [...snap.map((b) => ({ key: b.key, title: b.title, client: b.client !== false })), ...extra];
 }
 
-// The metric keys a table shows: the template's own list when there is one (only metrics that exist), otherwise the standard set.
+// The metric keys a table shows: the list a saved report was made with (only metrics that exist), otherwise the standard set.
 // `known`: the keys that can be computed (built-in ones are always known; custom and extra ones come from the caller).
 export function metricKeysOf(template, defaults, known = []) {
-  const own = normalizeTemplate(template).metrics;
-  if (!own) return defaults;
+  const own = Array.isArray(template?.metrics) ? [...new Set(template.metrics.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))] : null;
+  if (!own || !own.length) return defaults;
   const ok = new Set([...Object.keys(METRICS), ...known]);
   const keys = own.filter((k) => ok.has(k));
   return keys.length ? keys : defaults;

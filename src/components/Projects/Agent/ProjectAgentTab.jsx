@@ -6,6 +6,8 @@ import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
 import { DEFAULT_AGENT_CONFIG, addAgentEvent, connectAgent, disconnectAgent, fetchAgent, fetchAgentEvents, updateAgent } from '../../../lib/api/projectAgents';
 import { STYLES } from '../../../lib/presentation/deckModel';
 import { platformInfo } from '../../../lib/adAccounts';
+import { fetchReportLayouts } from '../../../lib/api/projectReportStore';
+import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '../../common/ConfirmDialog';
 import '../../../styles/projectAgent.css';
 import Select from '../../common/Select';
@@ -116,7 +118,9 @@ export default function ProjectAgentTab({ projectId }) {
   const [agent, setAgent] = useState(null);
   const [missing, setMissing] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
+  const [layouts, setLayouts] = useState({}); // platform → saved report layout (the agent reports only platforms that have one)
   const [events, setEvents] = useState([]);
   const [form, setForm] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -130,7 +134,8 @@ export default function ProjectAgentTab({ projectId }) {
   const [tgTest, setTgTest] = useState({ busy: false, ok: null, msg: '' });
 
   const load = useCallback(async () => {
-    const [{ agent: a, missing: m }, accs, ev, profiles, chats, topics] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles(), fetchTgChats(), fetchTgTopics()]);
+    const [{ agent: a, missing: m }, accs, ev, profiles, chats, topics, lay] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles(), fetchTgChats(), fetchTgTopics(), fetchReportLayouts(projectId)]);
+    setLayouts(lay);
     setPeople(profiles);
     setTgChats(chats);
     setTgTopics(topics);
@@ -144,6 +149,7 @@ export default function ProjectAgentTab({ projectId }) {
   useEffect(() => { load(); }, [load]);
 
   const linked = useMemo(() => [...new Set(accounts.map((a) => a.platform))], [accounts]);
+  const noLayout = linked.filter((p) => !layouts[p]);
   const status = statusOf(agent);
   const health = healthOf(agent);
   const dirty = Boolean(agent && form && !sameJson(form, { ...DEFAULT_AGENT_CONFIG, ...(agent.config || {}) }));
@@ -213,6 +219,13 @@ export default function ProjectAgentTab({ projectId }) {
       {missing && (
         <div className="prep-internal-note" role="note">
           <b>Потрібна міграція.</b> У базі ще немає таблиць агента: застосуйте <code>20261010000000_project_agents.sql</code>, і вкладка запрацює повністю.
+        </div>
+      )}
+
+      {noLayout.length > 0 && (
+        <div className="prep-internal-note" role="note">
+          <b>Макет звіту не налаштовано{linked.length > 1 ? `: ${noLayout.map((p) => platformInfo(p).label).join(', ')}` : ''}.</b> Агент складає звіти лише для платформ із макетом.{' '}
+          <button type="button" className="pacc-link" onClick={() => navigate(`/projects/${projectId}?tab=builder&platform=${noLayout[0]}`)}>Відкрити «Конструктор звіту»</button>
         </div>
       )}
 
