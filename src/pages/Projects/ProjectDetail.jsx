@@ -34,15 +34,21 @@ import '../../styles/projectHub.css'; // Hub style, last so it wins over the old
 const TABS = [
   { key: 'overview', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src },
   { key: 'builder', label: 'Конструктор звіту', icon: null, line: <path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z" /> },
-  { key: 'period', label: 'Показники за період', icon: null, line: <path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6" /> },
-  { key: 'weekly', label: 'Тижневий звіт', icon: PAGE_ICONS['page.weekly-report'].src },
-  { key: 'monthly', label: 'Місячний звіт', icon: PAGE_ICONS['page.monthly-report'].src },
+  { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'AI Агент', icon: PAGE_ICONS['page.ai-agents'].src },
 ];
 
 const STATUSES = ['active', 'paused', 'completed'];
-const KEEP_ALIVE = ['builder', 'period', 'weekly', 'monthly']; // tabs that keep their state while the card is open
+// «Формування звіту» holds three ways to look at a period; the old tabs (and the links the agent sends) still open them.
+const COMPOSE_MODES = [['period', 'Показники за період'], ['weekly', 'Тижневий звіт'], ['monthly', 'Місячний звіт']];
+const KEEP_ALIVE = ['builder', 'compose:period', 'compose:weekly', 'compose:monthly']; // panes that keep their state while the card is open
+function parseTab(params) {
+  const t = params.get('tab');
+  if (COMPOSE_MODES.some(([k]) => k === t)) return { tab: 'compose', mode: t };
+  const mode = COMPOSE_MODES.some(([k]) => k === params.get('mode')) ? params.get('mode') : 'weekly';
+  return { tab: TABS.some((x) => x.key === t) ? t : 'overview', mode };
+}
 
 // The Overview fields in reading order. Empty ones are hidden while viewing.
 const FIELD_GROUPS = [
@@ -74,20 +80,27 @@ export default function ProjectDetail() {
   const [project, setProject] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tab, setTabState] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview'));
+  const [tab, setTabState] = useState(() => parseTab(searchParams).tab);
+  const [mode, setModeState] = useState(() => parseTab(searchParams).mode);
   const setTab = (next) => {
     setTabState(next);
     // the chosen ad platform of the report tabs stays when moving between them
-    const platform = ['period', 'weekly', 'monthly', 'decks'].includes(next) ? searchParams.get('platform') : null;
-    setSearchParams(next === 'overview' ? {} : { tab: next, ...(platform ? { platform } : {}) }, { replace: true });
+    const platform = ['compose', 'decks', 'builder'].includes(next) ? searchParams.get('platform') : null;
+    setSearchParams(next === 'overview' ? {} : { tab: next, ...(next === 'compose' ? { mode } : {}), ...(platform ? { platform } : {}) }, { replace: true });
   };
+  const setMode = (next) => {
+    setModeState(next);
+    const platform = searchParams.get('platform');
+    setSearchParams({ tab: 'compose', mode: next, ...(platform ? { platform } : {}) }, { replace: true });
+  };
+  const paneKey = tab === 'compose' ? `compose:${mode}` : tab;
   const [deleting, setDeleting] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
   const tabRefs = useRef({});
-  const [visited, setVisited] = useState(() => new Set([tab]));
+  const [visited, setVisited] = useState(() => new Set([paneKey]));
   const [cfgVersion, setCfgVersion] = useState(0);
-  useEffect(() => { setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab))); }, [tab]);
-  useEffect(() => { setVisited(new Set([tab])); setCfgVersion(0); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setVisited((v) => (v.has(paneKey) ? v : new Set(v).add(paneKey))); }, [paneKey]);
+  useEffect(() => { setVisited(new Set([paneKey])); setCfgVersion(0); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Arrow keys / Home / End move between the folder tabs (the focused one is the selected one).
   function onTabKey(e) {
@@ -483,9 +496,16 @@ export default function ProjectDetail() {
 
       {/* The builder and the report tabs stay open once visited: coming back shows the report that was loaded, and nothing is pulled again.
           They are cleared when the card is closed or another project is opened. A change of the layout (saved in the builder) reloads the report tabs. */}
+      {tab === 'compose' && (
+        <div className="prep-seg compose-modes" role="tablist" aria-label="Формування звіту">
+          {COMPOSE_MODES.map(([k, label]) => (
+            <button key={k} type="button" role="tab" aria-selected={mode === k} className={'prep-seg-tab' + (mode === k ? ' on' : '')} onClick={() => setMode(k)}>{label}</button>
+          ))}
+        </div>
+      )}
       {KEEP_ALIVE.filter((k) => visited.has(k)).map((k) => (
-        <div key={k + '-' + id + (k === 'builder' ? '' : '-' + cfgVersion)} hidden={tab !== k}>
-          {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : <PlatformReports projectId={id} mode={k} />}
+        <div key={k + '-' + id + (k === 'builder' ? '' : '-' + cfgVersion)} hidden={paneKey !== k}>
+          {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : <PlatformReports projectId={id} mode={k.split(':')[1]} />}
         </div>
       ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
