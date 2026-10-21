@@ -408,3 +408,17 @@
 .project-detail-page.pw .ov-save-state.saved { background: #E3F6E8; color: #168a3a; }
 .project-detail-page.pw .ov-save-state.saving { background: #FBF0D5; color: #946200; }
 .project-detail-page.pw .ov-save-state.error { background: #FBEAEA; color: #C23232; }
+
+/* the report tables of the CRM: the label (and the account total) stay pinned while the numbers scroll. A soft edge shows that numbers pass under them,
+   and on a phone the pinned columns are narrow so the numbers keep the room */
+.project-detail-page.pw .prep-table--wide th:first-child, .project-detail-page.pw .prep-table--wide td.lbl { box-shadow: 8px 0 8px -8px rgba(104, 39, 104, .22); }
+.project-detail-page.pw .prep-table--groups th.total, .project-detail-page.pw .prep-table--groups td.total { box-shadow: 8px 0 8px -8px rgba(104, 39, 104, .22); }
+@media (max-width: 640px) {
+  .project-detail-page.pw .prep-table--groups th:first-child, .project-detail-page.pw .prep-table--groups td.lbl { width: 108px; min-width: 108px; max-width: 108px; font-size: 12.5px; line-height: 1.25; padding-left: 10px; padding-right: 6px; }
+  .project-detail-page.pw .prep-table--wide th.num, .project-detail-page.pw .prep-table--wide td.num { min-width: 112px; }
+  .project-detail-page.pw .prep-table--wide th:first-child, .project-detail-page.pw .prep-table--wide td.lbl { min-width: 108px; }
+}
+/* on a narrow screen only the label stays pinned: the account total scrolls with the other columns */
+@media (max-width: 820px) {
+  .project-detail-page.pw .prep-table--groups th.total, .project-detail-page.pw .prep-table--groups td.total { position: static; box-shadow: none; }
+}
