@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import useDialogA11y from '../../lib/useDialogA11y';
+import DesignTodo from '../common/DesignTodo';
 import { fetchCreativeCandidates, pickCreativeItem } from '../../lib/api/reportCreatives';
 import '../../styles/projectReports.css';
 import '../../styles/projectHistory.css';
@@ -31,6 +32,7 @@ export default function CreativePickerDialog({ row, taken = [], onPicked, onClos
       <div ref={box} tabIndex={-1} className="modal-box prep-modal crx-picker" role="dialog" aria-modal="true" aria-labelledby="crx-title">
         <div className="modal-head">
           <h3 id="crx-title">Оберіть креатив</h3>
+          <DesignTodo note="Вікно вибору креативу" />
           <button type="button" className="modal-close" onClick={onClose} disabled={Boolean(busy)} aria-label="Закрити">&times;</button>
         </div>
         <div className="modal-body">

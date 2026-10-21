@@ -5,6 +5,7 @@ import { platformInfo } from '../../lib/adAccounts';
 import { periodLabel } from '../../lib/presentation/deckModel';
 import { REPORT_STATUS } from '../../lib/projectHistory';
 import CreativeGrid from './CreativeGrid';
+import DesignTodo from '../common/DesignTodo';
 import CreativePickerDialog from './CreativePickerDialog';
 import { saveReportCreatives, suggestCreatives } from '../../lib/api/reportCreatives';
 import '../../styles/projectReports.css';
@@ -113,7 +114,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
       )}
       {(data.creatives?.items?.length > 0 || edit) && (
         <div className="arc-creatives">
-          <div className="arc-text-title">Most effective creatives</div>
+          <div className="arc-text-title">Most effective creatives <DesignTodo note="Блок креативів звіту: сітка, збільшення, кнопки «Замінити», «Прибрати», «Підібрати»" /></div>
           {data.creatives?.items?.length > 0 ? (
             <CreativeGrid items={data.creatives.items} onReplace={edit ? edit.onReplace : undefined} onRemove={edit ? edit.onRemove : undefined} />
           ) : (
