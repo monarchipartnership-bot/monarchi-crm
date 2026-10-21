@@ -753,3 +753,12 @@
 .crh tr.crh-off td:not(:first-child), .crh tr.crh-off td:first-child > :not(.crh-eye) { opacity: .45; }
 .crh .tcard.crh-off > :not(.tch), .crh .tcard.crh-off .tch > :not(.crh-eye) { opacity: .5; }
 .crh .tcard p.crh-ph { color: #9a8aa0; font-style: italic; }
+/* the label column stays put while the numbers scroll: a soft edge shows that they pass under it, and on a phone it is narrow so the numbers keep the room */
+.crh .hubt td:first-child, .crh .hubt th:first-child { box-shadow: 8px 0 8px -8px rgba(104, 39, 104, .22); }
+.crh .hubt.fx td:first-child { overflow: visible; text-overflow: clip; }
+@media (max-width: 640px) {
+  .crh .hubt.fx th:first-child { width: 104px; padding-left: 10px; padding-right: 6px; }
+  .crh .hubt td:first-child { white-space: normal; font-size: 12.5px; line-height: 1.25; padding: 7px 6px 7px 10px; }
+  .crh .hubt td, .crh .hubt th { padding-left: 8px; padding-right: 8px; }
+  .crh .hubt .dm { font-size: 10px; }
+}
