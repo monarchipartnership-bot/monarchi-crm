@@ -79,6 +79,15 @@ td.best .mk.good, td.worst .mk.bad { color: inherit; }
 .crea figure { margin: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .crea .img { aspect-ratio: 4 / 5; display: grid; place-items: center; font-size: 12px; color: var(--accent-ink); background: var(--accent-soft); padding: 10px; text-align: center; }
 .crea figcaption { padding: 6px 9px; font-size: 12.5px; border-top: 1px solid var(--line); }
+.crea .cr { all: unset; display: block; cursor: zoom-in; width: 100%; }
+.crea .cr:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
+.crea img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+.crea .zoom { font-size: 11.5px; color: var(--muted); display: block; margin-top: 1px; }
+.lb { position: fixed; inset: 0; z-index: 50; background: rgba(8, 10, 14, .84); display: grid; place-items: center; padding: 24px; }
+.lb figure { margin: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; }
+.lb img { max-height: 82vh; max-width: min(92vw, 720px); border-radius: 12px; display: block; }
+.lb figcaption { color: #fff; font-size: 14px; text-align: center; }
+.lb-x { position: absolute; top: 16px; right: 20px; font: inherit; font-size: 26px; line-height: 1; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .4); background: rgba(0, 0, 0, .3); color: #fff; cursor: pointer; }
 .sub { font-size: 13px; font-weight: 600; color: var(--accent-ink); margin: 0; }
 .note { font-size: 12.5px; color: var(--muted); background: var(--card); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; }
 .empty { padding: 28px 16px; text-align: center; color: var(--muted); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; }
@@ -100,6 +109,8 @@ td.best .mk.good, td.worst .mk.bad { color: inherit; }
   <div id="view" style="display:flex;flex-direction:column;gap:18px"></div>
 </div>
 
+<div id="lb" class="lb" hidden role="dialog" aria-modal="true" aria-label="Creative"><button class="lb-x" id="lbx" aria-label="Close">&times;</button><figure><img id="lbimg" alt=""><figcaption id="lbcap"></figcaption></figure></div>
+
 <script>
 var MONTHS = ['May', 'June', 'July', 'August', 'September', 'October'];
 var HIST = [
@@ -110,15 +121,15 @@ var NAMES = { kb: 'Kinky Bang RTS', cat: 'CATALOG RTS', hw: 'Hybrid Wig RTS', ld
 var G = function (spend, revenue, sales, clicks, impr, reach) { return { spend: spend, revenue: revenue, sales: sales, clicks: clicks, impr: impr, reach: reach }; };
 var WEEKS = [
   { n: 1, from: '01.09', to: '06.09', gen: G(1087, 9817, 13, 1567, 26119, 10230), groups: { kb: G(60.38, 382, 1, 44, 970, 639), cat: G(825, 7203, 9, 735, 16458, 5516), hw: G(173, 2234, 3, 151, 3031, 1260) },
-    done: 'We launched a promotional offer for the RTS (Ready to Ship) catalog, using discounted creatives across warm and cold audiences. In parallel, we launched the Labor Day -15% discount across the remaining product categories, including Hybrid Wigs and Kinky Bundles.', crea: ['Hybrid Wig RTS -15%'], concl: 'Strong opening week: the catalog and hybrid wig campaigns delivered ROAS above the account level.', plans: 'Add the Labor Day offer to the catalog ads and scale the best performing campaigns.' },
+    done: 'We launched a promotional offer for the RTS (Ready to Ship) catalog, using discounted creatives across warm and cold audiences. In parallel, we launched the Labor Day -15% discount across the remaining product categories, including Hybrid Wigs and Kinky Bundles.', crea: [{ t: 'Hybrid Wig RTS -15%', a: 2 }, { t: 'Catalog RTS', a: 1 }, { t: 'Labor Day -15%', a: 0 }], concl: 'Strong opening week: the catalog and hybrid wig campaigns delivered ROAS above the account level.', plans: 'Add the Labor Day offer to the catalog ads and scale the best performing campaigns.' },
   { n: 2, from: '07.09', to: '13.09', gen: G(2156, 14787, 20, 1619, 42722, 11964), groups: { kb: G(169.17, 680, 2, 128, 3120, 1942), cat: G(1043, 8154, 10, 1049, 24745, 9928), hw: G(523, 3738, 5, 323, 8628, 2925), ld: G(385.38, 2214, 3, 182, 6229, 2005) },
-    done: 'We launched a dedicated Labor Day promotional campaign and added the offer to our catalog ads. We continued scaling the best performing campaigns by increasing budgets for those delivering the strongest results.', crea: ['LABOUR DAY creative'], concl: 'Spend doubled and revenue followed: the catalog campaign carried most of the sales.', plans: 'Keep budgets on the catalog and hybrid wigs, watch CPA after the Labor Day peak.' },
+    done: 'We launched a dedicated Labor Day promotional campaign and added the offer to our catalog ads. We continued scaling the best performing campaigns by increasing budgets for those delivering the strongest results.', crea: [{ t: 'LABOUR DAY creative', a: 0 }, { t: 'Catalog best sellers', a: 1 }, { t: 'Hybrid Wig', a: 2 }], concl: 'Spend doubled and revenue followed: the catalog campaign carried most of the sales.', plans: 'Keep budgets on the catalog and hybrid wigs, watch CPA after the Labor Day peak.' },
   { n: 3, from: '14.09', to: '20.09', gen: G(1373, 2518, 5, 1150, 31000, 9800), groups: { kb: G(210, 640, 1, 260, 4800, 2300), cat: G(780, 1500, 3, 620, 18200, 6100), hw: G(330, 380, 1, 190, 5800, 2100), ld: G(53, 0, 0, 80, 2200, 900) },
-    done: 'Example text. The Labor Day campaign was switched off after the holiday, budgets were redistributed between the remaining campaigns.', crea: ['Catalog creative'], concl: 'Example text. Efficiency dropped after the holiday peak: cost per purchase rose.', plans: 'Example text. Test new creatives and return budget to the best performing campaign.' },
+    done: 'Example text. The Labor Day campaign was switched off after the holiday, budgets were redistributed between the remaining campaigns.', crea: [{ t: 'Catalog creative', a: 1 }, { t: 'Kinky Bang', a: 3 }, { t: 'Hybrid Wig', a: 2 }], concl: 'Example text. Efficiency dropped after the holiday peak: cost per purchase rose.', plans: 'Example text. Test new creatives and return budget to the best performing campaign.' },
   { n: 4, from: '21.09', to: '27.09', gen: G(1353, 5840, 11, 1300, 34000, 10100), groups: { kb: G(207, 3404, 6, 210, 4300, 2100), cat: G(565, 1017, 2, 640, 16500, 6000), hw: G(549, 1431, 3, 450, 12000, 3900) },
-    done: 'Example text. New creatives were added to Kinky Bang, budgets were moved towards the most promising directions.', crea: ['ROAS 15.74'], concl: 'Example text. Kinky Bang became the best direction of the week.', plans: 'Example text. Scale Kinky Bang carefully and keep testing RTS special offers.' },
+    done: 'Example text. New creatives were added to Kinky Bang, budgets were moved towards the most promising directions.', crea: [{ t: 'ROAS 15.74 · Kinky Bang', a: 3 }, { t: 'Catalog RTS', a: 1 }, { t: 'Hybrid Wig RTS', a: 2 }], concl: 'Example text. Kinky Bang became the best direction of the week.', plans: 'Example text. Scale Kinky Bang carefully and keep testing RTS special offers.' },
   { n: 5, from: '28.09', to: '30.09', gen: G(731, 2548, 5, 850, 18765, 8741), groups: { kb: G(269.76, 952, 2, 146, 6124, 3163), cat: G(161, 940, 2, 167, 3631, 2003), hw: G(161, 0, 0, 110, 3420, 2123), so: G(123, 656, 1, 79, 1977, 951), wt: G(16, 0, 0, 348, 3613, 3009) },
-    done: 'Continued monitoring and optimization of the active campaigns. Increased the budget for the Hybrid Wig campaign following the positive performance trend. Prepared new MTO creatives for the next launch.', crea: ['RTS Special Offer'], concl: 'Example text. A short final week: results held steady.', plans: 'Example text. Launch the Make To Order campaign and compare it with the RTS campaigns.' }
+    done: 'Continued monitoring and optimization of the active campaigns. Increased the budget for the Hybrid Wig campaign following the positive performance trend. Prepared new MTO creatives for the next launch.', crea: [{ t: 'RTS Special Offer', a: 4 }, { t: 'Kinky Bang RTS', a: 3 }, { t: 'Make To Order preview', a: 5 }], concl: 'Example text. A short final week: results held steady.', plans: 'Example text. Launch the Make To Order campaign and compare it with the RTS campaigns.' }
 ];
 var ORDER = ['kb', 'cat', 'hw', 'ld', 'so', 'wt'];
 var PREV_W1 = { label: 'the last week of August, 25.08 – 31.08 (demo figures)', gen: G(1450, 9100, 11, 1380, 33000, 11000), groups: null };
@@ -163,7 +174,29 @@ function metricTable(gen, groups, prev) {
   var cmp = prev ? 'Arrows: change against ' + prev.label + ' (green is better, red is worse; for costs lower is better; grey means no comparison or no value judgement, as for spend). ' : '';
   return h + '</tbody></table></div><p class="hint">' + cmp + 'Green cell: best value among campaign groups (ROAS, CPP, CTR). Red cell: weakest ROAS.</p>';
 }
-function crea(list) { return '<div class="crea">' + list.map(function (c) { return '<figure><div class="img">Creative image<br>(from the Meta ad)</div><figcaption>' + c + '</figcaption></figure>'; }).join('') + '</div>'; }
+var ARTS = [
+  { bg: '#F3D9C4', shape: '#E7A77C', skin: '#8A5A3C', cloth: '#2B2118', hair: '#1A120C', ink: '#2B1A0E', title: 'LABOR DAY SALE', sub: '15% off all wigs' },
+  { bg: '#E9E1F5', shape: '#B9A3E3', skin: '#A06B4B', cloth: '#3A2A5C', hair: '#150E1F', ink: '#2A1B4A', title: 'BEST SELLERS', sub: 'Ready to ship' },
+  { bg: '#D6EAE6', shape: '#8CC7BC', skin: '#7B4B33', cloth: '#16403A', hair: '#0F0A07', ink: '#0F3A33', title: 'HYBRID WIGS', sub: 'A natural looking finish' },
+  { bg: '#F7DCE6', shape: '#EBA0BC', skin: '#92603F', cloth: '#5C1F3A', hair: '#1B1010', ink: '#4A1530', title: 'KINKY CURLY', sub: 'Bounce and volume' },
+  { bg: '#FBEFC7', shape: '#F0CB62', skin: '#8D5B3B', cloth: '#4A3A10', hair: '#1D140A', ink: '#3A2C08', title: 'RTS SPECIAL OFFER', sub: '10% off today' },
+  { bg: '#DDE6F7', shape: '#8FAAE0', skin: '#865536', cloth: '#1D2F5C', hair: '#120E0B', ink: '#14244A', title: 'MAKE TO ORDER', sub: 'Made for you' }
+];
+function art(i) {
+  var A = ARTS[i % ARTS.length];
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000"><rect width="800" height="1000" fill="' + A.bg + '"/><circle cx="560" cy="400" r="300" fill="' + A.shape + '" opacity="0.55"/><path d="M300 1000 C300 770 410 650 520 650 C630 650 740 770 740 1000Z" fill="' + A.cloth + '"/><circle cx="520" cy="480" r="112" fill="' + A.skin + '"/><path d="M395 470 C395 320 470 285 535 285 C640 285 695 370 655 540 C645 430 600 390 535 390 C465 390 425 425 395 470Z" fill="' + A.hair + '"/><text x="50" y="130" font-family="Georgia, serif" font-size="52" font-weight="700" fill="' + A.ink + '">' + A.title + '</text><text x="50" y="190" font-family="Arial, sans-serif" font-size="32" fill="' + A.ink + '">' + A.sub + '</text><rect x="50" y="860" width="270" height="76" rx="38" fill="' + A.ink + '"/><text x="185" y="909" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="' + A.bg + '">SHOP NOW</text><text x="50" y="975" font-family="Arial, sans-serif" font-size="24" fill="' + A.ink + '">mellowdiamond.com</text></svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+function crea(list) {
+  return '<div class="crea">' + list.map(function (c) {
+    return '<figure><button class="cr" type="button" data-a="' + c.a + '" data-t="' + c.t.replace(/"/g, '&quot;') + '" aria-label="Open creative: ' + c.t.replace(/"/g, '&quot;') + '"><img src="' + art(c.a) + '" alt="Ad creative: ' + c.t.replace(/"/g, '&quot;') + '"><figcaption>' + c.t + '<span class="zoom">Click to enlarge</span></figcaption></button></figure>';
+  }).join('') + '</div>';
+}
+var lastOpener = null;
+function openLb(btn) { lastOpener = btn; document.getElementById('lbimg').src = art(Number(btn.getAttribute('data-a'))); document.getElementById('lbimg').alt = btn.getAttribute('data-t'); document.getElementById('lbcap').textContent = btn.getAttribute('data-t'); document.getElementById('lb').hidden = false; document.getElementById('lbx').focus(); }
+function closeLb() { document.getElementById('lb').hidden = true; if (lastOpener) lastOpener.focus(); }
+document.addEventListener('click', function (e) { var b = e.target.closest ? e.target.closest('.cr') : null; if (b) { openLb(b); return; } if (e.target.id === 'lb' || e.target.id === 'lbx') closeLb(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !document.getElementById('lb').hidden) closeLb(); });
 function tx(t, p) { return '<div class="t"><h4>' + t + '</h4><p>' + p + '</p></div>'; }
 
 function weekRow(w, i) {
@@ -224,8 +257,8 @@ function september() {
     tx('Why we see such results', 'Example text. Efficiency decreased mainly because of scaling the Catalog RTS campaign and reallocating budget towards directions with growth potential.') +
     tx('What worked good', 'Example text. Kinky Bang, promotional offers, catalog creatives with discounts.') +
     tx('What worked worse', 'Example text. Website Traffic produced many low-cost clicks but no direct sales.') +
-    '<p class="sub">Most effective creatives</p>' + crea(['Catalog', 'ROAS 15.74', 'banner + catalog RTS -15% labour day sale', 'Hybrid Wig RTS -15%']) + '</div></div></section>';
-  h += '<p class="note">Макет на цифрах сентября mellowdiamond. Недели 1, 2 и 5 и итог взяты из вашей таблицы, неделя 3, часть недели 4 и тексты «Example text» ориентировочные. Картинки креативов в боевой версии подтягиваются из объявлений Meta.</p>';
+    '<p class="sub">Most effective creatives</p>' + crea([{ t: 'Catalog', a: 1 }, { t: 'ROAS 15.74', a: 3 }, { t: 'banner + catalog RTS -15% labour day sale', a: 0 }, { t: 'Hybrid Wig RTS -15%', a: 2 }]) + '</div></div></section>';
+  h += '<p class="note">Макет на цифрах сентября mellowdiamond. Недели 1, 2 и 5 и итог взяты из вашей таблицы, неделя 3, часть недели 4 и тексты «Example text» ориентировочные. Картинки креативов в макете нарисованы для примера, в боевой версии подтягиваются из объявлений Meta: 3 на неделю, 4 на месяц.</p>';
   return h;
 }
 
