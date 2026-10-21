@@ -59,3 +59,10 @@
 .crx-item--pick .crx-img { cursor: pointer; }
 .crx-cap { padding: 8px 10px; font-size: .82rem; display: flex; flex-direction: column; gap: 3px; }
 .crx-cap small { color: var(--muted, #6A6577); }
+
+/* the client's link */
+.ph-share { border: 1px solid var(--border, #E3E1EA); border-radius: 14px; background: var(--card, #fff); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.ph-share h3 { margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
+.ph-share-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ph-share-url { flex: 1 1 320px; min-width: 0; font: inherit; font-size: .88rem; padding: 8px 12px; border: 1px solid var(--border, #E3E1EA); border-radius: 10px; background: #F7F6FA; color: inherit; }
+.ph-share-meta { color: var(--muted, #6A6577); font-size: .85rem; }

@@ -186,3 +186,22 @@ export async function fetchAllMonthlyReportsForMonth(monthStartIso) {
   if (error) { console.warn('fetchAllMonthlyReportsForMonth failed', error); return []; }
   return flatten(data ?? [], () => ({ month_start: monthStartIso }));
 }
+
+// ---- The client's link (the public page /r/<token>, see migration 20261033000000_report_shares.sql) ----
+// One active link per project + platform scope. → { id, token, created_at, opens, last_opened_at } or null.
+export async function fetchReportShare(projectId, platform) {
+  const { data, error } = await supabase.from('report_shares').select('id, token, created_at, opens, last_opened_at')
+    .eq('project_id', projectId).eq('platform', platform).eq('active', true).maybeSingle();
+  if (error) { console.warn('fetchReportShare failed', error); return null; }
+  return data;
+}
+// A new link; the previous one stops working at once. → the token.
+export async function issueReportShare(projectId, platform, by) {
+  const { data, error } = await supabase.rpc('issue_report_share', { p_project: projectId, p_platform: platform, p_by: by || null });
+  if (error) throw error;
+  return data;
+}
+export async function revokeReportShare(projectId, platform) {
+  const { error } = await supabase.from('report_shares').update({ active: false, revoked_at: nowIso() }).eq('project_id', projectId).eq('platform', platform).eq('active', true);
+  if (error) throw error;
+}

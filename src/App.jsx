@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login/Login';
@@ -37,6 +38,9 @@ import SiteLeads from './pages/SiteLeads/SiteLeads';
 import SettingsLayout from './pages/Settings/SettingsLayout';
 import './styles/pages.css';
 import './styles/motion.css';
+
+// the client's public page loads on its own: its styles never reach the CRM
+const ClientReportPage = lazy(() => import('./pages/ClientReport/ClientReportPage'));
 
 function AuthGate() {
   const { session, loading, passwordSet, profileLoading } = useAuth();
@@ -102,8 +106,10 @@ function AuthGate() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthGate />
-    </AuthProvider>
+    <Routes>
+      {/* the client's report link: no sign-in, no CRM around it */}
+      <Route path="/r/:token" element={<Suspense fallback={null}><ClientReportPage /></Suspense>} />
+      <Route path="*" element={<AuthProvider><AuthGate /></AuthProvider>} />
+    </Routes>
   );
 }

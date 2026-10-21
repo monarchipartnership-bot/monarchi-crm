@@ -7,6 +7,7 @@ import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './Arc
 import MonthDocument from './MonthDocument';
 import DesignTodo from '../common/DesignTodo';
 import ReportReturnDialog from './ReportReturnDialog';
+import ShareLinkBox from './ShareLinkBox';
 import { deleteProjectReport, fetchProjectReports, refreshMonthTotal, setReportStatus } from '../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../lib/api/projectDecks';
 import { loadReportContext, extraKeysOf } from '../../lib/projectReportContext';
@@ -122,6 +123,7 @@ export default function ProjectHistoryTab({ projectId }) {
           </button>
         ))}
       </div>
+      <ShareLinkBox projectId={projectId} scope={scopeOf(tab)} label={tabs.find((t) => t.key === tab)?.label || ''} />
       {error && <div className="pacc-err">{error}</div>}
       {note && <div className="pacc-hint" role="status">{note}</div>}
       {rows == null && <div className="empty-hint">Завантаження...</div>}

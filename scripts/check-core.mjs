@@ -27,6 +27,7 @@ import { collectCreatives, creativeCandidates, pickCreative } from '../api/_lib/
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { buildMonths, canApprove, clientVisible, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
+import { TOP_GROUPS, buildClientModel, change, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
@@ -2008,6 +2009,163 @@ await ok('campaign groups: a group is a chosen set of campaigns, a report narrow
   assert.equal(list.length, 3); // same name on another platform is another campaign
   assert.equal(list.find((c) => c.platform === 'meta' && c.name === 'A').spend, 9);
   assert.deepEqual(filterCampaigns(list, 'a').map((c) => [c.platform, c.name]), [['meta', 'A'], ['google', 'A']]); // by spend, filtered by text
+});
+
+// ---- the client's public report page: the model of what get_shared_report returns ----
+const shareGroup = (name, spend, revenue, purchases, extra = {}) => ({ name, spend, revenue, purchases, impressions: spend * 25, clicks: spend / 3, reach: spend * 9, leads: 0, ...extra });
+const shareRow = (id, type, start, end, groups, o = {}) => ({
+  id, type, start, end, status: o.status || 'final', toDate: Boolean(o.toDate), updatedAt: o.updatedAt || `${end}T10:00:00Z`,
+  data: {
+    kind: 'ecom', sections: o.sections || {}, creatives: o.creatives || [],
+    platforms: { meta: { currency: 'USD', total: o.total || groups.reduce((a, g) => ({ spend: a.spend + g.spend, revenue: a.revenue + g.revenue, purchases: a.purchases + g.purchases, impressions: a.impressions + g.impressions, clicks: a.clicks + g.clicks, reach: a.reach + g.reach, leads: 0 }), { spend: 0, revenue: 0, purchases: 0, impressions: 0, clicks: 0, reach: 0, leads: 0 }), groups, campaigns: o.campaigns } },
+    previous: o.prev ? { period: o.prev.period, platforms: { meta: { total: o.prev.total, groups: o.prev.groups || [] } } } : null,
+  },
+});
+await ok('fmtValue: money, ROAS as a percentage, costs with cents, a missing number as a dash', () => {
+  assert.equal(fmtValue('spend', 6700, 'money', 'USD'), '$6,700');
+  assert.equal(fmtValue('cpm', 43.9, 'money', 'USD'), '$43.90');
+  assert.equal(fmtValue('cpp', 129.4, 'money', 'USD'), '$129');
+  assert.equal(fmtValue('roas', 5.3, 'ratio', 'USD'), '530%');
+  assert.equal(fmtValue('ctr', 4.253, 'percent', 'USD'), '4.25%');
+  assert.equal(fmtValue('reach', 123456, 'number', 'USD'), '123,456');
+  assert.equal(fmtValue('roas', null, 'ratio', 'USD'), '—');
+  assert.equal(fmtValue('spend', Number.NaN, 'money', 'USD'), '—');
+});
+await ok('share link: the address is the origin plus /r/ plus the token, a trailing slash is not doubled', () => {
+  assert.equal(shareUrl('https://crm.monarchi.agency', 'abc'), 'https://crm.monarchi.agency/r/abc');
+  assert.equal(shareUrl('https://crm.monarchi.agency/', 'abc'), 'https://crm.monarchi.agency/r/abc');
+});
+await ok('change: arrow, percentage and tone (costs: lower is good, spend is neutral), nothing without a previous number', () => {
+  assert.deepEqual([change('roas', 6, 5, 'up').arrow, change('roas', 6, 5, 'up').pct, change('roas', 6, 5, 'up').tone], ['▲', '20.0%', 'good']);
+  assert.equal(change('cpp', 110, 100, 'down').tone, 'bad');
+  assert.equal(change('cpp', 90, 100, 'down').tone, 'good');
+  assert.equal(change('spend', 120, 100, 'neutral').tone, 'neu');
+  assert.equal(change('roas', 5, 0, 'up'), null);
+  assert.equal(change('roas', 5, null, 'up'), null);
+  assert.equal(change('roas', 5, 5, 'up').arrow, '');
+});
+await ok('client model: months in order, weeks numbered by the month plan, the running month flagged, history for the charts', () => {
+  const g = [shareGroup('Catalog', 100, 500, 5), shareGroup('Hybrid', 50, 100, 1)];
+  const payload = {
+    project: { name: 'Mellow', kind: 'ecom' }, platform: 'meta', columns: [], custom: [],
+    reports: [
+      shareRow(1, 'weekly', '2026-09-07', '2026-09-13', g, { updatedAt: '2026-09-14T08:00:00Z' }),
+      shareRow(2, 'weekly', '2026-09-01', '2026-09-06', g),
+      shareRow(3, 'monthly', '2026-09-01', '2026-09-30', g, { updatedAt: '2026-10-01T09:00:00Z' }),
+      shareRow(4, 'weekly', '2026-10-05', '2026-10-11', g, { updatedAt: '2026-10-12T09:00:00Z' }),
+      shareRow(5, 'monthly', '2026-10-01', '2026-10-11', g, { status: 'draft', toDate: true, updatedAt: '2026-10-12T09:05:00Z' }),
+    ],
+  };
+  const m = buildClientModel(payload);
+  assert.deepEqual(m.months.map((x) => x.key), ['2026-09', '2026-10']);
+  assert.deepEqual(m.months[0].weeks.map((w) => [w.n, w.label]), [[1, '01.09 – 06.09'], [2, '07.09 – 13.09']]); // sorted, numbered by the plan of the month
+  assert.equal(m.months[0].weeksTotal, 5);
+  assert.equal(m.months[0].running, false);
+  assert.equal(m.months[1].running, true); // the month to date: «draft» in the database, but the client never sees a status for it
+  assert.equal(m.months[1].weeks[0].n, 2); // 5–11 Oct is the second week of October
+  assert.deepEqual(m.history.map((h) => [h.key, h.partial]), [['2026-09', false], ['2026-10', true]]);
+  assert.equal(m.history[0].roas, 4); // 600 / 150
+  assert.equal(m.asOf, '2026-10-12');
+  assert.equal(m.months[0].asOf, '2026-10-01');
+});
+await ok('client model: no reports → no months; a month without its total still shows its weeks; campaign names never reach the model', () => {
+  assert.equal(buildClientModel(null), null);
+  assert.deepEqual(buildClientModel({ project: { name: 'X' }, platform: 'meta', reports: [] }).months, []);
+  const g = [shareGroup('Catalog', 100, 500, 5)];
+  const one = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'weekly', '2026-10-05', '2026-10-11', g, { campaigns: [{ name: 'SECRET CAMPAIGN' }] })] });
+  assert.equal(one.months[0].monthly, null);
+  assert.equal(one.history.length, 0);
+  assert.equal(one.months[0].weeks.length, 1);
+  assert.ok(!JSON.stringify(one).includes('SECRET'));
+});
+await ok('client model: several platforms of one scope are added together, groups with one name are merged', () => {
+  const r = shareRow(1, 'weekly', '2026-10-05', '2026-10-11', [shareGroup('A', 10, 20, 1)]);
+  r.data.platforms.google = { currency: 'USD', total: { spend: 5, revenue: 10, purchases: 1, impressions: 100, clicks: 10, reach: null }, groups: [shareGroup('A', 5, 10, 1), shareGroup('B', 1, 0, 0)] };
+  const v = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'all', reports: [r] }).months[0].weeks[0].view;
+  assert.equal(v.total.spend, 15);
+  assert.deepEqual(v.groups.map((x) => [x.name, x.spend]), [['A', 15], ['B', 1]]);
+});
+await ok('client model: campaigns outside every group (one column each, or the old «Інше») fold into «Other campaigns», no campaign name is shown', () => {
+  const g = [shareGroup('Catalog', 100, 500, 5), shareGroup('SECRET camp A', 30, 60, 1, { single: true, campaignCount: 1 }), shareGroup('SECRET camp B', 20, 10, 0, { single: true, campaignCount: 1 }), shareGroup('Інше', 10, 0, 0, { campaignCount: 3 })];
+  const v = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'weekly', '2026-10-05', '2026-10-11', g)] }).months[0].weeks[0].view;
+  assert.deepEqual(v.groups.map((x) => [x.name, x.spend]), [['Catalog', 100], ['Other campaigns', 60]]);
+  assert.equal(v.groups[1].campaignCount, 5);
+  assert.ok(!JSON.stringify(v).includes('SECRET'));
+  // as the database hands it over: every such group already named «Other campaigns» (some with the single flag, some without)
+  const g2 = [shareGroup('Catalog', 100, 500, 5), shareGroup('Other campaigns', 30, 60, 1, { single: true }), shareGroup('Other campaigns', 20, 10, 0)];
+  const v2 = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'weekly', '2026-10-05', '2026-10-11', g2)] }).months[0].weeks[0].view;
+  assert.deepEqual(v2.groups.map((x) => [x.name, x.spend]), [['Catalog', 100], ['Other campaigns', 50]]);
+});
+await ok('kpi cards: the six numbers with changes against the previous period; lead projects get their own set', () => {
+  const g = [shareGroup('Catalog', 100, 500, 5)];
+  const prev = { period: { start: '2026-08-01', end: '2026-08-31' }, total: { spend: 80, revenue: 600, purchases: 6, impressions: 2000, clicks: 30, reach: 900 } };
+  const m = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'monthly', '2026-09-01', '2026-09-30', g, { prev })] });
+  const v = m.months[0].monthly;
+  const cards = kpiCards(v);
+  assert.deepEqual(cards.map((c) => c.label), ['Spent', 'Revenue', 'ROAS', 'Purchases', 'Cost per purchase', 'Reach']);
+  assert.equal(cards[0].value, '$100');
+  assert.equal(cards[0].change.tone, 'neu');
+  assert.equal(cards[2].value, '500%');
+  assert.equal(cards[2].change.arrow, '▼'); // 5.0 vs 7.5
+  assert.equal(cards[2].change.tone, 'bad');
+  assert.equal(prevName(v), 'August');
+  const lead = kpiCards({ ...v, kind: 'leadgen' }).map((c) => c.label);
+  assert.deepEqual(lead, ['Spent', 'Leads', 'Cost per lead', 'Clicks', 'CTR', 'Reach']);
+  assert.equal(prevName({ ...v, type: 'weekly' }), 'previous week');
+  assert.equal(prevName({ ...v, prev: null }), '');
+});
+await ok('metric table: the top groups by name and «Other (N groups)»; «show all» opens every group; best / weakest cells; new groups', () => {
+  const groups = Array.from({ length: 8 }, (_, i) => shareGroup(`G${i + 1}`, 1000 - i * 100, (1000 - i * 100) * (i + 1), 10 + i));
+  const prevGroups = groups.slice(0, 7).map((x) => ({ ...x, spend: x.spend * 0.9 }));
+  const prev = { period: { start: '2026-08-01', end: '2026-08-31' }, total: { spend: 4000, revenue: 20000, purchases: 50, impressions: 100000, clicks: 3000, reach: 40000 }, groups: prevGroups };
+  const m = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'monthly', '2026-09-01', '2026-09-30', groups, { prev })] });
+  const v = m.months[0].monthly;
+  const keys = metricKeys('ecom');
+  const folded = metricTable(v, { keys });
+  assert.equal(folded.columns.length, 1 + TOP_GROUPS + 1);
+  assert.deepEqual(folded.columns.map((c) => c.kind), ['general', ...Array(TOP_GROUPS).fill('group'), 'other']);
+  assert.equal(folded.columns.at(-1).label, 'Other (3 groups)');
+  assert.equal(folded.hidden, 3);
+  const spent = folded.rows.find((r) => r.key === 'spend');
+  const otherSpend = (1000 - 5 * 100) + (1000 - 6 * 100) + (1000 - 7 * 100);
+  assert.equal(spent.cells.at(-1).text, `$${otherSpend.toLocaleString('en-US')}`); // the folded column is the sum of the rest
+  assert.equal(spent.cells.at(-1).change, null);
+  assert.equal(spent.cells[1].change.arrow, '▲'); // G1: 1000 vs 900
+  const all = metricTable(v, { keys, showAll: true });
+  assert.equal(all.columns.length, 1 + 8);
+  assert.equal(all.hidden, 0);
+  assert.equal(all.rows.find((r) => r.key === 'spend').cells[8].isNew, true); // G8 was not in the previous month
+  const roas = all.rows.find((r) => r.key === 'roas');
+  assert.equal(roas.cells.filter((c) => c.cls === 'best').length, 1);
+  assert.equal(roas.cells[8].cls, 'best'); // G8 has the highest ROAS (x8)
+  assert.equal(roas.cells[1].cls, 'worst'); // G1 the lowest
+  assert.equal(roas.cells[1].text, '100%');
+  // exactly one group more than the shown ones is not folded: «Other» of one group would just be that group
+  const six = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'monthly', '2026-09-01', '2026-09-30', groups.slice(0, TOP_GROUPS + 1), {})] }).months[0].monthly;
+  assert.equal(metricTable(six, { keys }).columns.length, 1 + TOP_GROUPS + 1);
+  assert.ok(metricTable(six, { keys }).columns.every((c) => c.kind !== 'other'));
+});
+await ok('metric table: extra columns and the project formulas follow the standard rows, with their own labels', () => {
+  const g = [shareGroup('Catalog', 100, 500, 5)];
+  const custom = [{ key: 'custom_x', name: 'Cost per click ×2', formula: { a: 'cpc', op: '*', b: 2 }, format: 'money' }];
+  const v = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', custom, reports: [shareRow(1, 'weekly', '2026-10-05', '2026-10-11', g)] }).months[0].weeks[0].view;
+  const keys = metricKeys('ecom', [], custom);
+  assert.equal(keys.at(-1), 'custom_x');
+  const t = metricTable(v, { keys, custom, platformLabel: 'Meta' });
+  assert.equal(t.rows.at(-1).label, 'Cost per click ×2');
+  assert.equal(t.rows.find((r) => r.key === 'roas').label, 'ROAS (Meta)');
+  assert.equal(t.rows.find((r) => r.key === 'spend').label, 'Spent');
+});
+await ok('group charts: spend slices fold the tail into «Other», ROAS bars list the best first', () => {
+  const groups = Array.from({ length: 8 }, (_, i) => shareGroup(`G${i + 1}`, 1000 - i * 100, (1000 - i * 100) * (i % 3 + 1), 10));
+  const v = buildClientModel({ project: { name: 'X', kind: 'ecom' }, platform: 'meta', reports: [shareRow(1, 'monthly', '2026-09-01', '2026-09-30', groups)] }).months[0].monthly;
+  const slices = spendSlices(v);
+  assert.equal(slices.length, TOP_GROUPS + 1);
+  assert.equal(slices.at(-1).label, 'Other (3 groups)');
+  assert.equal(slices.reduce((a, x) => a + x.value, 0), groups.reduce((a, x) => a + x.spend, 0));
+  const bars = roasBars(v);
+  assert.equal(bars.length, TOP_GROUPS);
+  assert.deepEqual(bars.map((b) => b.value), [...bars.map((b) => b.value)].sort((a, b) => b - a));
 });
 
 console.log(`\n${passed} checks passed`);
