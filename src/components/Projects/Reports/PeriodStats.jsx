@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ResultView from './ResultView';
 import CompareModal from './CompareModal';
 import { saveProjectReport } from '../../../lib/api/projectReportStore';
@@ -35,7 +36,8 @@ const PRESETS = [['7', '7 днів'], ['30', '30 днів'], ['month', 'Цей �
 export default function PeriodStats({ projectId, platform = 'total' }) {
   const ctx = useReportContext(projectId, platform);
   const { email } = useAuth();
-  const [archive, setArchive] = useState({ busy: false, msg: '' });
+  const navigate = useNavigate();
+  const [archive, setArchive] = useState({ busy: false, msg: '', id: null });
   const isTotal = platform === 'total';
   const initial = presetRange('7');
   const [from, setFrom] = useState(initial.from);
@@ -56,7 +58,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
 
   async function run(range = { from, to }, c = cmp, columns = ctx.fetchColumns, quiet = false) {
     if (range.from > range.to) { setState({ status: 'error', error: 'Початок періоду пізніше за кінець.' }); return; }
-    setState({ status: 'loading' }); setArchive({ busy: false, msg: '' });
+    setState({ status: 'loading' }); setArchive({ busy: false, msg: '', id: null });
     const prev = compareRange(range, c);
     try {
       const [cur, before] = await Promise.all([
@@ -121,17 +123,18 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     return regroupData(state.data, ctx.groups, { [platform]: { groups: own.groups, campaigns: [...own.campaigns, ...all] } });
   }, [state, allCampaigns, ctx.selections, ctx.groups, platform]);
 
-  // «Зберегти в архів»: the period on screen becomes a report of type «Довільний»
-  async function saveToArchive() {
-    setArchive({ busy: true, msg: '' });
+  // «Зберегти»: the period on screen becomes a custom report. It has no draft or rework (it is saved as final), never goes to the client, and lives in
+  // «Історія проекту» → «Кастомні звіти», where it is opened, edited, downloaded or deleted.
+  async function saveCustom() {
+    setArchive({ busy: true, msg: '', id: null });
     try {
       const period = { start: state.range.from, end: state.range.to };
       const prev = state.prev ? { start: state.prev.from, end: state.prev.to } : null;
       const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection: [], options: { groups: true } });
-      await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'draft', data: { ...payload, label: null }, createdBy: email });
-      setArchive({ busy: false, msg: 'Збережено в «Архів звітів».' });
+      const row = await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'final', data: { ...payload, label: null }, createdBy: email });
+      setArchive({ busy: false, msg: 'Збережено в «Історія проекту» → «Кастомні звіти».', id: row.id });
     } catch (e) {
-      setArchive({ busy: false, msg: (e.message || 'Не вдалося зберегти.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261030000000.' });
+      setArchive({ busy: false, msg: (e.message || 'Не вдалося зберегти.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261030000000.', id: null });
     }
   }
 
@@ -172,9 +175,14 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
             prevLabel={state.prev ? `${fmt(state.prev.from)}–${fmt(state.prev.to)}` : ''}
           >
             {canShowAll && <button type="button" className="btn" onClick={() => setAllCampaigns((v) => !v)} aria-pressed={allCampaigns}>{allCampaigns ? 'Лише обрані в макеті' : 'Показати всі кампанії'}</button>}
-            <button type="button" className="btn" onClick={saveToArchive} disabled={archive.busy}>{archive.busy ? 'Зберігаємо…' : 'Зберегти в архів'}</button>
+            <button type="button" className="btn" onClick={saveCustom} disabled={archive.busy}>{archive.busy ? 'Зберігаємо…' : 'Зберегти'}</button>
           </ResultView>
-          {archive.msg && <div className="pacc-hint prep-archive-msg">{archive.msg}</div>}
+          {archive.msg && (
+            <div className="pacc-hint prep-archive-msg">
+              {archive.msg}{' '}
+              {archive.id && <button type="button" className="pacc-link" onClick={() => navigate(`/projects/${projectId}?tab=decks&platform=${platform}&section=custom&report=${archive.id}`)}>Відкрити</button>}
+            </div>
+          )}
         </section>
       )}
 

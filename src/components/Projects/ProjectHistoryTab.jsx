@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
+import DesignTodo from '../common/DesignTodo';
 import { HubTitle, RibbonMark } from './hubIcons';
+import ReportEditor from './Workbench/ReportEditor';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './ArchiveReportModal';
 import MonthDocument from './MonthDocument';
 import ReportReturnDialog from './ReportReturnDialog';
 import ShareLinkBox from './ShareLinkBox';
-import { deleteProjectReport, fetchProjectReports, refreshMonthTotal, setReportStatus } from '../../lib/api/projectReportStore';
+import { deleteProjectReport, fetchCampaignGroups, fetchProjectReports, refreshMonthTotal, setReportStatus } from '../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../lib/api/projectDecks';
 import { loadReportContext, extraKeysOf } from '../../lib/projectReportContext';
 import { accountPlatforms, TOTAL_TAB } from '../../lib/reportScope';
@@ -24,8 +26,10 @@ const stamp = (iso) => (iso ? new Date(iso).toLocaleString('uk-UA', { day: '2-di
 const Chip = ({ status, toDate }) => (toDate ? <i className="ph-chip ph-chip--todate">Оновлюється</i> : status ? <i className={'ph-chip ph-chip--' + status}>{REPORT_STATUS[status] || status}</i> : <i className="ph-chip ph-chip--none">ще не створено</i>);
 
 
-// «Історія проекту»: month cards, one scope (platform) at a time like the report pages. A card holds the weeks of the month, the monthly report and the
-// combined document. A report is a draft, in rework or approved; only the approved ones reach the client, the others are opened in «Робота над звітами».
+// «Історія проекту» has two categories. «Перебіг проекту»: month cards, one scope (platform) at a time like the report pages. A card holds the weeks of the
+// month, the monthly report and the combined document. A report is a draft, in rework or approved; only the approved ones reach the client, the others are
+// opened in «Робота над звітами». «Кастомні звіти»: the reports made in «Показники за період» (any dates); they never go to the client and are opened,
+// edited, downloaded and deleted right here.
 export default function ProjectHistoryTab({ projectId }) {
   const navigate = useNavigate();
   const { email } = useAuth();
@@ -34,6 +38,7 @@ export default function ProjectHistoryTab({ projectId }) {
   const [rows, setRows] = useState(null);
   const [decks, setDecks] = useState([]);
   const [ctx, setCtx] = useState({ project: null, accounts: [], custom: [], columns: {}, approvers: [] });
+  const [groups, setGroups] = useState([]);
   const [openId, setOpenId] = useState(null);
   const [docKey, setDocKey] = useState(null);
   const [returning, setReturning] = useState(null);
@@ -51,6 +56,7 @@ export default function ProjectHistoryTab({ projectId }) {
   useEffect(() => {
     let off = false;
     loadReportContext(projectId).then((c) => { if (!off) setCtx(c); }).catch(() => {});
+    fetchCampaignGroups(projectId).then((g) => { if (!off) setGroups(g); }).catch(() => {});
     return () => { off = true; };
   }, [projectId]);
 
@@ -60,7 +66,10 @@ export default function ProjectHistoryTab({ projectId }) {
   const wanted = params.get('platform');
   const tab = tabs.some((t) => t.key === wanted) ? wanted : tabs[0].key;
   const scopeRows = useMemo(() => (rows || []).filter((r) => (r.platform || 'all') === scopeOf(tab)), [rows, tab, platforms]); // eslint-disable-line react-hooks/exhaustive-deps
-  const months = useMemo(() => buildMonths(scopeRows, today()), [scopeRows]);
+  const section = params.get('section') === 'custom' ? 'custom' : 'journey';
+  const months = useMemo(() => buildMonths(scopeRows.filter((r) => r.period_type !== 'custom'), today()), [scopeRows]);
+  const customRows = useMemo(() => scopeRows.filter((r) => r.period_type === 'custom').sort((a, b) => String(b.period_start).localeCompare(String(a.period_start)) || String(b.updated_at).localeCompare(String(a.updated_at))), [scopeRows]);
+  const customOpen = section === 'custom' ? customRows.find((r) => r.id === Number(params.get('report'))) || null : null;
   const approver = canApprove(email, ctx.approvers);
   const projectName = ctx.project?.name || '';
 
@@ -70,6 +79,18 @@ export default function ProjectHistoryTab({ projectId }) {
   function pick(key) {
     const next = new URLSearchParams(params);
     next.set('platform', key);
+    next.delete('report');
+    setParams(next, { replace: true });
+  }
+  function pickSection(key) {
+    const next = new URLSearchParams(params);
+    if (key === 'custom') next.set('section', 'custom'); else next.delete('section');
+    next.delete('report');
+    setParams(next, { replace: true });
+  }
+  function openCustom(id) {
+    const next = new URLSearchParams(params);
+    if (id) next.set('report', id); else next.delete('report');
     setParams(next, { replace: true });
   }
 
@@ -115,7 +136,12 @@ export default function ProjectHistoryTab({ projectId }) {
   return (
     <section className="report-section">
       <HubTitle icon="file" className="prep-box-title">Історія проекту</HubTitle>
-      <div className="pacc-hint">Місяці з тижневими звітами: чернетка, доробка, затверджено. Клієнт бачить лише затверджене; чернетки й доробка опрацьовуються в розділі «Робота над звітами».</div>
+      <DesignTodo note="Історія проекту: перемикач «Перебіг проекту / Кастомні звіти», список і відкритий кастомний звіт" />
+      <div className="prep-seg" role="tablist" aria-label="Розділи історії">
+        <button type="button" role="tab" aria-selected={section === 'journey'} className={'prep-seg-tab' + (section === 'journey' ? ' on' : '')} onClick={() => pickSection('journey')}>Перебіг проекту</button>
+        <button type="button" role="tab" aria-selected={section === 'custom'} className={'prep-seg-tab' + (section === 'custom' ? ' on' : '')} onClick={() => pickSection('custom')}>Кастомні звіти</button>
+      </div>
+      <div className="pacc-hint">{section === 'custom' ? 'Звіти за будь-який період, збережені в «Формування звіту» → «Показники за період». Клієнту вони не йдуть: їх можна відкрити, змінити, видалити й завантажити.' : 'Місяці з тижневими звітами: чернетка, доробка, затверджено. Клієнт бачить лише затверджене; чернетки й доробка опрацьовуються в розділі «Робота над звітами».'}</div>
       <div className="prep-seg" role="tablist" aria-label="Платформи">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>
@@ -123,11 +149,29 @@ export default function ProjectHistoryTab({ projectId }) {
           </button>
         ))}
       </div>
-      <ShareLinkBox projectId={projectId} scope={scopeOf(tab)} label={tabs.find((t) => t.key === tab)?.label || ''} />
+      {section === 'journey' && <ShareLinkBox projectId={projectId} scope={scopeOf(tab)} label={tabs.find((t) => t.key === tab)?.label || ''} />}
       {error && <div className="pacc-err">{error}</div>}
       {note && <div className="pacc-hint" role="status">{note}</div>}
       {rows == null && <div className="empty-hint">Завантаження...</div>}
-      {rows && (
+      {rows && section === 'custom' && (customOpen ? (
+        <ReportEditor key={customOpen.id} row={customOpen} ctx={{ ...ctx, groups }} onBack={() => openCustom(null)} onChanged={load} />
+      ) : customRows.length === 0 ? (
+        <div className="empty-hint">Кастомних звітів немає. Оберіть період у «Формування звіту» → «Показники за період», натисніть «Показати», потім «Зберегти».</div>
+      ) : (
+        <ul className="ph-rows ph-custom">
+          {customRows.map((r) => (
+            <li key={r.id}>
+              <span className="ph-name">{reportPeriodText(r)}</span>
+              <span className="ph-dates">{reportPlatformLabel(r.platform)} · оновлено {stamp(r.updated_at)}</span>
+              <span className="ph-act">
+                <button type="button" className="btn" onClick={() => openCustom(r.id)}>Відкрити</button>
+                <button type="button" className="btn" onClick={() => remove(r)}>Видалити</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ))}
+      {rows && section === 'journey' && (
         <div className="ph-months">
           {months.map((m, i) => {
             const isOpen = closed[m.key] === undefined ? i === 0 : !closed[m.key];
@@ -154,7 +198,7 @@ export default function ProjectHistoryTab({ projectId }) {
                     <ul className="ph-rows">
                       {m.weeks.map((w) => rowLine(w.row, `Тиждень ${w.n}`, `${fmt(w.start)} – ${fmt(w.end)}`, w.start))}
                       {rowLine(m.monthly, 'Місяць', `${fmt(m.start)} – ${fmt(m.end)}`, 'month')}
-                      {m.others.map((r) => rowLine(r, r.period_type === 'weekly' ? 'Тиждень (інший період)' : r.period_type === 'monthly' ? 'Місяць (інший період)' : 'Довільний', reportPeriodText(r), 'o' + r.id))}
+                      {m.others.map((r) => rowLine(r, r.period_type === 'weekly' ? 'Тиждень (інший період)' : 'Місяць (інший період)', reportPeriodText(r), 'o' + r.id))}
                     </ul>
                   </div>
                 )}

@@ -27,6 +27,8 @@ const OPEN_SELECTION = { open: 'selection', toggle: () => {} };
 
 // One report of «Робота над звітами» opened in the workspace: the numbers as they will look, what is in the report (metrics, groups and campaigns), the texts, the
 // creatives. «Зберегти» keeps the status, «Підтверджено» sends the report to the history and to the client's page.
+// A custom report («Показники за період» → «Зберегти», opened from «Історія проекту» → «Кастомні звіти») has no status, texts or creatives and never goes to the
+// client: only the table, what is in it, saving, downloading and deleting.
 export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
@@ -39,6 +41,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const [cbusy, setCbusy] = useState(false);
   const [cerr, setCerr] = useState('');
 
+  const isCustom = row.period_type === 'custom';
   const platform = row.platform;
   const isAll = platform === 'all';
   const kind = data.kind || 'ecom';
@@ -77,7 +80,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   // ---- creatives (Meta)
   const items = data.creatives?.items || [];
   const count = data.creatives?.count || (row.period_type === 'monthly' ? 4 : 3);
-  const canCreatives = platform === 'meta' || isAll;
+  const canCreatives = !isCustom && (platform === 'meta' || isAll);
   const setItems = (next) => edit((d) => ({ ...d, creatives: { count, items: next, source: 'manual', at: new Date().toISOString() } }));
   async function suggest() {
     setCbusy(true);
@@ -129,18 +132,18 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
         <button type="button" className="btn" onClick={back}>← До списку</button>
         <div className="wb-bar-title">
           <b>{TYPE_LABEL[row.period_type] || row.period_type} звіт · {reportPeriodText(row)}</b>
-          <small>{reportPlatformLabel(platform)} · <span className={'wb-chip wb-chip--' + row.status}>{REPORT_STATUS[row.status] || row.status}</span> · оновлено {stamp(row.updated_at)}</small>
+          <small>{reportPlatformLabel(platform)} · {!isCustom && <><span className={'wb-chip wb-chip--' + row.status}>{REPORT_STATUS[row.status] || row.status}</span> · </>}оновлено {stamp(row.updated_at)}</small>
         </div>
         <div className="wb-actions">
           {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
           <button type="button" className="btn" disabled={busy === 'delete' || !!busy} onClick={remove}>Видалити</button>
           <button type="button" className="btn" disabled={!dirty || !!busy} onClick={save}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
-          <button type="button" className="btn btn-p" disabled={!approver || !!busy} title={approver ? 'Відправити звіт в історію й до клієнта' : 'Підтверджують лише відповідальні, обрані в налаштуваннях агента'} onClick={approve}>{busy === 'approve' ? 'Підтверджуємо…' : 'Підтверджено'}</button>
+          {!isCustom && <button type="button" className="btn btn-p" disabled={!approver || !!busy} title={approver ? 'Відправити звіт в історію й до клієнта' : 'Підтверджують лише відповідальні, обрані в налаштуваннях агента'} onClick={approve}>{busy === 'approve' ? 'Підтверджуємо…' : 'Підтверджено'}</button>}
         </div>
       </div>
       <DesignTodo note="Робоча область звіту: таблиця, склад звіту, тексти, креативи, кнопки" />
-      {row.status === 'rework' && review.returnedNote && <div className="prep-internal-note" role="note"><b>Повернуто на доопрацювання{review.returnedBy ? ` (${review.returnedBy})` : ''}:</b> {review.returnedNote}</div>}
-      {!approver && <div className="pacc-hint">Підтвердити звіт можуть лише відповідальні, обрані в налаштуваннях агента. Ви можете працювати над ним і зберігати.</div>}
+      {!isCustom && row.status === 'rework' && review.returnedNote && <div className="prep-internal-note" role="note"><b>Повернуто на доопрацювання{review.returnedBy ? ` (${review.returnedBy})` : ''}:</b> {review.returnedNote}</div>}
+      {!isCustom && !approver && <div className="pacc-hint">Підтвердити звіт можуть лише відповідальні, обрані в налаштуваннях агента. Ви можете працювати над ним і зберігати.</div>}
       {message && <div className="pacc-hint" role="status">{message}</div>}
       {error && <div className="pacc-err">{error}</div>}
 
@@ -148,24 +151,24 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
         <h4>Таблиця звіту</h4>
         {Object.keys(data.platforms || {}).length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
           <ResultView
-            data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} noExport
+            data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} noExport={!isCustom}
             lockTotal={isAll} extraKeys={isAll ? [] : extraKeys} title={ctx.project?.name || ''} subtitle={`${TYPE_LABEL[row.period_type]} · ${reportPeriodText(row)}`}
-            fileBase="draft" campaignMode="selected" selection={[]} options={{ groups: true }} curLabel={reportPeriodText(row)} prevLabel={prevLabel}
+            fileBase={isCustom ? `${ctx.project?.name || 'report'}_${row.period_start}_${row.period_end}_${platform}` : 'draft'} campaignMode="selected" selection={[]} options={{ groups: true }} curLabel={reportPeriodText(row)} prevLabel={prevLabel}
           />
         )}
       </section>
 
       <section className="wb-block">
         <h4>Склад звіту</h4>
-        <div className="pacc-hint">Тільки для цього звіту: макет платформи не змінюється. Працює за збереженими цифрами, нового запиту в кабінет немає. Кампанія, якої не було в періоді, або метрика, якої немає в збережених цифрах, зʼявляться після оновлення звіту з кабінетів.</div>
+        <div className="pacc-hint">Тільки для цього звіту: макет платформи не змінюється. Працює за збереженими цифрами, нового запиту в кабінет немає. Кампанія, якої не було в періоді, або метрика, якої немає в збережених цифрах, зʼявляться, якщо сформувати звіт за цей період ще раз.</div>
         <h5>Метрики</h5>
         <div className="wb-metrics">
-          <div className="wb-mrow wb-mhead"><span>Метрика</span><span>У таблиці</span><span>Бачить клієнт</span></div>
+          <div className={'wb-mrow wb-mhead' + (isCustom ? ' wb-mrow--solo' : '')}><span>Метрика</span><span>У таблиці</span>{!isCustom && <span>Бачить клієнт</span>}</div>
           {options.map((o) => (
-            <div className="wb-mrow" key={o.key}>
+            <div className={'wb-mrow' + (isCustom ? ' wb-mrow--solo' : '')} key={o.key}>
               <span>{o.label}</span>
               <input type="checkbox" checked={shownKeys.includes(o.key)} onChange={() => toggleShown(o.key)} aria-label={`${o.label}: у таблиці`} />
-              <input type="checkbox" checked={!hidden.includes(o.key)} disabled={!shownKeys.includes(o.key)} onChange={() => toggleHidden(o.key)} aria-label={`${o.label}: бачить клієнт`} />
+              {!isCustom && <input type="checkbox" checked={!hidden.includes(o.key)} disabled={!shownKeys.includes(o.key)} onChange={() => toggleHidden(o.key)} aria-label={`${o.label}: бачить клієнт`} />}
             </div>
           ))}
         </div>
@@ -176,7 +179,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
         )}
       </section>
 
-      <section className="wb-block">
+      {!isCustom && <section className="wb-block">
         <h4>Тексти</h4>
         {blocks.map((b) => (
           <div className="wb-text" key={b.key}>
@@ -187,7 +190,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
             <AutoResizeTextarea id={'wb-t-' + b.key} value={data.sections?.[b.key] || ''} onChange={(v) => setText(b.key, v)} placeholder={b.title + '…'} />
           </div>
         ))}
-      </section>
+      </section>}
 
       {canCreatives && (
         <section className="wb-block">
