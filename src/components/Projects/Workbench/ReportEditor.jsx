@@ -16,7 +16,7 @@ import { regroupData } from '../../../lib/periodReport';
 import { metricKeys } from '../../../lib/clientReport';
 import { metricKeysOf, reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
 import { metricOptions } from '../../../lib/reportMetrics';
-import { REPORT_STATUS, canApprove, monthKey, reviewPatch } from '../../../lib/projectHistory';
+import { REPORT_STATUS, canApprove, isRunning, monthKey, reviewPatch } from '../../../lib/projectHistory';
 import '../../../styles/projectReports.css';
 import '../../../styles/workbench.css';
 import '../../../styles/builderHub.css';
@@ -76,7 +76,9 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const sel = useMemo(() => data.campaignSel || selectionFromColumns({ platform, columns: data.platforms?.[platform]?.groups, groups: groupsHere }), [data.campaignSel, data.platforms, platform, groupsHere]);
   const campaigns = useMemo(() => (data.platforms?.[platform]?.campaigns || []).map((c) => ({ name: c.name, spend: c.spend || 0 })), [data.platforms, platform]);
 
-  const edit = (fn) => { setData((d) => fn(d)); setDirty(true); setMessage(''); };
+  // the month-to-date report of the agent renews itself: nothing can be changed, saved, confirmed or deleted until the month is over
+  const running = isRunning(row, new Date().toISOString().slice(0, 10));
+  const edit = (fn) => { if (running) return; setData((d) => fn(d)); setDirty(true); setMessage(''); };
   const withTemplate = (d) => d.template || snapshotOf(null, row.period_type === 'monthly' ? 'monthly' : 'weekly');
   const setTemplate = (patch) => edit((d) => ({ ...d, template: { ...withTemplate(d), ...patch } }));
 
@@ -167,11 +169,13 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
         </div>
         <div className="wbe-actions">
           {isCustom && <span ref={setSlot} className="wbe-slot" />}
-          <button type="button" className="btn wbe-del" disabled={!!busy} onClick={remove}>Видалити</button>
-          <button type="button" className="btn" disabled={!dirty || !!busy} onClick={save}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
-          {!isCustom && <button type="button" className="btn wbe-ok" disabled={!approver || !!busy} title={approver ? 'Відправити звіт в історію й до клієнта' : 'Підтверджують лише відповідальні, обрані в налаштуваннях агента'} onClick={approve}><Ic n="check" />{busy === 'approve' ? 'Підтверджуємо…' : 'Підтверджено'}</button>}
+          {isCustom && <button type="button" className="btn" disabled={dirty || !!busy || !Object.keys(data.platforms || {}).length} title={dirty ? 'Спершу збережіть зміни' : 'Створити презентацію з цього звіту'} onClick={() => navigate(`/clients?project=${row.project_id}&type=custom&start=${row.period_start}&end=${row.period_end}&platform=${isAll ? Object.keys(data.platforms)[0] : platform}`)}>Зробити презентацію</button>}
+          <button type="button" className="btn wbe-del" disabled={!!busy || running} onClick={remove}>Видалити</button>
+          <button type="button" className="btn" disabled={!dirty || !!busy || running} onClick={save}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
+          {!isCustom && <button type="button" className="btn wbe-ok" disabled={!approver || !!busy || running} title={running ? 'Звіт оновлюється автоматично до кінця місяця' : approver ? 'Відправити звіт в історію й до клієнта' : 'Підтверджують лише відповідальні, обрані в налаштуваннях агента'} onClick={approve}><Ic n="check" />{busy === 'approve' ? 'Підтверджуємо…' : 'Підтверджено'}</button>}
         </div>
       </div>
+      {running && <div className="wbe-note wbe-note--info" role="note"><Ic n="info" /><span><b>Цей звіт оновлюється автоматично до кінця місяця.</b> Поки місяць не завершився, його не можна змінити, зберегти, підтвердити чи видалити: агент оновлює його сам. Після завершення місяця він стане звичайною чернеткою.</span></div>}
       {row.status === 'rework' && review.returnedNote && <div className="wbe-note wbe-note--warn" role="note"><Ic n="ret" /><span><b>Повернуто на доопрацювання{review.returnedBy ? ` (${review.returnedBy})` : ''}:</b> {review.returnedNote}</span></div>}
       {!isCustom && !approver && <div className="wbe-note wbe-note--info"><Ic n="info" /><span>Підтвердити звіт можуть лише відповідальні, обрані в налаштуваннях агента. Ви можете працювати над ним і зберігати.</span></div>}
       {message && <div className="wbe-note wbe-note--ok" role="status"><Ic n="check" /><span>{message}</span></div>}

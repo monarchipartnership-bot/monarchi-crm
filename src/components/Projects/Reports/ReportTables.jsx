@@ -110,22 +110,24 @@ export function GroupsTable({ keys, total, groups, custom, currency }) {
   );
 }
 
-// Plain rows for CSV / XLSX of the metrics table.
+const EN = 'en-US'; // the files are English: words and numbers
+
+// Plain rows for CSV / XLSX of the metrics table. The files are English only (they go to clients), whatever the language of the screen.
 export function metricsToExport(rows, showPrev = true) {
-  const columns = showPrev ? ['Метрика', 'Цей період', 'Попередній', 'Зміна, %'] : ['Метрика', 'Значення'];
+  const columns = showPrev ? ['Metric', 'This period', 'Previous', 'Change, %'] : ['Metric', 'Value'];
   const data = rows.map((r) => showPrev
-    ? [r.label, formatMetric(r.value, r.format, r.currency), formatMetric(r.before, r.format, r.currency), r.delta == null ? '' : Number(r.delta.toFixed(1))]
-    : [r.label, formatMetric(r.value, r.format, r.currency)]);
+    ? [r.en || r.label, formatMetric(r.value, r.format, r.currency, EN), formatMetric(r.before, r.format, r.currency, EN), r.delta == null ? '' : Number(r.delta.toFixed(1))]
+    : [r.en || r.label, formatMetric(r.value, r.format, r.currency, EN)]);
   return { columns, rows: data };
 }
 
 export function groupsToExport(keys, total, groups, custom, currency) {
-  const cols = [{ name: 'Весь акаунт', base: total }, ...groups.map((g) => ({ name: g.kind === 'group' ? `${g.name} (сума групи)` : g.name, base: g }))];
+  const cols = [{ name: 'General', base: total }, ...groups.map((g) => ({ name: g.kind === 'group' ? `${g.name} (group total)` : g.name, base: g }))];
   return {
-    columns: ['Метрика', ...cols.map((c) => c.name)],
+    columns: ['Metric', ...cols.map((c) => c.name)],
     rows: keys.map((k) => {
       const m = metricMeta(k, custom);
-      return [m.label, ...cols.map((c) => formatMetric(computeMetric(k, c.base, custom), m.format, currency))];
+      return [m.en || m.label, ...cols.map((c) => formatMetric(computeMetric(k, c.base, custom), m.format, currency, EN))];
     }),
   };
 }

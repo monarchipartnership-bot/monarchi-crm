@@ -28,6 +28,7 @@ const SEC_ICONS = {
   range: <><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4M8 14h3M13 14h3" /></>,
   open: <path d="M9 6l6 6-6 6" />,
   trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />,
+  deck: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></>,
 };
 const HubIcon = ({ n }) => <svg viewBox="0 0 24 24" aria-hidden="true">{SEC_ICONS[n]}</svg>;
 const Medal = ({ n, cls = '' }) => <span className={'hub-ring ph-md ' + cls} aria-hidden="true"><span className="hub-tile hub-tile--ln"><HubIcon n={n} /></span></span>;
@@ -192,6 +193,7 @@ export default function ProjectHistoryTab({ projectId }) {
               <span className="ph-grow" />
               <span className="ph-cact">
                 <button type="button" className="btn" onClick={() => openCustom(r.id)}><HubIcon n="open" />Відкрити</button>
+                <button type="button" className="btn" disabled={!Object.keys(r.data?.platforms || {}).length} onClick={() => presentation(r, r.platform === 'all' ? Object.keys(r.data.platforms)[0] : r.platform)}><HubIcon n="deck" />Презентація</button>
                 <button type="button" className="btn ph-cdel" onClick={() => remove(r)}><HubIcon n="trash" />Видалити</button>
               </span>
             </li>

@@ -26,7 +26,7 @@ import { CREATIVE_COUNT, creativeImageUrl, creativeKind, rankAds } from '../src/
 import { collectCreatives, creativeCandidates, creativesOf, pickCreative } from '../api/_lib/metaCreatives.js';
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
-import { REPORT_STATUS, buildMonths, canApprove, clientVisible, inWork, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
+import { REPORT_STATUS, buildMonths, canApprove, clientVisible, inWork, isRunning, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
 import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, normalizeTemplate, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
 import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
@@ -821,6 +821,12 @@ await ok('project history: who may approve, what a person can do in each status,
   assert.equal(canApprove('b@x.com', ['a@x.com']), false);
   assert.deepEqual(reportActions('final', true).map((a) => a.action), ['return']); // an approved report can be returned for rework by the people who approve
   assert.deepEqual(reportActions('final', false), []);
+  // the month-to-date report of the agent is locked until its month is over
+  const live = { period_start: '2026-10-01', data: { toDate: true } };
+  assert.equal(isRunning(live, '2026-10-22'), true);
+  assert.equal(isRunning(live, '2026-10-31'), true);
+  assert.equal(isRunning(live, '2026-11-01'), false);
+  assert.equal(isRunning({ period_start: '2026-10-01', data: {} }, '2026-10-22'), false); // an ordinary report is never locked
   for (const status of ['draft', 'rework', 'reviewed']) assert.deepEqual(reportActions(status, true), []); // those are worked on in «Робота над звітами», not in the history
   assert.deepEqual([inWork('draft'), inWork('rework'), inWork('reviewed'), inWork('final')], [true, true, true, false]);
   assert.equal(REPORT_STATUS.reviewed, 'Чернетка'); // the old value reads as a draft

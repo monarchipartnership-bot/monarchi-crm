@@ -11,7 +11,7 @@ import { fetchProjectReports, saveProjectReport, deleteProjectReport, refreshMon
 import { suggestCreatives } from '../../../lib/api/reportCreatives';
 import CreativeGrid from '../CreativeGrid';
 import CreativePickerDialog from '../CreativePickerDialog';
-import { REPORT_STATUS, canApprove, monthKey } from '../../../lib/projectHistory';
+import { REPORT_STATUS, canApprove, isRunning, monthKey } from '../../../lib/projectHistory';
 import { fetchProjectDecks } from '../../../lib/api/projectDecks';
 import { EMPTY_SECTIONS, buildWhatWasDone, comparisonPeriod, pullReportData, reportPayload } from '../../../lib/reportEngine';
 import { reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
@@ -267,6 +267,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   }
 
   async function remove(row) {
+    if (isRunning(row, new Date().toISOString().slice(0, 10))) return;
     if (!(await confirm({ title: 'Видалити звіт?', body: 'Видалити збережений звіт? Дію не можна скасувати.', confirmLabel: 'Видалити звіт', danger: true }))) return;
     try { await deleteProjectReport(row.id); await reloadSaved(); } catch (e) { setMessage(e.message || 'Не вдалося видалити.'); }
   }
@@ -468,7 +469,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
                 <tr key={r.id} className={r.period_start === period.start ? 'on' : ''}>
                   <td className="lbl"><button type="button" className="pacc-link" onClick={() => openSaved(r)}>{fmt(r.period_start)} – {fmt(r.period_end)}</button></td>
                   <td><span className={'pacc-pill prep-src prep-src--' + r.source}>{r.source === 'agent' ? 'AI-агент' : 'Вручну'}</span></td>
-                  <td>{REPORT_STATUS[r.status] || r.status}</td>
+                  <td>{isRunning(r, new Date().toISOString().slice(0, 10)) ? 'Оновлюється' : REPORT_STATUS[r.status] || r.status}</td>
                   <td className="muted">{new Date(r.updated_at).toLocaleString('uk-UA')}</td>
                   <td>
                     <div className="prep-deckcell">
@@ -485,7 +486,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
                       })}
                     </div>
                   </td>
-                  <td className="num"><button type="button" className="pacc-link pacc-link--danger" onClick={() => remove(r)}>Видалити</button></td>
+                  <td className="num">{isRunning(r, new Date().toISOString().slice(0, 10)) ? <span className="muted" title="Звіт оновлюється автоматично до кінця місяця">—</span> : <button type="button" className="pacc-link pacc-link--danger" onClick={() => remove(r)}>Видалити</button>}</td>
                 </tr>
               ))}
             </tbody>

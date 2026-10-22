@@ -27,6 +27,10 @@ export const monthRange = (key) => {
   return { start: `${key}-01`, end: ymd(new Date(y, m, 0)) };
 };
 
+// The month-to-date report of the agent renews itself until the month is over: by hand it can be neither saved, confirmed nor deleted meanwhile
+// (a person saving it would stop the agent renewing it).
+export const isRunning = (row, todayIso) => Boolean(row?.data?.toDate) && monthRange(monthKey(row.period_start)).end >= String(todayIso);
+
 // The weeks of a month, cut at its borders: [{ n, start, end }] with ISO dates.
 export function monthWeeks(key) {
   return computeWeeksForMonth(Number(key.slice(0, 4)), Number(key.slice(5, 7))).map((w) => ({ n: w.index, start: ymd(w.start), end: ymd(w.end) }));

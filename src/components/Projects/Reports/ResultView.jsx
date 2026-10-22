@@ -52,9 +52,9 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
   const shownCampaigns = cur.explicit ? [] : campaignMode === 'all' ? campaigns : campaigns.filter((c) => selection.includes(campaignKey(active, c.name)));
 
   const metricsExport = metricsToExport(rows, showPrev);
-  const sheets = [{ name: 'Показники', ...metricsExport }];
-  if (groups.length) sheets.push({ name: 'Групи кампаній', ...groupsToExport(keys, cur.total, groups, custom, currency) });
-  if (shownCampaigns.length) sheets.push({ name: 'Кампанії', ...campaignExport(shownCampaigns, kind, custom, currency, isTotal ? [] : extraKeys) });
+  const sheets = [{ name: 'Metrics', ...metricsExport }];
+  if (groups.length) sheets.push({ name: 'Campaign groups', ...groupsToExport(keys, cur.total, groups, custom, currency) });
+  if (shownCampaigns.length) sheets.push({ name: 'Campaigns', ...campaignExport(shownCampaigns, kind, custom, currency, isTotal ? [] : extraKeys) });
   const tabLabel = tabs.find((t) => t.key === active)?.label;
 
   return (
@@ -136,8 +136,8 @@ function CampaignsTable({ campaigns, kind, custom, currency, extraKeys = [] }) {
 function campaignExport(campaigns, kind, custom, currency, extraKeys = []) {
   const keys = [...CAMPAIGN_KEYS[kind], ...extraKeys];
   return {
-    columns: ['Кампанія', ...keys.map((k) => metricMeta(k, custom).label)],
-    rows: [...campaigns].sort((a, b) => (b.spend || 0) - (a.spend || 0)).map((c) => [c.name, ...keys.map((k) => { const m = metricMeta(k, custom); return formatMetric(computeMetric(k, c, custom), m.format, currency); })]),
+    columns: ['Campaign', ...keys.map((k) => { const m = metricMeta(k, custom); return m.en || m.label; })],
+    rows: [...campaigns].sort((a, b) => (b.spend || 0) - (a.spend || 0)).map((c) => [c.name, ...keys.map((k) => { const m = metricMeta(k, custom); return formatMetric(computeMetric(k, c, custom), m.format, currency, 'en-US'); })]),
   };
 }
 

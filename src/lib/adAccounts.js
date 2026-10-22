@@ -39,12 +39,12 @@ export function formatAccountId(platform, id) {
   return d;
 }
 
-export function formatMoney(value, currency) {
+export function formatMoney(value, currency, locale = 'uk-UA') {
   if (value == null || !Number.isFinite(Number(value))) return '—';
   try {
-    return new Intl.NumberFormat('uk-UA', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2 }).format(Number(value));
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2 }).format(Number(value));
   } catch {
-    return Number(value).toLocaleString('uk-UA', { maximumFractionDigits: 2 });
+    return Number(value).toLocaleString(locale, { maximumFractionDigits: 2 });
   }
 }
 

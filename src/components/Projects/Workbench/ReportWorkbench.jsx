@@ -4,7 +4,7 @@ import ReportEditor from './ReportEditor';
 import { reportPeriodText, reportPlatformLabel } from '../ArchiveReportModal';
 import { fetchCampaignGroups, fetchProjectReport, fetchWorkReports } from '../../../lib/api/projectReportStore';
 import { loadReportContext } from '../../../lib/projectReportContext';
-import { REPORT_STATUS } from '../../../lib/projectHistory';
+import { REPORT_STATUS, isRunning } from '../../../lib/projectHistory';
 import '../../../styles/projectReports.css';
 import '../../../styles/workbench.css';
 import '../../../styles/workbenchHub.css';
@@ -28,6 +28,7 @@ export default function ReportWorkbench({ projectId, onCount }) {
   const [ctx, setCtx] = useState(null);
   const [cat, setCat] = useState('draft');
   const [extra, setExtra] = useState(null); // a report opened by a link that is not in the lists (for example an approved one)
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   const load = useCallback(async () => {
     const list = await fetchWorkReports(projectId);
@@ -42,7 +43,8 @@ export default function ReportWorkbench({ projectId, onCount }) {
   }, [projectId]);
 
   const openId = Number(params.get('report')) || null;
-  const drafts = useMemo(() => (rows || []).filter((r) => r.status !== 'rework'), [rows]);
+  // the month-to-date report that renews itself goes first
+  const drafts = useMemo(() => (rows || []).filter((r) => r.status !== 'rework').sort((a, b) => Number(isRunning(b, todayIso)) - Number(isRunning(a, todayIso))), [rows]);
   const rework = useMemo(() => (rows || []).filter((r) => r.status === 'rework'), [rows]);
   const opened = (rows || []).find((r) => r.id === openId) || (extra && extra.id === openId ? extra : null);
 
@@ -99,12 +101,13 @@ export default function ReportWorkbench({ projectId, onCount }) {
         <ul className="wbh-grid">
           {list.map((r) => {
             const note = r.status === 'rework' ? r.data?.review : null;
+            const live = isRunning(r, todayIso);
             return (
               <li key={r.id}>
-                <button type="button" className="wbh-card" onClick={() => open(r.id, r.platform)}>
+                <button type="button" className={'wbh-card' + (live ? ' wbh-card--live' : '')} onClick={() => open(r.id, r.platform)}>
                   <span className="wbh-ch">
                     <i className={'wbh-plt wbh-plt--' + r.platform}>{reportPlatformLabel(r.platform)}</i>
-                    <i className={'wbh-chip wbh-chip--' + r.status}>{REPORT_STATUS[r.status] || r.status}</i>
+                    {live ? <i className="wbh-chip wbh-chip--live">Оновлюється</i> : <i className={'wbh-chip wbh-chip--' + r.status}>{REPORT_STATUS[r.status] || r.status}</i>}
                   </span>
                   <b className="wbh-type">{TYPE_LABEL[r.period_type] || r.period_type} звіт</b>
                   <span className="wbh-period">{reportPeriodText(r)}</span>
@@ -112,6 +115,7 @@ export default function ReportWorkbench({ projectId, onCount }) {
                     <span className={'wbh-src' + (r.source === 'agent' ? ' ag' : '')}><svg viewBox="0 0 24 24" aria-hidden="true">{r.source === 'agent' ? ICON.spark : ICON.edit}</svg>{r.source === 'agent' ? 'AI-агент' : 'вручну'}</span>
                     <span className="wbh-upd"><svg viewBox="0 0 24 24" aria-hidden="true">{ICON.clock}</svg>{stamp(r.updated_at)}</span>
                   </span>
+                  {live && <span className="wbh-note wbh-note--live">Оновлюється автоматично до кінця місяця. Змінити, підтвердити чи видалити його можна, коли місяць завершиться.</span>}
                   {note?.returnedNote && <span className="wbh-note"><svg viewBox="0 0 24 24" aria-hidden="true">{ICON.ret}</svg><span><b>Повернуто{note.returnedBy ? ` (${note.returnedBy})` : ''}:</b> {note.returnedNote}</span></span>}
                   <span className="wbh-open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>Відкрити</span>
                 </button>

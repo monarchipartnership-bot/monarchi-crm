@@ -122,3 +122,8 @@
 .project-detail-page.pw .wbh-chip--custom { background: #E8F0FE; color: #1D4FB3; }
 .project-detail-page.pw .wbe-slot { display: inline-flex; align-items: center; }
 .project-detail-page.pw .wbe-slot .prep-export { position: relative; }
+
+/* the month-to-date report that renews itself: marked among the drafts, locked until the month is over */
+.project-detail-page.pw .wbh-chip--live { background: #E3F6E8; color: #168a3a; }
+.project-detail-page.pw .wbh-card--live { border-color: #8FDDA9; background: linear-gradient(#FBFFFC, #F1FBF4); }
+.project-detail-page.pw .wbh-note--live { background: #E3F6E8; color: #166534; }

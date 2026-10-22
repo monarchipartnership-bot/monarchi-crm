@@ -102,12 +102,13 @@ export function metricMeta(key, custom = []) {
   return c ? { key, label: c.name, en: c.name, format: c.format || 'number', goodWhen: 'up' } : { key, label: key, en: key, format: 'number', goodWhen: 'neutral' };
 }
 
-export function formatMetric(value, format, currency) {
+// `locale`: the screens use Ukrainian number formatting; the files that go to clients ask for 'en-US'.
+export function formatMetric(value, format, currency, locale = 'uk-UA') {
   if (value == null || !Number.isFinite(value)) return '—';
-  if (format === 'money') return formatMoney(value, currency);
-  if (format === 'percent') return value.toLocaleString('uk-UA', { maximumFractionDigits: 2 }) + '%';
-  if (format === 'ratio') return value.toLocaleString('uk-UA', { maximumFractionDigits: 2 }) + 'x';
-  return value.toLocaleString('uk-UA', { maximumFractionDigits: 2 });
+  if (format === 'money') return formatMoney(value, currency, locale);
+  if (format === 'percent') return value.toLocaleString(locale, { maximumFractionDigits: 2 }) + '%';
+  if (format === 'ratio') return value.toLocaleString(locale, { maximumFractionDigits: 2 }) + 'x';
+  return value.toLocaleString(locale, { maximumFractionDigits: 2 });
 }
 
 // Change vs the previous period, in percent. null when there is nothing to compare.
