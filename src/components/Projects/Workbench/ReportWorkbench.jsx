@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import DesignTodo from '../../common/DesignTodo';
 import ReportEditor from './ReportEditor';
 import { reportPeriodText, reportPlatformLabel } from '../ArchiveReportModal';
 import { fetchCampaignGroups, fetchProjectReport, fetchWorkReports } from '../../../lib/api/projectReportStore';
@@ -8,8 +7,16 @@ import { loadReportContext } from '../../../lib/projectReportContext';
 import { REPORT_STATUS } from '../../../lib/projectHistory';
 import '../../../styles/projectReports.css';
 import '../../../styles/workbench.css';
+import '../../../styles/workbenchHub.css';
 
 const TYPE_LABEL = { weekly: 'Тижневий', monthly: 'Місячний', custom: 'Довільний' };
+const ICON = {
+  work: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" />,
+  ret: <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />,
+  spark: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />,
+  edit: <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />,
+  clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
+};
 const stamp = (iso) => (iso ? new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
 // «Робота над звітами»: the reports that are not ready yet. «Чернетки» are new ones (made by the agent or saved as a draft), «Доробка» are the ones returned from
@@ -66,30 +73,51 @@ export default function ReportWorkbench({ projectId, onCount }) {
   }
 
   const list = cat === 'rework' ? rework : drafts;
+  const CATS = [
+    { key: 'draft', title: 'Чернетки', caption: 'Нові: створив агент або збережені вручну', n: drafts.length, icon: ICON.work },
+    { key: 'rework', title: 'Доробка', caption: 'Повернуті з історії на доопрацювання', n: rework.length, icon: ICON.ret },
+  ];
   return (
-    <section className="report-section wb">
-      <div className="wb-head">
-        <h3>Робота над звітами <DesignTodo note="Розділ «Робота над звітами»: категорії, список звітів" /></h3>
-        <div className="pacc-hint">Звіти, що ще не готові. Відкрийте звіт, доопрацюйте тексти, креативи, метрики й кампанії та натисніть «Підтверджено»: він потрапить в історію проекту й до клієнта. Скачування й презентації в історії.</div>
+    <section className="report-section wb wbh">
+      <div className="wbh-tiles" role="tablist" aria-label="Категорії">
+        {CATS.map((c) => (
+          <button key={c.key} type="button" role="tab" aria-selected={cat === c.key} className={'wbh-tile' + (cat === c.key ? ' on' : '') + (c.key === 'rework' && c.n ? ' warm' : '')} onClick={() => setCat(c.key)}>
+            <span className={'hub-ring wbh-ring' + (c.key === 'rework' && c.n ? ' st-paused' : '')} aria-hidden="true"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24">{c.icon}</svg></span></span>
+            <span className="wbh-n">{c.n}</span>
+            <span className="wbh-tt"><b>{c.title}</b><small>{c.caption}</small></span>
+          </button>
+        ))}
       </div>
-      <div className="prep-seg" role="tablist" aria-label="Категорії">
-        <button type="button" role="tab" aria-selected={cat === 'draft'} className={'prep-seg-tab' + (cat === 'draft' ? ' on' : '')} onClick={() => setCat('draft')}>Чернетки · {drafts.length}</button>
-        <button type="button" role="tab" aria-selected={cat === 'rework'} className={'prep-seg-tab' + (cat === 'rework' ? ' on' : '')} onClick={() => setCat('rework')}>Доробка · {rework.length}</button>
-      </div>
+      <p className="wbh-hint">Відкрийте звіт, доопрацюйте тексти, креативи, метрики й кампанії та натисніть «Підтверджено»: він потрапить в історію проекту й до клієнта. Скачування й презентації в історії.</p>
       {list.length === 0 ? (
-        <div className="empty-hint">{cat === 'rework' ? 'Немає звітів у доробці: сюди потрапляють звіти, повернені з історії.' : 'Чернеток немає. Їх створює агент або кнопка «Зберегти чернетку» у «Формуванні звіту».'}</div>
+        <div className="wbh-empty">
+          <span className="hub-ring wbh-ring wbh-ring--xl st-mu" aria-hidden="true"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24">{cat === 'rework' ? ICON.ret : ICON.work}</svg></span></span>
+          <h3>{cat === 'rework' ? 'Немає звітів у доробці' : 'Чернеток немає'}</h3>
+          <p>{cat === 'rework' ? 'Сюди потрапляють звіти, повернені з історії проекту на доопрацювання.' : 'Чернетки створює агент або кнопка «Зберегти чернетку» у «Формуванні звіту».'}</p>
+        </div>
       ) : (
-        <ul className="wb-list">
-          {list.map((r) => (
-            <li key={r.id}>
-              <button type="button" className="wb-item" onClick={() => open(r.id, r.platform)}>
-                <span className="wb-item-main"><b>{TYPE_LABEL[r.period_type] || r.period_type} звіт · {reportPeriodText(r)}</b><small>{reportPlatformLabel(r.platform)}</small></span>
-                <span className="wb-item-meta">{r.source === 'agent' ? 'AI-агент' : 'вручну'} · оновлено {stamp(r.updated_at)}</span>
-                <span className={'wb-chip wb-chip--' + r.status}>{REPORT_STATUS[r.status] || r.status}</span>
-                {r.status === 'rework' && r.data?.review?.returnedNote && <span className="wb-note">Повернуто: {r.data.review.returnedNote}</span>}
-              </button>
-            </li>
-          ))}
+        <ul className="wbh-grid">
+          {list.map((r) => {
+            const note = r.status === 'rework' ? r.data?.review : null;
+            return (
+              <li key={r.id}>
+                <button type="button" className="wbh-card" onClick={() => open(r.id, r.platform)}>
+                  <span className="wbh-ch">
+                    <i className={'wbh-plt wbh-plt--' + r.platform}>{reportPlatformLabel(r.platform)}</i>
+                    <i className={'wbh-chip wbh-chip--' + r.status}>{REPORT_STATUS[r.status] || r.status}</i>
+                  </span>
+                  <b className="wbh-type">{TYPE_LABEL[r.period_type] || r.period_type} звіт</b>
+                  <span className="wbh-period">{reportPeriodText(r)}</span>
+                  <span className="wbh-meta">
+                    <span className={'wbh-src' + (r.source === 'agent' ? ' ag' : '')}><svg viewBox="0 0 24 24" aria-hidden="true">{r.source === 'agent' ? ICON.spark : ICON.edit}</svg>{r.source === 'agent' ? 'AI-агент' : 'вручну'}</span>
+                    <span className="wbh-upd"><svg viewBox="0 0 24 24" aria-hidden="true">{ICON.clock}</svg>{stamp(r.updated_at)}</span>
+                  </span>
+                  {note?.returnedNote && <span className="wbh-note"><svg viewBox="0 0 24 24" aria-hidden="true">{ICON.ret}</svg><span><b>Повернуто{note.returnedBy ? ` (${note.returnedBy})` : ''}:</b> {note.returnedNote}</span></span>}
+                  <span className="wbh-open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>Відкрити</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

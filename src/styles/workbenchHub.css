@@ -1,0 +1,124 @@
+/* «Робота над звітами» (project tab): the list in Hub style: two category tiles with the numbers, the reports as cards, an amber counter on the tab.
+   Scoped to the project page (.project-detail-page.pw), which carries the Hub base (rings, halo buttons). Specs: docs/design-decisions.md (section 24). */
+.project-detail-page.pw .wbh { display: flex; flex-direction: column; gap: 14px; font-family: 'Onest', system-ui, sans-serif; color: #270827; }
+.project-detail-page.pw .wbh * { box-sizing: border-box; }
+
+/* ---- the counter on the tab of the card ---- */
+.project-detail-page.pw .pw-tab-n { display: inline-grid; place-items: center; min-width: 22px; height: 22px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: linear-gradient(100deg, #FBBF24, #E08A06); color: #fff; font: 800 11.5px 'Onest', sans-serif; box-shadow: 0 0 0 3px #E08A0626; }
+
+/* ---- category tiles ---- */
+.project-detail-page.pw .wbh-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.project-detail-page.pw .wbh-tile { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 14px 18px 14px 14px; border: 1.5px solid transparent; border-radius: 24px; text-align: left; cursor: pointer; font-family: inherit; color: inherit; opacity: .88; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; box-shadow: none; }
+.project-detail-page.pw .wbh-tile.on { opacity: 1; box-shadow: 0 0 0 4px #AE40AE18; }
+.project-detail-page.pw .wbh-tile:focus-visible, .project-detail-page.pw .wbh-card:focus-visible { outline: 3px solid #AE40AE; outline-offset: 3px; }
+.project-detail-page.pw .wbh-ring { --s: 44px; --r: 4px; }
+.project-detail-page.pw .wbh-ring--xl { --s: 76px; --r: 6px; }
+.project-detail-page.pw .wbh-n { font: 800 30px/1 'Onest', sans-serif; color: #661466; }
+.project-detail-page.pw .wbh-tile.warm .wbh-n { color: #B86E00; }
+.project-detail-page.pw .wbh-tt { display: grid; gap: 2px; min-width: 0; }
+.project-detail-page.pw .wbh-tt b { font: 750 15px 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .wbh-tt small { font: 500 12.5px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .wbh-hint { margin: 0; font: 500 12.5px/1.45 'Onest', sans-serif; color: #883288; }
+
+/* ---- report cards ---- */
+.project-detail-page.pw .wbh-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.project-detail-page.pw .wbh-grid > li { display: flex; }
+.project-detail-page.pw .wbh-card { all: unset; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 16px 18px; border: 1.5px solid transparent; border-radius: 24px; cursor: pointer; font-family: 'Onest', sans-serif; color: #270827; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .wbh-ch { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.project-detail-page.pw .wbh-plt { display: inline-flex; padding: 2px 10px; border-radius: 999px; background: #F3E3F7; color: #682768; font: 700 11.5px 'Onest', sans-serif; font-style: normal; }
+.project-detail-page.pw .wbh-plt--meta { background: #E8F0FE; color: #1D4FB3; }
+.project-detail-page.pw .wbh-plt--google { background: #FFF1D6; color: #9A5B00; }
+.project-detail-page.pw .wbh-type { margin-top: 2px; font: 800 16px/1.25 'Onest', sans-serif; }
+.project-detail-page.pw .wbh-period { font: 600 13px 'Onest', sans-serif; color: #682768; }
+.project-detail-page.pw .wbh-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.project-detail-page.pw .wbh-src { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 8px; border-radius: 999px; background: #F3EEF6; color: #6b4a73; font: 700 11.5px 'Onest', sans-serif; }
+.project-detail-page.pw .wbh-src.ag { background: #F3E3F7; color: #682768; }
+.project-detail-page.pw .wbh-src svg, .project-detail-page.pw .wbh-upd svg, .project-detail-page.pw .wbh-note svg { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .wbh-src svg { width: 12px; height: 12px; }
+.project-detail-page.pw .wbh-upd { display: inline-flex; align-items: center; gap: 6px; font: 500 12px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .wbh-upd svg { width: 13px; height: 13px; }
+.project-detail-page.pw .wbh-note { display: flex; align-items: flex-start; gap: 10px; padding: 9px 14px; border-radius: 18px; background: #FBF0D5; color: #7a5200; font: 500 13px/1.45 'Onest', sans-serif; }
+.project-detail-page.pw .wbh-note svg { width: 15px; height: 15px; margin-top: 2px; flex: none; color: #946200; }
+.project-detail-page.pw .wbh-note b { font-weight: 750; }
+.project-detail-page.pw .wbh-open { align-self: flex-end; margin-top: auto; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; border-radius: 999px; background: #fff; color: #682768; font: 700 13px 'Onest', sans-serif; box-shadow: inset 0 0 0 1.5px #EBC6EB, 0 0 0 4px #AE40AE14; }
+.project-detail-page.pw .wbh-open svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- empty ---- */
+.project-detail-page.pw .wbh-empty { display: grid; justify-items: center; gap: 10px; padding: 34px 20px; border: 1.5px solid transparent; border-radius: 24px; text-align: center; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .wbh-empty h3 { margin: 4px 0 0; font: 750 17px 'Onest', sans-serif; }
+.project-detail-page.pw .wbh-empty p { margin: 0; max-width: 520px; font: 500 13.5px/1.5 'Onest', sans-serif; color: #6b4a73; }
+@media (max-width: 720px) { .project-detail-page.pw .wbh-tiles { grid-template-columns: 1fr; } }
+.project-detail-page.pw .wbh.report-section { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.project-detail-page.pw .wbh-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px 3px 9px; border-radius: 999px; background: #EFE6F3; color: #7a5a85; font: 700 11px 'Onest', sans-serif; font-style: normal; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.project-detail-page.pw .wbh-chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent); }
+.project-detail-page.pw .wbh-chip--reviewed, .project-detail-page.pw .wbh-chip--rework { background: #FBF0D5; color: #946200; }
+.project-detail-page.pw .wbh-chip--reviewed { background: #EFE6F3; color: #7a5a85; }
+.project-detail-page.pw .wbh-chip--final { background: #E3F6E8; color: #168a3a; }
+.project-detail-page.pw .wbh-tile.warm .hub-tile--ln { background: linear-gradient(135deg, #FBBF24, #E08A06); }
+.project-detail-page.pw .wbh-ring.st-mu .hub-tile--ln { background: linear-gradient(135deg, #C9A8D1, #8E6A99); }
+
+/* ======== the workspace of one report (ReportEditor): sticky bar A, main column + side column of settings B ======== */
+.project-detail-page.pw .wbe { display: flex; flex-direction: column; gap: 14px; font-family: 'Onest', system-ui, sans-serif; color: #270827; }
+.project-detail-page.pw .wbe * { box-sizing: border-box; }
+.project-detail-page.pw .wbe-bar { position: sticky; top: 8px; z-index: 6; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px 14px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 6px 18px #6827681c; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .wbe-back { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #fff; color: #682768; cursor: pointer; box-shadow: inset 0 0 0 1.5px #EBC6EB, 0 0 0 4px #AE40AE14; }
+.project-detail-page.pw .wbe-back svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .wbe-title { flex: 1 1 300px; min-width: 0; }
+.project-detail-page.pw .wbe-title b { display: block; font: 800 16px/1.25 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .wbe-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+.project-detail-page.pw .wbe-upd { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .wbe-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.project-detail-page.pw .wbe-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; min-height: 0; padding: 0 16px; }
+.project-detail-page.pw .wbe-actions .btn:disabled { opacity: .45; cursor: default; }
+.project-detail-page.pw .wbe-actions .btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .wbe-actions .btn.wbe-del { background: none; box-shadow: none; color: #C23232; }
+.project-detail-page.pw .wbe-actions .btn.wbe-ok, .project-detail-page.pw .wbe-actions .btn.wbe-ok:hover:not(:disabled) { color: #fff; text-shadow: 0 1px 1px #00000026; background: linear-gradient(135deg, #4BE07F, #12A144); box-shadow: 0 5px 12px -2px #12A14488, inset 0 0 0 2px #ffffff40, 0 0 0 4px color-mix(in srgb, #4BE07F 22%, transparent); }
+
+.project-detail-page.pw .wbe-note { display: flex; align-items: flex-start; gap: 10px; padding: 9px 14px; border-radius: 18px; font: 500 13px/1.45 'Onest', sans-serif; }
+.project-detail-page.pw .wbe-note svg { width: 15px; height: 15px; margin-top: 2px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .wbe-note b { font-weight: 750; }
+.project-detail-page.pw .wbe-note--warn { background: #FBF0D5; color: #7a5200; }
+.project-detail-page.pw .wbe-note--info { background: #F3E3F7; color: #4a2a66; }
+.project-detail-page.pw .wbe-note--ok { background: #E3F6E8; color: #146b32; }
+
+.project-detail-page.pw .wbe-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; align-items: start; }
+.project-detail-page.pw .wbe-main { display: grid; gap: 14px; min-width: 0; }
+.project-detail-page.pw .wbe-side { display: grid; gap: 10px; min-width: 0; position: sticky; top: 96px; }
+@media (max-width: 1100px) { .project-detail-page.pw .wbe-grid { grid-template-columns: 1fr; } .project-detail-page.pw .wbe-side { position: static; } }
+
+.project-detail-page.pw .wbe-block { display: grid; gap: 12px; padding: 14px 16px 16px; border: 1.5px solid transparent; border-radius: 24px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .wbe-bh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.project-detail-page.pw .wbe-bh b { font: 750 14.5px 'Onest', sans-serif; }
+.project-detail-page.pw .wbe-md { --s: 30px; --r: 2.5px; }
+.project-detail-page.pw .wbe-sp { flex: 1; }
+.project-detail-page.pw .wbe-mut { font: 500 12px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .wbe-count { display: inline-flex; padding: 2px 11px; border-radius: 999px; background: #EFE6F3; color: #7a5a85; font: 700 11.5px 'Onest', sans-serif; }
+.project-detail-page.pw .wbe-count.ok { background: #E3F6E8; color: #168a3a; }
+
+/* the eye in the metrics table and in the text cards: does the client see it */
+.project-detail-page.pw .rt-eye, .project-detail-page.pw .wbe-eye { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: #EFE6F3; color: #9a7aa5; cursor: pointer; flex: none; vertical-align: middle; }
+.project-detail-page.pw .rt-eye { margin-right: 10px; }
+.project-detail-page.pw .rt-eye.on, .project-detail-page.pw .wbe-eye.on { background: #F3E3F7; color: #682768; }
+.project-detail-page.pw .rt-eye svg, .project-detail-page.pw .wbe-eye svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .rt-eye:focus-visible, .project-detail-page.pw .wbe-eye:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
+.project-detail-page.pw tr.rt-off { opacity: .5; }
+.project-detail-page.pw tr.rt-off .lbl { text-decoration: line-through; }
+
+.project-detail-page.pw .wbe-texts { display: grid; gap: 8px; }
+.project-detail-page.pw .wbe-text { display: grid; gap: 8px; padding: 10px 14px 12px; border-radius: 20px; background: #F9EDF9; }
+.project-detail-page.pw .wbe-text.off { opacity: .6; }
+.project-detail-page.pw .wbe-text-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.project-detail-page.pw .wbe-text-head label { font: 750 13.5px 'Onest', sans-serif; }
+.project-detail-page.pw .wbe-text textarea { width: 100%; min-height: 64px; padding: 10px 14px; border: 0; border-radius: 18px; background: #fff; color: #270827; font: 500 13px/1.5 'Onest', sans-serif; resize: vertical; box-shadow: inset 0 0 0 1.5px #EBC6EB; }
+.project-detail-page.pw .wbe-text textarea:focus { outline: none; box-shadow: inset 0 0 0 1.5px #B544B5, 0 0 0 4px #AE40AE33; }
+.project-detail-page.pw .wbe-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* wide tables (many groups and campaigns) scroll inside their box and never push the side column */
+.project-detail-page.pw .wbe-main, .project-detail-page.pw .wbe-block { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.project-detail-page.pw .wbe-block .prep-result, .project-detail-page.pw .wbe-block .prep-capture { min-width: 0; max-width: 100%; }
+.project-detail-page.pw .wbe-block .prep-scroll { max-width: 100%; overflow-x: auto; }
+
+/* a custom report in the workspace: the mark instead of a status, the download menu in the bar */
+.project-detail-page.pw .wbh-chip--custom { background: #E8F0FE; color: #1D4FB3; }
+.project-detail-page.pw .wbe-slot { display: inline-flex; align-items: center; }
+.project-detail-page.pw .wbe-slot .prep-export { position: relative; }

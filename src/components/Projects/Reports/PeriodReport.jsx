@@ -25,7 +25,19 @@ import '../../../styles/projectReports.css';
 import Select from '../../common/Select';
 
 import { HubTitle } from '../hubIcons';
+import '../../../styles/composeHub.css';
 const fmt = (s) => s.split('-').reverse().join('.');
+
+const CH_ICONS = {
+  cal: <><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
+  pull: <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />,
+  cmp: <path d="M7 7h12l-3-3M17 17H5l3 3" />,
+  save: <path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6" />,
+  check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  pres: <><rect x="3" y="4" width="18" height="12" rx="2.5" /><path d="M8 20l4-4 4 4M12 16v4" /></>,
+};
+const ChIcon = ({ n }) => <svg className="ch-ic" viewBox="0 0 24 24" aria-hidden="true">{CH_ICONS[n]}</svg>;
+const ChMedal = ({ n }) => <span className="hub-ring ch-md" aria-hidden="true"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24">{CH_ICONS[n]}</svg></span></span>;
 
 function initialPicker() {
   const now = new Date();
@@ -303,37 +315,45 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
 
   return (
     <div className="prep-wrap">
-      <div className="prep-top prep-top--one">
-      <section className="report-section prep-box">
-        <HubTitle icon="cal" className="prep-box-title">Період звіту</HubTitle>
-        {periodType === 'weekly' ? (
-          <WeekPicker year={picker.year} month={picker.month} weekIndex={picker.weekIndex} onChange={changePicker} years={yearOptions()} />
-        ) : (
-          <div className="picker">
-            <div className="pk-field">
-              <label>Рік</label>
-              <Select value={picker.year} onChange={(v) => changePicker({ ...picker, year: v })} ariaLabel="Рік" options={yearOptions().map((y) => ({ value: y, label: String(y) }))} />
-            </div>
-            <div className="pk-field">
-              <label>Місяць</label>
-              <Select value={picker.month} onChange={(v) => changePicker({ ...picker, month: v })} ariaLabel="Місяць" options={MONTH_NAMES.map((name, i) => ({ value: i + 1, label: name }))} />
-            </div>
+      <section className="ch-period">
+        <div className="ch-ph"><ChMedal n="cal" /><h3>Період звіту</h3></div>
+        <div className="ch-pcols">
+          <div className="ch-pl">
+            {periodType === 'weekly' ? (
+              <WeekPicker year={picker.year} month={picker.month} weekIndex={picker.weekIndex} onChange={changePicker} years={yearOptions()} />
+            ) : (
+              <div className="picker">
+                <div className="pk-field">
+                  <label>Рік</label>
+                  <Select value={picker.year} onChange={(v) => changePicker({ ...picker, year: v })} ariaLabel="Рік" options={yearOptions().map((y) => ({ value: y, label: String(y) }))} />
+                </div>
+                <div className="pk-field">
+                  <label>Місяць</label>
+                  <Select value={picker.month} onChange={(v) => changePicker({ ...picker, month: v })} ariaLabel="Місяць" options={MONTH_NAMES.map((name, i) => ({ value: i + 1, label: name }))} />
+                </div>
+              </div>
+            )}
           </div>
-        )}
-        <div className="prep-period-line prep-period-card">
-          <b>{period.label}</b> · {fmt(period.start)} – {fmt(period.end)}{prev ? ` · порівняння з ${fmt(prev.start)} – ${fmt(prev.end)}` : ''}
-          {meta.id && <span className={'pacc-pill prep-src prep-src--' + meta.source}>{meta.source === 'agent' ? 'AI-агент' : 'Вручну'}</span>}
-        </div>
-        <div className="prep-actions">
-          <button type="button" className="btn btn-p" onClick={() => pull()} disabled={!hasAccounts || busy === 'pull'}>{busy === 'pull' ? 'Завантаження…' : data ? 'Оновити з кабінетів' : 'Підтягнути з кабінетів'}</button>
-          <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={busy === 'pull'}>
-            {cmp && prev ? `Порівняння: ${fmt(prev.start)}–${fmt(prev.end)}` : 'Порівняти'}
-          </button>
-          {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Огляд», щоб тягнути цифри автоматично.</span>}
+          <div className="ch-pr">
+            <div className="ch-pcard">
+              <small>Звіт за</small>
+              <b>{period.label}</b>
+              <span className="ch-pd">{fmt(period.start)} – {fmt(period.end)}</span>
+              <span className="ch-chips">
+                {prev ? <i className="ch-chp">порівняння з {fmt(prev.start)} – {fmt(prev.end)}</i> : <i className="ch-chp off">без порівняння</i>}
+                {meta.id && <i className={'ch-src' + (meta.source === 'agent' ? ' ag' : '')}>{meta.source === 'agent' ? 'AI-агент' : 'Вручну'}</i>}
+              </span>
+            </div>
+            <div className="ch-pacts">
+              <button type="button" className="btn btn-p" onClick={() => pull()} disabled={!hasAccounts || busy === 'pull'}><ChIcon n="pull" />{busy === 'pull' ? 'Завантаження…' : data ? 'Оновити з кабінетів' : 'Підтягнути з кабінетів'}</button>
+              <button type="button" className={'btn' + (cmp ? ' prep-btn-on' : '')} onClick={() => setModal('compare')} disabled={busy === 'pull'}>
+                <ChIcon n="cmp" />{cmp && prev ? `Порівняння: ${fmt(prev.start)}–${fmt(prev.end)}` : 'Порівняти'}
+              </button>
+            </div>
+            {!hasAccounts && <span className="pacc-hint">Підключіть рекламний кабінет на вкладці «Огляд», щоб тягнути цифри автоматично.</span>}
+          </div>
         </div>
       </section>
-
-      </div>
 
       {Object.entries(errors).map(([p, msg]) => <div className="pacc-err" key={p}>{p}: {msg}</div>)}
 
@@ -362,32 +382,6 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
           <button type="button" className="pacc-link" onClick={() => navigate(`/projects/${projectId}?tab=builder&platform=${platform}`)}>Відкрити «Конструктор звіту»</button>
         </div>
       )}
-
-      <section className="report-section prep-box prep-status-box">
-        <HubTitle icon="check" className="prep-box-title">Збереження</HubTitle>
-        <div className="prep-save-row">
-          <span className="pacc-hint">{meta.id ? `Статус: ${REPORT_STATUS[status] || status}` : 'Звіт ще не збережено'}</span>
-          {status !== 'final' && (
-            <button type="button" className="btn" onClick={saveDraft} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)} title="Звіт ще дорабатується: він зʼявиться в розділі «Робота над звітами»">
-              {busy === 'save' ? '...' : 'Зберегти чернетку'}
-            </button>
-          )}
-          <button type="button" className="btn pw-btn--ok" onClick={saveFinal} disabled={busy === 'save' || !approver || !data} title={approver ? 'Звіт піде в «Історію проекту» і до клієнта' : 'Фінал зберігають лише відповідальні, обрані в налаштуваннях агента'}>
-            {busy === 'save' ? '...' : status === 'final' ? 'Зберегти зміни' : 'Зберегти як фінал'}
-          </button>
-          <button
-            type="button" className="btn" disabled={!meta.id || dirty || !data || !Object.keys(data.platforms).length}
-            title={!meta.id ? 'Спершу збережіть звіт' : dirty ? 'Збережіть зміни у звіті' : 'Відкрити презентацію для клієнта з цього звіту'}
-            onClick={() => navigate(`/clients?project=${projectId}&type=${periodType}&start=${period.start}&platform=${Object.keys(data.platforms)[0]}`)}
-          >
-            Створити презентацію
-          </button>
-          {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
-          {message && <span className="pacc-hint">{message}</span>}
-          {savedId && <button type="button" className="pacc-link" onClick={() => navigate(`/projects/${projectId}?tab=work&report=${savedId}&platform=${platform}`)}>Відкрити в «Робота над звітами»</button>}
-        </div>
-        {!approver && <div className="pacc-hint">Фінал зберігають лише відповідальні, обрані в налаштуваннях агента; чернетку може зберегти будь-хто.</div>}
-      </section>
 
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
@@ -497,6 +491,34 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
             </tbody>
           </table>
         )}
+      </section>
+
+      <section className="ch-save" aria-label="Збереження">
+        <div className="ch-states">
+          <span className={'ch-pill' + (meta.id && status === 'final' ? ' ok' : '')}><i />{meta.id ? `Статус: ${REPORT_STATUS[status] || status}` : 'Звіт ще не збережено'}</span>
+          {dirty && <span className="ch-pill warn"><i />Є незбережені зміни</span>}
+          {message && <span className="ch-pill ok"><i />{message}</span>}
+        </div>
+        <span className="ch-grow" />
+        <div className="ch-sbtns">
+          {status !== 'final' && (
+            <button type="button" className="btn" onClick={saveDraft} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)} title="Звіт ще дорабатується: він зʼявиться в розділі «Робота над звітами»">
+              <ChIcon n="save" />{busy === 'save' ? '...' : 'Зберегти чернетку'}
+            </button>
+          )}
+          <button type="button" className="btn ch-ok" onClick={saveFinal} disabled={busy === 'save' || !approver || !data} title={approver ? 'Звіт піде в «Історію проекту» і до клієнта' : 'Фінал зберігають лише відповідальні, обрані в налаштуваннях агента'}>
+            <ChIcon n="check" />{busy === 'save' ? '...' : status === 'final' ? 'Зберегти зміни' : 'Зберегти як фінал'}
+          </button>
+          <button
+            type="button" className="btn" disabled={!meta.id || dirty || !data || !Object.keys(data.platforms).length}
+            title={!meta.id ? 'Спершу збережіть звіт' : dirty ? 'Збережіть зміни у звіті' : 'Відкрити презентацію для клієнта з цього звіту'}
+            onClick={() => navigate(`/clients?project=${projectId}&type=${periodType}&start=${period.start}&platform=${Object.keys(data.platforms)[0]}`)}
+          >
+            <ChIcon n="pres" />Створити презентацію
+          </button>
+          {savedId && <button type="button" className="ch-lnk" onClick={() => navigate(`/projects/${projectId}?tab=work&report=${savedId}&platform=${platform}`)}>Відкрити в «Робота над звітами»</button>}
+        </div>
+        {!approver && <div className="ch-shint">Фінал зберігають лише відповідальні, обрані в налаштуваннях агента; чернетку може зберегти будь-хто.</div>}
       </section>
 
       {(modal === 'compare' || modal === 'ask') && (

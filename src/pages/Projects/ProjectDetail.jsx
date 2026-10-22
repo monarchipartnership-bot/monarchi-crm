@@ -14,6 +14,7 @@ import AutoField from '../../components/Projects/AutoField';
 import ProjectHistoryTab from '../../components/Projects/ProjectHistoryTab';
 import ReportWorkbench from '../../components/Projects/Workbench/ReportWorkbench';
 import '../../styles/workbench.css';
+import '../../styles/composeHub.css';
 import { countWorkReports } from '../../lib/api/projectReportStore';
 import ReportBuilder from '../../components/Projects/Builder/ReportBuilder';
 import ActionIcon from '../../components/common/ActionIcon';
@@ -45,7 +46,15 @@ const TABS = [
 
 const STATUSES = ['active', 'paused', 'completed'];
 // «Формування звіту» holds three ways to look at a period; the old tabs (and the links the agent sends) still open them.
-const COMPOSE_MODES = [['period', 'Показники за період'], ['weekly', 'Тижневий звіт'], ['monthly', 'Місячний звіт']];
+const COMPOSE_MODES = [
+  ['period', 'Показники за період', 'Будь-які дати: швидка вибірка цифр', 'range'],
+  ['weekly', 'Тижневий звіт', 'Тиждень із порівнянням', 'cal'],
+  ['monthly', 'Місячний звіт', 'Підсумок місяця', 'cal'],
+];
+const COMPOSE_ICONS = {
+  range: <><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4M8 14h3M13 14h3" /></>,
+  cal: <><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
+};
 const KEEP_ALIVE = ['builder', 'compose:period', 'compose:weekly', 'compose:monthly', 'work']; // panes that keep their state while the card is open
 function parseTab(params) {
   const t = params.get('tab');
@@ -509,9 +518,12 @@ export default function ProjectDetail() {
       {/* The builder and the report tabs stay open once visited: coming back shows the report that was loaded, and nothing is pulled again.
           They are cleared when the card is closed or another project is opened. A change of the layout (saved in the builder) reloads the report tabs. */}
       {tab === 'compose' && (
-        <div className="prep-seg compose-modes" role="tablist" aria-label="Формування звіту">
-          {COMPOSE_MODES.map(([k, label]) => (
-            <button key={k} type="button" role="tab" aria-selected={mode === k} className={'prep-seg-tab' + (mode === k ? ' on' : '')} onClick={() => setMode(k)}>{label}</button>
+        <div className="ch-tiles compose-modes" role="tablist" aria-label="Формування звіту">
+          {COMPOSE_MODES.map(([k, label, caption, icon]) => (
+            <button key={k} type="button" role="tab" aria-selected={mode === k} className={'ch-tile' + (mode === k ? ' on' : '')} onClick={() => setMode(k)}>
+              <span className="hub-ring ch-md" aria-hidden="true"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24">{COMPOSE_ICONS[icon]}</svg></span></span>
+              <span className="ch-tt"><b>{label}</b><small>{caption}</small></span>
+            </button>
           ))}
         </div>
       )}

@@ -36,7 +36,8 @@ export function bestOf(values, goodWhen) {
 
 // Metrics table for one set of numbers: value, the previous period and the change.
 // `rows` come from metricRows() in lib/periodReport.js.
-export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей період', prevLabel = 'Попередній' }) {
+// `clientEye`: { hidden: [keys], onToggle(key) } puts an eye before every metric (the workspace of a report: what the client does not see).
+export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей період', prevLabel = 'Попередній', clientEye = null }) {
   return (
     <table className="prep-table">
       <thead>
@@ -49,8 +50,18 @@ export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей �
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.key}>
-            <td className="lbl">{r.label}</td>
+          <tr key={r.key} className={clientEye && clientEye.hidden.includes(r.key) ? 'rt-off' : undefined}>
+            <td className="lbl">
+              {clientEye && (() => {
+                const on = !clientEye.hidden.includes(r.key);
+                return (
+                  <button type="button" className={'rt-eye' + (on ? ' on' : '')} aria-pressed={on} aria-label={`${r.label}: ${on ? 'бачить клієнт' : 'приховано від клієнта'}`} title={on ? 'Клієнт бачить. Натисніть, щоб приховати' : 'Клієнт не бачить. Натисніть, щоб показати'} onClick={() => clientEye.onToggle(r.key)}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">{on ? <><path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6S2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.8" /></> : <><path d="M3 3l18 18M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4.2 9.5 6-.4.8-1.3 2.1-2.7 3.3M6.7 7.7C4.5 9.1 3.1 11 2.5 12c1 1.8 4.5 6 9.5 6 1.4 0 2.7-.3 3.8-.8" /><path d="M9.9 10a3 3 0 0 0 4.1 4.1" /></>}</svg>
+                  </button>
+                );
+              })()}
+              {r.label}
+            </td>
             <td className="num strong">{formatMetric(r.value, r.format, r.currency)}</td>
             {showPrev && <td className="num muted">{formatMetric(r.before, r.format, r.currency)}</td>}
             {showPrev && <td className="num"><Delta delta={r.delta} tone={r.tone} /></td>}

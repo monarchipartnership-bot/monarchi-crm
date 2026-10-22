@@ -48,5 +48,32 @@
 .project-detail-page.pw .ph-chip--none { background: none; color: #a77fb0; padding-left: 0; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .project-detail-page.pw .ph-chip--none::before { display: none; }
 .project-detail-page.pw .ph-chip--rework { background: #FBF0D5; color: #946200; }
-.ph-rows.ph-custom li { grid-template-columns: 220px minmax(0, 1fr) auto; }
-.project-detail-page.pw .ph-rows.ph-custom li { grid-template-columns: 220px minmax(0, 1fr) auto; }
+
+/* ---- the two sections of the history (section tiles B) and the custom reports (rows A). Specs: docs/design-decisions.md (section 26) ---- */
+.project-detail-page.pw .ph-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0 0 12px; }
+.project-detail-page.pw .ph-tile { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 14px 18px 14px 14px; border: 1.5px solid transparent; border-radius: 24px; text-align: left; cursor: pointer; font-family: 'Onest', sans-serif; color: #270827; opacity: .88; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; box-shadow: none; }
+.project-detail-page.pw .ph-tile.on { opacity: 1; box-shadow: 0 0 0 4px #AE40AE18; }
+.project-detail-page.pw .ph-tile:focus-visible { outline: 3px solid #AE40AE; outline-offset: 3px; }
+.project-detail-page.pw .ph-md { --s: 44px; --r: 4px; }
+.project-detail-page.pw .ph-md--xl { --s: 76px; --r: 6px; }
+.project-detail-page.pw .ph-tn { font: 800 30px/1 'Onest', sans-serif; color: #661466; }
+.project-detail-page.pw .ph-tt { display: grid; gap: 2px; min-width: 0; }
+.project-detail-page.pw .ph-tt b { font: 750 15px 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .ph-tt small { font: 500 12.5px 'Onest', sans-serif; color: #883288; }
+@media (max-width: 720px) { .project-detail-page.pw .ph-tiles { grid-template-columns: 1fr; } }
+
+.project-detail-page.pw .ph-clist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.project-detail-page.pw .ph-clist li { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 16px 10px 10px; border: 1.5px solid transparent; border-radius: 24px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .ph-ct b { display: block; font: 750 14px 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .ph-cs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; font: 500 12px 'Onest', sans-serif; color: #883288; }
+.project-detail-page.pw .ph-plt { display: inline-flex; padding: 2px 10px; border-radius: 999px; background: #F3E3F7; color: #682768; font: 700 11.5px 'Onest', sans-serif; font-style: normal; }
+.project-detail-page.pw .ph-plt--meta { background: #E8F0FE; color: #1D4FB3; }
+.project-detail-page.pw .ph-plt--google { background: #FFF1D6; color: #9A5B00; }
+.project-detail-page.pw .ph-cact { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.project-detail-page.pw .ph-cact .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; min-height: 0; padding: 0 16px; }
+.project-detail-page.pw .ph-cact .btn svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw .ph-cact .btn.ph-cdel { background: none; box-shadow: none; color: #C23232; }
+.project-detail-page.pw .ph-cempty { display: grid; justify-items: center; gap: 10px; padding: 34px 20px; border: 1.5px solid transparent; border-radius: 24px; text-align: center; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .ph-cempty h3 { margin: 4px 0 0; font: 750 17px 'Onest', sans-serif; color: #270827; }
+.project-detail-page.pw .ph-cempty p { margin: 0; max-width: 520px; font: 500 13.5px/1.5 'Onest', sans-serif; color: #6b4a73; }
+.project-detail-page.pw .ph-clist .ph-grow { flex: 1; }

@@ -17,7 +17,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, templateMetrics = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange }) {
+export default function ResultView({ data, kind, custom, templateMetrics = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -82,7 +82,7 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
           <div className="prep-capture-title">{title}</div>
           <div className="prep-capture-sub">{subtitle} · {tabLabel}{cur.accountName ? ` · ${cur.accountName}` : ''}</div>
         </div>
-        <ReportMetricsTable rows={rows} showPrev={showPrev} curLabel={curLabel} prevLabel={prevLabel} />
+        <ReportMetricsTable rows={rows} showPrev={showPrev} curLabel={curLabel} prevLabel={prevLabel} clientEye={clientEye} />
         {splitByCurrency && <div className="pacc-hint">Кабінети у різних валютах, тому суму не порахувати: кожна платформа показана окремо.</div>}
         {isTotal && <div className="pacc-hint">Сума платформ в одній валюті. Охоплення складається простою сумою, тож люди, яких побачили обидві платформи, враховані двічі.</div>}
         {groups.length > 0 && (

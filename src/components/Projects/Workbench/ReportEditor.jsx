@@ -2,12 +2,11 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useConfirm } from '../../common/ConfirmDialog';
-import DesignTodo from '../../common/DesignTodo';
 import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import ResultView from '../Reports/ResultView';
 import CreativeGrid from '../CreativeGrid';
 import CreativePickerDialog from '../CreativePickerDialog';
-import { PanelContext, SelectionPanel } from '../Builder/BuilderSettings';
+import { Panel, PanelContext, SelectionPanel } from '../Builder/BuilderSettings';
 import { reportPeriodText, reportPlatformLabel } from '../ArchiveReportModal';
 import { deleteProjectReport, refreshMonthTotal, saveReportData } from '../../../lib/api/projectReportStore';
 import { suggestCreatives } from '../../../lib/api/reportCreatives';
@@ -20,11 +19,29 @@ import { metricOptions } from '../../../lib/reportMetrics';
 import { REPORT_STATUS, canApprove, monthKey, reviewPatch } from '../../../lib/projectHistory';
 import '../../../styles/projectReports.css';
 import '../../../styles/workbench.css';
+import '../../../styles/builderHub.css';
+import '../../../styles/workbenchHub.css';
 
 const TYPE_LABEL = { weekly: 'Тижневий', monthly: 'Місячний', custom: 'Довільний' };
 const stamp = (iso) => (iso ? new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 const fmt = (s) => String(s).split('-').reverse().join('.');
-const OPEN_SELECTION = { open: 'selection', toggle: () => {} };
+const ICON = {
+  work: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" />,
+  back: <path d="M15 6l-6 6 6 6" />,
+  metrics: <path d="M5 20V10M12 20V4M19 20v-7" />,
+  texts: <path d="M5 6h14M5 11h14M5 16h9" />,
+  images: <><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-8 8" /></>,
+  eye: <><path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6S2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.8" /></>,
+  eyeOff: <><path d="M3 3l18 18M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4.2 9.5 6-.4.8-1.3 2.1-2.7 3.3M6.7 7.7C4.5 9.1 3.1 11 2.5 12c1 1.8 4.5 6 9.5 6 1.4 0 2.7-.3 3.8-.8" /><path d="M9.9 10a3 3 0 0 0 4.1 4.1" /></>,
+  ret: <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />,
+  info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
+  check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+};
+const Ic = ({ n }) => <svg viewBox="0 0 24 24" aria-hidden="true">{ICON[n]}</svg>;
+const Medal = ({ n, cls = '' }) => <span className={'bld-md ' + cls}><span className="bld-mi"><Ic n={n} /></span></span>;
+const Eye = ({ on, onToggle, label }) => (
+  <button type="button" className={'wbe-eye' + (on ? ' on' : '')} aria-pressed={on} aria-label={`${label}: ${on ? 'бачить клієнт' : 'приховано від клієнта'}`} title={on ? 'Клієнт бачить. Натисніть, щоб приховати' : 'Клієнт не бачить. Натисніть, щоб показати'} onClick={onToggle}><Ic n={on ? 'eye' : 'eyeOff'} /></button>
+);
 
 // One report of «Робота над звітами» opened in the workspace: the numbers as they will look, what is in the report (metrics, groups and campaigns), the texts, the
 // creatives. «Зберегти» keeps the status, «Підтверджено» sends the report to the history and to the client's page.
@@ -42,6 +59,8 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const [picking, setPicking] = useState(null);
   const [cbusy, setCbusy] = useState(false);
   const [cerr, setCerr] = useState('');
+  const [slot, setSlot] = useState(null); // where the download menu of a custom report is drawn: the bar
+  const [openPanel, setOpenPanel] = useState('metrics'); // the panels of the side column are an accordion, one open at a time
 
   const isCustom = row.period_type === 'custom';
   const platform = row.platform;
@@ -128,84 +147,95 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const review = data.review || {};
   const prevLabel = data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній';
 
+  const filled = blocks.filter((b) => (data.sections?.[b.key] || '').trim()).length;
+  const metricsInTable = options.filter((o) => shownKeys.includes(o.key)).length;
+  const statusLabel = REPORT_STATUS[row.status] || row.status;
+
   return (
-    <div className="wb-editor">
-      <div className="wb-bar">
-        <button type="button" className="btn" onClick={back}>← До списку</button>
-        <div className="wb-bar-title">
-          <b>{TYPE_LABEL[row.period_type] || row.period_type} звіт · {reportPeriodText(row)}</b>
-          <small>{reportPlatformLabel(platform)} · {!isCustom && <><span className={'wb-chip wb-chip--' + row.status}>{REPORT_STATUS[row.status] || row.status}</span> · </>}оновлено {stamp(row.updated_at)}</small>
+    <div className="wb-editor bld wbe">
+      <div className="wbe-bar">
+        <button type="button" className="wbe-back" onClick={back} aria-label="До списку" title="До списку"><Ic n="back" /></button>
+        <Medal n="work" />
+        <div className="wbe-title">
+          <b>{isCustom ? 'Кастомний звіт' : (TYPE_LABEL[row.period_type] || row.period_type) + ' звіт'} · {reportPeriodText(row)}</b>
+          <div className="wbe-sub">
+            <i className={'wbh-plt wbh-plt--' + platform}>{reportPlatformLabel(platform)}</i>
+            {isCustom ? <i className="wbh-chip wbh-chip--custom">Кастомний · клієнту не йде</i> : <i className={'wbh-chip wbh-chip--' + row.status}>{statusLabel}</i>}
+            <span className="wbe-upd">оновлено {stamp(row.updated_at)}</span>
+            {dirty && <span className="bld-state dirty"><i />Є незбережені зміни</span>}
+          </div>
         </div>
-        <div className="wb-actions">
-          {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
-          <button type="button" className="btn" disabled={busy === 'delete' || !!busy} onClick={remove}>Видалити</button>
-          {isCustom && <button type="button" className="btn" disabled={dirty || !!busy || !Object.keys(data.platforms || {}).length} title={dirty ? 'Спершу збережіть зміни' : 'Створити презентацію з цього звіту'} onClick={() => navigate(`/clients?project=${row.project_id}&type=custom&start=${row.period_start}&end=${row.period_end}&platform=${isAll ? Object.keys(data.platforms)[0] : platform}`)}>Зробити презентацію</button>}
+        <div className="wbe-actions">
+          {isCustom && <span ref={setSlot} className="wbe-slot" />}
+          <button type="button" className="btn wbe-del" disabled={!!busy} onClick={remove}>Видалити</button>
           <button type="button" className="btn" disabled={!dirty || !!busy} onClick={save}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
-          {!isCustom && <button type="button" className="btn btn-p" disabled={!approver || !!busy} title={approver ? 'Відправити звіт в історію й до клієнта' : 'Підтверджують лише відповідальні, обрані в налаштуваннях агента'} onClick={approve}>{busy === 'approve' ? 'Підтверджуємо…' : 'Підтверджено'}</button>}
+          {!isCustom && <button type="button" className="btn wbe-ok" disabled={!approver || !!busy} title={approver ? 'Відправити звіт в історію й до клієнта' : 'Підтверджують лише відповідальні, обрані в налаштуваннях агента'} onClick={approve}><Ic n="check" />{busy === 'approve' ? 'Підтверджуємо…' : 'Підтверджено'}</button>}
         </div>
       </div>
-      <DesignTodo note="Робоча область звіту: таблиця, склад звіту, тексти, креативи, кнопки" />
-      {!isCustom && row.status === 'rework' && review.returnedNote && <div className="prep-internal-note" role="note"><b>Повернуто на доопрацювання{review.returnedBy ? ` (${review.returnedBy})` : ''}:</b> {review.returnedNote}</div>}
-      {!isCustom && !approver && <div className="pacc-hint">Підтвердити звіт можуть лише відповідальні, обрані в налаштуваннях агента. Ви можете працювати над ним і зберігати.</div>}
-      {message && <div className="pacc-hint" role="status">{message}</div>}
+      {row.status === 'rework' && review.returnedNote && <div className="wbe-note wbe-note--warn" role="note"><Ic n="ret" /><span><b>Повернуто на доопрацювання{review.returnedBy ? ` (${review.returnedBy})` : ''}:</b> {review.returnedNote}</span></div>}
+      {!isCustom && !approver && <div className="wbe-note wbe-note--info"><Ic n="info" /><span>Підтвердити звіт можуть лише відповідальні, обрані в налаштуваннях агента. Ви можете працювати над ним і зберігати.</span></div>}
+      {message && <div className="wbe-note wbe-note--ok" role="status"><Ic n="check" /><span>{message}</span></div>}
       {error && <div className="pacc-err">{error}</div>}
 
-      <section className="wb-block">
-        <h4>Таблиця звіту</h4>
-        {Object.keys(data.platforms || {}).length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
-          <ResultView
-            data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} noExport={!isCustom}
-            lockTotal={isAll} extraKeys={isAll ? [] : extraKeys} title={ctx.project?.name || ''} subtitle={`${TYPE_LABEL[row.period_type]} · ${reportPeriodText(row)}`}
-            fileBase={isCustom ? `${ctx.project?.name || 'report'}_${row.period_start}_${row.period_end}_${platform}` : 'draft'} campaignMode="selected" selection={[]} options={{ groups: true }} curLabel={reportPeriodText(row)} prevLabel={prevLabel}
-          />
-        )}
-      </section>
+      <div className="wbe-grid">
+        <div className="wbe-main">
+          <section className="wbe-block">
+            <div className="wbe-bh"><Medal n="metrics" cls="wbe-md" /><b>Таблиця звіту</b><span className="wbe-sp" />{!isCustom && <span className="wbe-mut">Око: чи бачить клієнт показник</span>}</div>
+            {Object.keys(data.platforms || {}).length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
+              <ResultView
+                data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} noExport={!isCustom} exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']}
+                lockTotal={isAll} extraKeys={isAll ? [] : extraKeys} title={ctx.project?.name || ''} subtitle={`${TYPE_LABEL[row.period_type]} · ${reportPeriodText(row)}`}
+                fileBase={isCustom ? `${ctx.project?.name || 'report'}_custom_${row.period_start}_${row.period_end}_${platform}` : 'draft'} campaignMode="selected" selection={[]} options={{ groups: true }} curLabel={reportPeriodText(row)} prevLabel={prevLabel}
+                clientEye={isCustom ? null : { hidden, onToggle: toggleHidden }}
+              />
+            )}
+          </section>
 
-      <section className="wb-block">
-        <h4>Склад звіту</h4>
-        <div className="pacc-hint">Тільки для цього звіту: макет платформи не змінюється. Працює за збереженими цифрами, нового запиту в кабінет немає. Кампанія, якої не було в періоді, або метрика, якої немає в збережених цифрах, зʼявляться, якщо сформувати звіт за цей період ще раз.</div>
-        <h5>Метрики</h5>
-        <div className="wb-metrics">
-          <div className={'wb-mrow wb-mhead' + (isCustom ? ' wb-mrow--solo' : '')}><span>Метрика</span><span>У таблиці</span>{!isCustom && <span>Бачить клієнт</span>}</div>
-          {options.map((o) => (
-            <div className={'wb-mrow' + (isCustom ? ' wb-mrow--solo' : '')} key={o.key}>
-              <span>{o.label}</span>
-              <input type="checkbox" checked={shownKeys.includes(o.key)} onChange={() => toggleShown(o.key)} aria-label={`${o.label}: у таблиці`} />
-              {!isCustom && <input type="checkbox" checked={!hidden.includes(o.key)} disabled={!shownKeys.includes(o.key)} onChange={() => toggleHidden(o.key)} aria-label={`${o.label}: бачить клієнт`} />}
-            </div>
-          ))}
+          {!isCustom && (
+            <section className="wbe-block">
+              <div className="wbe-bh"><Medal n="texts" cls="wbe-md" /><b>Тексти</b><span className="wbe-sp" /><span className={'wbe-count' + (filled === blocks.length ? ' ok' : '')}>{filled} з {blocks.length} заповнено</span></div>
+              <div className="wbe-texts">
+                {blocks.map((b) => (
+                  <div className={'wbe-text' + (b.client ? '' : ' off')} key={b.key}>
+                    <div className="wbe-text-head">
+                      <label htmlFor={'wb-t-' + b.key}>{b.title}</label>
+                      <Eye on={b.client} onToggle={() => setBlockClient(b.key, !b.client)} label={b.title} />
+                    </div>
+                    <AutoResizeTextarea id={'wb-t-' + b.key} value={data.sections?.[b.key] || ''} onChange={(v) => setText(b.key, v)} placeholder={b.title + '…'} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {canCreatives && (
+            <section className="wbe-block">
+              <div className="wbe-bh"><Medal n="images" cls="wbe-md" /><b>Most effective creatives</b><span className="wbe-sp" /><span className="wbe-count">{items.length}</span></div>
+              {items.length > 0 ? <CreativeGrid items={items} onReplace={(i) => setPicking(i)} onRemove={(i) => setItems(items.filter((_, j) => j !== i))} /> : <div className="pacc-hint">Креативів у звіті ще немає.</div>}
+              <div className="wbe-tools">
+                <button type="button" className="btn" disabled={cbusy} onClick={suggest}>{cbusy ? 'Працюємо…' : items.length ? 'Підібрати знову' : 'Підібрати креативи автоматично'}</button>
+                <button type="button" className="btn" onClick={() => setPicking(items.length)}>+ Додати креатив</button>
+                {cerr && <span className="form-err">{cerr}</span>}
+              </div>
+            </section>
+          )}
         </div>
-        {!isAll && (
-          <PanelContext.Provider value={OPEN_SELECTION}>
-            <SelectionPanel platform={platform} groups={groupsHere} campaigns={campaigns} problem="" draft={{ campaignSel: sel }} set={setSelection} />
+
+        <aside className="wbe-side">
+          <PanelContext.Provider value={{ open: openPanel, toggle: (id) => setOpenPanel((cur) => (cur === id ? '' : id)) }}>
+            <Panel id="metrics" title="Метрики в таблиці" summary={`${metricsInTable} з ${options.length}`}>
+              <div className="pacc-hint">Тільки для цього звіту: макет платформи не змінюється. Рахується за збереженими цифрами, нового запиту в кабінет немає. Метрика, якої немає в збережених цифрах, зʼявиться після оновлення звіту з кабінетів.</div>
+              <div className="bld-chips">
+                {options.map((o) => {
+                  const on = shownKeys.includes(o.key);
+                  return <button key={o.key} type="button" className={'bld-toggle' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggleShown(o.key)}>{o.label}</button>;
+                })}
+              </div>
+            </Panel>
+            {!isAll && <SelectionPanel platform={platform} groups={groupsHere} campaigns={campaigns} problem="" draft={{ campaignSel: sel }} set={setSelection} />}
           </PanelContext.Provider>
-        )}
-      </section>
-
-      {!isCustom && <section className="wb-block">
-        <h4>Тексти</h4>
-        {blocks.map((b) => (
-          <div className="wb-text" key={b.key}>
-            <div className="wb-text-head">
-              <label htmlFor={'wb-t-' + b.key}>{b.title}</label>
-              <label className="wb-client"><input type="checkbox" checked={b.client} onChange={(e) => setBlockClient(b.key, e.target.checked)} /> Бачить клієнт</label>
-            </div>
-            <AutoResizeTextarea id={'wb-t-' + b.key} value={data.sections?.[b.key] || ''} onChange={(v) => setText(b.key, v)} placeholder={b.title + '…'} />
-          </div>
-        ))}
-      </section>}
-
-      {canCreatives && (
-        <section className="wb-block">
-          <h4>Most effective creatives</h4>
-          {items.length > 0 ? <CreativeGrid items={items} onReplace={(i) => setPicking(i)} onRemove={(i) => setItems(items.filter((_, j) => j !== i))} /> : <div className="pacc-hint">Креативів у звіті ще немає.</div>}
-          <div className="rte-row">
-            <button type="button" className="btn" disabled={cbusy} onClick={suggest}>{cbusy ? 'Працюємо…' : items.length ? 'Підібрати знову' : 'Підібрати креативи автоматично'}</button>
-            <button type="button" className="btn" onClick={() => setPicking(items.length)}>+ Додати креатив</button>
-            {cerr && <span className="form-err">{cerr}</span>}
-          </div>
-        </section>
-      )}
+        </aside>
+      </div>
 
       {picking != null && (
         <CreativePickerDialog

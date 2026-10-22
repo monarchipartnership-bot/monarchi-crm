@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
-import DesignTodo from '../common/DesignTodo';
 import { HubTitle, RibbonMark } from './hubIcons';
+import InfoTip from '../common/InfoTip';
 import ReportEditor from './Workbench/ReportEditor';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './ArchiveReportModal';
 import MonthDocument from './MonthDocument';
@@ -22,6 +22,15 @@ import '../../styles/historyHub.css';
 const fmt = (s) => s.split('-').reverse().join('.');
 const today = () => new Date().toISOString().slice(0, 10);
 const stamp = (iso) => (iso ? new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+
+const SEC_ICONS = {
+  journey: <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2" />,
+  range: <><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4M8 14h3M13 14h3" /></>,
+  open: <path d="M9 6l6 6-6 6" />,
+  trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />,
+};
+const HubIcon = ({ n }) => <svg viewBox="0 0 24 24" aria-hidden="true">{SEC_ICONS[n]}</svg>;
+const Medal = ({ n, cls = '' }) => <span className={'hub-ring ph-md ' + cls} aria-hidden="true"><span className="hub-tile hub-tile--ln"><HubIcon n={n} /></span></span>;
 
 const Chip = ({ status, toDate }) => (toDate ? <i className="ph-chip ph-chip--todate">Оновлюється</i> : status ? <i className={'ph-chip ph-chip--' + status}>{REPORT_STATUS[status] || status}</i> : <i className="ph-chip ph-chip--none">ще не створено</i>);
 
@@ -135,20 +144,30 @@ export default function ProjectHistoryTab({ projectId }) {
 
   return (
     <section className="report-section">
-      <HubTitle icon="file" className="prep-box-title">Історія проекту</HubTitle>
-      <DesignTodo note="Історія проекту: перемикач «Перебіг проекту / Кастомні звіти», список і відкритий кастомний звіт" />
-      <div className="prep-seg" role="tablist" aria-label="Розділи історії">
-        <button type="button" role="tab" aria-selected={section === 'journey'} className={'prep-seg-tab' + (section === 'journey' ? ' on' : '')} onClick={() => pickSection('journey')}>Перебіг проекту</button>
-        <button type="button" role="tab" aria-selected={section === 'custom'} className={'prep-seg-tab' + (section === 'custom' ? ' on' : '')} onClick={() => pickSection('custom')}>Кастомні звіти</button>
-      </div>
-      <div className="pacc-hint">{section === 'custom' ? 'Звіти за будь-який період, збережені в «Формування звіту» → «Показники за період». Клієнту вони не йдуть: їх можна відкрити, змінити, видалити й завантажити.' : 'Місяці з тижневими звітами: чернетка, доробка, затверджено. Клієнт бачить лише затверджене; чернетки й доробка опрацьовуються в розділі «Робота над звітами».'}</div>
-      <div className="prep-seg" role="tablist" aria-label="Платформи">
-        {tabs.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>
-            <RibbonMark platform={t.key === TOTAL_TAB ? null : t.key} />{t.label}
-          </button>
-        ))}
-      </div>
+      {!customOpen && (
+        <>
+          <HubTitle icon="file" className="prep-box-title">Історія проекту<InfoTip>{section === 'custom' ? 'Звіти за будь-який період, збережені в «Формування звіту» → «Показники за період». Клієнту вони не йдуть: їх можна відкрити, змінити, видалити й завантажити.' : 'Місяці з тижневими звітами: чернетка, доробка, затверджено. Клієнт бачить лише затверджене; чернетки й доробка опрацьовуються в розділі «Робота над звітами».'}</InfoTip></HubTitle>
+          <div className="ph-tiles" role="tablist" aria-label="Розділи історії">
+            {[
+              { key: 'journey', title: 'Перебіг проекту', caption: 'Тижні й місяці: те, що бачить клієнт', n: months.length, icon: 'journey' },
+              { key: 'custom', title: 'Кастомні звіти', caption: 'Будь-який період, клієнту не йдуть', n: customRows.length, icon: 'range' },
+            ].map((t) => (
+              <button key={t.key} type="button" role="tab" aria-selected={section === t.key} className={'ph-tile' + (section === t.key ? ' on' : '')} onClick={() => pickSection(t.key)}>
+                <Medal n={t.icon} />
+                <span className="ph-tn">{t.n}</span>
+                <span className="ph-tt"><b>{t.title}</b><small>{t.caption}</small></span>
+              </button>
+            ))}
+          </div>
+          <div className="prep-seg" role="tablist" aria-label="Платформи">
+            {tabs.map((t) => (
+              <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} className={'prep-seg-tab' + (t.key === tab ? ' on' : '')} onClick={() => pick(t.key)}>
+                <RibbonMark platform={t.key === TOTAL_TAB ? null : t.key} />{t.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {section === 'journey' && <ShareLinkBox projectId={projectId} scope={scopeOf(tab)} label={tabs.find((t) => t.key === tab)?.label || ''} />}
       {error && <div className="pacc-err">{error}</div>}
       {note && <div className="pacc-hint" role="status">{note}</div>}
@@ -156,16 +175,24 @@ export default function ProjectHistoryTab({ projectId }) {
       {rows && section === 'custom' && (customOpen ? (
         <ReportEditor key={customOpen.id} row={customOpen} ctx={{ ...ctx, groups }} onBack={() => openCustom(null)} onChanged={load} />
       ) : customRows.length === 0 ? (
-        <div className="empty-hint">Кастомних звітів немає. Оберіть період у «Формування звіту» → «Показники за період», натисніть «Показати», потім «Зберегти».</div>
+        <div className="ph-cempty">
+          <span className="hub-ring ph-md ph-md--xl st-mu" aria-hidden="true"><span className="hub-tile hub-tile--ln"><HubIcon n="range" /></span></span>
+          <h3>Кастомних звітів немає</h3>
+          <p>Оберіть період у «Формування звіту» → «Показники за період», натисніть «Показати», потім «Зберегти».</p>
+        </div>
       ) : (
-        <ul className="ph-rows ph-custom">
+        <ul className="ph-clist">
           {customRows.map((r) => (
             <li key={r.id}>
-              <span className="ph-name">{reportPeriodText(r)}</span>
-              <span className="ph-dates">{reportPlatformLabel(r.platform)} · оновлено {stamp(r.updated_at)}</span>
-              <span className="ph-act">
-                <button type="button" className="btn" onClick={() => openCustom(r.id)}>Відкрити</button>
-                <button type="button" className="btn" onClick={() => remove(r)}>Видалити</button>
+              <Medal n="range" />
+              <div className="ph-ct">
+                <b>{reportPeriodText(r)}</b>
+                <span className="ph-cs"><i className={'ph-plt ph-plt--' + r.platform}>{reportPlatformLabel(r.platform)}</i><span>оновлено {stamp(r.updated_at)}</span></span>
+              </div>
+              <span className="ph-grow" />
+              <span className="ph-cact">
+                <button type="button" className="btn" onClick={() => openCustom(r.id)}><HubIcon n="open" />Відкрити</button>
+                <button type="button" className="btn ph-cdel" onClick={() => remove(r)}><HubIcon n="trash" />Видалити</button>
               </span>
             </li>
           ))}
