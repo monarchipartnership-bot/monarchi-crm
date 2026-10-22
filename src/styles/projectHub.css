@@ -423,7 +423,6 @@
   .project-detail-page.pw .prep-table--groups th.total, .project-detail-page.pw .prep-table--groups td.total { position: static; box-shadow: none; }
 }
 
-/* on a phone the label column of the report tables is not pinned either: the numbers slid under it, so the table scrolls as one piece */
-@media (max-width: 640px) {
-  .project-detail-page.pw .prep-table--wide th:first-child, .project-detail-page.pw .prep-table--wide td.lbl { position: static; box-shadow: none; }
-}
+/* the label and the account total of the report tables are not pinned: the other columns slid under them and were cut in half, so the table scrolls as one piece */
+.project-detail-page.pw .prep-table--wide th:first-child, .project-detail-page.pw .prep-table--wide td.lbl,
+.project-detail-page.pw .prep-table--groups th.total, .project-detail-page.pw .prep-table--groups td.total { position: static; box-shadow: none; }

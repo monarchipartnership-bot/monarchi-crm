@@ -762,7 +762,5 @@
   .crh .hubt td, .crh .hubt th { padding-left: 8px; padding-right: 8px; }
   .crh .hubt .dm { font-size: 10px; }
 }
-/* on a phone nothing is pinned: the pinned label took more than a third of the width and the numbers slid under it, so the whole table scrolls together */
-@media (max-width: 640px) {
-  .crh .hubt td:first-child, .crh .hubt th:first-child, .crh .tbl .stk { position: static; box-shadow: none; }
-}
+/* nothing is pinned: with a pinned label the other columns slid under it and were cut in half, so the whole table scrolls together */
+.crh .hubt td:first-child, .crh .hubt th:first-child, .crh .tbl .stk { position: static; box-shadow: none; }
