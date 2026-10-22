@@ -3,11 +3,13 @@ import { supabase } from '../supabaseClient';
 // Saved client presentations (migration 20261009000000_project_decks.sql). The read
 // helpers return []/null (and warn) if the table isn't there yet, so the page still opens.
 
-export async function fetchDeck(projectId, periodType, periodStart, platform) {
-  const { data, error } = await supabase
+// A custom report is told apart by its end date as well (any dates); a week or a month by its start.
+export async function fetchDeck(projectId, periodType, periodStart, platform, periodEnd) {
+  let q = supabase
     .from('project_decks').select('*')
-    .eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform)
-    .maybeSingle();
+    .eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform);
+  if (periodType === 'custom') q = q.eq('period_end', periodEnd);
+  const { data, error } = await q.order('updated_at', { ascending: false }).limit(1).maybeSingle();
   if (error) { console.warn('fetchDeck failed', error); return null; }
   return data;
 }
@@ -33,7 +35,7 @@ export async function saveDeck({ projectId, reportId, periodType, periodStart, p
   const { data, error } = await supabase.from('project_decks').upsert({
     project_id: projectId, report_id: reportId || null, period_type: periodType, period_start: periodStart, period_end: periodEnd,
     platform, style, lang, status, source, deck, created_by: createdBy || null, updated_at: new Date().toISOString(),
-  }, { onConflict: 'project_id,period_type,period_start,platform' }).select().single();
+  }, { onConflict: 'project_id,period_type,period_start,period_end,platform' }).select().single();
   if (error) throw error;
   return data;
 }

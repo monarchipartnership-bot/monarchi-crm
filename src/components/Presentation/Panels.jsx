@@ -12,11 +12,12 @@ import { useRef, useState } from 'react';
 import { readSlideImage } from '../../lib/presentation/imageFile';
 import { MIXED, plain, text } from '../../lib/presentation/textModel';
 import Select from '../common/Select';
+import DatePicker from '../common/DatePicker';
 
 const STATUS = { draft: 'Чернетка', reviewed: 'Чернетка', rework: 'Доробка', final: 'Затверджено' };
 
 // ----- Дані ---------------------------------------------------------------------------------
-export function DataPanel({ sel, setSel, report, reportState, platforms, deck, hasDeck, building, message, onBuild, onClient, onPeriod, onLang }) {
+export function DataPanel({ sel, setSel, period, report, reportState, platforms, deck, hasDeck, building, message, onBuild, onClient, onPeriod, onLang }) {
   const weeks = computeWeeksForMonth(sel.year, sel.month);
   const lang = deck?.meta.lang || sel.lang;
   return (
@@ -27,7 +28,7 @@ export function DataPanel({ sel, setSel, report, reportState, platforms, deck, h
       <div className="pb-row2">
         <div className="pk-field">
           <label>Тип звіту</label>
-          <Select value={sel.periodType} onChange={(v) => setSel({ ...sel, periodType: v })} ariaLabel="Тип звіту" options={[{ value: 'weekly', label: 'Тижневий' }, { value: 'monthly', label: 'Місячний' }]} />
+          <Select value={sel.periodType} onChange={(v) => setSel(v === 'custom' ? { ...sel, periodType: v, from: sel.from || period?.start || null, to: sel.to || period?.end || null } : { ...sel, periodType: v })} ariaLabel="Тип звіту" options={[{ value: 'weekly', label: 'Тижневий' }, { value: 'monthly', label: 'Місячний' }, { value: 'custom', label: 'Довільний' }]} />
         </div>
         <div className="pk-field">
           <label>Платформа</label>
@@ -39,10 +40,17 @@ export function DataPanel({ sel, setSel, report, reportState, platforms, deck, h
 
       <div className="pk-field">
         <label>Період</label>
-        <div className="pb-row2">
-          <Select ariaLabel="Рік" value={sel.year} onChange={(v) => setSel({ ...sel, year: v })} options={yearOptions().map((y) => ({ value: y, label: String(y) }))} />
-          <Select ariaLabel="Місяць" value={sel.month} onChange={(v) => setSel({ ...sel, month: v })} options={MONTH_NAMES.map((n, i) => ({ value: i + 1, label: n }))} />
-        </div>
+        {sel.periodType === 'custom' ? (
+          <div className="pb-row2">
+            <DatePicker value={sel.from || ''} onChange={(v) => setSel({ ...sel, from: v })} placeholder="Від" />
+            <DatePicker value={sel.to || ''} onChange={(v) => setSel({ ...sel, to: v })} placeholder="До" />
+          </div>
+        ) : (
+          <div className="pb-row2">
+            <Select ariaLabel="Рік" value={sel.year} onChange={(v) => setSel({ ...sel, year: v })} options={yearOptions().map((y) => ({ value: y, label: String(y) }))} />
+            <Select ariaLabel="Місяць" value={sel.month} onChange={(v) => setSel({ ...sel, month: v })} options={MONTH_NAMES.map((n, i) => ({ value: i + 1, label: n }))} />
+          </div>
+        )}
         {sel.periodType === 'weekly' && (
           <Select ariaLabel="Тиждень" value={Math.min(sel.weekIndex, weeks.length)} onChange={(v) => setSel({ ...sel, weekIndex: v })} style={{ marginTop: 8 }}
             options={weeks.map((w) => ({ value: w.index, label: `Тиждень ${w.index} (${fmtDate(w.start.getFullYear(), w.start.getMonth() + 1, w.start.getDate())}–${fmtDate(w.end.getFullYear(), w.end.getMonth() + 1, w.end.getDate())})` }))} />
@@ -59,10 +67,10 @@ export function DataPanel({ sel, setSel, report, reportState, platforms, deck, h
         <div className="pb-source-title"><ActionIcon name="data" size={18} /> Джерело даних: звіт проєкту</div>
         {reportState === 'loading' && <div className="pacc-hint">Шукаємо збережений звіт…</div>}
         {reportState === 'none' && sel.projectId && (
-          <div className="pacc-hint">За цей період звіту ще немає. <Link to={sel.periodType === 'weekly' ? '/projects/reports/weekly' : '/projects/reports/monthly'}>Створіть і збережіть звіт</Link>, і презентація збереться з нього.</div>
+          <div className="pacc-hint">{sel.periodType === 'custom' && !(sel.from && sel.to && sel.from <= sel.to) ? 'Оберіть початок і кінець періоду.' : <>За цей період звіту ще немає. <Link to={`/projects/${sel.projectId}?tab=compose&mode=${sel.periodType === 'custom' ? 'period' : sel.periodType}`}>Створіть і збережіть звіт</Link>, і презентація збереться з нього.</>}</div>
         )}
         {reportState === 'ready' && report && (
-          <div className="pacc-hint">Звіт збережено · {STATUS[report.status] || report.status} · {new Date(report.updated_at).toLocaleString('uk-UA')}{platforms && !platforms.includes(sel.platform) ? ` · у звіті немає даних ${platformName(sel.platform)}` : ''}</div>
+          <div className="pacc-hint">Звіт збережено · {report.period_type === 'custom' ? 'Довільний' : STATUS[report.status] || report.status} · {new Date(report.updated_at).toLocaleString('uk-UA')}{platforms && !platforms.includes(sel.platform) ? ` · у звіті немає даних ${platformName(sel.platform)}` : ''}</div>
         )}
         <button type="button" className="btn btn-p pb-wide" disabled={reportState !== 'ready' || building || (platforms && !platforms.includes(sel.platform))} onClick={onBuild}>
           <ActionIcon name="import" size={18} /> {building ? 'Створюємо…' : hasDeck ? 'Підтягнути зі звіту знову' : 'Створити презентацію зі звіту'}

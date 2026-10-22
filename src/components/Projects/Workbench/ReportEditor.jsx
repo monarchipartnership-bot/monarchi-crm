@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useConfirm } from '../../common/ConfirmDialog';
 import DesignTodo from '../../common/DesignTodo';
@@ -31,6 +32,7 @@ const OPEN_SELECTION = { open: 'selection', toggle: () => {} };
 // client: only the table, what is in it, saving, downloading and deleting.
 export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const { email } = useAuth();
+  const navigate = useNavigate();
   const [confirm, confirmDialog] = useConfirm();
   const [data, setData] = useState(row.data || {});
   const [dirty, setDirty] = useState(false);
@@ -137,6 +139,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
         <div className="wb-actions">
           {dirty && <span className="pacc-hint">Є незбережені зміни</span>}
           <button type="button" className="btn" disabled={busy === 'delete' || !!busy} onClick={remove}>Видалити</button>
+          {isCustom && <button type="button" className="btn" disabled={dirty || !!busy || !Object.keys(data.platforms || {}).length} title={dirty ? 'Спершу збережіть зміни' : 'Створити презентацію з цього звіту'} onClick={() => navigate(`/clients?project=${row.project_id}&type=custom&start=${row.period_start}&end=${row.period_end}&platform=${isAll ? Object.keys(data.platforms)[0] : platform}`)}>Зробити презентацію</button>}
           <button type="button" className="btn" disabled={!dirty || !!busy} onClick={save}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
           {!isCustom && <button type="button" className="btn btn-p" disabled={!approver || !!busy} title={approver ? 'Відправити звіт в історію й до клієнта' : 'Підтверджують лише відповідальні, обрані в налаштуваннях агента'} onClick={approve}>{busy === 'approve' ? 'Підтверджуємо…' : 'Підтверджено'}</button>}
         </div>

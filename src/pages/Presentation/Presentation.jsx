@@ -24,8 +24,10 @@ function initialSel(params) {
   let year = now.getFullYear();
   let month = now.getMonth() + 1;
   let weekIndex = defaultWeekIndexFor(computeWeeksForMonth(year, month));
-  const periodType = params.get('type') === 'monthly' ? 'monthly' : 'weekly';
+  const type = params.get('type');
+  const periodType = type === 'monthly' ? 'monthly' : type === 'custom' ? 'custom' : 'weekly';
   const start = params.get('start');
+  const end = params.get('end');
   if (/^\d{4}-\d{2}-\d{2}$/.test(start || '')) {
     year = Number(start.slice(0, 4));
     month = Number(start.slice(5, 7));
@@ -34,6 +36,7 @@ function initialSel(params) {
   }
   return {
     projectId: params.get('project') || null, periodType, year, month, weekIndex,
+    from: periodType === 'custom' && /^\d{4}-\d{2}-\d{2}$/.test(start || '') ? start : null, to: periodType === 'custom' && /^\d{4}-\d{2}-\d{2}$/.test(end || '') ? end : null,
     platform: params.get('platform') === 'google' ? 'google' : 'meta', lang: 'en',
   };
 }
@@ -62,14 +65,16 @@ export default function Presentation() {
   const savedDeck = useRef(null);
   const loadKey = useRef('');
   const loadedSel = useRef(sel);
-  const period = useMemo(() => periodFromPicker(sel.periodType, sel), [sel]);
+  // a custom report has its own dates (picked on the left); a week or a month comes from the pickers
+  const period = useMemo(() => (sel.periodType === 'custom' ? { start: sel.from || '', end: sel.to || '', label: '' } : periodFromPicker(sel.periodType, sel)), [sel]);
   const dirty = deck.slides.length > 0 && deck !== savedDeck.current;
 
   // Report + saved deck for the picked project, period and platform.
   useEffect(() => {
     let off = false;
     if (!sel.projectId) { setReport(null); setReportState('idle'); setProject(null); reset(emptyDeck()); savedDeck.current = null; return undefined; }
-    const key = `${sel.projectId}|${sel.periodType}|${period.start}|${sel.platform}`;
+    if (sel.periodType === 'custom' && !(period.start && period.end && period.start <= period.end)) { setReport(null); setReportState('none'); reset(emptyDeck()); savedDeck.current = null; loadKey.current = ''; return undefined; }
+    const key = `${sel.projectId}|${sel.periodType}|${period.start}|${period.end}|${sel.platform}`;
     if (loadKey.current === key) return undefined;
     if (dirty && !window.confirm('Є незбережені зміни в презентації. Перейти без збереження?')) { setSel(loadedSel.current); return undefined; }
     loadKey.current = key;
@@ -80,13 +85,13 @@ export default function Presentation() {
       try {
         const [rows, proj, cm, saved, cols] = await Promise.all([
           fetchProjectReports(sel.projectId, sel.periodType), fetchProjectById(sel.projectId), fetchCustomMetrics(sel.projectId),
-          fetchDeck(sel.projectId, sel.periodType, period.start, sel.platform),
+          fetchDeck(sel.projectId, sel.periodType, period.start, sel.platform, period.end), fetchReportColumns(sel.projectId),
         ]);
         if (off) return;
-        const row = pickReportRow(rows, period.start, sel.platform);
+        const row = pickReportRow(rows, period.start, sel.platform, sel.periodType === 'custom' ? period.end : null);
         setProject(proj);
         setCustom(cm);
-        setColumnsMap(cols);
+        setColumnsMap(cols || {});
         setReport(row);
         setReportState(row ? 'ready' : 'none');
         if (saved?.deck?.slides?.length) {
@@ -107,9 +112,10 @@ export default function Presentation() {
         if (!off) { setReportState('none'); setMessage(e.message || 'Не вдалося завантажити дані.'); }
       }
     })();
-    return () => { off = true; };
+    // the key is forgotten on cleanup: a repeated run (StrictMode in development) must load again instead of waiting for a load that was cancelled
+    return () => { off = true; loadKey.current = ''; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel.projectId, sel.periodType, sel.platform, period.start]);
+  }, [sel.projectId, sel.periodType, sel.platform, period.start, period.end]);
 
   const platforms = report ? Object.keys(report.data?.platforms || {}) : null;
 
@@ -190,7 +196,7 @@ export default function Presentation() {
   const saveLabel = saveBusy ? 'Збереження…' : !deck.slides.length ? '' : dirty ? 'Є незбережені зміни' : savedAt ? 'Збережено' : 'Не збережено';
 
   const dataProps = {
-    sel, setSel: (next) => setSel(next), report, reportState, platforms, building, message,
+    sel, setSel: (next) => setSel(next), period, report, reportState, platforms, building, message,
     onBuild: build, onLang: (lang) => { setSel((s) => ({ ...s, lang })); if (deck.slides.length) update((d) => setMeta(d, { lang }), 'meta:lang'); },
   };
 

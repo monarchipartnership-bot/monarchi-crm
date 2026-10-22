@@ -70,9 +70,7 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
           <div className="arc-actions">
             {actions.map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' arc-ok' : '')} onClick={() => onAction && onAction(row, a.action)}>{a.label}</button>)}
             {onPresentation && (<>
-            {row.period_type === 'custom' ? (
-              <button type="button" className="btn" disabled title="Презентацію можна зробити зі збереженого тижневого або місячного звіту">Зробити презентацію</button>
-            ) : platforms.length > 1 ? (
+            {platforms.length > 1 ? (
               <div className="prep-export">
                 <button type="button" className="btn" onClick={() => setMenu((m) => !m)}>Зробити презентацію ▾</button>
                 {menu && (

@@ -116,7 +116,7 @@ export default function ProjectHistoryTab({ projectId }) {
     if (!(await confirm({ title: 'Видалити звіт?', body: 'Видалити збережений звіт з історії? Дію не можна скасувати. Презентація, зроблена з нього, залишиться.', confirmLabel: 'Видалити звіт', danger: true }))) return;
     try { await deleteProjectReport(r.id); setOpenId(null); await load(); } catch (e) { setError(e.message || 'Не вдалося видалити.'); }
   }
-  const presentation = (r, platform) => navigate(`/clients?project=${projectId}&type=${r.period_type}&start=${r.period_start}&platform=${platform}`);
+  const presentation = (r, platform) => navigate(`/clients?project=${projectId}&type=${r.period_type}&start=${r.period_start}&end=${r.period_end}&platform=${platform}`);
 
   const rowLine = (row, name, dates, key) => (
     <li key={key}>

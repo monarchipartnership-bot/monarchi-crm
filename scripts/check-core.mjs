@@ -298,6 +298,10 @@ await ok('report scope: a presentation takes the platform\'s own report, else a 
   assert.equal(pickReportRow(rows, '2026-10-01', 'google').id, 1);
   assert.equal(pickReportRow(rows, '2026-10-08', 'meta'), null);
   assert.equal(pickReportRow(rows, '2026-10-01', 'tiktok'), null);
+  // a custom report is found by its end date too
+  const customRows = [{ id: 7, period_start: '2026-10-01', period_end: '2026-10-09', platform: 'meta', data: { platforms: { meta: {} } } }, { id: 8, period_start: '2026-10-01', period_end: '2026-10-20', platform: 'meta', data: { platforms: { meta: {} } } }];
+  assert.equal(pickReportRow(customRows, '2026-10-01', 'meta', '2026-10-20').id, 8);
+  assert.equal(pickReportRow(customRows, '2026-10-01', 'meta', '2026-10-15'), null);
 });
 await ok('report scope: dashboards count a platform once (own report beats «Разом») and a project by its least finished report', () => {
   const rows = [

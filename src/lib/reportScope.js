@@ -17,8 +17,9 @@ export function reportScope(tab, accounts) {
 }
 
 // The report of a period for a presentation of `platform`: that platform's own report first, else a combined one that has the platform.
-export function pickReportRow(rows, periodStart, platform) {
-  const same = (rows || []).filter((r) => r.period_start === periodStart);
+// `periodEnd` is given for a custom report (any dates): then the end must match too.
+export function pickReportRow(rows, periodStart, platform, periodEnd) {
+  const same = (rows || []).filter((r) => r.period_start === periodStart && (!periodEnd || r.period_end === periodEnd));
   return same.find((r) => r.platform === platform) || same.find((r) => (r.platform || 'all') === 'all' && r.data?.platforms?.[platform]) || null;
 }
 
