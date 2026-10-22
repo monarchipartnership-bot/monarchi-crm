@@ -6,6 +6,7 @@
 //   POST { action: 'run_agent', agentId, brief? }    run one agent now (strategist, SEO, competitors), even if it is switched off
 //   POST { action: 'retry_task' | 'cancel_task', taskId }
 //   POST { action: 'launch_campaign', campaignId }   a campaign team goes live: its first agents get their first tasks
+//   POST { action: 'start_request', requestId }      a creative request of the studio starts its chain; { action: 'cancel_request', requestId } stops it
 //   POST { action: 'site_speed' }                    Google PageSpeed of the site's front page (phone and computer, 10-30 s)
 //   POST { action: 'site_overview' }                 the website analyst's main page: is GA4 / Search Console connected, and the live figures
 //   POST { action: 'poll_assets' }                   look at the pictures/videos being generated; { action: 'redo_visual', postId, note? }; { action: 'status' }
@@ -14,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { getModelClient } from './_lib/ai.js';
 import { approvePlan, cancelTask, generatorReady, launchCampaign, pollAssets, processQueue, redoVisual, rejectPlan, retryTask, runNow } from './_lib/agentEngine.js';
+import { cancelRequest, startRequest } from './_lib/studioEngine.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { siteOverview } from './_lib/googleSiteData.js';
 import { collectSpeed, speedFindings, speedKeyFromEnv } from './_lib/pageSpeed.js';
@@ -53,6 +55,8 @@ export default async function handler(req, res) {
     else if (action === 'poll_assets') out = { changed: await pollAssets(ctx) };
     else if (action === 'redo_visual') out = await redoVisual(ctx, Number(body.postId), body.note);
     else if (action === 'launch_campaign') out = await launchCampaign(ctx, Number(body.campaignId)); // the page then calls `process` until the queue is empty
+    else if (action === 'start_request') out = await startRequest(ctx, Number(body.requestId)); // the page then calls `process` until the queue is empty
+    else if (action === 'cancel_request') out = await cancelRequest(ctx, Number(body.requestId));
     else if (action === 'status') out = { higgsfield: generatorReady(ctx) };
     else if (action === 'site_speed') { // PageSpeed of the front page (10-30 s, so apart from the quick overview)
       const speed = await collectSpeed({ url: await siteUrlOf(ctx.db), key: speedKeyFromEnv() });

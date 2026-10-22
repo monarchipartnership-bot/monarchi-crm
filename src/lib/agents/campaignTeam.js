@@ -3,6 +3,7 @@
 // optimization and creative -> texts and control -> report -> the client message. Every agent is an ordinary framework agent
 // (ag_agents, team 'campaign', scope_id = the campaign id) with its own prompt library, settings, tasks and history.
 import { CAMPAIGN_PROMPTS } from './campaignPrompts.js';
+import { isStudioRole } from './studioTeam.js';
 
 export const CAMPAIGN_TEAM = 'campaign';
 
@@ -132,6 +133,8 @@ export async function ensureCampaignTeam(db, campaign, email = null) {
     }))).select());
     agents = must(await db.from('ag_agents').select('*').eq('team', CAMPAIGN_TEAM).eq('scope_type', 'client').eq('scope_id', scope));
   }
+  const studioIds = new Set(agents.filter((a) => isStudioRole(a.role)).map((a) => a.id));
+  agents = agents.filter((a) => !studioIds.has(a.id));
   const byRole = new Map(agents.map((a) => [a.role, a]));
   const ids = agents.map((a) => a.id);
   let links = ids.length ? must(await db.from('ag_links').select('*').in('from_agent_id', ids)) || [] : [];
@@ -149,5 +152,6 @@ export async function ensureCampaignTeam(db, campaign, email = null) {
     const created = must(await db.from('ag_prompts').insert(newPrompts).select());
     must(await db.from('ag_prompt_versions').insert(created.map((p) => ({ prompt_id: p.id, version: 1, body: p.body, note: 'Стартовий промт', created_by: email }))));
   }
-  return { agents: agents.sort((a, b) => a.sort - b.sort), links };
+  // the creative studio of the campaign has its own setup (studioTeam.js): it is not part of this team's chain
+  return { agents: agents.filter((a) => !isStudioRole(a.role)).sort((a, b) => a.sort - b.sort), links: links.filter((l) => !studioIds.has(l.from_agent_id) && !studioIds.has(l.to_agent_id)) };
 }

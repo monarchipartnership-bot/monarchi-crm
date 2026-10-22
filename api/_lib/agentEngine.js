@@ -19,6 +19,9 @@ import { speedKeyFromEnv } from './pageSpeed.js';
 import { runSeoAudit } from './seoRun.js';
 import * as higgsfield from './higgsfield.js';
 import { campaignRole } from './campaignRun.js';
+import { studioRole } from './studioRun.js';
+import { fanOutRequest, settleRequest } from './studioEngine.js';
+import { isStudioRole } from '../../src/lib/agents/studioTeam.js';
 import { CAMPAIGN_TEAM } from '../../src/lib/agents/campaignTeam.js';
 import { LANGUAGES, MAX_POSTS_PER_RUN, nextMonday, PLATFORM_KEYS } from './smmContent.js';
 
@@ -124,7 +127,8 @@ export function subTeam(all, agent) {
 const readyOf = (a) => (a?.team === CAMPAIGN_TEAM ? { ready: true } : READY[a?.role] || { ready: false });
 const typeOf = (a) => (a.team === CAMPAIGN_TEAM ? 'report' : TASK_TYPE[a.role]);
 // A campaign team works only while its campaign is active (pausing a campaign stops all of its agents at once).
-const campaignOn = (all, a) => a.team !== CAMPAIGN_TEAM || all.campaigns.get(a.scope_id) === 'active';
+// The creative studio works on requests a person starts by hand, so it also works for a campaign that is still a draft.
+const campaignOn = (all, a) => a.team !== CAMPAIGN_TEAM || all.campaigns.get(a.scope_id) === 'active' || (isStudioRole(a.role) && all.campaigns.get(a.scope_id) === 'draft');
 const runnable = (all, states, a) => !!a && readyOf(a).ready && campaignOn(all, a) && states[a.id]?.state === 'on';
 
 // ---------------------------------------------------------------------------------------------------------------- production of a post
@@ -330,7 +334,7 @@ async function seo({ ctx, task, rec }) {
 }
 
 const HANDLERS = { strategist, copywriter, visual, qc: qualityControl, competitors, seo, site_analyst: siteAnalyst };
-const handlerOf = (a) => (a?.team === CAMPAIGN_TEAM ? campaignRole : HANDLERS[a?.role]);
+const handlerOf = (a) => (a?.team === CAMPAIGN_TEAM ? (isStudioRole(a.role) ? studioRole : campaignRole) : HANDLERS[a?.role]);
 
 // Pictures and videos that were sent to the generator: look at each, keep the finished file in our storage, record a failure.
 export async function pollAssets(ctx) {
@@ -386,7 +390,8 @@ export async function runTask(ctx, team, task) {
   const status = outcome.ok ? 'done' : 'failed';
   await db.from('ag_tasks').update({ status, output: outcome.ok ? outcome.output : null, error: outcome.ok ? null : String(outcome.error).slice(0, 600), cost_usd: rec.state.cost, finished_at: finished, lease_until: null, prompt_id: prompt.id, prompt_version: prompt.version }).eq('id', task.id);
   if (agent) await db.from('ag_agents').update({ last_run_at: finished, last_status: outcome.ok ? 'ok' : 'problem', last_message: String(outcome.ok ? outcome.summary : outcome.error).slice(0, 500) }).eq('id', agent.id);
-  if (outcome.ok && agent) { try { await fanOut(ctx, team, agent); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
+  if (outcome.ok && agent) { try { await fanOut(ctx, team, agent, task); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
+  if (task.request_id) { try { await settleRequest(ctx, task.request_id, outcome.ok ? null : `${agent?.name || 'Агент'}: ${outcome.error}`); } catch (e) { console.warn('settleRequest failed:', e?.message || e); } }
   if (outcome.ok && outcome.advance) { try { await advancePost(ctx, team, outcome.advance); } catch (e) { console.warn('advancePost failed:', e?.message || e); } }
   return { id: task.id, status, role: agent?.role, error: outcome.ok ? null : outcome.error };
 }
@@ -396,8 +401,9 @@ export async function runTask(ctx, team, task) {
 // newer (a later task id) than the agent's own last one (the researchers, which work once at the launch, only need to have finished once). So a report
 // or a control never starts before the work it checks, whatever order the parallel tasks finish in. If something upstream failed,
 // the round waits until it is retried: that is how a broken link stops the chain.
-async function fanOut(ctx, team, agent) {
+async function fanOut(ctx, team, agent, task = null) {
   if (agent.team !== CAMPAIGN_TEAM) return;
+  if (isStudioRole(agent.role)) { await fanOutRequest(ctx, team, agent, task); return; }
   const targets = team.links.filter((l) => l.from_agent_id === agent.id).map((l) => team.byId.get(l.to_agent_id)).filter((b) => b && b.enabled && b.config?.trigger === 'upstream');
   for (const b of targets) {
     const ups = ancestorsOf(b.id, team.links).map((id) => team.byId.get(id)).filter((a) => a && a.enabled);

@@ -56,7 +56,7 @@ export async function fetchBlock(spec, accounts, deps = {}) {
 const urlsIn = (text) => [...new Set((String(text || '').match(/https?:\/\/[^\s,;)]+|(?:www\.)[a-z0-9.-]+\.[a-z]{2,}[^\s,;)]*/gi) || []).map((u) => u.replace(/[.,]+$/, '')))];
 
 // Public pages (the client's site, or the competitors') as text blocks.
-async function siteBlocks(text, { limit, read }) {
+export async function siteBlocks(text, { limit, read }) {
   const out = [];
   for (const url of urlsIn(text).slice(0, limit)) {
     try {

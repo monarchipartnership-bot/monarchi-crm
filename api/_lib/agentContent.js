@@ -8,7 +8,7 @@ import { brandBlock, LANGUAGES, MAX_POSTS_PER_RUN, PLATFORMS } from './smmConten
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
 const addDays = (date, n) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
-function readJson(text) {
+export function readJson(text) {
   const raw = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
   try { return JSON.parse(raw); } catch {
     const a = raw.indexOf('{'), b = raw.lastIndexOf('}');
