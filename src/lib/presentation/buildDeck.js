@@ -10,7 +10,8 @@ import { paginateBlocks } from './textFit.js';
 import { PLATFORMS, emptyDeck, labels, periodLabel, platformName, uid } from './deckModel.js';
 
 // How much fits on one slide (the editor still warns when a manual edit overflows).
-export const PER_PAGE = { metricslist: 12, kpigrid: 6, tableRows: 8, tableCols: 4, dynamics: 8, listItems: 8 };
+// Tables are never split over slides (their text shrinks to fit, see tableFit.js); the metrics list is a card grid that fits 16 cards; only texts run on to more slides.
+export const PER_PAGE = { metricslist: 16, kpigrid: 6, listItems: 8 };
 
 // Splits into the fewest pages that fit `n` per page, as even as possible (12 rows with 9 per page → 6 + 6, not 9 + 3).
 const chunk = (arr, n) => {
@@ -122,24 +123,18 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
 
   // Tables with metrics in rows and groups / campaigns in columns (the managers' sheet layout)
   const tableKeys = keys;
+  // one table = one slide, however many rows and columns it has
   const colTable = (title, columns) => {
-    const rowChunks = chunk(tableKeys, PER_PAGE.tableRows);
-    const colChunks = chunk(columns, PER_PAGE.tableCols);
-    const total = rowChunks.length * colChunks.length;
-    let n = 0;
-    colChunks.forEach((cols) => rowChunks.forEach((rows) => {
-      slides.push({
-        id: uid(), type: 'campaignTable',
-        data: {
-          heading: text(withPart(title, n, total, L)), corner: L.metric, columns: cols.map((c) => c.name),
-          rows: rows.map((k) => {
-            const m = metricMeta(k, custom);
-            return { label: lang === 'uk' ? m.label : m.en, cells: cols.map((c) => metricText(k, c.base, custom, currency, lang)) };
-          }),
-        },
-      });
-      n += 1;
-    }));
+    slides.push({
+      id: uid(), type: 'campaignTable',
+      data: {
+        heading: text(title), corner: L.metric, columns: columns.map((c) => c.name),
+        rows: tableKeys.map((k) => {
+          const m = metricMeta(k, custom);
+          return { label: lang === 'uk' ? m.label : m.en, cells: columns.map((c) => metricText(k, c.base, custom, currency, lang)) };
+        }),
+      },
+    });
   };
   if (plat?.groups?.length && rd.options?.groups !== false) {
     toc.push(L.byGroups);
@@ -161,8 +156,7 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
       const b = computeMetric(k, prevTotal, custom);
       return { label: lang === 'uk' ? m.label : m.en, prev: metricText(k, prevTotal, custom, currency, lang), change: fmtDelta(deltaPct(a, b), lang), cur: metricText(k, cur, custom, currency, lang) };
     });
-    const pages = chunk(rows, PER_PAGE.dynamics);
-    pages.forEach((page, i) => slides.push({ id: uid(), type: 'dynamicsTable', data: { heading: text(withPart(L.dynamics, i, pages.length, L)), headers: [L.metric, L.previous, L.change, L.current], rows: page } }));
+    slides.push({ id: uid(), type: 'dynamicsTable', data: { heading: text(L.dynamics), headers: [L.metric, L.previous, L.change, L.current], rows } });
   }
 
   // Texts of the report

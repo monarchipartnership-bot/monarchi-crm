@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { makeInternalPost } from '../api/_lib/internalPost.js';
 import { buildDeckFromReport } from '../src/lib/presentation/buildDeck.js';
+import { metricsFit, tableFit } from '../src/lib/presentation/tableFit.js';
 import {
   buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload,
 } from '../src/lib/reportEngine.js';
@@ -453,6 +454,26 @@ await ok('assistant: the presentation it makes carries the picked columns and fo
   const report = { id: 1, project_id: 3, period_type: 'weekly', period_start: '2026-10-05', period_end: '2026-10-11', data: { kind: 'ecom', platforms: { meta: { currency: 'USD', total: { spend: 100, impressions: 1000, clicks: 10, reach: 800, purchases: 2, revenue: 300, x_add_to_cart: 5 }, campaigns: [], groups: [] } }, previous: null, sections: {} } };
   const withExtra = JSON.stringify(buildDeckFromReport({ project: { name: 'P' }, report, platform: 'meta', extraKeys: ['mx_cost_add_to_cart'] }).slides);
   assert.ok(withExtra.includes('Cost per add to cart'));
+});
+await ok('presentation: a table is never split over slides, however many groups and campaigns it has', () => {
+  const base = { spend: 100, impressions: 1000, clicks: 10, reach: 800, purchases: 2, revenue: 300 };
+  const many = (n, tag) => Array.from({ length: n }, (_, i) => ({ name: `${tag} ${i + 1}`, ...base, spend: 100 + i }));
+  const report = { id: 1, project_id: 3, period_type: 'weekly', period_start: '2026-10-05', period_end: '2026-10-11', data: { kind: 'ecom', selection: many(14, 'Camp').map((c) => 'meta|' + c.name), platforms: { meta: { currency: 'USD', total: base, campaigns: many(14, 'Camp'), groups: many(10, 'Group').map((g) => ({ ...g, kind: 'group' })) } }, previous: { platforms: { meta: { total: base } } }, sections: {} } };
+  const deck = buildDeckFromReport({ project: { name: 'P' }, report, platform: 'meta' });
+  const tables = deck.slides.filter((sl) => sl.type === 'campaignTable');
+  assert.equal(tables.length, 2); // by groups, by campaigns: one slide each
+  assert.equal(tables[1].data.columns.length, 14);
+  assert.ok(tables[0].data.rows.length >= 10);
+  assert.equal(deck.slides.filter((sl) => sl.type === 'dynamicsTable').length, 1);
+  // the text of a big table shrinks, but stays readable and inside the slide
+  for (const [rows, cols] of [[8, 4], [12, 8], [12, 14], [16, 3]]) {
+    const f = tableFit(rows, cols);
+    assert.ok(f.fs >= 8 && f.fs <= 15, `font ${f.fs} for ${rows}x${cols}`);
+    assert.ok(f.hh + rows * f.rh <= 330, `height ${f.hh + rows * f.rh} for ${rows}x${cols}`);
+  }
+  assert.equal(tableFit(8, 4).rh, 34); // a roomy table keeps its normal look
+  assert.equal(metricsFit(12).rh, 106);
+  assert.ok(metricsFit(16).rh < 106);
 });
 await ok('assistant: a report made before a column was picked says which columns have no numbers yet', () => {
   assert.deepEqual(missingColumns('meta', ['mx_add_to_cart', 'mx_frequency'], { spend: 1 }), ['mx_add_to_cart']); // a ratio of standard numbers is never missing

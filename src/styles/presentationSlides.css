@@ -111,14 +111,14 @@
 
 /* ---- Metrics grid ---- */
 .ps-metrics { display: grid; grid-template-columns: repeat(4, 1fr); margin-left: 24px; border-top: 1px solid var(--ps-line); }
-.ps-metric { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 14px 18px; height: 106px; border-bottom: 1px solid var(--ps-line); border-left: 1px solid var(--ps-line); min-width: 0; }
+.ps-metric { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: calc(14px * var(--ps-ms, 1)) 18px; height: var(--ps-mh, 106px); border-bottom: 1px solid var(--ps-line); border-left: 1px solid var(--ps-line); min-width: 0; }
 .ps-metric:nth-child(4n+1) { border-left: 0; padding-left: 0; }
-.ps-m-label { font-size: 17px; font-weight: 500; color: var(--ps-muted); line-height: 1.2; }
+.ps-m-label { font-size: calc(17px * var(--ps-ms, 1)); font-weight: 500; color: var(--ps-muted); line-height: 1.2; }
 .pres-slide[data-style="monarchi-impact"] .ps-m-label { text-transform: uppercase; letter-spacing: .08em; font-size: 14px; }
-.ps-m-value { font-size: 36px; font-weight: 800; line-height: 1.12; font-variant-numeric: tabular-nums; color: #FFFFFF; white-space: nowrap; }
+.ps-m-value { font-size: calc(36px * var(--ps-ms, 1)); font-weight: 800; line-height: 1.12; font-variant-numeric: tabular-nums; color: #FFFFFF; white-space: nowrap; }
 .pres-slide[data-style="monarchi-impact"] .ps-m-value { font-weight: 700; }
 .pres-slide[data-style="plum-editorial"] .ps-m-value { font-weight: 600; }
-.ps-m-delta { font-size: 14px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+.ps-m-delta { font-size: calc(14px * var(--ps-ms, 1)); color: var(--ps-muted); font-variant-numeric: tabular-nums; }
 
 /* ---- KPI cards ---- */
 .ps-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px 36px; margin-left: 24px; margin-top: 16px; }
@@ -132,15 +132,15 @@
 .ps-k-delta { font-size: 15px; color: var(--ps-muted); }
 
 /* ---- Tables ---- */
-.ps-table { width: calc(100% - 24px); margin-left: 24px; border-collapse: collapse; table-layout: fixed; font-size: 15px; background: rgba(20, 4, 24, .35); }
-.ps-table th, .ps-table td { padding: 0 12px; height: 34px; border: 1px solid var(--ps-line); text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
-.ps-table th { background: var(--ps-head-fill); color: #FFFFFF; font-weight: 600; font-size: 14px; line-height: 1.2; padding-top: 6px; padding-bottom: 6px; height: 38px; }
+.ps-table { width: calc(100% - 24px); margin-left: 24px; border-collapse: collapse; table-layout: fixed; font-size: var(--ps-fs, 15px); background: rgba(20, 4, 24, .35); }
+.ps-table th, .ps-table td { padding: 0 var(--ps-pad, 12px); height: var(--ps-rh, 34px); border: 1px solid var(--ps-line); text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
+.ps-table th { background: var(--ps-head-fill); color: #FFFFFF; font-weight: 600; font-size: var(--ps-hfs, 14px); line-height: 1.2; padding-top: 6px; padding-bottom: 6px; height: var(--ps-hh, 38px); }
 .ps-table tbody tr:nth-child(even) td { background: var(--ps-fill); }
 .ps-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ps-table th.num { text-align: right; }
-.ps-table .ps-first { width: 30%; }
-.ps-table-dyn td, .ps-table-dyn th { font-size: 17px; }
-.ps-table-dyn td { height: 36px; }
+.ps-table .ps-first { width: var(--ps-w0, 30%); }
+.ps-table-dyn td, .ps-table-dyn th { font-size: var(--ps-fs, 17px); }
+.ps-table-dyn td { height: var(--ps-rh, 36px); }
 
 /* ---- Lists / text ---- */
 .ps-list { margin-left: 24px; font-size: 22px; line-height: 1.38; max-width: 820px; }
