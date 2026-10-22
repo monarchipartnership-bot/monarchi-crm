@@ -10,6 +10,7 @@ import Markdown from '../../Smm/Markdown';
 import { fmtDateTime } from '../../Smm/agentUi';
 import AgentWindow from './AgentWindow';
 import ChainDiagram from './ChainDiagram';
+import StudioSection from './studio/StudioSection';
 
 export const CAMPAIGN_STATUS = { draft: ['Чернетка', 'draft'], active: ['Працює', 'active'], paused: ['На паузі', 'paused'], archived: ['В архіві', 'archived'] };
 
@@ -90,6 +91,8 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
         <div className="cmp-scheme"><ChainDiagram active={active} states={states} onSelect={(role) => byRole.get(role) && setOpenRole(role)} selected={openRole} /></div>
         <p className="cmp-legend"><i style={{ background: '#5FE0A1' }} />працює <i style={{ background: '#8D7A93' }} />вимкнено <i style={{ background: '#FF7A9A' }} />зупинено (залежить від вимкненого) <i style={{ background: '#F2B94B' }} />кампанія на паузі</p>
       </section>
+
+      <StudioSection campaign={campaign} notify={notify} />
 
       <section className="cmp-reports">
         <h3>Останні результати агентів</h3>

@@ -98,11 +98,15 @@ export async function ensureStudioTeam(db, campaign, email = null) {
   let agents = must(await db.from('ag_agents').select('*').eq('team', TEAM).eq('scope_type', 'client').eq('scope_id', scope)) || [];
   const have = new Set(agents.map((a) => a.role));
   const missing = STUDIO_ROLES.filter((r) => !have.has(r.role));
+  // Two pages may open the studio at the same moment (React development mode does): the unique key of ag_agents lets only one insert win,
+  // the loser leaves the rest (links, prompts) to the winner.
+  let lost = false;
   if (missing.length) {
-    must(await db.from('ag_agents').insert(missing.map((r) => ({
+    const ins = await db.from('ag_agents').insert(missing.map((r) => ({
       team: TEAM, scope_type: 'client', scope_id: scope, role: r.role, name: r.name, description: r.description, enabled: true,
       config: { trigger: r.trigger }, schedule: null, sort: 100 + STUDIO_ROLES.indexOf(r), updated_by: email,
-    }))).select());
+    }))).select();
+    if (ins.error) { if (ins.error.code === '23505') lost = true; else throw ins.error; }
     agents = must(await db.from('ag_agents').select('*').eq('team', TEAM).eq('scope_type', 'client').eq('scope_id', scope));
   }
   const mine = agents.filter((a) => isStudioRole(a.role));
@@ -112,14 +116,15 @@ export async function ensureStudioTeam(db, campaign, email = null) {
   const haveLink = new Set(links.map((l) => `${l.from_agent_id}>${l.to_agent_id}`));
   const newLinks = STUDIO_LINKS.map((l) => ({ from_agent_id: byRole.get(l.from)?.id, to_agent_id: byRole.get(l.to)?.id, required: l.required }))
     .filter((l) => l.from_agent_id && l.to_agent_id && !haveLink.has(`${l.from_agent_id}>${l.to_agent_id}`));
-  if (newLinks.length) {
-    must(await db.from('ag_links').insert(newLinks).select());
+  if (newLinks.length && !lost) {
+    const ins = await db.from('ag_links').insert(newLinks).select();
+    if (ins.error && ins.error.code !== '23505') throw ins.error;
     links = must(await db.from('ag_links').select('*').in('from_agent_id', ids));
   }
   const prompts = ids.length ? must(await db.from('ag_prompts').select('agent_id').in('agent_id', ids)) || [] : [];
   const hasPrompt = new Set(prompts.map((p) => p.agent_id));
   const newPrompts = mine.filter((a) => !hasPrompt.has(a.id) && STUDIO_PROMPTS[a.role]).map((a) => ({ agent_id: a.id, name: 'Стартовий промт', body: STUDIO_PROMPTS[a.role], is_default: true, current_version: 1, note: 'Стартовий промт', created_by: email }));
-  if (newPrompts.length) {
+  if (newPrompts.length && !lost) {
     const created = must(await db.from('ag_prompts').insert(newPrompts).select());
     must(await db.from('ag_prompt_versions').insert(created.map((p) => ({ prompt_id: p.id, version: 1, body: p.body, note: 'Стартовий промт', created_by: email }))));
   }

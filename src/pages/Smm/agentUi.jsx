@@ -1,9 +1,10 @@
 import { agentState, chainStates } from '../../lib/agents/chain';
 import { roleDef as campaignRoleDef } from '../../lib/agents/campaignTeam';
+import { studioRoleDef } from '../../lib/agents/studioTeam';
 import { SMM_ROLES } from '../../lib/agents/smmTeam';
 
 // Shared bits of the agent pages: what an agent's state is called, small formatters.
-export const roleMeta = (role) => SMM_ROLES.find((r) => r.role === role) || campaignRoleDef(role) || { role, ready: true };
+export const roleMeta = (role) => SMM_ROLES.find((r) => r.role === role) || campaignRoleDef(role) || studioRoleDef(role) || { role, ready: true };
 
 export function stateOf(agent, team) {
   const meta = roleMeta(agent.role);
