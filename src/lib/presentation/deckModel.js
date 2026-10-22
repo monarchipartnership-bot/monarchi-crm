@@ -34,7 +34,7 @@ export const SLIDE_TYPES = [
   { id: 'closing', cat: 'basic', name: 'Фінальний', desc: 'Подяка й контакти наприкінці презентації.' },
   { id: 'metricslist', cat: 'metrics', name: 'Загальні метрики', desc: 'Сітка показників із значеннями.' },
   { id: 'kpigrid', cat: 'metrics', name: 'KPI-картки', desc: 'Кілька ключових показників крупно.' },
-  { id: 'campaignTable', cat: 'metrics', name: 'Метрики по кампаніях', desc: 'Таблиця: показники у рядках, кампанії у стовпцях.' },
+  { id: 'campaignTable', cat: 'metrics', name: 'Метрики по кампаніях', desc: 'Таблиця: кампанії (або групи) у рядках, показники у стовпцях.' },
   { id: 'dynamicsTable', cat: 'metrics', name: 'Динаміка за 2 періоди', desc: 'Показник, попередній період, зміна, поточний період.' },
   { id: 'table', cat: 'metrics', name: 'Довільна таблиця', desc: 'Таблиця з власними стовпцями й рядками.' },
   { id: 'bullets', cat: 'text', name: 'Список пунктів', desc: 'Маркований список із заголовком.' },
@@ -56,7 +56,7 @@ export const LABELS = {
     reportTitle: 'Performance Report',
     agenda: 'Agenda', keyMetrics: 'Key metrics', kpi: 'Key results', byGroups: 'Metrics by campaign group', byCampaigns: 'Metrics by campaign',
     dynamics: 'Dynamics vs previous period', whatWasDone: 'What was done', conclusion: 'Conclusion', plans: 'Plans for the next period',
-    metric: 'Metric', previous: 'Previous period', change: 'Change', current: 'Current period', other: 'Other',
+    metric: 'Metric', group: 'Group', campaign: 'Campaign', previous: 'Previous period', change: 'Change', current: 'Current period', other: 'Other',
     thanks: 'Thank you', thanksBody: 'Ready to answer your questions.', footer: "Mon'Archi", vsPrev: 'vs previous period',
     part: (n, total) => (total > 1 ? ` (${n}/${total})` : ''),
   },
@@ -64,7 +64,7 @@ export const LABELS = {
     reportTitle: 'Звіт ефективності',
     agenda: 'План звіту', keyMetrics: 'Загальні метрики', kpi: 'Ключові результати', byGroups: 'Метрики по групах кампаній', byCampaigns: 'Метрики по кампаніях',
     dynamics: 'Динаміка до попереднього періоду', whatWasDone: 'Виконана робота', conclusion: 'Висновки', plans: 'Плани на наступний період',
-    metric: 'Показник', previous: 'Попередній період', change: 'Зміна', current: 'Поточний період', other: 'Інше',
+    metric: 'Показник', group: 'Група', campaign: 'Кампанія', previous: 'Попередній період', change: 'Зміна', current: 'Поточний період', other: 'Інше',
     thanks: 'Дякуємо за увагу', thanksBody: 'Готові відповісти на ваші запитання.', footer: "Mon'Archi", vsPrev: 'до попереднього періоду',
     part: (n, total) => (total > 1 ? ` (${n}/${total})` : ''),
   },
@@ -105,7 +105,7 @@ export function blankSlide(type, lang = 'en') {
     case 'closing': return { ...base, data: { heading: text(L.thanks), body: text(L.thanksBody) } };
     case 'metricslist': return { ...base, data: { heading: text(L.keyMetrics), items: [blankItem(), blankItem(), blankItem(), blankItem()] } };
     case 'kpigrid': return { ...base, data: { heading: text(L.kpi), cards: [blankItem(), blankItem(), blankItem(), blankItem()] } };
-    case 'campaignTable': return { ...base, data: { heading: text(L.byCampaigns), corner: L.metric, columns: ['', '', ''], rows: [{ label: '', cells: ['', '', ''] }, { label: '', cells: ['', '', ''] }, { label: '', cells: ['', '', ''] }] } };
+    case 'campaignTable': return { ...base, data: { heading: text(L.byCampaigns), entityRows: true, corner: L.campaign, columns: ['', '', ''], rows: [{ label: '', cells: ['', '', ''] }, { label: '', cells: ['', '', ''] }, { label: '', cells: ['', '', ''] }] } };
     case 'dynamicsTable': return { ...base, data: { heading: text(L.dynamics), headers: [L.metric, L.previous, L.change, L.current], rows: [{ label: '', prev: '', change: '', cur: '' }, { label: '', prev: '', change: '', cur: '' }, { label: '', prev: '', change: '', cur: '' }] } };
     case 'table': return { ...base, data: { heading: text(''), header: ['', '', ''], rows: [['', '', ''], ['', '', ''], ['', '', '']] } };
     case 'bullets': return { ...base, data: { heading: text(''), list: listText(['', '', ''], 'bullet') } };
@@ -124,7 +124,7 @@ export function sampleSlide(type, lang = 'en') {
     case 'section': d.heading = text('Slide title'); d.body = text('A short line with the key message of this slide.'); break;
     case 'metricslist': d.items = [['Spend', '$2,400'], ['Clicks', '12,000'], ['CTR', '5.0%'], ['Revenue', '$9,000']].map(([label, value]) => ({ label, value, delta: '' })); break;
     case 'kpigrid': d.cards = [['CPA', '$12.50'], ['ROAS', '6.0x'], ['Conversions', '150'], ['CPC', '$0.25']].map(([label, value]) => ({ label, value, delta: '' })); break;
-    case 'campaignTable': d.columns = ['Campaign 1', 'Campaign 2', 'Campaign 3']; d.rows = [['Spend'], ['Clicks'], ['CTR']].map(([label]) => ({ label, cells: ['—', '—', '—'] })); break;
+    case 'campaignTable': d.columns = ['Spend', 'Clicks', 'CTR']; d.rows = [['Campaign 1'], ['Campaign 2'], ['Campaign 3']].map(([label]) => ({ label, cells: ['—', '—', '—'] })); break;
     case 'dynamicsTable': d.rows = [['Spend', '$2,400', '+25%', '$3,000'], ['Clicks', '4,800', '+25%', '6,000'], ['CTR', '4.0%', '+0.1%', '4.1%']].map(([label, prev, change, cur]) => ({ label, prev, change, cur })); break;
     case 'table': d.heading = text('Table title'); d.header = ['Column', 'Column', 'Column']; d.rows = [['Row', '—', '—'], ['Row', '—', '—'], ['Row', '—', '—']]; break;
     case 'bullets': d.heading = text('List of points'); d.list = listText(['First point of the list', 'Second point of the list', 'Third point of the list'], 'bullet'); break;

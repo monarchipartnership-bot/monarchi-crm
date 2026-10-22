@@ -16,12 +16,13 @@ const COVER_TYPES = ['title', 'section', 'closing'];
 const rid = (sid, path) => `${sid}:${path}`;
 const NO_STYLE = {};
 
-function Table({ head, rows, className = '', colClass = [], maxFs, maxRh }) {
+function Table({ head, rows, className = '', colClass = [], maxFs, maxRh, entity = false }) {
   // the whole table is on this one slide: text and rows shrink to fit
-  const f = tableFit(rows.length, head.length - 1, { maxFs, maxRh });
+  const longest = (list) => list.reduce((m, c) => Math.max(m, String(c.value || '').length), 0);
+  const f = tableFit(rows.length, head.length - 1, { maxFs, maxRh, entity, valueLen: entity ? longest(rows.flatMap((r) => r.slice(1))) : undefined, nameLen: entity ? longest(rows.map((r) => r[0])) : undefined, headLen: entity ? head.slice(1).reduce((m, h) => Math.max(m, ...String(h.value || '').split(/\s+/).map((w) => w.length)), 4) : undefined });
   const vars = { '--ps-fs': f.fs + 'px', '--ps-hfs': f.hfs + 'px', '--ps-rh': f.rh + 'px', '--ps-hh': f.hh + 'px', '--ps-pad': f.pad + 'px', '--ps-w0': f.w0 + 'px' };
   return (
-    <table className={'ps-table ' + className} data-pptx="table" style={vars}>
+    <table className={'ps-table ' + className + (entity ? ' ps-table-ent' : '')} data-pptx="table" style={vars}>
       <thead>
         <tr>{head.map((h) => <th key={h.id} className={h.cls}><PlainCell id={h.id} value={h.value} className="pc-h" placeholder="…" /></th>)}</tr>
       </thead>
@@ -104,7 +105,7 @@ function Body({ slide, deck }) {
         <>
           <Heading slide={slide} />
           <Table
-            className="ps-table-wide"
+            className="ps-table-wide" entity={Boolean(d.entityRows)}
             head={[{ id: rid(sid, 'corner'), value: d.corner, cls: 'ps-first' }, ...d.columns.map((c, i) => ({ id: rid(sid, `columns.${i}`), value: c, cls: 'num' }))]}
             rows={d.rows.map((r, i) => [{ id: rid(sid, `rows.${i}.label`), value: r.label }, ...r.cells.map((c, j) => ({ id: rid(sid, `rows.${i}.cells.${j}`), value: c }))])}
           />

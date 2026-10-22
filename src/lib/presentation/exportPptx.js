@@ -92,6 +92,15 @@ function collectImages(slideEl) {
   });
 }
 
+// A name that is cut with an ellipsis on the slide (campaign / group rows) is cut the same way in the file, so a row never grows taller than on the slide.
+function cutToFit(td) {
+  const full = td.textContent || '';
+  const pc = td.querySelector('.pc');
+  if (!pc || !td.closest('.ps-table-ent') || pc.scrollWidth <= pc.clientWidth + 1) return full;
+  const keep = Math.max(1, Math.floor(full.length * (pc.clientWidth / pc.scrollWidth)) - 1);
+  return full.slice(0, keep).trimEnd() + '…';
+}
+
 function collectTables(slideEl, ctx) {
   const base = slideEl.getBoundingClientRect();
   return [...slideEl.querySelectorAll('table.ps-table')].map((table) => {
@@ -103,7 +112,7 @@ function collectTables(slideEl, ctx) {
       const cs = getComputedStyle(td.querySelector('.pc') || td);
       const f = FONT_BY_ID[fontIdFromFamily(cs.fontFamily)] || FONT_BY_ID.Onest;
       return {
-        text: td.textContent || ' ',
+        text: cutToFit(td) || ' ',
         options: {
           fontFace: ctx.safeFonts ? f.safe : f.pptx, fontSize: Math.round(parseFloat(cs.fontSize) * PT * 10) / 10, bold: Number(cs.fontWeight) >= 600,
           color: hex(cs.color), italic: cs.fontStyle === 'italic', underline: String(cs.textDecorationLine).includes('underline') ? { style: 'sng' } : undefined, align: cs.textAlign === 'right' ? 'right' : cs.textAlign === 'center' ? 'center' : 'left', valign: 'middle',

@@ -13,6 +13,9 @@ import { PLATFORMS, emptyDeck, labels, periodLabel, platformName, uid } from './
 // Tables are never split over slides (their text shrinks to fit, see tableFit.js); the metrics list is a card grid that fits 16 cards; only texts run on to more slides.
 export const PER_PAGE = { metricslist: 16, kpigrid: 6, listItems: 8 };
 
+// Column headers of the campaign tables are short (the metrics are columns now and a column is narrow).
+const SHORT_EN = { impressions: 'Impr.', purchases: 'Sales' };
+
 // Splits into the fewest pages that fit `n` per page, as even as possible (12 rows with 9 per page → 6 + 6, not 9 + 3).
 const chunk = (arr, n) => {
   const pages = Math.max(1, Math.ceil(arr.length / n));
@@ -123,28 +126,26 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
 
   // Tables with metrics in rows and groups / campaigns in columns (the managers' sheet layout)
   const tableKeys = keys;
-  // one table = one slide, however many rows and columns it has
-  const colTable = (title, columns) => {
+  // one table = one slide, however many campaigns and metrics it has. The standard layout: campaigns (or groups) in the rows, metrics in the columns.
+  const colTable = (title, entities, corner) => {
     slides.push({
       id: uid(), type: 'campaignTable',
       data: {
-        heading: text(title), corner: L.metric, columns: columns.map((c) => c.name),
-        rows: tableKeys.map((k) => {
-          const m = metricMeta(k, custom);
-          return { label: lang === 'uk' ? m.label : m.en, cells: columns.map((c) => metricText(k, c.base, custom, currency, lang)) };
-        }),
+        heading: text(title), entityRows: true, corner,
+        columns: tableKeys.map((k) => { const m = metricMeta(k, custom); return lang === 'uk' ? m.label : SHORT_EN[k] || m.en; }),
+        rows: entities.map((e) => ({ label: e.name, cells: tableKeys.map((k) => metricText(k, e.base, custom, currency, lang)) })),
       },
     });
   };
   if (plat?.groups?.length && rd.options?.groups !== false) {
     toc.push(L.byGroups);
-    colTable(L.byGroups, deckGroupColumns(plat.groups, L.other));
+    colTable(L.byGroups, deckGroupColumns(plat.groups, L.other), L.group);
   }
   const picked = (rd.selection || []).filter((s) => s.startsWith(platform + '|')).map((s) => s.slice(platform.length + 1));
   const campaigns = (plat?.campaigns || []).filter((c) => picked.includes(c.name)).sort((a, b) => (b.spend || 0) - (a.spend || 0));
   if (campaigns.length) {
     toc.push(L.byCampaigns);
-    colTable(L.byCampaigns, campaigns.map((c) => ({ name: c.name, base: c })));
+    colTable(L.byCampaigns, campaigns.map((c) => ({ name: c.name, base: c })), L.campaign);
   }
 
   // Change versus the previous period

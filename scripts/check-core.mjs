@@ -462,10 +462,18 @@ await ok('presentation: a table is never split over slides, however many groups 
   const deck = buildDeckFromReport({ project: { name: 'P' }, report, platform: 'meta' });
   const tables = deck.slides.filter((sl) => sl.type === 'campaignTable');
   assert.equal(tables.length, 2); // by groups, by campaigns: one slide each
-  assert.equal(tables[1].data.columns.length, 14);
-  assert.ok(tables[0].data.rows.length >= 10);
+  assert.equal(tables[1].data.rows.length, 14); // campaigns in the rows, metrics in the columns
+  assert.ok(tables[1].data.columns.length >= 10 && tables[1].data.entityRows === true);
+  assert.equal(tables[1].data.rows[0].cells.length, tables[1].data.columns.length);
+  assert.equal(tables[1].data.corner, 'Campaign');
+  assert.equal(tables[0].data.corner, 'Group');
   assert.equal(deck.slides.filter((sl) => sl.type === 'dynamicsTable').length, 1);
   // the text of a big table shrinks, but stays readable and inside the slide
+  for (const [rows, cols] of [[14, 12], [10, 12], [6, 8]]) {
+    const f = tableFit(rows, cols, { entity: true, valueLen: 8, nameLen: 30 });
+    assert.ok(f.fs >= 8 && f.fs <= 14, `entity font ${f.fs} for ${rows}x${cols}`);
+    assert.ok(f.hh + rows * f.rh <= 330, `entity height ${f.hh + rows * f.rh} for ${rows}x${cols}`);
+  }
   for (const [rows, cols] of [[8, 4], [12, 8], [12, 14], [16, 3]]) {
     const f = tableFit(rows, cols);
     assert.ok(f.fs >= 8 && f.fs <= 15, `font ${f.fs} for ${rows}x${cols}`);

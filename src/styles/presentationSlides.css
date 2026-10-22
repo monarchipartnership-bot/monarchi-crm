@@ -139,6 +139,8 @@
 .ps-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ps-table th.num { text-align: right; }
 .ps-table .ps-first { width: var(--ps-w0, 30%); }
+/* campaigns / groups in the rows: a name stays on one line, a long one is cut with an ellipsis */
+.ps-table-ent td.ps-first .pc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ps-table-dyn td, .ps-table-dyn th { font-size: var(--ps-fs, 17px); }
 .ps-table-dyn td { height: var(--ps-rh, 36px); }
 
