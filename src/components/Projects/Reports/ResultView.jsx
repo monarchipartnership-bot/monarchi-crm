@@ -6,6 +6,7 @@ import { combinePlatforms, metricRows, visibleKeys } from '../../../lib/periodRe
 import { METRIC_SETS, computeMetric, formatMetric, metricMeta } from '../../../lib/reportMetrics';
 import { metricKeysOf } from '../../../lib/reportTemplate';
 import { platformInfo } from '../../../lib/adAccounts';
+import { exportCsv, exportXlsx, exportPdf, safeFileName } from '../../../lib/reportExport';
 
 // A fetched period shown as tables: a switcher (each platform + the sum of them
 // when they share a currency), the metrics table with the comparison, the
@@ -17,7 +18,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, templateMetrics = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null }) {
+export default function ResultView({ data, kind, custom, templateMetrics = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null, exportApi = null }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -56,26 +57,39 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
   if (groups.length) sheets.push({ name: 'Campaign groups', ...groupsToExport(keys, cur.total, groups, custom, currency) });
   if (shownCampaigns.length) sheets.push({ name: 'Campaigns', ...campaignExport(shownCampaigns, kind, custom, currency, isTotal ? [] : extraKeys) });
   const tabLabel = tabs.find((t) => t.key === active)?.label;
+  // A screen that has no download button of its own (the month document) asks for a file through this handle: the same files the menu above makes.
+  if (exportApi) {
+    exportApi.current = {
+      run: async (kind) => {
+        const name = safeFileName(`${fileBase}_${tabLabel}`);
+        if (kind === 'csv') exportCsv({ title, sheets }, name);
+        else if (kind === 'xlsx') exportXlsx({ title, sheets }, name);
+        else if (kind === 'pdf') await exportPdf(captureRef.current, name);
+      },
+    };
+  }
 
   return (
     <div className="prep-result">
-      <div className="prep-result-bar">
-        {tabs.length > 1 ? (
-          <div className="pacc-tabs" role="tablist">
-            {tabs.map((t) => (
-              <button key={t.key} type="button" role="tab" aria-selected={t.key === active} className={'pacc-tab' + (t.key === active ? ' on' : '')} onClick={() => setTab(t.key)}>{t.label}</button>
-            ))}
+      {(tabs.length > 1 || Boolean(children) || (!noExport && !exportPortal)) && (
+        <div className="prep-result-bar">
+          {tabs.length > 1 ? (
+            <div className="pacc-tabs" role="tablist">
+              {tabs.map((t) => (
+                <button key={t.key} type="button" role="tab" aria-selected={t.key === active} className={'pacc-tab' + (t.key === active ? ' on' : '')} onClick={() => setTab(t.key)}>{t.label}</button>
+              ))}
+            </div>
+          ) : <span />}
+          <div className="prep-result-actions">
+            {children}
+            {(() => {
+              if (noExport) return null;
+              const menu = <ExportMenu model={{ title, sheets }} targetRef={captureRef} fileBase={`${fileBase}_${tabLabel}`} formats={exportFormats} />;
+              return exportPortal ? createPortal(menu, exportPortal) : menu;
+            })()}
           </div>
-        ) : <span />}
-        <div className="prep-result-actions">
-          {children}
-          {(() => {
-            if (noExport) return null;
-            const menu = <ExportMenu model={{ title, sheets }} targetRef={captureRef} fileBase={`${fileBase}_${tabLabel}`} formats={exportFormats} />;
-            return exportPortal ? createPortal(menu, exportPortal) : menu;
-          })()}
         </div>
-      </div>
+      )}
 
       <div className="prep-capture" ref={captureRef}>
         <div className="prep-capture-head">

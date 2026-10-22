@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import ResultView from './Reports/ResultView';
+import useWorkAreaLeft from '../../lib/useWorkArea';
 import useDialogA11y from '../../lib/useDialogA11y';
 import { platformInfo } from '../../lib/adAccounts';
 import { periodLabel } from '../../lib/presentation/deckModel';
@@ -24,6 +25,7 @@ export const reportPeriodText = (r) => (r.period_type === 'monthly' ? periodLabe
 export default function ArchiveReportModal({ row, projectName, custom, extraKeys, onClose, onDelete, onPresentation, actions = [], onAction, onChanged }) {
   const box = useRef(null);
   useDialogA11y(box, onClose);
+  const workLeft = useWorkAreaLeft();
   const [slot, setSlot] = useState(null); // where the download menu is drawn: the header
   const [menu, setMenu] = useState(false);
   const [picking, setPicking] = useState(null); // the position of the creative being replaced
@@ -54,7 +56,7 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
   const sections = sectionsOf(data);
 
   return (
-    <div className="arc-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="arc-overlay" style={{ left: workLeft }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} tabIndex={-1} className="arc-win" role="dialog" aria-modal="true" aria-labelledby="arc-title">
         <div className="arc-head">
           <span className="arc-md"><span className="arc-mi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></svg></span></span>
@@ -98,7 +100,7 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
 }
 
 // The numbers and the texts of one saved report. Used by the window above and by the combined month document.
-export function ReportBody({ row, projectName, custom, extraKeys, slot = null, edit = null }) {
+export function ReportBody({ row, projectName, custom, extraKeys, slot = null, edit = null, noExport = false, exportApi = null }) {
   const data = row.data || {};
   const platforms = Object.keys(data.platforms || {});
   const isCombined = row.platform === 'all';
@@ -115,7 +117,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
           campaignMode="selected" selection={data.selection || []} options={{ groups: true, ...(data.options || {}) }}
           curLabel={reportPeriodText(row)}
           prevLabel={data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній'}
-          exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']}
+          exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} noExport={noExport} exportApi={exportApi}
         />
       )}
       {(data.creatives?.items?.length > 0 || edit) && (

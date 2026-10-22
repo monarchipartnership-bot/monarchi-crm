@@ -176,3 +176,33 @@
 .md-empty .arc-mi { width: 56px; height: 56px; background: linear-gradient(135deg, #C9A8D1, #8E6A99); }
 .md-empty h4 { margin: 4px 0 0; font: 750 16px 'Onest', sans-serif; }
 .md-empty p { margin: 0; max-width: 420px; font: 500 13px/1.5 'Onest', sans-serif; color: #6b4a73; }
+
+/* ---- the shape of the report windows: they cover the whole working area (the page next to the sidebar; `left` is set from the layout), with a narrow margin.
+   Long group and campaign names in the table headers wrap into 2-3 lines so the report is narrower. Specs: docs/design-decisions.md (section 29) ---- */
+.arc-overlay { padding: 14px; }
+.arc-overlay .arc-win .arc-body { min-height: 0; }
+.arc-overlay .prep-table--wide th.num, .arc-overlay .prep-table--wide td.num { min-width: 96px; }
+.arc-overlay .prep-table--wide th.num { max-width: 120px; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; vertical-align: bottom; }
+.arc-overlay .prep-table--wide th small { display: block; }
+/* a wide table scrolls inside its own box: nothing in the window may push the window wider */
+.arc-overlay .md-stack { grid-template-columns: minmax(0, 1fr); }
+.arc-overlay .md-acc, .arc-overlay .md-acb { min-width: 0; }
+.arc-overlay .prep-result, .arc-overlay .prep-capture { min-width: 0; max-width: 100%; }
+.arc-overlay .prep-scroll { max-width: 100%; }
+
+/* the download menu of the month document: pick the week (or the month) and the file format */
+.arc-win .md-dl { position: relative; }
+.arc-win .btn.md-dlb svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.arc-win .btn.md-dlb svg:last-child { width: 11px; height: 11px; stroke-width: 2.8; }
+.md-dmenu { position: absolute; right: 0; top: 42px; z-index: 40; width: 400px; max-width: calc(100vw - 80px); padding: 8px; border: 1.5px solid #EBC6EB; border-radius: 22px; background: #fff; box-shadow: 0 18px 44px #68276833; display: flex; flex-direction: column; gap: 2px; }
+.md-dmh { padding: 6px 12px 8px; font: 700 11.5px 'Onest', sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #883288; }
+.md-dmr { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; border-radius: 18px; }
+.md-dmr:nth-child(odd of .md-dmr) { background: #F9EDF9; }
+.md-dmt { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.md-dmt b { font: 700 13.5px 'Onest', sans-serif; color: #270827; }
+.md-dmt small { font: 500 11.5px 'Onest', sans-serif; color: #883288; }
+.md-fpl { display: flex; gap: 6px; }
+.md-fp { height: 26px; padding: 0 12px; border: 0; border-radius: 999px; background: #fff; color: #682768; font: 700 12px 'Onest', sans-serif; cursor: pointer; box-shadow: inset 0 0 0 1.5px #EBC6EB; }
+.md-fp:disabled { opacity: .5; cursor: default; }
+.md-dlerr { margin: 4px 8px 2px; padding: 6px 12px; border-radius: 14px; background: #FBEAEA; color: #9b2222; font: 500 12.5px 'Onest', sans-serif; }
+.arc-overlay .md-offscreen { position: absolute; left: -10000px; top: 0; width: 1000px; pointer-events: none; }

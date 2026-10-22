@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ReportBody } from './ArchiveReportModal';
+import useWorkAreaLeft from '../../lib/useWorkArea';
 import useDialogA11y from '../../lib/useDialogA11y';
 import { REPORT_STATUS, APPROVED, DRAFT } from '../../lib/projectHistory';
 import { scopeOf } from '../../lib/clientReport';
@@ -16,6 +17,7 @@ const ICONS = {
   week: <path d="M5 20V10M12 20V4M19 20v-7" />,
   month: <><path d="M5 6h14M5 12h9M5 18h14" /><path d="M17 10l2 2-2 2" /></>,
   chev: <path d="M6 9l6 6 6-6" />,
+  dl: <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
 };
 const Svg = ({ n }) => <svg viewBox="0 0 24 24" aria-hidden="true">{ICONS[n]}</svg>;
@@ -39,12 +41,15 @@ function figuresOf(row) {
   }).filter(Boolean);
 }
 
+const FORMATS = [['xlsx', 'Excel'], ['csv', 'CSV'], ['pdf', 'PDF']];
+
 // The combined document of a month: the weeks one under another, then the month. It is a view of the saved reports, nothing is stored or pulled
 // again, so it opens at once. The same order is used by the page the client gets. Every block folds, a ribbon of contents jumps between them.
 export default function MonthDocument({ month, projectName, custom, extraKeys, onClose }) {
   const box = useRef(null);
   const body = useRef(null);
   useDialogA11y(box, onClose);
+  const workLeft = useWorkAreaLeft();
   const weeks = month.weeks.filter((w) => w.row);
   const monthly = month.monthly;
   const empty = !weeks.length && !monthly;
@@ -58,6 +63,30 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
     return new Set([latest, monthly ? 'month' : null].filter(Boolean));
   });
   const [active, setActive] = useState(sections[0]?.id || null);
+
+  // «Завантажити»: one menu in the header, the week (or the month) and the format are picked there. The file is made from the report mounted out of sight,
+  // so a block that is folded can be downloaded too.
+  const [menu, setMenu] = useState(false);
+  const [job, setJob] = useState(null); // { id, kind }
+  const [dlError, setDlError] = useState('');
+  const menuRef = useRef(null);
+  const exportApi = useRef(null);
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenu(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [menu]);
+  useEffect(() => {
+    if (!job) return undefined;
+    let off = false;
+    const t = setTimeout(async () => {
+      try { await exportApi.current?.run(job.kind); if (!off) setMenu(false); } catch (e) { console.warn('export failed', e); if (!off) setDlError('Не вдалося зберегти файл.'); } finally { if (!off) setJob(null); }
+    }, 400);
+    return () => { off = true; clearTimeout(t); };
+  }, [job]);
+  const startExport = (id, kind) => { setDlError(''); setJob({ id, kind }); };
+  const jobSection = job ? sections.find((x) => x.id === job.id) : null;
 
   const toggle = (id) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const jump = (id) => {
@@ -78,7 +107,7 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
   const allApproved = month.counts.total > 0 && month.counts.approved === month.counts.total;
 
   return (
-    <div className="arc-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="arc-overlay" style={{ left: workLeft }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} tabIndex={-1} className="arc-win md-win" role="dialog" aria-modal="true" aria-labelledby="md-title">
         <div className="arc-head">
           <span className="arc-md"><span className="arc-mi"><Svg n="doc" /></span></span>
@@ -92,7 +121,30 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
                 : <span className="arc-chip">Місячного звіту ще немає</span>)}
             </div>
           </div>
-          <div className="arc-actions"><button type="button" className="arc-x" onClick={onClose} aria-label="Закрити"><Svg n="close" /></button></div>
+          <div className="arc-actions">
+            {!empty && (
+              <div className="md-dl" ref={menuRef}>
+                <button type="button" className="btn md-dlb" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}><Svg n="dl" />Завантажити<Svg n="chev" /></button>
+                {menu && (
+                  <div className="md-dmenu" role="menu">
+                    <div className="md-dmh">Що завантажити</div>
+                    {sections.map((sec) => (
+                      <div className="md-dmr" key={sec.id} role="none">
+                        <span className="md-dmt"><b>{sec.title}</b><small>{sec.chip}</small></span>
+                        <span className="md-fpl">
+                          {FORMATS.map(([k, label]) => (
+                            <button key={k} type="button" role="menuitem" className="md-fp" disabled={Boolean(job)} onClick={() => startExport(sec.id, k)}>{job && job.id === sec.id && job.kind === k ? '…' : label}</button>
+                          ))}
+                        </span>
+                      </div>
+                    ))}
+                    {dlError && <div className="md-dlerr">{dlError}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+            <button type="button" className="arc-x" onClick={onClose} aria-label="Закрити"><Svg n="close" /></button>
+          </div>
         </div>
 
         {!empty && (
@@ -135,7 +187,7 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
                   </button>
                   {isOpen && (
                     <div className="md-acb" id={'md-panel-' + s.id}>
-                      <ReportBody row={s.row} projectName={projectName} custom={custom} extraKeys={extraKeys(s.row)} />
+                      <ReportBody row={s.row} projectName={projectName} custom={custom} extraKeys={extraKeys(s.row)} noExport />
                     </div>
                   )}
                 </section>
@@ -150,6 +202,11 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
           </div>
         </div>
       </div>
+      {jobSection && (
+        <div className="md-offscreen" aria-hidden="true">
+          <ReportBody row={jobSection.row} projectName={projectName} custom={custom} extraKeys={extraKeys(jobSection.row)} noExport exportApi={exportApi} />
+        </div>
+      )}
     </div>
   );
 }
