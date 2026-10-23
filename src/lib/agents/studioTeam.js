@@ -22,17 +22,17 @@ export const STUDIO_ROLES = [
   { role: 'studio_competitor_analyst', name: 'Аналітик конкурентів', short: 'що роблять конкуренти у ніші', stage: 'in', row: 1, trigger: 'request',
     description: 'Вивчає конкурентів клієнта в тій самій ніші: пропозиції, обіцянки, візуальні підходи. Працює з їхніми сайтами й прикладами, які дав менеджер.',
     fields: [text('competitors', 'Конкуренти за замовчуванням', 'По одному на рядок: назва й сайт. Якщо в запиті конкурентів немає, агент візьме цей список.', 3)] },
-  { role: 'studio_brief_writer', name: 'Автор ТЗ', short: 'технічне завдання на креативи', stage: 'brief', row: 0, trigger: 'request',
+  { role: 'studio_brief_writer', name: 'Агент по ТЗ', short: 'технічне завдання на креативи', stage: 'brief', row: 0, trigger: 'request',
     description: 'З аналізів, вимог клієнта і наших правил складає технічне завдання: концепції креативів, формати, що брати з матеріалів клієнта, чи потрібен текст.',
     fields: [
       text('rules', 'Наші правила для креативів', 'Що ми завжди робимо: стиль, композиція, обовʼязкові елементи, тон.', 4),
       text('avoid', 'Чого не робимо', 'Що не можна показувати чи обіцяти в креативах.', 3),
       text('formats', 'Формати й обмеження', 'Які формати та розміри ми робимо. Наприклад: квадрат і сторіз, без відео.', 2),
     ] },
-  { role: 'studio_copywriter', name: 'Копірайтер креативів', short: 'тексти до креативів', stage: 'make', row: 0, trigger: 'request',
+  { role: 'studio_copywriter', name: 'Агент копірайтер', short: 'тексти до креативів', stage: 'make', row: 0, trigger: 'request',
     description: 'Пише тексти до концепцій із ТЗ, якщо вони потрібні: заголовок, основний текст, опис, заклик. Текст ніколи не вставляється в картинку.',
     fields: [text('tone', 'Тон і мови текстів', 'Наприклад: українською й англійською, прямий тон, без знижок у тексті.', 3)] },
-  { role: 'studio_producer', name: 'Виробник креативів', short: 'готує запит у Higgsfield і збирає результат', stage: 'make', row: 1, trigger: 'request',
+  { role: 'studio_producer', name: 'Агент креативщик', short: 'готує запит у Higgsfield і збирає результат', stage: 'make', row: 1, trigger: 'request',
     description: 'Для кожної концепції й формату пише точний запит для Higgsfield (з матеріалами клієнта як референсами). Коли Higgsfield підключено, отримує готові картинки й виносить їх на затвердження.',
     fields: [text('style', 'Стиль зображень за замовчуванням', 'Світло, кольори, настрій, який ми любимо. Додається до кожного запиту.', 3)] },
 ];
@@ -110,6 +110,10 @@ export async function ensureStudioTeam(db, campaign, email = null) {
     agents = must(await db.from('ag_agents').select('*').eq('team', TEAM).eq('scope_type', 'client').eq('scope_id', scope));
   }
   const mine = agents.filter((a) => isStudioRole(a.role));
+  for (const a of mine) {
+    const def = studioRoleDef(a.role);
+    if (def && a.name !== def.name) { await db.from('ag_agents').update({ name: def.name }).eq('id', a.id); a.name = def.name; }
+  }
   const byRole = new Map(mine.map((a) => [a.role, a]));
   const ids = mine.map((a) => a.id);
   let links = ids.length ? must(await db.from('ag_links').select('*').in('from_agent_id', ids)) || [] : [];

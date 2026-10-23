@@ -52,7 +52,7 @@ export const CAMPAIGN_ROLES = [
   { role: 'tiktok_analyst', name: 'Аналітик TikTok Ads', short: 'креативи й швидкість тестів', stage: 'analysis', row: 2, platforms: ['tiktok'], trigger: 'schedule', registry: 'tiktok-ads-analyst', schedule: sched(1, '09:00'), data: [],
     description: 'Аналізує дані TikTok, які менеджер вставляє з рекламного кабінету (прямого підключення немає): креативи, швидкість тестування.',
     fields: [KPI, { key: 'pasted', label: 'Дані з TikTok Ads Manager', type: 'textarea', rows: 8, hint: 'Скопіюйте таблицю кампаній і креативів за період. Оновлюйте перед кожним запуском.' }] },
-  { role: 'creative_performance_analyst', name: 'Аналітик креативів', short: 'які креативи працюють', stage: 'analysis', row: 3, platforms: ['meta', 'tiktok'], trigger: 'schedule', registry: 'creative-performance-analyst', schedule: sched(1, '09:15'),
+  { role: 'creative_performance_analyst', name: 'Агент аналітик креативів', short: 'які креативи працюють', stage: 'analysis', row: 3, platforms: ['meta', 'tiktok'], trigger: 'schedule', registry: 'creative-performance-analyst', schedule: sched(1, '09:15'),
     data: ['meta:ad:last_30d', 'meta:ad:last_7d'],
     description: 'Звʼязує кожен креатив з результатами і шукає закономірності: що виграє, що програє.', fields: [] },
   { role: 'tracking_integrity', name: 'Контроль трекінгу', short: 'чи не зламані конверсії', stage: 'analysis', row: 4, platforms: ['meta', 'google'], trigger: 'schedule', registry: 'tracking-data-integrity-agent', schedule: sched(1, '09:30'),
@@ -62,13 +62,13 @@ export const CAMPAIGN_ROLES = [
     description: 'З діагнозу аналітика і стратегії складає пріоритетний план дій у кабінеті Meta.', fields: [KPI] },
   { role: 'google_optimizer', name: 'Оптимізатор Google Ads', short: 'план дій у кабінеті Google', stage: 'action', row: 1, platforms: ['google'], trigger: 'upstream', registry: 'google-optimization-agent', schedule: null, data: [],
     description: 'З діагнозу аналітика і стратегії складає пріоритетний план дій у кабінеті Google Ads.', fields: [KPI] },
-  { role: 'creative_strategist', name: 'Креативний стратег', short: 'система креативних гіпотез', stage: 'action', row: 2, platforms: ['meta', 'tiktok'], trigger: 'upstream', registry: 'creative-strategist', schedule: null, data: [],
+  { role: 'creative_strategist', name: 'Агент креативний стратег', short: 'система креативних гіпотез', stage: 'action', row: 2, platforms: ['meta', 'tiktok'], trigger: 'upstream', registry: 'creative-strategist', schedule: null, data: [],
     description: 'Будує систему креативних гіпотез із планом тестів на два тижні, а не список ідей.',
     fields: [{ key: 'formats', label: 'Формати й обмеження', type: 'textarea', hint: 'Які формати можемо зробити (відео, статика, UGC), чого не можна показувати.' }] },
-  { role: 'performance_copywriter', name: 'Копірайтер реклами', short: 'тексти оголошень', stage: 'control', row: 0, platforms: ['*'], trigger: 'upstream', registry: 'performance-copywriter', schedule: null, data: [],
+  { role: 'performance_copywriter', name: 'Агент копірайтер', short: 'тексти оголошень', stage: 'control', row: 0, platforms: ['*'], trigger: 'upstream', registry: 'performance-copywriter', schedule: null, data: [],
     description: 'Пише варіанти текстів для рекламних платформ під гіпотези й плани оптимізації.',
     fields: [{ key: 'tone', label: 'Тон і мови оголошень', type: 'textarea', hint: 'Наприклад: українською й англійською, прямий тон, без знижок у тексті.' }] },
-  { role: 'quality_controller', name: 'Контролер якості', short: 'перевірка перед менеджером', stage: 'control', row: 1, platforms: ['*'], trigger: 'upstream', registry: 'ai-quality-controller',
+  { role: 'quality_controller', name: 'Агент перевірки якості', short: 'перевірка перед менеджером', stage: 'control', row: 1, platforms: ['*'], trigger: 'upstream', registry: 'ai-quality-controller',
     schedule: null, data: ['meta:account:last_7d', 'google:account:LAST_7_DAYS'],
     description: 'Звіряє цифри й твердження в планах і текстах з даними кабінетів і бріфом, показує, що й хто має виправити.', fields: [] },
   { role: 'cross_channel_report', name: 'Міжканальний звіт', short: 'тижневий звіт по всіх каналах', stage: 'report', row: 0, platforms: ['*'], trigger: 'upstream', registry: 'cross-channel-reporting-insights-agent', schedule: null,
@@ -135,6 +135,11 @@ export async function ensureCampaignTeam(db, campaign, email = null) {
   }
   const studioIds = new Set(agents.filter((a) => isStudioRole(a.role)).map((a) => a.id));
   agents = agents.filter((a) => !studioIds.has(a.id));
+  // an agent that was renamed in the code gets its new name in the database too
+  for (const a of agents) {
+    const def = roleDef(a.role);
+    if (def && a.name !== def.name) { await db.from('ag_agents').update({ name: def.name }).eq('id', a.id); a.name = def.name; }
+  }
   const byRole = new Map(agents.map((a) => [a.role, a]));
   const ids = agents.map((a) => a.id);
   let links = ids.length ? must(await db.from('ag_links').select('*').in('from_agent_id', ids)) || [] : [];
