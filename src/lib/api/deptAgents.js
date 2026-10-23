@@ -49,10 +49,17 @@ export async function fetchAgentTasks(agentId, limit = 80) {
   const tasks = must(await supabase.from('ag_tasks').select('id, status, campaign_id, request_id, created_at, started_at, finished_at, cost_usd, error, summary:output->>summary').eq('agent_id', agentId).order('id', { ascending: false }).limit(limit)) || [];
   const rids = [...new Set(tasks.map((t) => t.request_id).filter(Boolean))];
   const requests = rids.length ? must(await supabase.from('ag_creative_requests').select('id, title, status, campaign_id').in('id', rids)) || [] : [];
-  const steps = rids.length ? must(await supabase.from('ag_tasks').select('request_id, agent_id, status').in('request_id', rids).eq('status', 'done')) || [] : [];
+  return { tasks, progress: await progressOf(requests) };
+}
+
+// How far each request is: the steps of its chain that are done out of the steps that take part for its client.
+async function progressOf(requests) {
+  if (!requests.length) return {};
+  const rids = requests.map((r) => r.id);
+  const steps = must(await supabase.from('ag_tasks').select('request_id, agent_id, status').in('request_id', rids).eq('status', 'done')) || [];
   const cids = [...new Set(requests.map((r) => r.campaign_id))];
-  const clientLinks = cids.length ? must(await supabase.from('ag_agent_clients').select('agent_id, campaign_id, enabled, mode').in('campaign_id', cids)) || [] : [];
-  const agents = cids.length ? must(await supabase.from('ag_agents').select('id, role, enabled').eq('team', 'creative')) || [] : [];
+  const clientLinks = must(await supabase.from('ag_agent_clients').select('agent_id, campaign_id, enabled, mode').in('campaign_id', cids)) || [];
+  const agents = must(await supabase.from('ag_agents').select('id, role, enabled').eq('team', 'creative')) || [];
   const wanted = new Set(requestRoles());
   const progress = {};
   requests.forEach((r) => {
@@ -60,7 +67,20 @@ export async function fetchAgentTasks(agentId, limit = 80) {
     const done = new Set(steps.filter((s) => s.request_id === r.id).map((s) => s.agent_id)).size;
     progress[r.id] = { title: r.title, status: r.status, done: Math.min(done, total || done), total: total || done };
   });
-  return { tasks, progress };
+  return progress;
+}
+
+// The requests of the department that are alive (in work, waiting for the person's review, stuck on a problem), with the client and the progress: the map shows them.
+export async function fetchOpenRequests(limit = 6) {
+  const requests = must(await supabase.from('ag_creative_requests').select('id, title, status, campaign_id, updated_at').in('status', ['running', 'review', 'problem']).order('updated_at', { ascending: false }).limit(limit)) || [];
+  if (!requests.length) return [];
+  const campaigns = must(await supabase.from('ag_campaigns').select('id, name, project_id').in('id', [...new Set(requests.map((r) => r.campaign_id))])) || [];
+  const projects = campaigns.length ? must(await supabase.from('projects').select('id, name').in('id', campaigns.map((c) => c.project_id))) || [] : [];
+  const progress = await progressOf(requests);
+  return requests.map((r) => {
+    const c = campaigns.find((x) => x.id === r.campaign_id);
+    return { ...r, client: projects.find((p) => p.id === c?.project_id)?.name || c?.name || '', done: progress[r.id]?.done ?? 0, total: progress[r.id]?.total ?? 0 };
+  });
 }
 
 // The clients' requests (for the trial run: an agent below the strategist works from the results of a request).

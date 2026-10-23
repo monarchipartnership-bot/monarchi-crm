@@ -37,6 +37,7 @@ import FocusedGraph from './aiMap/FocusedGraph';
 import OverviewMap, { AiSvgDefs } from './aiMap/OverviewMap';
 import WorldMap3D from './aiMap/WorldMap3D';
 import useAgentRunStates from './aiMap/useAgentRunStates';
+import useOpenRequests from './aiMap/useOpenRequests';
 import { nightNow } from './aiMap/nightRule';
 import TaskFlowPanel from './aiMap/TaskFlowPanel';
 import { UI_SCALE, VIEWBOX_HALF, calculateDepartmentGraphLayout, findAgent } from './aiMap/graphLayout';
@@ -196,6 +197,7 @@ export default function ConstellationTest() {
   // The map is the 3D district; `?map=2d` brings the old SVG constellation back (kept as a fallback while the 3D map settles).
   const use3d = useMemo(() => new URLSearchParams(window.location.search).get('map') !== '2d', []);
   const runStates = useAgentRunStates(allAgents);
+  const openRequests = useOpenRequests();
 
   const [agentSearch, setAgentSearch] = useState('');
   // Separate from whether there's query text — lets a click outside the
@@ -564,7 +566,7 @@ export default function ConstellationTest() {
 
           {!focused && (
             <>
-              {use3d && <TaskFlowPanel step={flowStep} agentDepts={AGENT_DEPTS} onSelectDept={(k) => { setFocusedDept(k); setHoveredDept(null); }} />}
+              {use3d && <TaskFlowPanel step={flowStep} agentDepts={AGENT_DEPTS} requests={openRequests} onOpenRequest={() => setDeptAgent({ role: 'creative_strategy', legacyTool: null })} onSelectDept={(k) => { setFocusedDept(k); setHoveredDept(null); }} />}
               <button type="button" className="ai-kb-btn ai-pill" onClick={() => setCoreOpen(true)} data-ai-safe>
                 <span className="ai-kb-icon" dangerouslySetInnerHTML={{ __html: BOOK_ICON }} />
                 <span>Інформаційна база</span>

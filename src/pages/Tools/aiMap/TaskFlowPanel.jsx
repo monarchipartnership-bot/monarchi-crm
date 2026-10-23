@@ -16,7 +16,9 @@ const PARCEL = (
   </svg>
 );
 
-export default function TaskFlowPanel({ step, agentDepts, onSelectDept }) {
+const REQUEST_STATUS = { running: 'В роботі', review: 'Чекає вашої перевірки', problem: 'Помилка' };
+
+export default function TaskFlowPanel({ step, agentDepts, onSelectDept, requests = [], onOpenRequest = null }) {
   const cur = CHAIN[step % CHAIN.length];
   const curLabel = agentDepts[cur.key]?.label || cur.short;
   return (
@@ -39,6 +41,22 @@ export default function TaskFlowPanel({ step, agentDepts, onSelectDept }) {
         <span className="ai-flowcard-ic sm">{PARCEL}</span>
         <span><b>Зараз: {curLabel}</b><small>Демо-задача «Запит клієнта на кампанію»</small></span>
       </div>
+      {requests.length > 0 && (
+        <div className="ai-flowcard-real">
+          <b>Живі запити відділу креативів</b>
+          <ul>
+            {requests.map((r) => (
+              <li key={r.id}>
+                <button type="button" onClick={() => onOpenRequest?.(r)} title="Відкрити сторінку Агента креативний стратег">
+                  <span className="ai-flowcard-req"><b>{r.client || 'Клієнт'}</b><small>{r.title}</small></span>
+                  <span className={'ai-flowcard-chip is-' + r.status}>{REQUEST_STATUS[r.status] || r.status}</span>
+                  {r.total > 0 && <em>{r.done} з {r.total}</em>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

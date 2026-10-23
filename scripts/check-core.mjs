@@ -35,6 +35,7 @@ import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteEx
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
 import { cleanRequest, connectCampaign, ensureCreativeDepartment } from '../src/lib/agents/creativeTeam.js';
+import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc } from '../api/_lib/creativeRun.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
@@ -2029,6 +2030,25 @@ await ok('creative department: priority of clients, manual mode, confirm-before-
   assert.equal(tables.ag_tasks.find((t) => t.id === 802).status, 'queued');
   assert.equal(tables.ag_tasks.find((t) => t.id === 803).status, 'failed'); // older than a week: left alone
   assert.equal(A('creative_copywriter').attempts, 0);
+});
+
+await ok('creative department: the colour of an agent on the map comes from its own tables (problem, working, paused, waiting)', () => {
+  const ag = { id: 1, role: 'creative_strategy', enabled: true, last_status: 'ok' };
+  const link = (o = {}) => ({ agent_id: 1, enabled: true, mode: 'auto', ...o });
+  assert.equal(deptRunState({ agent: null }), 'waiting'); // the department is not in the database yet: idle
+  assert.equal(deptRunState({ agent: ag, clients: [link()] }), 'waiting');
+  assert.equal(deptRunState({ agent: ag, clients: [link()], tasks: [{ agent_id: 1, status: 'queued' }] }), 'working');
+  assert.equal(deptRunState({ agent: ag, clients: [link()], tasks: [{ agent_id: 1, status: 'running' }] }), 'working');
+  assert.equal(deptRunState({ agent: ag, clients: [link()], tasks: [{ agent_id: 2, status: 'running' }] }), 'waiting'); // another agent's task
+  assert.equal(deptRunState({ agent: ag, clients: [link()], tasks: [{ agent_id: 1, status: 'failed' }, { agent_id: 1, status: 'running' }] }), 'problem'); // a problem beats work
+  assert.equal(deptRunState({ agent: { ...ag, last_status: 'problem' }, clients: [link()] }), 'problem');
+  assert.equal(deptRunState({ agent: { ...ag, enabled: false }, clients: [link()] }), 'paused'); // switched off
+  assert.equal(deptRunState({ agent: { ...ag, enabled: false, last_status: 'problem' }, tasks: [{ agent_id: 1, status: 'failed' }] }), 'paused'); // an agent that is off is not «in trouble»
+  assert.equal(deptRunState({ agent: ag, clients: [link({ mode: 'paused' }), link({ enabled: false })] }), 'paused'); // every client stopped
+  assert.equal(deptRunState({ agent: ag, clients: [link({ mode: 'paused' }), link()] }), 'waiting'); // one client is enough
+  assert.equal(deptRunState({ agent: ag, clients: [link()], tasks: [{ agent_id: 1, status: 'done', awaiting_pass: true }] }), 'paused'); // a result waits for the person's OK
+  const all = deptRunStates([{ key: 'creative-strategist', deptAgent: 'creative_strategy' }, { key: 'other-agent' }], { agents: [ag], clients: [link()], tasks: [{ agent_id: 1, status: 'running' }] });
+  assert.deepEqual(all, { 'creative-strategist': 'working' }); // only the agents that have a page
 });
 
 await ok('creative department: the answers of the strategist, brief writer, copywriter, maker and checker are checked', () => {
