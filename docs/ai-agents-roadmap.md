@@ -863,3 +863,15 @@ via the section's own tab capsule, no CRM sidebar entries).
 - Workspaces: shared shell is now a 720-840px dark-plum overlay over the dimmed (.5) scene;
   info/close/back/create use the canonical action icon sprite.
 - QA screenshots: `docs/ai-agents-redesign-qa/`.
+
+
+### 8.1 3D map (2026-10-23) — replaces the SVG constellation as the Map section
+
+The Map section now draws a 3D isometric district (`pages/Tools/world3d/`, three.js, lazy chunk) instead of
+`OverviewMap`/`FocusedGraph`. The page keeps all its chrome (capsule, search, what's-new, department panel,
+MAP/CHART, carousel, knowledge base, footer) on top of the scene. `?map=2d` brings the old SVG map back.
+This **supersedes** "the map is live SVG" and the dark map background from §1b/§8 — for the map only; the other
+sections keep the dark plum kit. Agent colours on the map are runtime states (working / paused / waiting /
+problem / inactive, from `ai_agent_conversations`), not the lifecycle statuses of §8 above; "problem" is not shown
+until something records a failed run. Details and the full list of approved behaviours: `docs/design-decisions.md` §30.
+Panels built for the prototype but not yet in the CRM: `docs/ai-world-prototype-panels.md`.

@@ -35,6 +35,8 @@ import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
 import DeptChartView from './aiMap/DeptChartView';
 import FocusedGraph from './aiMap/FocusedGraph';
 import OverviewMap, { AiSvgDefs } from './aiMap/OverviewMap';
+import WorldMap3D from './aiMap/WorldMap3D';
+import useAgentRunStates from './aiMap/useAgentRunStates';
 import { UI_SCALE, VIEWBOX_HALF, calculateDepartmentGraphLayout, findAgent } from './aiMap/graphLayout';
 import {
   FONT_SAT, buildOverview, makeDims, pluralAgents, ringGeometry,
@@ -197,6 +199,9 @@ export default function ConstellationTest() {
     return list;
   }, []);
   const counts = useMemo(() => countStatuses(allAgents), [allAgents]);
+  // The map is the 3D district; `?map=2d` brings the old SVG constellation back (kept as a fallback while the 3D map settles).
+  const use3d = useMemo(() => new URLSearchParams(window.location.search).get('map') !== '2d', []);
+  const runStates = useAgentRunStates(allAgents);
 
   // §4.8 "what's new" (docs/ai-agents-roadmap.md) — surfaces agents whose
   // statusChangedAt is newer than the last time this viewer dismissed the
@@ -289,7 +294,7 @@ export default function ConstellationTest() {
   // several departments, and ignored over scrollable panels.
   const wheelCooldownRef = useRef(0);
   useEffect(() => {
-    if (!focusedDept || selectedAgent || coreOpen || agentToolOpen || compact) return undefined;
+    if (use3d || !focusedDept || selectedAgent || coreOpen || agentToolOpen || compact) return undefined; // in 3D the wheel zooms the scene
     function handleWheel(e) {
       if (e.target.closest('.chart-view, .dept-panel, .ai-section, [role="dialog"]')) return;
       e.preventDefault();
@@ -556,27 +561,39 @@ export default function ConstellationTest() {
           )}
 
           <div className={'constellation-stage' + (viewMode === 'chart' && focused ? ' is-chart' : '')} ref={stageRef}>
-            {/* decorative energy core: a picture, not a button or an agent */}
-            <img className={'ai-core' + (focused ? ' is-quiet' : '')} src={AI_ASSETS.core} alt="" aria-hidden="true" style={{ '--core-dy': `${(ring.dy || 0) / upx}px` }} />
-
-            <svg
-              ref={svgRef}
-              viewBox={`${-graphHalfW} ${-graphHalfH} ${graphHalfW * 2} ${graphHalfH * 2}`}
-              className="constellation-svg" role="group" aria-label="Мапа відділів і агентів"
-            >
-              <AiSvgDefs />
-              <OverviewMap
-                nodes={nodes} ring={ring} compact={compact} dims={dims} fontScale={fontScale} fit={fit}
-                focusedDept={focusedDept} hoveredDept={hoveredDept} setHoveredDept={setHoveredDept}
-                onFocusDept={focusDept} onOpenAgent={openAgent} selectedAgentKey={selectedAgentKey} motion={motion}
+            {use3d ? (
+              <WorldMap3D
+                agentDepts={AGENT_DEPTS} focusedDept={focusedDept} runStates={runStates}
+                hidden={viewMode === 'chart' && !!focused}
+                onFocusDept={(k) => { setFocusedDept(k); setHoveredDept(null); }}
+                onOpenAgent={(deptKey, agentKey) => { const a = allAgents.find((x) => x.key === agentKey); if (a) openAgent(a); }}
+                onReset={resetView}
               />
-              {focused && focusedGraph && !compact && (
-                <FocusedGraph
-                  key={focused.key} focused={focused} graph={focusedGraph} fs={fontScale}
-                  selectedAgentKey={selectedAgentKey} onOpenAgent={openAgent} onReset={resetView}
-                />
-              )}
-            </svg>
+            ) : (
+              <>
+                {/* decorative energy core: a picture, not a button or an agent */}
+                <img className={'ai-core' + (focused ? ' is-quiet' : '')} src={AI_ASSETS.core} alt="" aria-hidden="true" style={{ '--core-dy': `${(ring.dy || 0) / upx}px` }} />
+
+                <svg
+                  ref={svgRef}
+                  viewBox={`${-graphHalfW} ${-graphHalfH} ${graphHalfW * 2} ${graphHalfH * 2}`}
+                  className="constellation-svg" role="group" aria-label="Мапа відділів і агентів"
+                >
+                  <AiSvgDefs />
+                  <OverviewMap
+                    nodes={nodes} ring={ring} compact={compact} dims={dims} fontScale={fontScale} fit={fit}
+                    focusedDept={focusedDept} hoveredDept={hoveredDept} setHoveredDept={setHoveredDept}
+                    onFocusDept={focusDept} onOpenAgent={openAgent} selectedAgentKey={selectedAgentKey} motion={motion}
+                  />
+                  {focused && focusedGraph && !compact && (
+                    <FocusedGraph
+                      key={focused.key} focused={focused} graph={focusedGraph} fs={fontScale}
+                      selectedAgentKey={selectedAgentKey} onOpenAgent={openAgent} onReset={resetView}
+                    />
+                  )}
+                </svg>
+              </>
+            )}
           </div>
 
           {!focused && (
