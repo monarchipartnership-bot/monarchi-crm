@@ -41,6 +41,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
   const [prompts, setPrompts] = useState([]);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const timer = useRef(null);
   useDialogA11y(box, onClose);
   const notify = (text, isError = false) => {
@@ -58,7 +59,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
     const [c, d, p] = await Promise.all([fetchAgentClients(a.id), fetchAgentTasks(a.id), fetchPrompts(a.id)]);
     setClients(c); setData(d); setPrompts(p);
   }, [email, role]);
-  useEffect(() => { reload().catch((e) => notify(e.message || 'Не вдалося завантажити агента. Перевірте, що застосовано міграції 20261040 і 20261041.', true)); }, [reload]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setLoadError(''); reload().catch((e) => setLoadError(e.message || 'Не вдалося завантажити агента. Перевірте, що застосовано міграції 20261040 і 20261041.')); }, [reload]);
   const working = data.tasks.some((t) => t.status === 'queued' || t.status === 'running');
   useEffect(() => {
     if (!working) return undefined;
@@ -69,7 +70,20 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
   const def = creativeRoleDef(role);
   const nameOf = useCallback((campaignId) => { const c = clients.find((x) => x.campaign_id === campaignId); return c ? (c.project?.name || c.campaign?.name || `Кампанія ${campaignId}`) : `Кампанія ${campaignId}`; }, [clients]);
   const load = useMemo(() => loadOf(data.tasks), [data.tasks]);
-  if (!team) return createPortal(<div className="smm-overlay cmp-agentwin" data-dd="plum"><div className="smm-dialog smm-dialog--page"><p className="smm-muted">Завантаження…</p></div></div>, document.body);
+  // while the agent loads (or cannot be loaded) the window is still a window: it says so and can be closed
+  if (!team) {
+    return createPortal(
+      <div className="smm-overlay cmp-agentwin" data-dd="plum" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <div ref={box} className="smm-dialog smm-dialog--page" role="dialog" aria-modal="true" aria-label="Агент відділу" tabIndex={-1}>
+          <button type="button" className="smm-x smm-x--corner" onClick={onClose} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
+          <div className="smm-page smm-window-page">
+            {loadError ? <p className="smm-error" role="alert">{loadError}</p> : <p className="smm-muted">Завантаження…</p>}
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
   if (!agent) return null;
   const health = healthOf(agent, team);
   const state = stateOf(agent, team);
