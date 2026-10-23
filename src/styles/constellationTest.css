@@ -414,10 +414,10 @@
   height: 40px; background: var(--tb-panel); border: 0; color: var(--tb-ink); font-size: 13.5px;
   box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 0 4px #ae40ae14;
 }
-.constellation-exit { top: 16px; right: 20px; padding: 0 16px; gap: 9px; }
+.constellation-exit { top: 20px; right: 20px; padding: 0 16px; gap: 9px; min-width: 108px; justify-content: center; }
 .constellation-exit svg { color: var(--tb-sec); }
 .constellation-exit:hover { box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
-.agent-search { top: 68px; right: 20px; width: min(260px, calc(100vw - 48px)); padding: 0 14px; gap: 9px; }
+.agent-search { top: 20px; right: 138px; width: clamp(150px, 14vw, 220px); padding: 0 14px; gap: 9px; } /* one row with «До Hub»: 20px edge + 108px pill + 10px gap */
 .agent-search-icon { color: var(--tb-sec); }
 .agent-search-input { color: var(--tb-ink); font-size: 13.5px; font-weight: 500; }
 .agent-search-input::placeholder { color: var(--tb-sec); opacity: .8; }
@@ -482,3 +482,4 @@
 .constellation-page.is-compact .ai-flowcard li button { font-size: 10px; gap: 5px; }
 .constellation-page.is-compact .ai-flowcard li i { width: 26px; height: 26px; }
 .constellation-page.is-compact .ai-flowcard ol::before { top: 12px; }
+@media (max-width: 1180px) { .agent-search { top: 72px; right: 20px; width: 240px; } } /* a narrow window has no room beside the section capsule: the search drops under «До Hub» */
