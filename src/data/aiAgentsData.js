@@ -516,9 +516,9 @@ export const AGENT_DEPTS = {
     ],
   },
   'performance-creative': {
-    label: 'Performance-креативи',
+    label: 'Відділ креативів',
     color: '#3B82F6',
-    subtitle: 'креативні гіпотези, copy, аналіз ефективності',
+    subtitle: 'креативні гіпотези, ТЗ, креативи, тексти, аналіз ефективності',
     tagline: 'TEST WHAT WINS',
     icon: DEPT_ICONS.megaphone,
     narrative: 'Створює й оцінює performance-креативи як систему гіпотез і вимірних тестів, а не одноразові ідеї — від гіпотези до тексту і до аналізу, що з креативів реально спрацювало.',
