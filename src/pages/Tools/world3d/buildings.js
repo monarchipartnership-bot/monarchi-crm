@@ -671,6 +671,7 @@ export function createBuilding(dept, assets, idx) {
   const itick = [];
   const inner = new THREE.Group(); body.add(inner); // everything inside (props, desks, agents): hidden while the building is closed, which is most of the time
   interior(key, inner, W, D, itick, round, assets);
+  inner.traverse((o) => { if (o.isMesh) o.castShadow = false; }); // the props inside cast no shadow (nobody sees it, and it doubled the draw calls of an open building); desks and agents, added next, still do
   const slots = [];
   const robots = [];
   const z0 = -D / 2 + 4.6 + CELL_Z / 2;

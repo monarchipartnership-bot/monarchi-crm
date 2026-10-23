@@ -36,6 +36,7 @@ const stage = mk('div', 'w3d-stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false; // the shadow pass is redrawn every second frame (and at once while the camera moves), see frame()
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NeutralToneMapping;
 stage.appendChild(renderer.domElement);
@@ -244,7 +245,7 @@ function tickCarts(dt, t) {
   if (hero.pause > 0) hero.pause -= dt;
   else {
     hero.s += SPEED * dt;
-    if (hero.s >= heroStop[hero.next]) { hero.s = heroStop[hero.next]; hero.pause = 2.4; hero.step = hero.next % RING_ORDER.length; hero.next = hero.next % (heroStop.length - 1) + 1; if (hero.s >= heroPath.L - 0.01) hero.s = 0; ui?.setStep(hero.step); }
+    if (hero.s >= heroStop[hero.next]) { hero.s = heroStop[hero.next]; hero.pause = 2.4; hero.step = hero.next % RING_ORDER.length; hero.next = hero.next % (heroStop.length - 1) + 1; if (hero.s >= heroPath.L - 0.01) hero.s = 0; opts.onStep?.(hero.step); }
   }
   drive(hero.cart, pathAt(heroPath, hero.s), dt);
   hero.cart.userData.parcel.position.y = hero.cart.userData.parcel.userData.base + Math.sin(t * 3) * 0.03;
@@ -436,11 +437,15 @@ function adaptResolution(now) {
   if (slowFor > 1.2 && pr > 0.8) { pr = Math.max(0.75, pr * 0.82); renderer.setPixelRatio(pr); resize(); slowFor = 0; }
   else if (fastFor > 6 && pr < prMax) { pr = Math.min(prMax, pr * 1.15); renderer.setPixelRatio(pr); resize(); fastFor = 0; }
 }
+const shadowLast = new THREE.Vector3(); let shadowZoom = 0, shadowTick = 0;
+const FRAME_STATS = { n: 0, sum: 0, max: 0 }; // the cost of one frame of the loop itself (JS side), for ?w3ddebug
 let raf = 0, paused = false;
 function frame() {
   raf = 0;
   if (disposed || paused) return;
-  adaptResolution(performance.now());
+  const tFrame0 = performance.now();
+  { const moved = shadowLast.distanceTo(controls.target) > 0.02 || Math.abs(camera.zoom - shadowZoom) > 0.002; shadowLast.copy(controls.target); shadowZoom = camera.zoom; if (moved || (++shadowTick & 1) === 0) renderer.shadowMap.needsUpdate = true; }
+  adaptResolution(tFrame0);
   const dt = Math.min(clock.getDelta(), 0.05), t = reduce ? 0 : clock.elapsedTime;
   updateAutoOpen();
   dn.update(dt);
@@ -461,17 +466,19 @@ function frame() {
   sun.position.copy(controls.target).add(SUN_OFF); sun.target.position.copy(controls.target); sun.target.updateMatrixWorld();
   updateFocus(); updateLabels();
   renderer.render(scene, camera);
+  FRAME_STATS.n++; { const d = performance.now() - tFrame0; FRAME_STATS.sum += d; FRAME_STATS.max = Math.max(FRAME_STATS.max, d); }
   raf = requestAnimationFrame(frame);
 }
 // Everything inside the buildings is hidden while they are closed, so the GPU would first meet it (upload meshes, textures, shaders) the moment a
 // building opens, which froze the map for seconds. Show each interior once, here, behind the loading, one building at a time.
 async function prewarm() {
+  renderer.shadowMap.needsUpdate = true;
   camera.updateMatrixWorld(); camera.updateProjectionMatrix();
   let n = 0;
   for (const b of buildings.values()) {
     if (disposed) return;
     b.inner.visible = true; b.inner.traverse((o) => o.layers.set(0));
-    renderer.render(scene, camera);
+    renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera);
     b.inner.visible = false; b.inner.traverse((o) => o.layers.set(1));
     opts.onProgress?.(0.7 + 0.3 * (++n / buildings.size));
     await new Promise((r) => setTimeout(r, 0));
@@ -483,7 +490,7 @@ raf = requestAnimationFrame(frame);
 const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([e]) => setPaused(!e.isIntersecting)) : null; io?.observe(root);
 const onVis = () => setPaused(document.hidden); document.addEventListener('visibilitychange', onVis);
 function setPaused(v) { paused = v; if (!v && !raf && !disposed) { clock.getDelta(); lastAdapt = performance.now(); raf = requestAnimationFrame(frame); } }
-if (opts.debug) window.__app = { setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
+if (opts.debug) window.__app = { loopState: () => ({ paused, raf, disposed, hidden: document.hidden }), frameStats: () => { const o = { ...FRAME_STATS, avg: FRAME_STATS.n ? FRAME_STATS.sum / FRAME_STATS.n : 0 }; FRAME_STATS.n = 0; FRAME_STATS.sum = 0; FRAME_STATS.max = 0; return o; }, setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
 
 // fresh states from the page (real activity): recolour the hats and the boxes
 function setRunStatus(map) {
