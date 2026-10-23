@@ -26,8 +26,7 @@ const DEPTS = opts.depts;
 let halo = null;
 const hookStart = hookMark();
 let disposed = false;
-const assets = await loadAssets();
-if (opts.isCancelled?.()) { hookTrim(hookStart); return { dispose() {}, api: null, state: null, setRunStatus() {}, setPaused() {} }; }
+const assets = await loadAssets((p) => opts.onProgress?.(p * 0.7));
 
 // ------------------------------------------------------------ renderer, camera
 const root = container; root.classList.add('w3d'); root.innerHTML = '';
@@ -468,11 +467,13 @@ function frame() {
 // building opens, which froze the map for seconds. Show each interior once, here, behind the loading, one building at a time.
 async function prewarm() {
   camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+  let n = 0;
   for (const b of buildings.values()) {
-    if (disposed || opts.isCancelled?.()) return;
+    if (disposed) return;
     b.inner.visible = true; b.inner.traverse((o) => o.layers.set(0));
     renderer.render(scene, camera);
     b.inner.visible = false; b.inner.traverse((o) => o.layers.set(1));
+    opts.onProgress?.(0.7 + 0.3 * (++n / buildings.size));
     await new Promise((r) => setTimeout(r, 0));
   }
 }

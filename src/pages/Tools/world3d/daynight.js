@@ -59,3 +59,4 @@ export function initDayNight({ app, sun, hemi, fill, renderer, stars, moon }) {
     },
   };
 }
+
