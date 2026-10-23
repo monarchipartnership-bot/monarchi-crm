@@ -31,7 +31,7 @@ export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates,
         const { createWorld } = await import('../world3d/world.js');
         if (cancelled || !hostRef.current) return;
         world = await createWorld(hostRef.current, {
-          depts,
+          depts, isCancelled: () => cancelled, debug: new URLSearchParams(window.location.search).has('w3ddebug'),
           onFocusDept: (k) => cbRef.current.onFocusDept?.(k),
           onOpenAgent: (d, k) => cbRef.current.onOpenAgent?.(d, k),
           onReset: () => cbRef.current.onReset?.(),

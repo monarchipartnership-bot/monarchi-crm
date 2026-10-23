@@ -687,7 +687,7 @@ export function createBuilding(dept, assets, idx) {
 
   const il = new THREE.PointLight(0xffd9f2, 0, 22, 1.5); il.position.set(0, Math.min(H * 0.75, 5.2), 1.0); body.add(il);
   const b = {
-    key, root, body, W, D, H, round, sel, robots, slots, topY: st.top + PAD_H,
+    key, root, body, inner, W, D, H, round, sel, robots, slots, topY: st.top + PAD_H,
     open: 0, target: 0, anim: roofTicks, itick, front, roof, roofMats, R,
     setOpen(v) { b.target = v ? 1 : 0; },
     update(dt, t, reduce) {

@@ -27,6 +27,7 @@ let halo = null;
 const hookStart = hookMark();
 let disposed = false;
 const assets = await loadAssets();
+if (opts.isCancelled?.()) { hookTrim(hookStart); return { dispose() {}, api: null, state: null, setRunStatus() {}, setPaused() {} }; }
 
 // ------------------------------------------------------------ renderer, camera
 const root = container; root.classList.add('w3d'); root.innerHTML = '';
@@ -34,7 +35,6 @@ const mk = (tag, cls, parent = root) => { const e = document.createElement(tag);
 const sky = mk('div', 'w3d-sky'), starsEl = mk('canvas', 'w3d-stars', sky), moonEl = mk('div', 'w3d-moon', sky);
 const stage = mk('div', 'w3d-stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -427,10 +427,21 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 resize();
 const ro = new ResizeObserver(() => { if (stage.clientWidth > 0 && stage.clientHeight > 0) resize(); }); ro.observe(stage);
 let wasAtMin = false;
+// Adaptive resolution: if frames take too long (a weak or busy GPU, a game running next to the browser, a hi-dpi screen) draw fewer pixels instead of freezing;
+// when there is room again, go back up.
+let pr = Math.min(window.devicePixelRatio, 1.75), prMax = pr, ema = 1 / 60, slowFor = 0, fastFor = 0, lastAdapt = performance.now();
+renderer.setPixelRatio(pr);
+function adaptResolution(now) {
+  const d = Math.min(0.25, (now - lastAdapt) / 1000); lastAdapt = now; ema += (d - ema) * 0.1;
+  if (ema > 0.034) { slowFor += d; fastFor = 0; } else if (ema < 0.02) { fastFor += d; slowFor = 0; } else { slowFor = 0; fastFor = 0; }
+  if (slowFor > 1.2 && pr > 0.8) { pr = Math.max(0.75, pr * 0.82); renderer.setPixelRatio(pr); resize(); slowFor = 0; }
+  else if (fastFor > 6 && pr < prMax) { pr = Math.min(prMax, pr * 1.15); renderer.setPixelRatio(pr); resize(); fastFor = 0; }
+}
 let raf = 0, paused = false;
 function frame() {
   raf = 0;
   if (disposed || paused) return;
+  adaptResolution(performance.now());
   const dt = Math.min(clock.getDelta(), 0.05), t = reduce ? 0 : clock.elapsedTime;
   updateAutoOpen();
   dn.update(dt);
@@ -453,11 +464,25 @@ function frame() {
   renderer.render(scene, camera);
   raf = requestAnimationFrame(frame);
 }
+// Everything inside the buildings is hidden while they are closed, so the GPU would first meet it (upload meshes, textures, shaders) the moment a
+// building opens, which froze the map for seconds. Show each interior once, here, behind the loading, one building at a time.
+async function prewarm() {
+  camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+  for (const b of buildings.values()) {
+    if (disposed || opts.isCancelled?.()) return;
+    b.inner.visible = true; b.inner.traverse((o) => o.layers.set(0));
+    renderer.render(scene, camera);
+    b.inner.visible = false; b.inner.traverse((o) => o.layers.set(1));
+    await new Promise((r) => setTimeout(r, 0));
+  }
+}
+await prewarm();
+if (disposed) return { dispose() {} };
 raf = requestAnimationFrame(frame);
 const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([e]) => setPaused(!e.isIntersecting)) : null; io?.observe(root);
 const onVis = () => setPaused(document.hidden); document.addEventListener('visibilitychange', onVis);
-function setPaused(v) { paused = v; if (!v && !raf && !disposed) { clock.getDelta(); raf = requestAnimationFrame(frame); } }
-if (opts.debug) window.__app = { api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
+function setPaused(v) { paused = v; if (!v && !raf && !disposed) { clock.getDelta(); lastAdapt = performance.now(); raf = requestAnimationFrame(frame); } }
+if (opts.debug) window.__app = { setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
 
 // fresh states from the page (real activity): recolour the hats and the boxes
 function setRunStatus(map) {
