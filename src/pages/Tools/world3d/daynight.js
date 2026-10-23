@@ -19,7 +19,7 @@ export function collectEmissives(scene, boostByName = {}) {
   onNight((n) => list.forEach((base, m) => { m.emissiveIntensity = base * (1 + (boostByName[m.name] ?? 1.3) * n); }));
 }
 
-export function initDayNight({ app, sun, hemi, fill, renderer, stars, moon }) {
+export function initDayNight({ app, sun, hemi, fill, renderer, stars, moon, onTheme }) {
   let mode = 'auto'; try { mode = localStorage.getItem('aiw.tod') || 'auto'; } catch (e) { /* no storage */ }
   const target = () => (mode === 'day' ? 1 : mode === 'night' ? 0 : daylightAt(nowHours()));
   let d = target();
@@ -34,6 +34,7 @@ export function initDayNight({ app, sun, hemi, fill, renderer, stars, moon }) {
   paint();
   const clockEl = sw.querySelector('#todtime'); let clockT = 0;
 
+  let themeNight = null;
   const col = new THREE.Color(), col2 = new THREE.Color();
   function apply() {
     const n = 1 - d, warm = Math.pow(Math.sin(Math.PI * d), 2); // the warm dawn/dusk tint peaks halfway
@@ -44,7 +45,7 @@ export function initDayNight({ app, sun, hemi, fill, renderer, stars, moon }) {
     renderer.toneMappingExposure = lerp(1.2, 1.0, d);
     const sky = [0, 1, 2, 3].map((i) => col.copy(SKY.night[i]).lerp(SKY.day[i], d).lerp(SKY.warm[i], warm * 0.75).clone());
     ['--bg0', '--bg1', '--bg2', '--vig'].forEach((v, i) => app.style.setProperty(v, hex(sky[i])));
-    app.classList.toggle('is-night', n > 0.5);
+    app.classList.toggle('is-night', n > 0.5); if (onTheme && (n > 0.5) !== themeNight) { themeNight = n > 0.5; onTheme(themeNight); }
     const sv = smooth(0.4, 0.95, n); if (stars) stars.style.opacity = sv; if (moon) moon.style.opacity = sv;
   }
   apply();

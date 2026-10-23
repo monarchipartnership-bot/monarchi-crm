@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENT_DEPTS } from '../../data/aiAgentsData';
-import { AI_ASSETS, AI_PAGE_ICON } from '../../lib/aiAgentsAssets';
+import { AI_ASSETS } from '../../lib/aiAgentsAssets';
 import ActionIcon from '../../components/common/ActionIcon';
 import AiEnvironment from '../../components/AiEnvironment/AiEnvironment';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
@@ -37,9 +37,10 @@ import FocusedGraph from './aiMap/FocusedGraph';
 import OverviewMap, { AiSvgDefs } from './aiMap/OverviewMap';
 import WorldMap3D from './aiMap/WorldMap3D';
 import useAgentRunStates from './aiMap/useAgentRunStates';
+import { nightNow } from './aiMap/nightRule';
 import { UI_SCALE, VIEWBOX_HALF, calculateDepartmentGraphLayout, findAgent } from './aiMap/graphLayout';
 import {
-  FONT_SAT, buildOverview, makeDims, pluralAgents, ringGeometry,
+  FONT_SAT, buildOverview, makeDims, ringGeometry,
 } from './aiMap/overviewLayout';
 import { STATUS_TEXT, countStatuses } from './aiMap/status';
 import CampaignsSection from './campaigns/CampaignsSection';
@@ -93,20 +94,11 @@ const SECTIONS = [
   { key: 'spend', label: 'Витрати' },
 ];
 
-const WHATS_NEW_SEEN_KEY = 'aiAgentsWhatsNewSeenAt';
-
-function newAgentsWord(n) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'новий або оновлений агент';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'нові або оновлені агенти';
-  return 'нових або оновлених агентів';
-}
-
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 export default function ConstellationTest() {
   const [section, setSection] = useState('map');
+  const [mapNight, setMapNight] = useState(nightNow); // day or night on the 3D map: the top bar is light by day, dark plum at night and in the other sections
   const agentReviewCount = useAgentReviewCount();
   const [focusedDept, setFocusedDept] = useState(null);
   const [hoveredDept, setHoveredDept] = useState(null);
@@ -202,25 +194,6 @@ export default function ConstellationTest() {
   // The map is the 3D district; `?map=2d` brings the old SVG constellation back (kept as a fallback while the 3D map settles).
   const use3d = useMemo(() => new URLSearchParams(window.location.search).get('map') !== '2d', []);
   const runStates = useAgentRunStates(allAgents);
-
-  // §4.8 "what's new" (docs/ai-agents-roadmap.md) — surfaces agents whose
-  // statusChangedAt is newer than the last time this viewer dismissed the
-  // banner. Per-viewer convenience state only, so localStorage is right.
-  const [whatsNewSeenAt, setWhatsNewSeenAt] = useState(() => {
-    try { return localStorage.getItem(WHATS_NEW_SEEN_KEY); } catch { return null; }
-  });
-  const [whatsNewExpanded, setWhatsNewExpanded] = useState(false);
-  const recentlyChangedAgents = useMemo(() => (
-    allAgents
-      .filter((a) => a.statusChangedAt && (!whatsNewSeenAt || a.statusChangedAt > whatsNewSeenAt))
-      .sort((a, b) => (b.statusChangedAt || '').localeCompare(a.statusChangedAt || ''))
-  ), [allAgents, whatsNewSeenAt]);
-  function dismissWhatsNew() {
-    const now = new Date().toISOString().slice(0, 10);
-    try { localStorage.setItem(WHATS_NEW_SEEN_KEY, now); } catch { /* per-viewer convenience only, fine if it fails */ }
-    setWhatsNewSeenAt(now);
-    setWhatsNewExpanded(false);
-  }
 
   const [agentSearch, setAgentSearch] = useState('');
   // Separate from whether there's query text — lets a click outside the
@@ -349,11 +322,11 @@ export default function ConstellationTest() {
   const showMapChrome = section === 'map';
 
   return (
-    <div ref={pageRef} className={'constellation-page ai-immersive' + (calm ? ' is-calm' : '') + (motion ? '' : ' is-still') + (compact ? ' is-compact' : '')} style={{ '--ui-scale': UI_SCALE }}>
+    <div ref={pageRef} className={'constellation-page ai-immersive' + (section === 'map' && use3d && !mapNight && !compact ? ' is-map-light' : '') + (calm ? ' is-calm' : '') + (motion ? '' : ' is-still') + (compact ? ' is-compact' : '')} style={{ '--ui-scale': UI_SCALE }}>
       <AiEnvironment calm={calm} />
 
       <header className="ai-brand" data-ai-safe>
-        <img className="ai-brand-icon" src={AI_PAGE_ICON} alt="" />
+        <img className="ai-brand-logo" src={`${import.meta.env.BASE_URL}ai-world/logo/emblem.svg`} alt="" />
         <div className="ai-brand-text">
           <h1>AI Agents</h1>
           <span>Monarchi Hub</span>
@@ -417,26 +390,17 @@ export default function ConstellationTest() {
         </div>
       )}
 
-      {showMapChrome && !focused && recentlyChangedAgents.length > 0 && (
-        <div className="whats-new-banner" data-ai-safe>
-          <button type="button" className="whats-new-summary ai-pill" onClick={() => setWhatsNewExpanded((v) => !v)} aria-expanded={whatsNewExpanded}>
-            <span className="whats-new-dot-live" aria-hidden="true" />
-            <span className="whats-new-text">{recentlyChangedAgents.length} {newAgentsWord(recentlyChangedAgents.length)}</span>
-            <ActionIcon name="chevron" size={14} className={'whats-new-chevron' + (whatsNewExpanded ? ' open' : '')} />
-          </button>
-          {whatsNewExpanded && (
-            <div className="whats-new-list ai-panel">
-              <button type="button" className="whats-new-dismiss" onClick={dismissWhatsNew}>Приховати</button>
-              {recentlyChangedAgents.map((a) => (
-                <button key={a.key} type="button" className="whats-new-item" onClick={() => openAgent(a)}>
-                  <span className="whats-new-dot" />
-                  <span className="whats-new-name">{a.name}</span>
-                  <span className="whats-new-date">{a.statusChangedAt}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      {showMapChrome && !focused && (
+        <section className="ai-kpis" aria-label="Підсумок" data-ai-safe>
+          {[
+            ['Агентів', counts.total, 'all'],
+            ['Live', counts.live, 'live'],
+            ['У розробці', counts.in_development, 'dev'],
+            ['Заплановано', counts.not_started, 'plan'],
+          ].map(([label, n, c]) => (
+            <div key={c} className={'ai-kpi k-' + c}><span className="ai-kpi-dot" aria-hidden="true" /><span><b>{n}</b><small>{label}</small></span></div>
+          ))}
+        </section>
       )}
 
       {section === 'map' && (
@@ -567,7 +531,7 @@ export default function ConstellationTest() {
                 hidden={viewMode === 'chart' && !!focused}
                 onFocusDept={(k) => { setFocusedDept(k); setHoveredDept(null); }}
                 onOpenAgent={(deptKey, agentKey) => { const a = allAgents.find((x) => x.key === agentKey); if (a) openAgent(a); }}
-                onReset={resetView}
+                onReset={resetView} onTheme={setMapNight}
               />
             ) : (
               <>
@@ -602,12 +566,6 @@ export default function ConstellationTest() {
                 <span className="ai-kb-icon" dangerouslySetInnerHTML={{ __html: BOOK_ICON }} />
                 <span>Інформаційна база</span>
               </button>
-              <div className="ai-footer ai-pill" data-ai-safe>
-                <span className="ai-footer-total">{counts.total} {pluralAgents(counts.total)}</span>
-                <span className="ai-footer-item"><i className="ai-dot ai-dot-live" />{counts.live} Live</span>
-                <span className="ai-footer-item"><i className="ai-dot ai-dot-dev" />{counts.in_development} у розробці</span>
-                <span className="ai-footer-item"><i className="ai-dot ai-dot-plan" />{counts.not_started} заплановано</span>
-              </div>
             </>
           )}
         </>

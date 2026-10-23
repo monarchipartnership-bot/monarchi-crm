@@ -7,8 +7,8 @@ flags, agent boxes, the camera buttons, the time-of-day switch). The prototype p
 
 | Prototype panel | What it shows | Page element it would replace or sit next to |
 | --- | --- | --- |
-| Top bar | Logo + «AI Agents / Monarchi Hub», section capsule, search with results, department dropdown, «Демо-режим» pill, «До Hub» | The page's brand, section nav, search (`agent-search`) and exit pill |
-| KPI cards | Four cards: agents / Live / in development / planned, with a coloured dot and a caption | The footer pill with counts (`ai-footer`) |
+| Top bar (DONE 2026-10-24: restyled in the page: emblem, capsule, search and «До Hub» pills; still missing: department dropdown, «Демо-режим» pill) | Logo + «AI Agents / Monarchi Hub», section capsule, search with results, department dropdown, «Демо-режим» pill, «До Hub» | The page's brand, section nav, search (`agent-search`) and exit pill |
+| KPI cards (DONE 2026-10-24: `ai-kpis` in the page, the footer pill with the counts was removed) | Four cards: agents / Live / in development / planned, with a coloured dot and a caption | The footer pill with counts (`ai-footer`) |
 | Selected-object card (`detail`) | For a department: description, three status bars, «Всі відділи». For an agent: status, stage, autonomy, description, sub-function | The department panel (`dept-panel`) and the agent info modal |
 | Department and agent lists (`table`) | Two tabs («Відділи 7» / «Агенти 31»), rows with number, name, count, selected row highlighted, scroll | The Агенти catalog and the carousel at the bottom |
 | «Рух задачі по відділах» (`stepper`) | Six-step strip of the demo task going through the chain (Стратегія → Креативи → Реклама → Звіти → Клієнти → Продажі) with the current step and a «демо» tag | Nothing today (the 3D scene has the moving demo van and a «Демо-задача» tag) |

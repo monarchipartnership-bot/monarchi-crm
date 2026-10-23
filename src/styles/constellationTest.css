@@ -93,19 +93,6 @@
 .agent-search-empty { padding: 14px; font-size: 13px; color: var(--ai-secondary); text-align: center; }
 
 /* "what's new" banner (§4.8) — compact pill under the brand */
-.whats-new-banner { position: absolute; top: 90px; left: 28px; z-index: 7; display: flex; flex-direction: column; align-items: flex-start; max-width: min(380px, calc(100vw - 56px)); }
-.whats-new-summary { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; font-family: var(--font-body); font-size: 15px; color: var(--ai-text); cursor: pointer; }
-.whats-new-dot-live { width: 12px; height: 12px; border-radius: 50%; flex: none; background: radial-gradient(circle at 30% 25%, #fff, #eb9cef 60%, #ae40ae); box-shadow: 0 0 10px rgba(235, 156, 239, .8); }
-.whats-new-text { font-weight: 500; }
-.whats-new-chevron { transform: rotate(90deg); transition: transform .16s ease; color: var(--ai-secondary); }
-.whats-new-chevron.open { transform: rotate(-90deg); }
-.whats-new-list { width: 100%; margin-top: 8px; max-height: 280px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .35) transparent; }
-.whats-new-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; text-align: left; border: none; background: none; border-radius: 12px; padding: 8px 10px; cursor: pointer; color: var(--ai-text); font-family: var(--font-body); font-size: 13px; }
-.whats-new-item:hover, .whats-new-item:focus-visible { background: rgba(174, 64, 174, .22); }
-.whats-new-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #eb9cef; box-shadow: 0 0 6px #eb9cef; }
-.whats-new-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.whats-new-date { flex: none; font-size: 12px; color: var(--ai-secondary); }
-.whats-new-dismiss { position: sticky; top: -6px; z-index: 1; padding: 6px 10px; margin: -6px -6px 2px; background: rgba(39, 8, 39, .98); text-align: left; align-self: stretch; border: none; background: none; color: var(--ai-secondary); font-family: var(--font-body); font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 
 /* ---------------- stage: energy core + live SVG map ---------------- */
 .constellation-stage { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
@@ -368,8 +355,6 @@
 }
 .constellation-page.is-compact .ai-flow > * { position: relative !important; inset: auto !important; transform: none !important; margin: 0; width: auto; max-width: none; flex: none; }
 .constellation-page.is-compact .agent-search { order: 1; width: auto; }
-.constellation-page.is-compact .whats-new-banner { order: 2; align-items: stretch; }
-.constellation-page.is-compact .whats-new-summary { height: 40px; font-size: 13px; padding: 0 14px; width: 100%; }
 .constellation-page.is-compact .constellation-overlay { order: 3; }
 .constellation-page.is-compact .constellation-page.is-compact .view-tabs { order: 4; align-self: flex-start; }
 .constellation-page.is-compact .dept-sheet { order: 5; max-height: none; overflow: visible; }
@@ -400,3 +385,62 @@
   .constellation-section-tab, .constellation-carousel button, .view-tab { transition: none; }
 }
 .constellation-page.is-still .ai-core { animation: aiCoreIn .1s linear both; }
+
+
+/* ---------------- Hub style top bar (2026-10-24): brand with the emblem, section capsule, search / back pills, KPI cards ----------------
+   Dark plum glass by default; on the 3D map by day the same pieces turn light glass (is-map-light), like the city under them. */
+.constellation-page.ai-immersive {
+  --tb-panel: rgba(32, 13, 54, .82); --tb-ink: #f6e9fa; --tb-sec: #d6aee0; --tb-line: rgba(235, 156, 239, .34); --tb-deep: #f0c4f5;
+  --tb-shadow: 0 18px 44px rgba(0, 0, 0, .45); --tb-chip: rgba(235, 156, 239, .2); --tb-dot-bg: #3c1a58; --tb-dot-ring: #8a58aa;
+}
+.constellation-page.is-map-light {
+  --tb-panel: rgba(255, 255, 255, .86); --tb-ink: #270827; --tb-sec: #883288; --tb-line: #ebc6eb; --tb-deep: #661466;
+  --tb-shadow: 0 18px 44px #68276833; --tb-chip: #f1dcf5; --tb-dot-bg: #f1dcf5; --tb-dot-ring: #d9a6df;
+}
+.ai-brand { top: 16px; left: 20px; gap: 12px; }
+.ai-brand-logo { width: 46px; height: 46px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 0 4px #ae40ae26, 0 8px 18px #68276840; }
+.ai-brand h1 { font-size: 18px; line-height: 1.1; font-weight: 800; letter-spacing: -.2px; color: var(--tb-ink); }
+.ai-brand-text span { font-size: 12px; line-height: 1.3; font-weight: 500; color: var(--tb-sec); }
+.constellation-section-nav {
+  top: 16px; height: 48px; padding: 5px; gap: 4px; background: var(--tb-panel); border: 0; border-radius: 999px;
+  box-shadow: inset 0 0 0 1.5px var(--tb-line), var(--tb-shadow);
+}
+.constellation-section-tab { padding: 0 18px; font-size: 13.5px; font-weight: 600; color: var(--tb-ink); }
+.constellation-section-tab + .constellation-section-tab::before { display: none; }
+.constellation-section-tab.active { background: linear-gradient(88deg, #b544b5, #661466); color: #fff; box-shadow: 0 6px 16px #66146644; }
+.constellation-section-tab-badge { min-width: 20px; height: 20px; margin-left: 8px; padding: 0 6px; background: var(--tb-chip); color: var(--tb-deep); box-shadow: none; font-size: 11px; }
+.constellation-section-tab.active .constellation-section-tab-badge { background: rgba(255, 255, 255, .22); color: #fff; }
+.constellation-exit.ai-pill, .agent-search.ai-pill {
+  height: 40px; background: var(--tb-panel); border: 0; color: var(--tb-ink); font-size: 13.5px;
+  box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 0 4px #ae40ae14;
+}
+.constellation-exit { top: 16px; right: 20px; padding: 0 16px; gap: 9px; }
+.constellation-exit svg { color: var(--tb-sec); }
+.constellation-exit:hover { box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
+.agent-search { top: 68px; right: 20px; width: min(260px, calc(100vw - 48px)); padding: 0 14px; gap: 9px; }
+.agent-search-icon { color: var(--tb-sec); }
+.agent-search-input { color: var(--tb-ink); font-size: 13.5px; font-weight: 500; }
+.agent-search-input::placeholder { color: var(--tb-sec); opacity: .8; }
+.agent-search:focus-within { box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
+
+.ai-kpis { position: absolute; z-index: 4; top: 76px; left: 20px; display: flex; gap: 10px; flex-wrap: wrap; max-width: 560px; }
+.ai-kpi {
+  display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 14px; border-radius: 22px; background: var(--tb-panel); color: var(--tb-ink);
+  box-shadow: inset 0 0 0 1.5px var(--tb-line), var(--tb-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.ai-kpi b { display: block; font-family: var(--font-head); font-size: 22px; font-weight: 800; line-height: 1; letter-spacing: -.4px; }
+.ai-kpi small { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--tb-sec); }
+.ai-kpi-dot { width: 30px; height: 30px; border-radius: 50%; position: relative; flex: 0 0 auto; background: var(--tb-dot-bg); box-shadow: inset 0 0 0 1.5px var(--tb-dot-ring); }
+.ai-kpi-dot::after { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: #b544b5; }
+.ai-kpi.k-live .ai-kpi-dot::after { background: var(--ai-st-live); }
+.ai-kpi.k-dev .ai-kpi-dot::after { background: var(--ai-st-dev); }
+.ai-kpi.k-plan .ai-kpi-dot::after { background: var(--ai-st-plan); }
+
+.constellation-page.is-compact .ai-brand { top: 12px; left: 16px; }
+.constellation-page.is-compact .ai-brand-logo { width: 40px; height: 40px; }
+.constellation-page.is-compact .constellation-exit.ai-pill { top: 14px; right: 16px; height: 40px; }
+.constellation-page.is-compact .constellation-section-nav { top: 66px; height: 46px; }
+.constellation-page.is-compact .agent-search.ai-pill { order: 1; width: auto; }
+.constellation-page.is-compact .ai-kpis { order: 2; max-width: none; gap: 8px; }
+.constellation-page.is-compact .ai-kpi { flex: 1 1 calc(50% - 8px); padding: 8px 12px 8px 10px; border-radius: 18px; }
+.constellation-page.is-compact .ai-kpi b { font-size: 19px; }

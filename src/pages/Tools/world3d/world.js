@@ -407,7 +407,7 @@ const camEl = mk('div', 'w3d-cam');
 camEl.innerHTML = `<button type="button" data-a="in" aria-label="Наблизити">${ICONS.plus}</button><button type="button" data-a="out" aria-label="Віддалити">${ICONS.minus}</button><button type="button" data-a="rl" aria-label="Повернути ліворуч">${ICONS.rotL}</button><button type="button" data-a="rr" aria-label="Повернути праворуч">${ICONS.rotR}</button><button type="button" data-a="home" aria-label="Весь острів">${ICONS.home}</button>`;
 camEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; ({ in: () => api.zoom(1.35), out: () => api.zoom(1 / 1.35), rl: () => api.rotate(0.3), rr: () => api.rotate(-0.3), home: () => user.reset() })[b.dataset.a](); });
 collectEmissives(scene, { mat_glow: 3.5 });
-const dn = initDayNight({ app: root, sun, hemi, fill, renderer, stars: starsEl, moon: moonEl });
+const dn = initDayNight({ app: root, sun, hemi, fill, renderer, stars: starsEl, moon: moonEl, onTheme: (n) => opts.onTheme?.(n) });
 applySelection();
 
 // ------------------------------------------------------------ a building opens by itself when you zoom in on it (and closes again when you leave)

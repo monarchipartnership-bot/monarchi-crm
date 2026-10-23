@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './WorldMap3D.css';
+import { nightNow } from './nightRule';
 
 // The 3D map of departments and agents (src/pages/Tools/world3d). three.js and the models are a separate chunk that starts loading when the Map
 // section opens; until the city is ready the shell shows the sky of the scene (not the cosmos behind the page) and a small loader, then the
@@ -17,16 +18,6 @@ function toWorldDepts(agentDepts) {
       key, label: d.label, subtitle: d.subtitle || '',
       agents: (d.subcategories || []).flatMap((sc) => sc.agents.map((a) => ({ key: a.key, name: a.name, status: a.status }))),
     }));
-}
-
-// the same dawn / dusk rule as the scene (daynight.js), so the loader starts in the colours the city will have
-function nightNow() {
-  let mode = 'auto'; try { mode = localStorage.getItem('aiw.tod') || 'auto'; } catch { /* no storage */ }
-  if (mode === 'night') return true;
-  if (mode === 'day') return false;
-  const d = new Date(), h = d.getHours() + d.getMinutes() / 60;
-  const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  return sm(5.25, 8, h) * (1 - sm(17.5, 20.5, h)) < 0.5;
 }
 
 // one scene for the whole page session
@@ -51,6 +42,7 @@ function ensureWorld(depts) {
       onFocusDept: (k) => cache.handlers.onFocusDept?.(k),
       onOpenAgent: (d, k) => cache.handlers.onOpenAgent?.(d, k),
       onReset: () => cache.handlers.onReset?.(),
+      onTheme: (n) => cache.handlers.onTheme?.(n),
     }))
     .then((w) => { cache.world = w; return w; })
     .catch((e) => { cache.promise = null; host.remove(); cache.host = null; throw e; });
@@ -65,7 +57,7 @@ function scheduleDispose() {
   }, KEEP_ALIVE_MS);
 }
 
-export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates, onFocusDept, onOpenAgent, onReset }) {
+export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates, onFocusDept, onOpenAgent, onReset, onTheme }) {
   const shellRef = useRef(null);
   const worldRef = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -76,7 +68,7 @@ export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates,
   const depts = useMemo(() => toWorldDepts(agentDepts), [agentDepts]);
 
   useEffect(() => {
-    cache.handlers = { onFocusDept, onOpenAgent, onReset };
+    cache.handlers = { onFocusDept, onOpenAgent, onReset, onTheme };
   });
 
   useEffect(() => {
