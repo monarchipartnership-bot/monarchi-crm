@@ -38,6 +38,7 @@ import OverviewMap, { AiSvgDefs } from './aiMap/OverviewMap';
 import WorldMap3D from './aiMap/WorldMap3D';
 import useAgentRunStates from './aiMap/useAgentRunStates';
 import { nightNow } from './aiMap/nightRule';
+import TaskFlowPanel from './aiMap/TaskFlowPanel';
 import { UI_SCALE, VIEWBOX_HALF, calculateDepartmentGraphLayout, findAgent } from './aiMap/graphLayout';
 import {
   FONT_SAT, buildOverview, makeDims, ringGeometry,
@@ -98,6 +99,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 export default function ConstellationTest() {
   const [section, setSection] = useState('map');
+  const [flowStep, setFlowStep] = useState(0); // where the demo task is now (the demo van on the 3D map reports it)
   const [mapNight, setMapNight] = useState(nightNow); // day or night on the 3D map: the top bar is light by day, dark plum at night and in the other sections
   const agentReviewCount = useAgentReviewCount();
   const [focusedDept, setFocusedDept] = useState(null);
@@ -531,7 +533,7 @@ export default function ConstellationTest() {
                 hidden={viewMode === 'chart' && !!focused}
                 onFocusDept={(k) => { setFocusedDept(k); setHoveredDept(null); }}
                 onOpenAgent={(deptKey, agentKey) => { const a = allAgents.find((x) => x.key === agentKey); if (a) openAgent(a); }}
-                onReset={resetView} onTheme={setMapNight}
+                onReset={resetView} onTheme={setMapNight} onStep={setFlowStep}
               />
             ) : (
               <>
@@ -562,6 +564,7 @@ export default function ConstellationTest() {
 
           {!focused && (
             <>
+              {use3d && <TaskFlowPanel step={flowStep} agentDepts={AGENT_DEPTS} onSelectDept={(k) => { setFocusedDept(k); setHoveredDept(null); }} />}
               <button type="button" className="ai-kb-btn ai-pill" onClick={() => setCoreOpen(true)} data-ai-safe>
                 <span className="ai-kb-icon" dangerouslySetInnerHTML={{ __html: BOOK_ICON }} />
                 <span>Інформаційна база</span>

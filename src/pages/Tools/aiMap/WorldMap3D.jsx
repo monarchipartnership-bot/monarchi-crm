@@ -43,6 +43,7 @@ function ensureWorld(depts) {
       onOpenAgent: (d, k) => cache.handlers.onOpenAgent?.(d, k),
       onReset: () => cache.handlers.onReset?.(),
       onTheme: (n) => cache.handlers.onTheme?.(n),
+      onStep: (i) => cache.handlers.onStep?.(i),
     }))
     .then((w) => { cache.world = w; return w; })
     .catch((e) => { cache.promise = null; host.remove(); cache.host = null; throw e; });
@@ -57,7 +58,7 @@ function scheduleDispose() {
   }, KEEP_ALIVE_MS);
 }
 
-export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates, onFocusDept, onOpenAgent, onReset, onTheme }) {
+export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates, onFocusDept, onOpenAgent, onReset, onTheme, onStep }) {
   const shellRef = useRef(null);
   const worldRef = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -68,7 +69,7 @@ export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates,
   const depts = useMemo(() => toWorldDepts(agentDepts), [agentDepts]);
 
   useEffect(() => {
-    cache.handlers = { onFocusDept, onOpenAgent, onReset, onTheme };
+    cache.handlers = { onFocusDept, onOpenAgent, onReset, onTheme, onStep };
   });
 
   useEffect(() => {

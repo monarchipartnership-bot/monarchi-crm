@@ -444,3 +444,41 @@
 .constellation-page.is-compact .ai-kpis { order: 2; max-width: none; gap: 8px; }
 .constellation-page.is-compact .ai-kpi { flex: 1 1 calc(50% - 8px); padding: 8px 12px 8px 10px; border-radius: 18px; }
 .constellation-page.is-compact .ai-kpi b { font-size: 19px; }
+
+/* ---------------- "Рух задачі по відділах" (bottom left) and the knowledge base button (bottom right) ---------------- */
+.ai-kb-btn { left: auto; right: 20px; bottom: 20px; height: 44px; padding: 0 20px; font-size: 14px; font-weight: 600; background: var(--tb-panel); border: 0; color: var(--tb-ink); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 0 4px #ae40ae14; }
+.ai-kb-btn:hover { box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
+.ai-kb-icon { color: var(--tb-sec); }
+.ai-flowcard {
+  position: absolute; left: 20px; bottom: 20px; z-index: 5; width: min(540px, calc(50% - 210px)); min-width: 400px; padding: 14px 16px; display: grid; gap: 10px;
+  border-radius: 24px; background: var(--tb-panel); color: var(--tb-ink); box-shadow: inset 0 0 0 1.5px var(--tb-line), var(--tb-shadow);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.ai-flowcard header { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.ai-flowcard header b { font-weight: 800; }
+.ai-flowcard-tag { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #ffebdd; color: #a8500f; white-space: nowrap; }
+.ai-flowcard-ic { width: 32px; height: 32px; border-radius: 50%; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; background: var(--tb-dot-bg); box-shadow: inset 0 0 0 1.5px var(--tb-dot-ring); color: var(--tb-deep); }
+.ai-flowcard-ic svg { width: 17px; height: 17px; }
+.ai-flowcard-ic.sm { width: 28px; height: 28px; }
+.ai-flowcard ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); position: relative; }
+.ai-flowcard ol::before { content: ''; position: absolute; left: 8%; right: 8%; top: 14px; height: 3px; border-radius: 2px; background: var(--tb-dot-bg); }
+.ai-flowcard li { position: relative; }
+.ai-flowcard li button { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0; cursor: pointer; font-family: var(--font-body); font-weight: 600; font-size: 12px; color: var(--tb-sec); }
+.ai-flowcard li i {
+  font-style: normal; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;
+  background: var(--tb-panel-solid); box-shadow: inset 0 0 0 2px var(--tb-dot-ring); color: var(--tb-sec); position: relative; z-index: 1;
+}
+.ai-flowcard li.is-done i { background: #b544b5; box-shadow: none; color: #fff; }
+.ai-flowcard li.is-now i { background: linear-gradient(88deg, #b544b5, #661466); box-shadow: 0 0 0 5px #ae40ae33; color: #fff; }
+.ai-flowcard li.is-now button, .ai-flowcard li.is-done button { color: var(--tb-ink); }
+.ai-flowcard-now { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 18px; background: var(--tb-chip); }
+.ai-flowcard-now b { display: block; font-size: 13px; font-weight: 700; }
+.ai-flowcard-now small { display: block; font-size: 11.5px; color: var(--tb-sec); }
+.constellation-page.ai-immersive { --tb-panel-solid: #3a1c58; }
+.constellation-page.is-map-light { --tb-panel-solid: #ffffff; }
+.constellation-page.is-compact .ai-flowcard { order: 8; width: auto; min-width: 0; }
+.constellation-page.is-compact .ai-flowcard-tag { display: none; }
+.constellation-page.is-compact .ai-kb-btn { order: 9; right: auto; }
+.constellation-page.is-compact .ai-flowcard li button { font-size: 10px; gap: 5px; }
+.constellation-page.is-compact .ai-flowcard li i { width: 26px; height: 26px; }
+.constellation-page.is-compact .ai-flowcard ol::before { top: 12px; }
