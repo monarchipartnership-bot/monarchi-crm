@@ -1,62 +1,82 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchKnowledgeBase, updateKnowledgeArticle, createKnowledgeArticle, deleteKnowledgeArticle } from '../../lib/api/knowledgeBase';
-import KnowledgeOrb from './KnowledgeOrb';
-import KnowledgeSidebar from './KnowledgeSidebar';
+import KnowledgeNav from './KnowledgeNav';
 import ArticleView from './ArticleView';
+import { KnowledgeHome, KnowledgeCategory, KnowledgeSearch } from './KnowledgeHome';
+import { ICON } from './kbIcons';
+import { plural } from './kbText';
 import '../../styles/knowledgeBasePage.css';
 
-const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
-const BACK_ICON = '<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>';
-
-// Lives only inside the AI Agents map (see ConstellationTest.jsx's core
-// sphere) — opens as a near-fullscreen panel over the constellation's own
-// starfield, not a routed CRM page and not a plain white modal. `onClose`
-// returns the caller to the map.
+// Lives inside the AI Agents map (see ConstellationTest.jsx's knowledge-base button): a full-screen light workspace over the page, not a routed CRM
+// page. The header carries the way back to the map on the right. `onClose` returns the caller to the map.
 export default function KnowledgeBase({ onClose }) {
   const [categories, setCategories] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
+  const [view, setView] = useState('home'); // home | category | article | create
+  const [categoryId, setCategoryId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
-  const [collapsed, setCollapsed] = useState({});
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: '', content: '' });
   const [saving, setSaving] = useState(false);
-  const [addingTo, setAddingTo] = useState(null);
   const [newArticle, setNewArticle] = useState({ title: '', content: '' });
+  const searchRef = useRef(null);
+  const mainRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
     fetchKnowledgeBase().then((data) => {
       if (!alive) return;
       setCategories(data);
-      if (data.length && data[0].articles.length) setSelectedId(data[0].articles[0].id);
       if (!data.length) setLoadError(true);
     });
     return () => { alive = false; };
   }, []);
 
+  // «/» and ⌘K / Ctrl+K focus the search, Esc clears it or leaves the base
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '');
+      if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) { e.preventDefault(); searchRef.current?.focus(); }
+      else if (e.key === 'Escape' && !typing) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const allArticles = useMemo(
-    () => (categories ?? []).flatMap((cat) => cat.articles.map((a) => ({ ...a, categoryLabel: cat.label, categoryColor: cat.color }))),
+    () => (categories ?? []).flatMap((cat) => cat.articles.map((a) => ({ ...a, categoryId: cat.id, categoryLabel: cat.label, categoryColor: cat.color }))),
     [categories]
   );
   const selected = allArticles.find((a) => a.id === selectedId) || null;
+  const category = (categories ?? []).find((c) => c.id === (view === 'article' ? selected?.categoryId : categoryId)) || null;
 
+  const query = search.trim();
   const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = query.toLowerCase();
     if (!q) return null;
     return allArticles.filter((a) => a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q));
-  }, [search, allArticles]);
+  }, [query, allArticles]);
 
-  function openArticle(id) {
-    setSelectedId(id);
+  function go(next) {
+    next();
+    setSearch('');
     setEditing(false);
-    setAddingTo(null);
+    mainRef.current?.scrollTo({ top: 0 });
   }
+  const goHome = () => go(() => { setView('home'); setCategoryId(null); setSelectedId(null); });
+  const goCategory = (id) => go(() => { setView('category'); setCategoryId(id); setSelectedId(null); });
+  const goArticle = (id) => go(() => {
+    const art = allArticles.find((a) => a.id === id);
+    setView('article'); setSelectedId(id); if (art) setCategoryId(art.categoryId);
+  });
+  const goCreate = (catId) => go(() => { setView('create'); setCategoryId(catId); setNewArticle({ title: '', content: '' }); });
 
   function startEdit() {
     if (!selected) return;
     setDraft({ title: selected.title, content: selected.content });
     setEditing(true);
+    mainRef.current?.scrollTo({ top: 0 });
   }
 
   async function saveEdit() {
@@ -82,25 +102,23 @@ export default function KnowledgeBase({ onClose }) {
     if (!confirm(`Видалити розділ "${selected.title}"? Це незворотно.`)) return;
     try {
       await deleteKnowledgeArticle(selected.id);
+      const catId = selected.categoryId;
       setCategories((cats) => cats.map((cat) => ({ ...cat, articles: cat.articles.filter((a) => a.id !== selected.id) })));
-      setSelectedId(null);
-      setEditing(false);
+      setSelectedId(null); setEditing(false); setView('category'); setCategoryId(catId);
     } catch (err) {
       console.warn('deleteKnowledgeArticle failed', err);
       alert('Не вдалося видалити розділ.');
     }
   }
 
-  async function saveNewArticle(categoryId) {
-    if (!newArticle.title.trim()) return;
+  async function saveNewArticle() {
+    if (!newArticle.title.trim() || !categoryId) return;
     setSaving(true);
     try {
       const created = await createKnowledgeArticle(categoryId, newArticle);
       setCategories((cats) => cats.map((cat) => (cat.id === categoryId ? { ...cat, articles: [...cat.articles, created] } : cat)));
-      setSelectedId(created.id);
-      setAddingTo(null);
+      setSelectedId(created.id); setView('article'); setEditing(false);
       setNewArticle({ title: '', content: '' });
-      setEditing(false);
     } catch (err) {
       console.warn('createKnowledgeArticle failed', err);
       alert('Не вдалося створити розділ.');
@@ -109,75 +127,68 @@ export default function KnowledgeBase({ onClose }) {
     }
   }
 
-  function toggleCategory(id) {
-    setCollapsed((c) => ({ ...c, [id]: !c[id] }));
-  }
-
   const loading = categories === null;
+  const navView = searchResults ? 'search' : view;
+  const total = allArticles.length;
+
+  let main = null;
+  if (searchResults) main = <KnowledgeSearch results={searchResults} query={query} categories={categories} onArticle={goArticle} />;
+  else if (view === 'home') main = <KnowledgeHome categories={categories} allArticles={allArticles} onCategory={goCategory} onArticle={goArticle} />;
+  else if (view === 'category' && category) main = <KnowledgeCategory category={category} onArticle={goArticle} onAdd={goCreate} />;
+  else main = (
+    <ArticleView
+      article={view === 'create' ? null : selected} category={category}
+      editing={editing} draft={draft} setDraft={setDraft} saving={saving}
+      onStartEdit={startEdit} onCancelEdit={() => setEditing(false)} onSave={saveEdit} onDelete={handleDelete}
+      onOpenCategory={goCategory} onOpenArticle={goArticle}
+      creating={view === 'create'} newArticle={newArticle} setNewArticle={setNewArticle}
+      onCancelCreate={() => (categoryId ? goCategory(categoryId) : goHome())}
+      onSaveCreate={saveNewArticle}
+    />
+  );
 
   return (
-    <div className="kb-overlay">
-      <div className="kb-nav">
-        <button type="button" className="kb-nav-pill" onClick={onClose}>
-          <span dangerouslySetInnerHTML={{ __html: BACK_ICON }} /> До карти системи
+    <div className="kb-overlay" role="dialog" aria-modal="true" aria-label="Інформаційна база">
+      <header className="kb-top">
+        <button type="button" className="kb-brand" onClick={goHome} aria-label="Інформаційна база: на головну">
+          <span className="kb-brand-badge" dangerouslySetInnerHTML={{ __html: ICON.book }} />
+          <span className="kb-brand-text"><b>Інформаційна база</b><small>Спільна база знань Mon'Archi{!loading && total ? ` · ${total} ${plural(total, 'розділ', 'розділи', 'розділів')}` : ''}</small></span>
         </button>
-      </div>
 
-      <div className="kb-panel">
-        <div className="kb-panel-glow" />
-
-        <div className="kb-header">
-          <KnowledgeOrb />
-          <div className="kb-header-text">
-            <div className="kb-kicker">ІНФОРМАЦІЙНА БАЗА</div>
-            <h1>Спільна база знань</h1>
-            <p>Усе, що знає команда про Mon'Archi — процеси, доступи, канали, метрики й сезонність. Той самий контент, на який спираються AI-агенти й бот підтримки клієнтів.</p>
-          </div>
-        </div>
-
-        <div className="kb-search">
-          <span dangerouslySetInnerHTML={{ __html: SEARCH_ICON }} />
+        <label className="kb-search">
+          <span className="kb-search-ico" dangerouslySetInnerHTML={{ __html: ICON.search }} />
           <input
-            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Пошук по всій базі — назва або текст розділу…"
+            ref={searchRef} type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Пошук по всій базі — назва або текст розділу…" aria-label="Пошук по базі знань"
           />
-          <span className="kb-search-kbd">⌘K</span>
+          <span className="kb-search-kbd">/</span>
+        </label>
+
+        <button type="button" className="kb-back" onClick={onClose}>
+          <span className="kb-bi" dangerouslySetInnerHTML={{ __html: ICON.back }} /> До мапи
+        </button>
+      </header>
+
+      {loading && <div className="kb-empty kb-empty-full">Завантаження…</div>}
+
+      {!loading && loadError && (
+        <div className="kb-empty kb-empty-full">
+          База поки порожня. Якщо ви щойно додали таблиці — переконайтесь, що міграцію
+          <code> 2026-09-23_knowledge_base.sql</code> вже застосовано в Supabase.
         </div>
+      )}
 
-        {loading && <div className="kb-empty">Завантаження…</div>}
-
-        {!loading && loadError && (
-          <div className="kb-empty">
-            База поки порожня. Якщо ви щойно додали таблиці — переконайтесь, що міграцію
-            <code> 2026-09-23_knowledge_base.sql</code> вже застосовано в Supabase.
-          </div>
-        )}
-
-        {!loading && !loadError && (
-          <div className="kb-body">
-            <aside className="kb-sidebar">
-              <KnowledgeSidebar
-                categories={categories} search={search} searchResults={searchResults}
-                selectedId={selectedId} collapsed={collapsed}
-                onToggleCategory={toggleCategory}
-                onSelect={openArticle}
-                onAddClick={(catId) => { setAddingTo(catId); setSelectedId(null); }}
-              />
-            </aside>
-
-            <section className="kb-content">
-              <ArticleView
-                article={addingTo ? null : selected}
-                editing={editing} draft={draft} setDraft={setDraft} saving={saving}
-                onStartEdit={startEdit} onCancelEdit={() => setEditing(false)} onSave={saveEdit} onDelete={handleDelete}
-                creating={!!addingTo} newArticle={newArticle} setNewArticle={setNewArticle}
-                onCancelCreate={() => { setAddingTo(null); setNewArticle({ title: '', content: '' }); }}
-                onSaveCreate={() => saveNewArticle(addingTo)}
-              />
-            </section>
-          </div>
-        )}
-      </div>
+      {!loading && !loadError && (
+        <div className="kb-body">
+          <aside className="kb-side">
+            <KnowledgeNav
+              categories={categories} view={navView === 'create' ? 'category' : navView} categoryId={category?.id || null} selectedId={selectedId}
+              onHome={goHome} onCategory={goCategory} onArticle={goArticle} onAdd={goCreate}
+            />
+          </aside>
+          <main className="kb-main" ref={mainRef}>{main}</main>
+        </div>
+      )}
     </div>
   );
 }
