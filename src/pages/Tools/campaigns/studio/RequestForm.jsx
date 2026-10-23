@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import ActionIcon from '../../../../components/common/ActionIcon';
 import useDialogA11y from '../../../../lib/useDialogA11y';
-import { MATERIAL_KINDS, MAX_CONCEPTS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES, cleanRequest } from '../../../../lib/agents/studioTeam';
-import { FILE_TYPES, MAX_FILE_MB, uploadMaterial } from '../../../../lib/api/studio';
+import { MATERIAL_KINDS, MAX_CONCEPTS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES, cleanRequest } from '../../../../lib/agents/creativeTeam';
+import { FILE_TYPES, MAX_FILE_MB, uploadMaterial } from '../../../../lib/api/creatives';
 
 const EMPTY = { goal: '', product: '', audience: '', message: '', tone: '', must: '', avoid: '', site: '', competitors: '', examples: '', ratios: ['1:1'], count: 3, texts: 'auto', language: 'uk', materials: [] };
 
@@ -68,7 +68,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave 
               <legend>Формати</legend>
               <div className="stu-checks">{REQUEST_RATIOS.map((r) => <label key={r.key}><input type="checkbox" checked={f.ratios.includes(r.key)} onChange={() => toggleRatio(r.key)} />{r.label}</label>)}</div>
             </fieldset>
-            <Field id="stu-count" label={`Кількість концепцій (1–${MAX_CONCEPTS})`}><input id="stu-count" type="number" min={1} max={MAX_CONCEPTS} className="cmp-input" value={f.count} onChange={(e) => set({ count: e.target.value })} /></Field>
+            <Field id="stu-count" label={`Кількість напрямів (1–${MAX_CONCEPTS})`}><input id="stu-count" type="number" min={1} max={MAX_CONCEPTS} className="cmp-input" value={f.count} onChange={(e) => set({ count: e.target.value })} /></Field>
             <Field id="stu-texts" label="Тексти до креативів">
               <select id="stu-texts" className="cmp-input" value={f.texts} onChange={(e) => set({ texts: e.target.value })}>{Object.entries(TEXT_MODES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             </Field>

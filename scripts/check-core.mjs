@@ -34,9 +34,9 @@ import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
-import { cleanRequest, ensureStudioTeam } from '../src/lib/agents/studioTeam.js';
-import { cancelRequest, startRequest } from '../api/_lib/studioEngine.js';
-import { parseStudioBrief, parseStudioCopy, parseStudioProducer } from '../api/_lib/studioRun.js';
+import { cleanRequest, connectCampaign, ensureCreativeDepartment } from '../src/lib/agents/creativeTeam.js';
+import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
+import { parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc } from '../api/_lib/creativeRun.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
 import { buildRequest, check as hfCheck, submit as hfSubmit } from '../api/_lib/higgsfield.js';
 import { buildTelegramText, handleSiteLead, normalizeLead, runLeadReminders } from '../api/_lib/siteLead.js';
@@ -1797,127 +1797,242 @@ await ok('campaign team: ad-account inputs never throw, skip what is not connect
   assert.match(noToken.error, /META_ACCESS_TOKEN/);
 });
 
-await ok('creative studio: a request goes analysts -> brief -> copy + prompts, the creatives wait for the person; a failure stops it, a retry resumes, cancel withdraws', async () => {
+const creativeWorld = () => {
   const tables = {
-    projects: [{ id: 5, name: 'Acme Shop', client: 'Acme LLC' }],
+    projects: [{ id: 5, name: 'Acme Shop', client: 'Acme LLC', website: 'https://acme.example', country: 'Ukraine', business_type: 'E-commerce', services: ['Meta Ads'], notes: 'Sells sofas.' }, { id: 6, name: 'Beta Co', client: 'Beta' }],
     project_ad_accounts: [{ project_id: 5, platform: 'meta', account_id: '111' }],
-    ag_campaigns: [{ id: 1, project_id: 5, name: 'Acme autumn', platforms: ['meta'], status: 'draft', config: { brief: 'Furniture store.' } }],
-    ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [], ag_creative_requests: [], ag_creatives: [],
+    ag_campaigns: [{ id: 1, project_id: 5, name: 'Acme autumn', platforms: ['meta'], status: 'draft', config: { brief: 'Furniture store.' } }, { id: 2, project_id: 6, name: 'Beta spring', platforms: ['meta'], status: 'draft', config: {} }],
+    ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [], ag_agent_clients: [], ag_creative_requests: [], ag_creatives: [], notifications: [],
   };
   const db = fakeDb(tables);
-  const team = await ensureStudioTeam(db, tables.ag_campaigns[0], 'a@x.com');
-  assert.equal(team.agents.length, 5);
-  assert.equal(team.links.length, 4);
-  assert.equal(tables.ag_prompts.length, 5);
-  await ensureStudioTeam(db, tables.ag_campaigns[0], 'a@x.com');
-  assert.deepEqual([tables.ag_agents.length, tables.ag_links.length, tables.ag_prompts.length], [5, 4, 5]); // idempotent
-  assert.ok(tables.ag_agents.every((a) => a.enabled && a.config.trigger === 'request')); // on from the start, work only on requests
-  const campaignTeam = await ensureCampaignTeam(db, tables.ag_campaigns[0], 'a@x.com');
-  assert.ok(!campaignTeam.agents.some((a) => a.role.startsWith('studio_'))); // the campaign chain never mixes with the studio
-  const A = (r) => tables.ag_agents.find((a) => a.role === r);
-  A('studio_competitor_analyst').config = { ...A('studio_competitor_analyst').config, competitors: 'Rival https://rival.example' };
-  A('studio_brief_writer').config = { ...A('studio_brief_writer').config, rules: 'Soft daylight, no stock-photo smiles.' };
-
-  const request = cleanRequest({ goal: 'Autumn sale banners for the sofa line', product: 'Sofa Luna', ratios: ['1:1', '9:16', 'bogus'], count: 2, texts: 'yes', language: 'uk', site: 'https://acme.example', materials: [{ name: 'luna.jpg', url: 'https://x/luna.jpg', kind: 'product' }, { name: '', url: 'u' }] });
-  assert.deepEqual(request.brief.ratios, ['1:1', '9:16']);
-  assert.equal(request.materials.length, 1);
-  assert.throws(() => cleanRequest({ goal: '  ' }), /Опишіть/);
-  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'draft', title: request.title, brief: request.brief, materials: request.materials });
-
   let failBrief = true;
   const model = { calls: [], async callModel(args) {
     this.calls.push(args.agentKey);
     const body = (t) => ({ text: t, usage: { input_tokens: 10, output_tokens: 5 }, costUsd: 0.01 });
-    if (args.agentKey === 'studio-studio_brief_writer') {
+    if (args.agentKey === 'creative-creative_strategist') return body(JSON.stringify({ summary: 'Two directions for the sofa line.', directions: [
+      { key: 'd2', name: 'Autumn cosiness', priority: 2, why: 'Season', audience: 'Families', angle: 'Warm evenings', message: 'Warmth', tests: 'Lifestyle vs product' },
+      { key: 'd1', name: 'Morning comfort', priority: 1, why: 'Site stresses comfort', audience: 'Couples', angle: 'Slow mornings', message: 'Comfort', tests: 'Comfort angle' },
+      { key: 'd3', name: 'Third', priority: 3, why: 'x', angle: 'cut by the limit of two' }], clarify: 'Confirm the 15% discount.' }));
+    if (args.agentKey === 'creative-creative_brief') {
       if (failBrief) { failBrief = false; return body('Sorry, I cannot do this as JSON.'); }
-      return body(JSON.stringify({ summary: 'Two daylight concepts for the sofa.', concepts: [
-        { key: 'c1', name: 'Morning light', angle: 'Calm start', audience: 'Couples', message: 'Comfort', visual: 'A sofa in a bright living room, soft morning light', uses_materials: ['luna.jpg'], ratios: ['1:1', '9:16'], needs_text: true, text_brief: 'Hook about comfort' },
-        { key: 'c2', name: 'Autumn corner', angle: 'Cozy', audience: 'Families', message: 'Warmth', visual: 'A sofa with a plaid and a warm lamp', uses_materials: [], ratios: ['4:5'], needs_text: false },
-        { key: 'c3', name: 'Third one', visual: 'Cut by the limit of two concepts' }] }));
+      return body(JSON.stringify({ summary: 'Two daylight concepts.', concepts: [
+        { key: 'c1', direction: 'd1', name: 'Morning light', angle: 'Calm start', audience: 'Couples', message: 'Comfort', visual: 'A sofa in a bright living room, soft morning light', uses_materials: ['luna.jpg'], ratios: ['1:1', '9:16'], needs_text: true, text_brief: 'Hook about comfort' },
+        { key: 'c2', direction: 'd2', name: 'Autumn corner', angle: 'Cozy', audience: 'Families', message: 'Warmth', visual: 'A sofa with a plaid and a warm lamp', uses_materials: [], ratios: ['4:5'], needs_text: false },
+        { key: 'c3', name: 'Third one', visual: 'Cut by the limit' }] }));
     }
-    if (args.agentKey === 'studio-studio_copywriter') return body(JSON.stringify({ texts: [{ concept: 'c1', headline: 'Soft mornings', primary_text: 'Sofa Luna for slow mornings.', description: 'Autumn sale', cta: 'Shop now' }, { concept: 'zzz', headline: 'ghost', primary_text: 'ignored' }] }));
-    if (args.agentKey === 'studio-studio_producer') return body(JSON.stringify({ creatives: [{ concept: 'c1', ratio: '1:1', prompt: 'Photo of the sofa from the reference in a bright living room', negative_prompt: 'text', references: ['luna.jpg'] }] }));
+    if (args.agentKey === 'creative-creative_copywriter') return body(JSON.stringify({ texts: [{ concept: 'c1', headline: 'Soft mornings', primary_text: 'Sofa Luna for slow mornings.', description: 'Autumn sale', cta: 'Shop now' }, { concept: 'zzz', headline: 'ghost', primary_text: 'ignored' }] }));
+    if (args.agentKey === 'creative-creative_maker') return body(JSON.stringify({ creatives: [{ concept: 'c1', ratio: '1:1', prompt: 'Photo of the sofa from the reference in a bright living room', negative_prompt: 'text', references: ['luna.jpg'] }] }));
+    if (args.agentKey === 'creative-creative_quality') return body(JSON.stringify({ verdict: 'pass', summary: 'No obvious errors.', issues: [] }));
     return body(`## Підсумок\nSummary of ${args.agentKey}.\n\n## Деталі\nbody`);
   } };
   const read = async () => ({ pages: [{ ok: true, url: 'https://acme.example/', title: 'Acme', text: 'We sell sofas.' }], blockedByRobots: false });
   const campaignDeps = { metaToken: 't', meta: async () => ({ account: 'act_111', rows: [{ name: 'Ad 1', spend: 10 }], truncated: false }) };
   const ctx = { db, model, email: 'a@x.com', trigger: 'user', hf: null, read, campaignDeps, now: () => new Date('2026-10-22T08:00:00Z') };
+  return { tables, db, model, ctx };
+};
+const newRequest = (tables, campaignId, id, extra = {}) => {
+  const request = cleanRequest({ goal: 'Autumn sale banners for the sofa line', product: 'Sofa Luna', ratios: ['1:1', '9:16', 'bogus'], count: 2, texts: 'yes', language: 'uk', site: 'https://acme.example', materials: [{ name: 'luna.jpg', url: 'https://x/luna.jpg', kind: 'product' }, { name: '', url: 'u' }], ...extra });
+  tables.ag_creative_requests.push({ id, campaign_id: campaignId, status: 'draft', title: request.title, brief: request.brief, materials: request.materials });
+  return request;
+};
+
+await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {
+  const { tables, db, model, ctx } = creativeWorld();
+  const dept = await ensureCreativeDepartment(db, 'a@x.com');
+  assert.equal(dept.agents.length, 6);
+  assert.equal(dept.links.length, 6);
+  assert.equal(tables.ag_prompts.length, 6);
+  await ensureCreativeDepartment(db, 'a@x.com');
+  assert.deepEqual([tables.ag_agents.length, tables.ag_links.length, tables.ag_prompts.length], [6, 6, 6]); // idempotent
+  assert.ok(tables.ag_agents.every((a) => a.team === 'creative' && a.scope_type === 'internal' && a.enabled));
+  // two clients do NOT make twelve agents: they are linked to the same six
+  const l1 = await connectCampaign(db, tables.ag_campaigns[0], { email: 'a@x.com' });
+  const l2 = await connectCampaign(db, tables.ag_campaigns[1], { email: 'a@x.com' });
+  await connectCampaign(db, tables.ag_campaigns[0], { email: 'a@x.com' });
+  assert.deepEqual([l1.length, l2.length, tables.ag_agent_clients.length, tables.ag_agents.length], [6, 6, 12, 6]);
+  const A = (r) => tables.ag_agents.find((a) => a.role === r);
+  A('creative_brief').config = { ...A('creative_brief').config, rules: 'Soft daylight, no stock-photo smiles.' };
+  tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_strategist').id).config = { kpi: 'CPA under 12 dollars', extra: 'Never compare prices.' };
+  // research of another department (still per campaign in the old campaign team) reaches the strategist with its age
+  tables.ag_agents.push({ id: 900, team: 'campaign', scope_type: 'client', scope_id: '1', role: 'business_research', name: 'Дослідник бізнесу', enabled: true });
+  tables.ag_tasks.push({ id: 900, agent_id: 900, status: 'done', type: 'report', output: { text: 'Sofa store for families.', summary: 's' }, finished_at: '2026-10-01T10:00:00Z', brief: {} });
+
+  const request = newRequest(tables, 1, 1);
+  assert.deepEqual(request.brief.ratios, ['1:1', '9:16']);
+  assert.equal(request.materials.length, 1);
+  assert.throws(() => cleanRequest({ goal: '  ' }), /Опишіть/);
 
   const s1 = await startRequest(ctx, 1);
-  assert.equal(s1.started, 2); // the two analysts
+  assert.equal(s1.started, 1); // the strategist starts the request
   assert.equal(tables.ag_creative_requests[0].status, 'running');
-  assert.ok(tables.ag_tasks.every((t) => t.request_id === 1));
-  let q = await processQueue(ctx);
+  assert.ok(tables.ag_tasks.filter((t) => t.request_id === 1).every((t) => t.campaign_id === 1 && t.request_id === 1));
+  await processQueue(ctx);
   // the brief writer's first answer is not JSON: the task fails, the request is in «problem», nothing below it started
   assert.equal(tables.ag_creative_requests[0].status, 'problem');
-  assert.match(tables.ag_creative_requests[0].error, /Автор ТЗ/);
-  assert.equal(tables.ag_tasks.filter((t) => t.agent_id === A('studio_copywriter').id).length, 0);
-  const failed = tables.ag_tasks.find((t) => t.status === 'failed');
-  await retryTask(ctx, failed.id);
-  q = await processQueue(ctx);
+  assert.match(tables.ag_creative_requests[0].error, /Агент по ТЗ/);
+  assert.equal(tables.ag_tasks.filter((t) => t.agent_id === A('creative_copywriter').id).length, 0);
+  await retryTask(ctx, tables.ag_tasks.find((t) => t.status === 'failed').id);
+  await processQueue(ctx);
   assert.equal(tables.ag_creative_requests[0].status, 'review');
   assert.ok(tables.ag_creative_requests[0].finished_at);
-  assert.equal(tables.ag_tasks.filter((t) => t.status === 'done').length, 5);
-  // the brief was written from both analyses and the request; the limit of two concepts held
-  const briefRun = tables.ag_runs.filter((r) => r.agent_id === A('studio_brief_writer').id).pop();
-  assert.match(briefRun.user_prompt, /Autumn sale banners/);
-  assert.match(briefRun.user_prompt, /Результат агента «Аналітик клієнта»[\s\S]*Summary of studio-studio_client_analyst/);
-  assert.match(briefRun.user_prompt, /Результат агента «Аналітик конкурентів»/);
-  assert.match(briefRun.user_prompt, /luna\.jpg \(Фото продукту\)/);
-  assert.match(briefRun.user_prompt, /Наші правила для креативів[\s\S]*Soft daylight/); // the studio's own rules reach the brief writer
-  assert.match(briefRun.system_prompt, /never carry readable text/); // and the locked rules
-  const clientRun = tables.ag_runs.find((r) => r.agent_id === A('studio_client_analyst').id);
-  assert.match(clientRun.user_prompt, /We sell sofas/); // the site of the request was read
-  assert.match(clientRun.user_prompt, /Ad 1/); // the current ads came from the account
-  const compRun = tables.ag_runs.find((r) => r.agent_id === A('studio_competitor_analyst').id);
-  assert.match(compRun.user_prompt, /Rival/);
+  assert.equal(tables.ag_tasks.filter((t) => t.request_id === 1 && t.status === 'done').length, 5); // strategist, brief, copywriter, maker, quality (the analyst is not part of a request)
+  assert.equal(tables.ag_tasks.filter((t) => t.agent_id === A('creative_analyst').id).length, 0);
+  const runOf = (role, n = 'last') => tables.ag_runs.filter((r) => r.agent_id === A(role).id)[n === 'last' ? tables.ag_runs.filter((r) => r.agent_id === A(role).id).length - 1 : n];
+
+  // strategist: the card of the project, the request, the client's own fields, the research of the other department with its age, no analysis yet
+  const st = runOf('creative_strategist');
+  assert.match(st.user_prompt, /Картка проєкту[\s\S]*https:\/\/acme\.example[\s\S]*Ukraine/);
+  assert.match(st.user_prompt, /Autumn sale banners/);
+  assert.match(st.user_prompt, /Цілі й KPI клієнта \(клієнт\)\n.*CPA under 12 dollars/);
+  assert.match(st.system_prompt, /Never compare prices/); // the client's instruction reaches the system prompt
+  assert.match(st.user_prompt, /Дослідження бізнесу \(звіт від 2026-10-01: 21 дн\. тому, ЗАСТАРІВ\)[\s\S]*Sofa store for families/);
+  assert.match(st.user_prompt, /Аналізу немає/);
+  assert.match(st.user_prompt, /We sell sofas/); // no business research that is fresh enough is no excuse: the site is read
+  // the limit of two directions held and they are ordered by priority; the brief got them
+  const plan = tables.ag_tasks.find((t) => t.agent_id === A('creative_strategist').id).output;
+  assert.deepEqual(plan.json.directions.map((d) => d.key), ['d1', 'd2']);
+  assert.match(runOf('creative_brief').user_prompt, /План стратега[\s\S]*Morning comfort/);
+  assert.match(runOf('creative_brief').user_prompt, /Наші правила для креативів[\s\S]*Soft daylight/);
+  assert.match(runOf('creative_brief').user_prompt, /luna\.jpg \(Фото продукту\)/);
+  assert.match(runOf('creative_brief').system_prompt, /never carry readable text/); // the locked rules
   // creatives: one row per concept and format, the missing ones filled from the brief, the copy attached to its concept
   assert.deepEqual(tables.ag_creatives.map((c) => `${c.concept_key}:${c.ratio}`).sort(), ['c1:1:1', 'c1:9:16', 'c2:1:1', 'c2:9:16']);
   const c1 = tables.ag_creatives.find((c) => c.concept_key === 'c1' && c.ratio === '1:1');
   assert.equal(c1.status, 'planned');
-  assert.match(c1.prompt, /reference/);
-  assert.equal(c1.hf.references[0].url, 'https://x/luna.jpg'); // the reference file of the request goes with the prompt
-  assert.match(tables.ag_creatives.find((c) => c.concept_key === 'c2' && c.ratio === '1:1').prompt, /warm lamp/); // not answered by the model: built from the brief
-  assert.equal(tables.ag_creatives.filter((c) => c.concept_key === 'c2').length, 2); // 4:5 is not a format of the request: the concept gets the request's formats
+  assert.equal(c1.hf.references[0].url, 'https://x/luna.jpg');
+  assert.match(tables.ag_creatives.find((c) => c.concept_key === 'c2' && c.ratio === '1:1').prompt, /warm lamp/);
   assert.equal(c1.copy.variants[0].headline, 'Soft mornings');
-  assert.ok(!tables.ag_creatives.find((c) => c.concept_key === 'c2').copy?.variants); // no text for it
-  assert.equal(tables.ag_creatives.find((c) => c.concept_key === 'c2').concept_name, 'Autumn corner');
+  assert.ok(!tables.ag_creatives.find((c) => c.concept_key === 'c2').copy?.variants);
+  // the checker saw the brief, the texts and the prompts
+  assert.match(runOf('creative_quality').user_prompt, /Технічне завдання[\s\S]*Morning light/);
+  assert.match(runOf('creative_quality').user_prompt, /Результат агента «Агент копірайтер»/);
+  assert.match(runOf('creative_quality').user_prompt, /Результат агента «Агент креативщик»/);
+  // the client link remembers the last work
+  assert.equal(tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_maker').id).last_status, 'ok');
+  assert.equal(tables.ag_agent_clients.find((l) => l.campaign_id === 2 && l.agent_id === A('creative_maker').id).last_run_at, undefined); // the other client was not touched
 
-  // a paused campaign does not start requests; cancel withdraws the waiting tasks
+  // a paused campaign does not start requests; a client paused for the strategist neither; cancel withdraws the waiting tasks
   tables.ag_creative_requests.push({ id: 2, campaign_id: 1, status: 'draft', brief: request.brief, materials: [] });
   tables.ag_campaigns[0].status = 'paused';
   await assert.rejects(() => startRequest(ctx, 2), /призупинено/);
   tables.ag_campaigns[0].status = 'draft';
-  await assert.rejects(() => startRequest(ctx, 2).then(() => startRequest(ctx, 2)), /уже в роботі/);
+  const sl = tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_strategist').id);
+  sl.mode = 'paused';
+  await assert.rejects(() => startRequest(ctx, 2), /вимкнений або на паузі/);
+  sl.mode = 'auto';
+  await startRequest(ctx, 2);
+  await assert.rejects(() => startRequest(ctx, 2), /уже в роботі/);
   await cancelRequest(ctx, 2);
   assert.equal(tables.ag_creative_requests[1].status, 'cancelled');
   assert.equal(tables.ag_tasks.filter((t) => t.request_id === 2 && t.status === 'queued').length, 0);
-
-  // with the competitor analyst switched off the brief is still written from what exists
-  A('studio_competitor_analyst').enabled = false;
-  tables.ag_creative_requests.push({ id: 3, campaign_id: 1, status: 'draft', brief: request.brief, materials: [] });
-  assert.equal((await startRequest(ctx, 3)).started, 1);
-  await processQueue(ctx);
-  assert.equal(tables.ag_creative_requests[2].status, 'review');
 });
 
-await ok('creative studio: the answers of the brief writer, copywriter and producer are checked', () => {
+await ok('creative department: priority of clients, manual mode, confirm-before-pass, paused link, weekly analyst per client', async () => {
+  const { tables, db, model, ctx } = creativeWorld();
+  await connectCampaign(db, tables.ag_campaigns[0], { email: 'a@x.com' });
+  await connectCampaign(db, tables.ag_campaigns[1], { email: 'a@x.com' });
+  const A = (r) => tables.ag_agents.find((a) => a.role === r);
+  const link = (campaign, role) => tables.ag_agent_clients.find((l) => l.campaign_id === campaign && l.agent_id === A(role).id);
+  tables.ag_campaigns.forEach((c) => { c.status = 'active'; });
+  // the department works through the clients by priority: client 2 goes before client 1
+  newRequest(tables, 1, 1);
+  newRequest(tables, 2, 2);
+  link(2, 'creative_strategist').priority = 50;
+  await startRequest(ctx, 1);
+  await startRequest(ctx, 2);
+  model.calls.length = 0;
+  await processQueue(ctx, { parallel: 1 });
+  const firstRun = tables.ag_runs[0];
+  assert.equal(tables.ag_tasks.find((t) => t.id === firstRun.task_id).campaign_id, 2); // the higher priority client is served first
+  assert.deepEqual(tables.ag_creative_requests.map((r) => r.status), ['review', 'problem']); // client 2 went first and hit the brief writer's non-JSON answer; client 1 passed
+
+  // manual mode of a link: the chain does not start that agent for the client, the person does (and the request waits for it)
+  tables.ag_tasks.length = 0; tables.ag_runs.length = 0; tables.ag_creatives.length = 0;
+  tables.ag_creative_requests.length = 0;
+  newRequest(tables, 1, 3);
+  link(1, 'creative_copywriter').mode = 'manual';
+  await startRequest(ctx, 3);
+  await processQueue(ctx);
+  assert.equal(tables.ag_tasks.filter((t) => t.agent_id === A('creative_copywriter').id).length, 0);
+  assert.equal(tables.ag_creative_requests[0].status, 'running'); // quality needs the maker; the maker is done; copywriter is manual: quality starts when every participating agent above it delivered
+  const manual = await runNow(ctx, A('creative_copywriter').id, { campaignId: 1, requestId: 3 });
+  assert.equal(manual.status, 'done');
+  await assert.rejects(() => runNow(ctx, A('creative_copywriter').id, {}), /Оберіть клієнта/);
+
+  // confirm-before-pass: the brief writer's result waits for the person's OK, nothing starts below it until then
+  tables.ag_tasks.length = 0; tables.ag_runs.length = 0; tables.ag_creatives.length = 0;
+  tables.ag_creative_requests.length = 0;
+  link(1, 'creative_copywriter').mode = 'auto';
+  link(1, 'creative_brief').confirm_before_pass = true;
+  newRequest(tables, 1, 4);
+  await startRequest(ctx, 4);
+  await processQueue(ctx);
+  const briefTask = tables.ag_tasks.find((t) => t.agent_id === A('creative_brief').id);
+  assert.equal(briefTask.status, 'done');
+  assert.equal(briefTask.output.awaiting_pass, true);
+  assert.equal(tables.ag_tasks.filter((t) => t.agent_id === A('creative_maker').id).length, 0);
+  assert.equal(tables.ag_creative_requests[0].status, 'running');
+  await passOn(ctx, briefTask.id);
+  await processQueue(ctx);
+  assert.equal(tables.ag_creative_requests[0].status, 'review');
+  await assert.rejects(() => passOn(ctx, briefTask.id), /не чекає/);
+
+  // a client whose link to the strategist is paused neither runs nor blocks the others
+  link(2, 'creative_strategist').mode = 'paused';
+  tables.ag_tasks.push({ id: 700, agent_id: A('creative_strategist').id, campaign_id: 2, type: 'creative', status: 'queued', brief: { manual: true }, request_id: null });
+  const idle = await processQueue(ctx);
+  assert.equal(idle.processed, 0);
+  assert.equal(tables.ag_tasks.find((t) => t.id === 700).status, 'queued');
+
+  // the weekly analyst works per client: a client without a Meta account gets a «no data» note and costs nothing
+  tables.ag_tasks.length = 0; tables.ag_runs.length = 0;
+  link(2, 'creative_strategist').mode = 'auto';
+  A('creative_analyst').enabled_since = '2026-10-01T00:00:00Z';
+  tables.ag_agent_clients.forEach((l) => { l.created_at = '2026-10-01T00:00:00Z'; });
+  const monday = { ...ctx, now: () => new Date('2026-10-26T09:30:00Z') }; // Monday, 11:30 in Kyiv
+  model.calls.length = 0;
+  const run = await processQueue(monday);
+  assert.equal(run.started.filter((r) => r === 'creative_analyst').length, 2);
+  const analystTasks = tables.ag_tasks.filter((t) => t.agent_id === A('creative_analyst').id);
+  assert.deepEqual(analystTasks.map((t) => t.campaign_id).sort(), [1, 2]);
+  assert.equal(model.calls.filter((c) => c === 'creative-creative_analyst').length, 1); // only the client with Meta used the model
+  assert.equal(analystTasks.find((t) => t.campaign_id === 2).output.skipped, true);
+  assert.match(tables.ag_runs.find((r) => r.agent_id === A('creative_analyst').id).user_prompt, /Ad 1/);
+  const again = await processQueue(monday);
+  assert.equal(again.started.length, 0); // done for this week, per client
+  // the strategist now reads the analysis, with its age
+  newRequest(tables, 1, 5);
+  await startRequest(ctx, 5);
+  await processQueue(monday);
+  assert.match(tables.ag_runs.filter((r) => r.agent_id === A('creative_strategist').id).pop().user_prompt, /Аналіз ефективності креативів \(звіт від 2026-10-26: 0 дн\. тому, свіжий\)/);
+});
+
+await ok('creative department: the answers of the strategist, brief writer, copywriter, maker and checker are checked', () => {
   const req = { brief: { count: 2, ratios: ['1:1', '9:16'], texts: 'no' } };
-  const brief = parseStudioBrief('```json\n' + JSON.stringify({ concepts: [{ name: 'A', visual: 'v', ratios: ['16:9', '9:16'], needs_text: true }, { key: 'x y!', name: 'B', visual: 'w' }, { name: 'C', visual: 'z' }, { name: 'no picture' }] }) + '\n```', req);
-  assert.equal(brief.concepts.length, 2); // the request asks for two
+  const plan = parseCreativePlan('```json\n' + JSON.stringify({ directions: [{ name: 'B', priority: 2, angle: 'b' }, { name: 'A', priority: 1, why: 'a' }, { name: 'C', priority: 3, angle: 'c' }, { name: 'empty' }] }) + '\n```', req);
+  assert.deepEqual(plan.directions.map((d) => d.name), ['A', 'B']); // by priority, the request asks for two
+  assert.notEqual(plan.directions[0].key, plan.directions[1].key);
+  assert.throws(() => parseCreativePlan('not json', req), /не повернув/);
+  const brief = parseCreativeBrief('```json\n' + JSON.stringify({ concepts: [{ name: 'A', visual: 'v', ratios: ['16:9', '9:16'], needs_text: true }, { key: 'x y!', name: 'B', visual: 'w' }, { name: 'C', visual: 'z' }, { name: 'no picture' }] }) + '\n```', req, plan.directions);
+  assert.equal(brief.concepts.length, 2); // one concept per direction, at most what the request asks
   assert.deepEqual(brief.concepts[0].ratios, ['9:16']); // only formats the request lists
   assert.deepEqual(brief.concepts[1].ratios, ['1:1', '9:16']);
   assert.ok(brief.concepts.every((c) => c.needs_text === false)); // the request says no texts
   assert.notEqual(brief.concepts[0].key, brief.concepts[1].key);
-  assert.throws(() => parseStudioBrief('not json', req), /не повернув/);
-  assert.throws(() => parseStudioBrief('{"concepts":[{"name":"no visual"}]}', req), /не повернув/);
-  const copy = parseStudioCopy(JSON.stringify({ texts: [{ concept: 'c1', headline: 'H', primary_text: 'P' }, { concept: 'other', headline: 'H' }, { concept: 'c1' }] }), [{ key: 'c1' }]);
+  assert.throws(() => parseCreativeBrief('not json', req), /не повернув/);
+  assert.throws(() => parseCreativeBrief('{"concepts":[{"name":"no visual"}]}', req), /не повернув/);
+  const copy = parseCreativeCopy(JSON.stringify({ texts: [{ concept: 'c1', headline: 'H', primary_text: 'P' }, { concept: 'other', headline: 'H' }, { concept: 'c1' }] }), [{ key: 'c1' }]);
   assert.equal(copy.texts.length, 1);
-  const prod = parseStudioProducer('{"creatives":[{"concept":"c1","ratio":"1:1","prompt":"P1"}]}', [{ key: 'c1', name: 'N', ratios: ['1:1', '9:16'], visual: 'a sofa' }], 'warm light');
+  const prod = parseCreativeMaker('{"creatives":[{"concept":"c1","ratio":"1:1","prompt":"P1"}]}', [{ key: 'c1', name: 'N', ratios: ['1:1', '9:16'], visual: 'a sofa' }], 'warm light');
   assert.equal(prod.creatives.length, 2);
   assert.equal(prod.creatives[0].fallback, false);
-  assert.equal(prod.creatives[1].prompt, 'a sofa. warm light'); // skipped by the model: built from the brief and the studio style
-  assert.throws(() => parseStudioProducer('nope', [{ key: 'c1', ratios: ['1:1'], visual: 'v' }]), /не повернув/);
+  assert.equal(prod.creatives[1].prompt, 'a sofa. warm light'); // skipped by the model: built from the brief and the department style
+  assert.throws(() => parseCreativeMaker('nope', [{ key: 'c1', ratios: ['1:1'], visual: 'v' }]), /не повернув/);
+  // the checker: any high issue or three medium ones send the work back, whatever the model said
+  assert.equal(parseCreativeQc('{"verdict":"pass","issues":[{"severity":"high","comment":"invented price"}]}').verdict, 'revise');
+  assert.equal(parseCreativeQc('{"verdict":"revise","issues":[{"severity":"medium","comment":"a"},{"severity":"low","comment":"b"}]}').verdict, 'pass');
+  assert.equal(parseCreativeQc('{"verdict":"pass","issues":[{"severity":"medium","comment":"a"},{"severity":"medium","comment":"b"},{"severity":"medium","comment":"c"}]}').verdict, 'revise');
+  assert.throws(() => parseCreativeQc('nope'), /не повернув/);
 });
 
 await ok('campaign team: launch -> research -> strategy -> analysts -> optimizers and creative -> copy -> control -> report -> client message; pause stops it', async () => {

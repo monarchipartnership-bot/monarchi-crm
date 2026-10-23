@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { kickQueue } from '../../../../lib/api/agents';
-import { createRequest, fetchRequests, loadStudioTeam, startRequest } from '../../../../lib/api/studio';
-import { STUDIO_ROLES } from '../../../../lib/agents/studioTeam';
+import { createRequest, fetchRequests, loadCreativeTeam, startRequest } from '../../../../lib/api/creatives';
+import { CREATIVE_ROLES } from '../../../../lib/agents/creativeTeam';
 import { fmtDateTime } from '../../../Smm/agentUi';
 import AgentWindow from '../AgentWindow';
 import RequestForm from './RequestForm';
@@ -20,7 +20,7 @@ export default function StudioSection({ campaign, notify }) {
   const [openRole, setOpenRole] = useState(null);
 
   const reload = useCallback(async () => {
-    const [t, r] = await Promise.all([loadStudioTeam(campaign, email), fetchRequests(campaign.id)]);
+    const [t, r] = await Promise.all([loadCreativeTeam(campaign, email), fetchRequests(campaign.id)]);
     setTeam(t);
     setRequests(r);
   }, [campaign, email]);
@@ -44,11 +44,11 @@ export default function StudioSection({ campaign, notify }) {
     <section className="stu-section-wrap" aria-label="Креативна студія">
       <div className="cmp-live-head stu-head">
         <div>
-          <h3>Креативна студія</h3>
-          <span className="cmp-muted">Запит клієнта → аналіз клієнта й конкурентів → технічне завдання → тексти й запити для Higgsfield → ваше затвердження.</span>
+          <h3>Відділ креативів</h3>
+          <span className="cmp-muted">Запит клієнта → Агент креативний стратег → Агент по ТЗ → Агент копірайтер й Агент креативщик → Агент перевірки якості → ваше затвердження.</span>
         </div>
         <div className="stu-head-actions">
-          <button type="button" className="cmp-btn" disabled={!team} onClick={() => setOpenRole(STUDIO_ROLES[0].role)}>Агенти студії{team ? ` (${agentsOn} з ${team.agents.length})` : ''}</button>
+          <button type="button" className="cmp-btn" disabled={!team} onClick={() => setOpenRole(CREATIVE_ROLES.find((r) => r.entry).role)}>Агенти відділу{team ? ` (${agentsOn} з ${team.agents.length})` : ''}</button>
           <button type="button" className="cmp-btn cmp-btn--primary" disabled={!team || ['paused', 'archived'].includes(campaign.status)} onClick={() => setForm({ initial: null })}>Новий запит</button>
         </div>
       </div>

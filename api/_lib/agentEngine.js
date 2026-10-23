@@ -19,9 +19,9 @@ import { speedKeyFromEnv } from './pageSpeed.js';
 import { runSeoAudit } from './seoRun.js';
 import * as higgsfield from './higgsfield.js';
 import { campaignRole } from './campaignRun.js';
-import { studioRole } from './studioRun.js';
-import { fanOutRequest, settleRequest } from './studioEngine.js';
-import { isStudioRole } from '../../src/lib/agents/studioTeam.js';
+import { creativeRole } from './creativeRun.js';
+import { fanOutRequest, settleRequest, touchClientLink } from './creativeEngine.js';
+import { CREATIVE_TEAM } from '../../src/lib/agents/creativeTeam.js';
 import { CAMPAIGN_TEAM } from '../../src/lib/agents/campaignTeam.js';
 import { LANGUAGES, MAX_POSTS_PER_RUN, nextMonday, PLATFORM_KEYS } from './smmContent.js';
 
@@ -45,8 +45,8 @@ export async function loadTeam(db) {
   return { agents, links, byRole: new Map(agents.map((a) => [a.role, a])), byId: new Map(agents.map((a) => [a.id, a])) };
 }
 
-export async function enqueue(db, { agent, type, brief = {}, postId = null, planId = null, from = null, by = null, parent = null }) {
-  return must(await db.from('ag_tasks').insert({ agent_id: agent.id, type, status: 'queued', brief, post_id: postId, plan_id: planId, created_by_agent_id: from?.id ?? null, created_by: by, parent_task_id: parent }).select().single(), 'task');
+export async function enqueue(db, { agent, type, brief = {}, postId = null, planId = null, from = null, by = null, parent = null, campaignId = null, requestId = null }) {
+  return must(await db.from('ag_tasks').insert({ agent_id: agent.id, type, status: 'queued', brief, post_id: postId, plan_id: planId, created_by_agent_id: from?.id ?? null, created_by: by, parent_task_id: parent, campaign_id: campaignId, request_id: requestId }).select().single(), 'task');
 }
 
 async function loadPrompt(db, agent, task) {
@@ -116,7 +116,11 @@ export async function loadAll(db) {
   const agents = must(await db.from('ag_agents').select('*').order('sort'), 'agents') || [];
   const links = agents.length ? must(await db.from('ag_links').select('*').in('from_agent_id', agents.map((a) => a.id)), 'links') || [] : [];
   const campaigns = must(await db.from('ag_campaigns').select('id, status'), 'campaigns') || [];
-  return { agents, links, byId: new Map(agents.map((a) => [a.id, a])), campaigns: new Map(campaigns.map((c) => [String(c.id), c.status])) };
+  const clients = must(await db.from('ag_agent_clients').select('*'), 'client links') || [];
+  return {
+    agents, links, byId: new Map(agents.map((a) => [a.id, a])), campaigns: new Map(campaigns.map((c) => [String(c.id), c.status])),
+    clients: new Map(clients.map((c) => [`${c.agent_id}:${c.campaign_id}`, c])),
+  };
 }
 // The team one agent belongs to (same team and scope), in the shape the handlers use.
 export function subTeam(all, agent) {
@@ -124,12 +128,20 @@ export function subTeam(all, agent) {
   const ids = new Set(agents.map((a) => a.id));
   return { agents, links: all.links.filter((l) => ids.has(l.from_agent_id) && ids.has(l.to_agent_id)), byRole: new Map(agents.map((a) => [a.role, a])), byId: new Map(agents.map((a) => [a.id, a])) };
 }
-const readyOf = (a) => (a?.team === CAMPAIGN_TEAM ? { ready: true } : READY[a?.role] || { ready: false });
-const typeOf = (a) => (a.team === CAMPAIGN_TEAM ? 'report' : TASK_TYPE[a.role]);
+const readyOf = (a) => (a?.team === CAMPAIGN_TEAM || a?.team === CREATIVE_TEAM ? { ready: true } : READY[a?.role] || { ready: false });
+const typeOf = (a) => (a.team === CREATIVE_TEAM ? 'creative' : a.team === CAMPAIGN_TEAM ? 'report' : TASK_TYPE[a.role]);
 // A campaign team works only while its campaign is active (pausing a campaign stops all of its agents at once).
-// The creative studio works on requests a person starts by hand, so it also works for a campaign that is still a draft.
-const campaignOn = (all, a) => a.team !== CAMPAIGN_TEAM || all.campaigns.get(a.scope_id) === 'active' || (isStudioRole(a.role) && all.campaigns.get(a.scope_id) === 'draft');
-const runnable = (all, states, a) => !!a && readyOf(a).ready && campaignOn(all, a) && states[a.id]?.state === 'on';
+const campaignOn = (all, a) => a.team !== CAMPAIGN_TEAM || all.campaigns.get(a.scope_id) === 'active';
+// The agents of the creative department are shared workers: a TASK of a client runs when the agent is on, the client is linked to it and not paused for
+// it (a link in manual mode runs only tasks a person started), and the client's campaign is working (a draft campaign too: requests are started by hand).
+function clientOn(all, a, task) {
+  if (a.team !== CREATIVE_TEAM) return true;
+  const link = task ? all.clients.get(`${a.id}:${task.campaign_id}`) : null;
+  if (!link || !link.enabled || link.mode === 'paused') return false;
+  if (link.mode === 'manual' && !task.brief?.manual) return false;
+  return ['active', 'draft'].includes(all.campaigns.get(String(task.campaign_id)));
+}
+const runnable = (all, states, a, task = null) => !!a && readyOf(a).ready && campaignOn(all, a) && states[a.id]?.state === 'on' && clientOn(all, a, task);
 
 // ---------------------------------------------------------------------------------------------------------------- production of a post
 // After the copywriter or the visual agent finishes: when nothing of the production is still open and the text is written,
@@ -334,7 +346,7 @@ async function seo({ ctx, task, rec }) {
 }
 
 const HANDLERS = { strategist, copywriter, visual, qc: qualityControl, competitors, seo, site_analyst: siteAnalyst };
-const handlerOf = (a) => (a?.team === CAMPAIGN_TEAM ? (isStudioRole(a.role) ? studioRole : campaignRole) : HANDLERS[a?.role]);
+const handlerOf = (a) => (a?.team === CREATIVE_TEAM ? creativeRole : a?.team === CAMPAIGN_TEAM ? campaignRole : HANDLERS[a?.role]);
 
 // Pictures and videos that were sent to the generator: look at each, keep the finished file in our storage, record a failure.
 export async function pollAssets(ctx) {
@@ -369,6 +381,14 @@ export async function redoVisual(ctx, postId, note = '') {
 
 // ---------------------------------------------------------------------------------------------------------------- running tasks
 // Claims a queued task (only one process can) and runs it. → the finished task row, or null when someone else took it.
+// A link with confirm_before_pass keeps the result until the person gives the OK (action `pass_on`): the output is marked, nothing starts.
+async function confirmGate(ctx, task, agent, outcome) {
+  const link = (await ctx.db.from('ag_agent_clients').select('confirm_before_pass').eq('agent_id', agent.id).eq('campaign_id', task.campaign_id).maybeSingle()).data;
+  if (!link?.confirm_before_pass) return false;
+  await ctx.db.from('ag_tasks').update({ output: { ...outcome.output, awaiting_pass: true } }).eq('id', task.id);
+  return true;
+}
+
 export async function runTask(ctx, team, task) {
   const { db } = ctx;
   const agent = team.byId.get(task.agent_id);
@@ -390,7 +410,10 @@ export async function runTask(ctx, team, task) {
   const status = outcome.ok ? 'done' : 'failed';
   await db.from('ag_tasks').update({ status, output: outcome.ok ? outcome.output : null, error: outcome.ok ? null : String(outcome.error).slice(0, 600), cost_usd: rec.state.cost, finished_at: finished, lease_until: null, prompt_id: prompt.id, prompt_version: prompt.version }).eq('id', task.id);
   if (agent) await db.from('ag_agents').update({ last_run_at: finished, last_status: outcome.ok ? 'ok' : 'problem', last_message: String(outcome.ok ? outcome.summary : outcome.error).slice(0, 500) }).eq('id', agent.id);
-  if (outcome.ok && agent) { try { await fanOut(ctx, team, agent, task); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
+  if (agent?.team === CREATIVE_TEAM) { try { await touchClientLink(ctx, task, outcome.ok); } catch (e) { console.warn('touchClientLink failed:', e?.message || e); } }
+  // a result that must wait for the person's OK before it goes on (confirm_before_pass of the client's link) does not start the next agents
+  const gate = outcome.ok && agent?.team === CREATIVE_TEAM ? await confirmGate(ctx, task, agent, outcome) : false;
+  if (outcome.ok && agent && !gate) { try { await fanOut(ctx, team, agent, task); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
   if (task.request_id) { try { await settleRequest(ctx, task.request_id, outcome.ok ? null : `${agent?.name || 'Агент'}: ${outcome.error}`); } catch (e) { console.warn('settleRequest failed:', e?.message || e); } }
   if (outcome.ok && outcome.advance) { try { await advancePost(ctx, team, outcome.advance); } catch (e) { console.warn('advancePost failed:', e?.message || e); } }
   return { id: task.id, status, role: agent?.role, error: outcome.ok ? null : outcome.error };
@@ -402,8 +425,9 @@ export async function runTask(ctx, team, task) {
 // or a control never starts before the work it checks, whatever order the parallel tasks finish in. If something upstream failed,
 // the round waits until it is retried: that is how a broken link stops the chain.
 async function fanOut(ctx, team, agent, task = null) {
+  if (agent.team === CREATIVE_TEAM) { await fanOutRequest(ctx, team, agent, task); return; }
   if (agent.team !== CAMPAIGN_TEAM) return;
-  if (isStudioRole(agent.role)) { await fanOutRequest(ctx, team, agent, task); return; }
+  if (agent.team === CREATIVE_TEAM) { await fanOutRequest(ctx, team, agent, task); return; }
   const targets = team.links.filter((l) => l.from_agent_id === agent.id).map((l) => team.byId.get(l.to_agent_id)).filter((b) => b && b.enabled && b.config?.trigger === 'upstream');
   for (const b of targets) {
     const ups = ancestorsOf(b.id, team.links).map((id) => team.byId.get(id)).filter((a) => a && a.enabled);
@@ -423,11 +447,32 @@ async function fanOut(ctx, team, agent, task = null) {
   }
 }
 
+// A weekly agent of the creative department works PER CLIENT: every client linked to it (on, auto mode, campaign running) has its own schedule
+// state in the link row, so one client's failure never delays another's run. → [roles started]
+async function scheduleClients(ctx, all, states, a) {
+  const started = [];
+  if (!a.schedule || !a.enabled || states[a.id]?.state !== 'on') return started;
+  for (const link of all.clients.values()) {
+    if (link.agent_id !== a.id || !link.enabled || link.mode !== 'auto' || all.campaigns.get(String(link.campaign_id)) !== 'active') continue;
+    const since = [a.enabled_since, link.created_at].filter(Boolean).sort().pop() || null;
+    const verdict = agentDue({ agent: { ...a, enabled_since: since, last_scheduled: link.last_scheduled, attempts: link.attempts, last_attempt_at: link.last_attempt_at, last_status: link.last_status }, now: ctx.now() });
+    if (!verdict.due) continue;
+    const open = must(await ctx.db.from('ag_tasks').select('id').eq('agent_id', a.id).eq('campaign_id', link.campaign_id).in('status', ['queued', 'running']).limit(1), 'tasks') || [];
+    if (open.length) continue;
+    const same = link.last_scheduled === verdict.scheduledFor;
+    must(await ctx.db.from('ag_agent_clients').update({ last_scheduled: verdict.scheduledFor, attempts: same ? (link.attempts || 0) + 1 : 1, last_attempt_at: iso(ctx.now()) }).eq('id', link.id), 'client link');
+    await enqueue(ctx.db, { agent: a, type: typeOf(a), brief: { scheduled: true, scheduledFor: verdict.scheduledFor }, by: 'розклад', campaignId: link.campaign_id });
+    started.push(a.role);
+  }
+  return started;
+}
+
 // Agents with a schedule whose moment has come get a task. → [roles started]
 async function scheduleDue(ctx, all) {
   const states = chainStates(all.agents, all.links);
   const started = [];
   for (const a of all.agents) {
+    if (a.team === CREATIVE_TEAM) { started.push(...await scheduleClients(ctx, all, states, a)); continue; }
     if (!a.schedule || !runnable(all, states, a) || !a.enabled) continue;
     const verdict = agentDue({ agent: a, now: ctx.now() });
     if (!verdict.due) continue;
@@ -455,7 +500,8 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
     const states = chainStates(all.agents, all.links);
     const now = iso(ctx.now());
     const tasks = must(await ctx.db.from('ag_tasks').select('*').or(`status.eq.queued,and(status.eq.running,lease_until.lt.${now})`).order('created_at', { ascending: true }).limit(40), 'tasks') || [];
-    const ready = tasks.filter((t) => runnable(all, states, all.byId.get(t.agent_id)));
+    const prio = (t) => all.clients.get(`${t.agent_id}:${t.campaign_id}`)?.priority ?? 100;
+    const ready = tasks.filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).sort((a, b) => prio(a) - prio(b) || a.id - b.id); // clients by priority, then in turn
     stats.waiting = tasks.length - ready.length;
     stats.left = ready.length;
     if (!ready.length) break;
@@ -463,9 +509,9 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
     results.filter(Boolean).forEach((r) => { stats.processed += 1; if (r.status === 'failed') stats.failed += 1; });
     if (!results.filter(Boolean).length) break;
   }
-  const rest = must(await ctx.db.from('ag_tasks').select('id, agent_id').in('status', ['queued', 'running']).limit(100), 'tasks') || [];
+  const rest = must(await ctx.db.from('ag_tasks').select('id, agent_id, campaign_id, brief').in('status', ['queued', 'running']).limit(100), 'tasks') || [];
   const states = chainStates(all.agents, all.links);
-  stats.left = rest.filter((t) => runnable(all, states, all.byId.get(t.agent_id))).length;
+  stats.left = rest.filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).length;
   stats.waiting = rest.length - stats.left;
   return stats;
 }
@@ -477,8 +523,12 @@ export async function runNow(ctx, agentId, brief = {}) {
   const agent = all.byId.get(agentId);
   if (!agent) throw new Error('Агента не знайдено.');
   if (!readyOf(agent).ready) throw new Error(readyOf(agent).note || 'Цей агент ще не готовий до роботи.');
-  if (agent.team !== CAMPAIGN_TEAM && !['site_analyst', 'strategist', 'seo', 'competitors'].includes(agent.role)) throw new Error('Цей агент працює за завданнями від інших агентів.');
-  const task = await enqueue(ctx.db, { agent, type: typeOf(agent), brief, by: ctx.email });
+  if (agent.team !== CAMPAIGN_TEAM && agent.team !== CREATIVE_TEAM && !['site_analyst', 'strategist', 'seo', 'competitors'].includes(agent.role)) throw new Error('Цей агент працює за завданнями від інших агентів.');
+  // an agent of the creative department works for a client: a manual run says which one (and runs even if the client's link is in manual mode)
+  const campaignId = agent.team === CREATIVE_TEAM ? Number(brief.campaignId) || null : null;
+  if (agent.team === CREATIVE_TEAM && !campaignId) throw new Error('Оберіть клієнта, для якого запустити агента.');
+  const requestId = agent.team === CREATIVE_TEAM ? Number(brief.requestId) || null : null; // inside a request the manual run joins its chain
+  const task = await enqueue(ctx.db, { agent, type: typeOf(agent), brief: agent.team === CREATIVE_TEAM ? { ...brief, manual: true } : brief, by: ctx.email, campaignId, requestId });
   const result = await runTask(ctx, subTeam(all, agent), task);
   return { taskId: task.id, ...(result || { status: 'skipped' }) };
 }

@@ -3,8 +3,8 @@ import ActionIcon from '../../../../components/common/ActionIcon';
 import { useConfirm } from '../../../../components/common/ConfirmDialog';
 import useDialogA11y from '../../../../lib/useDialogA11y';
 import { kickQueue } from '../../../../lib/api/agents';
-import { cancelRequest, deleteRequest, fetchRequestDetail, retryStudioTask, startRequest } from '../../../../lib/api/studio';
-import { MATERIAL_KINDS, REQUEST_LANGUAGES, REQUEST_RATIOS, STUDIO_ROLES, TEXT_MODES } from '../../../../lib/agents/studioTeam';
+import { cancelRequest, deleteRequest, fetchRequestDetail, passOn, retryStudioTask, runStep, startRequest } from '../../../../lib/api/creatives';
+import { CREATIVE_ROLES, MATERIAL_KINDS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES } from '../../../../lib/agents/creativeTeam';
 import Markdown from '../../../Smm/Markdown';
 import { fmtDateTime } from '../../../Smm/agentUi';
 
@@ -12,7 +12,7 @@ export const REQUEST_STATUS = {
   draft: ['Чернетка', 'draft'], running: ['В роботі', 'active'], review: ['Готово до перегляду', 'active'], done: ['Завершено', 'archived'],
   problem: ['Помилка', 'bad'], cancelled: ['Скасовано', 'archived'],
 };
-const STEP_STATE = { wait: 'Чекає', work: 'Працює', done: 'Готово', fail: 'Помилка', off: 'Вимкнено' };
+const STEP_STATE = { wait: 'Чекає', work: 'Працює', done: 'Готово', fail: 'Помилка', off: 'Вимкнено', manual: 'Вручну', gate: 'Чекає вашого ОК' };
 
 // One request of the studio: where its chain is, what every agent concluded, the brief with its concepts, the prompts and texts of the
 // creatives. A person can start it, cancel it, retry a failed step, copy it into a new request or delete it.
@@ -39,19 +39,24 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
 
   const agentsByRole = useMemo(() => new Map((team?.agents || []).map((a) => [a.role, a])), [team]);
   const taskOf = (role) => { const a = agentsByRole.get(role); return a ? detail.tasks.find((t) => t.agent_id === a.id) : null; };
-  const steps = STUDIO_ROLES.map((def) => {
+  // the steps of a request are the agents of the department that work on requests; an agent is «off» for this client when it is off or the client's
+  // link to it is off or paused, and «manual» when the client's link is in manual mode (the person starts that step)
+  const steps = CREATIVE_ROLES.filter((r) => r.trigger === 'request').map((def) => {
     const agent = agentsByRole.get(def.role);
+    const link = agent ? team?.clients?.get(agent.id) : null;
     const task = taskOf(def.role);
     let state = 'wait';
-    if (!agent?.enabled) state = 'off';
-    else if (task?.status === 'done') state = 'done';
+    if (!agent?.enabled || !link || !link.enabled || link.mode === 'paused') state = 'off';
+    else if (task?.status === 'done') state = task.output?.awaiting_pass ? 'gate' : 'done';
     else if (task?.status === 'failed') state = 'fail';
     else if (task && ['queued', 'running'].includes(task.status)) state = 'work';
+    else if (link.mode === 'manual') state = 'manual';
     return { def, agent, task, state };
   });
   const cost = detail.tasks.reduce((s, t) => s + Number(t.cost_usd || 0), 0);
-  const brief = steps.find((s) => s.def.role === 'studio_brief_writer')?.task?.output?.json;
-  const copyBy = (key) => (steps.find((s) => s.def.role === 'studio_copywriter')?.task?.output?.json?.texts || []).filter((t) => t.concept === key);
+  const plan = steps.find((s) => s.def.role === 'creative_strategist')?.task?.output?.json;
+  const brief = steps.find((s) => s.def.role === 'creative_brief')?.task?.output?.json;
+  const copyBy = (key) => (steps.find((s) => s.def.role === 'creative_copywriter')?.task?.output?.json?.texts || []).filter((t) => t.concept === key);
   const b = detail.request.brief || {};
 
   async function run(fn, okText) {
@@ -60,6 +65,8 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
   }
   const start = () => run(async () => { await startRequest(detail.request.id); await reload(); await kickQueue(() => { reload().catch(() => {}); }); }, 'Запит запущено.');
   const retry = (task) => run(async () => { await retryStudioTask(task.id); await kickQueue(() => { reload().catch(() => {}); }); }, 'Крок запущено ще раз.');
+  const startStep = (agent) => run(async () => { await runStep(agent.id, detail.request.campaign_id, detail.request.id); await kickQueue(() => { reload().catch(() => {}); }); }, 'Крок виконано.');
+  const approve = (task) => run(async () => { await passOn(task.id); await kickQueue(() => { reload().catch(() => {}); }); }, 'Передано далі.');
   async function cancel() {
     if (!(await confirm({ title: 'Скасувати запит?', body: 'Завдання, що чекають у черзі, буде знято. Крок, який уже працює, закінчиться, але нічого нового не почне.', confirmLabel: 'Скасувати запит', danger: true }))) return;
     run(() => cancelRequest(detail.request.id), 'Запит скасовано.');
@@ -102,7 +109,7 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
               {b.message && <div><dt>Меседж</dt><dd>{b.message}</dd></div>}
               {b.must && <div><dt>Обовʼязково</dt><dd>{b.must}</dd></div>}
               {b.avoid && <div><dt>Не можна</dt><dd>{b.avoid}</dd></div>}
-              <div><dt>Формати</dt><dd>{(b.ratios || []).map((r) => REQUEST_RATIOS.find((x) => x.key === r)?.label || r).join(', ')} · концепцій: {b.count} · тексти: {TEXT_MODES[b.texts]} · {REQUEST_LANGUAGES[b.language]}</dd></div>
+              <div><dt>Формати</dt><dd>{(b.ratios || []).map((r) => REQUEST_RATIOS.find((x) => x.key === r)?.label || r).join(', ')} · напрямів: до {b.count} · тексти: {TEXT_MODES[b.texts]} · {REQUEST_LANGUAGES[b.language]}</dd></div>
             </dl>
             {(detail.request.materials || []).length > 0 && (
               <ul className="stu-files stu-files--ro">{detail.request.materials.map((m) => <li key={m.url}><img src={m.url} alt="" /><span><b>{m.name}</b><small>{MATERIAL_KINDS[m.kind] || m.kind}</small></span></li>)}</ul>
@@ -112,7 +119,7 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
           <section className="stu-section">
             <h3>Хід роботи</h3>
             <ol className="stu-steps">
-              {steps.map(({ def, task, state }) => (
+              {steps.map(({ def, agent, task, state }) => (
                 <li key={def.role} className={'stu-step stu-step--' + state}>
                   <div className="stu-step-head">
                     <b>{def.name}</b>
@@ -124,12 +131,33 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
                   <div className="stu-step-actions">
                     {task?.status === 'done' && task.output?.text && <button type="button" className="cmp-btn" onClick={() => setOpen((o) => ({ ...o, [def.role]: !o[def.role] }))}>{open[def.role] ? 'Згорнути' : 'Відкрити звіт'}</button>}
                     {task?.status === 'failed' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => retry(task)}>Повторити крок</button>}
+                    {state === 'gate' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={() => approve(task)}>Підтвердити й передати далі</button>}
+                    {state === 'manual' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => startStep(agent)}>Запустити для цього клієнта</button>}
                   </div>
                   {open[def.role] && task?.output?.text && <div className="stu-report"><Markdown text={task.output.text} />{task.output.failedInputs?.length > 0 && <p className="cmp-warnbox">Не завантажились дані: {task.output.failedInputs.join('; ')}</p>}</div>}
                 </li>
               ))}
             </ol>
           </section>
+
+          {plan?.directions?.length > 0 && (
+            <section className="stu-section">
+              <h3>План стратега</h3>
+              {plan.clarify && <p className="cmp-note">Що уточнити менеджеру: {plan.clarify}</p>}
+              <div className="stu-concepts">
+                {plan.directions.map((d) => (
+                  <article key={d.key} className="stu-concept">
+                    <header><b>{d.priority}. {d.name}</b><small>{d.key}</small></header>
+                    <p><span>Чому</span>{d.why}</p>
+                    <p><span>Для кого</span>{d.audience}</p>
+                    <p><span>Ідея</span>{d.angle}</p>
+                    <p><span>Що перевіряє</span>{d.tests}</p>
+                    {d.notes && <p><span>Ризики</span>{d.notes}</p>}
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           {brief?.concepts?.length > 0 && (
             <section className="stu-section">

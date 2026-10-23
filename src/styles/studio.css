@@ -51,6 +51,8 @@
 .stu-step--done .stu-step-state { background: rgba(95, 224, 161, .18); color: #7CF0B8; }
 .stu-step--fail .stu-step-state { background: rgba(255, 122, 154, .2); color: #FF8FAE; }
 .stu-step--off { opacity: .6; }
+.stu-step--manual .stu-step-state { background: rgba(124, 140, 248, .2); color: #A9B4FF; }
+.stu-step--gate .stu-step-state { background: rgba(242, 185, 75, .22); color: #F6CD76; }
 .stu-step-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .stu-report { margin-top: 6px; padding: 12px 14px; border-radius: 12px; background: rgba(12, 3, 16, .45); font-size: .86rem; max-height: 420px; overflow: auto; }
 .stu-concepts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }

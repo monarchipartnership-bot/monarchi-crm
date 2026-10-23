@@ -1,8 +1,9 @@
 import { supabase } from '../supabaseClient';
-import { cleanRequest, ensureStudioTeam, isStudioRole, STUDIO_ROLES } from '../agents/studioTeam';
+import { cleanRequest, connectCampaign, CREATIVE_ROLES, ensureCreativeDepartment, isCreativeRole } from '../agents/creativeTeam';
 import { agentAction } from './agents';
 
-// The creative studio of a campaign (migration 20261040000000_creative_studio.sql): requests, their tasks and creatives, the materials a manager uploads.
+// The creative department (migrations 20261040 and 20261041): its agents are shared workers, a client (campaign) is linked to each of them; requests, their
+// tasks and creatives, the materials a manager uploads.
 const nowIso = () => new Date().toISOString();
 const must = ({ data, error }) => { if (error) throw error; return data; };
 
@@ -10,14 +11,16 @@ export const BUCKET = 'creative-assets';
 export const MAX_FILE_MB = 8;
 export const FILE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
-// The studio agents of a campaign (created on first use) with their open tasks, in the shape the agent pages expect.
-export async function loadStudioTeam(campaign, email) {
-  const { agents, links } = await ensureStudioTeam(supabase, campaign, email);
+// The department's agents (created on first use) and the links of this client to them, with the open tasks, in the shape the agent pages expect.
+// `clients`: agent id -> the link row of this client (on/off, mode, priority, the client's own settings).
+export async function loadCreativeTeam(campaign, email) {
+  const { agents, links } = await ensureCreativeDepartment(supabase, email);
+  const rows = await connectCampaign(supabase, campaign, { email });
   const ids = agents.map((a) => a.id);
   const open = ids.length ? must(await supabase.from('ag_tasks').select('agent_id, status').in('agent_id', ids).in('status', ['queued', 'running', 'failed'])) || [] : [];
   const counts = {};
   open.forEach((t) => { (counts[t.agent_id] ||= { queued: 0, running: 0, failed: 0 })[t.status] += 1; });
-  return { agents, links, counts };
+  return { agents, links, counts, clients: new Map(rows.map((r) => [r.agent_id, r])) };
 }
 
 export async function fetchRequests(campaignId) {
@@ -50,6 +53,10 @@ export async function fetchRequestDetail(id) {
 export const startRequest = (requestId) => agentAction('start_request', { requestId });
 export const cancelRequest = (requestId) => agentAction('cancel_request', { requestId });
 export const retryStudioTask = (taskId) => agentAction('retry_task', { taskId });
+// A step the chain does not start by itself (the client's link is in manual mode): the person starts it for this client and request.
+export const runStep = (agentId, campaignId, requestId) => agentAction('run_agent', { agentId, brief: { campaignId, requestId } });
+// The person's OK on a result that waited before it goes to the next agent.
+export const passOn = (taskId) => agentAction('pass_on', { taskId });
 
 const safeName = (n) => String(n || 'file').normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-60);
 
@@ -64,4 +71,4 @@ export async function uploadMaterial(campaignId, file, kind) {
   return { name: file.name, url: data.publicUrl, path, kind };
 }
 
-export { isStudioRole, STUDIO_ROLES, nowIso };
+export { isCreativeRole, CREATIVE_ROLES, nowIso };
