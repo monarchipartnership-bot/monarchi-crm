@@ -414,7 +414,7 @@ export const AGENT_DEPTS = {
             wave: 2,
             status: 'in_development',
             statusChangedAt: '2026-10-17',
-            tool: 'campaign-teams',
+            deptAgent: 'creative_strategy', // the page of this agent in the department (Огляд / Здоровʼя / Проєкти / Налаштування / Журнал)
             description: 'Керівник відділу креативів: з запиту менеджера, досліджень бізнесу й конкурентів та аналізу креативів складає план по клієнту (гіпотези, кути, аудиторії, пріоритети) і ставить задачі Агенту по ТЗ.',
             buildNotes: 'Побудовано 2026-10-17 в команді кампанії. З результатів креативів, стратегії й досліджень аудиторії будує систему креативних гіпотез із планом тестів на два тижні.',
           },
@@ -427,7 +427,7 @@ export const AGENT_DEPTS = {
             wave: 2,
             status: 'in_development',
             statusChangedAt: '2026-10-17',
-            tool: 'campaign-teams',
+            deptAgent: 'creative_analyst', // the page of this agent in the department (Огляд / Здоровʼя / Проєкти / Налаштування / Журнал)
             description: 'Раз на тиждень зв’язує кожен креатив із фактичними результатами, шукає повторювані winning/losing patterns і віддає їх Агенту креативний стратег; після запуску вимірює, як спрацювали наші креативи.',
             buildNotes: 'Побудовано 2026-10-17 в команді кампанії. Читає дані рівня оголошень Meta, звʼязує кожен креатив з результатами й шукає закономірності, що виграють і програють.',
           },
@@ -435,7 +435,7 @@ export const AGENT_DEPTS = {
             key: 'creative-brief-agent',
             name: 'Агент по ТЗ',
             icon: AGENT_ICONS.clipboard,
-            tool: 'campaign-teams',
+            deptAgent: 'creative_brief', // the page of this agent in the department (Огляд / Здоровʼя / Проєкти / Налаштування / Журнал)
             autonomyLevel: 'human-assisted',
             stage: 'generate',
             wave: 2,
@@ -446,6 +446,7 @@ export const AGENT_DEPTS = {
           },
           {
             key: 'performance-copywriter',
+            deptAgent: 'creative_copywriter', // the page of this agent in the department; `tool` stays as the manual tool opened from that page
             name: 'Агент копірайтер',
             icon: AGENT_ICONS.pen,
             tool: 'performance-copywriter',
@@ -461,7 +462,7 @@ export const AGENT_DEPTS = {
             key: 'creative-producer-agent',
             name: 'Агент креативщик',
             icon: AGENT_ICONS.star,
-            tool: 'campaign-teams',
+            deptAgent: 'creative_maker', // the page of this agent in the department (Огляд / Здоровʼя / Проєкти / Налаштування / Журнал)
             autonomyLevel: 'human-assisted',
             stage: 'generate',
             wave: 3,
@@ -472,6 +473,7 @@ export const AGENT_DEPTS = {
           },
           {
             key: 'ai-quality-controller',
+            deptAgent: 'creative_quality', // the page of this agent in the department; `tool` stays as the manual tool opened from that page
             name: 'Агент перевірки якості',
             icon: DEPT_ICONS.shieldCheck,
             tool: 'ai-quality-controller',

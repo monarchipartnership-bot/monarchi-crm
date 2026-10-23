@@ -54,7 +54,7 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
     return { def, agent, task, state };
   });
   const cost = detail.tasks.reduce((s, t) => s + Number(t.cost_usd || 0), 0);
-  const plan = steps.find((s) => s.def.role === 'creative_strategist')?.task?.output?.json;
+  const plan = steps.find((s) => s.def.role === 'creative_strategy')?.task?.output?.json;
   const brief = steps.find((s) => s.def.role === 'creative_brief')?.task?.output?.json;
   const copyBy = (key) => (steps.find((s) => s.def.role === 'creative_copywriter')?.task?.output?.json?.texts || []).filter((t) => t.concept === key);
   const b = detail.request.brief || {};

@@ -44,6 +44,7 @@ export default function AgentSettings({ agent, notify, reload }) {
 
   const sch = f.schedule;
   const isCampaign = agent.team === CAMPAIGN_TEAM;
+  const isDept = agent.team === 'creative'; // an agent of a department: its fields are shared by all clients, the client's own fields live on the «Налаштування» tab of its page
   return (
     <form className="smm-auto" onSubmit={save}>
       {hasSchedule && (
@@ -59,7 +60,7 @@ export default function AgentSettings({ agent, notify, reload }) {
         </>
       )}
 
-      {isCampaign && (
+      {(isCampaign || isDept) && (
         <div className="smm-form">
           {(meta.fields || []).map((fld) => (
             <div key={fld.key} className="smm-field smm-field--wide">
@@ -70,11 +71,13 @@ export default function AgentSettings({ agent, notify, reload }) {
               {fld.hint && <span className="smm-hint">{fld.hint}</span>}
             </div>
           ))}
+          {isCampaign && (
           <div className="smm-field smm-field--wide">
             <label htmlFor="ag-extra">Додаткова інструкція для цього клієнта</label>
             <textarea id="ag-extra" rows={4} value={f.config.extra || ''} onChange={(e) => setCfg('extra', e.target.value)} maxLength={2000} placeholder="Наприклад: не порівнювати з конкурентами за ціною; писати коротко; завжди називати кампанії за іменем." />
             <span className="smm-hint">Додається до промту цього агента лише для цієї кампанії. Основний промт редагується у вкладці «Промти».</span>
           </div>
+          )}
         </div>
       )}
 
@@ -129,7 +132,7 @@ export default function AgentSettings({ agent, notify, reload }) {
         </div>
       )}
 
-      {!isCampaign && !hasSchedule && !['strategist', 'competitors', 'visual', 'qc', 'site_analyst'].includes(agent.role) && <p className="smm-muted">Окремих налаштувань у цього агента поки немає: він працює за завданнями від інших агентів.{meta.readyNote ? ' ' + meta.readyNote : ''}</p>}
+      {!isCampaign && !isDept && !hasSchedule && !['strategist', 'competitors', 'visual', 'qc', 'site_analyst'].includes(agent.role) && <p className="smm-muted">Окремих налаштувань у цього агента поки немає: він працює за завданнями від інших агентів.{meta.readyNote ? ' ' + meta.readyNote : ''}</p>}
 
       <div className="smm-form-foot">
         <button type="submit" className="smm-btn smm-btn--primary" disabled={saving || !dirty}><ActionIcon name="save" size={18} />{saving ? 'Зберігаємо…' : 'Зберегти'}</button>

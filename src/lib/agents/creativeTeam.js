@@ -24,7 +24,7 @@ export const CREATIVE_ROLES = [
   { role: 'creative_analyst', name: 'Агент аналітик креативів', short: 'які креативи працюють', stage: 'data', row: 0, trigger: 'schedule', schedule: { weekday: 1, time: '09:15' },
     description: 'Раз на тиждень по кожному клієнту зв’язує креативи з результатами, шукає закономірності й віддає висновки Агенту креативний стратег.',
     fields: [], clientFields: [] },
-  { role: 'creative_strategist', name: 'Агент креативний стратег', short: 'план по клієнту, до 3 напрямків', stage: 'plan', row: 0, trigger: 'request', entry: true,
+  { role: 'creative_strategy', name: 'Агент креативний стратег', short: 'план по клієнту, до 3 напрямків', stage: 'plan', row: 0, trigger: 'request', entry: true,
     description: 'Керівник відділу: з запиту менеджера, картки проєкту, досліджень і аналізу креативів складає план (до трьох напрямків) і ставить задачу Агенту по ТЗ.',
     fields: [text('rules', 'Правила відділу креативів', 'Що ми завжди враховуємо в планах: підхід, пріоритети, що вважаємо успіхом.', 4)],
     clientFields: [text('kpi', 'Цілі й KPI клієнта', 'Наприклад: CPA до $12, ROAS від 3.', 3), text('limits', 'Обмеження клієнта', 'Що не можна показувати чи обіцяти.', 3), text('budget', 'Бюджет на креативи', 'Скільки можна витратити на цей цикл.', 2)] },
@@ -51,8 +51,8 @@ export const REQUEST_ENTRY_ROLE = CREATIVE_ROLES.find((r) => r.entry).role;
 // from -> to. required = the downstream agent stops when the upstream one is switched off. The analyst feeds the strategist but never stops it;
 // the maker cannot work without the brief, and the checker needs the maker.
 export const CREATIVE_LINKS = [
-  { from: 'creative_analyst', to: 'creative_strategist', required: false },
-  { from: 'creative_strategist', to: 'creative_brief', required: true },
+  { from: 'creative_analyst', to: 'creative_strategy', required: false },
+  { from: 'creative_strategy', to: 'creative_brief', required: true },
   { from: 'creative_brief', to: 'creative_copywriter', required: false },
   { from: 'creative_brief', to: 'creative_maker', required: true },
   { from: 'creative_copywriter', to: 'creative_quality', required: false },

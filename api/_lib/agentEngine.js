@@ -58,7 +58,7 @@ async function loadPrompt(db, agent, task) {
 
 // The model, wrapped so that every call is written to ag_runs with the EXACT system and user prompt that was sent.
 // prefix: the editable instruction of agents whose system prompt is built by older code (competitors, SEO).
-function recorder(ctx, { task, agent, prompt, prefix = '' }) {
+function recorder(ctx, { task, agent, prompt, prefix = '', dry = false }) {
   const state = { cost: 0 };
   return {
     state,
@@ -71,9 +71,11 @@ function recorder(ctx, { task, agent, prompt, prefix = '' }) {
       try {
         const r = await ctx.model.callModel({ ...args, trigger: ctx.trigger, actor: ctx.email, params });
         state.cost += r.costUsd || 0;
+        if (dry) return r; // a trial run leaves no trace in the log of the agent
         await ctx.db.from('ag_runs').insert({ ...log, response: r.text, input_tokens: r.usage?.input_tokens ?? null, output_tokens: r.usage?.output_tokens ?? null, cost_usd: r.costUsd ?? null, duration_ms: Date.now() - started, status: 'ok' });
         return r;
       } catch (e) {
+        if (dry) throw e;
         await ctx.db.from('ag_runs').insert({ ...log, duration_ms: Date.now() - started, status: 'error', error: String(e?.message || e).slice(0, 500) });
         throw e;
       }
@@ -550,6 +552,35 @@ export async function launchCampaign(ctx, campaignId) {
     if (['initial', 'schedule'].includes(a.config?.trigger)) { await enqueue(ctx.db, { agent: a, type: 'report', brief: { launch: true }, by: ctx.email }); started += 1; }
   }
   return { started, agents: mine.length };
+}
+
+// «Restart the agent»: what hangs is put back in the queue: tasks that are «running» (the worker died) and the failed tasks of the last 7 days; the
+// retry counters are reset. Nothing is deleted and no new task is invented.
+export async function restartAgent(ctx, agentId) {
+  const all = await loadAll(ctx.db);
+  const agent = all.byId.get(agentId);
+  if (!agent) throw new Error('Агента не знайдено.');
+  const since = iso(new Date(ctx.now().getTime() - 7 * 86400000));
+  const stuck = must(await ctx.db.from('ag_tasks').update({ status: 'queued', lease_until: null, started_at: null }).eq('agent_id', agentId).eq('status', 'running').select('id'), 'tasks') || [];
+  const failed = must(await ctx.db.from('ag_tasks').update({ status: 'queued', error: null, finished_at: null, lease_until: null }).eq('agent_id', agentId).eq('status', 'failed').gte('created_at', since).select('id'), 'tasks') || [];
+  must(await ctx.db.from('ag_agents').update({ attempts: 0, last_status: null, last_message: null }).eq('id', agentId), 'agent');
+  if (agent.team === CREATIVE_TEAM) must(await ctx.db.from('ag_agent_clients').update({ attempts: 0 }).eq('agent_id', agentId), 'client links');
+  return { requeued: stuck.length + failed.length, stuck: stuck.length, failed: failed.length };
+}
+
+// «Trial run» of the Settings tab: the agent works for ONE client (and request) with the given prompt text, the result is shown and saved nowhere:
+// no task, no log, no pictures, nothing starts after it. Cost: one model call.
+export async function dryRun(ctx, agentId, { campaignId, requestId = null, promptBody = null } = {}) {
+  const all = await loadAll(ctx.db);
+  const agent = all.byId.get(agentId);
+  if (!agent) throw new Error('Агента не знайдено.');
+  if (agent.team !== CREATIVE_TEAM) throw new Error('Пробний запуск поки доступний лише агентам відділу креативів.');
+  if (!campaignId) throw new Error('Оберіть клієнта для пробного запуску.');
+  const task = { id: null, agent_id: agentId, campaign_id: Number(campaignId), request_id: requestId ? Number(requestId) : null, brief: { dry_run: true, manual: true } };
+  const prompt = promptBody && String(promptBody).trim() ? { id: null, version: null, body: String(promptBody) } : await loadPrompt(ctx.db, agent, task);
+  const rec = recorder(ctx, { task, agent, prompt, dry: true });
+  const r = await creativeRole({ ctx: { ...ctx, dryRun: true }, team: subTeam(all, agent), agent, task, prompt, rec });
+  return { text: r.output.text, summary: r.summary, json: r.output.json || null, cost: rec.state.cost };
 }
 
 export async function retryTask(ctx, taskId) {

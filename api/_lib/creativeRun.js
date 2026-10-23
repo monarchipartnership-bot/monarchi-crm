@@ -250,7 +250,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     if (last?.output?.summary) blocks.push({ title: 'Ваш попередній звіт (підсумок), для порівняння', text: clip(last.output.summary, 800) });
   }
 
-  if (agent.role === 'creative_strategist') {
+  if (agent.role === 'creative_strategy') {
     blocks.push(...await outsideInputs(db, campaignId, now));
     const analysis = await latestAnalysis(db, dept, campaignId);
     if (analysis?.output?.text && !analysis.output.skipped) blocks.push({ title: `Аналіз ефективності креативів${freshness(analysis.finished_at, now)}`, text: clip(analysis.output.text, 6000) });
@@ -288,7 +288,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   const result = await rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: json ? 4200 : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: user }] } });
   const raw = String(result.text || '').trim();
 
-  if (agent.role === 'creative_strategist') {
+  if (agent.role === 'creative_strategy') {
     const parsed = parseCreativePlan(raw, req || {});
     return { output: { text: renderPlan(parsed), summary: parsed.summary, json: parsed, requestId: rid, campaignId }, summary: parsed.summary || `Напрямів: ${parsed.directions.length}` };
   }
@@ -303,7 +303,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   }
   if (agent.role === 'creative_maker') {
     const parsed = parseCreativeMaker(raw, brief.concepts, clip(cfg.style, 600));
-    const rows = await saveCreatives(db, rid, parsed.creatives, req.materials);
+    const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, req.materials); // a trial run saves nothing
     const text = rows.map((c) => `**${c.concept_key} · ${c.ratio}**\n${c.prompt}`).join('\n\n');
     return { output: { text, summary: `Запитів до Higgsfield: ${rows.length}`, json: { creatives: parsed.creatives, notes: parsed.notes }, requestId: rid, campaignId }, summary: `Запитів до Higgsfield: ${rows.length}` };
   }

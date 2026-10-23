@@ -7,6 +7,8 @@
 //   POST { action: 'retry_task' | 'cancel_task', taskId }
 //   POST { action: 'launch_campaign', campaignId }   a campaign team goes live: its first agents get their first tasks
 //   POST { action: 'start_request', requestId }      a creative request starts its chain at the strategist; { action: 'cancel_request', requestId } stops it;
+//   POST { action: 'restart_agent', agentId }       puts back in the queue what hangs (running) and the failed tasks of the last 7 days
+//   POST { action: 'dry_run', agentId, campaignId, requestId?, promptBody? }  a trial run for one client with a prompt text: shown, saved nowhere
 //   POST { action: 'pass_on', taskId }               the person's OK on a result that waited (confirm_before_pass): the next agents start
 //   POST { action: 'site_speed' }                    Google PageSpeed of the site's front page (phone and computer, 10-30 s)
 //   POST { action: 'site_overview' }                 the website analyst's main page: is GA4 / Search Console connected, and the live figures
@@ -15,7 +17,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { getModelClient } from './_lib/ai.js';
-import { approvePlan, cancelTask, generatorReady, launchCampaign, pollAssets, processQueue, redoVisual, rejectPlan, retryTask, runNow } from './_lib/agentEngine.js';
+import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
 import { cancelRequest, passOn, startRequest } from './_lib/creativeEngine.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { siteOverview } from './_lib/googleSiteData.js';
@@ -58,6 +60,8 @@ export default async function handler(req, res) {
     else if (action === 'launch_campaign') out = await launchCampaign(ctx, Number(body.campaignId)); // the page then calls `process` until the queue is empty
     else if (action === 'start_request') out = await startRequest(ctx, Number(body.requestId)); // the page then calls `process` until the queue is empty
     else if (action === 'cancel_request') out = await cancelRequest(ctx, Number(body.requestId));
+    else if (action === 'restart_agent') { out = await restartAgent(ctx, Number(body.agentId)); if (out.requeued) out.queue = await processQueue(ctx, { maxMs: 60000 }); }
+    else if (action === 'dry_run') out = await dryRun(ctx, Number(body.agentId), { campaignId: body.campaignId, requestId: body.requestId, promptBody: body.promptBody });
     else if (action === 'pass_on') { out = await passOn(ctx, Number(body.taskId)); out.queue = await processQueue(ctx, { maxMs: 60000 }); } // the person's OK on a result that waited: the chain goes on
     else if (action === 'status') out = { higgsfield: generatorReady(ctx) };
     else if (action === 'site_speed') { // PageSpeed of the front page (10-30 s, so apart from the quick overview)

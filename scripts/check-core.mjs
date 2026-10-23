@@ -20,7 +20,7 @@ import { agentDue, chainStates, dependents } from '../src/lib/agents/chain.js';
 import { composeSystem } from '../src/lib/agents/locked.js';
 import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
 import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
-import { approvePlan, launchCampaign, pollAssets, processQueue, retryTask, runNow } from '../api/_lib/agentEngine.js';
+import { approvePlan, dryRun, launchCampaign, pollAssets, processQueue, restartAgent, retryTask, runNow } from '../api/_lib/agentEngine.js';
 import { analyseSite, authFromEnv, collectSiteStats, serviceAccountFromEnv, siteOverview, windows as siteWindows } from '../api/_lib/googleSiteData.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { CREATIVE_COUNT, creativeImageUrl, creativeKind, rankAds } from '../src/lib/creatives.js';
@@ -1808,8 +1808,9 @@ const creativeWorld = () => {
   let failBrief = true;
   const model = { calls: [], async callModel(args) {
     this.calls.push(args.agentKey);
+    this.last = args;
     const body = (t) => ({ text: t, usage: { input_tokens: 10, output_tokens: 5 }, costUsd: 0.01 });
-    if (args.agentKey === 'creative-creative_strategist') return body(JSON.stringify({ summary: 'Two directions for the sofa line.', directions: [
+    if (args.agentKey === 'creative-creative_strategy') return body(JSON.stringify({ summary: 'Two directions for the sofa line.', directions: [
       { key: 'd2', name: 'Autumn cosiness', priority: 2, why: 'Season', audience: 'Families', angle: 'Warm evenings', message: 'Warmth', tests: 'Lifestyle vs product' },
       { key: 'd1', name: 'Morning comfort', priority: 1, why: 'Site stresses comfort', audience: 'Couples', angle: 'Slow mornings', message: 'Comfort', tests: 'Comfort angle' },
       { key: 'd3', name: 'Third', priority: 3, why: 'x', angle: 'cut by the limit of two' }], clarify: 'Confirm the 15% discount.' }));
@@ -1852,7 +1853,7 @@ await ok('creative department: one agent per role with a queue of clients; a req
   assert.deepEqual([l1.length, l2.length, tables.ag_agent_clients.length, tables.ag_agents.length], [6, 6, 12, 6]);
   const A = (r) => tables.ag_agents.find((a) => a.role === r);
   A('creative_brief').config = { ...A('creative_brief').config, rules: 'Soft daylight, no stock-photo smiles.' };
-  tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_strategist').id).config = { kpi: 'CPA under 12 dollars', extra: 'Never compare prices.' };
+  tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_strategy').id).config = { kpi: 'CPA under 12 dollars', extra: 'Never compare prices.' };
   // research of another department (still per campaign in the old campaign team) reaches the strategist with its age
   tables.ag_agents.push({ id: 900, team: 'campaign', scope_type: 'client', scope_id: '1', role: 'business_research', name: 'Дослідник бізнесу', enabled: true });
   tables.ag_tasks.push({ id: 900, agent_id: 900, status: 'done', type: 'report', output: { text: 'Sofa store for families.', summary: 's' }, finished_at: '2026-10-01T10:00:00Z', brief: {} });
@@ -1880,7 +1881,7 @@ await ok('creative department: one agent per role with a queue of clients; a req
   const runOf = (role, n = 'last') => tables.ag_runs.filter((r) => r.agent_id === A(role).id)[n === 'last' ? tables.ag_runs.filter((r) => r.agent_id === A(role).id).length - 1 : n];
 
   // strategist: the card of the project, the request, the client's own fields, the research of the other department with its age, no analysis yet
-  const st = runOf('creative_strategist');
+  const st = runOf('creative_strategy');
   assert.match(st.user_prompt, /Картка проєкту[\s\S]*https:\/\/acme\.example[\s\S]*Ukraine/);
   assert.match(st.user_prompt, /Autumn sale banners/);
   assert.match(st.user_prompt, /Цілі й KPI клієнта \(клієнт\)\n.*CPA under 12 dollars/);
@@ -1889,7 +1890,7 @@ await ok('creative department: one agent per role with a queue of clients; a req
   assert.match(st.user_prompt, /Аналізу немає/);
   assert.match(st.user_prompt, /We sell sofas/); // no business research that is fresh enough is no excuse: the site is read
   // the limit of two directions held and they are ordered by priority; the brief got them
-  const plan = tables.ag_tasks.find((t) => t.agent_id === A('creative_strategist').id).output;
+  const plan = tables.ag_tasks.find((t) => t.agent_id === A('creative_strategy').id).output;
   assert.deepEqual(plan.json.directions.map((d) => d.key), ['d1', 'd2']);
   assert.match(runOf('creative_brief').user_prompt, /План стратега[\s\S]*Morning comfort/);
   assert.match(runOf('creative_brief').user_prompt, /Наші правила для креативів[\s\S]*Soft daylight/);
@@ -1916,7 +1917,7 @@ await ok('creative department: one agent per role with a queue of clients; a req
   tables.ag_campaigns[0].status = 'paused';
   await assert.rejects(() => startRequest(ctx, 2), /призупинено/);
   tables.ag_campaigns[0].status = 'draft';
-  const sl = tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_strategist').id);
+  const sl = tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_strategy').id);
   sl.mode = 'paused';
   await assert.rejects(() => startRequest(ctx, 2), /вимкнений або на паузі/);
   sl.mode = 'auto';
@@ -1937,7 +1938,7 @@ await ok('creative department: priority of clients, manual mode, confirm-before-
   // the department works through the clients by priority: client 2 goes before client 1
   newRequest(tables, 1, 1);
   newRequest(tables, 2, 2);
-  link(2, 'creative_strategist').priority = 50;
+  link(2, 'creative_strategy').priority = 50;
   await startRequest(ctx, 1);
   await startRequest(ctx, 2);
   model.calls.length = 0;
@@ -1978,15 +1979,15 @@ await ok('creative department: priority of clients, manual mode, confirm-before-
   await assert.rejects(() => passOn(ctx, briefTask.id), /не чекає/);
 
   // a client whose link to the strategist is paused neither runs nor blocks the others
-  link(2, 'creative_strategist').mode = 'paused';
-  tables.ag_tasks.push({ id: 700, agent_id: A('creative_strategist').id, campaign_id: 2, type: 'creative', status: 'queued', brief: { manual: true }, request_id: null });
+  link(2, 'creative_strategy').mode = 'paused';
+  tables.ag_tasks.push({ id: 700, agent_id: A('creative_strategy').id, campaign_id: 2, type: 'creative', status: 'queued', brief: { manual: true }, request_id: null });
   const idle = await processQueue(ctx);
   assert.equal(idle.processed, 0);
   assert.equal(tables.ag_tasks.find((t) => t.id === 700).status, 'queued');
 
   // the weekly analyst works per client: a client without a Meta account gets a «no data» note and costs nothing
   tables.ag_tasks.length = 0; tables.ag_runs.length = 0;
-  link(2, 'creative_strategist').mode = 'auto';
+  link(2, 'creative_strategy').mode = 'auto';
   A('creative_analyst').enabled_since = '2026-10-01T00:00:00Z';
   tables.ag_agent_clients.forEach((l) => { l.created_at = '2026-10-01T00:00:00Z'; });
   const monday = { ...ctx, now: () => new Date('2026-10-26T09:30:00Z') }; // Monday, 11:30 in Kyiv
@@ -2004,7 +2005,30 @@ await ok('creative department: priority of clients, manual mode, confirm-before-
   newRequest(tables, 1, 5);
   await startRequest(ctx, 5);
   await processQueue(monday);
-  assert.match(tables.ag_runs.filter((r) => r.agent_id === A('creative_strategist').id).pop().user_prompt, /Аналіз ефективності креативів \(звіт від 2026-10-26: 0 дн\. тому, свіжий\)/);
+  assert.match(tables.ag_runs.filter((r) => r.agent_id === A('creative_strategy').id).pop().user_prompt, /Аналіз ефективності креативів \(звіт від 2026-10-26: 0 дн\. тому, свіжий\)/);
+
+  // trial run: the result comes back, nothing is saved (no task, no log line, no picture rows) and nothing starts after it
+  const before = [tables.ag_tasks.length, tables.ag_runs.length, tables.ag_creatives.length];
+  const trial = await dryRun(ctx, A('creative_strategy').id, { campaignId: 1, requestId: 5, promptBody: 'MY TRIAL PROMPT for the strategist' });
+  assert.equal(trial.json.directions.length, 2);
+  assert.ok(trial.cost > 0);
+  assert.match(model.last.params.system, /MY TRIAL PROMPT/); // the text typed in the page, not the saved prompt
+  const trialMaker = await dryRun(ctx, A('creative_maker').id, { campaignId: 1, requestId: 5 });
+  assert.ok(trialMaker.json.creatives.length >= 1);
+  assert.deepEqual([tables.ag_tasks.length, tables.ag_runs.length, tables.ag_creatives.length], before);
+  await assert.rejects(() => dryRun(ctx, A('creative_maker').id, {}), /Оберіть клієнта/);
+  await assert.rejects(() => dryRun(ctx, 999999, { campaignId: 1 }), /не знайдено/);
+
+  // restart: tasks that hang («running») and the recent failed ones go back to the queue, the counters are reset
+  tables.ag_tasks.push({ id: 801, agent_id: A('creative_copywriter').id, campaign_id: 1, type: 'creative', status: 'running', brief: {}, created_at: '2026-10-25T10:00:00Z' });
+  tables.ag_tasks.push({ id: 802, agent_id: A('creative_copywriter').id, campaign_id: 1, type: 'creative', status: 'failed', error: 'boom', brief: {}, created_at: '2026-10-25T10:00:00Z' });
+  tables.ag_tasks.push({ id: 803, agent_id: A('creative_copywriter').id, campaign_id: 1, type: 'creative', status: 'failed', error: 'old', brief: {}, created_at: '2026-09-01T10:00:00Z' });
+  A('creative_copywriter').attempts = 3;
+  const rs = await restartAgent(monday, A('creative_copywriter').id);
+  assert.deepEqual([rs.stuck, rs.failed, rs.requeued], [1, 1, 2]);
+  assert.equal(tables.ag_tasks.find((t) => t.id === 802).status, 'queued');
+  assert.equal(tables.ag_tasks.find((t) => t.id === 803).status, 'failed'); // older than a week: left alone
+  assert.equal(A('creative_copywriter').attempts, 0);
 });
 
 await ok('creative department: the answers of the strategist, brief writer, copywriter, maker and checker are checked', () => {

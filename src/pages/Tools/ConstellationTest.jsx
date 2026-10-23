@@ -41,6 +41,7 @@ import {
 } from './aiMap/overviewLayout';
 import { STATUS_TEXT, countStatuses } from './aiMap/status';
 import CampaignsSection from './campaigns/CampaignsSection';
+import DeptAgentWindow from './agents/DeptAgentWindow';
 import '../../styles/constellationTest.css';
 
 // Agents with a real interactive tool (as opposed to the generic read-only
@@ -110,6 +111,7 @@ export default function ConstellationTest() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [coreOpen, setCoreOpen] = useState(false);
   const [agentToolOpen, setAgentToolOpen] = useState(null);
+  const [deptAgent, setDeptAgent] = useState(null); // { role, legacyTool }: the page of an agent of a department (one worker with a queue of clients)
   // Set only by a handoff from another agent tool (§4.5 of the roadmap —
   // e.g. JobPostAnalyzer → CoverLetterAgent) — never by a normal map/
   // catalog/search open, which always starts an agent with a blank slate.
@@ -120,6 +122,7 @@ export default function ConstellationTest() {
   // modal's content (badges/breaks-into/ladder/etc.) is still reachable
   // from inside the workspace itself via its own "?" button.
   function openAgent(agentWithContext) {
+    if (agentWithContext.deptAgent) { setDeptAgent({ role: agentWithContext.deptAgent, legacyTool: AGENT_TOOLS[agentWithContext.tool] ? agentWithContext.tool : null }); return; }
     if (agentWithContext.tool === 'campaign-teams') { setSection('campaigns'); return; }
     if (AGENT_TOOLS[agentWithContext.tool]) { setAgentToolOpen(agentWithContext.tool); setAgentToolPayload(null); }
     else setSelectedAgent(agentWithContext);
@@ -600,6 +603,7 @@ export default function ConstellationTest() {
           opening it from the map itself. */}
       {coreOpen && <KnowledgeBase onClose={() => setCoreOpen(false)} />}
 
+      {deptAgent && <DeptAgentWindow role={deptAgent.role} onClose={() => setDeptAgent(null)} onOpenLegacy={deptAgent.legacyTool ? () => { const tool = deptAgent.legacyTool; setDeptAgent(null); setAgentToolOpen(tool); setAgentToolPayload(null); } : null} />}
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {
         const AgentTool = AGENT_TOOLS[agentToolOpen];
         return (
