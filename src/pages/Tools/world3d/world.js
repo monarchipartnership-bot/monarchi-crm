@@ -58,7 +58,7 @@ controls.enableDamping = true; controls.dampingFactor = 0.09;
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
 controls.screenSpacePanning = false; controls.zoomToCursor = true;
-controls.minZoom = 0.95; controls.maxZoom = 4.5; controls.zoomSpeed = 0.9;
+controls.minZoom = 0.95; controls.maxZoom = 4.5; controls.zoomSpeed = 3.0; // about ten wheel notches from the whole city to a desk (it was 0.9: over thirty)
 controls.minPolarAngle = 0.72; controls.maxPolarAngle = 1.12;
 controls.minAzimuthAngle = Math.PI / 4 - 0.62; controls.maxAzimuthAngle = Math.PI / 4 + 0.62;
 controls.target.copy(HOME); controls.update();
