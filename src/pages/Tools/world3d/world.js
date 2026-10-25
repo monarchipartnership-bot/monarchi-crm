@@ -379,6 +379,7 @@ controls.addEventListener('start', () => { tween = null; });
 
 // ------------------------------------------------------------ state shared with the UI
 const state = { dept: null, agent: null };
+let autoFocused = false; // the focus came from zooming in on a building (not from a click), so zooming back out lets go of it again
 const selRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.06, 10, 40), new THREE.MeshBasicMaterial({ color: C.glow })); selRing.rotation.x = Math.PI / 2; selRing.visible = false; scene.add(selRing);
 function applySelection() {
   buildings.forEach((b, k) => { b.sel.material.opacity = state.dept === k ? 0.9 : 0; });
@@ -391,11 +392,11 @@ function applySelection() {
 const zoomFor = (b) => THREE.MathUtils.clamp(0.7 * (Math.max(VIEW_H, 104 / (stage.clientWidth / stage.clientHeight)) * stage.clientWidth / stage.clientHeight) / ((b.W + b.D) / Math.SQRT2 + 5), 1.3, 3.4);
 const api = {
   state,
-  selectDept(key) { state.dept = key; state.agent = null; applySelection(); const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
-  selectAgent(deptKey, agentKey) { state.dept = deptKey; state.agent = agentKey; applySelection(); const b = buildings.get(deptKey), rb = b.robots.find((r) => r.userData.agent === agentKey), wp = rb.getWorldPosition(new THREE.Vector3()); flyTo(b.pos.clone().lerp(wp, 0.45).add(new THREE.Vector3(0, 1.5, 0)), zoomFor(b) * 1.15); },
+  selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
+  selectAgent(deptKey, agentKey) { autoFocused = false; state.dept = deptKey; state.agent = agentKey; applySelection(); const b = buildings.get(deptKey), rb = b.robots.find((r) => r.userData.agent === agentKey), wp = rb.getWorldPosition(new THREE.Vector3()); flyTo(b.pos.clone().lerp(wp, 0.45).add(new THREE.Vector3(0, 1.5, 0)), zoomFor(b) * 1.15); },
   zoom(f) { flyTo(controls.target.clone(), THREE.MathUtils.clamp(camera.zoom * f, controls.minZoom, controls.maxZoom), 350); },
   rotate(rad) { const off = camera.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.theta = THREE.MathUtils.clamp(sph.theta + rad, controls.minAzimuthAngle, controls.maxAzimuthAngle); const to = new THREE.Vector3().setFromSpherical(sph), from = camera.position.clone().sub(controls.target), t0 = performance.now(); const step = () => { const k = Math.min(1, (performance.now() - t0) / 450); camera.position.copy(controls.target).add(from.clone().lerp(to, ease(k))); if (k < 1) requestAnimationFrame(step); }; step(); },
-  reset() { state.dept = null; state.agent = null; applySelection(); flyTo(HOME, 1, 650, HOME_OFFSET); },
+  reset() { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(HOME, 1, 650, HOME_OFFSET); },
   clear() { api.reset(); },
   buildings,
 };
@@ -412,13 +413,20 @@ const dn = initDayNight({ app: root, sun, hemi, fill, renderer, stars: starsEl, 
 applySelection();
 
 // ------------------------------------------------------------ a building opens by itself when you zoom in on it (and closes again when you leave)
-let autoKey = null;
+let autoKey = null, prevAuto = null;
 function updateAutoOpen() {
   let best = null, bd = 1e9;
   buildings.forEach((b) => { const d = Math.hypot(controls.target.x - b.pos.x, controls.target.z - b.pos.z); if (d < bd) { bd = d; best = b; } });
   const z = camera.zoom, cur = best && autoKey === best.key;
   autoKey = best && bd < (cur ? 17 : 14) && z > (cur ? 1.55 : 1.95) ? best.key : null;
   if (window.__noAuto) autoKey = null; // debugging aid: keep every building closed
+  // The page's interface follows the building: when one opens by zoom the page gets the same focus a click would give it (no camera flight, the camera is
+  // already there), and when it closes again by zoom the focus is released. Not while a flight is running: then the camera is moving on purpose.
+  if (!tween && autoKey !== prevAuto) {
+    if (autoKey && state.dept !== autoKey) { state.dept = autoKey; state.agent = null; autoFocused = true; applySelection(); opts.onFocusDept?.(autoKey); }
+    else if (!autoKey && autoFocused && state.dept === prevAuto) { state.dept = null; state.agent = null; autoFocused = false; applySelection(); opts.onReset?.(); }
+    prevAuto = autoKey;
+  }
 }
 
 // ------------------------------------------------------------ loop

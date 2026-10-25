@@ -4,6 +4,7 @@ import { AGENT_DEPTS } from '../../data/aiAgentsData';
 import { AI_ASSETS } from '../../lib/aiAgentsAssets';
 import ActionIcon from '../../components/common/ActionIcon';
 import { DeptRail, DeptStrip } from './aiMap/DeptChrome';
+import Presence from './aiMap/Presence';
 import AiEnvironment from '../../components/AiEnvironment/AiEnvironment';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import { BOOK_ICON } from '../KnowledgeBase/KnowledgeOrb';
@@ -396,7 +397,7 @@ export default function ConstellationTest() {
         </div>
       )}
 
-      {showMapChrome && !focused && (
+      <Presence show={showMapChrome && !focused} instant={compact}>
         <section className="ai-kpis" aria-label="Підсумок" data-ai-safe>
           {[
             ['Агентів', counts.total, 'all'],
@@ -407,7 +408,7 @@ export default function ConstellationTest() {
             <div key={c} className={'ai-kpi k-' + c}><span className="ai-kpi-dot" aria-hidden="true" /><span><b>{n}</b><small>{label}</small></span></div>
           ))}
         </section>
-      )}
+      </Presence>
 
       {section === 'map' && (
         <>
@@ -419,22 +420,27 @@ export default function ConstellationTest() {
             </div>
           )}
 
-          {focused && !focused.dept.comingSoon && (
-            <div className="view-tabs" role="tablist" aria-label="Вигляд відділу" data-ai-safe>
-              <button type="button" role="tab" aria-selected={viewMode === 'map'} className={'view-tab' + (viewMode === 'map' ? ' active' : '')} onClick={() => setViewMode('map')}>MAP</button>
-              <button type="button" role="tab" aria-selected={viewMode === 'chart'} className={'view-tab' + (viewMode === 'chart' ? ' active' : '')} onClick={() => setViewMode('chart')}>CHART</button>
-            </div>
-          )}
-
-          {focused && !compact && (
-            <>
-              <DeptRail
-                focused={focused} viewMode={viewMode} closed={deptPanelClosed} setClosed={setDeptPanelClosed} tab={deptTab} setTab={setDeptTab}
-                onReset={resetView} onOpenAgent={openAgent}
-              />
-              <DeptStrip deptKeys={deptKeys} agentDepts={AGENT_DEPTS} current={focused.key} onSelect={(k) => { setFocusedDept(k); setHoveredDept(null); }} />
-            </>
-          )}
+          <Presence show={!!focused} instant={compact}>
+            {focused && (
+              <>
+                {!focused.dept.comingSoon && (
+                  <div className="view-tabs" role="tablist" aria-label="Вигляд відділу" data-ai-safe>
+                    <button type="button" role="tab" aria-selected={viewMode === 'map'} className={'view-tab' + (viewMode === 'map' ? ' active' : '')} onClick={() => setViewMode('map')}>MAP</button>
+                    <button type="button" role="tab" aria-selected={viewMode === 'chart'} className={'view-tab' + (viewMode === 'chart' ? ' active' : '')} onClick={() => setViewMode('chart')}>CHART</button>
+                  </div>
+                )}
+                {!compact && (
+                  <>
+                    <DeptRail
+                      focused={focused} viewMode={viewMode} closed={deptPanelClosed} setClosed={setDeptPanelClosed} tab={deptTab} setTab={setDeptTab}
+                      onReset={resetView} onOpenAgent={openAgent}
+                    />
+                    <DeptStrip deptKeys={deptKeys} agentDepts={AGENT_DEPTS} current={focused.key} onSelect={(k) => { setFocusedDept(k); setHoveredDept(null); }} />
+                  </>
+                )}
+              </>
+            )}
+          </Presence>
 
           {focused && compact && (
             <div className="constellation-carousel" data-ai-safe>
@@ -516,7 +522,7 @@ export default function ConstellationTest() {
             )}
           </div>
 
-          {!focused && (
+          <Presence show={!focused} instant={compact}>
             <>
               {use3d && <TaskFlowPanel step={flowStep} agentDepts={AGENT_DEPTS} requests={openRequests} onOpenRequest={() => setDeptAgent({ role: 'creative_strategy', legacyTool: null })} onSelectDept={(k) => { setFocusedDept(k); setHoveredDept(null); }} />}
               <button type="button" className="ai-kb-btn ai-pill" onClick={() => setCoreOpen(true)} data-ai-safe>
@@ -524,7 +530,7 @@ export default function ConstellationTest() {
                 <span>Інформаційна база</span>
               </button>
             </>
-          )}
+          </Presence>
         </>
       )}
       </div>
