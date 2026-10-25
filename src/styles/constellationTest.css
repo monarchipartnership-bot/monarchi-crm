@@ -475,3 +475,13 @@
 .ai-flowcard-chip.is-review { background: #f5c23844; color: #4d3a00; }
 .ai-flowcard-chip.is-problem { background: #ef4d5e33; color: #5a0e18; }
 .ai-flowcard-real em { font-style: normal; font-size: 11px; font-weight: 800; color: var(--tb-sec); }
+
+/* «До Hub» is the main way out of the section: the one plum-gradient button of the top bar (Hub style: gradient = the main action), day and night alike */
+.constellation-page .constellation-exit.ai-pill, .constellation-page .constellation-exit.ai-pill:hover {
+  background: linear-gradient(100deg, #b544b5, #661466); color: #fff; font-weight: 700;
+  box-shadow: 0 0 0 4px #ae40ae33, 0 10px 20px -8px #66146699;
+}
+.constellation-page .constellation-exit .constellation-exit-icon { color: #fff; }
+.constellation-page.ai-immersive:not(.is-map-light) .constellation-exit.ai-pill, .constellation-page.ai-immersive:not(.is-map-light) .constellation-exit.ai-pill:hover {
+  box-shadow: 0 0 0 4px #ae40ae44, 0 10px 20px -8px #000000aa;
+}
