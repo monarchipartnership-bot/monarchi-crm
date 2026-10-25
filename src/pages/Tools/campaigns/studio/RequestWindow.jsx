@@ -54,7 +54,8 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
     return { def, agent, task, state };
   });
   const cost = detail.tasks.reduce((s, t) => s + Number(t.cost_usd || 0), 0);
-  const plan = steps.find((s) => s.def.role === 'creative_strategy')?.task?.output?.json;
+  const stratOut = steps.find((s) => s.def.role === 'creative_strategy')?.task?.output;
+  const plan = stratOut?.json;
   const brief = steps.find((s) => s.def.role === 'creative_brief')?.task?.output?.json;
   const copyBy = (key) => (steps.find((s) => s.def.role === 'creative_copywriter')?.task?.output?.json?.texts || []).filter((t) => t.concept === key);
   const b = detail.request.brief || {};
@@ -147,6 +148,19 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
             <section className="stu-section">
               <h3>План стратега</h3>
               {plan.clarify && <p className="cmp-note">Що уточнити менеджеру: {plan.clarify}</p>}
+              {stratOut?.figma && stratOut.figma.status !== 'read' && <p className="cmp-warnbox" role="status">Figma: {stratOut.figma.error}</p>}
+              {stratOut?.figma?.status === 'read' && <p className="cmp-muted">Стратег прочитав макет Figma «{stratOut.figma.name}»: кадрів {stratOut.figma.frames}.</p>}
+              {stratOut?.imagesNote && <p className="cmp-warnbox" role="status">{stratOut.imagesNote}</p>}
+              {plan.inventory && (plan.inventory.have.length > 0 || plan.inventory.missing.length > 0 || plan.inventory.to_generate.length > 0) && (
+                <div className="stu-inventory">
+                  <h4>Матеріали: що є, чого немає{stratOut?.imagesSeen ? ` (стратег бачив картинок: ${stratOut.imagesSeen})` : ''}</h4>
+                  <div className="stu-inv-cols">
+                    <div><b>Є</b>{plan.inventory.have.length ? <ul>{plan.inventory.have.map((h) => <li key={h.file}><span>{h.file}</span> {h.what}{h.use ? `. Годиться: ${h.use}` : ''}</li>)}</ul> : <p>—</p>}</div>
+                    <div><b>Немає</b>{plan.inventory.missing.length ? <ul>{plan.inventory.missing.map((m, i) => <li key={i}>{m}</li>)}</ul> : <p>—</p>}</div>
+                    <div><b>Можна згенерувати</b>{plan.inventory.to_generate.length ? <ul>{plan.inventory.to_generate.map((m, i) => <li key={i}>{m}</li>)}</ul> : <p>—</p>}</div>
+                  </div>
+                </div>
+              )}
               <div className="stu-concepts">
                 {plan.directions.map((d) => (
                   <article key={d.key} className="stu-concept">

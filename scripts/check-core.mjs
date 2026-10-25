@@ -36,6 +36,7 @@ import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
 import { cleanRequest, connectCampaign, directionLimit, ensureCreativeDepartment, parseGivenTexts } from '../src/lib/agents/creativeTeam.js';
 import { cleanSettings, defaultRatios, inputState, manualInput } from '../src/lib/agents/projectCreative.js';
+import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc } from '../api/_lib/creativeRun.js';
@@ -1811,8 +1812,11 @@ const creativeWorld = () => {
   const model = { calls: [], async callModel(args) {
     this.calls.push(args.agentKey);
     this.last = args;
+    this.contents = this.contents || {};
+    this.contents[args.agentKey] = args.params?.messages?.[0]?.content;
     const body = (t) => ({ text: t, usage: { input_tokens: 10, output_tokens: 5 }, costUsd: 0.01 });
-    if (args.agentKey === 'creative-creative_strategy') return body(JSON.stringify({ summary: 'Two directions for the sofa line.', directions: [
+    if (args.agentKey === 'creative-creative_strategy' && this.failImages && Array.isArray(args.params.messages[0].content)) throw new Error('Could not process image url');
+    if (args.agentKey === 'creative-creative_strategy') return body(JSON.stringify({ summary: 'Two directions for the sofa line.', inventory: { have: [{ file: 'luna.jpg', what: 'Grey sofa on white', use: 'hero product shot' }], missing: ['A lifestyle scene'], to_generate: ['Living room background'] }, directions: [
       { key: 'd2', name: 'Autumn cosiness', priority: 2, why: 'Season', audience: 'Families', angle: 'Warm evenings', message: 'Warmth', tests: 'Lifestyle vs product' },
       { key: 'd1', name: 'Morning comfort', priority: 1, why: 'Site stresses comfort', audience: 'Couples', angle: 'Slow mornings', message: 'Comfort', tests: 'Comfort angle' },
       { key: 'd3', name: 'Third', priority: 3, why: 'x', angle: 'cut by the limit of two' }], clarify: 'Confirm the 15% discount.' }));
@@ -1889,6 +1893,76 @@ await ok('creative inputs: given texts are parsed and kept word for word, the pr
   assert.doesNotMatch(prompt, /We sell sofas/); // the business data is fresh: the site is not read
   const plan = tables.ag_tasks.find((t) => t.agent_id === strat.id).output.json;
   assert.equal(plan.directions.length, 3); // the stand-in strategist offers three; the limit of five did not cut them
+});
+
+await ok('creative strategist sees the pictures (materials, competitors ads, Figma frames) and keeps an inventory; a missing token or a picture the model cannot fetch does not stop the plan', async () => {
+  assert.deepEqual(figmaFileKey('https://www.figma.com/design/AbC123/Brand?node-id=12-34&t=x'), { key: 'AbC123', nodeId: '12:34' });
+  assert.deepEqual(figmaFileKey('https://figma.com/file/Zz9/x'), { key: 'Zz9', nodeId: null });
+  assert.equal(figmaFileKey('https://example.com/design/abc'), null);
+  assert.equal(figmaFileKey('not a url'), null);
+  // reading a file with a stand-in for the network
+  const calls = [];
+  const reply = (b, status = 200) => ({ ok: status < 400, status, json: async () => b });
+  const fakeFetch = async (url, opts) => {
+    calls.push([url, opts.headers['X-Figma-Token']]);
+    if (url.includes('/v1/files/K1?depth=2')) return reply({ name: 'Brand', document: { children: [{ type: 'CANVAS', children: [{ type: 'FRAME', id: '1:2', name: 'Hero' }, { type: 'TEXT', id: '9:9', name: 'loose text' }, { type: 'FRAME', id: '1:3', name: 'Story' }] }] } });
+    if (url.includes('/nodes?')) return reply({ name: 'Brand', nodes: {
+      '1:2': { document: { type: 'FRAME', name: 'Hero', fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }], children: [
+        { type: 'TEXT', characters: 'Soft  hair', style: { fontFamily: 'Inter', fontWeight: 700 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }] },
+        { type: 'TEXT', characters: 'hidden', visible: false, style: { fontFamily: 'Hidden' } }] } },
+      '1:3': { document: { type: 'FRAME', name: 'Story', fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }], children: [] } } } });
+    if (url.includes('/v1/images/')) return reply({ images: { '1:2': 'https://img/hero.png', '1:3': null } });
+    return reply({}, 404);
+  };
+  const res = await readFigma('https://www.figma.com/design/K1/Brand', { token: 'tok', fetchImpl: fakeFetch });
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.frames.map((f) => [f.name, f.imageUrl]), [['Hero', 'https://img/hero.png'], ['Story', null]]); // top frames only, the loose text is not one
+  assert.deepEqual(res.colors[0], ['#FF0000', 2]);
+  assert.ok(res.fonts.some(([f]) => f === 'Inter 700') && !res.fonts.some(([f]) => /Hidden/.test(f))); // hidden layers are not the style
+  assert.deepEqual(res.texts, ['Soft hair']);
+  assert.ok(calls.every(([, t]) => t === 'tok'));
+  assert.match((await readFigma('https://www.figma.com/design/K1/Brand', { token: '', fetchImpl: fakeFetch })).error, /FIGMA_TOKEN/);
+  assert.match((await readFigma('https://www.figma.com/design/K1/Brand', { token: 't', fetchImpl: async () => reply({}, 403) })).error, /не пускає/);
+  assert.match((await readFigma('https://example.com/x', { token: 't', fetchImpl: fakeFetch })).error, /не схоже/);
+
+  // the strategist gets the pictures and the Figma file; the inventory it returns is kept and shown
+  const w = creativeWorld();
+  await ensureCreativeDepartment(w.db, 'a@x.com');
+  await connectCampaign(w.db, w.tables.ag_campaigns[0], { email: 'a@x.com' });
+  const rq = cleanRequest({ goal: 'Fall sale', texts: 'yes', figma: 'https://www.figma.com/design/K1/Brand', materials: [
+    { name: 'wig.jpg', url: 'https://x/wig.jpg', kind: 'product' }, { name: 'rival.png', url: 'https://x/rival.png', kind: 'competitor' }, { name: 'odd', url: 'ftp://x/odd.png', kind: 'other' }] });
+  w.tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'draft', title: rq.title, brief: rq.brief, materials: rq.materials });
+  w.ctx.figma = async () => ({ ok: true, name: 'Brand', frames: [{ id: '1:2', name: 'Hero', imageUrl: 'https://img/hero.png' }], colors: [['#FF0000', 2]], fonts: [['Inter 700', 1]], texts: ['Soft hair'] });
+  await startRequest(w.ctx, 1);
+  await processQueue(w.ctx);
+  const content = w.model.contents['creative-creative_strategy'];
+  assert.ok(Array.isArray(content));
+  assert.deepEqual(content.filter((x) => x.type === 'image').map((x) => x.source.url), ['https://x/wig.jpg', 'https://x/rival.png', 'https://img/hero.png']); // only web addresses
+  assert.match(content[0].text, /Макет бренду у Figma[\s\S]*Кольори \(за частотою\): #FF0000[\s\S]*Шрифти: Inter 700/);
+  assert.match(content[0].text, /Картинки, додані до цього повідомлення[\s\S]*- Матеріал клієнта: wig\.jpg \(Фото продукту\)[\s\S]*- Реклама конкурента \(скриншот\): rival\.png[\s\S]*- Figma, кадр: Hero/);
+  const strat = w.tables.ag_agents.find((a) => a.role === 'creative_strategy');
+  assert.match(w.tables.ag_runs.find((r) => r.agent_id === strat.id).user_prompt, /\[image: https:\/\/x\/wig\.jpg\]/); // the log keeps the text and the addresses
+  const out = w.tables.ag_tasks.find((t) => t.agent_id === strat.id).output;
+  assert.deepEqual([out.figma.status, out.figma.frames, out.imagesSeen], ['read', 1, 3]);
+  assert.equal(out.json.inventory.have[0].file, 'luna.jpg');
+  assert.match(out.text, /## Матеріали: що є, чого немає[\s\S]*- luna\.jpg: Grey sofa on white; годиться: hero product shot[\s\S]*Немає:[\s\S]*- A lifestyle scene[\s\S]*Можна згенерувати:[\s\S]*- Living room background/);
+
+  // no token on the server: the plan is made without the file and says so; the model cannot fetch a picture: one more try with text only
+  const w2 = creativeWorld();
+  await ensureCreativeDepartment(w2.db, 'a@x.com');
+  await connectCampaign(w2.db, w2.tables.ag_campaigns[0], { email: 'a@x.com' });
+  w2.tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'draft', title: rq.title, brief: rq.brief, materials: rq.materials });
+  w2.ctx.figma = async () => ({ ok: false, noToken: true, error: 'Токен Figma не налаштований на сервері (FIGMA_TOKEN): макет не прочитано.' });
+  w2.model.failImages = true;
+  await startRequest(w2.ctx, 1);
+  await processQueue(w2.ctx);
+  const strat2 = w2.tables.ag_agents.find((a) => a.role === 'creative_strategy');
+  const task2 = w2.tables.ag_tasks.find((t) => t.agent_id === strat2.id);
+  assert.equal(task2.status, 'done');
+  assert.deepEqual([task2.output.figma.status, task2.output.imagesSeen], ['no_token', 0]);
+  assert.match(task2.output.imagesNote, /не вдалося завантажити/);
+  assert.equal(typeof w2.model.contents['creative-creative_strategy'], 'string'); // the second call was text only
+  assert.match(w2.model.contents['creative-creative_strategy'], /Токен Figma не налаштований[\s\S]*Картинки не вдалося завантажити/);
 });
 
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {

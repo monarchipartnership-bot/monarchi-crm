@@ -12,6 +12,7 @@ import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
 import { fetchBlock, loadAccounts, siteBlocks, summaryOf } from './campaignRun.js';
 import { readJson } from './agentContent.js';
 import { readSite } from './siteReader.js';
+import { figmaText, figmaToken, readFigma } from './figma.js';
 
 const MODEL = 'claude-sonnet-5';
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -36,7 +37,17 @@ export function parseCreativePlan(text, request = {}) {
     };
   }).filter((d) => d.angle || d.why).sort((a, b) => a.priority - b.priority).slice(0, max);
   if (!directions.length) throw new Error('Стратег не повернув жодного напряму. Спробуйте ще раз.');
-  return { summary: clip(j?.summary, 800), directions, clarify: clip(j?.clarify, 600) };
+  return { summary: clip(j?.summary, 800), directions, inventory: parseInventory(j), clarify: clip(j?.clarify, 600) };
+}
+
+// What the strategist saw in the materials: what is there and what it is good for, what is missing, what can be generated instead.
+function parseInventory(j) {
+  const inv = j?.inventory || {};
+  return {
+    have: asList(inv.have).map((h) => ({ file: clip(h?.file, 160), what: clip(h?.what, 240), use: clip(h?.use, 240) })).filter((h) => h.file).slice(0, 12),
+    missing: asList(inv.missing).map((m) => clip(m, 240)).filter(Boolean).slice(0, 8),
+    to_generate: asList(inv.to_generate).map((m) => clip(m, 240)).filter(Boolean).slice(0, 8),
+  };
 }
 
 // The brief writer's answer → { summary, concepts, notes }. Concepts are checked against the request (how many, which formats, texts or not).
@@ -110,6 +121,14 @@ export function renderPlan(p) {
     if (d.notes) lines.push(`- Ризики: ${d.notes}`);
     lines.push('');
   });
+  const inv = p.inventory;
+  if (inv && (inv.have.length || inv.missing.length || inv.to_generate.length)) {
+    lines.push('## Матеріали: що є, чого немає');
+    if (inv.have.length) lines.push('Є:', ...inv.have.map((h) => `- ${h.file}: ${h.what}${h.use ? `; годиться: ${h.use}` : ''}`));
+    if (inv.missing.length) lines.push('Немає:', ...inv.missing.map((m) => `- ${m}`));
+    if (inv.to_generate.length) lines.push('Можна згенерувати:', ...inv.to_generate.map((m) => `- ${m}`));
+    lines.push('');
+  }
   if (p.clarify) lines.push('## Що уточнити менеджеру', p.clarify);
   return lines.join('\n').trim();
 }
@@ -228,7 +247,7 @@ async function projectCreativeBlocks(db, projectId, now, { inputs = false } = {}
     }
     if (missing.length) blocks.push({ title: 'Дані від інших відділів, яких ще немає', text: `${missing.join('\n')}\nПрацюйте без них і чесно скажіть у результаті, чого не вистачило.` });
   }
-  return { blocks, have };
+  return { blocks, have, row };
 }
 
 async function latestAnalysis(db, dept, campaignId) {
@@ -269,6 +288,9 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   let brief = null;
   let plan = null;
   let json = true;
+  let images = []; // pictures the strategist looks at: materials, competitors' ads, frames of the Figma file
+  let figmaInfo = null;
+  let imagesNote = '';
 
   if (agent.role === 'creative_analyst') {
     json = false;
@@ -296,6 +318,21 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     if (!fresh(/^Дослідження бізнесу/)) blocks.push(...await siteBlocks(b.site || project.website, { limit: 2, read }));
     if (!fresh(/^(Дослідження конкурентів|Конкуренти)/) && String(b.competitors || '').trim()) blocks.push({ title: 'Конкуренти, яких вказав менеджер', text: clip(b.competitors, 2000) }, ...await siteBlocks(b.competitors, { limit: 3, read }));
     if (String(b.examples || '').trim()) blocks.push({ title: 'Приклади креативів конкурентів (описав або вставив менеджер)', text: clip(b.examples, 3000) });
+    // the strategist LOOKS at the materials, the competitors' screenshots and the frames of the Figma file: the inventory is made from what it sees
+    const mats = asList(req?.materials);
+    images = [
+      ...mats.filter((m) => m.kind !== 'competitor').slice(0, 6).map((m) => ({ url: m.url, caption: `Матеріал клієнта: ${m.name} (${MATERIAL_KINDS[m.kind] || m.kind})` })),
+      ...mats.filter((m) => m.kind === 'competitor').slice(0, 6).map((m) => ({ url: m.url, caption: `Реклама конкурента (скриншот): ${m.name}` })),
+    ];
+    const figmaUrl = b.figma || own.row?.figma_url || '';
+    if (figmaUrl) {
+      const res = await Promise.resolve().then(() => (ctx.figma ? ctx.figma(figmaUrl) : readFigma(figmaUrl, { token: figmaToken() }))).catch((e) => ({ ok: false, error: String(e?.message || e) }));
+      figmaInfo = { status: res.ok ? 'read' : res.noToken ? 'no_token' : 'error', name: res.name || '', frames: res.ok ? res.frames.length : 0, error: res.ok ? '' : res.error };
+      blocks.push({ title: 'Макет бренду у Figma', text: figmaText(res) });
+      if (res.ok) res.frames.filter((f) => f.imageUrl).forEach((f) => images.push({ url: f.imageUrl, caption: `Figma, кадр: ${f.name || f.id}` }));
+    }
+    images = images.filter((im) => /^https?:\/\//i.test(im.url || '')).slice(0, 16);
+    blocks.push({ title: 'Картинки, додані до цього повідомлення', text: images.length ? images.map((im) => `- ${im.caption}`).join('\n') : 'Картинок не додано: матеріали видно лише за назвами файлів. Скажіть у результаті, що самі файли ви не бачили.' });
   }
 
   if (['creative_brief', 'creative_copywriter', 'creative_maker', 'creative_quality'].includes(agent.role)) {
@@ -321,12 +358,24 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
 
   const user = blocks.map((x) => `### ${x.title}\n${x.text}`).join('\n\n') + (failed.length ? `\n\n### Вхідні дані, які не завантажились\n${failed.map((f) => '- ' + f).join('\n')}` : '');
   const system = composeCreativeSystem(agent.role, prompt.body, mine.extra, language);
-  const result = await rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: json ? 4200 : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: user }] } });
+  const ask = (content) => rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: json ? 4200 : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content }] } });
+  let result;
+  if (images.length) {
+    const parts = [{ type: 'text', text: user }];
+    images.forEach((im) => parts.push({ type: 'text', text: `[${im.caption}]` }, { type: 'image', source: { type: 'url', url: im.url } }));
+    try { result = await ask(parts); } catch (e) {
+      // a picture the model could not fetch must not stop the whole plan: ask again with the text only and say so
+      if (!/image|url|media/i.test(String(e?.message || e))) throw e;
+      imagesNote = 'Картинки не вдалося завантажити в модель: план складено лише за текстом.';
+      images = [];
+      result = await ask(`${user}\n\n### Картинки\n${imagesNote} Скажіть про це в результаті.`);
+    }
+  } else result = await ask(user);
   const raw = String(result.text || '').trim();
 
   if (agent.role === 'creative_strategy') {
     const parsed = parseCreativePlan(raw, req || {});
-    return { output: { text: renderPlan(parsed), summary: parsed.summary, json: parsed, requestId: rid, campaignId }, summary: parsed.summary || `Напрямів: ${parsed.directions.length}` };
+    return { output: { text: renderPlan(parsed), summary: parsed.summary, json: parsed, requestId: rid, campaignId, figma: figmaInfo, imagesSeen: images.length, imagesNote }, summary: parsed.summary || `Напрямів: ${parsed.directions.length}` };
   }
   if (agent.role === 'creative_brief') {
     const parsed = parseCreativeBrief(raw, req, plan.directions);

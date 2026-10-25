@@ -67,7 +67,7 @@ function recorder(ctx, { task, agent, prompt, prefix = '', dry = false }) {
       if (prefix.trim()) params.system = `${prefix.trim()}\n\n${params.system}`;
       const started = Date.now();
       const content = params.messages?.[0]?.content;
-      const log = { task_id: task.id, agent_id: agent.id, prompt_id: prompt.id, prompt_version: prompt.version, model: params.model, system_prompt: params.system, user_prompt: typeof content === 'string' ? content : JSON.stringify(content) };
+      const log = { task_id: task.id, agent_id: agent.id, prompt_id: prompt.id, prompt_version: prompt.version, model: params.model, system_prompt: params.system, user_prompt: typeof content === 'string' ? content : Array.isArray(content) ? content.map((p) => (p.type === 'text' ? p.text : `[image: ${p.source?.url || ''}]`)).join('\n') : JSON.stringify(content) };
       try {
         const r = await ctx.model.callModel({ ...args, trigger: ctx.trigger, actor: ctx.email, params });
         state.cost += r.costUsd || 0;
