@@ -118,7 +118,7 @@ export default function WorldMap3D({ agentDepts, focusedDept, hidden, runStates,
 
   if (failed) return <div className="w3d-failed">Не вдалося запустити 3D-мапу. Оновіть сторінку або відкрийте розділ «Агенти».</div>;
   return (
-    <div ref={shellRef} className={'w3d-shell' + (night ? ' is-night' : '')} style={{ visibility: hidden ? 'hidden' : 'visible' }}>
+    <div ref={shellRef} className={'w3d-shell' + (night ? ' is-night' : '') + (focusedDept ? ' is-focused' : '')} style={{ visibility: hidden ? 'hidden' : 'visible' }}>
       {!loaderGone && (
         <div className={'w3d-loader' + (ready ? ' is-done' : '')} role="status" aria-live="polite">
           <img className="w3d-loader-mark" src={`${import.meta.env.BASE_URL}ai-world/logo/emblem.svg`} alt="" />

@@ -22,3 +22,7 @@
 .w3d-failed { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: #f6e9fa; }
 @keyframes w3dPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 @media (prefers-reduced-motion: reduce) { .w3d-loader-mark { animation: none; } .w3d-loader { transition: none; } }
+
+/* the day/night switch is for the city view; inside a department it steps aside */
+.w3d-shell .todsw { transition: opacity .25s ease; }
+.w3d-shell.is-focused .todsw { opacity: 0; pointer-events: none; }

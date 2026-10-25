@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AGENT_DEPTS } from '../../data/aiAgentsData';
 import { AI_ASSETS } from '../../lib/aiAgentsAssets';
 import ActionIcon from '../../components/common/ActionIcon';
+import { DeptRail, DeptStrip } from './aiMap/DeptChrome';
 import AiEnvironment from '../../components/AiEnvironment/AiEnvironment';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import { BOOK_ICON } from '../KnowledgeBase/KnowledgeOrb';
@@ -40,7 +41,7 @@ import useAgentRunStates from './aiMap/useAgentRunStates';
 import useOpenRequests from './aiMap/useOpenRequests';
 import { nightNow } from './aiMap/nightRule';
 import TaskFlowPanel from './aiMap/TaskFlowPanel';
-import { UI_SCALE, VIEWBOX_HALF, calculateDepartmentGraphLayout, findAgent } from './aiMap/graphLayout';
+import { UI_SCALE, VIEWBOX_HALF, calculateDepartmentGraphLayout } from './aiMap/graphLayout';
 import {
   FONT_SAT, buildOverview, makeDims, ringGeometry,
 } from './aiMap/overviewLayout';
@@ -135,6 +136,7 @@ export default function ConstellationTest() {
 
   const [deptPanelClosed, setDeptPanelClosed] = useState(false);
   const [viewMode, setViewMode] = useState('map');
+  const [deptTab, setDeptTab] = useState('ov');
 
   // Stage size drives the viewBox aspect, the compact (phone/narrow) layout
   // and the minimum readable label size.
@@ -229,7 +231,7 @@ export default function ConstellationTest() {
   // Re-show the department overview panel every time a (different)
   // department comes into focus — closing it is per-visit, not permanent.
   // CHART is per-visit too: entering a department always starts on MAP.
-  useEffect(() => { setDeptPanelClosed(false); setViewMode('map'); }, [focusedDept]);
+  useEffect(() => { setDeptPanelClosed(false); setViewMode('map'); setDeptTab('ov'); }, [focusedDept]);
 
   const dims = useMemo(() => makeDims(compact, upx, stageSize.w), [compact, upx, stageSize.w]);
   const ring = useMemo(
@@ -273,7 +275,7 @@ export default function ConstellationTest() {
   useEffect(() => {
     if (use3d || !focusedDept || selectedAgent || coreOpen || agentToolOpen || compact) return undefined; // in 3D the wheel zooms the scene
     function handleWheel(e) {
-      if (e.target.closest('.chart-view, .dept-panel, .ai-section, [role="dialog"]')) return;
+      if (e.target.closest('.chart-view, .dw-fly, .ai-section, [role="dialog"]')) return;
       e.preventDefault();
       const now = Date.now();
       if (now - wheelCooldownRef.current < 450 || Math.abs(e.deltaY) < 8) return;
@@ -409,7 +411,7 @@ export default function ConstellationTest() {
 
       {section === 'map' && (
         <>
-          {focused && (
+          {focused && compact && (
             <div className="constellation-overlay" data-ai-safe>
               <button type="button" className="constellation-reset ai-pill" onClick={resetView}>
                 <ActionIcon name="back" size={16} />Всі відділи
@@ -424,7 +426,17 @@ export default function ConstellationTest() {
             </div>
           )}
 
-          {focused && (
+          {focused && !compact && (
+            <>
+              <DeptRail
+                focused={focused} viewMode={viewMode} closed={deptPanelClosed} setClosed={setDeptPanelClosed} tab={deptTab} setTab={setDeptTab}
+                onReset={resetView} onOpenAgent={openAgent}
+              />
+              <DeptStrip deptKeys={deptKeys} agentDepts={AGENT_DEPTS} current={focused.key} onSelect={(k) => { setFocusedDept(k); setHoveredDept(null); }} />
+            </>
+          )}
+
+          {focused && compact && (
             <div className="constellation-carousel" data-ai-safe>
               <button type="button" aria-label="Попередній відділ" onClick={() => cycleDept(-1)}>
                 <ActionIcon name="chevron" size={22} className="chev-prev" />
@@ -437,66 +449,6 @@ export default function ConstellationTest() {
               </button>
             </div>
           )}
-
-          {focused && viewMode === 'map' && !deptPanelClosed && (() => {
-            const dept = focused.dept;
-            if (dept.comingSoon) {
-              return (
-                <div className="dept-panel ai-panel dept-panel-soon" data-ai-safe>
-                  <button type="button" className="dept-panel-close" aria-label="Закрити панель відділу" onClick={() => setDeptPanelClosed(true)}><ActionIcon name="close" size={18} /></button>
-                  <div className="dept-panel-eyebrow">Відділ · СКОРО</div>
-                  <h2>{dept.label}</h2>
-                  <div className="dept-panel-subtitle">{dept.subtitle}</div>
-                  {dept.comingSoonNote && <p className="dept-panel-narrative">{dept.comingSoonNote}</p>}
-                  <div className="dept-panel-soon-note">Узгоджено з командою як частина цільової карти відділів. Реалізація ще не почалась.</div>
-                </div>
-              );
-            }
-
-            const totalAgents = dept.subcategories.reduce((sum, sc) => sum + sc.agents.length, 0);
-            const startHereAgent = dept.startHere ? findAgent(dept, dept.startHere) : null;
-            return (
-              <div className="dept-panel ai-panel" data-ai-safe>
-                <button type="button" className="dept-panel-close" aria-label="Закрити панель відділу" onClick={() => setDeptPanelClosed(true)}><ActionIcon name="close" size={18} /></button>
-                <div className="dept-panel-eyebrow">Відділ</div>
-                <h2>{dept.label}</h2>
-                <div className="dept-panel-subtitle">{dept.subtitle}</div>
-                {dept.narrative && <p className="dept-panel-narrative">{dept.narrative}</p>}
-
-                <div className="dept-panel-section">
-                  <h4>Що охоплює</h4>
-                  <div className="dept-panel-pills">
-                    {dept.subcategories.map((sc) => <span key={sc.key} className="dept-panel-pill">{sc.label}</span>)}
-                  </div>
-                </div>
-
-                <div className="dept-panel-section">
-                  <h4>Функції</h4>
-                  <ul className="dept-panel-functions">
-                    {dept.subcategories.map((sc) => (
-                      <li key={sc.key}><span>{sc.label}</span><span className="dept-panel-count">{sc.agents.length} {sc.agents.length === 1 ? 'агент' : 'агенти'}</span></li>
-                    ))}
-                  </ul>
-                </div>
-
-                {startHereAgent && (
-                  <div className="dept-panel-section">
-                    <h4>З чого почати</h4>
-                    <button
-                      type="button" className="dept-panel-starthere"
-                      onClick={() => openAgent({ ...startHereAgent, deptKey: focused.key, deptLabel: dept.label, color: dept.color })}
-                    >
-                      {startHereAgent.name} &rarr;
-                    </button>
-                  </div>
-                )}
-
-                <div className="dept-panel-numbers">
-                  {totalAgents} {totalAgents === 1 ? 'агент' : 'агентів'} · {dept.subcategories.length} {dept.subcategories.length === 1 ? 'функція' : 'функції'}
-                </div>
-              </div>
-            );
-          })()}
 
           {focused && viewMode === 'chart' && !focused.dept.comingSoon && (
             <DeptChartView dept={focused.dept} deptKey={focused.key} onSelectAgent={setSelectedAgent} />
