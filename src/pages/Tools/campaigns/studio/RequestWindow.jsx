@@ -4,7 +4,7 @@ import { useConfirm } from '../../../../components/common/ConfirmDialog';
 import useDialogA11y from '../../../../lib/useDialogA11y';
 import { kickQueue } from '../../../../lib/api/agents';
 import { cancelRequest, deleteRequest, fetchRequestDetail, passOn, retryStudioTask, runStep, startRequest } from '../../../../lib/api/creatives';
-import { CREATIVE_ROLES, MATERIAL_KINDS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES } from '../../../../lib/agents/creativeTeam';
+import { CREATIVE_ROLES, IDEA_SOURCES, MATERIAL_KINDS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES } from '../../../../lib/agents/creativeTeam';
 import Markdown from '../../../Smm/Markdown';
 import { fmtDateTime } from '../../../Smm/agentUi';
 
@@ -109,7 +109,10 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
               {b.message && <div><dt>Меседж</dt><dd>{b.message}</dd></div>}
               {b.must && <div><dt>Обовʼязково</dt><dd>{b.must}</dd></div>}
               {b.avoid && <div><dt>Не можна</dt><dd>{b.avoid}</dd></div>}
-              <div><dt>Формати</dt><dd>{(b.ratios || []).map((r) => REQUEST_RATIOS.find((x) => x.key === r)?.label || r).join(', ')} · напрямів: до {b.count} · тексти: {TEXT_MODES[b.texts]} · {REQUEST_LANGUAGES[b.language]}</dd></div>
+              <div><dt>Формати</dt><dd>{(b.ratios || []).map((r) => REQUEST_RATIOS.find((x) => x.key === r)?.label || r).join(', ')} · {b.texts === 'given' ? `креативів за текстами: ${(b.given_texts || []).length}` : `напрямів: до ${b.count}`} · тексти: {TEXT_MODES[b.texts]} · {REQUEST_LANGUAGES[b.language]}</dd></div>
+              {b.texts === 'given' && (b.given_texts || []).length > 0 && <div><dt>Задані тексти</dt><dd>{b.given_texts.map((t, i) => `${i + 1}) ${t.headline}${t.subline ? ` / ${t.subline}` : ''}${t.badge ? ` / ${t.badge}` : ''}`).join(' | ')}</dd></div>}
+              {b.idea_source && <div><dt>Ідеї</dt><dd>{IDEA_SOURCES[b.idea_source]}{b.figma ? ` · Figma: ${b.figma}` : ''}</dd></div>}
+              <div><dt>Кнопка</dt><dd>{b.cta === false ? 'не потрібна' : `потрібна${b.cta_text ? `: «${b.cta_text}»` : ''}`}</dd></div>
             </dl>
             {(detail.request.materials || []).length > 0 && (
               <ul className="stu-files stu-files--ro">{detail.request.materials.map((m) => <li key={m.url}><img src={m.url} alt="" /><span><b>{m.name}</b><small>{MATERIAL_KINDS[m.kind] || m.kind}</small></span></li>)}</ul>

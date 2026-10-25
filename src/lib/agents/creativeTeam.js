@@ -70,14 +70,43 @@ export const REQUEST_RATIOS = [
   { key: '16:9', label: 'Горизонтальний 16:9' },
 ];
 export const REQUEST_LANGUAGES = { uk: 'Українська', en: 'English' };
-export const TEXT_MODES = { auto: 'Агент вирішує', yes: 'Потрібні', no: 'Не потрібні' };
-export const MATERIAL_KINDS = { logo: 'Логотип', product: 'Фото продукту', style: 'Приклад стилю', other: 'Інше' };
+// texts: 'given' = the manager gives the texts (used word for word, one creative per text), 'yes' = the copywriter writes them, 'no' = none,
+// 'auto' = the agent decides (older requests).
+export const TEXT_MODES = { auto: 'Агент вирішує', yes: 'Напише агент', given: 'Задані менеджером', no: 'Без тексту' };
+export const MATERIAL_KINDS = { logo: 'Логотип', product: 'Фото продукту', style: 'Приклад стилю', competitor: 'Реклама конкурента', other: 'Інше' };
 export const MAX_CONCEPTS = 3; // the strategist makes at most three directions, the brief one concept per direction
+export const MAX_GIVEN_TEXTS = 8; // with given texts there is one direction (and creative) per text
+export const MAX_MATERIALS = 16;
+export const IDEA_SOURCES = { competitors: 'Від конкурентів', own: 'Свої / від ШІ', mix: 'Мікс' };
+
+// How many directions (and concepts) a request asks for: one per given text when the manager gave the texts, otherwise up to three.
+export function directionLimit(brief = {}) {
+  const given = Array.isArray(brief.given_texts) ? brief.given_texts.length : 0;
+  if (brief.texts === 'given' && given) return Math.min(MAX_GIVEN_TEXTS, given);
+  return Math.min(MAX_CONCEPTS, Math.max(1, Number(brief.count) || MAX_CONCEPTS));
+}
+
+// The texts the manager pasted all together → [{ headline, subline, badge }]. Texts are numbered («1)» or «1.») or separated by an empty line; inside
+// a text the lines are the headline, the subline and the badge (the offer). Nothing is changed or completed.
+export function parseGivenTexts(text) {
+  const raw = String(text ?? '').replace(/\r\n/g, '\n').trim();
+  if (!raw) return [];
+  const numbered = /^\s*\d+[).]\s+\S/m.test(raw);
+  const blocks = (numbered ? raw.split(/^\s*\d+[).]\s+/m) : raw.split(/\n\s*\n/)).map((b) => b.trim()).filter(Boolean);
+  return blocks.slice(0, MAX_GIVEN_TEXTS).map((b) => {
+    const lines = b.split('\n').map((l) => l.trim()).filter(Boolean);
+    return { headline: lines[0] || '', subline: lines[1] || '', badge: lines.slice(2).join(' ') };
+  }).filter((t) => t.headline);
+}
 
 // A request as the form sends it, cleaned: only known keys, bounded sizes. Throws a message the person can read.
 export function cleanRequest(input = {}) {
   const clip = (v, n) => String(v ?? '').trim().slice(0, n);
   const ratios = (Array.isArray(input.ratios) ? input.ratios : []).filter((r) => REQUEST_RATIOS.some((x) => x.key === r));
+  const given = (Array.isArray(input.given_texts) ? input.given_texts : []).slice(0, MAX_GIVEN_TEXTS)
+    .map((t) => ({ headline: clip(t?.headline, 120), subline: clip(t?.subline, 240), badge: clip(t?.badge, 60) })).filter((t) => t.headline || t.subline || t.badge);
+  const texts = TEXT_MODES[input.texts] ? input.texts : 'auto';
+  const figma = clip(input.figma, 300);
   const brief = {
     goal: clip(input.goal, 3000),
     product: clip(input.product, 1500),
@@ -90,12 +119,19 @@ export function cleanRequest(input = {}) {
     competitors: clip(input.competitors, 2000),
     examples: clip(input.examples, 3000),
     ratios: ratios.length ? ratios : ['1:1'],
-    count: Math.min(MAX_CONCEPTS, Math.max(1, Math.round(Number(input.count)) || MAX_CONCEPTS)),
-    texts: TEXT_MODES[input.texts] ? input.texts : 'auto',
+    count: texts === 'given' && given.length ? Math.min(MAX_GIVEN_TEXTS, given.length) : Math.min(MAX_CONCEPTS, Math.max(1, Math.round(Number(input.count)) || MAX_CONCEPTS)),
+    texts,
+    given_texts: texts === 'given' ? given : [],
+    idea_source: IDEA_SOURCES[input.idea_source] ? input.idea_source : 'mix',
+    figma,
+    cta: input.cta !== false,
+    cta_text: clip(input.cta_text, 40),
     language: REQUEST_LANGUAGES[input.language] ? input.language : 'uk',
   };
   if (!brief.goal) throw new Error('Опишіть, що потрібно від креативів.');
-  const materials = (Array.isArray(input.materials) ? input.materials : []).slice(0, 12).map((m) => ({
+  if (figma && !/^https?:\/\//i.test(figma)) throw new Error('Посилання на Figma має починатися з https://');
+  if (texts === 'given' && !given.length) throw new Error('Додайте хоча б один текст або оберіть інший режим текстів.');
+  const materials = (Array.isArray(input.materials) ? input.materials : []).slice(0, MAX_MATERIALS).map((m) => ({
     name: clip(m?.name, 160), url: clip(m?.url, 600), path: clip(m?.path, 400), kind: MATERIAL_KINDS[m?.kind] ? m.kind : 'other',
   })).filter((m) => m.name && m.url);
   return { title: clip(input.title, 120) || clip(brief.goal, 60), brief, materials };

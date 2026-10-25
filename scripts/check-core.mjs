@@ -34,7 +34,8 @@ import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
-import { cleanRequest, connectCampaign, ensureCreativeDepartment } from '../src/lib/agents/creativeTeam.js';
+import { cleanRequest, connectCampaign, directionLimit, ensureCreativeDepartment, parseGivenTexts } from '../src/lib/agents/creativeTeam.js';
+import { cleanSettings, defaultRatios, inputState, manualInput } from '../src/lib/agents/projectCreative.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc } from '../api/_lib/creativeRun.js';
@@ -1837,6 +1838,58 @@ const newRequest = (tables, campaignId, id, extra = {}) => {
   tables.ag_creative_requests.push({ id, campaign_id: campaignId, status: 'draft', title: request.title, brief: request.brief, materials: request.materials });
   return request;
 };
+
+await ok('creative inputs: given texts are parsed and kept word for word, the project rules, library and data of other departments reach the strategist with what is missing', async () => {
+  // the paste of the manager (one text per block: headline, subline, badge) becomes one row per text
+  const rows = parseGivenTexts('1) Salon-Fresh Hair. Without the Salon.\nExpertly styled, colored & cut wigs — ready to wear.\nFALL SALE · 15% OFF\n\n2) We Style It. You Wear It.\nYour perfect wig, finished by our stylists.\nFALL SALE · 15% OFF');
+  assert.deepEqual(rows.map((r) => r.headline), ['Salon-Fresh Hair. Without the Salon.', 'We Style It. You Wear It.']);
+  assert.deepEqual([rows[0].subline, rows[0].badge], ['Expertly styled, colored & cut wigs — ready to wear.', 'FALL SALE · 15% OFF']);
+  assert.equal(parseGivenTexts('Headline A\nSub A\n\nHeadline B\nSub B\nBadge B').length, 2); // empty lines separate texts when they are not numbered
+  assert.deepEqual(parseGivenTexts('  '), []);
+  // the request: one direction per given text (up to eight), a request without given texts keeps the limit of three
+  const texts = ['A', 'B', 'C', 'D', 'E'].map((x) => ({ headline: `Headline ${x}`, subline: `Sub ${x}`, badge: 'FALL SALE · 15% OFF' }));
+  const given = cleanRequest({ goal: 'Fall sale', texts: 'given', given_texts: texts, count: 2, ratios: ['4:5', '9:16'], idea_source: 'competitors', figma: 'https://figma.com/design/x', cta: false });
+  assert.deepEqual([given.brief.count, given.brief.given_texts.length, directionLimit(given.brief), given.brief.cta, given.brief.idea_source], [5, 5, 5, false, 'competitors']);
+  assert.equal(directionLimit(cleanRequest({ goal: 'x', texts: 'yes', count: 9 }).brief), 3);
+  assert.throws(() => cleanRequest({ goal: 'x', texts: 'given', given_texts: [] }), /Додайте хоча б один текст/);
+  assert.throws(() => cleanRequest({ goal: 'x', figma: 'figma.com/x' }), /https/);
+  assert.equal(cleanRequest({ goal: 'x', texts: 'yes', given_texts: texts }).brief.given_texts.length, 0); // given texts count only in the «given» mode
+  // the project side: freshness of the data other departments deliver, the rules, the formats of the platforms
+  const now = new Date('2026-10-22T08:00:00Z');
+  assert.deepEqual([inputState(null, now).state, inputState({ body: '  ' }, now).state, inputState({ body: 'x', filled_at: '2026-10-20T00:00:00Z' }, now).state, inputState({ body: 'x', filled_at: '2026-09-01T00:00:00Z' }, now).state], ['wait', 'wait', 'ok', 'old']);
+  assert.equal(manualInput('   ', 'a@x.com'), null);
+  assert.deepEqual([manualInput('Text', 'a@x.com', now).source, manualInput('Text', 'a@x.com', now).filled_at], ['manual', '2026-10-22T08:00:00.000Z']);
+  assert.deepEqual([defaultRatios(['meta']), defaultRatios(['meta', 'google']), defaultRatios([])], [['4:5', '9:16'], ['4:5', '9:16', '1:1', '16:9'], ['1:1']]);
+  assert.throws(() => cleanSettings({ figma_url: 'figma.com/x' }), /https/);
+  assert.deepEqual([cleanSettings({ cta_mode: 'bogus' }).cta_mode, cleanSettings({ cta_mode: 'none' }).cta_mode], ['always', 'none']);
+
+  const { tables, db, ctx } = creativeWorld();
+  tables.project_creative = [{ project_id: 5, figma_url: 'https://figma.com/design/x', cta_mode: 'none', cta_text: '', restrictions: 'No models under 18.', inputs: {
+    business: { body: 'Wig store for the US market.', source: 'manual', by: 'a@x.com', filled_at: '2026-10-20T10:00:00Z' },
+    competitors: { body: 'Old competitor notes.', source: 'agent', by: 'Агент дослідження конкурентів', filled_at: '2026-09-01T10:00:00Z' } } }];
+  tables.project_creative_assets = [{ id: 1, project_id: 5, kind: 'logo', name: 'logo.png' }, { id: 2, project_id: 5, kind: 'product', name: 'wig.jpg' }];
+  await ensureCreativeDepartment(db, 'a@x.com');
+  await connectCampaign(db, tables.ag_campaigns[0], { email: 'a@x.com' });
+  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'draft', title: given.title, brief: given.brief, materials: [] });
+  await startRequest(ctx, 1);
+  await processQueue(ctx);
+  const strat = tables.ag_agents.find((a) => a.role === 'creative_strategy');
+  const prompt = tables.ag_runs.find((r) => r.agent_id === strat.id).user_prompt;
+  assert.match(prompt, /Кількість напрямів: рівно 5, по одному на кожен заданий текст/);
+  assert.match(prompt, /Тексти до креативів: задані менеджером, використовувати дослівно/);
+  assert.match(prompt, /Заданий текст 1: заголовок «Headline A»; підзаголовок «Sub A»; плашка «FALL SALE · 15% OFF»/);
+  assert.match(prompt, /Звідки брати ідеї: Від конкурентів/);
+  assert.match(prompt, /Кнопка заклику до дії: не потрібна/);
+  assert.match(prompt, /Правила клієнта для креативів[\s\S]*Макет бренду в Figma: https:\/\/figma\.com\/design\/x[\s\S]*Обмеження клієнта: No models under 18\./);
+  assert.match(prompt, /Бібліотека матеріалів клієнта[\s\S]*- logo\.png \(Логотип\)\n- wig\.jpg \(Фото продукту\)/);
+  assert.match(prompt, /### Дослідження бізнесу \(звіт від 2026-10-20: 2 дн\. тому, свіжий\) \[введено вручну, a@x\.com\]\nWig store for the US market\./);
+  assert.match(prompt, /### Конкуренти \(звіт від 2026-09-01: 51 дн\. тому, ЗАСТАРІВ\) \[агент: Агент дослідження конкурентів\]/);
+  assert.match(prompt, /Дані від інших відділів, яких ще немає[\s\S]*- Аудиторія \(заповнює: Агент дослідження аудиторії\)[\s\S]*- Стратегія кампанії \(заповнює: Маркетинговий стратег\)[\s\S]*- Результати кабінету[\s\S]*- Проблеми з трекінгом/);
+  assert.doesNotMatch(prompt, /- Дослідження бізнесу \(заповнює/); // what is there is not listed as missing
+  assert.doesNotMatch(prompt, /We sell sofas/); // the business data is fresh: the site is not read
+  const plan = tables.ag_tasks.find((t) => t.agent_id === strat.id).output.json;
+  assert.equal(plan.directions.length, 3); // the stand-in strategist offers three; the limit of five did not cut them
+});
 
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {
   const { tables, db, model, ctx } = creativeWorld();

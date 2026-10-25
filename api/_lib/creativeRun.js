@@ -6,7 +6,8 @@
 // parsed and checked here, and the maker's prompts become the rows of ag_creatives. Everything the outside world provides is handed in
 // (ctx.read, ctx.campaignDeps), so tests run it with stand-ins.
 import { PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
-import { REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef } from '../../src/lib/agents/creativeTeam.js';
+import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, directionLimit } from '../../src/lib/agents/creativeTeam.js';
+import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, inputState } from '../../src/lib/agents/projectCreative.js';
 import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
 import { fetchBlock, loadAccounts, siteBlocks, summaryOf } from './campaignRun.js';
 import { readJson } from './agentContent.js';
@@ -23,7 +24,7 @@ const asList = (v) => (Array.isArray(v) ? v : []);
 // The strategist's answer → { summary, directions, clarify }: at most three directions (and not more than the request asks), by priority.
 export function parseCreativePlan(text, request = {}) {
   const j = readJson(text);
-  const max = Math.min(MAX_CONCEPTS, Math.max(1, Number(request.brief?.count) || MAX_CONCEPTS));
+  const max = directionLimit(request.brief || {});
   const seen = new Set();
   const directions = asList(j?.directions).map((d, i) => {
     let key = clip(d?.key, 20).replace(/[^\w-]/g, '') || `d${i + 1}`;
@@ -44,14 +45,14 @@ export function parseCreativeBrief(text, request = {}, directions = []) {
   const brief = request.brief || {};
   const allowed = asList(brief.ratios).filter((r) => RATIO_KEYS.includes(r));
   const ratios = allowed.length ? allowed : ['1:1'];
-  const max = Math.max(1, Math.min(directions.length || MAX_CONCEPTS, Number(brief.count) || MAX_CONCEPTS));
+  const max = Math.max(1, Math.min(directions.length || MAX_CONCEPTS, directionLimit(brief)));
   const seen = new Set();
   const concepts = asList(j?.concepts).slice(0, max).map((c, i) => {
     let key = clip(c?.key, 20).replace(/[^\w-]/g, '') || `c${i + 1}`;
     if (seen.has(key)) key = `c${i + 1}`;
     seen.add(key);
     const mine = asList(c?.ratios).filter((r) => ratios.includes(r));
-    const needsText = brief.texts === 'yes' ? true : brief.texts === 'no' ? false : c?.needs_text !== false;
+    const needsText = brief.texts === 'yes' || brief.texts === 'given' ? true : brief.texts === 'no' ? false : c?.needs_text !== false;
     return {
       key, direction: clip(c?.direction, 20), name: clip(c?.name, 80) || `Концепція ${i + 1}`, angle: clip(c?.angle, 400), audience: clip(c?.audience, 300), message: clip(c?.message, 400),
       visual: clip(c?.visual, 1200), uses_materials: asList(c?.uses_materials).map((m) => clip(m, 160)).filter(Boolean).slice(0, 6),
@@ -153,8 +154,12 @@ function requestBlock(req) {
     text: [
       `Що потрібно від креативів: ${b.goal}`, b.product ? `Продукт або пропозиція: ${b.product}` : '', b.audience ? `Аудиторія: ${b.audience}` : '',
       b.message ? `Головний меседж: ${b.message}` : '', b.tone ? `Тон: ${b.tone}` : '', b.must ? `Обовʼязково: ${b.must}` : '', b.avoid ? `Не можна: ${b.avoid}` : '',
-      `Формати: ${ratios || '1:1'}`, `Кількість напрямів: до ${b.count || MAX_CONCEPTS}`, `Тексти до креативів: ${{ auto: 'агент вирішує', yes: 'потрібні', no: 'не потрібні' }[b.texts] || 'агент вирішує'}`,
+      `Формати: ${ratios || '1:1'}`, b.texts === 'given' ? `Кількість напрямів: рівно ${directionLimit(b)}, по одному на кожен заданий текст` : `Кількість напрямів: до ${b.count || MAX_CONCEPTS}`,
+      `Тексти до креативів: ${{ auto: 'агент вирішує', yes: 'потрібні, пише копірайтер', given: 'задані менеджером, використовувати дослівно', no: 'не потрібні' }[b.texts] || 'агент вирішує'}`,
+      ...(b.texts === 'given' ? asList(b.given_texts).map((t, i) => `Заданий текст ${i + 1}: заголовок «${t.headline}»${t.subline ? `; підзаголовок «${t.subline}»` : ''}${t.badge ? `; плашка «${t.badge}»` : ''}`) : []),
       `Мова текстів: ${REQUEST_LANGUAGES[b.language] || REQUEST_LANGUAGES.uk}`,
+      `Звідки брати ідеї: ${IDEA_SOURCES[b.idea_source] || IDEA_SOURCES.mix}`, b.figma ? `Макет у Figma: ${b.figma}` : '',
+      b.cta === false ? 'Кнопка заклику до дії: не потрібна' : `Кнопка заклику до дії: так${b.cta_text ? `, текст кнопки «${b.cta_text}»` : ''}`,
     ].filter(Boolean).join('\n'),
   };
 }
@@ -197,6 +202,35 @@ async function outsideInputs(db, campaignId, now) {
   return blocks;
 }
 
+// What the project keeps for the creative department (tab «Креативи»): the client's rules and library for every role of the request chain, and,
+// for the strategist, what other departments' agents delivered (or what is still missing, so it says so instead of guessing).
+async function projectCreativeBlocks(db, projectId, now, { inputs = false } = {}) {
+  const row = (await db.from('project_creative').select('*').eq('project_id', projectId).maybeSingle()).data || null;
+  const assets = (await db.from('project_creative_assets').select('name, kind').eq('project_id', projectId).order('id', { ascending: true })).data || [];
+  const blocks = [];
+  const rules = [
+    row?.figma_url ? `Макет бренду в Figma: ${row.figma_url}` : '',
+    `Кнопка заклику до дії: ${CTA_MODES[row?.cta_mode || 'always']}${row?.cta_text ? `, текст кнопки «${row.cta_text}»` : ''}`,
+    row?.restrictions ? `Обмеження клієнта: ${clip(row.restrictions, 2000)}` : '',
+  ].filter(Boolean);
+  blocks.push({ title: 'Правила клієнта для креативів (вкладка «Креативи» проєкту)', text: rules.join('\n') });
+  blocks.push({ title: 'Бібліотека матеріалів клієнта (вкладка «Креативи» проєкту)', text: assets.length ? assets.map((a) => `- ${a.name} (${ASSET_KINDS[a.kind] || a.kind})`).join('\n') : 'Бібліотека порожня.' });
+  const have = new Set();
+  if (inputs) {
+    const missing = [];
+    for (const f of INPUT_FIELDS) {
+      const item = row?.inputs?.[f.key];
+      const st = inputState(item, now);
+      if (st.state === 'wait') { missing.push(`- ${f.label} (заповнює: ${f.agent})`); continue; }
+      have.add(f.key);
+      const who = item.source === 'manual' ? `введено вручну${item.by ? `, ${item.by}` : ''}` : `агент: ${item.by || f.agent}`;
+      blocks.push({ title: `${f.label}${freshness(item.filled_at, now)} [${who}]`, text: clip(item.body, 5000) });
+    }
+    if (missing.length) blocks.push({ title: 'Дані від інших відділів, яких ще немає', text: `${missing.join('\n')}\nПрацюйте без них і чесно скажіть у результаті, чого не вистачило.` });
+  }
+  return { blocks, have };
+}
+
 async function latestAnalysis(db, dept, campaignId) {
   const analyst = dept.agents.find((a) => a.role === 'creative_analyst');
   if (!analyst) return null;
@@ -227,6 +261,8 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   for (const f of def.clientFields || []) if (String(mine[f.key] || '').trim()) blocks.push({ title: `${f.label} (клієнт)`, text: clip(mine[f.key], 1500) });
   for (const f of def.fields || []) if (String(cfg[f.key] || '').trim()) blocks.push({ title: f.label, text: clip(cfg[f.key], 1800) });
   if (req) blocks.push(requestBlock(req), materialsBlock(req.materials));
+  const own = await projectCreativeBlocks(db, campaign.project_id, now, { inputs: agent.role === 'creative_strategy' });
+  if (agent.role !== 'creative_analyst') blocks.push(...own.blocks);
   const failed = [];
   const accounts = await loadAccounts(db, campaign.project_id);
   const dept = sub;
@@ -251,14 +287,14 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   }
 
   if (agent.role === 'creative_strategy') {
-    blocks.push(...await outsideInputs(db, campaignId, now));
+    blocks.push(...(await outsideInputs(db, campaignId, now)).filter((x) => !(own.have.has('business') && /^Дослідження бізнесу/.test(x.title)) && !(own.have.has('competitors') && /^Дослідження конкурентів/.test(x.title)) && !(own.have.has('audience') && /^Дослідження аудиторії/.test(x.title))));
     const analysis = await latestAnalysis(db, dept, campaignId);
     if (analysis?.output?.text && !analysis.output.skipped) blocks.push({ title: `Аналіз ефективності креативів${freshness(analysis.finished_at, now)}`, text: clip(analysis.output.text, 6000) });
     else blocks.push({ title: 'Аналіз ефективності креативів', text: 'Аналізу немає (новий клієнт або кабінет Meta не підключено): напрями спираються на дослідження й сайт.' });
     // research that is missing or outdated is no excuse to work blind: the strategist reads the site (and the named competitors) itself
     const fresh = (re) => blocks.some((x) => re.test(x.title) && /свіжий/.test(x.title));
     if (!fresh(/^Дослідження бізнесу/)) blocks.push(...await siteBlocks(b.site || project.website, { limit: 2, read }));
-    if (!fresh(/^Дослідження конкурентів/) && String(b.competitors || '').trim()) blocks.push({ title: 'Конкуренти, яких вказав менеджер', text: clip(b.competitors, 2000) }, ...await siteBlocks(b.competitors, { limit: 3, read }));
+    if (!fresh(/^(Дослідження конкурентів|Конкуренти)/) && String(b.competitors || '').trim()) blocks.push({ title: 'Конкуренти, яких вказав менеджер', text: clip(b.competitors, 2000) }, ...await siteBlocks(b.competitors, { limit: 3, read }));
     if (String(b.examples || '').trim()) blocks.push({ title: 'Приклади креативів конкурентів (описав або вставив менеджер)', text: clip(b.examples, 3000) });
   }
 

@@ -58,7 +58,7 @@ export const runStep = (agentId, campaignId, requestId) => agentAction('run_agen
 // The person's OK on a result that waited before it goes to the next agent.
 export const passOn = (taskId) => agentAction('pass_on', { taskId });
 
-const safeName = (n) => String(n || 'file').normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-60);
+export const safeName = (n) => String(n || 'file').normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-60);
 
 // One material of a request (logo, product photo, style example) goes to the storage bucket; the form keeps its public address.
 export async function uploadMaterial(campaignId, file, kind) {

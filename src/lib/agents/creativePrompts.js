@@ -30,12 +30,12 @@ export const CREATIVE_CONTRACTS = {
   creative_strategy: [
     JSON_RULES,
     'Answer with ONE JSON object: {"summary":"2-4 sentences: the plan and why","directions":[{"key":"d1","name":"2 to 5 words","priority":1,"why":"the facts that support it","audience":"who it is for","angle":"the one idea","message":"what the viewer must understand or feel","tests":"what this direction proves or tests","notes":"risks or what to avoid"}],"clarify":"what the manager must clarify (or empty)"}.',
-    'At most three directions, ordered by priority (1 is first). Never more than the request asks for.',
+    'At most three directions, ordered by priority (1 is first). Never more than the request asks for. Exception: when the request lists texts given by the manager, make exactly one direction per given text, in the order given, and the given text is that direction\'s message.',
   ],
   creative_brief: [
     JSON_RULES,
     'Answer with ONE JSON object: {"summary":"2-4 sentences: the idea of the request and the approach","concepts":[{"key":"c1","direction":"the key of the strategist\'s direction","name":"2 to 5 words","angle":"the one idea","audience":"who it is for","message":"what the viewer must understand or feel","visual":"what is in the picture: subject, scene, composition, mood, light, colors; no words in the picture","uses_materials":["file names from the materials list the picture is built on"],"ratios":["1:1"],"needs_text":true,"text_brief":"what the copywriter should write: hook, offer, call to action","avoid":"what must not appear"}],"notes":"what a person must check or provide"}.',
-    'One concept per direction of the strategist (or fewer). "ratios" uses only the formats the request lists. "uses_materials" lists names exactly as in the materials list (or an empty list). "needs_text" follows the request: true when texts are asked, false when not, your judgement when the request leaves it to you.',
+    'One concept per direction of the strategist (or fewer). When the request lists texts given by the manager, put the given text WORD FOR WORD into that concept\'s "text_brief" (headline, subline and badge, nothing changed or added) and set "needs_text" to true. "ratios" uses only the formats the request lists. "uses_materials" lists names exactly as in the materials list (or an empty list). "needs_text" follows the request: true when texts are asked, false when not, your judgement when the request leaves it to you.',
   ],
   creative_copywriter: [
     JSON_RULES,
