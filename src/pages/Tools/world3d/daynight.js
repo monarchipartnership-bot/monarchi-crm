@@ -27,12 +27,13 @@ export function initDayNight({ app, sun, hemi, fill, renderer, stars, moon, onTh
 
   // the test switch
   const sw = document.createElement('div'); sw.className = 'todsw';
-  sw.innerHTML = `<span>Час доби · тест</span><button type="button" data-m="auto"><b>◔</b><i id="todtime">Авто</i></button><button type="button" data-m="day"><b>☀</b>День</button><button type="button" data-m="night"><b>☾</b>Ніч</button>`;
+  sw.setAttribute('role', 'group'); sw.setAttribute('aria-label', 'Час доби');
+  sw.innerHTML = `<button type="button" data-m="auto" title="Авто" aria-label="Авто"><b>◔</b></button><button type="button" data-m="day" title="День" aria-label="День"><b>☀</b></button><button type="button" data-m="night" title="Ніч" aria-label="Ніч"><b>☾</b></button>`;
   app.appendChild(sw);
   const paint = () => sw.querySelectorAll('button').forEach((b) => b.classList.toggle('is-on', b.dataset.m === mode));
   sw.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; mode = b.dataset.m; try { localStorage.setItem('aiw.tod', mode); } catch (er) { /* no storage */ } paint(); });
   paint();
-  const clockEl = sw.querySelector('#todtime'); let clockT = 0;
+  // icon-only switch: the tumblers carry no text, the clock readout is gone
 
   let themeNight = null;
   const col = new THREE.Color(), col2 = new THREE.Color();
@@ -56,7 +57,6 @@ export function initDayNight({ app, sun, hemi, fill, renderer, stars, moon, onTh
       const now = performance.now(), dt = Math.min(1, (now - lastNow) / 1000); lastNow = now; // real elapsed time, so the change takes about as long on a slow frame rate too
       const t = target(); d += (t - d) * Math.min(1, dt * 1.7); if (Math.abs(t - d) < 0.002) d = t;
       if (Math.abs(d - last) > 0.0015) { last = d; apply(); }
-      clockT -= dt; if (clockT < 0) { clockT = 1; const h = nowHours(); clockEl.textContent = mode === 'auto' ? `Авто ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}` : 'Авто'; }
     },
   };
 }
