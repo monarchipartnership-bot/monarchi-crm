@@ -40,6 +40,17 @@ function collectStyle(root, acc) {
   }
 }
 
+// The frames among the children of a page: frames and components, and the frames inside sections (one level).
+function topFrames(children = [], max = 4) {
+  const out = [];
+  for (const c of children || []) {
+    if (out.length >= max) break;
+    if (FRAME_TYPES.has(c.type)) out.push({ id: c.id, name: c.name || '' });
+    else if (c.type === 'SECTION') for (const f of c.children || []) if (FRAME_TYPES.has(f.type) && out.length < max) out.push({ id: f.id, name: f.name || '' });
+  }
+  return out;
+}
+
 const top = (counts, n) => Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n);
 
 class FigmaError extends Error {}
@@ -57,12 +68,17 @@ export async function readFigma(url, { token, fetchImpl = fetch, maxFrames = 4 }
   };
   try {
     let frames = [];
-    if (ref.nodeId) frames = [{ id: ref.nodeId, name: '' }];
-    else {
+    if (ref.nodeId) {
+      // a link to a node: a frame is read as it is, a page (or a section) of the file is read by its top frames
+      const part = await get(`/v1/files/${ref.key}/nodes?ids=${encodeURIComponent(ref.nodeId)}&depth=2`);
+      const doc = part.nodes?.[ref.nodeId]?.document;
+      if (!doc) return { ok: false, error: 'Вузол із посилання не знайдено у файлі Figma.' };
+      frames = doc.type === 'CANVAS' || doc.type === 'SECTION' ? topFrames(doc.children, maxFrames) : [{ id: ref.nodeId, name: doc.name || '' }];
+    } else {
       const file = await get(`/v1/files/${ref.key}?depth=2`);
-      for (const page of file.document?.children || []) for (const c of page.children || []) if (FRAME_TYPES.has(c.type) && frames.length < maxFrames) frames.push({ id: c.id, name: c.name || '' });
-      if (!frames.length) return { ok: false, error: 'У файлі Figma немає кадрів верхнього рівня.' };
+      for (const page of file.document?.children || []) frames.push(...topFrames(page.children, maxFrames - frames.length));
     }
+    if (!frames.length) return { ok: false, error: 'У файлі Figma немає кадрів верхнього рівня.' };
     const ids = encodeURIComponent(frames.map((f) => f.id).join(','));
     const [nodes, images] = await Promise.all([get(`/v1/files/${ref.key}/nodes?ids=${ids}`), get(`/v1/images/${ref.key}?ids=${ids}&format=png&scale=1`)]);
     const acc = { colors: {}, fonts: {}, texts: [] };

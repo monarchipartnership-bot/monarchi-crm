@@ -1906,6 +1906,7 @@ await ok('creative strategist sees the pictures (materials, competitors ads, Fig
   const fakeFetch = async (url, opts) => {
     calls.push([url, opts.headers['X-Figma-Token']]);
     if (url.includes('/v1/files/K1?depth=2')) return reply({ name: 'Brand', document: { children: [{ type: 'CANVAS', children: [{ type: 'FRAME', id: '1:2', name: 'Hero' }, { type: 'TEXT', id: '9:9', name: 'loose text' }, { type: 'FRAME', id: '1:3', name: 'Story' }] }] } });
+    if (url.includes('ids=0%3A1&depth=2')) return reply({ name: 'Brand', nodes: { '0:1': { document: { type: 'CANVAS', name: 'Page 1', children: [{ type: 'SECTION', children: [{ type: 'FRAME', id: '1:2', name: 'Hero' }] }, { type: 'FRAME', id: '1:3', name: 'Story' }] } } } });
     if (url.includes('/nodes?')) return reply({ name: 'Brand', nodes: {
       '1:2': { document: { type: 'FRAME', name: 'Hero', fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }], children: [
         { type: 'TEXT', characters: 'Soft  hair', style: { fontFamily: 'Inter', fontWeight: 700 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }] },
@@ -1921,6 +1922,8 @@ await ok('creative strategist sees the pictures (materials, competitors ads, Fig
   assert.ok(res.fonts.some(([f]) => f === 'Inter 700') && !res.fonts.some(([f]) => /Hidden/.test(f))); // hidden layers are not the style
   assert.deepEqual(res.texts, ['Soft hair']);
   assert.ok(calls.every(([, t]) => t === 'tok'));
+  const page = await readFigma('https://www.figma.com/design/K1/Brand?node-id=0-1&p=f', { token: 'tok', fetchImpl: fakeFetch }); // a link to a page of the file
+  assert.deepEqual([page.ok, page.frames.map((f) => f.name)], [true, ['Hero', 'Story']]); // the frame inside a section counts too
   assert.match((await readFigma('https://www.figma.com/design/K1/Brand', { token: '', fetchImpl: fakeFetch })).error, /FIGMA_TOKEN/);
   assert.match((await readFigma('https://www.figma.com/design/K1/Brand', { token: 't', fetchImpl: async () => reply({}, 403) })).error, /не пускає/);
   assert.match((await readFigma('https://example.com/x', { token: 't', fetchImpl: fakeFetch })).error, /не схоже/);
