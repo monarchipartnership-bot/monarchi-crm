@@ -5,6 +5,7 @@ import { AI_ASSETS } from '../../lib/aiAgentsAssets';
 import ActionIcon from '../../components/common/ActionIcon';
 import { DeptRail, DeptStrip } from './aiMap/DeptChrome';
 import Presence from './aiMap/Presence';
+import { AgentWindowTheme } from '../../components/AgentWorkspace/AgentWindowTheme';
 import AiEnvironment from '../../components/AiEnvironment/AiEnvironment';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
 import { BOOK_ICON } from '../KnowledgeBase/KnowledgeOrb';
@@ -324,8 +325,10 @@ export default function ConstellationTest() {
   const calm = section !== 'map' || !!agentToolOpen || !!selectedAgent || coreOpen;
   const selectedAgentKey = selectedAgent?.key || null;
   const showMapChrome = section === 'map';
+  const windowTheme = useMemo(() => ({ night: !(section === 'map' && use3d && !mapNight && !compact) }), [section, use3d, mapNight, compact]); // the agent windows follow the page: light by day on the map, dark plum otherwise
 
   return (
+    <AgentWindowTheme.Provider value={windowTheme}>
     <div ref={pageRef} className={'constellation-page ai-immersive' + (section === 'map' && use3d && !mapNight && !compact ? ' is-map-light' : '') + (calm ? ' is-calm' : '') + (motion ? '' : ' is-still') + (compact ? ' is-compact' : '')} style={{ '--ui-scale': UI_SCALE }}>
       <AiEnvironment calm={calm} />
 
@@ -527,7 +530,7 @@ export default function ConstellationTest() {
           opening it from the map itself. */}
       {coreOpen && <KnowledgeBase onClose={() => setCoreOpen(false)} />}
 
-      {deptAgent && <DeptAgentWindow role={deptAgent.role} night={!(section === 'map' && use3d && !mapNight && !compact)} onClose={() => setDeptAgent(null)} onOpenLegacy={deptAgent.legacyTool ? () => { const tool = deptAgent.legacyTool; setDeptAgent(null); setAgentToolOpen(tool); setAgentToolPayload(null); } : null} />}
+      {deptAgent && <DeptAgentWindow role={deptAgent.role} onClose={() => setDeptAgent(null)} onOpenLegacy={deptAgent.legacyTool ? () => { const tool = deptAgent.legacyTool; setDeptAgent(null); setAgentToolOpen(tool); setAgentToolPayload(null); } : null} />}
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {
         const AgentTool = AGENT_TOOLS[agentToolOpen];
         return (
@@ -541,6 +544,7 @@ export default function ConstellationTest() {
 
       {selectedAgent && <AgentInfoModal agent={selectedAgent} onClose={() => setSelectedAgent(null)} />}
     </div>
+    </AgentWindowTheme.Provider>
   );
 }
 

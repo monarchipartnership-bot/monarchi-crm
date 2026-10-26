@@ -15,7 +15,7 @@ import { AgentSwitch } from './SmmAgents';
 import { nextMondayYmd } from '../../lib/smmDates';
 import { Dialog } from './smmCommon';
 
-const SUBTABS = [
+export const SUBTABS = [
   { key: 'overview', label: 'Огляд' },
   { key: 'reports', label: 'Звіти', roles: ['site_analyst'] }, // the saved reports of the agent (only agents that write them)
   { key: 'settings', label: 'Налаштування' },
@@ -72,9 +72,12 @@ function RunDialog({ agent, prompts, onClose, onRun }) {
   );
 }
 
-export default function AgentPage({ role, team, posts, notify, reloadTeam, reloadAll, back, open, go, kick }) {
+// `embedded`: the agent window of the AI Agents section draws the head and the section tabs itself and drives the open section (`subKey` / `setSubKey`).
+export default function AgentPage({ role, team, posts, notify, reloadTeam, reloadAll, back, open, go, kick, embedded = false, subKey = 'overview', setSubKey = () => {} }) {
   const agent = team.agents.find((a) => a.role === role);
-  const [sub, setSub] = useState('overview');
+  const [ownSub, setOwnSub] = useState('overview');
+  const sub = embedded ? subKey : ownSub;
+  const setSub = embedded ? setSubKey : setOwnSub;
   const [prompts, setPrompts] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [running, setRunning] = useState(false);
@@ -115,6 +118,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
 
   return (
     <div className="smm-agentpage">
+      {!embedded && (<>
       <div className="smm-agent-head">
         <button type="button" className="smm-btn" onClick={back}><ActionIcon name="back" size={18} />Команда</button>
         <div className="smm-agent-title">
@@ -130,6 +134,7 @@ export default function AgentPage({ role, team, posts, notify, reloadTeam, reloa
           </button>
         ))}
       </div>
+      </>)}
 
       {sub === 'overview' && (
         <>

@@ -1,14 +1,15 @@
-/* The page of an agent of a department as a full-screen window in Hub style, variant B (navigation in a left column of medallions). Scoped under .dwa-*.
+/* The frame of every agent window as a full-screen window in Hub style, variant B (navigation in a left column of medallions). Scoped under .dwa-*.
    Day by default, `.is-night` for the dark plum look. No hover effects (owner's rule): pressed/selected states and focus-visible only.
    The tab bodies that still use the older agent-window markup (Проєкти, Налаштування, Журнал) are restyled at the bottom under .dwa-scroll. */
 
-.dwa-overlay {
+.dwa-overlay.smm-overlay, .dwa-overlay.smm-overlay .smm-page {
   --ink: #270827; --sec: #883288; --ln: #EBC6EB; --chip: #F1DCF5; --deep: #661466; --solid: #fff; --win: #FBF3FC; --side: linear-gradient(180deg, #F9EDF9, #F3E3F7);
   --card: #fff; --track: #F3E3F7; --shadow: 0 24px 80px #27082766; --ok: #1F9D55; --warn: #B7791F; --bad: #C23232; --info: #2A74C9;
   --s-ink: #270827; --s-muted: #883288; --s-field: #fff; --s-field-line: #EBC6EB; --s-line: #EBC6EB; --s-primary: #8E2C8E; --s-plum: #8E2C8E; --s-bad: #C23232;
-  background: rgba(39, 8, 39, .46); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 24px; font-family: 'Onest', var(--font-body), system-ui, sans-serif; color: var(--ink);
+  font-family: 'Onest', var(--font-body), system-ui, sans-serif; color: var(--ink);
 }
-.dwa-overlay.is-night {
+.dwa-overlay.smm-overlay { background: rgba(39, 8, 39, .46); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 24px; z-index: 1400; animation: none; }
+.dwa-overlay.smm-overlay.is-night, .dwa-overlay.smm-overlay.is-night .smm-page {
   --ink: #F6E9FA; --sec: #D6AEE0; --ln: rgba(235, 156, 239, .3); --chip: rgba(235, 156, 239, .16); --deep: #F0C4F5; --solid: #3A1C58; --win: #1F0C33; --side: linear-gradient(180deg, #2A1244, #231038);
   --card: #2A1244; --track: rgba(235, 156, 239, .12); --shadow: 0 24px 80px #000000aa; --ok: #4BE07F; --warn: #FBBF24; --bad: #FF8A8A; --info: #7AB8FF;
   --s-ink: #F6E9FA; --s-muted: #D6AEE0; --s-field: #34184f; --s-field-line: rgba(235, 156, 239, .34); --s-line: rgba(235, 156, 239, .3); --s-primary: #B544B5; --s-plum: #E58BEA; --s-bad: #FF8A8A;
@@ -144,7 +145,7 @@
 .dwa-scroll .dpt-check, .dwa-scroll .smm-check { color: var(--ink); }
 
 @media (max-width: 860px) {
-  .dwa-overlay { padding: 8px; }
+  .dwa-overlay.smm-overlay { padding: 8px; }
   .dwa-win { flex-direction: column; border-radius: 24px; }
   .dwa-side { width: auto; flex-direction: row; align-items: center; gap: 10px; padding: 10px 12px; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1.5px solid color-mix(in srgb, var(--ln) 60%, transparent); flex: none; }
   .dwa-who { padding: 0; flex: none; } .dwa-who small, .dwa-note { display: none; }
@@ -153,3 +154,27 @@
   .dwa-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dwa-grid2 { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { .dwa-win { animation: none; } }
+
+/* ---- the bodies of the other agents (tools, campaign agents, «Про агента») ---- */
+.dwa-scroll .smm-page { min-height: 0; padding: 0; background: transparent; }
+.dwa-scroll--tool { display: flex; flex-direction: column; overflow: hidden; padding: 14px 20px 20px; }
+.dwa-tool { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 18px; padding: 24px 28px; border-radius: 24px; overflow: hidden; position: relative;
+  background: rgba(39, 8, 39, .97); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F9EDF9; }
+.dwa-tool[hidden] { display: none; }
+.dwa-tool > * { position: relative; }
+.dwa-about { max-width: 1100px; }
+.dwa-chips-row, .dwa-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.dwa-about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 14px; align-items: start; }
+.dwa-about-grid > .dwa-stack:empty { display: none; }
+.dwa-scroll .smm-state-card { border: 0; border-radius: 22px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--ln); }
+.dwa-scroll .smm-stat { border: 0; border-radius: 18px; background: var(--chip); box-shadow: inset 0 0 0 1.5px var(--ln); }
+.dwa-scroll .smm-stat b { color: var(--ink); }
+.dwa-scroll .smm-stat span, .dwa-scroll .smm-last { color: var(--sec); }
+.dwa-scroll .smm-agent-desc { color: var(--ink); }
+.dwa-scroll .smm-warn-banner { border: 0; border-radius: 16px; }
+.dwa-scroll .smm-power { border: 0; border-radius: 999px; background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ln); }
+.dwa-scroll .smm-power-wrap small { color: var(--sec); }
+.dwa-scroll .acm { border-radius: 22px; }
+.dwa-scroll .acm-side h5 { color: var(--sec); }
+.dwa-scroll .acm-empty { color: var(--sec); }
+@media (max-width: 860px) { .dwa-about-grid { grid-template-columns: minmax(0, 1fr); } .dwa-tool { padding: 16px; } }

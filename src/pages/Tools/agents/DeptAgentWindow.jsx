@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import ActionIcon from '../../../components/common/ActionIcon';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { useAuth } from '../../../contexts/AuthContext';
-import useDialogA11y from '../../../lib/useDialogA11y';
+import AgentWindowFrame from '../../../components/AgentWorkspace/AgentWindowFrame';
+import { Icon, Medallion } from '../../../components/AgentWorkspace/AgentWindowParts';
 import { AGENT_DEPTS } from '../../../data/aiAgentsData';
 import { STATUS_TEXT } from '../aiMap/status';
 import { agentAction, fetchPrompts, kickQueue, nextRunOf } from '../../../lib/api/agents';
@@ -18,7 +17,6 @@ import DeptSettings from './DeptSettings';
 import '../../../styles/projectWorkspace.css'; // the confirmation window of the agent switch lives in this sheet
 import '../../../styles/smmPage.css';
 import '../../../styles/deptAgent.css';
-import '../../../styles/deptAgentHub.css';
 
 const TABS = [
   { key: 'overview', label: 'Огляд', icon: 'info' },
@@ -27,32 +25,10 @@ const TABS = [
   { key: 'settings', label: 'Налаштування', icon: 'gear' },
   { key: 'journal', label: 'Журнал', icon: 'book' },
 ];
-const TAB_ICONS = {
-  info: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 11v5M12 8h.01',
-  pulse: 'M3 12h4l2-6 4 12 2-6h6',
-  users: 'M9 11a3 3 0 100-6 3 3 0 000 6zM3 20a6 6 0 0112 0M17 11a3 3 0 100-6M21 20a6 6 0 00-4-5.6',
-  gear: 'M12 9a3 3 0 100 6 3 3 0 000-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1',
-  book: 'M4 5.5A2.5 2.5 0 016.5 3H20v16H6.5A2.5 2.5 0 004 16.5zM8 7h8M8 11h8',
-  layers: 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
-  play: 'M8 5v14l11-7z',
-  chart: 'M4 20V10m6 10V4m6 16v-7',
-  refresh: 'M20 11a8 8 0 10-2.3 5.7M20 4v7h-7',
-  agent: 'M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z',
-};
 const TASK_STATUS = { queued: 'У черзі', running: 'Виконується', done: 'Готово', failed: 'Помилка', cancelled: 'Скасовано' };
 export const MODE_LABEL = { auto: 'Авто', manual: 'Вручну', paused: 'Пауза' };
 const secs = (s) => (s == null ? '—' : s < 90 ? `${Math.round(s)} с` : `${Math.round(s / 60)} хв`);
 const LADDER = [['human-led', 'Human-led', 'humanLed'], ['human-assisted', 'Human-assisted', 'humanAssisted'], ['fully-autonomous', 'Fully autonomous', 'fullyAutonomous']];
-
-const Icon = ({ k, size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={TAB_ICONS[k]} /></svg>
-);
-// the medallion of Hub style: a ring (colour = meaning), a white disc, a tile with the icon
-const Medallion = ({ icon, html, size, ring = 4, color }) => (
-  <span className="dwa-med" style={{ '--s': `${size}px`, '--r': `${ring}px`, ...(color ? { '--rc': color } : {}) }} aria-hidden="true">
-    <i><b>{html ? <span className="dwa-med-svg" dangerouslySetInnerHTML={{ __html: html }} /> : <Icon k={icon} size={Math.round(size * 0.46)} />}</b></i>
-  </span>
-);
 
 // The record of the agent in the catalogue of the map (autonomy, lifecycle status, wave, ladder, the human), found by the role of its page.
 function catalogueOf(role) {
@@ -68,9 +44,8 @@ function catalogueOf(role) {
 // The page of ONE agent of a department, as a full-screen window (Hub style, variant B: navigation in a left column). Sections: Огляд (what it does now,
 // tasks with progress, its place in the chain), Здоровʼя (status, load, last and next run, restart), Проєкти (its clients: mode, priority, stop/continue),
 // Налаштування (what it knows, prompts, trial run), Журнал. `night`: the dark plum look (the page is dark or it is night on the map).
-export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null, night = false }) {
+export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) {
   const { email } = useAuth();
-  const box = useRef(null);
   const [confirm, confirmDialog] = useConfirm();
   const [tab, setTab] = useState('overview');
   const [team, setTeam] = useState(null);
@@ -82,7 +57,6 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null, ni
   const [toast, setToast] = useState(null);
   const [loadError, setLoadError] = useState('');
   const timer = useRef(null);
-  useDialogA11y(box, onClose);
   const notify = (text, isError = false) => {
     clearTimeout(timer.current);
     setToast({ text, isError });
@@ -111,20 +85,12 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null, ni
   const cat = useMemo(() => catalogueOf(role), [role]);
   const nameOf = useCallback((campaignId) => { const c = clients.find((x) => x.campaign_id === campaignId); return c ? (c.project?.name || c.campaign?.name || `Кампанія ${campaignId}`) : `Кампанія ${campaignId}`; }, [clients]);
   const load = useMemo(() => loadOf(data.tasks), [data.tasks]);
-  const shell = (children, label) => createPortal(
-    <div className={'dwa-overlay smm-overlay cmp-agentwin' + (night ? ' is-night' : '')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={box} className="dwa-win" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{children}</div>
-    </div>,
-    document.body,
-  );
   // while the agent loads (or cannot be loaded) the window is still a window: it says so and can be closed
   if (!team) {
-    return shell(
-      <div className="dwa-main">
-        <header className="dwa-head"><div className="dwa-idt"><div className="dwa-eyebrow">Агент відділу</div></div><button type="button" className="dwa-back" onClick={onClose}><ActionIcon name="back" size={16} />До відділу</button></header>
-        <div className="dwa-scroll">{loadError ? <p className="smm-error" role="alert">{loadError}</p> : <p className="dwa-mut">Завантаження…</p>}</div>
-      </div>,
-      'Агент відділу',
+    return (
+      <AgentWindowFrame label="Агент відділу" closeLabel="До відділу" eyebrow="Агент відділу" title="Завантаження…" onClose={onClose}>
+        {loadError ? <p className="smm-error" role="alert">{loadError}</p> : <p className="dwa-mut">Завантаження…</p>}
+      </AgentWindowFrame>
     );
   }
   if (!agent) return null;
@@ -288,59 +254,45 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null, ni
     </div>
   );
 
-  return shell(
-    <>
-      <aside className="dwa-side">
-        <div className="dwa-who">
-          <Medallion icon="agent" html={cat?.icon} size={52} ring={4} color={ringColor} />
-          <span><b>{agent.name}</b><small>{cat ? cat.deptLabel : 'Відділ креативів'}</small></span>
-        </div>
-        <nav className="dwa-nav" role="tablist" aria-orientation="vertical" aria-label="Розділи агента">
-          {TABS.map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className="dwa-nav-i" onClick={() => setTab(t.key)}>
-              <Medallion icon={t.icon} size={38} ring={3} />
-              <span className="dwa-nav-t">{t.label}</span>
-              {count[t.key] ? <span className={'dwa-cnt' + (t.key === 'overview' ? ' is-bad' : '')}>{count[t.key]}</span> : null}
-            </button>
-          ))}
-        </nav>
-        <div className="dwa-note">{cat?.buildNotes || def?.short || agent.description}</div>
-      </aside>
-
-      <div className="dwa-main">
-        <header className="dwa-head">
-          <div className="dwa-idt">
-            <div className="dwa-eyebrow">{def?.short || cat?.subcatLabel || 'Агент відділу'}</div>
-            <h2>{current.label}</h2>
-          </div>
+  return (
+    <AgentWindowFrame
+      label={agent.name} onClose={onClose} closeLabel="До відділу"
+      who={{ name: agent.name, sub: cat ? cat.deptLabel : 'Відділ креативів', html: cat?.icon, ring: ringColor }}
+      sections={TABS.map((x) => ({ key: x.key, label: x.label, icon: x.icon, count: count[x.key], bad: x.key === 'overview' }))}
+      active={tab} onSection={setTab}
+      eyebrow={def?.short || cat?.subcatLabel || 'Агент відділу'} title={current.label}
+      headRight={(
+        <>
           <span className={'dwa-chip ' + chipKind}><i />{health.label}</span>
           <AgentSwitch agent={agent} team={team} onChanged={reload} notify={notify} variant="power" />
-          <button type="button" className="dwa-back" onClick={onClose}><ActionIcon name="back" size={16} />До відділу</button>
-        </header>
-        {toast && <div className={'smm-toast dwa-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
-        <div className="dwa-chips">
+        </>
+      )}
+      toast={toast && <div className={'smm-toast dwa-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
+      chips={(
+        <>
           {cat && <span className="dwa-chip">{LADDER.find((l) => l[0] === cat.autonomyLevel)?.[1] || cat.autonomyLevel}</span>}
           {cat && <span className="dwa-chip">{STATUS_TEXT[cat.status] || cat.status}</span>}
           {cat?.wave && <span className="dwa-chip">Хвиля {cat.wave}</span>}
           <span className="dwa-chip">{triggerText}</span>
-        </div>
-        <div className="dwa-scroll" role="tabpanel">
-          {tab === 'overview' && renderOverview()}
-          {tab === 'health' && renderHealth()}
-          {tab === 'projects' && <DeptProjects agent={agent} team={team} clients={clients} tasks={data.tasks} reload={reload} notify={notify} />}
-          {tab === 'settings' && <DeptSettings agent={agent} team={team} clients={clients} prompts={prompts} reload={reload} notify={notify} />}
-          {tab === 'journal' && <AgentHistory agent={agent} notify={notify} />}
-        </div>
-        <footer className="dwa-foot">
+        </>
+      )}
+      note={cat?.buildNotes || def?.short || agent.description}
+      footer={(
+        <>
           <span className="dwa-mut">{triggerText}{cat ? ` · ${cat.subcatLabel}` : ''}</span>
           <span className="dwa-foot-r">
             <button type="button" className="dwa-btn" disabled={busy} onClick={restart}><Icon k="refresh" size={15} />Перезапустити</button>
             {onOpenLegacy && <button type="button" className="dwa-cta" onClick={onOpenLegacy}>Відкрити ручний інструмент</button>}
           </span>
-        </footer>
-      </div>
-      {confirmDialog}
-    </>,
-    agent.name,
+        </>
+      )}
+      extra={confirmDialog}
+    >
+      {tab === 'overview' && renderOverview()}
+      {tab === 'health' && renderHealth()}
+      {tab === 'projects' && <DeptProjects agent={agent} team={team} clients={clients} tasks={data.tasks} reload={reload} notify={notify} />}
+      {tab === 'settings' && <DeptSettings agent={agent} team={team} clients={clients} prompts={prompts} reload={reload} notify={notify} />}
+      {tab === 'journal' && <AgentHistory agent={agent} notify={notify} />}
+    </AgentWindowFrame>
   );
 }
