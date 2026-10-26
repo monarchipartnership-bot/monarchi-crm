@@ -5,6 +5,7 @@ import useDialogA11y from '../../../../lib/useDialogA11y';
 import { kickQueue } from '../../../../lib/api/agents';
 import { cancelRequest, deleteRequest, fetchRequestDetail, passOn, retryStudioTask, runStep, startRequest } from '../../../../lib/api/creatives';
 import { CREATIVE_ROLES, IDEA_SOURCES, MATERIAL_KINDS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES } from '../../../../lib/agents/creativeTeam';
+import CreativesGallery from './CreativesGallery';
 import Markdown from '../../../Smm/Markdown';
 import { fmtDateTime } from '../../../Smm/agentUi';
 
@@ -207,6 +208,8 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
               </div>
             </section>
           )}
+
+          <CreativesGallery request={detail.request} creatives={detail.creatives} concepts={brief?.concepts || []} reload={reload} notify={(text, isError) => notify?.(text, isError)} confirm={confirm} />
         </div>
         {confirmDialog}
       </div>

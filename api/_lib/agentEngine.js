@@ -18,6 +18,7 @@ import { applyExtras, siteExtras } from './siteExtras.js';
 import { speedKeyFromEnv } from './pageSpeed.js';
 import { runSeoAudit } from './seoRun.js';
 import * as higgsfield from './higgsfield.js';
+import { pollCreatives } from './creativeMake.js';
 import { campaignRole } from './campaignRun.js';
 import { creativeRole } from './creativeRun.js';
 import { fanOutRequest, settleRequest, touchClientLink } from './creativeEngine.js';
@@ -497,6 +498,7 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
   if (!all.agents.length) return { ...stats, note: 'Команди ще не створено.' };
   stats.started = await scheduleDue(ctx, all);
   try { stats.assets = await pollAssets(ctx); } catch (e) { console.warn('pollAssets failed:', e?.message || e); }
+  try { stats.creatives = await pollCreatives(ctx); } catch (e) { console.warn('pollCreatives failed:', e?.message || e); }
   for (let pass = 0; pass < 60 && Date.now() - began < maxMs; pass += 1) {
     all = await loadAll(ctx.db); // switches may be flipped while we work
     const states = chainStates(all.agents, all.links);

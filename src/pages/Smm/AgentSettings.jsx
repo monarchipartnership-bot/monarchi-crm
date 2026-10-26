@@ -64,8 +64,10 @@ export default function AgentSettings({ agent, notify, reload }) {
         <div className="smm-form">
           {(meta.fields || []).map((fld) => (
             <div key={fld.key} className="smm-field smm-field--wide">
-              <label htmlFor={'ag-f-' + fld.key}>{fld.label}</label>
-              {fld.type === 'text'
+              {fld.type === 'check'
+                ? <label className="smm-check" htmlFor={'ag-f-' + fld.key}><input id={'ag-f-' + fld.key} type="checkbox" checked={!!f.config[fld.key]} onChange={(e) => setCfg(fld.key, e.target.checked)} /> {fld.label}</label>
+                : <label htmlFor={'ag-f-' + fld.key}>{fld.label}</label>}
+              {fld.type === 'check' ? null : fld.type === 'text'
                 ? <input id={'ag-f-' + fld.key} type="text" value={f.config[fld.key] || ''} onChange={(e) => setCfg(fld.key, e.target.value)} maxLength={300} />
                 : <textarea id={'ag-f-' + fld.key} rows={fld.rows || 3} value={f.config[fld.key] || ''} onChange={(e) => setCfg(fld.key, e.target.value)} maxLength={12000} />}
               {fld.hint && <span className="smm-hint">{fld.hint}</span>}

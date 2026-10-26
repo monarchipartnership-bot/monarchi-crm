@@ -13,6 +13,7 @@ import { fetchBlock, loadAccounts, siteBlocks, summaryOf } from './campaignRun.j
 import { readJson } from './agentContent.js';
 import { readSite } from './siteReader.js';
 import { figmaText, figmaToken, readFigma } from './figma.js';
+import { generateCreatives } from './creativeMake.js';
 
 const MODEL = 'claude-sonnet-5';
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -418,7 +419,9 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     const parsed = parseCreativeMaker(raw, brief.concepts, clip(cfg.style, 600));
     const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, req.materials); // a trial run saves nothing
     const text = rows.map((c) => `**${c.concept_key} · ${c.ratio}**\n${c.prompt}`).join('\n\n');
-    return { output: { text, summary: `Запитів до Higgsfield: ${rows.length}`, json: { creatives: parsed.creatives, notes: parsed.notes }, requestId: rid, campaignId }, summary: `Запитів до Higgsfield: ${rows.length}` };
+    // with «Генерувати одразу» on, the pictures go to Higgsfield at once (within the limit of the agent); otherwise the person starts it from the request window
+    const generation = !ctx.dryRun && cfg.auto_generate ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;
+    return { output: { text, summary: `Запитів до Higgsfield: ${rows.length}`, json: { creatives: parsed.creatives, notes: parsed.notes }, requestId: rid, campaignId, generation }, summary: `Запитів до Higgsfield: ${rows.length}` };
   }
   if (agent.role === 'creative_quality') {
     const parsed = parseCreativeQc(raw);

@@ -30,3 +30,7 @@
 .dpt-compare article { padding: 12px 14px; border: 1px solid #EBC6EB; border-radius: 14px; background: #fff; max-height: 460px; overflow: auto; }
 .dpt-compare h4 { margin: 0 0 4px; }
 @media (max-width: 760px) { .dpt-compare.has-base { grid-template-columns: minmax(0, 1fr); } }
+
+/* Higgsfield spend of the creative maker (Огляд) */
+.dpt-spend-nums { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 4px 0 10px; font-size: .9rem; }
+.dpt-spend-nums b { font-size: 1.25rem; font-weight: 800; }

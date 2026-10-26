@@ -5,7 +5,7 @@ import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { useAuth } from '../../../contexts/AuthContext';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { agentAction, fetchPrompts, kickQueue, nextRunOf } from '../../../lib/api/agents';
-import { fetchAgentClients, fetchAgentTasks, loadDeptTeam, loadOf, restartAgent } from '../../../lib/api/deptAgents';
+import { fetchAgentClients, fetchAgentTasks, fetchHiggsfieldSpend, loadDeptTeam, loadOf, restartAgent } from '../../../lib/api/deptAgents';
 import { creativeRoleDef } from '../../../lib/agents/creativeTeam';
 import AgentHistory from '../../Smm/AgentHistory';
 import { HealthLight, healthOf } from '../../Smm/AgentCardParts';
@@ -39,6 +39,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
   const [clients, setClients] = useState([]);
   const [data, setData] = useState({ tasks: [], progress: {} });
   const [prompts, setPrompts] = useState([]);
+  const [spend, setSpend] = useState(null); // Higgsfield spend, only for the creative maker
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
   const [loadError, setLoadError] = useState('');
@@ -58,6 +59,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
     if (!a) return;
     const [c, d, p] = await Promise.all([fetchAgentClients(a.id), fetchAgentTasks(a.id), fetchPrompts(a.id)]);
     setClients(c); setData(d); setPrompts(p);
+    if (role === 'creative_maker') setSpend(await fetchHiggsfieldSpend().catch(() => null));
   }, [email, role]);
   useEffect(() => { setLoadError(''); reload().catch((e) => setLoadError(e.message || 'Не вдалося завантажити агента. Перевірте, що застосовано міграції 20261040 і 20261041.')); }, [reload]);
   const working = data.tasks.some((t) => t.status === 'queued' || t.status === 'running');
@@ -132,6 +134,18 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
 
             {tab === 'overview' && (
               <>
+                {role === 'creative_maker' && (
+                  <section className="smm-block dpt-spend">
+                    <h3>Витрати Higgsfield</h3>
+                    {spend ? (
+                      <>
+                        <p className="dpt-spend-nums"><span><b>${spend.month.toFixed(2)}</b> за 30 днів</span><span><b>${spend.total.toFixed(2)}</b> усього</span><span><b>{spend.generations}</b> генерацій{spend.refunds ? `, повернено ${spend.refunds}` : ''}</span></p>
+                        {spend.byClient.length > 0 && <ul className="dpt-list">{spend.byClient.map((c) => <li key={c.campaignId}><b>{nameOf(c.campaignId)}</b><span className="smm-muted">за 30 днів</span><span>${c.usd.toFixed(2)}</span></li>)}</ul>}
+                        <p className="smm-muted">Рахується те, що генерує система (за оцінкою Higgsfield перед запуском; відхилені картинки не оплачуються й повертаються). Ліміт на запит задається в «Налаштуваннях». Генерації, зроблені вручну в самому Higgsfield, тут не видно.</p>
+                      </>
+                    ) : <p className="smm-muted">Обліку ще немає: застосуйте міграцію 20261044.</p>}
+                  </section>
+                )}
                 <section className="smm-block">
                   <h3>Зараз у роботі</h3>
                   {runningNow.length ? <ul className="dpt-list">{runningNow.map((t) => <li key={t.id}><b>{nameOf(t.campaign_id)}</b><span>{data.progress[t.request_id]?.title || 'завдання без запиту'}</span><span className="dpt-chip dpt-chip--work">Виконується</span></li>)}</ul>
@@ -198,6 +212,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
                 <section className="smm-block"><h3>Останній запуск</h3><p><b>{fmtDateTime(agent.last_run_at)}</b></p>{agent.last_message && <p className="smm-muted">{agent.last_message}</p>}</section>
                 <section className="smm-block"><h3>Наступний запуск</h3><p>{next ? <b>{fmtDateTime(next.at)}</b> : 'Немає розкладу: за запитами клієнтів.'}</p></section>
                 <section className="smm-block"><h3>Витрати за 30 днів</h3><p><b>${load.cost30.toFixed(2)}</b></p><p className="smm-muted">Виклики моделі цього агента по всіх клієнтах.</p></section>
+                {role === 'creative_maker' && <section className="smm-block"><h3>Витрати Higgsfield</h3>{spend ? <><p><b>${spend.month.toFixed(2)}</b> за 30 днів · <b>${spend.total.toFixed(2)}</b> усього</p><p className="smm-muted">Генерацій: {spend.generations}{spend.refunds ? `, повернено: ${spend.refunds}` : ''}.</p></> : <p className="smm-muted">Обліку ще немає: застосуйте міграцію 20261044.</p>}</section>}
                 <section className="smm-block dpt-wide">
                   <h3>Перезапуск</h3>
                   <p className="smm-muted">Повертає в чергу завдання, що зависли, і невдалі за останні 7 днів. Нічого не видаляє.</p>

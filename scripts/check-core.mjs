@@ -38,6 +38,9 @@ import { cleanRequest, connectCampaign, directionLimit, ensureCreativeDepartment
 import { cleanSettings, defaultRatios, inputState, manualInput } from '../src/lib/agents/projectCreative.js';
 import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
+import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/creativeMake.js';
+import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
+import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc } from '../api/_lib/creativeRun.js';
@@ -1806,7 +1809,7 @@ const creativeWorld = () => {
     projects: [{ id: 5, name: 'Acme Shop', client: 'Acme LLC', website: 'https://acme.example', country: 'Ukraine', business_type: 'E-commerce', services: ['Meta Ads'], notes: 'Sells sofas.' }, { id: 6, name: 'Beta Co', client: 'Beta' }],
     project_ad_accounts: [{ project_id: 5, platform: 'meta', account_id: '111' }],
     ag_campaigns: [{ id: 1, project_id: 5, name: 'Acme autumn', platforms: ['meta'], status: 'draft', config: { brief: 'Furniture store.' } }, { id: 2, project_id: 6, name: 'Beta spring', platforms: ['meta'], status: 'draft', config: {} }],
-    ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [], ag_agent_clients: [], ag_creative_requests: [], ag_creatives: [], notifications: [],
+    ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [], ag_agent_clients: [], ag_creative_requests: [], ag_creatives: [], ag_creative_spend: [], notifications: [],
   };
   const db = fakeDb(tables);
   let failBrief = true;
@@ -2004,6 +2007,170 @@ await ok('creative brief for Higgsfield: references checked against the material
   const clean = parseCreativeMaker('{"creatives":[]}', uk.concepts, '');
   assert.doesNotMatch(clean.creatives[0].prompt, /Text in the picture/);
   assert.match(clean.creatives[0].negative_prompt, /^text, letters/);
+});
+
+await ok('Higgsfield images with references: the request is built from the configuration, the price is asked first, a wrong model shows before any spend', async () => {
+  const env = { HF_API_KEY_ID: 'id1', HF_API_KEY_SECRET: 'sec1', HF_IMAGE_MODEL: '/vendor/model/v1', HF_IMAGE_EXTRA: '{"quality":"high"}' };
+  const profile = profileFromEnv(env);
+  const built = buildImageRequest({ prompt: 'A woman in a studio', negative_prompt: 'watermark', ratio: '4:5', references: ['https://x/a.jpg', 'http://insecure/b.jpg', 'https://x/c.jpg'] }, profile);
+  assert.deepEqual([built.path, built.body.quality, built.body.aspect_ratio, built.body.image_urls], ['vendor/model/v1', 'high', '4:5', ['https://x/a.jpg', 'https://x/c.jpg']]); // only https references
+  assert.match(built.body.prompt, /A woman in a studio Avoid: watermark\./);
+  const single = buildImageRequest({ prompt: 'p', ratio: '1:1', references: ['https://x/a.jpg', 'https://x/c.jpg'] }, profileFromEnv({ ...env, HF_IMAGE_REF_PARAM: 'image_url', HF_IMAGE_REF_MODE: 'single' }));
+  assert.equal(single.body.image_url, 'https://x/a.jpg');
+  assert.equal('image_urls' in buildImageRequest({ prompt: 'p' }, profile).body, false); // no references, no parameter
+  assert.deepEqual(missingConfig({}), ['HF_API_KEY_ID', 'HF_API_KEY_SECRET', 'HF_IMAGE_MODEL']);
+  assert.deepEqual(missingConfig(env), []);
+  // the network, with a stand-in
+  const seen = [];
+  const reply = (b, status = 200, headers = {}) => ({ ok: status < 400, status, json: async () => b, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer, headers: { get: (k) => headers[k.toLowerCase()] } });
+  const net = async (url, opts = {}) => {
+    seen.push([url, opts.headers?.Authorization, opts.headers?.['Idempotency-Key']]);
+    if (url.endsWith('/estimate/vendor/model/v1')) return reply({ usd: '0.094' });
+    if (url.endsWith('/estimate/bad/model')) return reply({ detail: 'unknown model' }, 404);
+    if (url === 'https://api.higgsfield.ai/vendor/model/v1') return reply({ request_id: 'r1', status_url: 'https://api.higgsfield.ai/requests/r1/status' });
+    if (url.endsWith('/r1/status')) return reply({ status: 'completed', images: [{ url: 'https://cdn/out.png' }] });
+    if (url.endsWith('/r2/status')) return reply({ status: 'nsfw' });
+    if (url.endsWith('/r3/status')) return reply({ status: 'in_progress' });
+    if (url === 'https://cdn/out.png') return reply({}, 200, { 'content-type': 'image/png' });
+    return reply({}, 404);
+  };
+  assert.equal(await imgEstimate({ request: built, env, fetchFn: net }), 0.094);
+  await assert.rejects(() => imgEstimate({ request: { path: 'bad/model', body: {} }, env, fetchFn: net }), /unknown model[\s\S]*HF_IMAGE_MODEL/);
+  const job = await imgSubmit({ request: built, key: 'creative-1-g1', env, fetchFn: net });
+  assert.deepEqual([job.jobId, job.statusUrl], ['r1', 'https://api.higgsfield.ai/requests/r1/status']);
+  assert.deepEqual(seen.find((x) => x[0] === 'https://api.higgsfield.ai/vendor/model/v1').slice(1), ['Key id1:sec1', 'creative-1-g1']);
+  assert.deepEqual(await imgCheck({ statusUrl: 'https://api.higgsfield.ai/requests/r1/status', env, fetchFn: net }), { state: 'ready', url: 'https://cdn/out.png' });
+  assert.match((await imgCheck({ statusUrl: 'https://api.higgsfield.ai/requests/r2/status', env, fetchFn: net })).error, /модерацією/);
+  assert.equal((await imgCheck({ statusUrl: 'https://api.higgsfield.ai/requests/r3/status', env, fetchFn: net })).state, 'pending');
+  assert.equal((await imgCheck({ statusUrl: 'https://evil.example/status', env, fetchFn: net })).state, 'failed'); // the key is never sent to another host
+  const uploads = [];
+  const db = { storage: { from: () => ({ upload: async (path, bytes, o) => { uploads.push([path, bytes.length, o.contentType]); return {}; }, getPublicUrl: (path) => ({ data: { publicUrl: `https://store/${path}` } }) }) } };
+  const saved = await imgPersist({ db, url: 'https://cdn/out.png', requestId: 9, creativeId: 4, fetchFn: net });
+  assert.match(saved.url, /^https:\/\/store\/requests\/9\/creative-4-\d+\.png$/);
+  assert.deepEqual(uploads[0].slice(1), [3, 'image/png']);
+});
+
+await ok('creative generation: the price is asked first, the limit of the request holds, ready pictures are kept, failed ones are not charged, a picture made again adds to its cost', async () => {
+  const { tables, db, ctx } = creativeWorld();
+  await ensureCreativeDepartment(db, 'a@x.com');
+  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'review', title: 't', brief: {}, materials: [] });
+  const refs = [{ name: 'a.jpg', url: 'https://x/a.jpg', kind: 'product' }];
+  ['c1', 'c2', 'c3'].forEach((k, i) => tables.ag_creatives.push({ id: i + 1, request_id: 1, concept_key: k, ratio: '4:5', prompt: `Prompt ${k}`, negative_prompt: 'n', status: 'planned', cost_usd: 0, generations: 0, hf: { references: refs } }));
+  const maker = tables.ag_agents.find((a) => a.role === 'creative_maker');
+  maker.config = { max_usd: '0.25' };
+  const log = [];
+  const state = { check: {} };
+  ctx.hfImage = {
+    estimate: async ({ request }) => { log.push(['estimate', request.body.prompt]); if (/BAD/.test(request.body.prompt)) throw new Error('Higgsfield: unknown model'); return 0.1; },
+    submit: async ({ request, key }) => { log.push(['submit', key, request.body.image_urls]); return { jobId: `j-${key}`, statusUrl: `https://api.higgsfield.ai/requests/${key}/status` }; },
+    check: async ({ statusUrl }) => state.check[statusUrl] || { state: 'pending' },
+    persist: async ({ requestId, creativeId }) => ({ url: `https://store/${requestId}/${creativeId}.png`, path: `requests/${requestId}/${creativeId}.png` }),
+  };
+  const row = (id) => tables.ag_creatives.find((r) => r.id === id);
+  // only an estimate: nothing is spent, nothing changes; the third picture would not fit the limit of 25 cents
+  const est = await generateCreatives(ctx, 1, { estimateOnly: true });
+  assert.deepEqual([est.estimateUsd, est.count, est.skipped, est.limit], [0.2, 2, [3], 0.25]);
+  assert.ok(tables.ag_creatives.every((r) => r.status === 'planned' && r.cost_usd === 0));
+  assert.equal(log.some((l) => l[0] === 'submit'), false);
+  // the real run
+  const run = await generateCreatives(ctx, 1);
+  assert.deepEqual([run.submitted, run.spent, run.skipped], [2, 0.2, [3]]);
+  assert.deepEqual([row(1).status, row(1).cost_usd, row(1).generations, row(1).hf.job_id, row(3).status], ['producing', 0.1, 1, 'j-creative-1-g1', 'planned']);
+  assert.deepEqual(log.find((l) => l[0] === 'submit')[2], ['https://x/a.jpg']); // the references of the creative go with the request
+  // the pictures: one ready (copied into our storage and sent to the review), one refused by the provider (not charged)
+  state.check['https://api.higgsfield.ai/requests/creative-1-g1/status'] = { state: 'ready', url: 'https://cdn/1.png' };
+  state.check['https://api.higgsfield.ai/requests/creative-2-g1/status'] = { state: 'failed', error: 'Higgsfield відхилив результат модерацією. Змініть промт.' };
+  assert.equal(await pollCreatives(ctx), 2);
+  assert.deepEqual([row(1).status, row(1).asset_url, row(1).cost_usd], ['review', 'https://store/1/1.png', 0.1]);
+  assert.deepEqual([row(2).status, row(2).cost_usd], ['failed', 0]);
+  assert.match(row(2).note, /модерацією/);
+  // the ledger: both generations are written, the refused one is given back
+  assert.deepEqual(tables.ag_creative_spend.map((l) => [l.kind, l.usd, l.creative_id, l.campaign_id]), [['generation', 0.1, 1, 1], ['generation', 0.1, 2, 1], ['refund', -0.1, 2, 1]]);
+  // one picture made again: its cost adds to the earlier one, the key of the request is new; if it fails only the new price goes back
+  const again = await generateCreatives(ctx, 1, { ids: [1] });
+  assert.deepEqual([again.submitted, row(1).cost_usd, row(1).generations, row(1).hf.job_id, row(1).asset_url], [1, 0.2, 2, 'j-creative-1-g2', 'https://store/1/1.png']);
+  state.check['https://api.higgsfield.ai/requests/creative-1-g2/status'] = { state: 'failed', error: 'Higgsfield: busy' };
+  await pollCreatives(ctx);
+  assert.deepEqual([row(1).status, row(1).cost_usd], ['failed', 0.1]);
+  // a wrong model: the estimate fails, the picture is marked, nothing is submitted for it
+  row(3).prompt = 'BAD prompt';
+  const bad = await generateCreatives(ctx, 1, { ids: [3] });
+  assert.deepEqual([bad.submitted, bad.failed.length, row(3).status], [0, 1, 'failed']);
+  assert.match(row(3).note, /unknown model/);
+  // a picture that never comes back is given up after 40 minutes
+  row(2).status = 'producing'; row(2).hf = { status_url: 'https://api.higgsfield.ai/requests/x/status', submitted_at: '2026-10-21T08:00:00Z', charged_before: 0 }; row(2).cost_usd = 0.1;
+  assert.equal(await pollCreatives(ctx), 1);
+  assert.deepEqual([row(2).status, row(2).cost_usd], ['failed', 0.1]); // only slow, not refused: it may still be charged, so its price stays
+  assert.equal(tables.ag_creative_spend.filter((l) => l.kind === 'refund').length, 2); // the refused picture and the failed second generation; the slow one is not refunded
+  // not configured on the server: nothing happens, the page is told what is missing
+  ctx.hfImage = null;
+  const off = await generateCreatives(ctx, 1);
+  assert.deepEqual([off.ok, off.configured, Array.isArray(off.missing)], [false, false, true]);
+  assert.equal(await pollCreatives(ctx), 0);
+  assert.equal(generatorState(ctx).ready, false);
+});
+
+await ok('creative maker with «generate at once» on: the pictures go to Higgsfield right after the brief, within the limit', async () => {
+  const { tables, db, ctx } = creativeWorld();
+  await ensureCreativeDepartment(db, 'a@x.com');
+  await connectCampaign(db, tables.ag_campaigns[0], { email: 'a@x.com' });
+  const maker = tables.ag_agents.find((a) => a.role === 'creative_maker');
+  maker.config = { ...maker.config, auto_generate: true };
+  const submitted = [];
+  ctx.hfImage = { estimate: async () => 0.5, submit: async ({ key }) => { submitted.push(key); return { jobId: 'j', statusUrl: 'https://api.higgsfield.ai/requests/j/status' }; }, check: async () => ({ state: 'pending' }), persist: async () => ({ url: 'u', path: '' }) };
+  newRequest(tables, 1, 1);
+  await startRequest(ctx, 1);
+  await processQueue(ctx);
+  await retryTask(ctx, tables.ag_tasks.find((t) => t.status === 'failed').id); // the stand-in brief writer fails once, as in the chain test
+  await processQueue(ctx);
+  assert.ok(submitted.length >= 1);
+  assert.ok(tables.ag_creatives.every((r) => r.status === 'producing' && r.cost_usd === 0.5));
+  const out = tables.ag_tasks.find((t) => t.agent_id === maker.id).output;
+  assert.equal(out.generation.submitted, submitted.length);
+});
+
+await ok('words over a clean picture: lines wrap to the zone, the items stack without overlap inside it, empty parts are skipped', () => {
+  const m = (t) => t.length * 10;
+  assert.deepEqual(wrapLines(m, 'one two three four', 80), ['one two', 'three', 'four']);
+  assert.deepEqual(wrapLines(m, 'supercalifragilistic a', 80), ['supercalifragilistic', 'a']); // a word wider than a line keeps a line of its own
+  assert.deepEqual(wrapLines(m, '   ', 80), []);
+  const measure = (t, size) => t.length * size * 0.5;
+  const W = 1080;
+  const H = 1350;
+  const lay = layoutText({ measure, W, H, zone: 'left', headline: 'Салон-свіжа зачіска. Без салону.', subline: 'Професійно підстрижені, пофарбовані й укладені перуки — одягай і йди.', badge: 'ОСІННІЙ ПРОДАЖ · −15%', cta: 'Купити зараз' });
+  assert.deepEqual(lay.items.map((i) => i.kind), ['headline', 'subline', 'badge', 'cta']);
+  assert.ok(lay.items.every((i) => i.x === lay.box.x && i.x + i.w <= lay.box.x + lay.box.w + 1)); // inside the zone, at its left edge
+  assert.ok(lay.items.every((it, i) => i === 0 || it.y >= lay.items[i - 1].y + lay.items[i - 1].h)); // one under another, no overlap
+  assert.ok(lay.items[0].y >= lay.box.y && lay.items.at(-1).y + lay.items.at(-1).h <= lay.box.y + lay.box.h); // and inside it vertically
+  assert.ok(lay.items[0].lines.length > 1); // the long headline wrapped
+  const small = layoutText({ measure, W: 540, H: 675, zone: 'left', headline: 'Hi' });
+  assert.equal(small.items[0].size, 32); // the type follows the width of the picture
+  const none = layoutText({ measure, W, H, zone: 'left', headline: 'Only a headline', subline: '', badge: '', cta: '' });
+  assert.deepEqual(none.items.map((i) => i.kind), ['headline']);
+  const top = layoutText({ measure, W, H, zone: 'top', headline: 'Top', badge: 'Sale' });
+  assert.equal(top.items[0].y, zoneBox('top', W, H).y); // a top zone starts at the top
+  const bottom = layoutText({ measure, W, H, zone: 'bottom', headline: 'Bottom', cta: 'Go' });
+  const last = bottom.items.at(-1);
+  assert.equal(last.y + last.h, zoneBox('bottom', W, H).y + zoneBox('bottom', W, H).h); // a bottom zone ends at the bottom
+  const mid = layoutText({ measure, W, H, zone: 'center', headline: 'Mid', cta: 'Go' });
+  const pill = mid.items.find((i) => i.kind === 'cta');
+  assert.equal(pill.x, Math.round(mid.box.x + (mid.box.w - pill.w) / 2)); // centred
+  assert.equal(zoneBox('bogus', W, H).x, zoneBox('left', W, H).x); // an unknown zone is the left one
+  // the calm part beside the subject limits the side zones (never narrower than 22% of the picture), a right zone hugs the right edge
+  assert.equal(zoneBox('left', W, H, 300).w, 300);
+  assert.equal(zoneBox('left', W, H, 10).w, Math.round(W * 0.22));
+  const right = zoneBox('right', W, H, 300);
+  assert.equal(right.x + right.w, W - Math.round(W * 0.07));
+  assert.equal(layoutText({ measure, W, H, zone: 'left', headline: 'Wide headline here', maxW: 260 }).box.w, 260);
+  // a badge and a button wider than the zone shrink, then wrap inside their pill: the words never run out of it
+  const narrow = layoutText({ measure, W, H, zone: 'left', headline: 'Hi', badge: 'ОСІННІЙ ПРОДАЖ · −15% ТІЛЬКИ ЦЬОГО ТИЖНЯ', cta: 'Купити зараз', maxW: 260 });
+  narrow.items.filter((i) => i.kind === 'badge' || i.kind === 'cta').forEach((it) => {
+    assert.ok(it.w <= narrow.box.w);
+    assert.ok(it.lines.every((l) => measure(l, it.size, it.weight) <= it.w - 2 * it.padX + 1)); // every line fits inside its pill
+    assert.ok(it.size >= Math.round(0.62 * (it.kind === 'badge' ? 30 : 32)) - 1);
+  });
+  assert.ok(narrow.items.find((i) => i.kind === 'badge').lines.length > 1); // the long badge wrapped
+  assert.equal(zoneBox('top', W, H, 100).w, W - 2 * Math.round(W * 0.07)); // top and bottom zones ignore it
 });
 
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {

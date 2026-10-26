@@ -97,6 +97,21 @@ export function loadOf(tasks) {
   return { cost30: recent.reduce((s, t) => s + Number(t.cost_usd || 0), 0), avgSeconds: avg, queued: tasks.filter((t) => t.status === 'queued').length, running: tasks.filter((t) => t.status === 'running').length, failed: tasks.filter((t) => t.status === 'failed').length, done30: recent.filter((t) => t.status === 'done').length };
 }
 
+// What the pictures of the department cost in Higgsfield (the ledger ag_creative_spend, written by the engine at every generation and every refund):
+// for 30 days, for all time, the number of generations, and per client for 30 days. Generations made by hand in Higgsfield itself are not in it.
+export async function fetchHiggsfieldSpend() {
+  const rows = must(await supabase.from('ag_creative_spend').select('usd, kind, created_at, campaign_id').order('id', { ascending: false }).limit(5000)) || [];
+  const since = Date.now() - 30 * 86400000;
+  const sum = (list) => Math.round(list.reduce((s, r) => s + Number(r.usd || 0), 0) * 10000) / 10000;
+  const month = rows.filter((r) => new Date(r.created_at).getTime() >= since);
+  const byClient = {};
+  month.forEach((r) => { if (r.campaign_id != null) byClient[r.campaign_id] = (byClient[r.campaign_id] || 0) + Number(r.usd || 0); });
+  return {
+    month: sum(month), total: sum(rows), generations: rows.filter((r) => r.kind === 'generation').length, refunds: rows.filter((r) => r.kind === 'refund').length,
+    byClient: Object.entries(byClient).map(([campaignId, usd]) => ({ campaignId: Number(campaignId), usd: Math.round(usd * 10000) / 10000 })).sort((a, b) => b.usd - a.usd),
+  };
+}
+
 export const restartAgent = (agentId) => agentAction('restart_agent', { agentId });
 export const dryRunAgent = (agentId, { campaignId, requestId, promptBody }) => agentAction('dry_run', { agentId, campaignId, requestId, promptBody });
 export const runForClient = (agentId, campaignId, requestId = null) => agentAction('run_agent', { agentId, brief: { campaignId, requestId } });

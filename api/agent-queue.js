@@ -17,6 +17,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { getModelClient } from './_lib/ai.js';
+import { generateCreatives, generatorState, pollCreatives } from './_lib/creativeMake.js';
 import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
 import { cancelRequest, passOn, startRequest } from './_lib/creativeEngine.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
@@ -56,6 +57,12 @@ export default async function handler(req, res) {
     else if (action === 'retry_task') out = await retryTask(ctx, Number(body.taskId));
     else if (action === 'cancel_task') out = await cancelTask(ctx, Number(body.taskId));
     else if (action === 'poll_assets') out = { changed: await pollAssets(ctx) };
+    else if (action === 'generate_creatives') { // the pictures of a request go to Higgsfield; with estimateOnly nothing is spent and the price is returned
+      const rid = Number(body.requestId);
+      out = await generateCreatives(ctx, rid, { ids: Array.isArray(body.ids) ? body.ids.map(Number) : null, estimateOnly: body.estimateOnly === true });
+      if (out.submitted) out.polled = await pollCreatives(ctx, { requestId: rid });
+    }
+    else if (action === 'poll_creatives') out = { changed: await pollCreatives(ctx, { requestId: body.requestId ? Number(body.requestId) : null }), generator: generatorState(ctx) };
     else if (action === 'redo_visual') out = await redoVisual(ctx, Number(body.postId), body.note);
     else if (action === 'launch_campaign') out = await launchCampaign(ctx, Number(body.campaignId)); // the page then calls `process` until the queue is empty
     else if (action === 'start_request') out = await startRequest(ctx, Number(body.requestId)); // the page then calls `process` until the queue is empty

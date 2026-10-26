@@ -71,4 +71,23 @@ export async function uploadMaterial(campaignId, file, kind) {
   return { name: file.name, url: data.publicUrl, path, kind };
 }
 
+// The pictures: the price is asked first (nothing is spent), then the pictures go to Higgsfield. ids: only these creatives (made again).
+export const estimateGeneration = (requestId, ids = null) => agentAction('generate_creatives', { requestId, ids, estimateOnly: true });
+export const generateCreatives = (requestId, ids = null) => agentAction('generate_creatives', { requestId, ids });
+export const pollCreatives = (requestId) => agentAction('poll_creatives', { requestId });
+
+// The person's decision on a finished picture.
+export async function setCreativeStatus(id, status, note = null) {
+  return must(await supabase.from('ag_creatives').update({ status, note, updated_at: nowIso() }).eq('id', id).select().single());
+}
+
+// The picture with the words put over it (made in the browser) goes to the storage and becomes the final picture of the creative.
+export async function saveFinalPicture(creative, blob) {
+  const path = `requests/${creative.request_id}/final-${creative.id}-${Date.now()}.png`;
+  const up = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/png', upsert: false });
+  if (up.error) throw new Error(up.error.message || 'Не вдалося зберегти картинку.');
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return must(await supabase.from('ag_creatives').update({ final_url: data.publicUrl, final_path: path, updated_at: nowIso() }).eq('id', creative.id).select().single());
+}
+
 export { isCreativeRole, CREATIVE_ROLES, nowIso };
