@@ -14,9 +14,7 @@ const WAVE_ORDER = [1, 2, 3];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Phase 3 of docs/ai-agents-roadmap.md (§4.6) — a company-wide rollup, as
-// opposed to the map's own per-department CHART view (DeptChartView in
-// ConstellationTest.jsx, which this deliberately mirrors the matrix idea
-// of rather than reinventing a new visual language). `agents` is the same
+// opposed to the map's per-department view. `agents` is the same
 // flattened allAgents list every other section view already receives.
 //
 // Deliberately does NOT show estimated hours/cost saved — no per-agent

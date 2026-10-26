@@ -34,7 +34,6 @@ import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
 import AgentSpend from '../AgentSpend/AgentSpend';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
 import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
-import DeptChartView from './aiMap/DeptChartView';
 import FocusedGraph from './aiMap/FocusedGraph';
 import OverviewMap, { AiSvgDefs } from './aiMap/OverviewMap';
 import WorldMap3D from './aiMap/WorldMap3D';
@@ -136,7 +135,6 @@ export default function ConstellationTest() {
   }
 
   const [deptPanelClosed, setDeptPanelClosed] = useState(false);
-  const [viewMode, setViewMode] = useState('map');
   const [deptTab, setDeptTab] = useState('ov');
 
   // Stage size drives the viewBox aspect, the compact (phone/narrow) layout
@@ -231,8 +229,7 @@ export default function ConstellationTest() {
 
   // Re-show the department overview panel every time a (different)
   // department comes into focus — closing it is per-visit, not permanent.
-  // CHART is per-visit too: entering a department always starts on MAP.
-  useEffect(() => { setDeptPanelClosed(false); setViewMode('map'); setDeptTab('ov'); }, [focusedDept]);
+  useEffect(() => { setDeptPanelClosed(false); setDeptTab('ov'); }, [focusedDept]);
 
   const dims = useMemo(() => makeDims(compact, upx, stageSize.w), [compact, upx, stageSize.w]);
   const ring = useMemo(
@@ -276,7 +273,7 @@ export default function ConstellationTest() {
   useEffect(() => {
     if (use3d || !focusedDept || selectedAgent || coreOpen || agentToolOpen || compact) return undefined; // in 3D the wheel zooms the scene
     function handleWheel(e) {
-      if (e.target.closest('.chart-view, .dw-fly, .ai-section, [role="dialog"]')) return;
+      if (e.target.closest('.dw-fly, .ai-section, [role="dialog"]')) return;
       e.preventDefault();
       const now = Date.now();
       if (now - wheelCooldownRef.current < 450 || Math.abs(e.deltaY) < 8) return;
@@ -423,16 +420,10 @@ export default function ConstellationTest() {
           <Presence show={!!focused} instant={compact}>
             {focused && (
               <>
-                {!focused.dept.comingSoon && (
-                  <div className="view-tabs" role="tablist" aria-label="Вигляд відділу" data-ai-safe>
-                    <button type="button" role="tab" aria-selected={viewMode === 'map'} className={'view-tab' + (viewMode === 'map' ? ' active' : '')} onClick={() => setViewMode('map')}>MAP</button>
-                    <button type="button" role="tab" aria-selected={viewMode === 'chart'} className={'view-tab' + (viewMode === 'chart' ? ' active' : '')} onClick={() => setViewMode('chart')}>CHART</button>
-                  </div>
-                )}
                 {!compact && (
                   <>
                     <DeptRail
-                      focused={focused} viewMode={viewMode} closed={deptPanelClosed} setClosed={setDeptPanelClosed} tab={deptTab} setTab={setDeptTab}
+                      focused={focused} closed={deptPanelClosed} setClosed={setDeptPanelClosed} tab={deptTab} setTab={setDeptTab}
                       onReset={resetView} onOpenAgent={openAgent}
                     />
                     <DeptStrip deptKeys={deptKeys} agentDepts={AGENT_DEPTS} current={focused.key} onSelect={(k) => { setFocusedDept(k); setHoveredDept(null); }} />
@@ -456,13 +447,9 @@ export default function ConstellationTest() {
             </div>
           )}
 
-          {focused && viewMode === 'chart' && !focused.dept.comingSoon && (
-            <DeptChartView dept={focused.dept} deptKey={focused.key} onSelectAgent={setSelectedAgent} />
-          )}
-
           {/* Phones/narrow windows: the focused department is a touch list
               (same data, same open handlers) instead of a tiny SVG graph. */}
-          {focused && compact && viewMode === 'map' && !focused.dept.comingSoon && (
+          {focused && compact && !focused.dept.comingSoon && (
             <div className="dept-sheet ai-panel" data-ai-safe>
               <div className="dept-sheet-head">
                 <h2>{focused.dept.label}</h2>
@@ -486,11 +473,10 @@ export default function ConstellationTest() {
             </div>
           )}
 
-          <div className={'constellation-stage' + (viewMode === 'chart' && focused ? ' is-chart' : '')} ref={stageRef}>
+          <div className="constellation-stage" ref={stageRef}>
             {use3d ? (
               <WorldMap3D
                 agentDepts={AGENT_DEPTS} focusedDept={focusedDept} runStates={runStates}
-                hidden={viewMode === 'chart' && !!focused}
                 onFocusDept={(k) => { setFocusedDept(k); setHoveredDept(null); }}
                 onOpenAgent={(deptKey, agentKey) => { const a = allAgents.find((x) => x.key === agentKey); if (a) openAgent(a); }}
                 onReset={resetView} onTheme={setMapNight} onStep={setFlowStep}

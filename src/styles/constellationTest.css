@@ -107,7 +107,6 @@
   0%, 100% { opacity: .9; transform: translate(-50%, -50%) scale(1); filter: brightness(.96); }
   50% { opacity: 1; transform: translate(-50%, -50%) scale(1.035); filter: brightness(1.14); }
 }
-.constellation-stage.is-chart .constellation-svg, .constellation-stage.is-chart .ai-core { opacity: 0; pointer-events: none; }
 .constellation-svg { position: relative; z-index: 2; width: 100%; height: 100%; overflow: visible; display: block; }
 
 /* overview group: leaves the scene softly when a department takes focus */
@@ -189,12 +188,6 @@
 .constellation-reset { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; font-family: var(--font-body); font-size: 15px; font-weight: 600; cursor: pointer; transition: border-color .16s ease; }
 .constellation-reset:hover { border-color: rgba(235, 156, 239, .6); }
 
-.view-tabs {
-  position: absolute; top: 86px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 4px; height: 44px; padding: 4px;
-  background: rgba(39, 8, 39, .86); border: 1px solid var(--ai-border); border-radius: 999px; backdrop-filter: blur(8px);
-}
-.view-tab { padding: 0 20px; border: none; border-radius: 999px; background: none; cursor: pointer; color: var(--ai-secondary); font-family: var(--font-body); font-size: 14px; font-weight: 600; letter-spacing: .04em; transition: color .16s ease, background .16s ease; }
-.view-tab.active { background: var(--ai-active); color: #fff; box-shadow: inset 0 1px rgba(255, 255, 255, .25); }
 
 .constellation-carousel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; height: 120px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .constellation-carousel button {
@@ -258,30 +251,6 @@
 .dept-graph-root-circle { fill: url(#ai-g-sphere); stroke: #facbfa; stroke-width: 1.4px; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 12px rgba(174, 64, 174, .6)); }
 .dept-graph-root:focus-visible .dept-graph-root-circle { stroke: #fff; stroke-width: 3px; }
 
-/* ---------------- CHART view ---------------- */
-.chart-view { position: absolute; inset: 0; z-index: 4; background: rgba(23, 5, 28, .92); overflow-y: auto; padding: 150px 40px 130px; }
-.chart-header { max-width: 1000px; margin: 0 auto 28px; }
-.chart-header h2 { font-family: var(--font-head); font-size: 1.5rem; color: var(--ai-text); margin: 4px 0 8px; }
-.chart-stats { font-size: 14px; color: var(--ai-secondary); margin: 0; }
-.chart-grid { display: grid; grid-template-columns: 160px repeat(var(--stage-cols), 1fr); gap: 10px; max-width: 1000px; margin: 0 auto; }
-.chart-col-header { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ai-lilac); text-align: center; padding-bottom: 8px; border-bottom: 1px solid var(--ai-border); }
-.chart-row-label { font-size: 13px; font-weight: 700; color: var(--ai-text); display: flex; align-items: center; padding-right: 10px; }
-.chart-cell { background: rgba(53, 17, 63, .5); border: 1px solid var(--ai-border); border-radius: 14px; padding: 10px; min-height: 64px; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
-.chart-cell-empty { color: rgba(213, 169, 220, .45); font-size: 13px; margin: 0 auto; }
-.chart-card { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; text-align: left; background: rgba(174, 64, 174, .16); border: 1px solid var(--ai-border); border-radius: 12px; padding: 8px 10px; cursor: pointer; font-family: var(--font-body); color: var(--ai-text); transition: background .16s ease, border-color .16s ease; }
-.chart-card:hover { background: rgba(174, 64, 174, .3); border-color: rgba(235, 156, 239, .55); }
-.chart-card-ic { flex: none; display: flex; color: var(--ai-lilac); }
-.chart-card-ic svg { width: 16px; height: 16px; stroke: currentColor; }
-.chart-card-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.chart-card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chart-card-sub { font-size: 11px; color: var(--ai-secondary); }
-.chart-card-wave { flex: none; font-size: 10px; font-weight: 800; letter-spacing: .03em; padding: 2px 6px; border-radius: 999px; }
-.chart-card-wave.wave-1 { background: rgba(74, 222, 128, .16); color: #86efac; }
-.chart-card-wave.wave-2 { background: rgba(125, 211, 252, .16); color: #7dd3fc; }
-.chart-card-wave.wave-3 { background: rgba(235, 156, 239, .18); color: var(--ai-lilac); }
-.chart-card-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--ai-st-plan); }
-.chart-card-dot.status-live { background: var(--ai-st-live); box-shadow: 0 0 6px 1px rgba(176, 124, 224, .5); }
-.chart-card-dot.status-in_development { background: var(--ai-st-dev); }
 
 /* ---------------- agent info modal (read-only spec) ---------------- */
 .agent-modal-backdrop { position: fixed; inset: 0; background: rgba(23, 5, 28, .6); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; animation: aiFadeIn .24s ease-out; }
@@ -336,9 +305,7 @@
 .constellation-page.is-compact .ai-flow > * { position: relative !important; inset: auto !important; transform: none !important; margin: 0; width: auto; max-width: none; flex: none; }
 .constellation-page.is-compact .agent-search { order: 1; width: auto; }
 .constellation-page.is-compact .constellation-overlay { order: 3; }
-.constellation-page.is-compact .constellation-page.is-compact .view-tabs { order: 4; align-self: flex-start; }
 .constellation-page.is-compact .dept-sheet { order: 5; max-height: none; overflow: visible; }
-.constellation-page.is-compact .chart-view { order: 6; padding: 8px 0 12px; background: none; overflow: visible; }
 .constellation-page.is-compact .constellation-stage { order: 7; height: clamp(480px, calc(100dvh - 300px), 720px); }
 .constellation-page.is-compact .ai-kb-btn { order: 8; align-self: flex-start; height: 44px; padding: 0 18px; font-size: 14px; }
 .constellation-page.is-compact .ai-footer { order: 9; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; padding: 8px 14px; font-size: 13px; height: auto; min-height: 50px; border-radius: 22px; }
@@ -350,7 +317,6 @@
 .constellation-page.is-compact .constellation-carousel button:last-of-type { right: 0; }
 .constellation-page.is-compact .constellation-carousel-info { padding: 0 52px; }
 .constellation-page.is-compact .constellation-carousel-name { font-size: 1.1rem; }
-.constellation-page.is-compact .chart-grid { grid-template-columns: 110px repeat(var(--stage-cols), 1fr); }
 .constellation-page.is-compact .agent-modal { padding: 24px 20px; }
 .constellation-page.is-compact .ladder-row { flex-direction: column; gap: 4px; }
 .constellation-page.is-compact .ladder-row-label { width: auto; }
@@ -361,7 +327,7 @@
   .ai-overview, .ai-dept, .ai-spoke, .ai-node-halo, .ai-sat-glow, .dept-graph-agent-glow { transition: opacity .1s linear !important; }
   .ai-overview.is-focused { transform: none; }
   .ai-dept-inner, .ai-sat, .ai-sat-line, .ai-dept-label, .dept-graph { animation: none !important; }
-  .constellation-section-tab, .constellation-carousel button, .view-tab { transition: none; }
+  .constellation-section-tab, .constellation-carousel button { transition: none; }
 }
 .constellation-page.is-still .ai-core { animation: aiCoreIn .1s linear both; }
 

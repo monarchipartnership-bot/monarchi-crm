@@ -33,7 +33,7 @@ const plural = (n, one, few, many) => {
   return many;
 };
 
-export function DeptRail({ focused, viewMode, closed, setClosed, tab, setTab, onReset, onOpenAgent }) {
+export function DeptRail({ focused, closed, setClosed, tab, setTab, onReset, onOpenAgent }) {
   const { key, dept } = focused;
   const soon = !!dept.comingSoon;
   const startHere = dept.startHere ? dept.subcategories.flatMap((sc) => sc.agents).find((a) => a.key === dept.startHere) : null;
@@ -98,17 +98,15 @@ export function DeptRail({ focused, viewMode, closed, setClosed, tab, setTab, on
   return (
     <div className="dw-right" data-ai-safe>
       <button type="button" className="dw-back" onClick={onReset}><ActionIcon name="back" size={16} />До мапи</button>
-      {viewMode === 'map' && (
-        <div className="dw-rail" role="group" aria-label="Розділи відділу">
-          {tabs.map(([k, name]) => (
-            <button key={k} type="button" className="dw-rail-btn" aria-pressed={open && tab === k} onClick={() => pick(k)}>
-              <Medallion html={RAIL_ICONS[k]} size={46} />
-              <span>{name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {viewMode === 'map' && open && (
+      <div className="dw-rail" role="group" aria-label="Розділи відділу">
+        {tabs.map(([k, name]) => (
+          <button key={k} type="button" className="dw-rail-btn" aria-pressed={open && tab === k} onClick={() => pick(k)}>
+            <Medallion html={RAIL_ICONS[k]} size={46} />
+            <span>{name}</span>
+          </button>
+        ))}
+      </div>
+      {open && (
         <section className="dw-fly" aria-label={dept.label}>
           <div className="dw-fly-head">
             <div>

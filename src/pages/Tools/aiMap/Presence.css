@@ -17,8 +17,6 @@
 .pres.is-enter > .dw-right, .pres.is-exit > .dw-right { transform: translateX(18px); }
 .pres > .dw-strip { transition: transform .38s cubic-bezier(.22, .61, .36, 1) var(--pd, 0ms); }
 .pres.is-enter > .dw-strip, .pres.is-exit > .dw-strip { transform: translate(-50%, 18px); }
-.pres > .view-tabs { transition: transform .38s cubic-bezier(.22, .61, .36, 1) var(--pd, 0ms); }
-.pres.is-enter > .view-tabs, .pres.is-exit > .view-tabs { transform: translate(-50%, -10px); }
 
 @media (prefers-reduced-motion: reduce) {
   .pres, .pres > * { transition: none !important; }
