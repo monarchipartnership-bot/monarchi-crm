@@ -527,7 +527,7 @@ export default function ConstellationTest() {
           opening it from the map itself. */}
       {coreOpen && <KnowledgeBase onClose={() => setCoreOpen(false)} />}
 
-      {deptAgent && <DeptAgentWindow role={deptAgent.role} onClose={() => setDeptAgent(null)} onOpenLegacy={deptAgent.legacyTool ? () => { const tool = deptAgent.legacyTool; setDeptAgent(null); setAgentToolOpen(tool); setAgentToolPayload(null); } : null} />}
+      {deptAgent && <DeptAgentWindow role={deptAgent.role} night={!(section === 'map' && use3d && !mapNight && !compact)} onClose={() => setDeptAgent(null)} onOpenLegacy={deptAgent.legacyTool ? () => { const tool = deptAgent.legacyTool; setDeptAgent(null); setAgentToolOpen(tool); setAgentToolPayload(null); } : null} />}
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {
         const AgentTool = AGENT_TOOLS[agentToolOpen];
         return (
