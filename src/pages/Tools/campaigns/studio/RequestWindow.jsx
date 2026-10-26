@@ -132,6 +132,7 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
                   </div>
                   <small>{def.short}</small>
                   {task?.status === 'done' && task.output?.summary && <p>{task.output.summary}</p>}
+                  {task?.output?.rework && <p className={task.output.rework.stopped ? 'cmp-warnbox' : 'cmp-muted'}>{task.output.rework.stopped ? 'Перевірка якості ще має зауваження, а переробка завершена (двох кіл було достатньо або немає кому переробляти): подивіться їх і вирішіть самі.' : `Повернуто на переробку (круг ${task.output.rework.round} з 2): ${task.output.rework.sent.map((r) => CREATIVE_ROLES.find((x) => x.role === r)?.name || r).join(', ')}.`}</p>}
                   {task?.status === 'failed' && <p className="cmp-bad">{task.error}</p>}
                   <div className="stu-step-actions">
                     {task?.status === 'done' && task.output?.text && <button type="button" className="cmp-btn" onClick={() => setOpen((o) => ({ ...o, [def.role]: !o[def.role] }))}>{open[def.role] ? 'Згорнути' : 'Відкрити звіт'}</button>}

@@ -383,7 +383,11 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
       if (!brief) throw new Error('Немає технічного завдання для перевірки.');
     }
   }
-  if (task.brief?.feedback) blocks.push({ title: 'Зауваження перевірки до попередньої версії (виправте саме їх)', text: clip(JSON.stringify(task.brief.feedback), 3000) });
+  if (task.brief?.feedback) {
+    blocks.push({ title: `Зауваження перевірки якості (круг переробки ${task.brief.round || 1}): виправте саме їх, решту лишіть як було`, text: clip(asList(task.brief.feedback).map((f) => `- [${f.severity || ''}] ${f.concept ? `${f.concept}: ` : ''}${f.comment}`).join('\n'), 3000) });
+    const prev = (await db.from('ag_tasks').select('output').eq('agent_id', agent.id).eq('request_id', rid).eq('status', 'done').order('id', { ascending: false }).limit(1)).data?.[0];
+    if (prev?.output?.text) blocks.push({ title: 'Ваша попередня версія (її й виправляєте)', text: clip(prev.output.text, 6000) });
+  }
 
   const user = blocks.map((x) => `### ${x.title}\n${x.text}`).join('\n\n') + (failed.length ? `\n\n### Вхідні дані, які не завантажились\n${failed.map((f) => '- ' + f).join('\n')}` : '');
   const system = composeCreativeSystem(agent.role, prompt.body, mine.extra, language);

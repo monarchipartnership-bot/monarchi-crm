@@ -1833,7 +1833,7 @@ const creativeWorld = () => {
     }
     if (args.agentKey === 'creative-creative_copywriter') return body(JSON.stringify({ texts: [{ concept: 'c1', headline: 'Soft mornings', primary_text: 'Sofa Luna for slow mornings.', description: 'Autumn sale', cta: 'Shop now' }, { concept: 'zzz', headline: 'ghost', primary_text: 'ignored' }] }));
     if (args.agentKey === 'creative-creative_maker') return body(JSON.stringify({ creatives: [{ concept: 'c1', ratio: '1:1', prompt: 'Photo of the sofa from the reference in a bright living room', negative_prompt: 'text', references: ['luna.jpg'] }] }));
-    if (args.agentKey === 'creative-creative_quality') return body(JSON.stringify({ verdict: 'pass', summary: 'No obvious errors.', issues: [] }));
+    if (args.agentKey === 'creative-creative_quality') return body(JSON.stringify(this.qcQueue?.shift() || { verdict: 'pass', summary: 'No obvious errors.', issues: [] }));
     return body(`## Підсумок\nSummary of ${args.agentKey}.\n\n## Деталі\nbody`);
   } };
   const read = async () => ({ pages: [{ ok: true, url: 'https://acme.example/', title: 'Acme', text: 'We sell sofas.' }], blockedByRobots: false });
@@ -2171,6 +2171,54 @@ await ok('words over a clean picture: lines wrap to the zone, the items stack wi
   });
   assert.ok(narrow.items.find((i) => i.kind === 'badge').lines.length > 1); // the long badge wrapped
   assert.equal(zoneBox('top', W, H, 100).w, W - 2 * Math.round(W * 0.07)); // top and bottom zones ignore it
+});
+
+await ok('quality loop: a «revise» verdict sends the work back to the agents it names with their own issues, twice at most, and the checker looks again only when they delivered', async () => {
+  const issue = (target, comment, severity = 'high') => ({ target, concept: 'c1', severity, comment });
+  const run = async (queue) => {
+    const w = creativeWorld();
+    await ensureCreativeDepartment(w.db, 'a@x.com');
+    await connectCampaign(w.db, w.tables.ag_campaigns[0], { email: 'a@x.com' });
+    newRequest(w.tables, 1, 1);
+    w.model.qcQueue = queue;
+    await startRequest(w.ctx, 1);
+    await processQueue(w.ctx);
+    await retryTask(w.ctx, w.tables.ag_tasks.find((t) => t.status === 'failed').id); // the stand-in brief writer fails once, as in the chain test
+    await processQueue(w.ctx);
+    const A = (r) => w.tables.ag_agents.find((a) => a.role === r);
+    const tasksOf = (r) => w.tables.ag_tasks.filter((t) => t.agent_id === A(r).id && t.request_id === 1);
+    return { ...w, A, tasksOf };
+  };
+
+  // 1) a copy issue: only the copywriter works again, with the issue and its own previous version, then the checker passes
+  const one = await run([{ verdict: 'revise', summary: 'The hook is weak.', issues: [issue('copy', 'Hook is vague'), issue('copy', 'Minor typo', 'low')] }]);
+  assert.deepEqual([one.tasksOf('creative_copywriter').length, one.tasksOf('creative_maker').length, one.tasksOf('creative_quality').length], [2, 1, 2]);
+  const rework = one.tasksOf('creative_copywriter')[1];
+  assert.deepEqual([rework.brief.trigger, rework.brief.round, rework.brief.feedback.map((f) => f.comment)], ['rework', 1, ['Hook is vague']]); // low issues are not sent
+  assert.deepEqual(one.tasksOf('creative_quality')[0].output.rework, { round: 1, sent: ['creative_copywriter'], skipped: [], stopped: false });
+  const writerRuns = one.tables.ag_runs.filter((r) => r.agent_id === one.A('creative_copywriter').id);
+  assert.match(writerRuns.at(-1).user_prompt, /круг переробки 1[\s\S]*- \[high\] c1: Hook is vague[\s\S]*Ваша попередня версія/);
+  assert.doesNotMatch(writerRuns[0].user_prompt, /круг переробки/);
+  assert.equal(one.tables.ag_creative_requests[0].status, 'review');
+
+  // 2) issues for both: both work again and the checker waits for the last of them (its new task is newer than both)
+  const both = await run([{ verdict: 'revise', summary: 's', issues: [issue('copy', 'Weak hook'), issue('creative', 'Prompt ignores the sofa reference')] }]);
+  assert.deepEqual([both.tasksOf('creative_copywriter').length, both.tasksOf('creative_maker').length, both.tasksOf('creative_quality').length], [2, 2, 2]);
+  const lastQc = both.tasksOf('creative_quality')[1];
+  assert.ok(lastQc.id > both.tasksOf('creative_copywriter')[1].id && lastQc.id > both.tasksOf('creative_maker')[1].id);
+  assert.equal(both.tables.ag_creative_requests[0].status, 'review');
+
+  // 3) it never gets better: after two rounds the request goes to the person with the issues still on it (the third verdict is not sent back)
+  const stuck = await run([1, 2, 3].map((n) => ({ verdict: 'revise', summary: `round ${n}`, issues: [issue('creative', `Still wrong ${n}`)] })));
+  assert.deepEqual([stuck.tasksOf('creative_maker').length, stuck.tasksOf('creative_quality').length, stuck.tasksOf('creative_copywriter').length], [3, 3, 1]); // one run + two reworks
+  const last = stuck.tasksOf('creative_quality')[2].output.rework;
+  assert.deepEqual([last.round, last.stopped], [3, true]);
+  assert.equal(stuck.tables.ag_creative_requests[0].status, 'review');
+  assert.equal(stuck.tables.ag_tasks.filter((t) => ['queued', 'running'].includes(t.status)).length, 0);
+
+  // 4) a pass sends nothing back
+  const clean = await run([]);
+  assert.deepEqual([clean.tasksOf('creative_quality').length, clean.tasksOf('creative_quality')[0].output.rework], [1, undefined]);
 });
 
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {

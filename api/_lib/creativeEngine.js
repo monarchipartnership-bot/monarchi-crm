@@ -6,6 +6,8 @@
 import { ancestorsOf } from '../../src/lib/agents/chain.js';
 import { CREATIVE_TEAM, REQUEST_ENTRY_ROLE, isCreativeRole, requestRoles } from '../../src/lib/agents/creativeTeam.js';
 
+export const MAX_REWORK_ROUNDS = 2; // the quality checker may send the work back twice; the third time it goes to the person as it is
+
 const iso = (d) => d.toISOString();
 const must = (r, what) => { if (r.error) throw new Error(`${what}: ${r.error.message}`); return r.data; };
 
@@ -67,6 +69,7 @@ export async function fanOutRequest(ctx, team, agent, task) {
   const dept = await loadDepartment(db);
   const links = await loadClientLinks(db, req.campaign_id);
   const parts = participantsOf(dept, links);
+  if (agent.role === 'creative_quality') { await reworkFromQuality(ctx, dept, links, parts, agent, task, req); return; }
   const targets = dept.links.filter((l) => l.from_agent_id === agent.id).map((l) => parts.find((p) => p.id === l.to_agent_id)).filter(Boolean);
   for (const b of targets) {
     if (links.get(b.id).mode === 'manual') continue;
@@ -75,13 +78,41 @@ export async function fanOutRequest(ctx, team, agent, task) {
     const rows = must(await db.from('ag_tasks').select('id, agent_id, status').in('agent_id', ids).eq('request_id', rid), 'tasks') || [];
     if (rows.some((r) => ['queued', 'running'].includes(r.status))) continue; // someone above is still working: the last one to finish starts it
     const done = new Set(rows.filter((r) => r.status === 'done').map((r) => r.agent_id));
-    if (rows.some((r) => r.agent_id === b.id)) continue; // it already has (or had) its task for this request
+    // it works again when something above it delivered AFTER its own last task (a rework): the first time it has no task of its own yet
+    const lastOwn = Math.max(0, ...rows.filter((r) => r.agent_id === b.id).map((r) => r.id));
+    const lastUp = Math.max(0, ...rows.filter((r) => r.status === 'done' && ups.some((u) => u.id === r.agent_id)).map((r) => r.id));
+    if (lastOwn && lastOwn > lastUp) continue; // it already worked on the latest version of what is above it
     if (!ups.every((u) => done.has(u.id))) continue;
     const created = await enqueue(db, b, { campaignId: req.campaign_id, requestId: rid, brief: { trigger: 'request', requestId: rid, from: agent.name }, by: 'ланцюжок' });
     // Two agents finishing at the same moment may both start the same one: the earliest task stays, the later one withdraws.
     const same = must(await db.from('ag_tasks').select('id').eq('agent_id', b.id).eq('request_id', rid).in('status', ['queued', 'running']).order('id', { ascending: true }), 'tasks') || [];
     if (same.length > 1 && Math.min(...same.map((t) => t.id)) !== created.id) await db.from('ag_tasks').update({ status: 'cancelled', finished_at: iso(ctx.now()) }).eq('id', created.id).eq('status', 'queued');
   }
+}
+
+// The quality checker answered. A «revise» verdict sends the work back to the agents it names (the copywriter for copy issues, the maker for the
+// pictures' prompts) with exactly the issues for them, at most MAX_REWORK_ROUNDS times; the checker looks again when they have delivered (the chain
+// above runs it again because their tasks are newer than its own). After the last round the request goes to the person with what is still wrong.
+async function reworkFromQuality(ctx, dept, links, parts, qc, task, req) {
+  const { db } = ctx;
+  const verdict = task.output?.json;
+  if (!verdict || verdict.verdict !== 'revise') return;
+  const mine = must(await db.from('ag_tasks').select('id, output, status').eq('agent_id', qc.id).eq('request_id', task.request_id).eq('status', 'done'), 'tasks') || [];
+  const round = mine.filter((t) => t.output?.json?.verdict === 'revise').length;
+  const mark = async (rework) => { await db.from('ag_tasks').update({ output: { ...task.output, rework } }).eq('id', task.id); };
+  if (round > MAX_REWORK_ROUNDS) { await mark({ round, stopped: true }); return; }
+  const roleOf = { copy: 'creative_copywriter', creative: 'creative_maker' };
+  const sent = [];
+  const skipped = [];
+  for (const target of ['copy', 'creative']) {
+    const issues = (verdict.issues || []).filter((i) => i.target === target && ['high', 'medium'].includes(i.severity));
+    if (!issues.length) continue;
+    const agent = parts.find((p) => p.role === roleOf[target]);
+    if (!agent || links.get(agent.id)?.mode === 'manual') { skipped.push(roleOf[target]); continue; }
+    await enqueue(db, agent, { campaignId: req.campaign_id, requestId: task.request_id, brief: { trigger: 'rework', requestId: task.request_id, round, feedback: issues.map((i) => ({ concept: i.concept, severity: i.severity, comment: i.comment })), from: qc.name }, by: 'перевірка якості' });
+    sent.push(roleOf[target]);
+  }
+  await mark({ round, sent, skipped, stopped: !sent.length });
 }
 
 // The person gives the OK on a result that waited for it (the link of its client has confirm_before_pass): the chain goes on.
