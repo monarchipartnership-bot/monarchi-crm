@@ -37,6 +37,7 @@ import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/ca
 import { cleanRequest, connectCampaign, directionLimit, ensureCreativeDepartment, parseGivenTexts } from '../src/lib/agents/creativeTeam.js';
 import { cleanSettings, defaultRatios, inputState, manualInput } from '../src/lib/agents/projectCreative.js';
 import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
+import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc } from '../api/_lib/creativeRun.js';
@@ -1968,6 +1969,43 @@ await ok('creative strategist sees the pictures (materials, competitors ads, Fig
   assert.match(w2.model.contents['creative-creative_strategy'], /Токен Figma не налаштований[\s\S]*Картинки не вдалося завантажити/);
 });
 
+await ok('creative brief for Higgsfield: references checked against the materials, the manager texts go to their directions word for word, who renders the text is decided by the system', async () => {
+  const texts = [{ headline: 'Salon-Fresh Hair. Without the Salon.', subline: 'Expertly styled — ready to wear.', badge: 'FALL SALE · 15% OFF' }, { headline: 'We Style It. You Wear It.', subline: '', badge: 'FALL SALE · 15% OFF' }];
+  const mats = [{ name: 'kbb-worn.jpg', url: 'https://x/kbb.jpg', kind: 'product' }, { name: 'logo.png', url: 'https://x/logo.png', kind: 'logo' }];
+  const request = cleanRequest({ goal: 'Fall sale', texts: 'given', given_texts: texts, language: 'en', ratios: ['4:5', '9:16'], cta: true, cta_text: 'Shop now', materials: mats });
+  const dirs = [{ key: 'd1' }, { key: 'd2' }];
+  // the model answers in the wrong order and tries to change the words: neither counts
+  const answer = JSON.stringify({ summary: 's', concepts: [
+    { key: 'c2', direction: 'd2', name: 'Second', visual: 'A woman in a cream studio', references: [{ file: 'kbb-worn.jpg', role: 'product', keep: 'dark chocolate brown, tight coils, fringe' }, { file: 'made-up.png', role: 'product' }], layout: { text_zone: 'left', note: 'badge under the subline' }, text_brief: 'Salon-Fresh Hair!!!' },
+    { key: 'c1', direction: 'd1', name: 'First', visual: 'A woman by a window', references: [{ file: 'logo.png', role: 'bogus' }], layout: { text_zone: 'sideways' }, ratios: ['4:5', '1:1'] }] });
+  const brief = parseCreativeBrief(answer, request, dirs);
+  const c1 = brief.concepts.find((c) => c.key === 'c1');
+  const c2 = brief.concepts.find((c) => c.key === 'c2');
+  assert.equal(c1.copy.headline, 'Salon-Fresh Hair. Without the Salon.'); // by the direction, not by the order of the answer
+  assert.deepEqual([c1.copy.source, c1.copy.badge, c2.copy.headline, c2.copy.subline], ['given', 'FALL SALE · 15% OFF', 'We Style It. You Wear It.', '']);
+  assert.deepEqual(c2.references, [{ file: 'kbb-worn.jpg', role: 'product', keep: 'dark chocolate brown, tight coils, fringe' }]); // a file that is not in the materials is dropped
+  assert.deepEqual([c1.references[0].role, c1.layout.text_zone, c2.layout.text_zone, c1.ratios, c2.ratios], ['other', 'left', 'left', ['4:5'], ['4:5', '9:16']]);
+  assert.deepEqual([c1.text_render, c1.cta, c1.needs_text], ['model', { show: true, text: 'Shop now' }, true]);
+  assert.deepEqual(COPY_LINES(c2), ['headline "We Style It. You Wear It."', 'badge "FALL SALE · 15% OFF"']);
+  const rendered = renderBrief(brief);
+  assert.match(rendered, /Референси: kbb-worn\.jpg \(product; лишити як у файлі: dark chocolate brown/);
+  assert.match(rendered, /Текст: заданий менеджером, дослівно: headline "Salon-Fresh Hair\. Without the Salon\."/);
+  assert.match(rendered, /Хто робить текст на картинці: модель/);
+  assert.match(rendered, /Кнопка заклику до дії: так, «Shop now»/);
+  // who renders the text: English the model (tried), other languages the system over a clean picture, no texts nobody
+  assert.deepEqual([textRender({ language: 'en', texts: 'yes' }), textRender({ language: 'uk', texts: 'yes' }), textRender({ language: 'en', texts: 'no' }), textRender({ language: 'en' }, false)], ['model', 'overlay', 'none', 'none']);
+  // the Ukrainian request: a clean picture with a free zone, the button as the request says
+  const uk = parseCreativeBrief(JSON.stringify({ concepts: [{ key: 'c1', direction: 'd1', visual: 'Scene', layout: { text_zone: 'top' } }] }), cleanRequest({ goal: 'x', texts: 'yes', language: 'uk', cta: false, materials: mats }), [{ key: 'd1' }]);
+  assert.deepEqual([uk.concepts[0].text_render, uk.concepts[0].cta.show, uk.concepts[0].layout.text_zone, uk.concepts[0].copy.source], ['overlay', false, 'top', 'copywriter']);
+  // the maker: when the model renders the text and the answer lacks a prompt, the fallback carries the exact words; otherwise the picture is asked to have none
+  const made = parseCreativeMaker('{"creatives":[]}', [{ ...c1, ratios: ['4:5'] }], 'Soft daylight');
+  assert.match(made.creatives[0].prompt, /headline "Salon-Fresh Hair\. Without the Salon\."[\s\S]*badge "FALL SALE · 15% OFF"[\s\S]*No other words/);
+  assert.doesNotMatch(made.creatives[0].negative_prompt, /^text, letters/);
+  const clean = parseCreativeMaker('{"creatives":[]}', uk.concepts, '');
+  assert.doesNotMatch(clean.creatives[0].prompt, /Text in the picture/);
+  assert.match(clean.creatives[0].negative_prompt, /^text, letters/);
+});
+
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {
   const { tables, db, model, ctx } = creativeWorld();
   const dept = await ensureCreativeDepartment(db, 'a@x.com');
@@ -2026,7 +2064,7 @@ await ok('creative department: one agent per role with a queue of clients; a req
   assert.match(runOf('creative_brief').user_prompt, /План стратега[\s\S]*Morning comfort/);
   assert.match(runOf('creative_brief').user_prompt, /Наші правила для креативів[\s\S]*Soft daylight/);
   assert.match(runOf('creative_brief').user_prompt, /luna\.jpg \(Фото продукту\)/);
-  assert.match(runOf('creative_brief').system_prompt, /never carry readable text/); // the locked rules
+  assert.match(runOf('creative_brief').system_prompt, /text_render "model"/); // the locked rules: words in a picture only when the brief says so
   // creatives: one row per concept and format, the missing ones filled from the brief, the copy attached to its concept
   assert.deepEqual(tables.ag_creatives.map((c) => `${c.concept_key}:${c.ratio}`).sort(), ['c1:1:1', 'c1:9:16', 'c2:1:1', 'c2:9:16']);
   const c1 = tables.ag_creatives.find((c) => c.concept_key === 'c1' && c.ratio === '1:1');

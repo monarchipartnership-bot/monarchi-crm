@@ -50,6 +50,16 @@ function parseInventory(j) {
   };
 }
 
+const TEXT_ZONES = ['left', 'right', 'top', 'bottom', 'center', 'none'];
+const REF_ROLES = ['product', 'logo', 'style', 'person', 'other'];
+// Who puts the words on the picture: the image model itself ('model', tried on English: it spells exactly), the system over a clean picture ('overlay',
+// the default for other languages until the model is tried on them), or nobody ('none'). Decided by the system from the request, not by an agent.
+export function textRender(brief = {}, needsText = true) {
+  if (!needsText || brief.texts === 'no') return 'none';
+  return brief.language === 'en' ? 'model' : 'overlay';
+}
+export const COPY_LINES = (c) => [c.copy?.headline && `headline "${c.copy.headline}"`, c.copy?.subline && `subline "${c.copy.subline}"`, c.copy?.badge && `badge "${c.copy.badge}"`].filter(Boolean);
+
 // The brief writer's answer → { summary, concepts, notes }. Concepts are checked against the request (how many, which formats, texts or not).
 export function parseCreativeBrief(text, request = {}, directions = []) {
   const j = readJson(text);
@@ -58,16 +68,28 @@ export function parseCreativeBrief(text, request = {}, directions = []) {
   const ratios = allowed.length ? allowed : ['1:1'];
   const max = Math.max(1, Math.min(directions.length || MAX_CONCEPTS, directionLimit(brief)));
   const seen = new Set();
+  // the files the picture may be built on: the materials of the request (when there are none on record, any name is accepted)
+  const known = new Set(asList(request.materials).map((m) => m.name));
+  const isKnown = (n) => !known.size || known.has(n);
+  const given = brief.texts === 'given' ? asList(brief.given_texts) : [];
   const concepts = asList(j?.concepts).slice(0, max).map((c, i) => {
     let key = clip(c?.key, 20).replace(/[^\w-]/g, '') || `c${i + 1}`;
     if (seen.has(key)) key = `c${i + 1}`;
     seen.add(key);
     const mine = asList(c?.ratios).filter((r) => ratios.includes(r));
     const needsText = brief.texts === 'yes' || brief.texts === 'given' ? true : brief.texts === 'no' ? false : c?.needs_text !== false;
+    const references = asList(c?.references).map((r) => ({ file: clip(r?.file, 160), role: REF_ROLES.includes(r?.role) ? r.role : 'other', keep: clip(r?.keep, 300) })).filter((r) => r.file && isKnown(r.file)).slice(0, 6);
+    const files = [...new Set([...references.map((r) => r.file), ...asList(c?.uses_materials).map((m) => clip(m, 160)).filter((m) => m && isKnown(m))])].slice(0, 6);
+    // the manager's texts are not trusted to the model: the text i of the request goes to the direction i word for word
+    const at = directions.findIndex((d) => d.key === clip(c?.direction, 20));
+    const g = given[at >= 0 ? at : i];
+    const copy = g ? { source: 'given', headline: g.headline, subline: g.subline, badge: g.badge } : { source: needsText ? 'copywriter' : 'none', headline: '', subline: '', badge: '' };
+    const zone = TEXT_ZONES.includes(c?.layout?.text_zone) ? c.layout.text_zone : needsText ? 'left' : 'none';
     return {
       key, direction: clip(c?.direction, 20), name: clip(c?.name, 80) || `Концепція ${i + 1}`, angle: clip(c?.angle, 400), audience: clip(c?.audience, 300), message: clip(c?.message, 400),
-      visual: clip(c?.visual, 1200), uses_materials: asList(c?.uses_materials).map((m) => clip(m, 160)).filter(Boolean).slice(0, 6),
-      ratios: mine.length ? mine : ratios, needs_text: needsText, text_brief: clip(c?.text_brief, 600), avoid: clip(c?.avoid, 400),
+      visual: clip(c?.visual, 1200), references, uses_materials: files, layout: { text_zone: zone, note: clip(c?.layout?.note, 300) },
+      ratios: mine.length ? mine : ratios, needs_text: needsText, text_brief: clip(c?.text_brief, 600), copy, text_render: textRender(brief, needsText),
+      cta: { show: brief.cta !== false, text: clip(brief.cta_text, 40) }, avoid: clip(c?.avoid, 400),
     };
   }).filter((c) => c.visual);
   if (!concepts.length) throw new Error('Агент по ТЗ не повернув жодної концепції з описом картинки. Спробуйте ще раз.');
@@ -91,9 +113,10 @@ export function parseCreativeMaker(text, concepts = [], style = '') {
   for (const c of concepts) {
     for (const ratio of c.ratios) {
       const hit = got.find((g) => clip(g?.concept, 20) === c.key && clip(g?.ratio, 10) === ratio && clip(g?.prompt, 4000));
-      const base = clip(hit?.prompt, 2500) || [c.visual, style].filter(Boolean).join('. ');
+      const words = c.text_render === 'model' ? COPY_LINES(c) : [];
+      const base = clip(hit?.prompt, 2500) || [c.visual, style, words.length ? `Text in the picture, spelled exactly as written, clean sans-serif type with a clear hierarchy, in the free ${c.layout?.text_zone || 'left'} zone: ${words.join(', ')}. No other words` : ''].filter(Boolean).join('. ');
       creatives.push({
-        concept_key: c.key, concept_name: c.name, ratio, prompt: base, negative_prompt: clip(hit?.negative_prompt, 500) || 'text, letters, watermark, logo, distorted hands, extra fingers',
+        concept_key: c.key, concept_name: c.name, ratio, prompt: base, negative_prompt: clip(hit?.negative_prompt, 500) || (c.text_render === 'model' ? 'watermark, extra words, misspelled words, distorted hands, extra fingers' : 'text, letters, watermark, logo, distorted hands, extra fingers'),
         references: asList(hit?.references).map((r) => clip(r, 160)).filter(Boolean).slice(0, 6), fallback: !hit,
       });
     }
@@ -136,8 +159,13 @@ export function renderPlan(p) {
 export function renderBrief(p) {
   const lines = ['## Підсумок', p.summary || '(без підсумку)', '', '## Концепції'];
   p.concepts.forEach((c) => {
+    const refs = c.references?.length ? c.references.map((r) => `${r.file} (${r.role}${r.keep ? `; лишити як у файлі: ${r.keep}` : ''})`).join('; ') : c.uses_materials.join(', ') || 'без референсів';
+    const copy = COPY_LINES(c);
     lines.push(`### ${c.key}. ${c.name}`, `- Ідея: ${c.angle}`, `- Для кого: ${c.audience}`, `- Меседж: ${c.message}`, `- Картинка: ${c.visual}`,
-      `- Формати: ${c.ratios.join(', ')}`, `- З матеріалів клієнта: ${c.uses_materials.join(', ') || 'без референсів'}`, `- Текст: ${c.needs_text ? c.text_brief || 'потрібен' : 'не потрібен'}`);
+      `- Референси: ${refs}`, `- Місце під текст: ${c.layout?.text_zone || 'none'}${c.layout?.note ? ` (${c.layout.note})` : ''}`,
+      `- Формати: ${c.ratios.join(', ')}`, `- Текст: ${c.needs_text ? (copy.length ? `${c.copy.source === 'given' ? 'заданий менеджером, дослівно' : 'від копірайтера'}: ${copy.join(', ')}` : c.text_brief || 'потрібен') : 'не потрібен'}`,
+      `- Хто робить текст на картинці: ${{ model: 'модель (точний текст у запиті)', overlay: 'система накладає поверх чистої картинки', none: 'ніхто' }[c.text_render || 'none']}`,
+      `- Кнопка заклику до дії: ${c.cta?.show === false ? 'ні' : `так${c.cta?.text ? `, «${c.cta.text}»` : ''}`}`);
     if (c.avoid) lines.push(`- Не показувати: ${c.avoid}`);
     lines.push('');
   });

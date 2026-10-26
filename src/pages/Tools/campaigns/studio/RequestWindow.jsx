@@ -187,7 +187,10 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
                     <p><span>Ідея</span>{c.angle}</p>
                     <p><span>Меседж</span>{c.message}</p>
                     <p><span>Картинка</span>{c.visual}</p>
-                    {c.uses_materials?.length > 0 && <p><span>З матеріалів</span>{c.uses_materials.join(', ')}</p>}
+                    {c.references?.length > 0 ? <p><span>Референси</span>{c.references.map((r) => `${r.file} (${r.role}${r.keep ? `: лишити ${r.keep}` : ''})`).join('; ')}</p> : c.uses_materials?.length > 0 && <p><span>З матеріалів</span>{c.uses_materials.join(', ')}</p>}
+                    {c.layout?.text_zone && c.layout.text_zone !== 'none' && <p><span>Місце під текст</span>{c.layout.text_zone}{c.layout.note ? `, ${c.layout.note}` : ''}</p>}
+                    {c.copy?.source === 'given' && <p><span>Текст (заданий, дослівно)</span>{[c.copy.headline, c.copy.subline, c.copy.badge].filter(Boolean).join(' / ')}</p>}
+                    {c.text_render && c.text_render !== 'none' && <p><span>Текст на картинці</span>{c.text_render === 'model' ? 'малює модель' : 'накладає система'}{c.cta?.show === false ? '' : `, кнопка${c.cta?.text ? ` «${c.cta.text}»` : ''}`}</p>}
                     {copyBy(c.key).map((t, i) => (
                       <div key={i} className="stu-copy"><b>{t.headline}</b><p>{t.primary_text}</p><small>{t.description}{t.cta ? ` · ${t.cta}` : ''}</small></div>
                     ))}
