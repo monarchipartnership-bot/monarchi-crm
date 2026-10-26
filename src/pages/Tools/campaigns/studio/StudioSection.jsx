@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { kickQueue } from '../../../../lib/api/agents';
-import { createRequest, fetchRequests, loadCreativeTeam, startRequest } from '../../../../lib/api/creatives';
-import { CREATIVE_ROLES } from '../../../../lib/agents/creativeTeam';
+import { createRequest, fetchRequests, loadCreativeTeam, saveCreativeSetup, startRequest } from '../../../../lib/api/creatives';
+import { CREATIVE_ROLES, creativeSetupOf } from '../../../../lib/agents/creativeTeam';
 import { fmtDateTime } from '../../../Smm/agentUi';
 import AgentWindow from '../AgentWindow';
 import RequestForm from './RequestForm';
@@ -11,7 +11,7 @@ import '../../../../styles/studio.css';
 
 // «Креативна студія» of a campaign: the requests of the client (requirements + materials) and the chain of agents that turns each of them into
 // a technical brief, ad texts and prompts for Higgsfield. The agents of the studio are opened from here (prompts, settings, history).
-export default function StudioSection({ campaign, notify }) {
+export default function StudioSection({ campaign, notify, onCampaign = null }) {
   const { email } = useAuth();
   const [team, setTeam] = useState(null);
   const [requests, setRequests] = useState(null);
@@ -36,6 +36,22 @@ export default function StudioSection({ campaign, notify }) {
       notify('Запит запущено: агенти працюють.');
       kickQueue(() => { reload().catch(() => {}); }).catch(() => {});
     } else notify('Запит збережено як чернетку.');
+  }
+
+  // the wizard left the department out for this client: a note and a button, nothing else
+  const setup = creativeSetupOf(campaign);
+  async function connect() {
+    try { const row = await saveCreativeSetup(campaign, { enabled: true, roles: CREATIVE_ROLES.map((r) => r.role) }, email); onCampaign?.(row); notify('Відділ креативів підключено до клієнта.'); } catch (e) { notify(e.message || 'Не вдалося підключити відділ креативів.', true); }
+  }
+  if (setup.configured && !setup.enabled) {
+    return (
+      <section className="stu-section-wrap" aria-label="Креативна студія">
+        <div className="cmp-live-head stu-head">
+          <div><h3>Відділ креативів</h3><span className="cmp-muted">Для цього клієнта відділ креативів не підключено: запитів на креативи немає. Підключення нічого не коштує, поки ви не створите запит.</span></div>
+          <button type="button" className="cmp-btn cmp-btn--primary" disabled={!onCampaign} onClick={connect}>Підключити відділ креативів</button>
+        </div>
+      </section>
+    );
   }
 
   const open = requests?.find((r) => r.id === openId) || null;

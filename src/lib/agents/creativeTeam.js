@@ -198,3 +198,43 @@ export async function connectCampaign(db, campaign, { email = null, only = null 
   }
   return must(await db.from('ag_agent_clients').select('*').eq('campaign_id', campaign.id)) || [];
 }
+
+// ---------------------------------------------------------------------------------------------------------------- connecting a client (campaign wizard)
+// The agents without which a request cannot be made: the strategist starts it, the brief writer turns the plan into a brief, the maker makes the
+// pictures (see the required links). The others (the weekly analyst, the copywriter, the quality checker) can be left out for a client.
+export const CREATIVE_REQUIRED = ['creative_strategy', 'creative_brief', 'creative_maker'];
+export const CREATIVE_OPTIONAL = CREATIVE_ROLES.map((r) => r.role).filter((r) => !CREATIVE_REQUIRED.includes(r));
+
+// What the wizard decided for a campaign (campaign.config.creative = { enabled, roles }). A campaign that was never through the wizard step keeps the
+// old behaviour: the whole department.
+export function creativeSetupOf(campaign) {
+  const c = campaign?.config?.creative;
+  if (!c || typeof c !== 'object') return { configured: false, enabled: true, roles: CREATIVE_ROLES.map((r) => r.role) };
+  if (c.enabled === false) return { configured: true, enabled: false, roles: [] };
+  const roles = [...new Set([...CREATIVE_REQUIRED, ...(Array.isArray(c.roles) ? c.roles : [])])].filter(isCreativeRole);
+  return { configured: true, enabled: true, roles };
+}
+
+// The client is connected to exactly these roles: missing link rows are created, the rows of the other roles are switched off (never deleted, so
+// their settings and history stay), the ones asked for are switched on. → the link rows of the client.
+export async function setCreativeRoles(db, campaign, roles, { email = null } = {}) {
+  const want = new Set((roles || []).filter(isCreativeRole));
+  const { agents } = await ensureCreativeDepartment(db, email);
+  const rows = want.size ? await connectCampaign(db, campaign, { email, only: [...want] }) : must(await db.from('ag_agent_clients').select('*').eq('campaign_id', campaign.id)) || [];
+  const roleOf = new Map(agents.map((a) => [a.id, a.role]));
+  for (const r of rows) {
+    const on = want.has(roleOf.get(r.agent_id));
+    if (r.enabled !== on) must(await db.from('ag_agent_clients').update({ enabled: on, updated_at: new Date().toISOString() }).eq('id', r.id));
+  }
+  return must(await db.from('ag_agent_clients').select('*').eq('campaign_id', campaign.id)) || [];
+}
+
+// What the wizard fills in for the client's fields of an agent by itself, and from where (shown next to the field so the person can check it):
+// the goals typed in the first part of the step, the restrictions kept in the project's «Креативи» tab. The rest stays empty: nothing is invented.
+export function creativeAutofill({ project = {}, goals = '', projectCreative = null } = {}) {
+  const clip = (v, n) => String(v ?? '').trim().slice(0, n);
+  const fields = { kpi: clip(goals, 400), limits: clip(projectCreative?.restrictions, 600), budget: '' };
+  const from = { kpi: fields.kpi ? 'campaign' : null, limits: fields.limits ? 'project' : null };
+  const facts = [['Сайт', project.website], ['Країна', project.country], ['Тип бізнесу', project.business_type], ['Менеджер', project.manager]].filter(([, v]) => String(v || '').trim()).map(([k, v]) => [k, clip(v, 80)]);
+  return { fields, from, facts };
+}

@@ -1,6 +1,8 @@
 import { supabase } from '../supabaseClient';
-import { cleanRequest, connectCampaign, CREATIVE_ROLES, ensureCreativeDepartment, isCreativeRole } from '../agents/creativeTeam';
+import { cleanRequest, connectCampaign, CREATIVE_ROLES, creativeSetupOf, ensureCreativeDepartment, isCreativeRole, setCreativeRoles } from '../agents/creativeTeam';
 import { agentAction } from './agents';
+import { updateCampaign } from './campaigns';
+import { fetchProjectCreative } from './projectCreative';
 
 // The creative department (migrations 20261040 and 20261041): its agents are shared workers, a client (campaign) is linked to each of them; requests, their
 // tasks and creatives, the materials a manager uploads.
@@ -15,12 +17,31 @@ export const FILE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 // `clients`: agent id -> the link row of this client (on/off, mode, priority, the client's own settings).
 export async function loadCreativeTeam(campaign, email) {
   const { agents, links } = await ensureCreativeDepartment(supabase, email);
-  const rows = await connectCampaign(supabase, campaign, { email });
+  const setup = creativeSetupOf(campaign);
+  // a campaign that went through the wizard step is connected to the roles chosen there; an older one to the whole department
+  const rows = setup.configured ? await setCreativeRoles(supabase, campaign, setup.roles, { email }) : await connectCampaign(supabase, campaign, { email });
   const ids = agents.map((a) => a.id);
   const open = ids.length ? must(await supabase.from('ag_tasks').select('agent_id, status').in('agent_id', ids).in('status', ['queued', 'running', 'failed'])) || [] : [];
   const counts = {};
   open.forEach((t) => { (counts[t.agent_id] ||= { queued: 0, running: 0, failed: 0 })[t.status] += 1; });
   return { agents, links, counts, clients: new Map(rows.map((r) => [r.agent_id, r])) };
+}
+
+// The wizard (or the campaign page) decides which agents of the department work for this client: enabled false = none. → the updated campaign row.
+export async function saveCreativeSetup(campaign, { enabled = true, roles = [] }, email) {
+  const chosen = enabled ? [...new Set(roles)].filter(isCreativeRole) : [];
+  const row = await updateCampaign(campaign.id, { config: { ...(campaign.config || {}), creative: { enabled: !!enabled, roles: chosen } } });
+  await setCreativeRoles(supabase, row, creativeSetupOf(row).roles, { email });
+  return row;
+}
+
+// What the second step of the wizard shows: the agents of the department with this client's link rows, and what the project keeps for creatives.
+export async function fetchDeptClientSetup(campaign, email) {
+  const { agents } = await ensureCreativeDepartment(supabase, email);
+  const links = must(await supabase.from('ag_agent_clients').select('*').eq('campaign_id', campaign.id)) || [];
+  const { fetchProjectCreative } = await import('./projectCreative'); // loaded here, not at the top: that file imports this one
+  const projectCreative = await fetchProjectCreative(campaign.project_id).then((d) => d.settings).catch(() => null);
+  return { agents, links, projectCreative };
 }
 
 export async function fetchRequests(campaignId) {

@@ -34,7 +34,7 @@ import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
-import { cleanRequest, connectCampaign, directionLimit, ensureCreativeDepartment, parseGivenTexts } from '../src/lib/agents/creativeTeam.js';
+import { CREATIVE_REQUIRED, cleanRequest, connectCampaign, creativeAutofill, creativeSetupOf, directionLimit, ensureCreativeDepartment, parseGivenTexts, setCreativeRoles } from '../src/lib/agents/creativeTeam.js';
 import { cleanSettings, defaultRatios, inputState, manualInput } from '../src/lib/agents/projectCreative.js';
 import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
@@ -2219,6 +2219,37 @@ await ok('quality loop: a «revise» verdict sends the work back to the agents i
   // 4) a pass sends nothing back
   const clean = await run([]);
   assert.deepEqual([clean.tasksOf('creative_quality').length, clean.tasksOf('creative_quality')[0].output.rework], [1, undefined]);
+});
+
+await ok('connecting a client to the department (wizard): the chosen roles are on, the rest are switched off and kept, the required ones are always there, the autofill says where it comes from', async () => {
+  const all = ['creative_analyst', 'creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker', 'creative_quality'];
+  assert.deepEqual(creativeSetupOf({ config: {} }), { configured: false, enabled: true, roles: all }); // a campaign that never saw the step: the whole department
+  assert.deepEqual(creativeSetupOf({ config: { creative: { enabled: false } } }), { configured: true, enabled: false, roles: [] });
+  const setup = creativeSetupOf({ config: { creative: { enabled: true, roles: ['creative_quality', 'bogus'] } } });
+  assert.deepEqual(setup.roles, [...CREATIVE_REQUIRED, 'creative_quality']); // the required ones cannot be left out, an unknown role is dropped
+  const { tables, db } = creativeWorld();
+  const camp = tables.ag_campaigns[0];
+  const roleOf = (rows) => rows.map((r) => tables.ag_agents.find((a) => a.id === r.agent_id).role).sort();
+  let rows = await setCreativeRoles(db, camp, setup.roles, { email: 'a@x.com' });
+  assert.deepEqual([rows.length, roleOf(rows.filter((r) => r.enabled))], [4, [...CREATIVE_REQUIRED, 'creative_quality'].sort()]);
+  assert.equal(tables.ag_agents.length, 6); // the department itself is the same six, a client only gets links
+  // the person changes the mind: the copywriter in, the checker out: its row stays (settings and history), switched off
+  rows = await setCreativeRoles(db, camp, [...CREATIVE_REQUIRED, 'creative_copywriter'], { email: 'a@x.com' });
+  assert.deepEqual([rows.length, roleOf(rows.filter((r) => r.enabled))], [5, [...CREATIVE_REQUIRED, 'creative_copywriter'].sort()]);
+  const off = rows.find((r) => !r.enabled);
+  assert.equal(tables.ag_agents.find((a) => a.id === off.agent_id).role, 'creative_quality');
+  rows = await setCreativeRoles(db, camp, setup.roles, { email: 'a@x.com' }); // and back: the same row is switched on again, no copy
+  assert.deepEqual([rows.length, rows.find((r) => r.id === off.id).enabled], [5, true]);
+  rows = await setCreativeRoles(db, camp, [], { email: 'a@x.com' }); // the department is not wanted for this client
+  assert.deepEqual([rows.length, rows.every((r) => !r.enabled)], [5, true]);
+  assert.equal(tables.ag_agent_clients.filter((r) => r.campaign_id === 2).length, 0); // another client is not touched
+  // the autofill: the goals of the campaign and the restrictions kept in the project; nothing is invented
+  const a = creativeAutofill({ project: tables.projects[0], goals: 'CPA under 12 dollars', projectCreative: { restrictions: 'No kids in the picture' } });
+  assert.deepEqual(a.fields, { kpi: 'CPA under 12 dollars', limits: 'No kids in the picture', budget: '' });
+  assert.deepEqual(a.from, { kpi: 'campaign', limits: 'project' });
+  assert.deepEqual(a.facts, [['Сайт', 'https://acme.example'], ['Країна', 'Ukraine'], ['Тип бізнесу', 'E-commerce']]); // empty card fields are not listed
+  const none = creativeAutofill({});
+  assert.deepEqual([none.fields, none.from, none.facts], [{ kpi: '', limits: '', budget: '' }, { kpi: null, limits: null }, []]);
 });
 
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {

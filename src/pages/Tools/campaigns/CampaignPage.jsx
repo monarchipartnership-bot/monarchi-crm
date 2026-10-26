@@ -92,7 +92,7 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
         <p className="cmp-legend"><i style={{ background: '#5FE0A1' }} />працює <i style={{ background: '#8D7A93' }} />вимкнено <i style={{ background: '#FF7A9A' }} />зупинено (залежить від вимкненого) <i style={{ background: '#F2B94B' }} />кампанія на паузі</p>
       </section>
 
-      <StudioSection campaign={campaign} notify={notify} />
+      <StudioSection campaign={campaign} notify={notify} onCampaign={(c) => { setCampaign(c); onChanged(); }} />
 
       <section className="cmp-reports">
         <h3>Останні результати агентів</h3>
