@@ -6,6 +6,8 @@ import { platformInfo } from '../../lib/adAccounts';
 import { periodLabel } from '../../lib/presentation/deckModel';
 import { REPORT_STATUS } from '../../lib/projectHistory';
 import CreativeGrid from './CreativeGrid';
+import { rowBlock, sheetNameOf } from '../../lib/reportWorkbook';
+import { saveReportWorkbook } from '../../lib/reportWorkbookExport';
 import { reportBlocks } from '../../lib/reportTemplate';
 import CreativePickerDialog from './CreativePickerDialog';
 import { saveReportCreatives, suggestCreatives } from '../../lib/api/reportCreatives';
@@ -101,6 +103,8 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
 
 // The numbers and the texts of one saved report. Used by the window above and by the combined month document.
 export function ReportBody({ row, projectName, custom, extraKeys, slot = null, edit = null, noExport = false, exportApi = null }) {
+  // Excel of a report of the history: one sheet with the table, the texts and the creatives (reportWorkbook.js)
+  const onXlsx = () => saveReportWorkbook([rowBlock(row, { custom, extraKeys })], { filename: `${projectName}_${row.period_type}_${row.period_start}_${row.platform}`, sheetName: sheetNameOf(row) });
   const data = row.data || {};
   const platforms = Object.keys(data.platforms || {});
   const isCombined = row.platform === 'all';
@@ -117,7 +121,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
           campaignMode="selected" selection={data.selection || []} options={{ groups: true, ...(data.options || {}) }}
           curLabel={reportPeriodText(row)}
           prevLabel={data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній'}
-          exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} noExport={noExport} exportApi={exportApi}
+          exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} noExport={noExport} exportApi={exportApi} onXlsx={onXlsx}
         />
       )}
       {(data.creatives?.items?.length > 0 || edit) && (

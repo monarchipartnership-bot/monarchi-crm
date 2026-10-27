@@ -40,6 +40,7 @@ import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
 import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/creativeMake.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
+import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
@@ -2250,6 +2251,74 @@ await ok('connecting a client to the department (wizard): the chosen roles are o
   assert.deepEqual(a.facts, [['Сайт', 'https://acme.example'], ['Країна', 'Ukraine'], ['Тип бізнесу', 'E-commerce']]); // empty card fields are not listed
   const none = creativeAutofill({});
   assert.deepEqual([none.fields, none.from, none.facts], [{ kpi: '', limits: '', budget: '' }, { kpi: null, limits: null }, []]);
+});
+
+await ok('Excel of a report: ONE sheet with the table, the texts at its right and the creatives under it; a month is the weeks one under another, then the summary', async () => {
+  const ExcelJS = (await import('exceljs/dist/exceljs.min.js')).default;
+  const weeks = monthWeeks('2026-10');
+  const scope = (spend, revenue) => ({ currency: 'USD', accountName: 'Acme', explicit: true,
+    total: { spend: spend * 3, revenue: revenue * 3, purchases: 9, impressions: 30000, clicks: 900, reach: 12000 },
+    groups: [{ id: 'c:Camp A', kind: 'campaign', name: 'Camp A', spend, revenue, purchases: 4, impressions: 12000, clicks: 400, reach: 5000 }, { id: 'c:Camp B', kind: 'campaign', name: 'Camp B', spend: spend * 2, revenue: revenue * 2, purchases: 5, impressions: 18000, clicks: 500, reach: 7000 }], campaigns: [] });
+  const mk = (id, type, start, end, spend, texts = true) => ({
+    id, period_type: type, period_start: start, period_end: end, platform: 'meta', status: 'final', updated_at: '2026-10-20T10:00:00Z',
+    data: { kind: 'ecom', platforms: { meta: scope(spend, spend * 4) }, previous: { period: { start: '2026-09-01', end: '2026-09-07' }, platforms: { meta: scope(spend / 2, spend * 3) } },
+      sections: texts ? { whatWasDone: `We tested new hooks ${id}`, conclusion: 'ROAS grew', plans: 'Scale the winners' } : {},
+      creatives: { count: 1, items: type === 'monthly' ? [] : [{ adId: String(id), caption: `Ad ${id} · ROAS 3.2`, imageUrl: `https://img/${id}.jpg`, metrics: { purchases: 2, spend: 100, roas: 3.2 } }] } } });
+  const w1 = mk(1, 'weekly', weeks[0].start, weeks[0].end, 100);
+  const w2 = mk(2, 'weekly', weeks[1].start, weeks[1].end, 120, false);
+  const mo = mk(3, 'monthly', '2026-10-01', '2026-10-31', 400);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const fetchImage = async (url) => (/missing/.test(url) ? null : { buffer: png, extension: 'png' });
+  const read = async (blocks, opts = {}) => { const wb = await buildWorkbook(ExcelJS, blocks, { fetchImage, ...opts }); const back = new ExcelJS.Workbook(); await back.xlsx.load(await wb.xlsx.writeBuffer()); return back; };
+  const textOf = (c) => (c.value && c.value.richText ? c.value.richText.map((t) => t.text).join('') : c.value);
+  const find = (ws, text) => { let at = null; ws.eachRow((row) => row.eachCell((c) => { if (at == null && textOf(c) === text) at = c; })); return at; };
+
+  // the titles in the client's words, the sheet name
+  assert.deepEqual([titleOfRow(w1), titleOfRow(w2), titleOfRow(mo)], ['Week 1', 'Week 2', 'OCTOBER SUMMARY']);
+  assert.deepEqual([sheetNameOf(w1), sheetNameOf(mo)], ['Meta | Week 1', 'Meta | October']);
+  assert.equal(titleOfRow({ ...mo, data: { ...mo.data, toDate: true } }), 'OCTOBER SUMMARY (TO DATE)');
+  assert.equal(rowBlock({ ...w1, data: { ...w1.data, platforms: {} } }), null); // a report without numbers makes no block
+
+  // one week: one sheet, the table with the change under the value, the texts to the right, the picture under the table
+  const one = await read([rowBlock(w1)], { sheetName: sheetNameOf(w1) });
+  assert.equal(one.worksheets.length, 1);
+  const ws = one.worksheets[0];
+  assert.equal(ws.name, 'Meta | Week 1');
+  assert.equal(textOf(find(ws, 'Week 1')), 'Week 1');
+  const head = find(ws, 'General advertising metrics');
+  assert.equal(head.row, 3);
+  assert.deepEqual(['Camp A', 'Camp B'].map((n) => find(ws, n).col), [head.col + 1, head.col + 2]); // the columns of the report across
+  const spent = find(ws, 'Spent');
+  const spentRow = ws.getRow(spent.row);
+  assert.match(textOf(spentRow.getCell(head.col)), /^\$300\n▲ \+/); // the value and, under it, the change against the previous period
+  const textHead = find(ws, 'What was done');
+  assert.ok(textHead.col > head.col + 2); // the texts are to the right of the table
+  assert.equal(textOf(ws.getCell(textHead.row + 1, textHead.col)), 'We tested new hooks 1');
+  assert.equal(textOf(ws.getCell(textHead.row + 1, textHead.col + 1)), 'ROAS grew');
+  assert.ok(find(ws, 'Most effective creatives').row > spent.row); // the creatives are under the table
+  assert.equal(ws.getImages().length, 1);
+  assert.match(textOf(find(ws, '1. Ad 1 · ROAS 3.2\n2 purchases · spent $100 · ROAS 3.20x')), /^1\. Ad 1/);
+
+  // a picture that cannot be fetched: the address stays in the caption, the file is still made
+  const lost = await read([rowBlock(mk(9, 'weekly', weeks[0].start, weeks[0].end, 50))], {
+    fetchImage: async () => null });
+  assert.equal(lost.worksheets[0].getImages().length, 0);
+  assert.match(textOf(find(lost.worksheets[0], '1. Ad 9 · ROAS 3.2\n2 purchases · spent $100 · ROAS 3.20x\nhttps://img/9.jpg')), /https:\/\/img\/9\.jpg$/);
+
+  // a month: the weeks in their order, one under another on ONE sheet, then the summary
+  const month = buildMonths([mo, w2, w1], '2026-10-27')[0];
+  const blocks = monthBlocks(month, {});
+  assert.deepEqual(blocks.map((b) => b.title), ['Week 1', 'Week 2', 'OCTOBER SUMMARY']);
+  const all = await read(blocks, { sheetName: 'Meta | October' });
+  assert.equal(all.worksheets.length, 1);
+  const sheet = all.worksheets[0];
+  const rowsOf = (t) => { const out = []; sheet.eachRow((row, n) => { if (textOf(row.getCell(2)) === t) out.push(n); }); return out; };
+  const [a, b, c] = [rowsOf('Week 1')[0], rowsOf('Week 2')[0], rowsOf('OCTOBER SUMMARY')[0]];
+  assert.ok(a < b && b < c); // downwards in the order of the report
+  assert.equal(rowsOf('Spent').length, 3); // the same table three times
+  assert.equal(sheet.getImages().length, 2); // the two weeks have a picture each, the month has none
+  assert.equal(rowsOf('Most effective creatives').length, 2); // and the band of the creatives only where there are some
+  assert.equal(textOf(sheet.getCell(find(sheet, 'What was done').row + 1, find(sheet, 'What was done').col)), 'We tested new hooks 1');
 });
 
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {

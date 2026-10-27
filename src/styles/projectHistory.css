@@ -108,3 +108,6 @@
 .bld-toggle.on { background: #F1DCF5; box-shadow: inset 0 0 0 1.5px #AE40AE; color: #682768; }
 .bld-toggle:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
 .bld-camps { max-height: 320px; overflow: auto; }
+
+/* the report drawn out of sight for a CSV / PDF made from a row of the history (ReportDownload) */
+.rdl-offscreen { position: fixed; left: -10000px; top: 0; width: 1000px; pointer-events: none; }

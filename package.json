@@ -25,6 +25,7 @@
     "@supabase/supabase-js": "^2.112.4",
     "chart.js": "^4.5.1",
     "dompurify": "^3.4.15",
+    "exceljs": "^4.4.0",
     "flag-icons": "^7.5.0",
     "google-ads-api": "^25.1.0",
     "html-to-image": "^1.11.13",

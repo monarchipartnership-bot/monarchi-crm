@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ReportBody } from './ArchiveReportModal';
+import { monthBlocks, platformEn, rowBlock, sheetNameOf } from '../../lib/reportWorkbook';
+import { saveReportWorkbook } from '../../lib/reportWorkbookExport';
 import useWorkAreaLeft from '../../lib/useWorkArea';
 import useDialogA11y from '../../lib/useDialogA11y';
 import { REPORT_STATUS, APPROVED, DRAFT } from '../../lib/projectHistory';
@@ -85,7 +87,19 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
     }, 400);
     return () => { off = true; clearTimeout(t); };
   }, [job]);
-  const startExport = (id, kind) => { setDlError(''); setJob({ id, kind }); };
+  // Excel is the one-sheet file made from the saved rows (the weeks one under another, then the month; or one block); CSV and PDF come from the report mounted out of sight
+  const [xbusy, setXbusy] = useState('');
+  async function exportExcel(id, sec) {
+    setDlError('');
+    setXbusy(id + ':xlsx');
+    try {
+      const platform = (weeks[0]?.row || monthly)?.platform || 'all';
+      if (sec) await saveReportWorkbook([rowBlock(sec.row, { custom, extraKeys: extraKeys(sec.row) })], { filename: `${projectName}_${sec.row.period_type}_${sec.row.period_start}_${sec.row.platform}`, sheetName: sheetNameOf(sec.row) });
+      else await saveReportWorkbook(monthBlocks(month, { custom, extraKeysOf: extraKeys }), { filename: `${projectName}_month_${month.key}_${platform}`, sheetName: [platformEn(platform), month.label.split(' ')[0]].filter(Boolean).join(' | ') });
+      setMenu(false);
+    } catch (e) { console.warn('export failed', e); setDlError('Не вдалося зберегти файл.'); } finally { setXbusy(''); }
+  }
+  const startExport = (id, kind) => { if (kind === 'xlsx') { exportExcel(id, sections.find((x) => x.id === id)); return; } setDlError(''); setJob({ id, kind }); };
   const jobSection = job ? sections.find((x) => x.id === job.id) : null;
 
   const toggle = (id) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -128,12 +142,16 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
                 {menu && (
                   <div className="md-dmenu" role="menu">
                     <div className="md-dmh">Що завантажити</div>
+                    <div className="md-dmr" role="none">
+                      <span className="md-dmt"><b>Весь місяць</b><small>один аркуш: тижні й підсумок</small></span>
+                      <span className="md-fpl"><button type="button" role="menuitem" className="md-fp" disabled={Boolean(job) || Boolean(xbusy)} onClick={() => exportExcel('month-all', null)}>{xbusy === 'month-all:xlsx' ? '…' : 'Excel'}</button></span>
+                    </div>
                     {sections.map((sec) => (
                       <div className="md-dmr" key={sec.id} role="none">
                         <span className="md-dmt"><b>{sec.title}</b><small>{sec.chip}</small></span>
                         <span className="md-fpl">
                           {FORMATS.map(([k, label]) => (
-                            <button key={k} type="button" role="menuitem" className="md-fp" disabled={Boolean(job)} onClick={() => startExport(sec.id, k)}>{job && job.id === sec.id && job.kind === k ? '…' : label}</button>
+                            <button key={k} type="button" role="menuitem" className="md-fp" disabled={Boolean(job) || Boolean(xbusy)} onClick={() => startExport(sec.id, k)}>{(job && job.id === sec.id && job.kind === k) || xbusy === sec.id + ':' + k ? '…' : label}</button>
                           ))}
                         </span>
                       </div>

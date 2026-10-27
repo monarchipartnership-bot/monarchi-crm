@@ -8,6 +8,7 @@ import ReportEditor from './Workbench/ReportEditor';
 import ArchiveReportModal, { reportPeriodText, reportPlatformLabel } from './ArchiveReportModal';
 import MonthDocument from './MonthDocument';
 import ReportReturnDialog from './ReportReturnDialog';
+import ReportDownload from './ReportDownload';
 import ShareLinkBox from './ShareLinkBox';
 import { deleteProjectReport, fetchCampaignGroups, fetchProjectReports, refreshMonthTotal, setReportStatus } from '../../lib/api/projectReportStore';
 import { fetchProjectDecks } from '../../lib/api/projectDecks';
@@ -136,6 +137,7 @@ export default function ProjectHistoryTab({ projectId }) {
       {row ? (
         <span className="ph-act">
           {(row.data?.toDate ? [] : reportActions(row.status, approver)).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
+          {Object.keys(row.data?.platforms || {}).length > 0 && <ReportDownload row={row} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, row)} />}
           <button type="button" className="btn" onClick={() => (row.status === 'final' ? setOpenId(row.id) : navigate(`/projects/${projectId}?tab=work&report=${row.id}&platform=${row.platform}`))}>Відкрити</button>
         </span>
       ) : <span className="ph-missing">Зʼявиться, коли агент або менеджер створить звіт за цей період.</span>}
