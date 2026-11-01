@@ -19,6 +19,18 @@ const CREATIVES = [
   { id: 6, url: '', gradient: gradient('#B544B5', '#661466'), ratio: '9:16', conceptName: 'Осінь у діамантах, сторіз', status: 'review' },
 ];
 
+const item = (id, conceptName, ratio, status, g, extra = {}) => ({ id, url: '', downloadUrl: '', ratio, conceptName, status, kind: 'image', fileName: `autumn-sale-${String(id).padStart(2, '0')}.png`, note: '', gradient: g, ...extra });
+const ITEMS_14 = [
+  item(1, 'Осінь у діамантах', '4:5', 'review', gradient('#B544B5', '#661466'), { note: 'Тепле світло, діаманти в центрі кадру. Текст із заданого набору, дослівно.' }),
+  item(2, 'Подарунок, який не забудуть', '4:5', 'review', gradient('#F5B04A', '#B5651D'), { note: 'Подарункова коробка, акцент на дедлайні акції.' }),
+  item(3, 'Світло, що залишається', '9:16', 'review', gradient('#7C8CF8', '#3B3FA8'), { note: 'Сторіз: вечірнє світло, колекція «Вечірнє золото».' }),
+  item(4, 'Кольє для вас', '4:5', 'approved', gradient('#E46AA8', '#8E1D63'), { note: 'Затверджено вчора.' }),
+  item(5, 'Остання осінь знижок', '4:5', 'approved', gradient('#4AD488', '#12803F'), { note: 'Затверджено вчора.' }),
+  item(6, 'Осінь у діамантах, сторіз', '9:16', 'rejected', gradient('#B544B5', '#661466'), { note: 'Повернено з коментарем: збільшити текст і посунути його від краю.' }),
+  item(7, 'Відео для сторіз', '9:16', 'failed', gradient('#555', '#222'), { kind: 'video', fileName: 'story-video.mp4', note: 'Не згенеровано: ліміт швидкості Higgsfield.' }),
+  item(8, 'Вечірнє світло', '4:5', 'producing', gradient('#9aa4f8', '#5b66c8'), { note: 'У роботі, буде за кілька хвилин.' }),
+];
+
 export const COCKPIT_WAITING = {
   id: 14, name: 'Осінній розпродаж', client: 'Mellow Diamond', modeLabel: 'Креативи', tone: 'attention', waiting: 5, status: 'active', activeRequestId: 14,
   stages: [
@@ -40,10 +52,10 @@ export const COCKPIT_WAITING = {
     { id: 'es-1', kind: 'estimate', tone: 'attention', title: 'Оцінка генерації', text: '6 зображень і 2 відео в Higgsfield. Баланс $48.20.', requestId: 14, estimate: { usd: 3.4, count: 8, limitUsd: 48.2 }, actions: [{ key: 'confirm_generation', label: 'Підтвердити генерацію', primary: true }] },
   ],
   requests: [
-    { id: 14, title: 'Осінній розпродаж', status: 'review', statusLabel: 'на перегляд', updatedAt: ago(4), creatives: { total: 6, review: 6, approved: 0, failed: 1 } },
-    { id: 13, title: 'Подарунки до Дня матері', status: 'approved', statusLabel: 'затверджено', updatedAt: ago(60 * 24 * 8), creatives: { total: 8, review: 0, approved: 8, failed: 0 } },
-    { id: 12, title: 'Вечірня колекція', status: 'problem', statusLabel: 'проблема', updatedAt: ago(60 * 24 * 13), creatives: { total: 5, review: 0, approved: 3, failed: 2 } },
-    { id: 11, title: 'Новинки жовтня', status: 'running', statusLabel: 'працює', updatedAt: ago(60 * 24 * 15), creatives: { total: 2, review: 0, approved: 0, failed: 0 } },
+    { id: 14, title: 'Осінній розпродаж', status: 'review', statusLabel: 'на перегляд', updatedAt: ago(4), creatives: { total: 8, review: 3, approved: 2, failed: 1 }, items: ITEMS_14 },
+    { id: 13, title: 'Подарунки до Дня матері', status: 'approved', statusLabel: 'затверджено', updatedAt: ago(60 * 24 * 8), creatives: { total: 8, review: 0, approved: 8, failed: 0 }, items: ITEMS_14.slice(0, 5).map((x, k) => ({ ...x, id: 100 + k, status: 'approved', conceptName: 'Подарунок ' + (k + 1) })) },
+    { id: 12, title: 'Вечірня колекція', status: 'problem', statusLabel: 'проблема', updatedAt: ago(60 * 24 * 13), creatives: { total: 5, review: 0, approved: 3, failed: 2 }, items: ITEMS_14.slice(0, 5).map((x, k) => ({ ...x, id: 200 + k, status: k < 3 ? 'approved' : 'failed', conceptName: 'Колекція ' + (k + 1) })) },
+    { id: 11, title: 'Новинки жовтня', status: 'problem', statusLabel: 'проблема', updatedAt: ago(60 * 24 * 15), creatives: { total: 0, review: 0, approved: 0, failed: 0 }, items: [] },
     { id: 10, title: 'Листопад: ідеї', status: 'draft', statusLabel: 'чернетка', updatedAt: ago(60 * 24 * 17), creatives: { total: 0, review: 0, approved: 0, failed: 0 } },
   ],
   spend: { model: 2.14, higgsfield: 9.6, total: 11.74, currency: 'USD' },

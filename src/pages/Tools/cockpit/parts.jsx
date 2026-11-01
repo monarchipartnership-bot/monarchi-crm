@@ -2,7 +2,7 @@ import { initials } from './format';
 
 // Shared small pieces of the project cockpit: icons, the client avatar, status chips, the progress bar.
 const PATHS = {
-  close: 'M6 6l12 12M18 6L6 18', check: 'M5 12.5l4.5 4.5L19 7.5', chev: 'M6 9l6 6 6-6', plus: 'M12 5v14M5 12h14', arrow: 'M5 12h14M13 6l6 6-6 6',
+  close: 'M6 6l12 12M18 6L6 18', download: 'M12 4v11M7 11l5 5 5-5M5 20h14', back: 'M15 5l-7 7 7 7', check: 'M5 12.5l4.5 4.5L19 7.5', chev: 'M6 9l6 6 6-6', plus: 'M12 5v14M5 12h14', arrow: 'M5 12h14M13 6l6 6-6 6',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2', warn: 'M12 3l10 18H2zM12 10v5M12 18v.5', refresh: 'M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2M20 4v5h-5M4 20v-5h5',
   chat: 'M4 5h16v11H9l-5 4z', upload: 'M12 16V5M7 10l5-5 5 5M5 20h14', wallet: 'M3 9a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zM3 10h18M16 14h2', stop: 'M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
   play: 'M8 5l11 7-11 7z', user: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21c1-5 15-5 16 0', folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
