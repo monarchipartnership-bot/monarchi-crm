@@ -273,3 +273,7 @@ textarea.cmp-input { resize: vertical; }
 .cmp-diagram--quarters .cmp-stage-title { font-size: 9.5px; letter-spacing: .05em; }
 .cmp-diagram--quarters .cmp-node-name { font-size: 11.5px; }
 .cmp-diagram--quarters .cmp-node-short { font-size: 8.8px; }
+.cmp-col.is-lit { fill: rgba(235, 156, 239, .1); }
+.cmp-flow-edge { stroke-width: 2.6; stroke-dasharray: none; animation: none; }
+.cmp-flow-edge.is-lit { stroke-dasharray: none; animation: none; }
+.cmp-edge { stroke-linejoin: round; stroke-linecap: round; }

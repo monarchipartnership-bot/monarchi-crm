@@ -79,25 +79,29 @@ const node = (id, quarter, row, source, extra = {}) => {
   const def = (source === 'dept' ? DEPT : TEAM)[id];
   return { id, name: shortName(def.name), short: def.short, quarter, row, platforms: def.platforms || ['*'], source, ...extra };
 };
+// The agents stand so that the links are short and straight: inside a quarter the next agent is the card below (a vertical arrow), a fork is a bracket on
+// the left (one agent feeds several), a join is a bracket on the right (several feed one). Between quarters there is one wide arrow per flow.
 export const QUARTER_NODES = [
   node('business_research', 0, 0, 'team'), node('competitor_research', 0, 1, 'team'), node('audience_research', 0, 2, 'team'), node('marketing_strategist', 0, 3, 'team'),
-  node('creative_strategy', 1, 0, 'dept'), node('creative_brief', 1, 1, 'dept'), node('creative_copywriter', 1, 2, 'dept'), node('creative_maker', 1, 3, 'dept'),
-  node('creative_quality', 1, 4, 'dept'), node('creative_analyst', 1, 5, 'dept'),
-  node('meta_analyst', 2, 0, 'team'), node('google_analyst', 2, 1, 'team'), node('tiktok_analyst', 2, 2, 'team'), node('tracking_integrity', 2, 3, 'team'),
-  node('meta_optimizer', 2, 4, 'team'), node('google_optimizer', 2, 5, 'team'),
-  { id: 'tiktok_optimizer', name: 'Оптимізатор TikTok', short: 'ще не збудований', quarter: 2, row: 6, platforms: ['tiktok'], source: 'planned', planned: true },
-  node('cross_channel_report', 3, 0, 'team'), node('account_manager', 3, 2, 'team'),
+  node('creative_analyst', 1, 0, 'dept'), node('creative_strategy', 1, 1, 'dept'), node('creative_brief', 1, 2, 'dept'), node('creative_copywriter', 1, 3, 'dept'),
+  node('creative_maker', 1, 4, 'dept'), node('creative_quality', 1, 5, 'dept'),
+  node('meta_analyst', 2, 0, 'team'), node('meta_optimizer', 2, 1, 'team'), node('google_analyst', 2, 2, 'team'), node('google_optimizer', 2, 3, 'team'),
+  node('tiktok_analyst', 2, 4, 'team'), { id: 'tiktok_optimizer', name: 'Оптимізатор TikTok', short: 'ще не збудований', quarter: 2, row: 5, platforms: ['tiktok'], source: 'planned', planned: true },
+  node('tracking_integrity', 2, 6, 'team'),
+  node('cross_channel_report', 3, 0, 'team'), node('account_manager', 3, 1, 'team'),
 ];
-const L = (from, to, required = false) => ({ from, to, required });
+// kind: 'down' = the agent right below, 'left' = a bracket on the left side (a fork), 'right' = a bracket on the right side (a join)
+const L = (from, to, kind, required = false) => ({ from, to, kind, required });
 export const QUARTER_LINKS = [
-  L('business_research', 'marketing_strategist'), L('competitor_research', 'marketing_strategist'), L('audience_research', 'marketing_strategist'),
-  L('marketing_strategist', 'creative_strategy'), L('marketing_strategist', 'meta_optimizer'), L('marketing_strategist', 'google_optimizer'),
-  L('creative_analyst', 'creative_strategy'), L('creative_strategy', 'creative_brief', true), L('creative_brief', 'creative_copywriter'), L('creative_brief', 'creative_maker', true),
-  L('creative_copywriter', 'creative_quality'), L('creative_maker', 'creative_quality', true),
-  L('meta_analyst', 'meta_optimizer', true), L('google_analyst', 'google_optimizer', true), L('tiktok_analyst', 'tiktok_optimizer'),
-  L('meta_analyst', 'cross_channel_report'), L('google_analyst', 'cross_channel_report'), L('tiktok_analyst', 'cross_channel_report'), L('tracking_integrity', 'cross_channel_report'),
-  L('meta_optimizer', 'cross_channel_report'), L('google_optimizer', 'cross_channel_report'), L('creative_quality', 'cross_channel_report'), L('cross_channel_report', 'account_manager', true),
+  L('business_research', 'marketing_strategist', 'left'), L('competitor_research', 'marketing_strategist', 'left'), L('audience_research', 'marketing_strategist', 'left'),
+  L('creative_analyst', 'creative_strategy', 'down'), L('creative_strategy', 'creative_brief', 'down', true),
+  L('creative_brief', 'creative_copywriter', 'left'), L('creative_brief', 'creative_maker', 'left', true),
+  L('creative_copywriter', 'creative_quality', 'right'), L('creative_maker', 'creative_quality', 'right', true),
+  L('meta_analyst', 'meta_optimizer', 'down', true), L('google_analyst', 'google_optimizer', 'down', true), L('tiktok_analyst', 'tiktok_optimizer', 'down'),
+  L('cross_channel_report', 'account_manager', 'down', true),
 ];
+// the flows between quarters (indexes in QUARTERS): the strategy feeds creatives and ads, creatives and ads feed the report
+export const QUARTER_FLOWS = [{ from: 0, to: 1 }, { from: 0, to: 2, lane: 'top' }, { from: 1, to: 3, lane: 'bottom' }, { from: 2, to: 3 }];
 
 // → the ids of the nodes that glow for this mode and these channels: the agents of its quarters; the department agents only where the department works;
 // an agent of another channel fades; the planned agent never glows.

@@ -41,7 +41,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/creativeMake.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
-import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
+import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_FLOWS, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
@@ -2350,6 +2350,11 @@ await ok('wizard modes: each of the five modes switches on only the agents of it
   // the scheme: every link joins two nodes, the lit set follows the mode and the channels, the planned agent never glows
   const ids = new Set(QUARTER_NODES.map((n) => n.id));
   assert.ok(QUARTER_LINKS.every((l) => ids.has(l.from) && ids.has(l.to)));
+  const nodeOf = Object.fromEntries(QUARTER_NODES.map((n) => [n.id, n]));
+  assert.ok(QUARTER_LINKS.every((l) => nodeOf[l.from].quarter === nodeOf[l.to].quarter)); // inside a quarter only: the links between quarters are the flows
+  assert.ok(QUARTER_LINKS.filter((l) => l.kind === 'down').every((l) => nodeOf[l.to].row === nodeOf[l.from].row + 1)); // a vertical arrow joins neighbours
+  assert.ok(QUARTER_LINKS.filter((l) => l.kind === 'left').every((l) => nodeOf[l.to].row > nodeOf[l.from].row)); // a fork goes down
+  assert.ok(QUARTER_FLOWS.every((f) => f.to > f.from && QUARTERS.length > f.to && (f.to - f.from === 1 ? !f.lane : ['top', 'bottom'].includes(f.lane)))); // a flow that skips a quarter goes around it
   assert.equal(new Set(QUARTER_NODES.map((n) => `${n.quarter}:${n.row}`)).size, QUARTER_NODES.length); // no two cards in one place
   const adsMeta = litNodes('ads', ['meta']);
   assert.deepEqual([...adsMeta].sort(), ['meta_analyst', 'meta_optimizer', 'tracking_integrity']);
