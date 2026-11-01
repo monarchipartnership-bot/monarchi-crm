@@ -506,7 +506,7 @@ function interior(key, g, W, D, ticks, round, assets) {
   } else if (key === 'performance-creative') { // a real studio: paintings, paint, easels, sculpture, a photo corner, a swatch board
     const a2 = artTex('#c9a4f0', '#8f5bd6', '#3a1a66'), a3 = artTex('#ffd0b0', '#f59b5b', '#a8500f'), a4 = artTex('#d9a6df', '#b544b5', '#270827'), a5 = artTex('#bfe8ff', '#7c8cf8', '#2a2a7a');
     [[artTex(), -3.0, 3.5, 2.2, 1.7], [a2, -0.55, 3.8, 1.5, 2.0], [a3, 1.8, 3.4, 2.4, 1.8]].forEach(([t, x, y, w, h]) => { box(g, w + 0.24, h + 0.24, 0.1, C.white, x, y - h / 2 - 0.12, bz, 0.04); plane(g, w, h, t, x, y, bz + 0.07); });
-    plane(g, 5.2, 1.15, neonTex('КРЕАТИВ'), 0, 5.75, bz + 0.07, 0, 0, true);
+    plane(g, 5.2, 1.15, neonTex(SIGN_OWN || 'КРЕАТИВ'), 0, 5.75, bz + 0.07, 0, 0, true);
     [[a4, -1.3, 3.5, 1.6, 2.0], [a5, 1.3, 3.8, 1.6, 2.0]].forEach(([t, z, y, w, h]) => { box(g, 0.1, h + 0.24, w + 0.24, C.white, bx, y - h / 2 - 0.12, z, 0.04); plane(g, w, h, t, bx + 0.07, y, z, Math.PI / 2); });
     const placeAt = (n, x, z, ry, s2, color) => { const o = add(n, x, z, ry, s2); if (color) tint(o, color); return o; };
     placeAt('supply_shelf', -W / 2 + 0.55, 0, Math.PI / 2, 1.0);
@@ -585,10 +585,11 @@ function padTop(w, d) { const t = padTexBase.clone(); t.needsUpdate = true; t.wr
 
 // ---------- the building
 // sandbox: a department may borrow the silhouette of another one (dept.shape) while keeping its own name on the sign and its own key
+let SIGN_OWN = null; // the sign word of a department that borrows another's building (set while it is built), for the neon sign inside
 export function createBuilding(dept, assets, idx) {
   if (!dept.shape) return createBuildingImpl(dept, assets, idx);
-  const saved = SIGN[dept.shape]; SIGN[dept.shape] = SIGN[dept.key] || saved;
-  try { const b = createBuildingImpl({ ...dept, key: dept.shape }, assets, idx); b.root.userData.key = dept.key; return b; } finally { SIGN[dept.shape] = saved; }
+  const saved = SIGN[dept.shape]; SIGN[dept.shape] = SIGN[dept.key] || saved; SIGN_OWN = SIGN[dept.key] || null;
+  try { const b = createBuildingImpl({ ...dept, key: dept.shape }, assets, idx); b.root.userData.key = dept.key; return b; } finally { SIGN[dept.shape] = saved; SIGN_OWN = null; }
 }
 function createBuildingImpl(dept, assets, idx) {
   const key = dept.key, n = dept.agents.length;

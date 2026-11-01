@@ -10,13 +10,13 @@ import { nightNow } from './nightRule';
 const WORLD_DEPTS = ['management', 'strategy-research', 'performance-creative', 'performance-delivery', 'data-tracking-reporting', 'client-success', 'sales', 'client-research', 'client-creative', 'client-ads', 'client-reports', 'internal', 'social'];
 const KEEP_ALIVE_MS = 3 * 60 * 1000;
 
-// AGENT_DEPTS (departments → functions → agents) to the flat shape the scene draws: one building per department, one desk per agent.
+// AGENT_DEPTS (departments → functions → agents) to the flat shape the scene draws: one building per department, one desk per agent (chat tools such as the Аналітик-чат have no desk).
 function toWorldDepts(agentDepts) {
   return Object.entries(agentDepts)
     .filter(([key]) => WORLD_DEPTS.includes(key))
     .map(([key, d]) => ({
       key, label: d.label, subtitle: d.subtitle || '',
-      agents: (d.subcategories || []).flatMap((sc) => sc.agents.map((a) => ({ key: a.key, name: a.name, status: a.status }))),
+      agents: (d.subcategories || []).flatMap((sc) => sc.agents.filter((a) => !a.isTool).map((a) => ({ key: a.key, name: a.name, status: a.status }))),
     }));
 }
 
