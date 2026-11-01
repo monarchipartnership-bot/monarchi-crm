@@ -41,6 +41,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/creativeMake.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
+import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
@@ -2329,6 +2330,34 @@ await ok('Excel of a report: ONE sheet with the table, the texts at its right an
   assert.equal(sheet.getImages().length, 2); // the two weeks have a picture each, the month has none
   assert.equal(rowsOf('Most effective creatives').length, 2); // and the band of the creatives only where there are some
   assert.equal(textOf(sheet.getCell(find(sheet, 'What was done').row + 1, find(sheet, 'What was done').col)), 'We tested new hooks 1');
+});
+
+await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
+  assert.deepEqual(MODE_ORDER, ['creative', 'full', 'strategy', 'ads', 'report']);
+  assert.equal(MODE_ORDER.filter((m) => MODES[m].safe).join(), 'creative'); // only «Тільки креативи» is the safe one (nothing starts by itself)
+  assert.deepEqual(modeRoles('creative', ['meta', 'google']), []); // the department is not a part of the campaign team
+  assert.deepEqual(modeRoles('strategy', ['meta']), ['business_research', 'competitor_research', 'audience_research', 'marketing_strategist']); // no channel needed
+  assert.deepEqual(modeRoles('ads', ['meta']), ['meta_analyst', 'tracking_integrity', 'meta_optimizer']); // the channel decides: no Google, no TikTok
+  assert.deepEqual(modeRoles('ads', ['google', 'tiktok']), ['google_analyst', 'tiktok_analyst', 'tracking_integrity', 'google_optimizer']);
+  assert.deepEqual(modeRoles('report', ['meta']), ['cross_channel_report', 'account_manager']);
+  const full = modeRoles('full', ['meta', 'google']);
+  assert.equal(full.length, 11); // 4 research and strategy, 2 analysts, tracking, 2 optimizers, the report and the account manager
+  for (const m of MODE_ORDER) for (const r of modeRoles(m, ['meta', 'google', 'tiktok'])) assert.ok(!LEGACY_CREATIVE_ROLES.includes(r), `${m}: ${r}`);
+  assert.deepEqual(MODE_ORDER.map((m) => modeHasDepartment(m, true)), [true, true, false, false, false]);
+  assert.equal(modeHasDepartment('full', false), false); // the department of the full campaign can be left out
+  assert.equal(modeEstimate('strategy', []), 0.28); // 4 agents x 0.07
+  assert.equal(modeEstimate('creative', ['meta']), 0); // nothing is spent before the first request
+  // the scheme: every link joins two nodes, the lit set follows the mode and the channels, the planned agent never glows
+  const ids = new Set(QUARTER_NODES.map((n) => n.id));
+  assert.ok(QUARTER_LINKS.every((l) => ids.has(l.from) && ids.has(l.to)));
+  assert.equal(new Set(QUARTER_NODES.map((n) => `${n.quarter}:${n.row}`)).size, QUARTER_NODES.length); // no two cards in one place
+  const adsMeta = litNodes('ads', ['meta']);
+  assert.deepEqual([...adsMeta].sort(), ['meta_analyst', 'meta_optimizer', 'tracking_integrity']);
+  assert.equal(adsMeta.has('tiktok_optimizer'), false);
+  assert.equal(litNodes('creative', []).size, 6); // the six agents of the department
+  assert.equal(litNodes('creative', [], { optional: { creative_analyst: false } }).has('creative_analyst'), false);
+  assert.equal(litNodes('full', ['meta', 'google'], { departmentWanted: false }).has('creative_maker'), false);
+  assert.equal(litNodes('strategy', ['meta']).has('creative_maker'), false);
 });
 
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {

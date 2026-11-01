@@ -247,3 +247,29 @@ textarea.cmp-input { resize: vertical; }
 .cmp-legend--scheme i.is-dash { border-top-width: 2px; border-top-style: dashed; }
 .cmp-step3--creative { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
 @media (max-width: 980px) { .cmp-modecards, .cmp-step3--creative { grid-template-columns: minmax(0, 1fr); } }
+.cmp-node.is-planned .cmp-node-box { stroke-dasharray: 5 4; fill: transparent; }
+.cmp-node-soon { fill: #F2B94B; font: 800 9px var(--font-head); letter-spacing: .08em; }
+.cmp-diagram--quarters { min-width: 0; }
+
+/* ---- mode picker B: a list with radios and the panel of the chosen mode ---- */
+.cmp-modepick { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 14px; align-items: start; margin-top: 6px; }
+.cmp-modelist { display: flex; flex-direction: column; gap: 8px; }
+.cmp-moderow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 14px 8px 10px; border: 0; border-radius: 999px; background: rgba(53, 17, 63, .55); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F9EDF9; font: inherit; text-align: left; cursor: pointer; }
+.cmp-moderow b { display: block; font: 800 .9rem var(--font-head); line-height: 1.2; }
+.cmp-moderow small { font-size: .72rem; color: #C193CA; }
+.cmp-moderow.is-on { box-shadow: inset 0 0 0 2.5px #D26AD2, 0 0 0 4px rgba(181, 68, 181, .24); }
+.cmp-moderow:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 3px; }
+.cmp-radio { margin-left: auto; flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(235, 156, 239, .45); }
+.cmp-moderow.is-on .cmp-radio { background: radial-gradient(circle, #fff 0 3px, #B544B5 3.5px); box-shadow: none; }
+.cmp-modeicon--sm { width: 34px; height: 34px; }
+.cmp-modeicon--sm svg { width: 18px; height: 18px; }
+.cmp-modepanel { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border-radius: 22px; background: rgba(53, 17, 63, .55); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.cmp-who { display: flex; flex-direction: column; gap: 6px; }
+.cmp-who small { font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #C193CA; }
+.cmp-who-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cmp-whochip { padding: 3px 11px; border-radius: 999px; background: rgba(235, 156, 239, .14); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); font-size: .76rem; font-weight: 600; color: #F2DDF4; }
+.cmp-whochip.is-dept { background: rgba(95, 224, 161, .1); box-shadow: inset 0 0 0 1.5px rgba(95, 224, 161, .3); }
+@media (max-width: 980px) { .cmp-modepick { grid-template-columns: minmax(0, 1fr); } }
+.cmp-diagram--quarters .cmp-stage-title { font-size: 9.5px; letter-spacing: .05em; }
+.cmp-diagram--quarters .cmp-node-name { font-size: 11.5px; }
+.cmp-diagram--quarters .cmp-node-short { font-size: 8.8px; }
