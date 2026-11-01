@@ -38,7 +38,7 @@ const LAYOUT = {
   ],
   parks: [[-1, 0]], strip: [], strip2: [[0, 1], [0, 2]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [1, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
   water: [{ w: 9, pts: [[-170, -52], [-100, -44], [-30, -52], [30, -46], [100, -54], [170, -48]] }, { w: 7, pts: [[-47, -40], [-52, 10], [-44, 60], [-50, 120], [-46, 170]] }],
-  home: [8, -6], viewH: 170, lim: 120, range: 4, lamp: 112, lampStreets: [-80, -48, -16, 16, 48, 80], vx: [-16, 16, 48],
+  home: [8, -6], viewH: 170, pan: [-80, 112, -112, 112], lim: 120, range: 4, lamp: 112, lampStreets: [-80, -48, -16, 16, 48, 80], vx: [-16, 16, 48],
   districts: [
     { n: 'Клієнтський район', sub: 'проєкти клієнтів · 4 квартали', slots: ['client-research', 'client-creative', 'client-ads', 'client-reports'] },
     { n: 'Адміністративний район', sub: 'нагляд за агентами', slots: ['admin'] },
@@ -90,8 +90,8 @@ controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGH
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
 controls.screenSpacePanning = false; controls.zoomToCursor = true;
 controls.minZoom = 0.95; controls.maxZoom = 4.5 * VIEW_H / 88; controls.zoomSpeed = 3.0 * Math.sqrt(ZK); // about ten wheel notches from the whole city to a desk (it was 0.9: over thirty)
-controls.minPolarAngle = 0.72; controls.maxPolarAngle = 1.12;
-controls.minAzimuthAngle = Math.PI / 4 - 0.62; controls.maxAzimuthAngle = Math.PI / 4 + 0.62;
+controls.minPolarAngle = 0.8; controls.maxPolarAngle = 1.05;
+controls.minAzimuthAngle = Math.PI / 4 - 0.36; controls.maxAzimuthAngle = Math.PI / 4 + 0.36; // the turn is small on purpose: the map is read from one side
 controls.target.copy(HOME); controls.update();
 const HOME_OFFSET = camera.position.clone().sub(controls.target); // the standard viewing angle
 
@@ -358,6 +358,7 @@ const districtLabels = LAY.districts.map((dd) => {
   const present = dd.slots.map((id) => LAY.slots.find((q) => q.id === id)).filter((sl) => [...slotOf.values()].includes(sl));
   if (!present.length) return null;
   const el = document.createElement('div'); el.className = 'district-label'; el.innerHTML = `<b>${dd.n}</b><small>${dd.sub}</small>`; labelLayer.appendChild(el);
+  const cx = present.reduce((a, sl) => a + sl.cell[0] * GRID, 0) / present.length, cz = present.reduce((a, sl) => a + sl.cell[1] * GRID, 0) / present.length;
   if (present.length === 1) {
     const key = [...slotOf].find(([, v]) => v === present[0])[0], dl = deptLabels.find((q) => q.d.key === key), d0 = dl.d;
     const cnt = (st) => d0.agents.filter((a) => a.status === st).length;
@@ -365,8 +366,7 @@ const districtLabels = LAY.districts.map((dd) => {
     el.innerHTML = `<b>${dd.n}</b><small>${dd.sub} · ${d0.agents.length} ${plural(d0.agents.length)}</small><span class="dl-st"><span><i class="s-live"></i>${cnt('live')}</span><span><i class="s-dev"></i>${cnt('in_development')}</span><span><i class="s-plan"></i>${cnt('not_started')}</span></span>`;
     el.addEventListener('click', () => user.dept(key));
   }
-  else present.forEach((sl) => { const k = [...slotOf].find(([, v]) => v === sl)[0], dl = deptLabels.find((q) => q.d.key === k); if (dl) dl.quarter = true; }); // the quarters' own flags would pile up over the whole district: the plaque stands for them until you come closer
-  const cx = present.reduce((a, sl) => a + sl.cell[0] * GRID, 0) / present.length, cz = present.reduce((a, sl) => a + sl.cell[1] * GRID, 0) / present.length;
+  else { el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.addEventListener('click', () => user.district(cx, cz, present.length)); present.forEach((sl) => { const k = [...slotOf].find(([, v]) => v === sl)[0], dl = deptLabels.find((q) => q.d.key === k); if (dl) dl.quarter = true; }); } // the quarters' own flags would pile up over the whole district: the plaque stands for them until you come closer; a click on the plaque brings the whole district into view
   return { el, pos: new THREE.Vector3(cx, present.length > 1 ? 46 : 30, cz + 4) };
 }).filter(Boolean);
 const STATUS_DOT = { live: 'live', in_development: 'dev', not_started: 'plan' };
@@ -485,12 +485,14 @@ const api = {
   selectAgent(deptKey, agentKey) { autoFocused = false; state.dept = deptKey; state.agent = agentKey; applySelection(); const b = buildings.get(deptKey), rb = b.robots.find((r) => r.userData.agent === agentKey), wp = rb.getWorldPosition(new THREE.Vector3()); flyTo(b.pos.clone().lerp(wp, 0.45).add(new THREE.Vector3(0, 1.5, 0)), zoomFor(b) * 1.15); },
   zoom(f) { flyTo(controls.target.clone(), THREE.MathUtils.clamp(camera.zoom * f, controls.minZoom, controls.maxZoom), 350); },
   rotate(rad) { const off = camera.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.theta = THREE.MathUtils.clamp(sph.theta + rad, controls.minAzimuthAngle, controls.maxAzimuthAngle); const to = new THREE.Vector3().setFromSpherical(sph), from = camera.position.clone().sub(controls.target), t0 = performance.now(); const step = () => { const k = Math.min(1, (performance.now() - t0) / 450); camera.position.copy(controls.target).add(from.clone().lerp(to, ease(k))); if (k < 1) requestAnimationFrame(step); }; step(); },
+  district(x, z, n) { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(new THREE.Vector3(x, 0, z + 2), n > 1 ? 1.75 : 2.4); }, // a district of several buildings: all of them in view, none opened
   reset() { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(HOME, 1, 650, HOME_OFFSET); },
   clear() { api.reset(); },
   buildings,
 };
 const user = { // what a person does on the map: move the camera and tell the page, which owns the real state
   dept(k) { api.selectDept(k); opts.onFocusDept?.(k); },
+  district(x, z, n) { api.district(x, z, n); opts.onReset?.(); },
   agent(d, k) { api.selectAgent(d, k); opts.onOpenAgent?.(d, k); },
   reset() { api.reset(); opts.onReset?.(); },
 };
@@ -548,7 +550,7 @@ function frame() {
   dn.update(dt);
   if (halo) halo.material.size = 30 * Math.min(1.8, Math.max(0.85, Math.pow(camera.zoom, 0.55)));
   buildings.forEach((b) => { b.setOpen((state.dept === b.key && camera.zoom > 1.15 * ZK) || autoKey === b.key); b.update(dt, t, reduce); });
-  deptLabels.forEach((l) => { const dim = l.b.open > 0.2 || (l.quarter && camera.zoom < 1.5 * ZK); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } });
+  deptLabels.forEach((l) => { const dim = l.b.open > 0.2 || (l.quarter && camera.zoom < 1.45); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } });
   agentLabels.forEach((l) => { const show = buildings.get(l.dept).open > 0.55; if (l.el.hidden === show) l.el.hidden = !show; });
   if (!reduce) tickCarts(dt, t);
   tickRoutes(dt, clock.elapsedTime);
@@ -558,7 +560,12 @@ function frame() {
   if (atMin && !wasAtMin && !tween) { const off = camera.position.clone().sub(controls.target); if (state.dept || controls.target.distanceTo(HOME) > 0.6 || off.distanceTo(HOME_OFFSET) > 0.6) user.reset(); }
   wasAtMin = atMin;
   stepTween(performance.now());
-  { const lim = 8 + (LAY.lim - 8) * Math.min(1, Math.max(0, (camera.zoom / ZK - 1) / 0.5)); controls.target.x = THREE.MathUtils.clamp(controls.target.x, -lim, lim); controls.target.z = THREE.MathUtils.clamp(controls.target.z, -lim, lim); } // the working zone only: far out you see the whole zone, closer in you can reach its edges, never the outskirts
+  { // the camera may reach every district: the room to move opens with the zoom (none when the whole city is in view) and is the box around all of them
+    const s = THREE.MathUtils.smoothstep(camera.zoom, controls.minZoom + 0.05, controls.minZoom + 0.75), B = LAY.pan;
+    const x0 = THREE.MathUtils.lerp(HOME.x - 3, B[0], s), x1 = THREE.MathUtils.lerp(HOME.x + 3, B[1], s), z0 = THREE.MathUtils.lerp(HOME.z - 3, B[2], s), z1 = THREE.MathUtils.lerp(HOME.z + 3, B[3], s);
+    controls.target.x = THREE.MathUtils.clamp(controls.target.x, x0, x1); controls.target.z = THREE.MathUtils.clamp(controls.target.z, z0, z1);
+    if (!tween && camera.zoom < controls.minZoom + 0.12 && !state.dept) controls.target.lerp(HOME, 1 - Math.exp(-4 * dt)); // zoomed all the way out: the city settles back to the centre
+  } // the working zone only: far out you see the whole zone, closer in you can reach its edges, never the outskirts
   controls.update();
   sun.position.copy(controls.target).add(SUN_OFF); sun.target.position.copy(controls.target); sun.target.updateMatrixWorld();
   updateFocus(); updateLabels();
