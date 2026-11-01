@@ -37,7 +37,9 @@ const LAYOUT = {
     { id: 'social', keys: ['social'], shape: 'performance-creative', cell: [0, 3] },
   ],
   parks: [[-1, 0]], strip: [], strip2: [[0, 1], [0, 2]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [1, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
-  water: [{ w: 9, pts: [[-170, -52], [-100, -44], [-30, -52], [30, -46], [100, -54], [170, -48]] }, { w: 7, pts: [[-47, -40], [-52, 10], [-44, 60], [-50, 120], [-46, 170]] }],
+  // the waters run through whole rows and columns of blocks, never along a street: the streets run beside them and cross them by bridges at right angles
+  water: [{ w: 9, pts: [[-170, -34], [-100, -30], [-30, -34], [30, -30], [100, -34], [170, -30]] }, { w: 7, pts: [[-96, -32], [-97, 10], [-95, 60], [-96, 120], [-96, 170]] }],
+  bank: [[-4, -1], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [4, -1], [-3, 0], [-3, 1], [-3, 2], [-3, 3], [-3, 4]],
   home: [8, -6], viewH: 170, pan: [-80, 112, -112, 112], lim: 120, range: 4, lamp: 112, lampStreets: [-80, -48, -16, 16, 48, 80], vx: [-16, 16, 48],
   districts: [
     { n: 'Клієнтський район', sub: 'проєкти клієнтів · 4 квартали', slots: ['client-research', 'client-creative', 'client-ads', 'client-reports'] },
@@ -163,13 +165,17 @@ const parkTicks = [];
 const parkLamps = [];
 PARKS.forEach(([i, j]) => buildPark(world, blockCentre(i, j), assets, BLOCK, parkTicks, parkLamps));
 // ---- forests, long green squares, two waters with bridges
-const reserved = new Set([...Object.values(PLOT), ...PARKS, ...(LAY.strip || []), ...(LAY.strip2 || []), ...(LAY.forest || [])].map(([i, j]) => i + ',' + j));
+const reserved = new Set([...Object.values(PLOT), ...PARKS, ...(LAY.strip || []), ...(LAY.strip2 || []), ...(LAY.forest || []), ...(LAY.bank || [])].map(([i, j]) => i + ',' + j));
 const waterCurves = (LAY.water || []).map((sp) => { const curve = new THREE.CatmullRomCurve3(sp.pts.map(([x, z]) => new THREE.Vector3(x, 0, z))); return { sp, curve, P: curve.getSpacedPoints(Math.max(8, Math.round(curve.getLength() / 2))) }; });
 function nearWater(x, z, r) { return waterCurves.some(({ sp, P }) => P.some((q) => Math.hypot(q.x - x, q.z - z) < r + sp.w / 2)); }
 (LAY.forest || []).forEach(([i, j]) => {
   const c = blockCentre(i, j), lawn = new THREE.Mesh(new RoundedBoxGeometry(BLOCK - 1.2, 0.12, BLOCK - 1.2, 2, 0.4), mat(0xddcdf0, { rough: 0.95 })); lawn.position.set(c.x, 0.2, c.z); lawn.receiveShadow = true; world.add(lawn);
   const nearPlot = (x, z) => Object.values(PLOT).some(([pi, pj]) => Math.abs(x - pi * GRID) < 12 && Math.abs(z - pj * GRID) < 12);
-  for (let t = 0, k = 0; t < 600 && k < 64; t++) { const x = c.x + (rng() - 0.5) * (BLOCK - 2), z = c.z + (rng() - 0.5) * (BLOCK - 2); if (nearPlot(x, z)) continue; trees.push([x, z, 1.1 + rng() * 1.1]); k++; }
+  for (let t = 0, k = 0; t < 600 && k < 64; t++) { const x = c.x + (rng() - 0.5) * (BLOCK - 5), z = c.z + (rng() - 0.5) * (BLOCK - 5); if (nearPlot(x, z)) continue; trees.push([x, z, 1.1 + rng() * 1.1]); k++; }
+});
+(LAY.bank || []).forEach(([i, j]) => { // a block that carries water: a lawn with a few trees well away from the water and the streets
+  const c = blockCentre(i, j), lawn = new THREE.Mesh(new RoundedBoxGeometry(BLOCK - 1.2, 0.12, BLOCK - 1.2, 2, 0.4), mat(0xe3d3f1, { rough: 0.95 })); lawn.position.set(c.x, 0.2, c.z); lawn.receiveShadow = true; world.add(lawn);
+  for (let t = 0, k = 0; t < 200 && k < 7; t++) { const x = c.x + (rng() - 0.5) * (BLOCK - 7), z = c.z + (rng() - 0.5) * (BLOCK - 7); if (nearWater(x, z, 5.5)) continue; trees.push([x, z, 1.0 + rng() * 0.8]); k++; }
 });
 [...(LAY.strip || []).map((c) => [...c, 'x']), ...(LAY.strip2 || []).map((c) => [...c, 'z'])].forEach(([i, j, ax]) => { // a long green square: lawn, a stone walk down the middle, a double row of trees, benches
   const c0 = blockCentre(i, j), lawn = new THREE.Mesh(new RoundedBoxGeometry(BLOCK, 0.14, BLOCK, 2, 0.4), mat(0xe3d3f1, { rough: 0.95 })); lawn.position.set(c0.x, 0.2, c0.z); lawn.receiveShadow = true; world.add(lawn);
@@ -186,8 +192,9 @@ function waterStrip(P, w, y, material) {
 }
 const waterMat = new THREE.MeshStandardMaterial({ color: 0xa9bef2, roughness: 0.16, metalness: 0.05, emissive: 0x6f86d8, emissiveIntensity: 0.14, side: THREE.DoubleSide });
 const bankMat = new THREE.MeshStandardMaterial({ color: 0xfdf8fe, roughness: 0.9, side: THREE.DoubleSide });
-waterCurves.forEach(({ sp, P }) => {
-  waterStrip(P, sp.w + 3.6, 0.27, bankMat); waterStrip(P, sp.w, 0.31, waterMat);
+const bridgeRects = []; // {axis, x, z, half}: where a deck lifts the road, for the vans
+waterCurves.forEach(({ sp, P }, wi) => {
+  waterStrip(P, sp.w + 3.6, 0.27 + wi * 0.001, bankMat); waterStrip(P, sp.w, 0.31 + wi * 0.001, waterMat);
   // bridges where the streets cross it
   const along = sp.axis || (Math.abs(sp.pts[0][1] - sp.pts[sp.pts.length - 1][1]) > Math.abs(sp.pts[0][0] - sp.pts[sp.pts.length - 1][0]) ? 'z' : 'x');
   STREETS.forEach((st) => { for (let k = 1; k < P.length; k++) {
@@ -195,6 +202,8 @@ waterCurves.forEach(({ sp, P }) => {
     if ((va - st) * (vb - st) >= 0) continue;
     const f = (st - va) / (vb - va), x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f, L = sp.w + 6;
     const Wd = ROADW + 0.6;
+    bridgeRects.push({ axis: along === 'z' ? 'x' : 'z', x, z, half: L / 2 });
+    for (let u = -L / 2 + 2.4; u <= L / 2 - 2; u += 4.2) { if (along === 'z') box(world, 1.6, 0.03, 0.2, C.white, x + u, 0.32, z, 0.02); else box(world, 0.2, 0.03, 1.6, C.white, x, 0.32, z + u, 0.02); } // the lane dashes go on over the bridge
     if (along === 'z') { box(world, L, 0.34, Wd, C.cream, x, 0.14, z, 0.1); box(world, L, 0.5, 0.25, C.plum, x, 0.48, z - Wd / 2 + 0.125, 0.08); box(world, L, 0.5, 0.25, C.plum, x, 0.48, z + Wd / 2 - 0.125, 0.08); }
     else { box(world, Wd, 0.34, L, C.cream, x, 0.14, z, 0.1); box(world, 0.25, 0.5, L, C.plum, x - Wd / 2 + 0.125, 0.48, z, 0.08); box(world, 0.25, 0.5, L, C.plum, x + Wd / 2 - 0.125, 0.48, z, 0.08); }
   } });
@@ -203,7 +212,8 @@ waterCurves.forEach(({ sp, P }) => {
 
 // the margins of the central blocks: a few trees where the pads leave room
 buildForecourts(world, plots, assets, { BLOCK, FRONT, rng }); // lawn, paved apron, hedges, beds, benches, trees, a car bay and bollards round every building
-{ // trees as three instanced meshes
+{ // trees as three instanced meshes (none on a road or in the water, even when a scatter put one there)
+  for (let q = trees.length - 1; q >= 0; q--) { const [tx, tz] = trees[q]; if (STREETS.some((st) => Math.abs(tx - st) < ROADW / 2 + 1.3 || Math.abs(tz - st) < ROADW / 2 + 1.3) || nearWater(tx, tz, 2)) trees.splice(q, 1); }
   const N = Math.max(1, trees.length), trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.14, 1, 8), mat(C.deep), N), c1 = new THREE.InstancedMesh(new THREE.SphereGeometry(0.7, 14, 10), mat(0xffffff, { rough: 0.8 }), N), c2 = new THREE.InstancedMesh(new THREE.SphereGeometry(0.45, 12, 8), mat(0xffffff, { rough: 0.8 }), N);
   const o = new THREE.Object3D(), col = new THREE.Color(); const cols = [C.pink, C.mid, 0xe3a4f0, 0xf6cdf0, 0xc9a4f0];
   trees.forEach(([x, z, s], n) => {
@@ -217,7 +227,13 @@ buildForecourts(world, plots, assets, { BLOCK, FRONT, rng }); // lawn, paved apr
 }
 // street lamps along every street of the work zone (plus the lamps of the parks); at night each casts a pool of light and a halo
 const lampPts = [];
-LAY.lampStreets.forEach((st) => { for (let u = -LAY.lamp, k = 0; u <= LAY.lamp; u += 16, k++) { const side = k % 2 ? 1 : -1; if (!nearWater(u, st + 2.9 * side, 7)) lampPts.push([u, st + 2.9 * side]); if (!nearWater(st + 2.9 * side, u, 7)) lampPts.push([st + 2.9 * side, u]); } });
+LAY.lampStreets.forEach((st) => { // two lamps per block side, at ±8 from the block centre: never in a crossing, alternating sides
+  for (let i = -LAY.range; i <= LAY.range; i++) for (const du of [-8, 8]) {
+    const u = i * GRID + du, side = (i + (du > 0 ? 1 : 0)) % 2 ? 1 : -1, off = st + 2.9 * side;
+    if (!nearWater(u, off, 7) && Math.abs(u) <= LAY.lamp) lampPts.push([u, off]);
+    if (!nearWater(off, u, 7) && Math.abs(u) <= LAY.lamp) lampPts.push([off, u]);
+  }
+});
 instancedProto(world, assets, 'lamp_post', lampPts.map(([x, z]) => [x, z, 1.0]));
 const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x, z]) => [x, z, 2.5])];
 {
@@ -233,12 +249,13 @@ const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x,
   winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping;
   const tints = [0xeceaf8, 0xe6e6f6, 0xf0eefa, 0xe2e3f4, 0xeeeefa];
   for (let i = -LAY.range; i <= LAY.range; i++) for (let j = -LAY.range; j <= LAY.range; j++) {
-    if (reserved.has(i + ',' + j) || nearWater(i * GRID, j * GRID, 26)) continue;
+    if (reserved.has(i + ',' + j)) continue;
     const c = blockCentre(i, j), far = Math.max(Math.abs(i), Math.abs(j));
     if (rng() < 0.16) { const lawn = new THREE.Mesh(new RoundedBoxGeometry(BLOCK - 2, 0.1, BLOCK - 2, 2, 0.4), mat(0xe9d9f4, { rough: 0.95 })); lawn.position.set(c.x, 0.2, c.z); world.add(lawn); continue; }
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([qx, qz]) => {
       if (rng() < 0.15) return;
       const w = 8 + rng() * 4, d = 8 + rng() * 4, h = (2 + rng() * 3.6) * (far === 2 ? 1 : 0.85), x = c.x + qx * 7, z = c.z + qz * 7;
+      if (nearWater(x, z, Math.max(w, d) / 2 + 1)) return;
       const tex = winTex.clone(); tex.needsUpdate = true; tex.repeat.set(Math.max(1, Math.round(w / 3)), Math.max(1, Math.round(h / 3)));
       const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, 0.35), new THREE.MeshStandardMaterial({ color: tints[Math.floor(rng() * tints.length)], map: tex, roughness: 0.75 }));
       m.position.set(x, 0.14 + h / 2, z); m.castShadow = true; m.receiveShadow = true; world.add(m);
@@ -268,7 +285,8 @@ function laneOffset(points) {
   return { pts: out, raw };
 }
 function drive(cart, p, dt) { // sit on the road and turn smoothly towards the direction of travel
-  cart.position.set(p.x, 0.03, p.z);
+  let y = 0.03; for (const r of bridgeRects) { const d = r.half - Math.abs(r.axis === 'x' ? p.x - r.x : p.z - r.z), lat = Math.abs(r.axis === 'x' ? p.z - r.z : p.x - r.x); if (d > 0 && lat < ROADW) y = Math.max(y, 0.03 + 0.28 * Math.min(1, d / 1.6)); } // up the ramp onto a bridge deck and down again
+  cart.position.set(p.x, y, p.z);
   const target = -Math.atan2(p.dz, p.dx); let d = target - (cart.userData.ang ?? target); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   cart.userData.ang = (cart.userData.ang ?? target) + d * Math.min(1, dt * 9); cart.rotation.y = cart.userData.ang;
 }
