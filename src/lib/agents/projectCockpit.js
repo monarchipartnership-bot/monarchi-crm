@@ -60,13 +60,13 @@ export function buildStages(request, tasks, roleOf) {
 }
 
 // What waits for the person in one request.
-function requestAttention(request, tasks, creatives, roleOf, library) {
+function requestAttention(request, tasks, creatives, roleOf, library, { onlyReview = false } = {}) {
   const items = [];
   const mine = tasks.filter((t) => t.request_id === request.id);
   const made = creatives.filter((c) => c.request_id === request.id);
 
   // a step that stopped (and was not repeated successfully since)
-  STAGES.filter((s) => s.role).forEach((s) => {
+  STAGES.filter((s) => s.role && !onlyReview).forEach((s) => {
     const t = lastBy(mine, (x) => roleOf(x.agent_id) === s.role);
     if (t?.status === 'failed') {
       items.push({ id: `failed:${t.id}`, kind: 'failed_step', tone: 'problem', title: `Крок «${s.label}» зупинився`, text: clip(t.error, 400) || 'Крок завершився з помилкою.', requestId: request.id, taskId: t.id,
@@ -82,36 +82,36 @@ function requestAttention(request, tasks, creatives, roleOf, library) {
       actions: [{ key: 'approve_all', label: 'Схвалити всі', primary: true }, { key: 'return', label: 'Повернути з коментарем' }] });
   }
 
-  // what the agents ask: the notes of the steps that are done (the newest note of each step)
+  // what the agents ask: the notes of the steps that are done (the newest note of each step), ONE card per step with its points, the same note of two steps once
   const asked = new Set();
-  STAGES.filter((s) => ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker'].includes(s.role)).forEach((s) => {
+  STAGES.filter((s) => !onlyReview && ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker'].includes(s.role)).forEach((s) => {
     const t = lastBy(mine, (x) => roleOf(x.agent_id) === s.role && x.status === 'done');
     const notes = t?.notes ?? t?.output?.json?.notes;
-    splitNotes(typeof notes === 'string' ? notes : '').forEach((text) => {
-      const id = `question:${request.id}:${hashText(text)}`;
-      if (asked.has(id)) return;
-      asked.add(id);
-      items.push({ id, kind: 'question', tone: 'attention', title: `Питання від кроку «${s.label}»`, text, requestId: request.id, actions: [{ key: 'dismiss', label: 'Зрозуміло' }] });
-    });
+    const points = splitNotes(typeof notes === 'string' ? notes : '');
+    if (!points.length) return;
+    const id = `question:${request.id}:${hashText(points.join('|'))}`;
+    if (asked.has(id)) return;
+    asked.add(id);
+    items.push({ id, kind: 'question', tone: 'attention', title: `Питання від кроку «${s.label}»`, text: points.length > 1 ? points.map((p, i) => `${i + 1}) ${p}`).join('\n') : points[0], requestId: request.id, actions: [{ key: 'dismiss', label: 'Зрозуміло' }] });
   });
 
   // remarks of the quality control
   const qc = lastBy(mine, (x) => roleOf(x.agent_id) === 'creative_quality' && x.status === 'done');
   const issues = Array.isArray(qc?.issues) ? qc.issues : Array.isArray(qc?.output?.json?.issues) ? qc.output.json.issues : [];
-  if (issues.length && ['review', 'problem'].includes(request.status)) {
+  if (issues.length && !onlyReview && ['review', 'problem'].includes(request.status)) {
     items.push({ id: `qc:${qc.id}`, kind: 'qc_remark', tone: 'attention', title: `Зауваження контролю якості: ${issues.length}`, requestId: request.id,
       text: issues.map((i) => `${i.severity === 'high' ? '● ' : '○ '}${i.concept ? `${i.concept}: ` : ''}${clip(i.comment, 240)}`).join('\n'), actions: [{ key: 'dismiss', label: 'Прийнято до відома' }] });
   }
 
   // no materials at all: the pictures would be made without references
-  if (['draft', 'running', 'review', 'problem'].includes(request.status) && !(request.materials || []).length && !library.assets) {
+  if (!onlyReview && ['draft', 'running', 'review', 'problem'].includes(request.status) && !(request.materials || []).length && !library.assets) {
     items.push({ id: `assets:${request.id}`, kind: 'missing_assets', tone: 'attention', title: 'Немає фото товару', requestId: request.id,
       text: 'У картці проєкту й запиті немає матеріалів: картинки будуть зроблені без референсів, менш точно.', actions: [{ key: 'upload_assets', label: 'Додати фото', primary: true }, { key: 'dismiss', label: 'Продовжити без фото' }] });
   }
 
   // the pictures are planned and nothing is being made: the person confirms the money
   const planned = made.filter((c) => ['planned', 'failed'].includes(c.status));
-  if (planned.length && !made.some((c) => c.status === 'producing') && ['review', 'running', 'problem'].includes(request.status)) {
+  if (planned.length && !onlyReview && !made.some((c) => c.status === 'producing') && ['review', 'running', 'problem'].includes(request.status)) {
     items.push({ id: `estimate:${request.id}`, kind: 'estimate', tone: 'attention', title: `Генерація: ${planned.length} картинок`, requestId: request.id,
       text: 'Спершу оцініть вартість (безкоштовно), потім підтвердіть генерацію.', estimate: null, actions: [{ key: 'estimate', label: 'Оцінити вартість', primary: true }] });
   }
@@ -129,7 +129,8 @@ export function buildCockpit(raw) {
   const active = live[0] || mine[0] || null;
 
   const attention = [];
-  live.slice(0, 4).forEach((r) => attention.push(...requestAttention(r, tasks, creatives, roleOf, library)));
+  // the newest open request is the work; an older one is shown only while pictures wait in it for the decision (its old stops and questions are history)
+  live.slice(0, 4).forEach((r, i) => attention.push(...requestAttention(r, tasks, creatives, roleOf, library, { onlyReview: i > 0 })));
   // a campaign agent (not a request step) that failed: a task of the campaign without a request
   tasks.filter((t) => t.campaign_id === campaign.id && !t.request_id && t.status === 'failed').slice(0, 5).forEach((t) => {
     attention.push({ id: `failed:${t.id}`, kind: 'failed_step', tone: 'problem', title: 'Агент кампанії зупинився', text: clip(t.error, 400) || 'Завдання завершилось помилкою.', requestId: null, taskId: t.id, actions: [{ key: 'retry_step', label: 'Повторити крок', primary: true }] });

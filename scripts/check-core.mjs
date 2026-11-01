@@ -2366,8 +2366,9 @@ await ok('project cabinet: the stage is the first step of the chain that is not 
   assert.equal(c.currentStageKey, 'you');
   assert.deepEqual(c.stages.filter((s) => s.parallel).map((s) => s.key), ['copy', 'maker']);
   const kinds = c.attention.map((i) => i.kind).sort();
-  assert.deepEqual(kinds, ['estimate', 'missing_assets', 'qc_remark', 'question', 'question', 'review']); // the same note of two steps is one question
-  assert.equal(c.waiting, 6);
+  assert.deepEqual(kinds, ['estimate', 'missing_assets', 'qc_remark', 'question', 'review']); // the same note of two steps is one question card
+  assert.equal(c.waiting, 5);
+  assert.match(c.attention.find((i) => i.kind === 'question').text, /^1\) Перекласти чи лишити оригінал\?\n2\) Не задано текст кнопки\.$/);
   assert.equal(c.tone, 'attention');
   const review = c.attention.find((i) => i.kind === 'review');
   assert.deepEqual(review.creatives.map((x) => x.id), [11]);
@@ -2376,6 +2377,10 @@ await ok('project cabinet: the stage is the first step of the chain that is not 
   assert.equal(c.attention.find((i) => i.kind === 'qc_remark').text.split('\n').length, 2);
   assert.equal(c.spend.model, 0.25); assert.equal(c.spend.higgsfield, 1.5); assert.equal(c.spend.total, 1.75);
   assert.equal(c.requests[0].creatives.review, 1);
+  // an older open request: its stops and notes are history, only pictures waiting for the decision count
+  const old = buildCockpit({ ...base, requests: [...base.requests, { id: 3, campaign_id: 4, status: 'problem', title: 'Older', materials: [{}], created_at: '2026-10-30T10:00:00Z' }], tasks: [...tasks, { id: 90, agent_id: 4, request_id: 3, campaign_id: 4, status: 'failed', error: 'old', created_at: '2026-10-30T10:01:00Z' }], creatives: [...creatives, { id: 31, request_id: 3, concept_key: 'c1', ratio: '4:5', status: 'review' }] });
+  assert.equal(old.attention.some((i) => i.kind === 'failed_step'), false);
+  assert.equal(old.attention.filter((i) => i.kind === 'review').length, 2);
   // a step that stopped makes the tone red and goes first; a repeated one that succeeded is not a problem any more
   const failed = buildCockpit({ ...base, tasks: [t(1, 1, 'done'), t(2, 2, 'failed', { error: 'Помилка моделі (401)' })], creatives: [] });
   assert.equal(failed.tone, 'problem');
