@@ -41,10 +41,12 @@ const signTex = (text) => canvasTex(512, 128, (c, w, h) => {
 });
 const floorTex = (a, b) => canvasTex(128, 128, (c, w, h) => { c.fillStyle = a; c.fillRect(0, 0, w, h); c.fillStyle = b; c.fillRect(0, 0, w / 2, h / 2); c.fillRect(w / 2, h / 2, w / 2, h / 2); });
 
-const SIGN = { management: 'КЕРУВАННЯ', sales: 'ПРОДАЖІ', 'client-success': 'КЛІЄНТИ', 'strategy-research': 'СТРАТЕГІЯ', 'performance-creative': 'КРЕАТИВИ', 'performance-delivery': 'РЕКЛАМА', 'data-tracking-reporting': 'ДАНІ' };
+const SIGN = { internal: 'САЙТ', social: 'СОЦМЕРЕЖІ', management: 'КЕРУВАННЯ', sales: 'ПРОДАЖІ', 'client-success': 'КЛІЄНТИ', 'strategy-research': 'СТРАТЕГІЯ', 'performance-creative': 'КРЕАТИВИ', 'performance-delivery': 'РЕКЛАМА', 'data-tracking-reporting': 'ДАНІ' };
 
 // ---------- shapes: every department gets its own silhouette (height, roof volumes, facade) so the purpose reads from afar
 const STYLE = {
+  internal: { H: 7.6, top: 10 },
+  social: { H: 6.8, top: 9 },
   management: { H: 11.5, top: 13.5 },
   sales: { H: 6.2, top: 7.4 },
   'client-success': { H: 7.0, top: 9.6, round: true },
@@ -582,7 +584,13 @@ const padTexBase = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#fcf6fd'; c
 function padTop(w, d) { const t = padTexBase.clone(); t.needsUpdate = true; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w / 2.4, d / 2.4); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }); }
 
 // ---------- the building
+// sandbox: a department may borrow the silhouette of another one (dept.shape) while keeping its own name on the sign and its own key
 export function createBuilding(dept, assets, idx) {
+  if (!dept.shape) return createBuildingImpl(dept, assets, idx);
+  const saved = SIGN[dept.shape]; SIGN[dept.shape] = SIGN[dept.key] || saved;
+  try { const b = createBuildingImpl({ ...dept, key: dept.shape }, assets, idx); b.root.userData.key = dept.key; return b; } finally { SIGN[dept.shape] = saved; }
+}
+function createBuildingImpl(dept, assets, idx) {
   const key = dept.key, n = dept.agents.length;
   const { cols, rows, W, D, H, round } = layoutFor(n, key);
   const st = STYLE[key] || { top: H + 5 };

@@ -7,7 +7,7 @@ import { nightNow } from './nightRule';
 // city fades in. The scene is kept alive for a few minutes when the section is left, so coming back is instant.
 // The page owns the state (which department is focused, which agent is open); the scene reports clicks and follows props.
 
-const WORLD_DEPTS = ['management', 'strategy-research', 'performance-creative', 'performance-delivery', 'data-tracking-reporting', 'client-success', 'sales'];
+const WORLD_DEPTS = ['management', 'strategy-research', 'performance-creative', 'performance-delivery', 'data-tracking-reporting', 'client-success', 'sales', 'client-research', 'client-creative', 'client-ads', 'client-reports', 'internal', 'social'];
 const KEEP_ALIVE_MS = 3 * 60 * 1000;
 
 // AGENT_DEPTS (departments → functions → agents) to the flat shape the scene draws: one building per department, one desk per agent.

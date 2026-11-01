@@ -21,8 +21,39 @@ const ICONS = {
 
 // The 3D map. `container` is an empty element; `opts`: { depts, onFocusDept(key), onOpenAgent(dept, agent), onReset(), debug }.
 // Returns { api, setRunStatus(map), setPaused(bool), dispose() }.
+
+// ------------------------------------------------------------ the map: five districts on the city grid, split by two waters, a long green square and a forest (approved 2026-11-01, variant B «Дві води»)
+// A slot is one building on a block of the grid. It takes the first department of the data whose key is listed (the old keys keep working while the registry is rebuilt)
+// and borrows the silhouette of `shape` (a department the scene already knows how to build).
+const LAYOUT = {
+  slots: [
+    { id: 'admin', keys: ['management'], shape: 'management', cell: [0, 0] },
+    { id: 'client-research', keys: ['client-research', 'strategy-research'], shape: 'strategy-research', cell: [1, -3] },
+    { id: 'client-creative', keys: ['client-creative', 'performance-creative'], shape: 'performance-creative', cell: [2, -3] },
+    { id: 'client-ads', keys: ['client-ads', 'performance-delivery'], shape: 'performance-delivery', cell: [1, -2] },
+    { id: 'client-reports', keys: ['client-reports', 'client-success'], shape: 'client-success', cell: [2, -2] },
+    { id: 'sales', keys: ['sales'], shape: 'sales', cell: [-2, 0] },
+    { id: 'internal', keys: ['internal', 'data-tracking-reporting'], shape: 'data-tracking-reporting', cell: [3, 1] },
+    { id: 'social', keys: ['social'], shape: 'performance-creative', cell: [0, 3] },
+  ],
+  parks: [[-1, 0]], strip: [], strip2: [[0, 1], [0, 2]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [1, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
+  water: [{ w: 9, pts: [[-170, -52], [-100, -44], [-30, -52], [30, -46], [100, -54], [170, -48]] }, { w: 7, pts: [[-47, -40], [-52, 10], [-44, 60], [-50, 120], [-46, 170]] }],
+  home: [8, -6], viewH: 170, lim: 120, range: 4, lamp: 112, lampStreets: [-80, -48, -16, 16, 48, 80], vx: [-16, 16, 48],
+  districts: [
+    { n: 'Клієнтський район', sub: 'проєкти клієнтів · 4 квартали', slots: ['client-research', 'client-creative', 'client-ads', 'client-reports'] },
+    { n: 'Адміністративний район', sub: 'нагляд за агентами', slots: ['admin'] },
+    { n: 'Продажний район', sub: 'нові клієнти', slots: ['sales'] },
+    { n: 'Внутрішній район', sub: 'SEO сайту Mon’Archi', slots: ['internal'] },
+    { n: 'Соціальний район', sub: 'наші соцмережі', slots: ['social'] },
+  ],
+};
+
 export async function createWorld(container, opts = {}) {
 const DEPTS = opts.depts;
+const LAY = LAYOUT;
+const ZK = LAY.viewH / 88; // the zoom steps below were tuned for a view 88 units tall; the wider map keeps the same look at the matching zoom
+const slotOf = new Map(); // department key -> slot
+LAY.slots.forEach((sl) => { const d = DEPTS.find((x) => sl.keys.includes(x.key)); if (d && !slotOf.has(d.key)) slotOf.set(d.key, sl); });
 let halo = null;
 const hookStart = hookMark();
 let disposed = false;
@@ -42,10 +73,10 @@ renderer.toneMapping = THREE.NeutralToneMapping;
 stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const VIEW_H = 88;
+const VIEW_H = LAY.viewH;
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -400, 800);
 const BASE_OFFSET = new THREE.Vector3(1, 0.95, 1).normalize().multiplyScalar(160);
-const HOME = new THREE.Vector3(-4, 0, -4);
+const HOME = new THREE.Vector3(LAY.home[0], 0, LAY.home[1]);
 camera.position.copy(BASE_OFFSET);
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight, a = w / h, H = Math.max(VIEW_H, 104 / a);
@@ -58,7 +89,7 @@ controls.enableDamping = true; controls.dampingFactor = 0.09;
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
 controls.screenSpacePanning = false; controls.zoomToCursor = true;
-controls.minZoom = 0.95; controls.maxZoom = 4.5; controls.zoomSpeed = 3.0; // about ten wheel notches from the whole city to a desk (it was 0.9: over thirty)
+controls.minZoom = 0.95; controls.maxZoom = 4.5 * VIEW_H / 88; controls.zoomSpeed = 3.0 * Math.sqrt(ZK); // about ten wheel notches from the whole city to a desk (it was 0.9: over thirty)
 controls.minPolarAngle = 0.72; controls.maxPolarAngle = 1.12;
 controls.minAzimuthAngle = Math.PI / 4 - 0.62; controls.maxAzimuthAngle = Math.PI / 4 + 0.62;
 controls.target.copy(HOME); controls.update();
@@ -86,9 +117,9 @@ function fadeTex() {
 }
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(270, 270), new THREE.MeshStandardMaterial({ color: ASPHALT, alphaMap: fadeTex(), transparent: true, roughness: 0.95 }));
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; world.add(ground);
-const RING_ORDER = ['strategy-research', 'performance-creative', 'performance-delivery', 'data-tracking-reporting', 'client-success', 'sales']; // the order of the chain (also the demo route)
-const PLOT = { management: [0, 0], 'strategy-research': [-1, 0], 'performance-creative': [-1, -1], 'performance-delivery': [-1, 1], 'data-tracking-reporting': [1, -1], 'client-success': [1, 0], sales: [1, 1] };
-const PARKS = [[0, 1], [0, -1]];
+const RING_ORDER = LAY.slots.filter((sl) => sl.id !== 'admin').map((sl) => [...slotOf].find(([, v]) => v === sl)?.[0]).filter(Boolean); // the order of the chain (also the demo route)
+const PLOT = Object.fromEntries([...slotOf].map(([k, sl]) => [k, sl.cell]));
+const PARKS = LAY.parks;
 // the zebra crossings sit where the door drives meet the street; the lane dashes leave them free
 const CROSSINGS = Object.values(PLOT).map(([i, j]) => [i * GRID, j * GRID + GRID / 2]);
 // lane dashes down the middle of every street (not across crossings)
@@ -100,14 +131,14 @@ const CROSSINGS = Object.values(PLOT).map(([i, j]) => [i * GRID, j * GRID + GRID
 const blockCentre = (i, j) => new THREE.Vector3(i * GRID, 0, j * GRID);
 // raised city blocks (the kerb), one per cell of the grid
 const blockMat = mat(KERB, { rough: 0.9 });
-for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { const b = new THREE.Mesh(new RoundedBoxGeometry(BLOCK, 0.2, BLOCK, 2, 0.5), blockMat); b.position.set(i * GRID, 0.04, j * GRID); b.receiveShadow = true; world.add(b); }
+for (let i = -LAY.range; i <= LAY.range; i++) for (let j = -LAY.range; j <= LAY.range; j++) { const b = new THREE.Mesh(new RoundedBoxGeometry(BLOCK, 0.2, BLOCK, 2, 0.5), blockMat); b.position.set(i * GRID, 0.04, j * GRID); b.receiveShadow = true; world.add(b); }
 
 // ------------------------------------------------------------ buildings: the pad's front edge sits 3.2 from the street, a drive runs from the door to the street
 const buildings = new Map();
 const pickables = [];
 const FRONT = BLOCK / 2 - 3.2; // front edge of every pad, relative to the block centre
 function addBuilding(d, cell, idx) {
-  const b = createBuilding(d, assets, idx), c = blockCentre(cell[0], cell[1]);
+  const sl = slotOf.get(d.key), b = createBuilding(sl && sl.shape !== d.key ? { ...d, shape: sl.shape } : d, assets, idx), c = blockCentre(cell[0], cell[1]);
   const pos = new THREE.Vector3(c.x, 0.14, c.z + FRONT - (b.D + 4.6) / 2);
   b.root.position.copy(pos); world.add(b.root);
   b.pos = pos.clone(); b.idx = idx; b.cell = c; b.door = new THREE.Vector3(c.x, 0.5, c.z + GRID / 2); // the middle of the street in front of the door
@@ -117,7 +148,7 @@ function addBuilding(d, cell, idx) {
   buildings.set(d.key, b); pickables.push(b.root);
   return b;
 }
-addBuilding(DEPTS.find((d) => d.key === 'management'), PLOT.management, -1);
+{ const adm = DEPTS.find((d) => slotOf.get(d.key)?.id === 'admin'); if (adm) addBuilding(adm, PLOT[adm.key], -1); }
 RING_ORDER.forEach((k, i) => addBuilding(DEPTS.find((d) => d.key === k), PLOT[k], i));
 
 // ------------------------------------------------------------ scenery
@@ -131,6 +162,45 @@ function scatterTrees(cx, cz, n, keepOut) { for (let t = 0, k = 0; t < 200 && k 
 const parkTicks = [];
 const parkLamps = [];
 PARKS.forEach(([i, j]) => buildPark(world, blockCentre(i, j), assets, BLOCK, parkTicks, parkLamps));
+// ---- forests, long green squares, two waters with bridges
+const reserved = new Set([...Object.values(PLOT), ...PARKS, ...(LAY.strip || []), ...(LAY.strip2 || []), ...(LAY.forest || [])].map(([i, j]) => i + ',' + j));
+const waterCurves = (LAY.water || []).map((sp) => { const curve = new THREE.CatmullRomCurve3(sp.pts.map(([x, z]) => new THREE.Vector3(x, 0, z))); return { sp, curve, P: curve.getSpacedPoints(Math.max(8, Math.round(curve.getLength() / 2))) }; });
+function nearWater(x, z, r) { return waterCurves.some(({ sp, P }) => P.some((q) => Math.hypot(q.x - x, q.z - z) < r + sp.w / 2)); }
+(LAY.forest || []).forEach(([i, j]) => {
+  const c = blockCentre(i, j), lawn = new THREE.Mesh(new RoundedBoxGeometry(BLOCK - 1.2, 0.12, BLOCK - 1.2, 2, 0.4), mat(0xddcdf0, { rough: 0.95 })); lawn.position.set(c.x, 0.2, c.z); lawn.receiveShadow = true; world.add(lawn);
+  const nearPlot = (x, z) => Object.values(PLOT).some(([pi, pj]) => Math.abs(x - pi * GRID) < 12 && Math.abs(z - pj * GRID) < 12);
+  for (let t = 0, k = 0; t < 600 && k < 64; t++) { const x = c.x + (rng() - 0.5) * (BLOCK - 2), z = c.z + (rng() - 0.5) * (BLOCK - 2); if (nearPlot(x, z)) continue; trees.push([x, z, 1.1 + rng() * 1.1]); k++; }
+});
+[...(LAY.strip || []).map((c) => [...c, 'x']), ...(LAY.strip2 || []).map((c) => [...c, 'z'])].forEach(([i, j, ax]) => { // a long green square: lawn, a stone walk down the middle, a double row of trees, benches
+  const c0 = blockCentre(i, j), lawn = new THREE.Mesh(new RoundedBoxGeometry(BLOCK, 0.14, BLOCK, 2, 0.4), mat(0xe3d3f1, { rough: 0.95 })); lawn.position.set(c0.x, 0.2, c0.z); lawn.receiveShadow = true; world.add(lawn);
+  const rot = (u, v) => (ax === 'z' ? [c0.x + v, c0.z + u] : [c0.x + u, c0.z + v]), c = { x: c0.x, z: c0.z };
+  const walk = new THREE.Mesh(new THREE.BoxGeometry(ax === 'z' ? 3.2 : BLOCK, 0.05, ax === 'z' ? BLOCK : 3.2), mat(0xfcf7fd, { rough: 0.9 })); walk.position.set(c0.x, 0.28, c0.z); walk.receiveShadow = true; world.add(walk);
+  for (let u = -12; u <= 12; u += 4.5) { const t1 = rot(u, -4.2), t2 = rot(u + 1.5, 4.2); trees.push([t1[0], t1[1], 1.0 + rng() * 0.5]); trees.push([t2[0], t2[1], 1.0 + rng() * 0.5]); if (Math.abs(u) > 8) { const t3 = rot(u, -10), t4 = rot(u + 2, 10); trees.push([t3[0], t3[1], 1.3 + rng() * 0.5]); trees.push([t4[0], t4[1], 1.3 + rng() * 0.5]); } }
+  { const b1 = rot(-6, -2.2), b2 = rot(6, 2.2); box(world, ax === 'z' ? 0.7 : 2.6, 0.5, ax === 'z' ? 2.6 : 0.7, C.cream, b1[0], 0.28, b1[1], 0.15); box(world, ax === 'z' ? 0.7 : 2.6, 0.5, ax === 'z' ? 2.6 : 0.7, C.cream, b2[0], 0.28, b2[1], 0.15); const l1 = rot(-8, -1.9), l2 = rot(8, 1.9); parkLamps.push(l1, l2); }
+});
+function waterStrip(P, w, y, material) {
+  const pos = [], idx = [];
+  P.forEach((q, k) => { const a = P[Math.max(0, k - 1)], b = P[Math.min(P.length - 1, k + 1)]; let tx = b.x - a.x, tz = b.z - a.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l; pos.push(q.x - tz * w / 2, y, q.z + tx * w / 2, q.x + tz * w / 2, y, q.z - tx * w / 2); if (k) { const v = k * 2; idx.push(v - 2, v - 1, v, v - 1, v + 1, v); } });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, material); m.receiveShadow = true; world.add(m); return m;
+}
+const waterMat = new THREE.MeshStandardMaterial({ color: 0xa9bef2, roughness: 0.16, metalness: 0.05, emissive: 0x6f86d8, emissiveIntensity: 0.14, side: THREE.DoubleSide });
+const bankMat = new THREE.MeshStandardMaterial({ color: 0xfdf8fe, roughness: 0.9, side: THREE.DoubleSide });
+waterCurves.forEach(({ sp, P }) => {
+  waterStrip(P, sp.w + 3.6, 0.27, bankMat); waterStrip(P, sp.w, 0.31, waterMat);
+  // bridges where the streets cross it
+  const along = sp.axis || (Math.abs(sp.pts[0][1] - sp.pts[sp.pts.length - 1][1]) > Math.abs(sp.pts[0][0] - sp.pts[sp.pts.length - 1][0]) ? 'z' : 'x');
+  STREETS.forEach((st) => { for (let k = 1; k < P.length; k++) {
+    const a = P[k - 1], b = P[k], va = along === 'z' ? a.z : a.x, vb = along === 'z' ? b.z : b.x; // streets that cross it run the other way
+    if ((va - st) * (vb - st) >= 0) continue;
+    const f = (st - va) / (vb - va), x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f, L = sp.w + 6;
+    const Wd = ROADW + 0.6;
+    if (along === 'z') { box(world, L, 0.34, Wd, C.cream, x, 0.14, z, 0.1); box(world, L, 0.5, 0.25, C.plum, x, 0.48, z - Wd / 2 + 0.125, 0.08); box(world, L, 0.5, 0.25, C.plum, x, 0.48, z + Wd / 2 - 0.125, 0.08); }
+    else { box(world, Wd, 0.34, L, C.cream, x, 0.14, z, 0.1); box(world, 0.25, 0.5, L, C.plum, x - Wd / 2 + 0.125, 0.48, z, 0.08); box(world, 0.25, 0.5, L, C.plum, x + Wd / 2 - 0.125, 0.48, z, 0.08); }
+  } });
+});
+// the demo vans do not drive on water
+
 // the margins of the central blocks: a few trees where the pads leave room
 buildForecourts(world, plots, assets, { BLOCK, FRONT, rng }); // lawn, paved apron, hedges, beds, benches, trees, a car bay and bollards round every building
 { // trees as three instanced meshes
@@ -147,7 +217,7 @@ buildForecourts(world, plots, assets, { BLOCK, FRONT, rng }); // lawn, paved apr
 }
 // street lamps along every street of the work zone (plus the lamps of the parks); at night each casts a pool of light and a halo
 const lampPts = [];
-[-48, -16, 16, 48].forEach((st) => { for (let u = -56, k = 0; u <= 56; u += 16, k++) { const side = k % 2 ? 1 : -1; lampPts.push([u, st + 2.9 * side]); lampPts.push([st + 2.9 * side, u]); } });
+LAY.lampStreets.forEach((st) => { for (let u = -LAY.lamp, k = 0; u <= LAY.lamp; u += 16, k++) { const side = k % 2 ? 1 : -1; if (!nearWater(u, st + 2.9 * side, 7)) lampPts.push([u, st + 2.9 * side]); if (!nearWater(st + 2.9 * side, u, 7)) lampPts.push([st + 2.9 * side, u]); } });
 instancedProto(world, assets, 'lamp_post', lampPts.map(([x, z]) => [x, z, 1.0]));
 const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x, z]) => [x, z, 2.5])];
 {
@@ -162,8 +232,8 @@ const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x,
   const winTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.fillStyle = '#d6d8ee'; for (let y = 6; y < h; y += 16) for (let x = 6; x < w; x += 16) c.fillRect(x, y, 9, 8); });
   winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping;
   const tints = [0xeceaf8, 0xe6e6f6, 0xf0eefa, 0xe2e3f4, 0xeeeefa];
-  for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
-    if (Math.abs(i) <= 1 && Math.abs(j) <= 1) continue;
+  for (let i = -LAY.range; i <= LAY.range; i++) for (let j = -LAY.range; j <= LAY.range; j++) {
+    if (reserved.has(i + ',' + j) || nearWater(i * GRID, j * GRID, 26)) continue;
     const c = blockCentre(i, j), far = Math.max(Math.abs(i), Math.abs(j));
     if (rng() < 0.16) { const lawn = new THREE.Mesh(new RoundedBoxGeometry(BLOCK - 2, 0.1, BLOCK - 2, 2, 0.4), mat(0xe9d9f4, { rough: 0.95 })); lawn.position.set(c.x, 0.2, c.z); world.add(lawn); continue; }
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([qx, qz]) => {
@@ -178,7 +248,7 @@ const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x,
 }
 
 // ------------------------------------------------------------ demo carts that drive along the streets (not real task data)
-const VX = [-48, -16, 16, 48];
+const VX = LAY.vx;
 function route(a, b) { // a, b: points in the middle of a street running along x; go along it, turn into a cross street, come back to the second street
   if (Math.abs(a.z - b.z) < 0.01) return [b];
   let xv = VX[0], cost = 1e9; VX.forEach((x) => { const c = Math.abs(a.x - x) + Math.abs(b.x - x); if (c < cost) { cost = c; xv = x; } });
@@ -269,22 +339,40 @@ const DEPT_ICON = {
   'performance-delivery': ic('<path d="M3 10v4a1 1 0 0 0 1 1h3l5 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8a5 5 0 0 1 0 8"/>'),
   'data-tracking-reporting': ic('<path d="M6 20v-6M12 20V9M18 20V4"/>'),
 };
+DEPT_ICON['client-research'] = DEPT_ICON['strategy-research']; DEPT_ICON['client-creative'] = DEPT_ICON['performance-creative']; DEPT_ICON['client-ads'] = DEPT_ICON['performance-delivery']; DEPT_ICON['client-reports'] = DEPT_ICON['client-success'];
+DEPT_ICON.internal = DEPT_ICON['data-tracking-reporting']; DEPT_ICON.social = DEPT_ICON['performance-creative'];
 const count = (d, st) => d.agents.filter((a) => a.status === st).length;
 // the label over a building: a plum header with the department, and below it the split of its agents by status
 function labelHTML(d) {
   const n = d.agents.length, live = count(d, 'live'), dev = count(d, 'in_development'), plan = count(d, 'not_started');
   return `<span class="lv-head"><span class="lv-ico">${DEPT_ICON[d.key] || ''}</span><b>${d.label}</b></span><span class="lv-status"><span><i class="s-live"></i>${live}</span><span><i class="s-dev"></i>${dev}</span><span><i class="s-plan"></i>${plan}</span><em>${n} ${plural(n)}</em></span>`;
 }
-const deptLabels = DEPTS.map((d) => {
+const deptLabels = DEPTS.filter((d) => buildings.has(d.key)).map((d) => {
   const b = buildings.get(d.key), el = document.createElement('button');
   el.type = 'button'; el.className = 'dept-label'; el.dataset.key = d.key; el.innerHTML = labelHTML(d);
   el.addEventListener('click', () => user.dept(d.key)); labelLayer.appendChild(el);
   return { el, b, d };
 });
+// the district plaques: the big name over every district; a district of one building has the plaque take the place of the department flag and opens it
+const districtLabels = LAY.districts.map((dd) => {
+  const present = dd.slots.map((id) => LAY.slots.find((q) => q.id === id)).filter((sl) => [...slotOf.values()].includes(sl));
+  if (!present.length) return null;
+  const el = document.createElement('div'); el.className = 'district-label'; el.innerHTML = `<b>${dd.n}</b><small>${dd.sub}</small>`; labelLayer.appendChild(el);
+  if (present.length === 1) {
+    const key = [...slotOf].find(([, v]) => v === present[0])[0], dl = deptLabels.find((q) => q.d.key === key), d0 = dl.d;
+    const cnt = (st) => d0.agents.filter((a) => a.status === st).length;
+    dl.el.classList.add('is-merged'); el.classList.add('is-single'); el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer';
+    el.innerHTML = `<b>${dd.n}</b><small>${dd.sub} · ${d0.agents.length} ${plural(d0.agents.length)}</small><span class="dl-st"><span><i class="s-live"></i>${cnt('live')}</span><span><i class="s-dev"></i>${cnt('in_development')}</span><span><i class="s-plan"></i>${cnt('not_started')}</span></span>`;
+    el.addEventListener('click', () => user.dept(key));
+  }
+  else present.forEach((sl) => { const k = [...slotOf].find(([, v]) => v === sl)[0], dl = deptLabels.find((q) => q.d.key === k); if (dl) dl.quarter = true; }); // the quarters' own flags would pile up over the whole district: the plaque stands for them until you come closer
+  const cx = present.reduce((a, sl) => a + sl.cell[0] * GRID, 0) / present.length, cz = present.reduce((a, sl) => a + sl.cell[1] * GRID, 0) / present.length;
+  return { el, pos: new THREE.Vector3(cx, present.length > 1 ? 46 : 30, cz + 4) };
+}).filter(Boolean);
 const STATUS_DOT = { live: 'live', in_development: 'dev', not_started: 'plan' };
 const agentLabels = [];
 const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
-DEPTS.forEach((d) => { const b = buildings.get(d.key); d.agents.forEach((a, i) => {
+DEPTS.forEach((d) => { const b = buildings.get(d.key); if (!b) return; d.agents.forEach((a, i) => {
   const run = RUN[runOf(a)], el = document.createElement('div'); el.className = 'agent-label'; el.hidden = true; el.style.setProperty('--c', run.css); el.style.setProperty('--ci', run.ink);
   el.innerHTML = `<b class="pin">${i + 1}</b><button type="button" class="abox" aria-label="Відкрити агента: ${a.name}"><span class="an-top"><span class="an-name">${a.name}</span><span class="an-go">${CHEV}</span></span><span class="an-st"><i></i>${run.label}</span></button>`;
   el.addEventListener('click', () => user.agent(d.key, a.key)); // the box opens the agent, like a click on the robot itself
@@ -299,6 +387,7 @@ function updateLabels() {
   const pxu = stage.clientHeight / (camera.top - camera.bottom) * camera.zoom, ls = THREE.MathUtils.clamp(pxu * 0.02, 0.5, 1.05);
   if (Math.abs(ls - lastLs) > 0.01) { lastLs = ls; labelLayer.style.setProperty('--ls', ls.toFixed(2)); labelLayer.classList.toggle('mini', ls < 0.6); }
   deptLabels.forEach(({ el, b }) => { place(el, tmp.set(b.pos.x, b.topY, b.pos.z)); });
+  districtLabels.forEach(({ el, pos }) => { place(el, tmp.copy(pos)); });
   const vis = agentLabels.filter((l) => !l.el.hidden), mini = labelLayer.classList.contains('mini'), W = stage.clientWidth, H = stage.clientHeight;
   vis.forEach((l) => { l.robot.getWorldPosition(tmp); tmp.y += 3.7; tmp.project(camera); l.sx = (tmp.x * 0.5 + 0.5) * W; l.sy = (-tmp.y * 0.5 + 0.5) * H; l.ow = l.el.offsetWidth; l.oh = l.el.offsetHeight; });
   // declutter: nearer boxes (lower on screen) keep their place, a box that would cover one of them is lifted above it and its stem grows
@@ -389,7 +478,7 @@ function applySelection() {
   if (state.agent) { const b = buildings.get(state.dept), rb = b.robots.find((r) => r.userData.agent === state.agent); if (rb) { selRing.visible = true; selRing.userData.target = rb; } }
   opts.onState?.(state);
 }
-const zoomFor = (b) => THREE.MathUtils.clamp(0.7 * (Math.max(VIEW_H, 104 / (stage.clientWidth / stage.clientHeight)) * stage.clientWidth / stage.clientHeight) / ((b.W + b.D) / Math.SQRT2 + 5), 1.3, 3.4);
+const zoomFor = (b) => THREE.MathUtils.clamp(0.7 * (Math.max(VIEW_H, 104 / (stage.clientWidth / stage.clientHeight)) * stage.clientWidth / stage.clientHeight) / ((b.W + b.D) / Math.SQRT2 + 5), 1.3 * ZK, 3.4 * ZK);
 const api = {
   state,
   selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
@@ -418,7 +507,7 @@ function updateAutoOpen() {
   let best = null, bd = 1e9;
   buildings.forEach((b) => { const d = Math.hypot(controls.target.x - b.pos.x, controls.target.z - b.pos.z); if (d < bd) { bd = d; best = b; } });
   const z = camera.zoom, cur = best && autoKey === best.key;
-  autoKey = best && bd < (cur ? 17 : 14) && z > (cur ? 1.55 : 1.95) ? best.key : null;
+  autoKey = best && bd < (cur ? 17 : 14) && z > (cur ? 1.55 : 1.95) * ZK ? best.key : null;
   if (window.__noAuto) autoKey = null; // debugging aid: keep every building closed
   // The page's interface follows the building: when one opens by zoom the page gets the same focus a click would give it (no camera flight, the camera is
   // already there), and when it closes again by zoom the focus is released. Not while a flight is running: then the camera is moving on purpose.
@@ -458,8 +547,8 @@ function frame() {
   updateAutoOpen();
   dn.update(dt);
   if (halo) halo.material.size = 30 * Math.min(1.8, Math.max(0.85, Math.pow(camera.zoom, 0.55)));
-  buildings.forEach((b) => { b.setOpen((state.dept === b.key && camera.zoom > 1.15) || autoKey === b.key); b.update(dt, t, reduce); });
-  deptLabels.forEach((l) => { const dim = l.b.open > 0.2; if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } });
+  buildings.forEach((b) => { b.setOpen((state.dept === b.key && camera.zoom > 1.15 * ZK) || autoKey === b.key); b.update(dt, t, reduce); });
+  deptLabels.forEach((l) => { const dim = l.b.open > 0.2 || (l.quarter && camera.zoom < 1.5 * ZK); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } });
   agentLabels.forEach((l) => { const show = buildings.get(l.dept).open > 0.55; if (l.el.hidden === show) l.el.hidden = !show; });
   if (!reduce) tickCarts(dt, t);
   tickRoutes(dt, clock.elapsedTime);
@@ -469,7 +558,7 @@ function frame() {
   if (atMin && !wasAtMin && !tween) { const off = camera.position.clone().sub(controls.target); if (state.dept || controls.target.distanceTo(HOME) > 0.6 || off.distanceTo(HOME_OFFSET) > 0.6) user.reset(); }
   wasAtMin = atMin;
   stepTween(performance.now());
-  { const lim = 8 + 33 * Math.min(1, Math.max(0, (camera.zoom - 1) / 0.5)); controls.target.x = THREE.MathUtils.clamp(controls.target.x, -lim, lim); controls.target.z = THREE.MathUtils.clamp(controls.target.z, -lim, lim); } // the working zone only: far out you see the whole zone, closer in you can reach its edges, never the outskirts
+  { const lim = 8 + (LAY.lim - 8) * Math.min(1, Math.max(0, (camera.zoom / ZK - 1) / 0.5)); controls.target.x = THREE.MathUtils.clamp(controls.target.x, -lim, lim); controls.target.z = THREE.MathUtils.clamp(controls.target.z, -lim, lim); } // the working zone only: far out you see the whole zone, closer in you can reach its edges, never the outskirts
   controls.update();
   sun.position.copy(controls.target).add(SUN_OFF); sun.target.position.copy(controls.target); sun.target.updateMatrixWorld();
   updateFocus(); updateLabels();
@@ -502,7 +591,7 @@ if (opts.debug) window.__app = { loopState: () => ({ paused, raf, disposed, hidd
 
 // fresh states from the page (real activity): recolour the hats and the boxes
 function setRunStatus(map) {
-  DEPTS.forEach((d) => { const b = buildings.get(d.key); d.agents.forEach((a, i) => {
+  DEPTS.forEach((d) => { const b = buildings.get(d.key); if (!b) return; d.agents.forEach((a, i) => {
     const run = map && map[a.key] && RUN[map[a.key]] ? map[a.key] : 'inactive', rb = b.robots[i], l = agentLabels.find((x) => x.dept === d.key && x.key === a.key);
     setRobotRun(rb, run);
     if (l) { const r = RUN[run]; l.el.style.setProperty('--c', r.css); l.el.style.setProperty('--ci', r.ink); const st = l.el.querySelector('.an-st'); if (st) st.lastChild.textContent = r.label; }

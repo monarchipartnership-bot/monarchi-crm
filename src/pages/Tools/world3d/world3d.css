@@ -72,3 +72,15 @@
 .w3d.w3d-narrow .lv-head .lv-ico { display: none; }
 .w3d.w3d-narrow .lv-status { padding: 3px 8px; gap: 5px; font-size: 10px; }
 .w3d.w3d-narrow .lv-status em { display: none; }
+
+/* district name plaques: bigger than the department flags, a thin stem to the ground */
+.district-label { position: absolute; left: 0; top: 0; z-index: 9; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 24px 11px; border-radius: 22px; background: linear-gradient(100deg, #B544B5, #661466); color: #fff; font-family: 'Onest', system-ui, sans-serif; white-space: nowrap; box-shadow: 0 0 0 5px #ae40ae33, 0 16px 30px -12px #661466aa; will-change: transform; }
+.district-label b { font-size: 21px; font-weight: 800; letter-spacing: -.2px; }
+.district-label small { font-size: 12.5px; font-weight: 600; opacity: .88; }
+.district-label::after { content: ''; position: absolute; left: 50%; top: 100%; width: 3px; height: 54px; margin-left: -1.5px; border-radius: 2px; background: linear-gradient(#B544B5, transparent); }
+
+.dept-label.is-merged { display: none; }
+.district-label.is-single { padding-bottom: 9px; }
+.district-label .dl-st { display: flex; gap: 12px; margin-top: 4px; font: 700 12px 'Onest', sans-serif; }
+.district-label .dl-st i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; box-shadow: 0 0 0 1.5px #fff8; }
+.district-label .s-live { background: #B07CE0; } .district-label .s-dev { background: #F59B5B; } .district-label .s-plan { background: #7C8CF8; }
