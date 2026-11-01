@@ -90,18 +90,22 @@ export const QUARTER_NODES = [
   node('tracking_integrity', 2, 6, 'team'),
   node('cross_channel_report', 3, 0, 'team'), node('account_manager', 3, 1, 'team'),
 ];
-// kind: 'down' = the agent right below, 'left' = a bracket on the left side (a fork), 'right' = a bracket on the right side (a join)
+// kind: where the link leaves and enters. 'across' joins agents of different quarters: it leaves the right side of the first and enters the left side of
+// the next (a smooth curve to the right). Inside a quarter: 'down' = the agent right below (a straight arrow), 'left' / 'right' = the link leaves and
+// enters on the same side (a smooth bulge on that side), so it never loops around a card. 'around' skips a quarter: it dips under the panels and comes
+// up in front of its target, so it never passes behind a card that is not its own.
 const L = (from, to, kind, required = false) => ({ from, to, kind, required });
 export const QUARTER_LINKS = [
   L('business_research', 'marketing_strategist', 'left'), L('competitor_research', 'marketing_strategist', 'left'), L('audience_research', 'marketing_strategist', 'left'),
+  L('marketing_strategist', 'creative_strategy', 'across'), L('marketing_strategist', 'meta_optimizer', 'around'), L('marketing_strategist', 'google_optimizer', 'around'),
   L('creative_analyst', 'creative_strategy', 'down'), L('creative_strategy', 'creative_brief', 'down', true),
-  L('creative_brief', 'creative_copywriter', 'left'), L('creative_brief', 'creative_maker', 'left', true),
-  L('creative_copywriter', 'creative_quality', 'right'), L('creative_maker', 'creative_quality', 'right', true),
+  L('creative_brief', 'creative_copywriter', 'down'), L('creative_brief', 'creative_maker', 'left', true),
+  L('creative_copywriter', 'creative_quality', 'right'), L('creative_maker', 'creative_quality', 'down', true),
   L('meta_analyst', 'meta_optimizer', 'down', true), L('google_analyst', 'google_optimizer', 'down', true), L('tiktok_analyst', 'tiktok_optimizer', 'down'),
-  L('cross_channel_report', 'account_manager', 'down', true),
+  L('meta_analyst', 'cross_channel_report', 'across'), L('google_analyst', 'cross_channel_report', 'across'), L('tiktok_analyst', 'cross_channel_report', 'across'),
+  L('tracking_integrity', 'cross_channel_report', 'across'), L('meta_optimizer', 'cross_channel_report', 'across'), L('google_optimizer', 'cross_channel_report', 'across'),
+  L('creative_quality', 'cross_channel_report', 'around'), L('cross_channel_report', 'account_manager', 'down', true),
 ];
-// the flows between quarters (indexes in QUARTERS): the strategy feeds creatives and ads, creatives and ads feed the report
-export const QUARTER_FLOWS = [{ from: 0, to: 1 }, { from: 0, to: 2, lane: 'top' }, { from: 1, to: 3, lane: 'bottom' }, { from: 2, to: 3 }];
 
 // → the ids of the nodes that glow for this mode and these channels: the agents of its quarters; the department agents only where the department works;
 // an agent of another channel fades; the planned agent never glows.

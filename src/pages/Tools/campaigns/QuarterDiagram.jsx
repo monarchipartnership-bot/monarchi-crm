@@ -1,20 +1,20 @@
 import { useId, useMemo } from 'react';
 import { PLATFORMS } from '../../../lib/agents/campaignTeam';
-import { QUARTERS, QUARTER_FLOWS, QUARTER_LINKS, QUARTER_NODES } from '../../../lib/agents/campaignModes';
+import { QUARTERS, QUARTER_LINKS, QUARTER_NODES } from '../../../lib/agents/campaignModes';
 
 // The scheme of the wizard: four panels, the quarters of the client district. `lit` (a Set of node ids) is what works in the chosen mode: it glows, the rest
-// fades. Inside a quarter the links are short: the card below (a vertical arrow), a fork or a join (a bracket on the left or the right side). Between
-// quarters there is one wide arrow per flow; the two that skip a quarter go around it, over the top or under the bottom. Required links are solid.
-const NODE_W = 196;
+// fades. A link is a smooth curve from agent to agent: to the next quarter it leaves the right side and enters the left side; inside a quarter it is a
+// straight arrow to the card below, or a bulge on one side (the same side at both ends), so nothing loops around a card. Required links are solid.
+const NODE_W = 184;
 const NODE_H = 52;
 const ROW_GAP = 18;
-const PAD_IN = 18; // the panel around the cards: room for the brackets
+const PAD_IN = 26; // the panel around the cards: room for the bulges
 const PANEL_W = NODE_W + PAD_IN * 2;
-const COL_GAP = 92;
-const TOP_LANE = 26;
-const BOT_LANE = 26;
+const COL_GAP = 66;
+const TOP_LANE = 8;
+const BOT_LANE = 28;
 const TITLE_H = 36;
-const MARGIN = 10;
+const MARGIN = 8;
 const ROWS = Math.max(...QUARTER_NODES.map((n) => n.row)) + 1;
 const PANEL_H = TITLE_H + ROWS * NODE_H + (ROWS - 1) * ROW_GAP + 14;
 const WIDTH = MARGIN * 2 + QUARTERS.length * PANEL_W + (QUARTERS.length - 1) * COL_GAP;
@@ -28,19 +28,15 @@ const cy = (id) => BOX[id].y + NODE_H / 2;
 function linkPath(l) {
   const a = BOX[l.from];
   const b = BOX[l.to];
+  const bulge = 30;
   if (l.kind === 'down') return `M${a.x + NODE_W / 2} ${a.y + NODE_H} L${b.x + NODE_W / 2} ${b.y}`;
-  if (l.kind === 'left') { const x = a.x - 9; return `M${a.x} ${cy(l.from)} L${x} ${cy(l.from)} L${x} ${cy(l.to)} L${b.x} ${cy(l.to)}`; }
-  const x = a.x + NODE_W + 9; // a join: several feed one, they enter its right edge
-  return `M${a.x + NODE_W} ${cy(l.from)} L${x} ${cy(l.from)} L${x} ${cy(l.to) - 8} L${b.x + NODE_W} ${cy(l.to) - 8}`;
-}
-
-function flowPath(f) {
-  const left = panelX(f.from) + PANEL_W;
-  const right = panelX(f.to);
-  const mid = TOP_LANE + PANEL_H / 2;
-  if (f.lane === 'top') { const x1 = left - 34; const x2 = right + 34; return `M${x1} ${TOP_LANE} L${x1} ${TOP_LANE - 14} L${x2} ${TOP_LANE - 14} L${x2} ${TOP_LANE}`; }
-  if (f.lane === 'bottom') { const y = TOP_LANE + PANEL_H; const x1 = left - 34; const x2 = right + 34; return `M${x1} ${y} L${x1} ${y + 14} L${x2} ${y + 14} L${x2} ${y}`; }
-  return `M${left} ${mid} L${right} ${mid}`;
+  if (l.kind === 'left') return `M${a.x} ${cy(l.from)} C${a.x - bulge} ${cy(l.from)}, ${b.x - bulge} ${cy(l.to)}, ${b.x} ${cy(l.to)}`;
+  if (l.kind === 'right') return `M${a.x + NODE_W} ${cy(l.from)} C${a.x + NODE_W + bulge} ${cy(l.from)}, ${b.x + NODE_W + bulge} ${cy(l.to) - 8}, ${b.x + NODE_W} ${cy(l.to) - 8}`;
+  const x1 = a.x + NODE_W;
+  const x2 = b.x;
+  if (l.kind === 'around') { const yB = TOP_LANE + PANEL_H + 14; return `M${x1} ${cy(l.from)} C${x1 + 50} ${cy(l.from)}, ${x1 + 50} ${yB}, ${x1 + 110} ${yB} L${x2 - 110} ${yB} C${x2 - 50} ${yB}, ${x2 - 50} ${cy(l.to)}, ${x2} ${cy(l.to)}`; }
+  const dx = Math.max(30, (x2 - x1) * 0.5);
+  return `M${x1} ${cy(l.from)} C${x1 + dx} ${cy(l.from)}, ${x2 - dx} ${cy(l.to)}, ${x2} ${cy(l.to)}`;
 }
 
 export default function QuarterDiagram({ lit }) {
@@ -59,10 +55,6 @@ export default function QuarterDiagram({ lit }) {
       {QUARTERS.map((q, i) => <rect key={q.key} className={'cmp-col' + (quarterLit[i] ? ' is-lit' : '')} x={panelX(i)} y={TOP_LANE} width={PANEL_W} height={PANEL_H} rx="20" />)}
       {QUARTERS.map((q, i) => <text key={q.key} className="cmp-stage-title" x={panelX(i) + PANEL_W / 2} y={TOP_LANE + 23} textAnchor="middle">{q.label}</text>)}
       <g className="cmp-edges">
-        {QUARTER_FLOWS.map((f) => {
-          const on = quarterLit[f.from] && quarterLit[f.to];
-          return <path key={f.from + '-' + f.to} className={'cmp-edge cmp-flow-edge' + (on ? ' is-lit' : '')} d={flowPath(f)} markerEnd={`url(#${on ? 'qa' : 'qd'}-${uid})`} fill="none" />;
-        })}
         {links.map((l) => <path key={l.from + l.to} className={'cmp-edge' + (l.on ? ' is-lit' : '') + (l.required ? ' is-required' : '')} d={linkPath(l)} markerEnd={`url(#${l.on ? 'qa' : 'qd'}-${uid})`} fill="none" />)}
       </g>
       <g className="cmp-nodes">
