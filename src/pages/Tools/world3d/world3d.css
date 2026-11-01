@@ -84,3 +84,6 @@
 .district-label .dl-st { display: flex; gap: 12px; margin-top: 4px; font: 700 12px 'Onest', sans-serif; }
 .district-label .dl-st i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; box-shadow: 0 0 0 1.5px #fff8; }
 .district-label .s-live { background: #B07CE0; } .district-label .s-dev { background: #F59B5B; } .district-label .s-plan { background: #7C8CF8; }
+
+.district-label { transition: opacity .25s; }
+.district-label.is-dim { opacity: 0; pointer-events: none !important; }

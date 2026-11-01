@@ -367,7 +367,8 @@ const districtLabels = LAY.districts.map((dd) => {
     el.addEventListener('click', () => user.dept(key));
   }
   else { el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.addEventListener('click', () => user.district(cx, cz, present.length)); present.forEach((sl) => { const k = [...slotOf].find(([, v]) => v === sl)[0], dl = deptLabels.find((q) => q.d.key === k); if (dl) dl.quarter = true; }); } // the quarters' own flags would pile up over the whole district: the plaque stands for them until you come closer; a click on the plaque brings the whole district into view
-  return { el, pos: new THREE.Vector3(cx, present.length > 1 ? 46 : 30, cz + 4) };
+  const keys = present.map((sl) => [...slotOf].find(([, v]) => v === sl)[0]);
+  return { el, keys, many: present.length > 1, pos: new THREE.Vector3(cx, present.length > 1 ? 46 : 30, cz + 4) };
 }).filter(Boolean);
 const STATUS_DOT = { live: 'live', in_development: 'dev', not_started: 'plan' };
 const agentLabels = [];
@@ -528,12 +529,13 @@ const ro = new ResizeObserver(() => { if (stage.clientWidth > 0 && stage.clientH
 let wasAtMin = false;
 // Adaptive resolution: if frames take too long (a weak or busy GPU, a game running next to the browser, a hi-dpi screen) draw fewer pixels instead of freezing;
 // when there is room again, go back up.
-let pr = Math.min(window.devicePixelRatio, 1.75), prMax = pr, ema = 1 / 60, slowFor = 0, fastFor = 0, lastAdapt = performance.now();
+const PR_FLOOR = Math.min(1, window.devicePixelRatio); // never draw below one pixel per screen pixel: below it the picture goes soft
+let pr = Math.min(2, Math.max(window.devicePixelRatio, 1.5)), prMax = pr, ema = 1 / 60, slowFor = 0, fastFor = 0, lastAdapt = performance.now();
 renderer.setPixelRatio(pr);
 function adaptResolution(now) {
   const d = Math.min(0.25, (now - lastAdapt) / 1000); lastAdapt = now; ema += (d - ema) * 0.1;
   if (ema > 0.034) { slowFor += d; fastFor = 0; } else if (ema < 0.02) { fastFor += d; slowFor = 0; } else { slowFor = 0; fastFor = 0; }
-  if (slowFor > 1.2 && pr > 0.8) { pr = Math.max(0.75, pr * 0.82); renderer.setPixelRatio(pr); resize(); slowFor = 0; }
+  if (slowFor > 1.2 && pr > PR_FLOOR + 0.02) { pr = Math.max(PR_FLOOR, pr * 0.85); renderer.setPixelRatio(pr); resize(); slowFor = 0; }
   else if (fastFor > 6 && pr < prMax) { pr = Math.min(prMax, pr * 1.15); renderer.setPixelRatio(pr); resize(); fastFor = 0; }
 }
 const shadowLast = new THREE.Vector3(); let shadowZoom = 0, shadowTick = 0;
@@ -551,6 +553,7 @@ function frame() {
   if (halo) halo.material.size = 30 * Math.min(1.8, Math.max(0.85, Math.pow(camera.zoom, 0.55)));
   buildings.forEach((b) => { b.setOpen((state.dept === b.key && camera.zoom > 1.15 * ZK) || autoKey === b.key); b.update(dt, t, reduce); });
   deptLabels.forEach((l) => { const dim = l.b.open > 0.2 || (l.quarter && camera.zoom < 1.45); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } });
+  districtLabels.forEach((l) => { const dim = l.keys.some((k) => buildings.get(k).open > 0.2) || (l.many && camera.zoom >= 1.45); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } }); // an opened district hands over to its own flags
   agentLabels.forEach((l) => { const show = buildings.get(l.dept).open > 0.55; if (l.el.hidden === show) l.el.hidden = !show; });
   if (!reduce) tickCarts(dt, t);
   tickRoutes(dt, clock.elapsedTime);
