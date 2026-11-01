@@ -106,9 +106,30 @@ export function parseCreativeCopy(text, concepts = []) {
   return { texts, notes: clip(j?.notes, 800) };
 }
 
+// An answer cut off by the token limit still holds the complete objects before the cut: they are taken, the rest of the pictures get the plain prompt of the brief.
+export function salvageCreatives(text) {
+  const raw = String(text || '');
+  const start = raw.indexOf('"creatives"');
+  const open = start < 0 ? -1 : raw.indexOf('[', start);
+  if (open < 0) return null;
+  const out = [];
+  let depth = 0; let from = -1; let str = false; let esc = false;
+  for (let i = open + 1; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (str) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') str = false; continue; }
+    if (ch === '"') str = true;
+    else if (ch === '{') { if (depth === 0) from = i; depth += 1; }
+    else if (ch === '}') { depth -= 1; if (depth === 0 && from >= 0) { try { out.push(JSON.parse(raw.slice(from, i + 1))); } catch { /* a broken object is skipped */ } from = -1; } }
+  }
+  return out.length ? { creatives: out, notes: 'Відповідь моделі обірвалась: частину запитів складено з технічного завдання, перевірте їх.' } : null;
+}
+
+// How many pictures the maker answers for: one per concept and format. Its answer budget grows with it.
+export const makerTokens = (concepts = []) => Math.min(12000, 400 * concepts.reduce((n, c) => n + (c.ratios?.length || 1), 0) + 1000);
+
 // The maker's prompts, one per concept and format. A concept or format the model skipped gets a plain prompt from the brief, so no creative is lost.
 export function parseCreativeMaker(text, concepts = [], style = '') {
-  const j = readJson(text);
+  const j = readJson(text) || salvageCreatives(text);
   const got = asList(j?.creatives);
   const creatives = [];
   for (const c of concepts) {
@@ -391,7 +412,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
 
   const user = blocks.map((x) => `### ${x.title}\n${x.text}`).join('\n\n') + (failed.length ? `\n\n### Вхідні дані, які не завантажились\n${failed.map((f) => '- ' + f).join('\n')}` : '');
   const system = composeCreativeSystem(agent.role, prompt.body, mine.extra, language);
-  const ask = (content) => rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: json ? 4200 : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content }] } });
+  const ask = (content) => rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: agent.role === 'creative_maker' ? Math.max(4200, makerTokens(brief?.concepts)) : json ? 4200 : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content }] } });
   let result;
   if (images.length) {
     const parts = [{ type: 'text', text: user }];

@@ -47,6 +47,7 @@ export const CREATIVE_CONTRACTS = {
     JSON_RULES,
     'Answer with ONE JSON object: {"creatives":[{"concept":"the key of the concept","ratio":"1:1|4:5|9:16|16:9","prompt":"the full generation prompt in English","negative_prompt":"what must not appear","references":["file names of the client materials used as references"]}],"notes":"what a person must check (or empty)"}.',
     'One object per concept and format, in the order of the brief. "references" uses names exactly as in the materials list (or an empty list). When the concept\'s text_render is "model", the prompt contains the exact strings of its copy in quotation marks and keeps the text zone free of detail; otherwise it asks for no words at all.',
+    'Keep every prompt under 80 words and every negative prompt under 25 words: the answer holds one prompt for every concept and format, so it must stay short or it gets cut off.',
   ],
   creative_quality: [
     JSON_RULES,

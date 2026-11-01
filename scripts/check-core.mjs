@@ -45,7 +45,7 @@ import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUAR
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
-import { parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc } from '../api/_lib/creativeRun.js';
+import { makerTokens, parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc, salvageCreatives } from '../api/_lib/creativeRun.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
 import { buildRequest, check as hfCheck, submit as hfSubmit } from '../api/_lib/higgsfield.js';
 import { buildTelegramText, handleSiteLead, normalizeLead, runLeadReminders } from '../api/_lib/siteLead.js';
@@ -2330,6 +2330,24 @@ await ok('Excel of a report: ONE sheet with the table, the texts at its right an
   assert.equal(sheet.getImages().length, 2); // the two weeks have a picture each, the month has none
   assert.equal(rowsOf('Most effective creatives').length, 2); // and the band of the creatives only where there are some
   assert.equal(textOf(sheet.getCell(find(sheet, 'What was done').row + 1, find(sheet, 'What was done').col)), 'We tested new hooks 1');
+});
+
+await ok('creative maker: the answer budget follows the number of pictures, and an answer cut off by the token limit keeps its complete prompts (the rest get the plain prompt of the brief)', () => {
+  const concepts = [{ key: 'c1', name: 'One', ratios: ['4:5', '9:16', '1:1', '16:9'], visual: 'A woman with a wig', text_render: 'none' }, { key: 'c2', name: 'Two', ratios: ['4:5', '9:16', '1:1', '16:9'], visual: 'A mirror', text_render: 'none' }];
+  assert.equal(makerTokens(concepts), 400 * 8 + 1000); // eight pictures
+  assert.equal(makerTokens([]), 1000);
+  assert.equal(makerTokens(Array.from({ length: 10 }, () => ({ ratios: ['4:5', '9:16', '1:1', '16:9'] }))), 12000); // capped
+  // a reply that stops in the middle of the third prompt (the real failure of 2026-11-01: 4200 tokens were not enough for twelve pictures)
+  const cut = '```json\n{"creatives":[{"concept":"c1","ratio":"4:5","prompt":"Prompt one, with a { brace } and \\"quotes\\"","negative_prompt":"text","references":[]},{"concept":"c1","ratio":"9:16","prompt":"Prompt two","negative_prompt":"text","references":[]},{"concept":"c1","ratio":"1:1","prompt":"Square 1';
+  const saved = salvageCreatives(cut);
+  assert.equal(saved.creatives.length, 2);
+  assert.equal(saved.creatives[0].prompt, 'Prompt one, with a { brace } and "quotes"');
+  const made = parseCreativeMaker(cut, concepts, 'clean style');
+  assert.equal(made.creatives.length, 8); // none is lost
+  assert.deepEqual(made.creatives.map((c) => c.fallback), [false, false, true, true, true, true, true, true]); // two from the model, six from the brief
+  assert.match(made.notes, /обірвалась/);
+  assert.equal(salvageCreatives('no json at all'), null);
+  assert.throws(() => parseCreativeMaker('nothing useful', concepts, ''), /не повернув запитів/); // an empty answer is still an error
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
