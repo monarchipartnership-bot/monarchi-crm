@@ -57,7 +57,12 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     const n = await downloadZip(files, { project: cockpit?.client || cockpit?.name, zipName: name });
     return { downloaded: n };
   }
-  if (key === 'approve_all') { for (const c of item?.creatives || []) await setCreativeStatus(c.id, 'approved'); return {}; }
+  if (key === 'approve_all') {
+    const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);
+    if (!ids.length) throw new Error('Немає креативів на перегляд.');
+    for (const id of ids) await setCreativeStatus(id, 'approved');
+    return {};
+  }
   if (key === 'approve_one') { await setCreativeStatus(payload.creativeId, 'approved'); return {}; }
   if (key === 'return') {
     const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);

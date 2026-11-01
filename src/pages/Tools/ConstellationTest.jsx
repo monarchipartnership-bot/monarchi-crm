@@ -532,7 +532,7 @@ export default function ConstellationTest() {
           onClose={() => setCockpitId(null)}
           onAction={(item, key, payload) => cockpit.run(item, key, payload)}
           onNewRequest={() => { setCampaignTarget({ id: cockpitId, newRequest: true }); setCockpitId(null); setSection('campaigns'); }}
-          onOpenRequest={() => { setCampaignTarget({ id: cockpitId, newRequest: false }); setCockpitId(null); setSection('campaigns'); }}
+          onOpenRequest={() => {}}
           onStop={async () => { const c = cockpit.byId[cockpitId]; await updateCampaign(cockpitId, { status: c?.status === 'paused' ? 'active' : 'paused' }); await cockpit.reload(); }}
         />
       )}
