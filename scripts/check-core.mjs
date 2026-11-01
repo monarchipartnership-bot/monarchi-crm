@@ -41,6 +41,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/creativeMake.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
+import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
 import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
@@ -2348,6 +2349,58 @@ await ok('creative maker: the answer budget follows the number of pictures, and 
   assert.match(made.notes, /обірвалась/);
   assert.equal(salvageCreatives('no json at all'), null);
   assert.throws(() => parseCreativeMaker('nothing useful', concepts, ''), /не повернув запитів/); // an empty answer is still an error
+});
+
+await ok('project cabinet: the stage is the first step of the chain that is not finished, what waits for the person is collected from the steps and the creatives, the tone and the counter follow it', () => {
+  const agents = [[1, 'creative_strategy'], [2, 'creative_brief'], [3, 'creative_copywriter'], [4, 'creative_maker'], [5, 'creative_quality']].map(([id, role]) => ({ id, role }));
+  const campaign = { id: 4, project_id: 9, name: 'Mellow · Instagram', status: 'active', config: { mode: 'creative' } };
+  const t = (id, agent_id, status, extra = {}) => ({ id, agent_id, request_id: 2, campaign_id: 4, status, created_at: `2026-11-01T18:0${id}:00Z`, cost_usd: 0.05, ...extra });
+  const base = { campaign, project: { name: 'Mellowdiamond', client: 'Mellow' }, agents, library: { assets: 0 }, spend: 1.5,
+    requests: [{ id: 2, campaign_id: 4, status: 'review', title: 'Fall sale', materials: [], created_at: '2026-11-01T18:00:00Z' }, { id: 1, campaign_id: 4, status: 'problem', title: 'Old', materials: [{}], created_at: '2026-11-01T17:00:00Z' }] };
+  const tasks = [t(1, 1, 'done', { notes: '1) Перекласти чи лишити оригінал? 2) Не задано текст кнопки.' }), t(2, 2, 'done'), t(3, 3, 'done', { notes: '1) Перекласти чи лишити оригінал? 2) Не задано текст кнопки.' }), t(4, 4, 'done'),
+    t(5, 5, 'done', { issues: [{ severity: 'high', concept: 'c1', comment: 'Невідома обіцянка' }, { severity: 'low', comment: 'Дрібниця' }] })];
+  const creatives = [{ id: 11, request_id: 2, concept_key: 'c1', concept_name: 'One', ratio: '4:5', status: 'review', asset_url: 'https://x/1.jpg' }, { id: 12, request_id: 2, concept_key: 'c1', concept_name: 'One', ratio: '9:16', status: 'planned' }];
+  const c = buildCockpit({ ...base, tasks, creatives });
+  assert.equal(c.activeRequestId, 2);
+  assert.deepEqual(c.stages.map((s) => [s.key, s.state]), [['strategy', 'done'], ['brief', 'done'], ['copy', 'done'], ['maker', 'done'], ['quality', 'done'], ['you', 'working']]); // the review waits for the person
+  assert.equal(c.currentStageKey, 'you');
+  assert.deepEqual(c.stages.filter((s) => s.parallel).map((s) => s.key), ['copy', 'maker']);
+  const kinds = c.attention.map((i) => i.kind).sort();
+  assert.deepEqual(kinds, ['estimate', 'missing_assets', 'qc_remark', 'question', 'question', 'review']); // the same note of two steps is one question
+  assert.equal(c.waiting, 6);
+  assert.equal(c.tone, 'attention');
+  const review = c.attention.find((i) => i.kind === 'review');
+  assert.deepEqual(review.creatives.map((x) => x.id), [11]);
+  assert.deepEqual(review.actions.map((a) => a.key), ['approve_all', 'return']);
+  assert.deepEqual(c.attention.find((i) => i.kind === 'estimate').actions.map((a) => a.key), ['estimate']);
+  assert.equal(c.attention.find((i) => i.kind === 'qc_remark').text.split('\n').length, 2);
+  assert.equal(c.spend.model, 0.25); assert.equal(c.spend.higgsfield, 1.5); assert.equal(c.spend.total, 1.75);
+  assert.equal(c.requests[0].creatives.review, 1);
+  // a step that stopped makes the tone red and goes first; a repeated one that succeeded is not a problem any more
+  const failed = buildCockpit({ ...base, tasks: [t(1, 1, 'done'), t(2, 2, 'failed', { error: 'Помилка моделі (401)' })], creatives: [] });
+  assert.equal(failed.tone, 'problem');
+  assert.equal(failed.attention[0].kind, 'failed_step');
+  assert.equal(failed.attention[0].taskId, 2);
+  assert.equal(failed.currentStageKey, 'brief');
+  const fixed = buildCockpit({ ...base, tasks: [t(1, 1, 'done'), t(2, 2, 'failed'), t(3, 2, 'done')], creatives: [] });
+  assert.equal(fixed.attention.some((i) => i.kind === 'failed_step'), false);
+  // the list: the problems first, the short line
+  const list = sortProjects([cockpitSummary({ ...c, id: 1 }), cockpitSummary({ ...failed, id: 2 }), cockpitSummary({ ...c, id: 3, tone: 'ok', waiting: 0 })]);
+  assert.deepEqual(list.map((x) => x.id), [2, 1, 3]);
+  assert.equal(cockpitSummary(c).stageLabel, 'Готово до перегляду');
+  assert.equal(cockpitSummary(failed).stageLabel, 'ТЗ зупинився');
+  assert.equal(cockpitSummary(buildCockpit({ ...base, requests: [], tasks: [], creatives: [] })).stageLabel, 'Чекає на запит');
+  assert.equal(c.modeLabel, 'Тільки креативи');
+  // which campaigns are worked on
+  assert.equal(isActiveCampaign({ id: 4, status: 'active' }, []), true);
+  assert.equal(isActiveCampaign({ id: 4, status: 'draft' }, []), false);
+  assert.equal(isActiveCampaign({ id: 4, status: 'paused' }, [{ campaign_id: 4, status: 'review' }]), true);
+  // the notes: numbered points are separate questions, a stable id
+  assert.deepEqual(splitNotes('1) Перший. 2) Другий.'), ['Перший.', 'Другий.']);
+  assert.deepEqual(splitNotes('Одне речення без номерів'), ['Одне речення без номерів']);
+  assert.deepEqual(splitNotes(''), []);
+  assert.equal(hashText('abc'), hashText('abc'));
+  assert.notEqual(hashText('abc'), hashText('abd'));
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
