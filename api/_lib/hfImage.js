@@ -9,6 +9,8 @@
 //   HF_IMAGE_REF_PARAM    the parameter that takes the reference pictures (default image_urls)
 //   HF_IMAGE_REF_MODE     array (default) or single (only the first reference)
 //   HF_IMAGE_EXTRA        JSON with fixed parameters of the model, e.g. {"quality":"high","resolution":"1k"}
+//   HF_IMAGE_RATIOS       the aspect ratios the model accepts, comma separated, e.g. «1:1,3:2,2:3,4:3,3:4,16:9,9:16,21:9»; a format outside the list (4:5 of the
+//                         Meta feed) is asked as the nearest accepted one and the prompt keeps the important parts away from the edges that Meta trims
 // fetch and the database are handed in, so scripts/check-core.mjs runs all of it with a stand-in network.
 
 const BASE = 'https://api.higgsfield.ai';
@@ -24,7 +26,19 @@ export function profileFromEnv(env = process.env) {
     refParam: String(env.HF_IMAGE_REF_PARAM || 'image_urls').trim(),
     refMode: env.HF_IMAGE_REF_MODE === 'single' ? 'single' : 'array',
     extra: extra && typeof extra === 'object' && !Array.isArray(extra) ? extra : {},
+    ratios: String(env.HF_IMAGE_RATIOS || '').split(',').map((r) => r.trim()).filter((r) => /^\d+:\d+$/.test(r)),
   };
+}
+
+const ratioValue = (r) => { const [w, h] = String(r).split(':').map(Number); return w > 0 && h > 0 ? w / h : null; };
+// → the ratio to ask the model for: the wanted one when it is accepted (or the list is unknown), else the nearest accepted one (by proportion).
+export function snapRatio(wanted, accepted = []) {
+  if (!accepted.length || accepted.includes(wanted)) return wanted;
+  const want = ratioValue(wanted);
+  if (!want) return wanted;
+  let best = accepted[0]; let gap = Infinity;
+  accepted.forEach((r) => { const v = ratioValue(r); const d = v ? Math.abs(Math.log(v / want)) : Infinity; if (d < gap) { gap = d; best = r; } });
+  return best;
 }
 
 export const missingConfig = (env = process.env) => ['HF_API_KEY_ID', 'HF_API_KEY_SECRET', 'HF_IMAGE_MODEL'].filter((k) => !String(env[k] || '').trim());
@@ -34,7 +48,10 @@ export const isConfigured = (env = process.env) => missingConfig(env).length ===
 export function buildImageRequest(creative, profile) {
   const avoid = creative.negative_prompt ? ` Avoid: ${creative.negative_prompt}.` : '';
   const refs = (creative.references || []).filter((u) => /^https:\/\//i.test(u || '')).slice(0, 6);
-  const body = { ...profile.extra, prompt: `${creative.prompt}${avoid}`.slice(0, 3500), aspect_ratio: creative.ratio || '1:1' };
+  const wanted = creative.ratio || '1:1';
+  const asked = snapRatio(wanted, profile.ratios);
+  const trim = asked !== wanted ? ` The picture will be cropped to ${wanted}: keep the product, the people and any words well inside the frame, away from the edges.` : '';
+  const body = { ...profile.extra, prompt: `${creative.prompt}${avoid}${trim}`.slice(0, 3500), aspect_ratio: asked };
   if (refs.length) body[profile.refParam] = profile.refMode === 'single' ? refs[0] : refs;
   return { path: profile.path, body };
 }

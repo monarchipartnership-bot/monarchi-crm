@@ -2019,6 +2019,16 @@ await ok('Higgsfield images with references: the request is built from the confi
   const single = buildImageRequest({ prompt: 'p', ratio: '1:1', references: ['https://x/a.jpg', 'https://x/c.jpg'] }, profileFromEnv({ ...env, HF_IMAGE_REF_PARAM: 'image_url', HF_IMAGE_REF_MODE: 'single' }));
   assert.equal(single.body.image_url, 'https://x/a.jpg');
   assert.equal('image_urls' in buildImageRequest({ prompt: 'p' }, profile).body, false); // no references, no parameter
+  // a model that does not take 4:5: the nearest accepted ratio is asked and the prompt keeps the content away from the edges that will be trimmed
+  const accepted = profileFromEnv({ ...env, HF_IMAGE_RATIOS: 'auto, 1:1,3:2,2:3,4:3,3:4,16:9,9:16,21:9' });
+  assert.deepEqual(accepted.ratios, ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16', '21:9']);
+  const snapped = buildImageRequest({ prompt: 'p', ratio: '4:5' }, accepted);
+  assert.equal(snapped.body.aspect_ratio, '3:4');
+  assert.match(snapped.body.prompt, /cropped to 4:5/);
+  const kept = buildImageRequest({ prompt: 'p', ratio: '9:16' }, accepted);
+  assert.equal(kept.body.aspect_ratio, '9:16');
+  assert.doesNotMatch(kept.body.prompt, /cropped/);
+  assert.equal(buildImageRequest({ prompt: 'p', ratio: '4:5' }, profile).body.aspect_ratio, '4:5'); // the list is not set: the ratio goes as it is
   assert.deepEqual(missingConfig({}), ['HF_API_KEY_ID', 'HF_API_KEY_SECRET', 'HF_IMAGE_MODEL']);
   assert.deepEqual(missingConfig(env), []);
   // the network, with a stand-in
