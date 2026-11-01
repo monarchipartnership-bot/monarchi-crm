@@ -544,9 +544,15 @@ export async function launchCampaign(ctx, campaignId) {
   const campaign = must(await ctx.db.from('ag_campaigns').select('*').eq('id', campaignId).maybeSingle(), 'campaign');
   if (!campaign) throw new Error('Кампанію не знайдено.');
   if (campaign.status === 'active') throw new Error('Кампанію вже запущено.');
+  const now = iso(ctx.now());
+  // «Тільки креативи»: the client is only connected to the creative department, which works on requests. The campaign becomes active (the department
+  // runs only for active campaigns) but no agent of the campaign team starts and nothing is spent.
+  if (campaign.config?.mode === 'creative') {
+    must(await ctx.db.from('ag_campaigns').update({ status: 'active', launched_at: now, updated_at: now }).eq('id', campaign.id), 'campaign');
+    return { started: 0, agents: 0, creativeOnly: true };
+  }
   const mine = all.agents.filter((a) => a.team === CAMPAIGN_TEAM && a.scope_id === String(campaign.id) && a.enabled);
   if (!mine.length) throw new Error('Увімкніть хоча б одного агента.');
-  const now = iso(ctx.now());
   must(await ctx.db.from('ag_campaigns').update({ status: 'active', launched_at: now, updated_at: now }).eq('id', campaign.id), 'campaign');
   must(await ctx.db.from('ag_agents').update({ enabled_since: now, attempts: 0 }).eq('team', CAMPAIGN_TEAM).eq('scope_id', String(campaign.id)).eq('enabled', true), 'agents');
   let started = 0;

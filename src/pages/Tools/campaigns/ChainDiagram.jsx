@@ -4,33 +4,39 @@ import { CAMPAIGN_LINKS, CAMPAIGN_ROLES, PLATFORMS, STAGES } from '../../../lib/
 // The structural scheme of the campaign team: who depends on whom. Columns are the stages of the work, arrows are the links.
 // `active` (a Set of roles) is the part of the chain that works on the chosen campaign: it glows, the rest fades. `states`
 // (role -> 'on' | 'off' | 'blocked' | 'paused') paints a live campaign.
-const NODE_W = 176;
-const NODE_H = 60;
-const COL_GAP = 66;
-const ROW_GAP = 18;
-const HEAD = 38;
+const NODE_W = 186;
+const NODE_H = 54;
+const COL_GAP = 44;
+const ROW_GAP = 14;
+const HEAD = 34;
 const PAD = 14;
 
 const accentOf = (def) => (def.platforms.includes('*') ? '#EB9CEF' : PLATFORMS[def.platforms[0]]?.color || '#EB9CEF');
 
+// Every agent sits on the row given in its definition (`row`), so related agents stand in one line: the analyst and the optimizer of a channel, the
+// creative strategist and the copywriter. A column is a lighter band behind its cards; the links go behind the cards.
 export function layout() {
-  const cols = STAGES.map((s) => CAMPAIGN_ROLES.filter((r) => r.stage === s.key).sort((a, b) => a.row - b.row));
-  const maxRows = Math.max(...cols.map((c) => c.length));
-  const colH = maxRows * NODE_H + (maxRows - 1) * ROW_GAP;
+  const rows = Math.max(...CAMPAIGN_ROLES.map((r) => r.row)) + 1;
+  const colH = rows * NODE_H + (rows - 1) * ROW_GAP;
   const pos = {};
-  cols.forEach((col, ci) => {
-    const startY = HEAD + PAD + (colH - (col.length * NODE_H + (col.length - 1) * ROW_GAP)) / 2;
-    col.forEach((def, ri) => { pos[def.role] = { x: PAD + ci * (NODE_W + COL_GAP), y: startY + ri * (NODE_H + ROW_GAP) }; });
+  CAMPAIGN_ROLES.forEach((def) => {
+    const ci = STAGES.findIndex((s) => s.key === def.stage);
+    pos[def.role] = { x: PAD + ci * (NODE_W + COL_GAP), y: HEAD + 6 + def.row * (NODE_H + ROW_GAP) };
   });
-  return { pos, width: PAD * 2 + STAGES.length * NODE_W + (STAGES.length - 1) * COL_GAP, height: HEAD + PAD * 2 + colH };
+  return { pos, width: PAD * 2 + STAGES.length * NODE_W + (STAGES.length - 1) * COL_GAP, height: HEAD + 6 + colH + 8, colH };
 }
 
 const STATE_DOT = { on: '#5FE0A1', off: '#8D7A93', blocked: '#FF7A9A', paused: '#F2B94B' };
 
 export default function ChainDiagram({ active, states, selected, onSelect, compact = false }) {
   const uid = useId().replace(/:/g, '');
-  const { pos, width, height } = useMemo(layout, []);
+  const { pos, width, height, colH } = useMemo(layout, []);
   const isOn = (role) => !active || active.has(role);
+  // the links that do not work on this campaign go first (under), the working ones over them
+  const edges = useMemo(() => {
+    const all = CAMPAIGN_LINKS.filter((l) => pos[l.from] && pos[l.to]).map((l) => ({ ...l, lit: isOn(l.from) && isOn(l.to) }));
+    return [...all.filter((l) => !l.lit), ...all.filter((l) => l.lit)];
+  }, [pos, active]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <svg className={'cmp-diagram' + (compact ? ' is-compact' : '')} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Схема звʼязків між агентами кампанії">
@@ -41,21 +47,22 @@ export default function ChainDiagram({ active, states, selected, onSelect, compa
       </defs>
 
       {STAGES.map((s, i) => (
-        <text key={s.key} className="cmp-stage-title" x={PAD + i * (NODE_W + COL_GAP) + NODE_W / 2} y={HEAD - 8} textAnchor="middle">{s.label}</text>
+        <rect key={s.key} className="cmp-col" x={PAD + i * (NODE_W + COL_GAP) - 8} y={HEAD - 4} width={NODE_W + 16} height={colH + 16} rx="18" />
+      ))}
+      {STAGES.map((s, i) => (
+        <text key={s.key} className="cmp-stage-title" x={PAD + i * (NODE_W + COL_GAP) + NODE_W / 2} y={HEAD - 12} textAnchor="middle">{s.label}</text>
       ))}
 
       <g className="cmp-edges">
-        {CAMPAIGN_LINKS.map((l) => {
+        {edges.map((l) => {
           const a = pos[l.from];
           const b = pos[l.to];
-          if (!a || !b) return null;
-          const lit = isOn(l.from) && isOn(l.to);
+          const lit = l.lit;
           const x1 = a.x + NODE_W;
           const y1 = a.y + NODE_H / 2;
           const x2 = b.x;
           const y2 = b.y + NODE_H / 2;
-          const dx = Math.max(30, (x2 - x1) * 0.5);
-          // a link that skips a column goes over the nodes in between: it is bent upwards a little so it stays readable
+          const dx = Math.max(24, (x2 - x1) * 0.45);
           return (
             <path
               key={l.from + l.to}
@@ -83,10 +90,10 @@ export default function ChainDiagram({ active, states, selected, onSelect, compa
               onKeyDown={onSelect && lit ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(def.role); } } : undefined}
               aria-label={def.name + (st ? ', ' + st : '')}
             >
-              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="13" filter={lit && active ? `url(#glow-${uid})` : undefined} />
-              <rect className="cmp-node-bar" x="0" y="10" width="4" height={NODE_H - 20} rx="2" />
-              <text className="cmp-node-name" x="16" y="25">{def.name}</text>
-              <text className="cmp-node-short" x="16" y="43">{def.short}</text>
+              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="14" filter={lit && active ? `url(#glow-${uid})` : undefined} />
+              <rect className="cmp-node-bar" x="0" y="12" width="4" height={NODE_H - 24} rx="2" />
+              <text className="cmp-node-name" x="16" y="23">{def.name}</text>
+              <text className="cmp-node-short" x="16" y="40">{def.short}</text>
               {st && <circle cx={NODE_W - 14} cy="14" r="5" fill={STATE_DOT[st] || STATE_DOT.off} />}
             </g>
           );

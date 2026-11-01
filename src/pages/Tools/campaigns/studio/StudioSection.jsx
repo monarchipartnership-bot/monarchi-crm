@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { kickQueue } from '../../../../lib/api/agents';
 import { createRequest, fetchRequests, loadCreativeTeam, saveCreativeSetup, startRequest } from '../../../../lib/api/creatives';
@@ -11,7 +11,7 @@ import '../../../../styles/studio.css';
 
 // «Креативна студія» of a campaign: the requests of the client (requirements + materials) and the chain of agents that turns each of them into
 // a technical brief, ad texts and prompts for Higgsfield. The agents of the studio are opened from here (prompts, settings, history).
-export default function StudioSection({ campaign, notify, onCampaign = null }) {
+export default function StudioSection({ campaign, notify, onCampaign = null, autoOpenForm = false }) {
   const { email } = useAuth();
   const [team, setTeam] = useState(null);
   const [requests, setRequests] = useState(null);
@@ -24,6 +24,8 @@ export default function StudioSection({ campaign, notify, onCampaign = null }) {
     setTeam(t);
     setRequests(r);
   }, [campaign, email]);
+  const autoOpened = useRef(false);
+  useEffect(() => { if (autoOpenForm && team && requests && !autoOpened.current) { autoOpened.current = true; setForm({ initial: null }); } }, [autoOpenForm, team, requests]); // «Тільки креативи» was just created: the form of the first request opens at once
   useEffect(() => { reload().catch((e) => notify(e.message || 'Не вдалося завантажити студію. Перевірте, що застосовано міграцію 20261040000000.', true)); }, [reload, notify]);
 
   async function save(values, start) {

@@ -15,7 +15,7 @@ import StudioSection from './studio/StudioSection';
 export const CAMPAIGN_STATUS = { draft: ['Чернетка', 'draft'], active: ['Працює', 'active'], paused: ['На паузі', 'paused'], archived: ['В архіві', 'archived'] };
 
 // One live campaign: the chain with the state of every agent, the agents' latest reports, pause / archive.
-export default function CampaignPage({ campaign: initial, project, onBack, onChanged, notify }) {
+export default function CampaignPage({ campaign: initial, project, onBack, onChanged, notify, openNewRequest = false }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
   const [campaign, setCampaign] = useState(initial);
@@ -61,6 +61,7 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
     try { await deleteCampaign(campaign.id); onChanged(); onBack(); notify('Кампанію видалено.'); } catch (e) { notify(e.message || 'Не вдалося видалити.', true); setBusy(false); }
   }
 
+  const creativeOnly = campaign.config?.mode === 'creative'; // «Тільки креативи»: no campaign team, only the creative department
   const [label, tone] = CAMPAIGN_STATUS[campaign.status] || ['—', 'draft'];
   const reports = (team?.agents || []).filter((a) => outputs[a.id]);
   const failedTotal = team ? Object.values(team.counts).reduce((s, c) => s + c.failed, 0) : 0;
@@ -72,7 +73,7 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
         <div className="cmp-page-title">
           <span className="cmp-kicker">{project?.name || 'Проєкт'}{project?.client ? ` · ${project.client}` : ''}</span>
           <h2>{campaign.name}</h2>
-          <div className="cmp-chips-ro">{campaign.platforms.map((p) => <em key={p} style={{ '--c': PLATFORMS[p]?.color }}>{PLATFORMS[p]?.label || p}</em>)}<span className={'cmp-status cmp-status--' + tone}>{label}</span></div>
+          <div className="cmp-chips-ro">{creativeOnly ? <span className="cmp-status cmp-status--active">Тільки креативи</span> : campaign.platforms.map((p) => <em key={p} style={{ '--c': PLATFORMS[p]?.color }}>{PLATFORMS[p]?.label || p}</em>)}<span className={'cmp-status cmp-status--' + tone}>{label}</span></div>
         </div>
         <div className="cmp-page-actions">
           {campaign.status === 'active' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('paused', 'Кампанію призупинено: усі її агенти зупинені.')}>Призупинити</button>}
@@ -86,14 +87,17 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
       {campaign.status === 'draft' && <p className="cmp-note">Це чернетка: кампанію створено, але не запущено. Видаліть її або створіть заново через «Створити кампанію».</p>}
       {failedTotal > 0 && <p className="cmp-warnbox" role="status"><b>Є завдання з помилкою ({failedTotal}).</b> Відкрийте агента зі статусом помилки, вкладка «Завдання», і натисніть «Повторити».</p>}
 
+      {!creativeOnly && (
       <section className="cmp-live">
         <div className="cmp-live-head"><h3>Схема агентів кампанії</h3><span className="cmp-muted">Натисніть агента, щоб відкрити його промти, налаштування й історію.</span></div>
         <div className="cmp-scheme"><ChainDiagram active={active} states={states} onSelect={(role) => byRole.get(role) && setOpenRole(role)} selected={openRole} /></div>
         <p className="cmp-legend"><i style={{ background: '#5FE0A1' }} />працює <i style={{ background: '#8D7A93' }} />вимкнено <i style={{ background: '#FF7A9A' }} />зупинено (залежить від вимкненого) <i style={{ background: '#F2B94B' }} />кампанія на паузі</p>
       </section>
+      )}
 
-      <StudioSection campaign={campaign} notify={notify} onCampaign={(c) => { setCampaign(c); onChanged(); }} />
+      <StudioSection campaign={campaign} notify={notify} onCampaign={(c) => { setCampaign(c); onChanged(); }} autoOpenForm={openNewRequest} />
 
+      {!creativeOnly && (
       <section className="cmp-reports">
         <h3>Останні результати агентів</h3>
         {!reports.length && <p className="cmp-muted">Результатів ще немає. Вони зʼявляться, коли агенти закінчать першу роботу.</p>}
@@ -107,6 +111,7 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
           ))}
         </div>
       </section>
+      )}
 
       {report && outputs[report.id] && (
         <div className="cmp-reportwin-wrap" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setReport(null); }}>

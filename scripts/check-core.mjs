@@ -2603,6 +2603,13 @@ await ok('campaign team: launch -> research -> strategy -> analysts -> optimizer
   assert.equal((await processQueue(ctx)).processed, 0);
   tables.ag_tasks.length = 0;
 
+  // «Тільки креативи»: launching only makes the campaign active (the creative department runs for active campaigns), no agent of the campaign team starts
+  const was = { status: tables.ag_campaigns[0].status, config: tables.ag_campaigns[0].config };
+  tables.ag_campaigns[0].config = { ...(was.config || {}), mode: 'creative' };
+  const lc = await launchCampaign(ctx, 1);
+  assert.deepEqual([lc.started, lc.agents, lc.creativeOnly, tables.ag_campaigns[0].status, tables.ag_tasks.length], [0, 0, true, 'active', 0]);
+  Object.assign(tables.ag_campaigns[0], { status: was.status, config: was.config, launched_at: null });
+
   const l = await launchCampaign(ctx, 1);
   assert.equal(l.started, 7); // 3 researchers + meta/google analysts + creative analyst + tracking
   assert.equal(tables.ag_campaigns[0].status, 'active');

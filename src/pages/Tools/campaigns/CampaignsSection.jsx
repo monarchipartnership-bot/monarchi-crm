@@ -19,6 +19,7 @@ export default function CampaignsSection() {
   const [view, setView] = useState('current'); // current | archive
   const [wizard, setWizard] = useState(false);
   const [openId, setOpenId] = useState(null);
+  const [newRequest, setNewRequest] = useState(false); // «Тільки креативи» was just created: the request form opens at once
   const [toast, setToast] = useState(null);
 
   const notify = useCallback((text, isError = false) => { setToast({ text, isError }); setTimeout(() => setToast(null), isError ? 7000 : 4000); }, []);
@@ -46,7 +47,7 @@ export default function CampaignsSection() {
     return (
       <div className="ai-section cmp-section" role="region" aria-label="Кампанія">
         {toast && <div className={'cmp-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
-        <CampaignPage key={open.id} campaign={open} project={projectOf(open.project_id)} onBack={() => { setOpenId(null); reload(); }} onChanged={reload} notify={notify} />
+        <CampaignPage key={open.id} campaign={open} project={projectOf(open.project_id)} openNewRequest={newRequest} onBack={() => { setOpenId(null); setNewRequest(false); reload(); }} onChanged={reload} notify={notify} />
       </div>
     );
   }
@@ -101,7 +102,7 @@ export default function CampaignsSection() {
       {wizard && (
         <CreateCampaignWizard
           onClose={() => { setWizard(false); reload(); }} notify={notify}
-          onLaunched={(id) => { setWizard(false); reload().then(() => setOpenId(id)); }}
+          onLaunched={(id, opts) => { setWizard(false); setNewRequest(Boolean(opts?.newRequest)); reload().then(() => setOpenId(id)); }}
         />
       )}
     </div>
