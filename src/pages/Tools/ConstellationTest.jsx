@@ -8,7 +8,6 @@ import Presence from './aiMap/Presence';
 import { AgentWindowTheme } from '../../components/AgentWorkspace/AgentWindowTheme';
 import AiEnvironment from '../../components/AiEnvironment/AiEnvironment';
 import KnowledgeBase from '../KnowledgeBase/KnowledgeBase';
-import { BOOK_ICON } from '../KnowledgeBase/KnowledgeOrb';
 import AdsInsightsAnalyst from '../AdsInsightsAnalyst/AdsInsightsAnalyst';
 import DealHealthCheck from '../DealHealthCheck/DealHealthCheck';
 import CoverLetterAgent from '../CoverLetterAgent/CoverLetterAgent';
@@ -29,12 +28,11 @@ import CompetitorResearchAgent from '../CompetitorResearchAgent/CompetitorResear
 import AudienceResearchAgent from '../AudienceResearchAgent/AudienceResearchAgent';
 import OnboardingMeetingCoordinator from '../OnboardingMeetingCoordinator/OnboardingMeetingCoordinator';
 import ChiefOfStaff from '../ChiefOfStaff/ChiefOfStaff';
-import AiAgentActivity from '../AiAgentActivity/AiAgentActivity';
-import AgentCatalog from '../AgentCatalog/AgentCatalog';
-import AgentAnalytics from '../AgentAnalytics/AgentAnalytics';
 import AgentSpend from '../AgentSpend/AgentSpend';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
-import { useAgentReviewCount } from '../../lib/useAgentReviewCount';
+import useProjectCockpit from '../../lib/useProjectCockpit';
+import { updateCampaign } from '../../lib/api/campaigns';
+import { ActiveProjectsCard, ProjectsPage, ProjectWindow } from './cockpit';
 import FocusedGraph from './aiMap/FocusedGraph';
 import OverviewMap, { AiSvgDefs } from './aiMap/OverviewMap';
 import WorldMap3D from './aiMap/WorldMap3D';
@@ -89,13 +87,13 @@ const AGENT_TOOLS = {
 // horizontal nav — not routes, not sidebar entries. Per explicit direction:
 // anything AI-agents-related stays inside this one section rather than
 // spreading into the main CRM's sidebar/routing.
+// Design decision 33: the map, the projects the agents work on, the campaigns, the money and the knowledge base (which opens over the page, it is not a section).
 const SECTIONS = [
   { key: 'map', label: 'Мапа' },
-  { key: 'agents', label: 'Агенти' },
+  { key: 'projects', label: 'Проєкти' },
   { key: 'campaigns', label: 'Кампанії' },
-  { key: 'activity', label: 'Задачі агентів' },
-  { key: 'analytics', label: 'Аналітика' },
   { key: 'spend', label: 'Витрати' },
+  { key: 'knowledge', label: 'Інформаційна база' },
 ];
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -104,7 +102,10 @@ export default function ConstellationTest() {
   const [section, setSection] = useState('map');
   const [flowStep, setFlowStep] = useState(0); // where the demo task is now (the demo van on the 3D map reports it)
   const [mapNight, setMapNight] = useState(nightNow); // day or night on the 3D map: the top bar is light by day, dark plum at night and in the other sections
-  const agentReviewCount = useAgentReviewCount();
+  const [cockpitId, setCockpitId] = useState(null); // the window of a project
+  const [cockpitCollapsed, setCockpitCollapsed] = useState(false);
+  const [campaignTarget, setCampaignTarget] = useState(null); // { id, newRequest }: «Кампанії» opens on this campaign
+  const cockpit = useProjectCockpit({ enabled: true });
   const [focusedDept, setFocusedDept] = useState(null);
   const [hoveredDept, setHoveredDept] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -348,11 +349,11 @@ export default function ConstellationTest() {
           <button
             key={s.key} type="button" role="tab" aria-selected={section === s.key}
             className={'constellation-section-tab' + (section === s.key ? ' active' : '')}
-            onClick={() => setSection(s.key)}
+            onClick={() => (s.key === 'knowledge' ? setCoreOpen(true) : setSection(s.key))}
           >
             {s.label}
-            {s.key === 'activity' && agentReviewCount > 0 && (
-              <span className="constellation-section-tab-badge">{agentReviewCount}</span>
+            {s.key === 'projects' && cockpit.waitingTotal > 0 && (
+              <span className="constellation-section-tab-badge">{cockpit.waitingTotal} чекають</span>
             )}
           </button>
         ))}
@@ -363,10 +364,8 @@ export default function ConstellationTest() {
         <span>До Hub</span>
       </Link>
 
-      {section === 'agents' && <AgentCatalog agents={allAgents} onSelectAgent={openAgent} />}
-      {section === 'campaigns' && <CampaignsSection />}
-      {section === 'analytics' && <AgentAnalytics agents={allAgents} />}
-      {section === 'activity' && <AiAgentActivity />}
+      {section === 'projects' && <ProjectsPage projects={cockpit.list} loading={cockpit.loading} onOpen={setCockpitId} />}
+      {section === 'campaigns' && <CampaignsSection key={campaignTarget ? `c${campaignTarget.id}` : 'all'} openCampaignId={campaignTarget?.id ?? null} openNewRequest={!!campaignTarget?.newRequest} />}
       {section === 'spend' && <AgentSpend />}
 
       <div className="ai-flow">
@@ -514,10 +513,7 @@ export default function ConstellationTest() {
           <Presence show={!focused} instant={compact}>
             <>
               {use3d && <TaskFlowPanel step={flowStep} agentDepts={AGENT_DEPTS} requests={openRequests} onOpenRequest={() => setDeptAgent({ role: 'creative_strategy', legacyTool: null })} onSelectDept={(k) => { setFocusedDept(k); setHoveredDept(null); }} />}
-              <button type="button" className="ai-kb-btn ai-pill" onClick={() => setCoreOpen(true)} data-ai-safe>
-                <span className="ai-kb-icon" dangerouslySetInnerHTML={{ __html: BOOK_ICON }} />
-                <span>Інформаційна база</span>
-              </button>
+              <ActiveProjectsCard projects={cockpit.list} loading={cockpit.loading} collapsed={cockpitCollapsed} onToggle={() => setCockpitCollapsed((v) => !v)} onOpen={setCockpitId} onOpenAll={() => setSection('projects')} />
             </>
           </Presence>
         </>
@@ -529,6 +525,17 @@ export default function ConstellationTest() {
           the Агенти catalog (or anywhere else) must work the same as
           opening it from the map itself. */}
       {coreOpen && <KnowledgeBase onClose={() => setCoreOpen(false)} />}
+
+      {cockpitId != null && (
+        <ProjectWindow
+          cockpit={cockpit.byId[cockpitId] || null} loading={cockpit.loading}
+          onClose={() => setCockpitId(null)}
+          onAction={(item, key, payload) => cockpit.run(item, key, payload)}
+          onNewRequest={() => { setCampaignTarget({ id: cockpitId, newRequest: true }); setCockpitId(null); setSection('campaigns'); }}
+          onOpenRequest={() => { setCampaignTarget({ id: cockpitId, newRequest: false }); setCockpitId(null); setSection('campaigns'); }}
+          onStop={async () => { const c = cockpit.byId[cockpitId]; await updateCampaign(cockpitId, { status: c?.status === 'paused' ? 'active' : 'paused' }); await cockpit.reload(); }}
+        />
+      )}
 
       {deptAgent && <DeptAgentWindow role={deptAgent.role} onClose={() => setDeptAgent(null)} onOpenLegacy={deptAgent.legacyTool ? () => { const tool = deptAgent.legacyTool; setDeptAgent(null); setAgentToolOpen(tool); setAgentToolPayload(null); } : null} />}
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {

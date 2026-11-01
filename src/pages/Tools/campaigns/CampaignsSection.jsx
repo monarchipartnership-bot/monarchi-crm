@@ -11,15 +11,15 @@ import '../../../styles/campaignsSection.css';
 
 // «Кампанії»: the teams of agents that work on the campaigns of the clients. Create a campaign (a window with the chain of agents),
 // the current campaigns, the archive.
-export default function CampaignsSection() {
+export default function CampaignsSection({ openCampaignId = null, openNewRequest = false }) {
   const [campaigns, setCampaigns] = useState(null);
   const [projects, setProjects] = useState([]);
   const [agents, setAgents] = useState([]);
   const [failed, setFailed] = useState({});
   const [view, setView] = useState('current'); // current | archive
   const [wizard, setWizard] = useState(false);
-  const [openId, setOpenId] = useState(null);
-  const [newRequest, setNewRequest] = useState(false); // «Тільки креативи» was just created: the request form opens at once
+  const [openId, setOpenId] = useState(openCampaignId);
+  const [newRequest, setNewRequest] = useState(openNewRequest); // «Тільки креативи» was just created: the request form opens at once
   const [toast, setToast] = useState(null);
 
   const notify = useCallback((text, isError = false) => { setToast({ text, isError }); setTimeout(() => setToast(null), isError ? 7000 : 4000); }, []);
