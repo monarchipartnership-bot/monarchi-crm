@@ -60,17 +60,22 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
     const lawn = new THREE.Mesh(new RoundedBoxGeometry(rect.w - 1.2, 0.12, rect.d - 1.2, 3, 0.4), mat(LAWN, { rough: 0.95 })); lawn.position.set(center.x, 0.2, center.z); lawn.receiveShadow = true; world.add(lawn); }
   const contains = (wx, wz, m = 0) => Math.abs(wx - center.x) < rect.w / 2 - m && Math.abs(wz - center.z) < rect.d / 2 - m;
 
-  // ---- the plaza (a lawn island with the fountain and beds), the ring ROAD round it, the sidewalk outside the road
-  { const pr = RP - RW / 2 - 1.0; // the plaza island
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(pr + 0.5, pr + 0.5, 0.34, 72), mat(C.cream, { rough: 0.9 })); base.position.y = G - 0.02; base.receiveShadow = true; g.add(base);
-    const plaza = new THREE.Mesh(new THREE.CircleGeometry(pr, 72), mat(0xe9dcf5, { rough: 0.95 })); plaza.rotation.x = -Math.PI / 2; plaza.position.y = G + 0.16; plaza.receiveShadow = true; g.add(plaza);
-    const f = assets.fountain.getObjectByName('fountain').clone(true); f.position.set(0, G + 0.16, 0); f.scale.setScalar(0.95); g.add(f);
-    const ring = (r0, r1, y, color, rough = 0.95) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 120), mat(color, { rough })); m.rotation.x = -Math.PI / 2; m.position.y = y; m.receiveShadow = true; g.add(m); return m; };
-    ring(RS - SW / 2, RS + SW / 2, G + 0.02, STONE, 0.9); // the sidewalk
-    ring(RS - SW / 2 - 0.35, RS - SW / 2, G + 0.05, 0xffffff, 0.8); ring(RS + SW / 2, RS + SW / 2 + 0.3, G + 0.03, C.lilac2, 0.9);
-    const asphalt = new THREE.MeshStandardMaterial({ color: ASPHALT, roughness: 0.95 }); const road = new THREE.Mesh(new THREE.RingGeometry(RP - RW / 2, RP + RW / 2, 120), asphalt); road.rotation.x = -Math.PI / 2; road.position.y = G + 0.05; road.receiveShadow = true; g.add(road);
-    ring(RP - RW / 2 - 0.45, RP - RW / 2, G + 0.12, 0xffffff, 0.8); ring(RP + RW / 2, RP + RW / 2 + 0.45, G + 0.12, 0xffffff, 0.8); // the kerbs of the road
-    const dm = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.03, 0.22), mat(C.white, { rough: 0.8 }), 40), o = new THREE.Object3D(); for (let k = 0; k < 40; k++) { const th = (k / 40) * Math.PI * 2; o.position.set(Math.cos(th) * RP, G + 0.07, Math.sin(th) * RP); o.rotation.set(0, -th - Math.PI / 2, 0); o.updateMatrix(); dm.setMatrixAt(k, o.matrix); } g.add(dm); // the dashes down the middle of the road
+  // ---- the plaza (a lawn island with the fountain and beds), the ring ROAD round it, the sidewalk outside the road.
+  // Every layer has its own height (at least 0.04 apart) and every painted line is a decal with a polygon offset, so no two surfaces share a depth and nothing shimmers.
+  const H = { side: G + 0.06, foot: G + 0.11, road: G + 0.16, paint: G + 0.2 };
+  const decal = (color, n = 1) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -n, polygonOffsetUnits: -n * 2 });
+  const OPEN = Math.asin((RW / 2 + 0.6) / (RP + RW / 2)); // the entrance road opens the outer edge line of the ring
+  { const pr = RP - RW / 2 - 1.0; // the plaza island: the top is its own colour, so there is no second disc over it
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(pr + 0.5, pr + 0.5, 0.34, 72), [mat(C.cream, { rough: 0.9 }), new THREE.MeshStandardMaterial({ color: 0xe9dcf5, roughness: 0.95 }), mat(C.cream, { rough: 0.9 })]); base.position.y = G - 0.02; base.receiveShadow = true; g.add(base);
+    const f = assets.fountain.getObjectByName('fountain').clone(true); f.position.set(0, G + 0.15, 0); f.scale.setScalar(0.95); g.add(f);
+    const ring = (r0, r1, y, material, th0 = 0, th1 = Math.PI * 2) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 120, 1, th0, th1 - th0), material); m.rotation.x = -Math.PI / 2; m.position.y = y; m.receiveShadow = true; g.add(m); return m; };
+    ring(RS - SW / 2, RS + SW / 2, H.side, new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.9 })); // the sidewalk
+    ring(RS - SW / 2 - 0.35, RS - SW / 2, H.side + 0.01, decal(0xffffff)); ring(RS + SW / 2, RS + SW / 2 + 0.3, H.side + 0.01, decal(C.lilac2));
+    ring(RP - RW / 2, RP + RW / 2, H.road, new THREE.MeshStandardMaterial({ color: ASPHALT, roughness: 0.95 })); // the road
+    const white = decal(0xffffff, 2);
+    ring(RP - RW / 2 - 0.4, RP - RW / 2, H.road + 0.01, white); // the edge lines of the road; the outer one is open where the entrance joins
+    ring(RP + RW / 2, RP + RW / 2 + 0.4, H.road + 0.01, white, Math.PI / 2 + OPEN, Math.PI / 2 - OPEN + Math.PI * 2);
+    const dm = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.03, 0.22), decal(0xffffff, 3), 40), o = new THREE.Object3D(); for (let k = 0; k < 40; k++) { const th = (k / 40) * Math.PI * 2; o.position.set(Math.cos(th) * RP, H.paint, Math.sin(th) * RP); o.rotation.set(0, -th - Math.PI / 2, 0); o.updateMatrix(); dm.setMatrixAt(k, o.matrix); } g.add(dm); // the dashes down the middle of the road
   }
   const stoneMat = mat(STONE, { rough: 0.9 }); stoneMat.side = THREE.DoubleSide;
   function ribbon(P, w, y, material) {
@@ -183,8 +188,8 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
     const V = (x, z) => new THREE.Vector3(x, 0, z);
     return new THREE.CubicBezierCurve3(V(a.x, a.z), V(a.x + d.x * L1, a.z + d.z * L1), V(end.x + Math.cos(th) * L2, end.z + Math.sin(th) * L2), V(end.x, end.z)).getSpacedPoints(18).map((q) => ({ x: q.x, z: q.z }));
   }
-  houses.forEach((h) => { h.spur = spurFor(h.doorLocal, h.dirLocal); ribbon(h.spur, 2.6, G + 0.03, stoneMat); });
-  sites.forEach((st) => { st.spur = spurFor(st.door, st.dir); ribbon(st.spur, 2.6, G + 0.03, stoneMat); });
+  houses.forEach((h) => { h.spur = spurFor(h.doorLocal, h.dirLocal); ribbon(h.spur, 2.6, H.foot, stoneMat); });
+  sites.forEach((st) => { st.spur = spurFor(st.door, st.dir); ribbon(st.spur, 2.6, H.foot, stoneMat); });
   const GATE_Z = -(HZ - 2.6); // the gate: on the north edge, towards the main building
   function arc(t0, t1, r) { let d = t1 - t0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const n = Math.max(2, Math.ceil(Math.abs(d) * r / 1.2)); return Array.from({ length: n + 1 }, (_, k) => ({ x: Math.cos(t0 + d * k / n) * r, z: Math.sin(t0 + d * k / n) * r })); }
   const polyLen = (P) => { let L = 0; const cum = [0]; for (let i = 1; i < P.length; i++) { L += Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z); cum.push(L); } return { P, L, cum }; };
@@ -195,15 +200,16 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
   const asphaltMat = mat(ASPHALT, { rough: 0.95 }); asphaltMat.side = THREE.DoubleSide;
   const edge = (48 + 2.2 - center.z) / S, ringTop = -(RP + RW / 2 - 0.6); // the street edge, the outer edge of the ring road, in local z
   { const len = ringTop - edge, zc = (edge + ringTop) / 2;
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(RW, Math.abs(len)), asphaltMat); road.rotation.x = -Math.PI / 2; road.position.set(0, G + 0.055, zc); road.receiveShadow = true; g.add(road);
-    { const kEnd = -(RS + SW / 2 + 0.3), klen = Math.abs(kEnd - edge), kzc = (edge + kEnd) / 2; [-RW / 2 - 0.22, RW / 2 + 0.22].forEach((x) => box(g, 0.45, 0.08, klen, C.white, x, G + 0.02, kzc, 0.03)); }
-    for (let z = edge + 2; z < ringTop - 1; z += 4.6) box(g, 0.22, 0.03, 1.8, C.white, 0, G + 0.1, z, 0.02);
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(RW, Math.abs(len)), asphaltMat); road.rotation.x = -Math.PI / 2; road.position.set(0, H.road, zc); road.receiveShadow = true; g.add(road);
+    { const kEnd = -(RS + SW / 2 + 0.3), klen = Math.abs(kEnd - edge), kzc = (edge + kEnd) / 2; [-RW / 2 - 0.22, RW / 2 + 0.22].forEach((x) => box(g, 0.45, 0.2, klen, C.white, x, G, kzc, 0.03)); }
+    for (let z = edge + 2; z < ringTop - 1; z += 4.6) { if (Math.abs(z + RS) < SW + 1) continue; box(g, 0.22, 0.03, 1.8, C.white, 0, H.road + 0.03, z, 0.02); }
+    for (let k = -3; k <= 3; k++) box(g, 0.6, 0.03, SW, C.white, k * 1.15, H.road + 0.03, -RS - SW / 2, 0.02); // a zebra where the sidewalk crosses the entrance road
     [-6.9, 6.9].forEach((x) => { box(g, 1.4, 6.2, 1.4, C.white, x, G, GATE_Z, 0.2); box(g, 1.7, 0.4, 1.7, C.plum, x, G + 6.2, GATE_Z, 0.1, { emissive: C.plum, ei: 0.25 }); });
     box(g, 16, 1.8, 1.0, C.deep, 0, G + 5.1, GATE_Z, 0.2);
     const gtex = canvasTex(768, 86, (c, w, h) => { const gr = c.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#b544b5'); gr.addColorStop(1, '#661466'); c.fillStyle = gr; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '800 52px Onest, Arial'; c.fillText('СОЦІАЛЬНИЙ РАЙОН', w / 2, h / 2 + 2); });
     [1, -1].forEach((sd) => { const gs = new THREE.Mesh(new THREE.PlaneGeometry(14.8, 1.62), new THREE.MeshBasicMaterial({ map: gtex, toneMapped: false })); gs.position.set(0, G + 6.0, GATE_Z + sd * 0.52); if (sd < 0) gs.rotation.y = Math.PI; g.add(gs); });
-    [-1, 1].forEach((sd, k) => { const x = sd * 13.5, bz = GATE_Z + 8; const bay = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 8.4), asphaltMat); bay.rotation.x = -Math.PI / 2; bay.position.set(x, G + 0.055, bz); g.add(bay);
-      const c = makeCartGlb(assets.cart, [C.mid, C.plum][k], assets.logo); c.scale.setScalar(1.6 / S); c.position.set(x, G + 0.06, bz); c.rotation.y = Math.PI / 2 + (k ? Math.PI : 0); g.add(c); }); }
+    [-1, 1].forEach((sd, k) => { const x = sd * 13.5, bz = GATE_Z + 8; const bay = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 8.4), asphaltMat); bay.rotation.x = -Math.PI / 2; bay.position.set(x, H.road, bz); g.add(bay);
+      const c = makeCartGlb(assets.cart, [C.mid, C.plum][k], assets.logo); c.scale.setScalar(1.6 / S); c.position.set(x, H.road + 0.01, bz); c.rotation.y = Math.PI / 2 + (k ? Math.PI : 0); g.add(c); }); }
 
   // ---- scenery
   const inPathNear = () => false;
@@ -243,7 +249,7 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
   for (let k = 0; k < 14; k++) { const th = k * Math.PI / 7 + 0.17, r = RS + SW / 2 + 1.5, x = Math.cos(th) * r, z = Math.sin(th) * r; if (!onSurface(x, z, 0.4) && !inPathNear(x, z)) benches.push([center.x + x * S, center.z + z * S, S * 1.2, G * S, face(x, z)]); }
   houses.forEach((h) => { const i = Math.floor(h.spur.length * 0.55), q = h.spur[i], q2 = h.spur[i + 1], tx = q2.x - q.x, tz = q2.z - q.z, l = Math.hypot(tx, tz) || 1, nx = -tz / l, nz = tx / l; [1, -1].forEach((sd, k) => { if (k) return; const x = q.x + nx * sd * 2.6, z = q.z + nz * sd * 2.6; if (!onSurface(x, z, 0.3)) benches.push([center.x + x * S, center.z + z * S, S * 1.2, G * S, Math.atan2(nx * sd, nz * sd)]); }); }); // a bench beside every footpath, facing it
   instancedProto(world, assets, 'bench', benches);
-  const beds = []; for (let k = 0; k < 6; k++) { const th = k * Math.PI / 3 + 0.5, r = 6.6; beds.push([center.x + Math.cos(th) * r * S, center.z + Math.sin(th) * r * S, S * 1.1, (G + 0.16) * S]); }
+  const beds = []; for (let k = 0; k < 6; k++) { const th = k * Math.PI / 3 + 0.5, r = 6.6; beds.push([center.x + Math.cos(th) * r * S, center.z + Math.sin(th) * r * S, S * 1.1, (G + 0.15) * S]); }
   for (let k = 0; k < 14; k++) { const sp = freeSpot(2.5); if (sp) beds.push([center.x + sp.x * S, center.z + sp.z * S, S * 1.2, G * S]); }
   instancedProto(world, assets, 'flower_bed', beds);
   const lamps = [], addLamp = (x, z) => { if (!onSurface(x, z, 0.5) && Math.abs(x) < HX - 1.5 && Math.abs(z) < HZ - 1.5) lamps.push([x, z]); };
@@ -266,7 +272,7 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
     walkers.forEach((w) => {
       if (w.state === 'wait') { w.t -= dt; if (w.t <= 0) startEdge(w); }
       else {
-        w.s += 7.5 * dt; const p = polyAt(w.route, w.s); w.rb.position.set(p.x, G + 0.04 + Math.abs(Math.sin(w.s * 2.0)) * 0.07, p.z); drive(w.rb, p, dt); w.rb.rotation.z = Math.sin(w.s * 2.0) * 0.05;
+        w.s += 7.5 * dt; const p = polyAt(w.route, w.s); w.rb.position.set(p.x, H.side + 0.04 + Math.abs(Math.sin(w.s * 2.0)) * 0.07, p.z); drive(w.rb, p, dt); w.rb.rotation.z = Math.sin(w.s * 2.0) * 0.05;
         const near = Math.min(1, Math.min(w.s, w.route.L - w.s) / 2.6); w.rb.scale.setScalar(1.15 * (0.25 + 0.75 * near)); // it shrinks into the doorway on both ends
         if (w.s >= w.route.L - 0.02) { w.rb.visible = false; w.from.away--; w.state = 'wait'; w.t = 1.6; w.edge = (w.edge + 1) % chain.length; }
       }

@@ -297,7 +297,7 @@ function laneOffset(points) {
 }
 function drive(cart, p, dt) { // sit on the road and turn smoothly towards the direction of travel
   let y = 0.03; for (const r of bridgeRects) { const d = r.half - Math.abs(r.axis === 'x' ? p.x - r.x : p.z - r.z), lat = Math.abs(r.axis === 'x' ? p.z - r.z : p.x - r.x); if (d > 0 && lat < ROADW) y = Math.max(y, 0.03 + 0.28 * Math.min(1, d / 1.6)); } // up the ramp onto a bridge deck and down again
-  if (VREC) { const dp = Math.min(p.x - VREC.x0, VREC.x1 - p.x, p.z - VREC.z0, VREC.z1 - p.z); if (dp > 0) y = Math.max(y, 0.03 + 0.27 * Math.min(1, dp / 1.6)); } // the ground of the village is a little higher than the street
+  if (VREC) { const dp = Math.min(p.x - VREC.x0, VREC.x1 - p.x, p.z - VREC.z0, VREC.z1 - p.z); if (dp > 0) y = Math.max(y, 0.03 + 0.31 * Math.min(1, dp / 1.6)); } // the ground of the village is a little higher than the street
   cart.position.set(p.x, y, p.z);
   const target = -Math.atan2(p.dz, p.dx); let d = target - (cart.userData.ang ?? target); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   cart.userData.ang = (cart.userData.ang ?? target) + d * Math.min(1, dt * 9); cart.rotation.y = cart.userData.ang;
