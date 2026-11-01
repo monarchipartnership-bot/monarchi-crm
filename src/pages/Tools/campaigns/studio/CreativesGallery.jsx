@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { composeText } from '../../../../lib/creatives/composeText';
+import { downloadOne, downloadZip } from '../../../../lib/creatives/download';
 import { estimateGeneration, generateCreatives, pollCreatives, saveFinalPicture, setCreativeStatus } from '../../../../lib/api/creatives';
 
 const STATUS = {
@@ -10,7 +11,7 @@ const usd = (n) => `$${Number(n || 0).toFixed(2)}`;
 
 // The pictures of a request: what Higgsfield made for every concept and format, what each cost, and the person's decisions. The price is asked before anything
 // is spent (the window shows it and waits for the OK); the words are put over the picture here when the system, not the image model, writes them.
-export default function CreativesGallery({ request, creatives, concepts = [], reload, notify, confirm }) {
+export default function CreativesGallery({ request, creatives, concepts = [], reload, notify, confirm, projectName = '' }) {
   const [busy, setBusy] = useState('');
   const [missing, setMissing] = useState(null);
   const producing = creatives.some((c) => c.status === 'producing');
@@ -23,6 +24,11 @@ export default function CreativesGallery({ request, creatives, concepts = [], re
   const conceptOf = (c) => concepts.find((x) => x.key === c.concept_key) || null;
   const todo = creatives.filter((c) => ['planned', 'failed'].includes(c.status));
   const total = creatives.reduce((s, c) => s + Number(c.cost_usd || 0), 0);
+  const fileOf = (c) => ({ id: c.id, url: c.final_url || c.asset_url || '', downloadUrl: c.final_url || c.asset_url || '', ratio: c.ratio, conceptName: c.concept_name || c.concept_key });
+  const ready = creatives.filter((c) => c.final_url || c.asset_url);
+  // the very file from the storage, no re-drawing: the quality stays as the model made it
+  async function download(c) { setBusy(`dl:${c.id}`); try { await downloadOne(fileOf(c), { project: projectName }); } catch (e) { notify(e.message || 'Не вдалося завантажити файл.', true); } finally { setBusy(''); } }
+  async function downloadAll() { setBusy('dlall'); try { const n = await downloadZip(ready.map(fileOf), { project: projectName, zipName: `${projectName || 'creatives'}_zapyt-${request.id}` }); notify(`Завантажено файлів: ${n}.`); } catch (e) { notify(e.message || 'Не вдалося завантажити файли.', true); } finally { setBusy(''); } }
 
   async function generate(ids = null) {
     setBusy(ids ? `one:${ids[0]}` : 'all');
@@ -71,6 +77,7 @@ export default function CreativesGallery({ request, creatives, concepts = [], re
       <div className="stu-gal-head">
         <h3>Картинки</h3>
         <span className="cmp-muted">Витрачено на запит: <b>{usd(total)}</b></span>
+        {ready.length > 0 && <button type="button" className="cmp-btn" disabled={!!busy} onClick={downloadAll}>{busy === 'dlall' ? 'Збираємо архів…' : `Завантажити все (${ready.length})`}</button>}
         {todo.length > 0 && <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy} onClick={() => generate(null)}>{busy === 'all' ? 'Рахуємо вартість…' : `Згенерувати картинки (${todo.length})`}</button>}
       </div>
       {missing && (
@@ -99,6 +106,7 @@ export default function CreativesGallery({ request, creatives, concepts = [], re
               <div className="stu-gal-actions">
                 {canOverlay && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => overlay(c)}>{busy === `text:${c.id}` ? 'Накладаємо…' : c.final_url ? 'Накласти текст знову' : 'Накласти текст'}</button>}
                 {['review', 'rejected', 'failed', 'approved'].includes(c.status) && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => generate([c.id])}>{busy === `one:${c.id}` ? 'Рахуємо…' : c.status === 'failed' ? 'Спробувати знову' : 'Згенерувати знову'}</button>}
+                {shown && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => download(c)}>{busy === `dl:${c.id}` ? 'Завантажуємо…' : 'Завантажити'}</button>}
                 {c.status === 'review' && <><button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy} onClick={() => decide(c, 'approved')}>Схвалити</button><button type="button" className="cmp-btn" disabled={!!busy} onClick={() => decide(c, 'rejected')}>Відхилити</button></>}
               </div>
             </li>

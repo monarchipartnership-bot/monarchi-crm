@@ -2,6 +2,8 @@
 // request stands, and what waits for the person. Pure code: it turns the rows of the database (campaigns, requests, tasks, creatives) into the shapes the
 // design components take as props (see the contract in docs/design-decisions.md, decision 33). The database is read by lib/api/projectCockpit.js.
 
+import { fileNameOf } from '../creatives/download.js';
+
 export const STAGES = [
   { key: 'strategy', label: 'Стратег', role: 'creative_strategy' },
   { key: 'brief', label: 'ТЗ', role: 'creative_brief' },
@@ -148,7 +150,12 @@ export function buildCockpit(raw) {
     requests: mine.filter((r) => r.status !== 'cancelled').map((r) => {
       const c = creatives.filter((x) => x.request_id === r.id);
       const status = DB_STATUS[r.status] || r.status;
-      return { id: r.id, title: clip(r.title, 90), status, statusLabel: REQUEST_STATUS_LABEL[status] || status, updatedAt: r.updated_at || r.created_at, creatives: { total: c.length, review: c.filter((x) => x.status === 'review').length, approved: c.filter((x) => x.status === 'approved').length, failed: c.filter((x) => x.status === 'failed').length, producing: c.filter((x) => x.status === 'producing').length } };
+      const items = c.slice().sort((a, b) => num(a.id) - num(b.id)).map((x) => {
+        const url = x.final_url || x.asset_url || '';
+        const item = { id: x.id, url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400) };
+        return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
+      });
+      return { id: r.id, title: clip(r.title, 90), status, statusLabel: REQUEST_STATUS_LABEL[status] || status, items, updatedAt: r.updated_at || r.created_at, creatives: { total: c.length, review: c.filter((x) => x.status === 'review').length, approved: c.filter((x) => x.status === 'approved').length, failed: c.filter((x) => x.status === 'failed').length, producing: c.filter((x) => x.status === 'producing').length } };
     }),
     spend: { model: modelCost, higgsfield, total: round(modelCost + higgsfield), currency: 'USD' },
     updatedAt: active?.updated_at || campaign.updated_at || campaign.created_at || null,

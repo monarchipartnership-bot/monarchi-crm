@@ -54,13 +54,15 @@ export default function useProjectCockpit({ enabled = true } = {}) {
 
   const waitingTotal = useMemo(() => list.filter((p) => p.waiting > 0).length, [list]);
 
+  const byIdAll = state.byId;
   const run = useCallback(async (item, key, payload = {}) => {
-    const res = await runCockpitAction(item, key, payload, { cockpit: Object.values(state.byId).find((c) => c.attention.some((i) => i.id === item.id)) || null, email });
+    const cockpit = (payload.campaignId != null ? byIdAll[payload.campaignId] : null) || Object.values(byIdAll).find((c) => c.attention.some((i) => i.id === item?.id)) || null;
+    const res = await runCockpitAction(item, key, payload, { cockpit, email });
     if (res.estimate) setEstimates((e) => ({ ...e, [item.requestId]: res.estimate }));
     if (res.dismissed) setDismissed((d) => { const n = new Set(d); n.add(res.dismissed); saveDismissed(n); return n; });
     await reload();
     return res;
-  }, [state.byId, email, reload]);
+  }, [byIdAll, email, reload]);
 
   return { list, byId, loading: state.loading, error: state.error, waitingTotal, reload, run };
 }

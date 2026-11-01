@@ -41,6 +41,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/creativeMake.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
+import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
 import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
@@ -2406,6 +2407,34 @@ await ok('project cabinet: the stage is the first step of the chain that is not 
   assert.deepEqual(splitNotes(''), []);
   assert.equal(hashText('abc'), hashText('abc'));
   assert.notEqual(hashText('abc'), hashText('abd'));
+});
+
+await ok('download of the creatives: the file keeps its own bytes and format (no re-drawing), names are readable and unique, a ZIP holds every file as it is', async () => {
+  const JSZip = (await import('jszip')).default;
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAAByRU5ErkJggg==', 'base64');
+  const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 0xff, 0xd9]);
+  const files = { 'https://x/a.png': { bytes: png, type: 'image/png' }, 'https://x/b.jpg': { bytes: jpg, type: 'image/jpeg' } };
+  const fetchFn = async (url) => (files[url] ? new Response(files[url].bytes, { status: 200, headers: { 'content-type': files[url].type } }) : new Response('', { status: 404 }));
+  const items = [{ id: 1, url: 'https://x/a.png', downloadUrl: 'https://x/a.png', ratio: '4:5', conceptName: 'Salon-fresh hair' }, { id: 2, url: 'https://x/b.jpg', downloadUrl: 'https://x/b.jpg', ratio: '9:16', conceptName: 'Salon-fresh hair' }, { id: 1, url: 'https://x/a.png', downloadUrl: 'https://x/a.png', ratio: '4:5', conceptName: 'Salon-fresh hair' }];
+  assert.equal(fileNameOf(items[0], { project: 'Mellow Diamond' }), 'Mellow_Diamond_Salon-fresh_hair_4x5_n1.png');
+  assert.equal(fileNameOf(items[1], { project: '' }), 'Salon-fresh_hair_9x16_n2.jpg');
+  const built = await buildZip(items, { project: 'Mellow', fetchFn });
+  assert.equal(built.count, 3);
+  assert.equal(new Set(built.names).size, 3); // the same creative twice does not overwrite itself
+  const back = await JSZip.loadAsync(Buffer.from(await built.blob.arrayBuffer()));
+  const nameOf = (n) => built.names.find((x) => x.includes(n));
+  assert.deepEqual(Buffer.from(await back.file(nameOf('4x5_n1.png')).async('uint8array')), png); // the bytes are the same as in the storage
+  assert.deepEqual(Buffer.from(await back.file(nameOf('9x16_n2.jpg')).async('uint8array')), jpg);
+  assert.equal(back.file(nameOf('9x16_n2.jpg'))._data.compressedSize, jpg.length); // stored, not compressed again
+  await assert.rejects(() => buildZip([{ id: 3, url: 'https://x/missing.png', ratio: '1:1', conceptName: 'x' }], { fetchFn }), /недоступний/);
+  await assert.rejects(() => buildZip([], { fetchFn }), /Немає готових файлів/);
+  // the cabinet carries the files of every request
+  const cockpit = buildCockpit({ campaign: { id: 4, project_id: 9, name: 'Mellow', status: 'active', config: { mode: 'creative' } }, project: { name: 'Mellowdiamond', client: 'Mellow' }, agents: [], tasks: [], library: { assets: 1 }, spend: 0,
+    requests: [{ id: 2, campaign_id: 4, status: 'review', title: 'T', materials: [{}], created_at: '2026-11-01T18:00:00Z' }],
+    creatives: [{ id: 7, request_id: 2, concept_key: 'c1', concept_name: 'One', ratio: '4:5', status: 'review', asset_url: 'https://x/raw.png', final_url: 'https://x/final.png' }, { id: 8, request_id: 2, concept_key: 'c1', ratio: '9:16', status: 'planned' }] });
+  const [first, second] = cockpit.requests[0].items;
+  assert.deepEqual([first.url, first.downloadUrl, first.kind, first.fileName], ['https://x/final.png', 'https://x/final.png', 'image', 'Mellowdiamond_One_4x5_n7.png']); // the picture with the words is what is downloaded
+  assert.deepEqual([second.url, second.status], ['', 'planned']);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

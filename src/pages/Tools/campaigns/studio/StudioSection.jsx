@@ -88,7 +88,7 @@ export default function StudioSection({ campaign, notify, onCampaign = null, aut
       </div>
 
       {form && <RequestForm campaign={campaign} initial={form.initial} onClose={() => setForm(null)} onSave={save} />}
-      {open && <RequestWindow request={open} team={team} onClose={() => setOpenId(null)} onChanged={() => reload().catch(() => {})} notify={notify} onCopy={(req) => { setOpenId(null); setForm({ initial: { ...req.brief, materials: req.materials } }); }} />}
+      {open && <RequestWindow campaignName={campaign.name} request={open} team={team} onClose={() => setOpenId(null)} onChanged={() => reload().catch(() => {})} notify={notify} onCopy={(req) => { setOpenId(null); setForm({ initial: { ...req.brief, materials: req.materials } }); }} />}
       {openRole && team && team.agents.find((a) => a.role === openRole) && (
         <AgentWindow role={openRole} team={team} setRole={(r) => team.agents.find((a) => a.role === r) && setOpenRole(r)} onClose={() => setOpenRole(null)} onChanged={() => reload().catch(() => {})} kick={() => kickQueue().then(() => reload()).catch(() => {})} />
       )}

@@ -3,6 +3,7 @@ import { buildCockpit, isActiveCampaign, sortProjects, summaryOf } from '../agen
 import { kickQueue } from './agents';
 import { estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, setCreativeStatus } from './creatives';
 import { uploadAsset } from './projectCreative';
+import { downloadOne, downloadZip } from '../creatives/download';
 
 const must = ({ data, error }) => { if (error) throw error; return data; };
 const WINDOW_DAYS = 30;
@@ -42,10 +43,24 @@ export async function fetchCockpits() {
 // What the person presses in a card (the names of the actions are the contract with the design components). Every function throws a readable Error.
 export async function runCockpitAction(item, key, payload = {}, { cockpit = null, email = null } = {}) {
   const kick = () => kickQueue().catch(() => {});
-  if (key === 'approve_all') { for (const c of item.creatives || []) await setCreativeStatus(c.id, 'approved'); return {}; }
+  if (key === 'download_one') {
+    const file = (cockpit?.requests || []).flatMap((r) => r.items || []).find((i) => i.id === payload.creativeId);
+    if (!file) throw new Error('Креатив не знайдено.');
+    await downloadOne(file, { project: cockpit.client || cockpit.name });
+    return {};
+  }
+  if (key === 'download_all') {
+    const request = (cockpit?.requests || []).find((r) => r.id === payload.requestId);
+    const wanted = Array.isArray(payload.statuses) && payload.statuses.length ? payload.statuses : null;
+    const files = (request?.items || []).filter((i) => i.url && (!wanted || wanted.includes(i.status)));
+    const name = `${cockpit?.client || cockpit?.name || 'creatives'}_zapyt-${payload.requestId}`;
+    const n = await downloadZip(files, { project: cockpit?.client || cockpit?.name, zipName: name });
+    return { downloaded: n };
+  }
+  if (key === 'approve_all') { for (const c of item?.creatives || []) await setCreativeStatus(c.id, 'approved'); return {}; }
   if (key === 'approve_one') { await setCreativeStatus(payload.creativeId, 'approved'); return {}; }
   if (key === 'return') {
-    const ids = payload.creativeIds?.length ? payload.creativeIds : (item.creatives || []).map((c) => c.id);
+    const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);
     const comment = String(payload.comment || '').trim();
     if (!comment) throw new Error('Напишіть коментар: що саме не так.');
     for (const id of ids) await setCreativeStatus(id, 'rejected', comment);

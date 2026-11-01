@@ -31,6 +31,7 @@
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
     "papaparse": "^5.7.0",
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.8",

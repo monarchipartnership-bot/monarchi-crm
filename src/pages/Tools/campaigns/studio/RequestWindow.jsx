@@ -17,7 +17,7 @@ const STEP_STATE = { wait: 'Чекає', work: 'Працює', done: 'Готов
 
 // One request of the studio: where its chain is, what every agent concluded, the brief with its concepts, the prompts and texts of the
 // creatives. A person can start it, cancel it, retry a failed step, copy it into a new request or delete it.
-export default function RequestWindow({ request: initial, team, onClose, onChanged, onCopy, notify }) {
+export default function RequestWindow({ request: initial, team, onClose, onChanged, onCopy, notify, campaignName = '' }) {
   const box = useRef(null);
   const [confirm, confirmDialog] = useConfirm();
   const [detail, setDetail] = useState({ request: initial, tasks: [], creatives: [] });
@@ -210,7 +210,7 @@ export default function RequestWindow({ request: initial, team, onClose, onChang
             </section>
           )}
 
-          <CreativesGallery request={detail.request} creatives={detail.creatives} concepts={brief?.concepts || []} reload={reload} notify={(text, isError) => notify?.(text, isError)} confirm={confirm} />
+          <CreativesGallery projectName={campaignName} request={detail.request} creatives={detail.creatives} concepts={brief?.concepts || []} reload={reload} notify={(text, isError) => notify?.(text, isError)} confirm={confirm} />
         </div>
         {confirmDialog}
       </div>

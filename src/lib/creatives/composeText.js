@@ -106,7 +106,7 @@ function calmWidth(ctx, W, H, zone) {
 }
 
 // → a PNG Blob: the picture with the words over it. The colour of the words follows the brightness of the picture under them.
-export async function composeText({ imageUrl, zone = 'left', headline = '', subline = '', badge = '', cta = '', maxSide = 2048 }) {
+export async function composeText({ imageUrl, zone = 'left', headline = '', subline = '', badge = '', cta = '', maxSide = 4096 }) {
   const img = await loadImage(imageUrl);
   const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
   const W = Math.round(img.naturalWidth * scale);
