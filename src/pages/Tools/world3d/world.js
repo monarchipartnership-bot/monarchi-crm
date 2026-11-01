@@ -123,18 +123,22 @@ ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; world.add(ground)
 const RING_ORDER = LAY.slots.filter((sl) => sl.id !== 'admin').map((sl) => [...slotOf].find(([, v]) => v === sl)?.[0]).filter(Boolean); // the order of the chain (also the demo route)
 const PLOT = Object.fromEntries([...slotOf].filter(([, sl]) => !sl.village).map(([k, sl]) => [k, sl.cell]));
 const PARKS = LAY.parks;
+// the area of the village: its blocks and the streets between them become one plate of its own, so no block, street or dash of the old grid is left under it
+const VC = LAY.villageCells || [], vci = VC.map((c) => c[0]), vcj = VC.map((c) => c[1]);
+const VREC = VC.length ? { x0: Math.min(...vci) * GRID - BLOCK / 2, x1: Math.max(...vci) * GRID + BLOCK / 2, z0: Math.min(...vcj) * GRID - BLOCK / 2, z1: Math.max(...vcj) * GRID + BLOCK / 2 } : null;
+const inVC = (i, j) => VC.some((c) => c[0] === i && c[1] === j), inVR = (x, z) => !!VREC && x > VREC.x0 && x < VREC.x1 && z > VREC.z0 && z < VREC.z1;
 // the zebra crossings sit where the door drives meet the street; the lane dashes leave them free
 const CROSSINGS = Object.values(PLOT).map(([i, j]) => [i * GRID, j * GRID + GRID / 2]);
 // lane dashes down the middle of every street (not across crossings)
 {
   const dash = new THREE.BoxGeometry(1.6, 0.03, 0.2), dm = new THREE.InstancedMesh(dash, mat(C.white, { rough: 0.8 }), 1600); let n = 0; const o = new THREE.Object3D();
-  STREETS.forEach((s) => { for (let u = -118; u <= 118; u += 4.2) { if (STREETS.some((c) => Math.abs(u - c) < ROADW / 2 + 1.5)) continue; if (CROSSINGS.some(([cx, cz]) => Math.abs(cz - s) < 0.1 && Math.abs(u - cx) < 2.6)) continue; o.position.set(u, 0.03, s); o.rotation.set(0, 0, 0); o.updateMatrix(); dm.setMatrixAt(n++, o.matrix); o.position.set(s, 0.03, u); o.rotation.set(0, Math.PI / 2, 0); o.updateMatrix(); dm.setMatrixAt(n++, o.matrix); } });
+  STREETS.forEach((s) => { for (let u = -118; u <= 118; u += 4.2) { if (STREETS.some((c) => Math.abs(u - c) < ROADW / 2 + 1.5)) continue; if (CROSSINGS.some(([cx, cz]) => Math.abs(cz - s) < 0.1 && Math.abs(u - cx) < 2.6)) continue; if (!inVR(u, s)) { o.position.set(u, 0.03, s); o.rotation.set(0, 0, 0); o.updateMatrix(); dm.setMatrixAt(n++, o.matrix); } if (!inVR(s, u)) { o.position.set(s, 0.03, u); o.rotation.set(0, Math.PI / 2, 0); o.updateMatrix(); dm.setMatrixAt(n++, o.matrix); } } });
   dm.count = n; dm.receiveShadow = true; world.add(dm);
 }
 const blockCentre = (i, j) => new THREE.Vector3(i * GRID, 0, j * GRID);
 // raised city blocks (the kerb), one per cell of the grid
 const blockMat = mat(KERB, { rough: 0.9 });
-for (let i = -LAY.range; i <= LAY.range; i++) for (let j = -LAY.range; j <= LAY.range; j++) { const b = new THREE.Mesh(new RoundedBoxGeometry(BLOCK, 0.2, BLOCK, 2, 0.5), blockMat); b.position.set(i * GRID, 0.04, j * GRID); b.receiveShadow = true; world.add(b); }
+for (let i = -LAY.range; i <= LAY.range; i++) for (let j = -LAY.range; j <= LAY.range; j++) { if (inVC(i, j)) continue; const b = new THREE.Mesh(new RoundedBoxGeometry(BLOCK, 0.2, BLOCK, 2, 0.5), blockMat); b.position.set(i * GRID, 0.04, j * GRID); b.receiveShadow = true; world.add(b); }
 
 // ------------------------------------------------------------ buildings: the pad's front edge sits 3.2 from the street, a drive runs from the door to the street
 const buildings = new Map();
@@ -157,7 +161,7 @@ RING_ORDER.forEach((k, i) => { if (PLOT[k]) addBuilding(DEPTS.find((d) => d.key 
 // ------------------------------------------------------------ scenery
 const rng = (() => { let s = 11; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
 const vSlot = LAY.slots.find((q) => q.village), vKey = vSlot ? [...slotOf].find(([, v]) => v === vSlot)?.[0] : null;
-const village = vKey ? buildVillage({ world, assets, agents: DEPTS.find((d) => d.key === vKey).agents, deptKey: vKey, center: { x: vSlot.cell[0] * GRID, z: vSlot.cell[1] * GRID }, S: 0.6, rng }) : null;
+const village = vKey ? buildVillage({ world, assets, agents: DEPTS.find((d) => d.key === vKey).agents, deptKey: vKey, center: { x: vSlot.cell[0] * GRID, z: vSlot.cell[1] * GRID }, S: 0.6, rng, rect: { w: VREC.x1 - VREC.x0, d: VREC.z1 - VREC.z0 } }) : null;
 if (village) village.houses.forEach((h) => { buildings.set(h.key, h); pickables.push(h.root); });
 const bFor = (deptKey, agentKey) => (village && deptKey === vKey ? buildings.get(vKey + '/' + (agentKey || '')) || null : buildings.get(deptKey));
 const plots = [...buildings.values()].filter((b) => !b.village);
@@ -239,7 +243,7 @@ LAY.lampStreets.forEach((st) => { // two lamps per block side, at ±8 from the b
     if (!nearWater(off, u, 7) && Math.abs(u) <= LAY.lamp) lampPts.push([off, u]);
   }
 });
-if (village) { const keep = lampPts.filter(([x, z]) => !village.contains(x, z, 2)); lampPts.length = 0; lampPts.push(...keep, ...village.lamps); } // the island of the village has its own lamps
+if (village) { const keep = lampPts.filter(([x, z]) => !village.contains(x, z, 1.2)); lampPts.length = 0; lampPts.push(...keep, ...village.lamps); } // the island of the village has its own lamps
 instancedProto(world, assets, 'lamp_post', lampPts.map(([x, z]) => [x, z, 1.0]));
 const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x, z]) => [x, z, 2.5])];
 {
