@@ -297,6 +297,7 @@ function laneOffset(points) {
 }
 function drive(cart, p, dt) { // sit on the road and turn smoothly towards the direction of travel
   let y = 0.03; for (const r of bridgeRects) { const d = r.half - Math.abs(r.axis === 'x' ? p.x - r.x : p.z - r.z), lat = Math.abs(r.axis === 'x' ? p.z - r.z : p.x - r.x); if (d > 0 && lat < ROADW) y = Math.max(y, 0.03 + 0.28 * Math.min(1, d / 1.6)); } // up the ramp onto a bridge deck and down again
+  if (VREC) { const dp = Math.min(p.x - VREC.x0, VREC.x1 - p.x, p.z - VREC.z0, VREC.z1 - p.z); if (dp > 0) y = Math.max(y, 0.03 + 0.27 * Math.min(1, dp / 1.6)); } // the ground of the village is a little higher than the street
   cart.position.set(p.x, y, p.z);
   const target = -Math.atan2(p.dz, p.dx); let d = target - (cart.userData.ang ?? target); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   cart.userData.ang = (cart.userData.ang ?? target) + d * Math.min(1, dt * 9); cart.rotation.y = cart.userData.ang;
@@ -316,6 +317,11 @@ world.add(hero.cart);
 // quiet traffic on the two ring streets
 const sq = (h) => [{ x: -h, z: -h }, { x: h, z: -h }, { x: h, z: h }, { x: -h, z: h }, { x: -h, z: -h }];
 const loopLanes = [laneOffset(sq(16)), laneOffset(sq(48))];
+{ // the grand tour: the vans go round the whole map by the streets (over the bridges), and through the gate of the village, once round its ring road
+  const tourRaw = [{ x: -80, z: 48 }, { x: 0, z: 48 }, { x: 48, z: 48 }, { x: 48, z: -48 }, { x: -16, z: -48 }, { x: -16, z: 16 }, { x: -80, z: 16 }, { x: -80, z: 48 }];
+  const tl = laneOffset(tourRaw).pts; if (village) { const k = tl.findIndex((q) => Math.abs(q.x) < 0.01 && Math.abs(q.z - 49) < 0.01); if (k > 0) tl.splice(k, 1, ...village.excursion); }
+  loopLanes.push({ pts: tl });
+}
 const loops = loopLanes.map((l) => makePath(l.pts));
 
 // the route of a van, drawn as a light dashed strip that fades in while you point at the van
@@ -336,7 +342,7 @@ function routeRibbon(pts, color) {
 }
 const heroRibbon = routeRibbon(heroLane.pts, C.plum), loopRibbons = loopLanes.map((l) => routeRibbon(l.pts, C.violet));
 hero.cart.userData.info = { ribbon: heroRibbon, hero: true };
-const carts = [[C.violet, 0, 0.0, 6], [C.pink, 0, 0.5, 6], [C.mid, 1, 0.1, 8], [C.violet, 1, 0.45, 8], [C.pink, 1, 0.75, 8]].map(([col, li, ph, v]) => { const c = makeCartGlb(assets.cart, col, assets.logo); c.scale.setScalar(1.6); c.userData.info = { ribbon: loopRibbons[li], hero: false }; world.add(c); return { c, li, ph, v }; });
+const carts = [[C.violet, 0, 0.0, 6], [C.pink, 0, 0.5, 6], [C.mid, 1, 0.1, 8], [C.violet, 1, 0.45, 8], [C.pink, 1, 0.75, 8], [C.violet, 2, 0.0, 7], [C.pink, 2, 0.33, 7], [C.mid, 2, 0.66, 7]].map(([col, li, ph, v]) => { const c = makeCartGlb(assets.cart, col, assets.logo); c.scale.setScalar(1.6); c.userData.info = { ribbon: loopRibbons[li], hero: false }; world.add(c); return { c, li, ph, v }; });
 const cartObjs = [hero.cart, ...carts.map((k) => k.c)];
 let hoverRibbon = null;
 const SPEED = 9;
@@ -641,7 +647,7 @@ raf = requestAnimationFrame(frame);
 const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([e]) => setPaused(!e.isIntersecting)) : null; io?.observe(root);
 const onVis = () => setPaused(document.hidden); document.addEventListener('visibilitychange', onVis);
 function setPaused(v) { paused = v; if (!v && !raf && !disposed) { clock.getDelta(); lastAdapt = performance.now(); raf = requestAnimationFrame(frame); } }
-if (opts.debug) window.__app = { hero, heroStop, village, loopState: () => ({ paused, raf, disposed, hidden: document.hidden }), frameStats: () => { const o = { ...FRAME_STATS, avg: FRAME_STATS.n ? FRAME_STATS.sum / FRAME_STATS.n : 0 }; FRAME_STATS.n = 0; FRAME_STATS.sum = 0; FRAME_STATS.max = 0; return o; }, setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
+if (opts.debug) window.__app = { hero, heroStop, village, loops, pathAt, loopState: () => ({ paused, raf, disposed, hidden: document.hidden }), frameStats: () => { const o = { ...FRAME_STATS, avg: FRAME_STATS.n ? FRAME_STATS.sum / FRAME_STATS.n : 0 }; FRAME_STATS.n = 0; FRAME_STATS.sum = 0; FRAME_STATS.max = 0; return o; }, setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
 
 // fresh states from the page (real activity): recolour the hats and the boxes
 function setRunStatus(map) {

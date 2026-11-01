@@ -84,7 +84,7 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
   const houses = [], sites = [], flags = [];
   const houseAt = (slot) => { const th = ANGLES[slot] * Math.PI / 180, j = 0.04 * Math.sin(slot * 2.3 + 1); return { x: Math.cos(th) * ELL.a * (1 + j), z: Math.sin(th) * ELL.b * (1 - j) }; };
   const SY = G; // the floor level of a house
-  function frame(slot) { const p = houseAt(slot), yaw = Math.atan2(-p.x, -p.z) + (rng() - 0.5) * 0.2, dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); return { p, yaw, dir, door: { x: p.x + dir.x * (HD / 2 + 2.2), z: p.z + dir.z * (HD / 2 + 2.2) } }; }
+  function frame(slot) { const p = houseAt(slot), yaw = Math.atan2(-p.x, -p.z) + (rng() - 0.5) * 0.2, dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); return { p, yaw, dir, door: { x: p.x + dir.x * (HD / 2 + 1.0), z: p.z + dir.z * (HD / 2 + 1.0) } }; }
 
   function buildHouse(a, i, slot) {
     const { p, yaw, dir, door } = frame(slot), hg = new THREE.Group(); hg.position.set(p.x, SY, p.z); hg.rotation.y = yaw; g.add(hg);
@@ -177,13 +177,14 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
 
   // ---- paths: a spur from every door to the ring, the entrance walk from the gate
   const ringAngle = (h) => Math.atan2(h.doorLocal.z, h.doorLocal.x);
-  function spur(h) {
-    const th = ringAngle(h), end = { x: Math.cos(th) * (RS + SW / 2 - 0.3), z: Math.sin(th) * (RS + SW / 2 - 0.3) }, a = h.doorLocal;
-    const mid = { x: (a.x + end.x) / 2 - Math.sin(th) * 1.2, z: (a.z + end.z) / 2 + Math.cos(th) * 1.2 };
-    return new THREE.QuadraticBezierCurve3(new THREE.Vector3(a.x, 0, a.z), new THREE.Vector3(mid.x, 0, mid.z), new THREE.Vector3(end.x, 0, end.z)).getSpacedPoints(14).map((q) => ({ x: q.x, z: q.z }));
+  function spurFor(a, d) { // door -> sidewalk: it leaves the door straight out and meets the sidewalk at a right angle
+    const th = Math.atan2(a.z, a.x), rEnd = RS + SW / 2 - 0.3, end = { x: Math.cos(th) * rEnd, z: Math.sin(th) * rEnd };
+    const dist = Math.hypot(end.x - a.x, end.z - a.z), L1 = Math.min(9, dist * 0.38), L2 = Math.min(9, dist * 0.38);
+    const V = (x, z) => new THREE.Vector3(x, 0, z);
+    return new THREE.CubicBezierCurve3(V(a.x, a.z), V(a.x + d.x * L1, a.z + d.z * L1), V(end.x + Math.cos(th) * L2, end.z + Math.sin(th) * L2), V(end.x, end.z)).getSpacedPoints(18).map((q) => ({ x: q.x, z: q.z }));
   }
-  houses.forEach((h) => { h.spur = spur(h); ribbon(h.spur, 2.6, G + 0.03, stoneMat); });
-  sites.forEach((s) => { const th = Math.atan2(s.door.z, s.door.x), end = { x: Math.cos(th) * (RS + SW / 2 - 0.3), z: Math.sin(th) * (RS + SW / 2 - 0.3) }; ribbon([{ x: s.door.x, z: s.door.z }, end], 2.6, G + 0.03, stoneMat); });
+  houses.forEach((h) => { h.spur = spurFor(h.doorLocal, h.dirLocal); ribbon(h.spur, 2.6, G + 0.03, stoneMat); });
+  sites.forEach((st) => { st.spur = spurFor(st.door, st.dir); ribbon(st.spur, 2.6, G + 0.03, stoneMat); });
   const GATE_Z = -(HZ - 2.6); // the gate: on the north edge, towards the main building
   function arc(t0, t1, r) { let d = t1 - t0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const n = Math.max(2, Math.ceil(Math.abs(d) * r / 1.2)); return Array.from({ length: n + 1 }, (_, k) => ({ x: Math.cos(t0 + d * k / n) * r, z: Math.sin(t0 + d * k / n) * r })); }
   const polyLen = (P) => { let L = 0; const cum = [0]; for (let i = 1; i < P.length; i++) { L += Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z); cum.push(L); } return { P, L, cum }; };
@@ -195,7 +196,7 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
   const edge = (48 + 2.2 - center.z) / S, ringTop = -(RP + RW / 2 - 0.6); // the street edge, the outer edge of the ring road, in local z
   { const len = ringTop - edge, zc = (edge + ringTop) / 2;
     const road = new THREE.Mesh(new THREE.PlaneGeometry(RW, Math.abs(len)), asphaltMat); road.rotation.x = -Math.PI / 2; road.position.set(0, G + 0.055, zc); road.receiveShadow = true; g.add(road);
-    [-RW / 2 - 0.22, RW / 2 + 0.22].forEach((x) => box(g, 0.45, 0.08, Math.abs(len), C.white, x, G + 0.02, zc, 0.03));
+    { const kEnd = -(RS + SW / 2 + 0.3), klen = Math.abs(kEnd - edge), kzc = (edge + kEnd) / 2; [-RW / 2 - 0.22, RW / 2 + 0.22].forEach((x) => box(g, 0.45, 0.08, klen, C.white, x, G + 0.02, kzc, 0.03)); }
     for (let z = edge + 2; z < ringTop - 1; z += 4.6) box(g, 0.22, 0.03, 1.8, C.white, 0, G + 0.1, z, 0.02);
     [-6.9, 6.9].forEach((x) => { box(g, 1.4, 6.2, 1.4, C.white, x, G, GATE_Z, 0.2); box(g, 1.7, 0.4, 1.7, C.plum, x, G + 6.2, GATE_Z, 0.1, { emissive: C.plum, ei: 0.25 }); });
     box(g, 16, 1.8, 1.0, C.deep, 0, G + 5.1, GATE_Z, 0.2);
@@ -205,9 +206,11 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
       const c = makeCartGlb(assets.cart, [C.mid, C.plum][k], assets.logo); c.scale.setScalar(1.6 / S); c.position.set(x, G + 0.06, bz); c.rotation.y = Math.PI / 2 + (k ? Math.PI : 0); g.add(c); }); }
 
   // ---- scenery
+  const inPathNear = () => false;
   const frame0 = (h) => ({ x: (h.pos.x - center.x) / S, z: (h.pos.z - center.z) / S });
   const RIN = RS + SW / 2 + 2.6; // everything inside this radius belongs to the plaza, the road and the sidewalk
   const inPath = (x, z, m = 0) => { const r = Math.hypot(x, z); if (r < RIN + m) return true; if (Math.abs(x) < RW / 2 + 3.4 + m && z < 0) return true; if (Math.hypot(x, z - (GATE_Z + 8)) < 15 + m) return true; return houses.some((h) => Math.hypot(x - frame0(h).x, z - frame0(h).z) < 11 + m || h.spur.some((q) => Math.hypot(q.x - x, q.z - z) < 3.4 + m)) || sites.some((st) => Math.hypot(x - st.x0, z - st.z0) < 11 + m); };
+  const onSurface = (x, z, m = 0) => { const r = Math.hypot(x, z); if (r > RP - RW / 2 - 0.8 && r < RS + SW / 2 + 0.3 + m) return true; if (Math.abs(x) < RW / 2 + 0.9 + m && z < -RP && z > edge - 1) return true; if (Math.hypot(x, z - (GATE_Z + 8)) < 6.5 + m && Math.abs(x) > 9) return false; return houses.some((h) => h.spur.some((q) => Math.hypot(q.x - x, q.z - z) < 1.8 + m)) || sites.some((st) => st.spur.some((q) => Math.hypot(q.x - x, q.z - z) < 1.8 + m)); };
   const inRect = (x, z, m) => Math.abs(x) < HX - m && Math.abs(z) < HZ - m;
   const taken = [];
   const freeSpot = (r) => { for (let t = 0; t < 800; t++) { const x = (rng() - 0.5) * 2 * (HX - 8), z = (rng() - 0.5) * 2 * (HZ - 8); if (inRect(x, z, r + 2) && !inPath(x, z, r * 0.45) && !taken.some(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) < tr + r + 3)) { taken.push([x, z, r]); return { x, z }; } } return null; };
@@ -234,19 +237,20 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
   for (let t = 0, n = 0; t < 9000 && n < 120; t++) { const x = (rng() - 0.5) * 2 * (HX - 4), z = (rng() - 0.5) * 2 * (HZ - 4); if (!inRect(x, z, 3) || inPath(x, z) || taken.some(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) < tr + 1)) continue; const k = kinds[Math.floor(rng() * kinds.length)]; put(k, x, z, k === 'bush' ? 0.8 + rng() * 0.5 : 0.85 + rng() * 0.55); n++; }
   // a hedge of bushes outside the sidewalk (open at the footpaths and at the entrance)
   const angDiff = (u, v) => Math.abs(Math.atan2(Math.sin(u - v), Math.cos(u - v)));
-  for (let a = 0; a < Math.PI * 2; a += 0.1) { const nearSpur = houses.some((h) => angDiff(ringAngle(h), a) < 0.12) || sites.some((st) => angDiff(st.th, a) < 0.12) || angDiff(-Math.PI / 2, a) < 0.28; if (!nearSpur) put('bush', Math.cos(a) * (RS + SW / 2 + 1.4), Math.sin(a) * (RS + SW / 2 + 1.4), 0.55); }
+  for (let a = 0; a < Math.PI * 2; a += 0.1) { const nearSpur = houses.some((h) => angDiff(ringAngle(h), a) < 0.17) || sites.some((st) => angDiff(st.th, a) < 0.17) || angDiff(-Math.PI / 2, a) < 0.3; if (!nearSpur) put('bush', Math.cos(a) * (RS + SW / 2 + 3.0), Math.sin(a) * (RS + SW / 2 + 3.0), 0.55); }
   kinds.forEach((k) => { if (trees[k].length) instancedProto(world, assets, k, trees[k]); });
-  const benches = []; for (let k = 0; k < 12; k++) { const th = k * Math.PI / 6 + 0.26, r = RS + SW / 2 + 0.9; benches.push([center.x + Math.cos(th) * r * S, center.z + Math.sin(th) * r * S, S * 1.2, G * S, -th + Math.PI / 2]); }
-  houses.forEach((h) => { const q = h.spur[Math.floor(h.spur.length * 0.45)], th = Math.atan2(q.z, q.x); benches.push([center.x + (q.x + 2.2) * S, center.z + (q.z + 0.4) * S, S * 1.2, G * S, -th]); });
+  const benches = [], face = (x, z) => Math.atan2(-x, -z); // a bench faces the middle of the plaza (the same turn as the benches of the parks)
+  for (let k = 0; k < 14; k++) { const th = k * Math.PI / 7 + 0.17, r = RS + SW / 2 + 1.5, x = Math.cos(th) * r, z = Math.sin(th) * r; if (!onSurface(x, z, 0.4) && !inPathNear(x, z)) benches.push([center.x + x * S, center.z + z * S, S * 1.2, G * S, face(x, z)]); }
+  houses.forEach((h) => { const i = Math.floor(h.spur.length * 0.55), q = h.spur[i], q2 = h.spur[i + 1], tx = q2.x - q.x, tz = q2.z - q.z, l = Math.hypot(tx, tz) || 1, nx = -tz / l, nz = tx / l; [1, -1].forEach((sd, k) => { if (k) return; const x = q.x + nx * sd * 2.6, z = q.z + nz * sd * 2.6; if (!onSurface(x, z, 0.3)) benches.push([center.x + x * S, center.z + z * S, S * 1.2, G * S, Math.atan2(nx * sd, nz * sd)]); }); }); // a bench beside every footpath, facing it
   instancedProto(world, assets, 'bench', benches);
   const beds = []; for (let k = 0; k < 6; k++) { const th = k * Math.PI / 3 + 0.5, r = 6.6; beds.push([center.x + Math.cos(th) * r * S, center.z + Math.sin(th) * r * S, S * 1.1, (G + 0.16) * S]); }
   for (let k = 0; k < 14; k++) { const sp = freeSpot(2.5); if (sp) beds.push([center.x + sp.x * S, center.z + sp.z * S, S * 1.2, G * S]); }
   instancedProto(world, assets, 'flower_bed', beds);
-  const lamps = [];
-  for (let k = 0; k < 16; k++) { const th = k * Math.PI / 8 + 0.1; lamps.push([Math.cos(th) * (RS + SW / 2 + 0.9), Math.sin(th) * (RS + SW / 2 + 0.9)]); }
-  for (let z = GATE_Z + 6; z < -(RIN - 1); z += 9) { lamps.push([RW / 2 + 1.0, z]); lamps.push([-RW / 2 - 1.0, z + 4.5]); }
-  houses.forEach((h) => { const d = h.doorLocal, dir = h.dirLocal; lamps.push([d.x + dir.z * 3.4 + dir.x * 1.2, d.z - dir.x * 3.4 + dir.z * 1.2]); });
-  sites.forEach((st) => { lamps.push([st.x0 + st.dir.z * 6, st.z0 - st.dir.x * 6]); });
+  const lamps = [], addLamp = (x, z) => { if (!onSurface(x, z, 0.5) && Math.abs(x) < HX - 1.5 && Math.abs(z) < HZ - 1.5) lamps.push([x, z]); };
+  for (let k = 0; k < 16; k++) { const th = k * Math.PI / 8 + 0.1; addLamp(Math.cos(th) * (RS + SW / 2 + 1.5), Math.sin(th) * (RS + SW / 2 + 1.5)); }
+  for (let z = GATE_Z + 6; z < -(RIN - 1); z += 9) { addLamp(RW / 2 + 2.4, z); addLamp(-RW / 2 - 2.4, z + 4.5); }
+  houses.forEach((h) => { const d = h.doorLocal, dir = h.dirLocal; addLamp(d.x + dir.z * 4.6 + dir.x * 1.6, d.z - dir.x * 4.6 + dir.z * 1.6); });
+  sites.forEach((st) => { addLamp(st.door.x + st.dir.z * 6 + st.dir.x * 2, st.door.z - st.dir.x * 6 + st.dir.z * 2); });
   const lampWorld = lamps.map(([x, z]) => [center.x + x * S, center.z + z * S]);
 
   // ---- people: the sending agent leaves its house, carries the task round the ring to the next house, goes in; the next one comes out
@@ -258,10 +262,7 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
   });
   function startEdge(w) { const a = chain[w.edge % chain.length], b = chain[(w.edge + 1) % chain.length]; w.route = polyLen(routeBetween(a, b)); w.s = 0; w.state = 'walk'; w.from = a; w.to = b; a.away++; w.rb.visible = true; }
   function drive(obj, p, dt) { const target = Math.atan2(p.dx, p.dz); let d = target - (obj.userData.ang ?? target); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; obj.userData.ang = (obj.userData.ang ?? target) + d * Math.min(1, dt * 9); obj.rotation.y = obj.userData.ang; }
-  const ringPath = polyLen(Array.from({ length: 121 }, (_, k) => { const th = (k / 120) * Math.PI * 2; return { x: Math.cos(th) * (RP + 1.8), z: Math.sin(th) * (RP + 1.8) }; })); // the outer lane: the cars go clockwise
-  const cars = [[C.violet, 0.0, 6.5], [C.pink, 0.36, 6.5], [C.mid, 0.7, 5.5]].map(([col, ph, v]) => { const c = makeCartGlb(assets.cart, col, assets.logo); c.scale.setScalar(1.6 / S); g.add(c); return { c, ph, v }; });
   function tick(dt, t) {
-    cars.forEach((k) => { const p = polyAt(ringPath, ((k.ph * ringPath.L + t * k.v / S) % ringPath.L)); k.c.position.set(p.x, G + 0.06, p.z); const target = -Math.atan2(p.dz, p.dx); let d = target - (k.c.userData.ang ?? target); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; k.c.userData.ang = (k.c.userData.ang ?? target) + d * Math.min(1, dt * 9); k.c.rotation.y = k.c.userData.ang; k.c.userData.parcel.position.y = k.c.userData.parcel.userData.base + Math.sin(t * 2.4 + k.ph * 9) * 0.03; });
     walkers.forEach((w) => {
       if (w.state === 'wait') { w.t -= dt; if (w.t <= 0) startEdge(w); }
       else {
@@ -272,5 +273,15 @@ export function buildVillage({ world, assets, agents, deptKey, center, S, rng, r
       w.parcel.position.y = 1.55 + Math.sin(t * 5) * 0.04;
     });
   }
-  return { group: g, houses, sites, flags, tick, contains, lamps: lampWorld, taken, center, S, gate: { x: center.x, z: 48 }, halfX: rect.w / 2, plaqueY: 34 };
+  // the tour of the vans: from the street z=48 through the gate down to the ring road, one lap (anticlockwise as seen on the map, keeping to the outer lane), and out again
+  const excursion = (() => {
+    const RC = RP + 1.8, xin = -2.5, xout = 2.5, P = [], w = (x, z) => P.push({ x: center.x + x * S, z: center.z + z * S }), zs = (48 + 1.0 - center.z) / S;
+    const zi = -Math.sqrt(RC * RC - xin * xin), zo = -Math.sqrt(RC * RC - xout * xout);
+    w(-7, zs); w(-3.6, zs + 0.8); w(xin, zs + 3); w(xin, zi - 10); w(xin, zi - 4);
+    const a0 = -Math.PI / 2 - Math.asin(Math.abs(xin) / RC), a1 = -Math.PI / 2 + Math.asin(Math.abs(xout) / RC) - Math.PI * 2;
+    for (let k = 0; k <= 48; k++) { const th = a0 + (a1 - a0) * k / 48; w(Math.cos(th) * RC, Math.sin(th) * RC); }
+    w(xout, zo - 4); w(xout, zo - 10); w(xout, zs + 3); w(3.6, zs + 0.8); w(7, zs);
+    return P;
+  })();
+  return { group: g, excursion, houses, sites, flags, tick, contains, lamps: lampWorld, taken, center, S, gate: { x: center.x, z: 48 }, halfX: rect.w / 2, plaqueY: 34 };
 }
