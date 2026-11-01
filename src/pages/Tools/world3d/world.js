@@ -575,7 +575,9 @@ const clock = new THREE.Clock();
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 resize();
 const ro = new ResizeObserver(() => { if (stage.clientWidth > 0 && stage.clientHeight > 0) resize(); }); ro.observe(stage);
-let wasAtMin = false;
+let prevZoom = camera.zoom, wheelOut = 0, hadTween = false;
+const atHome = () => !state.dept && controls.target.distanceTo(HOME) < 0.6 && camera.position.clone().sub(controls.target).distanceTo(HOME_OFFSET) < 0.6;
+renderer.domElement.addEventListener('wheel', (e) => { if (e.deltaY > 0) wheelOut = performance.now(); }, { passive: true });
 // Adaptive resolution: if frames take too long (a weak or busy GPU, a game running next to the browser, a hi-dpi screen) draw fewer pixels instead of freezing;
 // when there is room again, go back up.
 const PR_FLOOR = Math.min(1, window.devicePixelRatio); // never draw below one pixel per screen pixel: below it the picture goes soft
@@ -609,15 +611,16 @@ function frame() {
   if (village && !reduce) village.tick(dt, t);
   parkTicks.forEach((fn) => fn(t));
   if (selRing.visible) { const wp = selRing.userData.target.getWorldPosition(new THREE.Vector3()); selRing.position.set(wp.x, wp.y + 0.12, wp.z); selRing.scale.setScalar(1 + Math.sin(t * 4) * 0.06); }
-  const atMin = camera.zoom <= controls.minZoom + 0.04; // zoomed out as far as it goes: go back to the standard view
-  if (atMin && !wasAtMin && !tween) { const off = camera.position.clone().sub(controls.target); if (state.dept || controls.target.distanceTo(HOME) > 0.6 || off.distanceTo(HOME_OFFSET) > 0.6) user.reset(); }
-  wasAtMin = atMin;
+  // Zooming all the way out always ends in the same place: the home point and the standard angle, exactly as the home button does it (one flight, nothing else moves the camera).
+  const zoomingOut = camera.zoom < prevZoom - 1e-4 || performance.now() - wheelOut < 150;
+  const flightEnded = hadTween && !tween; // the «−» button reaches the far end by a flight: that counts as zooming out as well
+  if (!tween && (zoomingOut || flightEnded) && camera.zoom <= controls.minZoom + 0.15 && !atHome()) user.reset();
+  hadTween = !!tween; prevZoom = camera.zoom;
   stepTween(performance.now());
   { // the camera may reach every district: the room to move opens with the zoom (none when the whole city is in view) and is the box around all of them
     const s = THREE.MathUtils.smoothstep(camera.zoom, controls.minZoom + 0.05, controls.minZoom + 0.75), B = LAY.pan;
     const x0 = THREE.MathUtils.lerp(HOME.x - 3, B[0], s), x1 = THREE.MathUtils.lerp(HOME.x + 3, B[1], s), z0 = THREE.MathUtils.lerp(HOME.z - 3, B[2], s), z1 = THREE.MathUtils.lerp(HOME.z + 3, B[3], s);
-    controls.target.x = THREE.MathUtils.clamp(controls.target.x, x0, x1); controls.target.z = THREE.MathUtils.clamp(controls.target.z, z0, z1);
-    if (!tween && camera.zoom < controls.minZoom + 0.12 && !state.dept) controls.target.lerp(HOME, 1 - Math.exp(-4 * dt)); // zoomed all the way out: the city settles back to the centre
+    if (!tween) { controls.target.x = THREE.MathUtils.clamp(controls.target.x, x0, x1); controls.target.z = THREE.MathUtils.clamp(controls.target.z, z0, z1); } // not while a flight runs: the flight knows where it is going
   } // the working zone only: far out you see the whole zone, closer in you can reach its edges, never the outskirts
   controls.update();
   sun.position.copy(controls.target).add(SUN_OFF); sun.target.position.copy(controls.target); sun.target.updateMatrixWorld();
