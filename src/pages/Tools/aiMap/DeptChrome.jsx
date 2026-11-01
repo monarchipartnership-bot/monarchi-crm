@@ -5,10 +5,10 @@ import './DeptChrome.css';
 // Chrome of a focused department on the 3D map (Hub style, picks C + 2 of the 2026-10-25 mockup):
 // a rail of medallions on the right with a flyout card, «До мапи» above the rail, and a strip of all departments at the bottom.
 
-const STRIP_ORDER = ['management', 'strategy-research', 'performance-creative', 'performance-delivery', 'data-tracking-reporting', 'client-success', 'sales'];
+const STRIP_ORDER = ['management', 'client-research', 'client-creative', 'client-ads', 'client-reports', 'sales', 'internal', 'social'];
 const SHORT = {
-  management: 'Управління', 'strategy-research': 'Стратегія', 'performance-creative': 'Креативи', 'performance-delivery': 'Реклама',
-  'data-tracking-reporting': 'Дані', 'client-success': 'Клієнти', sales: 'Продажі',
+  management: 'Службові', 'client-research': 'Стратегія', 'client-creative': 'Креативи', 'client-ads': 'Реклама',
+  'client-reports': 'Звіти', sales: 'Нові клієнти', internal: 'SEO сайту', social: 'SMM',
 };
 
 const RAIL_ICONS = {

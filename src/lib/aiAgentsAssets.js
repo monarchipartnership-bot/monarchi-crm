@@ -24,5 +24,12 @@ export const DEPARTMENT_ICONS = {
   'performance-delivery': departmentAdvertising, // department.advertising (new)
   'performance-creative': SI.imageStudio, // page.image-studio
   'data-tracking-reporting': SI.salesDashboard, // page.sales-dashboard
+  // the eight slots of 2026-11-01 (five districts of the map)
+  'client-research': SI.clientsReport,
+  'client-creative': SI.imageStudio,
+  'client-ads': departmentAdvertising,
+  'client-reports': SI.salesDashboard,
+  internal: SI.automationDashboard, // the site of Mon'Archi
+  social: SI.followup, // our own social networks
   'quality-control': departmentQuality, // department.quality (new)
 };

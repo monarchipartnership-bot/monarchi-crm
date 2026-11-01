@@ -2,12 +2,10 @@
 // It is a demonstration only (the tag says so): no real task is behind it.
 
 const CHAIN = [
-  { key: 'strategy-research', short: 'Стратегія' },
-  { key: 'performance-creative', short: 'Креативи' },
-  { key: 'performance-delivery', short: 'Реклама' },
-  { key: 'data-tracking-reporting', short: 'Звітність' },
-  { key: 'client-success', short: 'Клієнти' },
-  { key: 'sales', short: 'Продажі' },
+  { key: 'client-research', short: 'Стратегія' },
+  { key: 'client-creative', short: 'Креативи' },
+  { key: 'client-ads', short: 'Реклама' },
+  { key: 'client-reports', short: 'Звіти' },
 ];
 
 const PARCEL = (

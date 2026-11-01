@@ -54,7 +54,7 @@ export const CAMPAIGN_ROLES = [
   { role: 'creative_performance_analyst', name: 'Агент аналітик креативів', short: 'які креативи працюють', stage: 'analysis', row: 3, platforms: ['meta', 'tiktok'], trigger: 'schedule', registry: 'creative-performance-analyst', schedule: sched(1, '09:15'),
     data: ['meta:ad:last_30d', 'meta:ad:last_7d'],
     description: 'Звʼязує кожен креатив з результатами і шукає закономірності: що виграє, що програє.', fields: [] },
-  { role: 'tracking_integrity', name: 'Контроль трекінгу', short: 'чи не зламані конверсії', stage: 'analysis', row: 4, platforms: ['meta', 'google'], trigger: 'schedule', registry: 'tracking-data-integrity-agent', schedule: sched(1, '09:30'),
+  { role: 'tracking_integrity', name: 'Контроль трекінгу', short: 'чи не зламані конверсії', stage: 'analysis', row: 4, platforms: ['meta', 'google'], trigger: 'schedule', registry: 'client-tracking-control', schedule: sched(1, '09:30'),
     data: ['meta:account:last_30d', 'google:account:LAST_30_DAYS', 'meta:account:last_7d', 'google:account:LAST_7_DAYS'],
     description: 'Порівнює дані платформ між собою і шукає ознаки зламаного трекінгу: нулі, дублі, різкі стрибки.', fields: [] },
   { role: 'meta_optimizer', name: 'Оптимізатор Meta Ads', short: 'план дій у кабінеті Meta', stage: 'action', row: 0, platforms: ['meta'], trigger: 'upstream', registry: 'meta-optimization-agent', schedule: null, data: [],
