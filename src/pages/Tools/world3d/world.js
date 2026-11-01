@@ -35,9 +35,9 @@ const LAYOUT = {
     { id: 'client-reports', keys: ['client-reports', 'client-success'], shape: 'client-success', cell: [2, -2] },
     { id: 'sales', keys: ['sales'], shape: 'sales', cell: [-2, 0] },
     { id: 'internal', keys: ['internal', 'data-tracking-reporting'], shape: 'data-tracking-reporting', cell: [3, 1] },
-    { id: 'social', keys: ['social'], shape: 'performance-creative', cell: [-0.5, 2.5], village: true }, // a village of small houses, one per agent, over four blocks (the streets between them are taken by its island)
+    { id: 'social', keys: ['social'], shape: 'performance-creative', cell: [0, 2.5], village: true }, // a village of small houses, one per agent, over six blocks centred on the main building (the streets between them are taken by its island)
   ],
-  parks: [[-1, 0]], strip: [], strip2: [[0, 1]], villageCells: [[-1, 2], [0, 2], [-1, 3], [0, 3]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [1, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
+  parks: [[-1, 0]], strip: [], strip2: [[0, 1]], villageCells: [[-1, 2], [0, 2], [1, 2], [-1, 3], [0, 3], [1, 3]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
   // the waters run through whole rows and columns of blocks, never along a street: the streets run beside them and cross them by bridges at right angles
   water: [{ w: 9, pts: [[-170, -34], [-100, -30], [-30, -34], [30, -30], [100, -34], [170, -30]] }, { w: 7, pts: [[-96, -32], [-97, 10], [-95, 60], [-96, 120], [-96, 170]] }],
   bank: [[-4, -1], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [4, -1], [-3, 0], [-3, 1], [-3, 2], [-3, 3], [-3, 4]],
@@ -275,7 +275,7 @@ const VX = LAY.vx;
 function route(a, b) { // a, b: points in the middle of a street running along x; go along it, turn into a cross street, come back to the second street
   if (Math.abs(a.z - b.z) < 0.01) return [b];
   let xv = VX[0], cost = 1e9; const lo = Math.min(a.z, b.z), hi = Math.max(a.z, b.z);
-  VX.forEach((x) => { if (village && Math.abs(x - village.center.x) < 1 && lo < 110 && hi > 50) return; const c = Math.abs(a.x - x) + Math.abs(b.x - x); if (c < cost) { cost = c; xv = x; } }); // not through the island of the village
+  VX.forEach((x) => { if (village && Math.abs(x - village.center.x) < village.halfX && lo < 110 && hi > 50) return; const c = Math.abs(a.x - x) + Math.abs(b.x - x); if (c < cost) { cost = c; xv = x; } }); // not through the island of the village
   return [{ x: xv, z: a.z }, { x: xv, z: b.z }, b];
 }
 function makePath(points) { const seg = []; let L = 0; for (let i = 0; i < points.length - 1; i++) { const a = points[i], b = points[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z); if (l < 1e-3) continue; seg.push({ a, l, s0: L, dx: (b.x - a.x) / l, dz: (b.z - a.z) / l }); L += l; } return { seg, L }; }
@@ -519,11 +519,11 @@ function applySelection() {
 const zoomFor = (b) => THREE.MathUtils.clamp(0.7 * (Math.max(VIEW_H, 104 / (stage.clientWidth / stage.clientHeight)) * stage.clientWidth / stage.clientHeight) / ((b.W + b.D) / Math.SQRT2 + 5), 1.3 * ZK, 3.4 * ZK);
 const api = {
   state,
-  selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); if (village && key === vKey) { flyTo(new THREE.Vector3(village.center.x, 0, village.center.z + 1), 2.7); return; } const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
+  selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); if (village && key === vKey) { flyTo(new THREE.Vector3(village.center.x, 0, village.center.z + 1), 2.2); return; } const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
   selectAgent(deptKey, agentKey) { autoFocused = false; state.dept = deptKey; state.agent = agentKey; applySelection(); const b = bFor(deptKey, agentKey), rb = b.robots.find((r) => r.userData.agent === agentKey), wp = rb.getWorldPosition(new THREE.Vector3()); flyTo(b.pos.clone().lerp(wp, 0.45).add(new THREE.Vector3(0, 1.5, 0)), zoomFor(b) * 1.15); },
   zoom(f) { flyTo(controls.target.clone(), THREE.MathUtils.clamp(camera.zoom * f, controls.minZoom, controls.maxZoom), 350); },
   rotate(rad) { const off = camera.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.theta = THREE.MathUtils.clamp(sph.theta + rad, controls.minAzimuthAngle, controls.maxAzimuthAngle); const to = new THREE.Vector3().setFromSpherical(sph), from = camera.position.clone().sub(controls.target), t0 = performance.now(); const step = () => { const k = Math.min(1, (performance.now() - t0) / 450); camera.position.copy(controls.target).add(from.clone().lerp(to, ease(k))); if (k < 1) requestAnimationFrame(step); }; step(); },
-  district(x, z, n) { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(new THREE.Vector3(x, 0, z + 2), n > 1 ? 1.75 : n === 0 ? 2.7 : 2.4); }, // a district of several buildings: all of them in view, none opened
+  district(x, z, n) { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(new THREE.Vector3(x, 0, z + 2), n > 1 ? 1.75 : n === 0 ? 2.2 : 2.4); }, // a district of several buildings: all of them in view, none opened
   reset() { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(HOME, 1, 650, HOME_OFFSET); },
   clear() { api.reset(); },
   buildings,
