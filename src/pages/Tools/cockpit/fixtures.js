@@ -49,7 +49,7 @@ export const COCKPIT_WAITING = {
     { id: 'ma-1', kind: 'missing_assets', tone: 'attention', title: 'Креативщику не вистачає фото товару', text: 'Без фото креативи будуть менш точними. Можна пропустити.', requestId: 14, actions: [{ key: 'upload_assets', label: 'Додати файли' }, { key: 'dismiss', label: 'Пропустити, менш точно' }] },
     { id: 'fs-1', kind: 'failed_step', tone: 'problem', title: 'Впав крок «Відео для сторіз»', text: 'Higgsfield відхилив запит: ліміт швидкості. Інші 7 кроків готові.', requestId: 14, actions: [{ key: 'retry_step', label: 'Повторити крок', primary: true }] },
     { id: 'qc-1', kind: 'qc_remark', tone: 'attention', title: 'Зауваження контролю якості', text: 'На креативі №3 (сторіз) текст виходить за безпечну зону.', requestId: 14, actions: [{ key: 'retry_step', label: 'Виправити автоматично', primary: true }, { key: 'dismiss', label: 'Лишити як є' }] },
-    { id: 'es-1', kind: 'estimate', tone: 'attention', title: 'Оцінка генерації', text: '6 зображень і 2 відео в Higgsfield. Баланс $48.20.', requestId: 14, estimate: { usd: 3.4, count: 8, limitUsd: 48.2 }, actions: [{ key: 'confirm_generation', label: 'Підтвердити генерацію', primary: true }] },
+    { id: 'es-1', kind: 'estimate', tone: 'attention', title: 'Оцінка генерації', text: '6 зображень і 2 відео в Higgsfield. Баланс $48.20.', requestId: 14, estimate: { usd: 3.4, count: 8, limitUsd: 48.2 }, actions: [{ key: 'confirm_generation', label: 'Підтвердити генерацію · $3.40', primary: true }] },
   ],
   requests: [
     { id: 14, title: 'Осінній розпродаж', status: 'review', statusLabel: 'на перегляд', updatedAt: ago(4), creatives: { total: 8, review: 3, approved: 2, failed: 1 }, items: ITEMS_14 },

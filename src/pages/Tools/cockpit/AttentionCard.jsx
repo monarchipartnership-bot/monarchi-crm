@@ -5,7 +5,7 @@ import { fmtUsd } from './format';
 // One card of «Потребує вашої уваги». Every action is done on the spot: the card calls onAction(item, key, payload) and shows a spinner on the button
 // until the promise settles; a rejected promise shows its message under the card.
 const KIND = { review: ['img', 'amber'], question: ['chat', 'blue'], missing_assets: ['upload', 'blue'], failed_step: ['refresh', 'red'], qc_remark: ['shield', 'amber'], estimate: ['wallet', 'green'] };
-const GOOD = new Set(['approve_all', 'approve_one', 'confirm_generation']);
+const GOOD = new Set(['approve_all', 'approve_one']);
 const FALLBACK = ['linear-gradient(150deg,#B544B5,#661466)', 'linear-gradient(150deg,#F5B04A,#B5651D)', 'linear-gradient(150deg,#7C8CF8,#3B3FA8)', 'linear-gradient(150deg,#E46AA8,#8E1D63)', 'linear-gradient(150deg,#4AD488,#12803F)'];
 const thumbSize = (ratio, h) => { const [a, b] = String(ratio || '1:1').split(':').map(Number); const r = a > 0 && b > 0 ? a / b : 1; return { height: h, width: Math.round(h * Math.max(0.5, Math.min(1.8, r))) }; };
 
@@ -86,8 +86,8 @@ export default function AttentionCard({ item, onAction, big = false }) {
         {actions.filter((a) => a.key !== 'approve_one').length > 0 && (
           <div className="ckp-acts">
             {actions.filter((a) => a.key !== 'approve_one').map((a) => (
-              <button key={a.key + a.label} type="button" className={'ckp-btn' + (a.primary ? (GOOD.has(a.key) ? ' is-ok' : ' is-primary') : '')} onClick={() => click(a)} disabled={!!busy}>
-                {busy === a.key ? <Spinner /> : GOOD.has(a.key) && a.primary ? <Ic n="check" size={15} /> : a.key === 'retry_step' ? <Ic n="refresh" size={15} /> : a.key === 'upload_assets' ? <Ic n="upload" size={15} /> : null}
+              <button key={a.key + a.label} type="button" className={'ckp-btn' + (a.primary ? (a.key === 'confirm_generation' ? ' is-money' : GOOD.has(a.key) ? ' is-ok' : ' is-primary') : '')} title={a.key === 'confirm_generation' ? 'Це запустить платну генерацію' : undefined} onClick={() => click(a)} disabled={!!busy}>
+                {busy === a.key ? <Spinner /> : a.key === 'confirm_generation' ? <Ic n="wallet" size={15} /> : GOOD.has(a.key) && a.primary ? <Ic n="check" size={15} /> : a.key === 'retry_step' ? <Ic n="refresh" size={15} /> : a.key === 'upload_assets' ? <Ic n="upload" size={15} /> : null}
                 {a.label}
               </button>
             ))}

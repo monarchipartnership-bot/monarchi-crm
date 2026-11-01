@@ -17,17 +17,17 @@ export default function AttentionRow({ item, onAction, onShowReview }) {
   const bad = item.tone === 'problem';
   const rest = item.title.startsWith(label) ? item.title.slice(label.length).trim() : '';
   const short = item.kind === 'review' ? (item.text || '') : item.kind === 'failed_step' ? (rest || item.text) : item.kind === 'estimate' ? '' : (item.text || item.title);
-  const head = item.kind === 'estimate' && item.estimate ? `Оцінка ≈ ${fmtUsd(item.estimate.usd)}` : label;
+  const paid = quick?.key === 'confirm_generation', head = item.kind === 'estimate' ? (paid ? 'Генерація' : item.estimate ? `Оцінка ≈ ${fmtUsd(item.estimate.usd)}` : label) : label;
   async function run() {
     setErr(''); setBusy(quick.key);
     try { await onAction?.(item, quick.key, {}); } catch (e) { setErr(e?.message || 'Не вдалося виконати дію.'); } finally { setBusy(''); }
   }
   return (
-    <div className={'ckp-arow' + (bad ? ' is-bad' : '')}>
+    <div className={'ckp-arow' + (bad ? ' is-bad' : '') + (quick && quick.label.length > 16 ? ' is-stack' : '')}>
       <IconBadge n={icon} tone={bad ? 'red' : tone} size={28} />
       <span className="ckp-atx" title={item.text || item.title}><b>{head}</b>{short ? <span> · {short}</span> : null}</span>
       <span className="ckp-ac2">
-        {quick && <button type="button" className={'ckp-btn is-sm ' + (item.kind === 'estimate' ? 'is-ok' : 'is-primary')} disabled={!!busy} onClick={run}>{busy ? <Spinner /> : item.kind === 'failed_step' ? <Ic n="refresh" size={14} /> : <Ic n="check" size={14} />}{item.kind === 'estimate' ? 'Підтвердити' : quick.label}</button>}
+        {quick && <button type="button" className={'ckp-btn is-sm ' + (quick.key === 'confirm_generation' ? 'is-money' : item.kind === 'estimate' ? 'is-ok' : 'is-primary')} title={quick.key === 'confirm_generation' ? 'Це запустить платну генерацію' : undefined} disabled={!!busy} onClick={run}>{busy ? <Spinner /> : item.kind === 'failed_step' ? <Ic n="refresh" size={14} /> : quick.key === 'confirm_generation' ? <Ic n="wallet" size={14} /> : <Ic n="check" size={14} />}{quick.label}</button>}
         {item.kind === 'review' && onShowReview && <button type="button" className="ckp-more" onClick={onShowReview}>Показати</button>}
         {item.kind !== 'review' && <button type="button" className="ckp-more" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Згорнути' : 'Детальніше'}</button>}
       </span>

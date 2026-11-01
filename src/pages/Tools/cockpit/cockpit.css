@@ -184,3 +184,7 @@
 .ckp-aopen { grid-column: 1 / -1; padding-top: 4px; } .ckp-aopen .ckp-acard { box-shadow: none; padding: 6px 2px 2px; background: transparent; }
 .ckp-aerr { grid-column: 1 / -1; margin: 0; }
 .ckp-tr { grid-template-columns: 38px minmax(0, 1fr) auto; } .ckp-tr.is-on { background: var(--ck-chip); box-shadow: inset 0 0 0 1.5px #B544B5; }
+
+/* a button that spends money (a paid generation): amber, with the wallet icon, so it is not taken for a plain «OK» */
+.ckp-btn.is-money { background: linear-gradient(100deg, #F5B04A, #C27A0B); color: #fff; box-shadow: 0 0 0 4px #f5b04a40, 0 10px 20px -8px #a8650b99; font-weight: 700; }
+.ckp-arow.is-stack { grid-template-columns: 28px minmax(0, 1fr); row-gap: 6px; } .ckp-arow.is-stack .ckp-ac2 { grid-column: 2; justify-content: space-between; }
