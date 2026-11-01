@@ -87,3 +87,10 @@
 
 .district-label { transition: opacity .25s; }
 .district-label.is-dim { opacity: 0; pointer-events: none !important; }
+
+/* the flags with the name of a house of the village */
+.w3d .dept-label.hname { min-width: 0; max-width: none; border-radius: 999px; box-shadow: 0 6px 16px #66146644; }
+.w3d .dept-label.hname .lv-head { padding: 6px 14px 6px 11px; border-radius: 999px; gap: 7px; white-space: nowrap; }
+.w3d .dept-label.hname .lv-head b { font-size: 12px; }
+.w3d .dept-label.hname .sd { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px #ffffffaa; }
+.w3d .dept-label.hname::after { height: 12px; }

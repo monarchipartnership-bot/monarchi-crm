@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { C, box, cyl, makeCart, mat, canvasTex } from './models.js';
 import { loadAssets, makeCartGlb, setRobotRun } from './assets.js';
 import { createBuilding } from './buildings.js';
+import { buildVillage } from './village.js';
 import { buildPark, instancedProto } from './park.js';
 import { buildForecourts } from './forecourt.js';
 import { initDayNight, collectEmissives } from './daynight.js';
@@ -34,9 +35,9 @@ const LAYOUT = {
     { id: 'client-reports', keys: ['client-reports', 'client-success'], shape: 'client-success', cell: [2, -2] },
     { id: 'sales', keys: ['sales'], shape: 'sales', cell: [-2, 0] },
     { id: 'internal', keys: ['internal', 'data-tracking-reporting'], shape: 'data-tracking-reporting', cell: [3, 1] },
-    { id: 'social', keys: ['social'], shape: 'performance-creative', cell: [0, 3] },
+    { id: 'social', keys: ['social'], shape: 'performance-creative', cell: [-0.5, 2.5], village: true }, // a village of small houses, one per agent, over four blocks (the streets between them are taken by its island)
   ],
-  parks: [[-1, 0]], strip: [], strip2: [[0, 1], [0, 2]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [1, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
+  parks: [[-1, 0]], strip: [], strip2: [[0, 1]], villageCells: [[-1, 2], [0, 2], [-1, 3], [0, 3]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [1, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
   // the waters run through whole rows and columns of blocks, never along a street: the streets run beside them and cross them by bridges at right angles
   water: [{ w: 9, pts: [[-170, -34], [-100, -30], [-30, -34], [30, -30], [100, -34], [170, -30]] }, { w: 7, pts: [[-96, -32], [-97, 10], [-95, 60], [-96, 120], [-96, 170]] }],
   bank: [[-4, -1], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [4, -1], [-3, 0], [-3, 1], [-3, 2], [-3, 3], [-3, 4]],
@@ -120,7 +121,7 @@ function fadeTex() {
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(270, 270), new THREE.MeshStandardMaterial({ color: ASPHALT, alphaMap: fadeTex(), transparent: true, roughness: 0.95 }));
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; world.add(ground);
 const RING_ORDER = LAY.slots.filter((sl) => sl.id !== 'admin').map((sl) => [...slotOf].find(([, v]) => v === sl)?.[0]).filter(Boolean); // the order of the chain (also the demo route)
-const PLOT = Object.fromEntries([...slotOf].map(([k, sl]) => [k, sl.cell]));
+const PLOT = Object.fromEntries([...slotOf].filter(([, sl]) => !sl.village).map(([k, sl]) => [k, sl.cell]));
 const PARKS = LAY.parks;
 // the zebra crossings sit where the door drives meet the street; the lane dashes leave them free
 const CROSSINGS = Object.values(PLOT).map(([i, j]) => [i * GRID, j * GRID + GRID / 2]);
@@ -151,11 +152,15 @@ function addBuilding(d, cell, idx) {
   return b;
 }
 { const adm = DEPTS.find((d) => slotOf.get(d.key)?.id === 'admin'); if (adm) addBuilding(adm, PLOT[adm.key], -1); }
-RING_ORDER.forEach((k, i) => addBuilding(DEPTS.find((d) => d.key === k), PLOT[k], i));
+RING_ORDER.forEach((k, i) => { if (PLOT[k]) addBuilding(DEPTS.find((d) => d.key === k), PLOT[k], i); });
 
 // ------------------------------------------------------------ scenery
 const rng = (() => { let s = 11; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
-const plots = [...buildings.values()];
+const vSlot = LAY.slots.find((q) => q.village), vKey = vSlot ? [...slotOf].find(([, v]) => v === vSlot)?.[0] : null;
+const village = vKey ? buildVillage({ world, assets, agents: DEPTS.find((d) => d.key === vKey).agents, deptKey: vKey, center: { x: vSlot.cell[0] * GRID, z: vSlot.cell[1] * GRID }, S: 0.6, rng }) : null;
+if (village) village.houses.forEach((h) => { buildings.set(h.key, h); pickables.push(h.root); });
+const bFor = (deptKey, agentKey) => (village && deptKey === vKey ? buildings.get(vKey + '/' + (agentKey || '')) || null : buildings.get(deptKey));
+const plots = [...buildings.values()].filter((b) => !b.village);
 const padRect = (b) => ({ x0: b.cell.x - (b.W + 4.6) / 2 - 1.2, x1: b.cell.x + (b.W + 4.6) / 2 + 1.2, z0: b.pos.z - (b.D + 4.6) / 2 - 1.2, z1: b.cell.z + BLOCK / 2 });
 const inPad = (x, z) => plots.some((b) => { const r = padRect(b); return x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1; });
 const trees = [];
@@ -165,7 +170,7 @@ const parkTicks = [];
 const parkLamps = [];
 PARKS.forEach(([i, j]) => buildPark(world, blockCentre(i, j), assets, BLOCK, parkTicks, parkLamps));
 // ---- forests, long green squares, two waters with bridges
-const reserved = new Set([...Object.values(PLOT), ...PARKS, ...(LAY.strip || []), ...(LAY.strip2 || []), ...(LAY.forest || []), ...(LAY.bank || [])].map(([i, j]) => i + ',' + j));
+const reserved = new Set([...Object.values(PLOT), ...PARKS, ...(LAY.strip || []), ...(LAY.strip2 || []), ...(LAY.forest || []), ...(LAY.bank || []), ...(LAY.villageCells || [])].map(([i, j]) => i + ',' + j));
 const waterCurves = (LAY.water || []).map((sp) => { const curve = new THREE.CatmullRomCurve3(sp.pts.map(([x, z]) => new THREE.Vector3(x, 0, z))); return { sp, curve, P: curve.getSpacedPoints(Math.max(8, Math.round(curve.getLength() / 2))) }; });
 function nearWater(x, z, r) { return waterCurves.some(({ sp, P }) => P.some((q) => Math.hypot(q.x - x, q.z - z) < r + sp.w / 2)); }
 (LAY.forest || []).forEach(([i, j]) => {
@@ -234,6 +239,7 @@ LAY.lampStreets.forEach((st) => { // two lamps per block side, at ±8 from the b
     if (!nearWater(off, u, 7) && Math.abs(u) <= LAY.lamp) lampPts.push([off, u]);
   }
 });
+if (village) { const keep = lampPts.filter(([x, z]) => !village.contains(x, z, 2)); lampPts.length = 0; lampPts.push(...keep, ...village.lamps); } // the island of the village has its own lamps
 instancedProto(world, assets, 'lamp_post', lampPts.map(([x, z]) => [x, z, 1.0]));
 const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x, z]) => [x, z, 2.5])];
 {
@@ -268,7 +274,8 @@ const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x,
 const VX = LAY.vx;
 function route(a, b) { // a, b: points in the middle of a street running along x; go along it, turn into a cross street, come back to the second street
   if (Math.abs(a.z - b.z) < 0.01) return [b];
-  let xv = VX[0], cost = 1e9; VX.forEach((x) => { const c = Math.abs(a.x - x) + Math.abs(b.x - x); if (c < cost) { cost = c; xv = x; } });
+  let xv = VX[0], cost = 1e9; const lo = Math.min(a.z, b.z), hi = Math.max(a.z, b.z);
+  VX.forEach((x) => { if (village && Math.abs(x - village.center.x) < 1 && lo < 110 && hi > 50) return; const c = Math.abs(a.x - x) + Math.abs(b.x - x); if (c < cost) { cost = c; xv = x; } }); // not through the island of the village
   return [{ x: xv, z: a.z }, { x: xv, z: b.z }, b];
 }
 function makePath(points) { const seg = []; let L = 0; for (let i = 0; i < points.length - 1; i++) { const a = points[i], b = points[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z); if (l < 1e-3) continue; seg.push({ a, l, s0: L, dx: (b.x - a.x) / l, dz: (b.z - a.z) / l }); L += l; } return { seg, L }; }
@@ -291,7 +298,7 @@ function drive(cart, p, dt) { // sit on the road and turn smoothly towards the d
   cart.userData.ang = (cart.userData.ang ?? target) + d * Math.min(1, dt * 9); cart.rotation.y = cart.userData.ang;
 }
 // the demo task visits the departments in the order of the chain and comes back along the streets
-const stops = RING_ORDER.map((k) => buildings.get(k).door);
+const stops = RING_ORDER.map((k) => (village && k === vKey ? new THREE.Vector3(village.gate.x, 0.5, village.gate.z) : buildings.get(k).door));
 const heroRaw = [{ x: stops[0].x, z: stops[0].z }];
 for (let i = 1; i <= stops.length; i++) { const a2 = heroRaw[heroRaw.length - 1], b2 = stops[i % stops.length]; route(a2, { x: b2.x, z: b2.z }).forEach((q) => heroRaw.push(q)); }
 const heroLane = laneOffset(heroRaw);
@@ -377,6 +384,11 @@ const districtLabels = LAY.districts.map((dd) => {
   if (!present.length) return null;
   const el = document.createElement('div'); el.className = 'district-label'; el.innerHTML = `<b>${dd.n}</b><small>${dd.sub}</small>`; labelLayer.appendChild(el);
   const cx = present.reduce((a, sl) => a + sl.cell[0] * GRID, 0) / present.length, cz = present.reduce((a, sl) => a + sl.cell[1] * GRID, 0) / present.length;
+  if (village && present.length === 1 && present[0].village) { // the village: the plaque stands over it, a click brings the whole village into view; the house flags take over when you come closer
+    const n0 = DEPTS.find((d) => d.key === vKey).agents.length; el.innerHTML = `<b>${dd.n}</b><small>${dd.sub} · ${n0} ${plural(n0)}</small>`;
+    el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.addEventListener('click', () => user.district(village.center.x, village.center.z, 0));
+    return { el, keys: village.houses.map((h) => h.key), many: true, thr: 2.0, pos: new THREE.Vector3(village.center.x, 22, village.center.z - 4) };
+  }
   if (present.length === 1) {
     const key = [...slotOf].find(([, v]) => v === present[0])[0], dl = deptLabels.find((q) => q.d.key === key), d0 = dl.d;
     const cnt = (st) => d0.agents.filter((a) => a.status === st).length;
@@ -388,14 +400,19 @@ const districtLabels = LAY.districts.map((dd) => {
   const keys = present.map((sl) => [...slotOf].find(([, v]) => v === sl)[0]);
   return { el, keys, many: present.length > 1, pos: new THREE.Vector3(cx, present.length > 1 ? 46 : 30, cz + 4) };
 }).filter(Boolean);
+const houseLabels = village ? village.flags.map((f) => { // the name of every house of the village, a small flag that shows once you are close
+  const el = document.createElement('div'), col = f.built ? RUN[runOf(f.a)].css : '#7C8CF8'; el.className = 'dept-label hname'; el.style.pointerEvents = 'auto'; el.style.cursor = f.built ? 'pointer' : 'default';
+  el.innerHTML = `<span class="lv-head"><i class="sd" style="background:${col}"></i><b>${f.a.name}</b></span>`; labelLayer.appendChild(el); if (f.built) el.addEventListener('click', () => user.house(vKey, f.a.key)); return { el, f };
+}) : [];
 const STATUS_DOT = { live: 'live', in_development: 'dev', not_started: 'plan' };
 const agentLabels = [];
 const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
-DEPTS.forEach((d) => { const b = buildings.get(d.key); if (!b) return; d.agents.forEach((a, i) => {
+DEPTS.forEach((d) => { if (!buildings.get(d.key) && !(village && d.key === vKey)) return; d.agents.forEach((a, i) => {
+  const b = bFor(d.key, a.key); if (!b) return;
   const run = RUN[runOf(a)], el = document.createElement('div'); el.className = 'agent-label'; el.hidden = true; el.style.setProperty('--c', run.css); el.style.setProperty('--ci', run.ink);
   el.innerHTML = `<b class="pin">${i + 1}</b><button type="button" class="abox" aria-label="Відкрити агента: ${a.name}"><span class="an-top"><span class="an-name">${a.name}</span><span class="an-go">${CHEV}</span></span><span class="an-st"><i></i>${run.label}</span></button>`;
   el.addEventListener('click', () => user.agent(d.key, a.key)); // the box opens the agent, like a click on the robot itself
-  labelLayer.appendChild(el); agentLabels.push({ el, dept: d.key, key: a.key, robot: b.robots[i] });
+  labelLayer.appendChild(el); agentLabels.push({ el, dept: d.key, key: a.key, robot: b.robots[b.village ? 0 : i], b });
 }); });
 const heroTag = document.createElement('div'); heroTag.className = 'hero-tag'; heroTag.innerHTML = '<i></i>Демо-задача'; labelLayer.appendChild(heroTag);
 const tmp = new THREE.Vector3();
@@ -406,6 +423,7 @@ function updateLabels() {
   const pxu = stage.clientHeight / (camera.top - camera.bottom) * camera.zoom, ls = THREE.MathUtils.clamp(pxu * 0.02, 0.5, 1.05);
   if (Math.abs(ls - lastLs) > 0.01) { lastLs = ls; labelLayer.style.setProperty('--ls', ls.toFixed(2)); labelLayer.classList.toggle('mini', ls < 0.6); }
   deptLabels.forEach(({ el, b }) => { place(el, tmp.set(b.pos.x, b.topY, b.pos.z)); });
+  houseLabels.forEach((l) => { const hide = camera.zoom < 2.0 || (l.f.built && l.f.b.open > 0.2); if (l.hid !== hide) { l.hid = hide; l.el.classList.toggle('is-dim', hide); } if (!hide) place(l.el, tmp.set(l.f.x, l.f.y, l.f.z)); });
   districtLabels.forEach(({ el, pos }) => { place(el, tmp.copy(pos)); });
   const vis = agentLabels.filter((l) => !l.el.hidden), mini = labelLayer.classList.contains('mini'), W = stage.clientWidth, H = stage.clientHeight;
   vis.forEach((l) => { l.robot.getWorldPosition(tmp); tmp.y += 3.7; tmp.project(camera); l.sx = (tmp.x * 0.5 + 0.5) * W; l.sy = (-tmp.y * 0.5 + 0.5) * H; l.ow = l.el.offsetWidth; l.oh = l.el.offsetHeight; });
@@ -439,7 +457,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (focus) { user.agent(focus.rb.userData.dept, focus.rb.userData.agent); return; } // the agent under the pointer, even when a row in front of it is faded
   const p = pick(e);
   if (!p) { user.reset(); return; }
-  if (p.kind === 'agent') user.agent(p.obj.userData.dept, p.obj.userData.agent); else user.dept(p.obj.userData.key);
+  if (p.kind === 'agent') user.agent(p.obj.userData.dept, p.obj.userData.agent); else if (p.obj.userData.agentKey) user.house(p.obj.userData.key, p.obj.userData.agentKey); else user.dept(p.obj.userData.key);
 });
 renderer.domElement.addEventListener('pointermove', (e) => {
   if (e.buttons) { tip.hidden = true; hoverRibbon = null; return; }
@@ -490,21 +508,22 @@ const state = { dept: null, agent: null };
 let autoFocused = false; // the focus came from zooming in on a building (not from a click), so zooming back out lets go of it again
 const selRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.06, 10, 40), new THREE.MeshBasicMaterial({ color: C.glow })); selRing.rotation.x = Math.PI / 2; selRing.visible = false; scene.add(selRing);
 function applySelection() {
-  buildings.forEach((b, k) => { b.sel.material.opacity = state.dept === k ? 0.9 : 0; });
+  buildings.forEach((b, k) => { b.sel.material.opacity = (b.village ? state.dept === b.dept && state.agent === b.agentKey : state.dept === k) ? 0.9 : 0; });
+  houseLabels.forEach((l) => l.el.classList.toggle('is-on', l.f.built && state.dept === vKey && state.agent === l.f.a.key));
   deptLabels.forEach(({ el }) => { el.classList.toggle('is-on', state.dept === el.dataset.key); });
   agentLabels.forEach((l) => { l.el.classList.toggle('is-on', l.key === state.agent && l.dept === state.dept); });
   selRing.visible = false;
-  if (state.agent) { const b = buildings.get(state.dept), rb = b.robots.find((r) => r.userData.agent === state.agent); if (rb) { selRing.visible = true; selRing.userData.target = rb; } }
+  if (state.agent) { const b = bFor(state.dept, state.agent), rb = b && b.robots.find((r) => r.userData.agent === state.agent); if (rb) { selRing.visible = true; selRing.userData.target = rb; } }
   opts.onState?.(state);
 }
 const zoomFor = (b) => THREE.MathUtils.clamp(0.7 * (Math.max(VIEW_H, 104 / (stage.clientWidth / stage.clientHeight)) * stage.clientWidth / stage.clientHeight) / ((b.W + b.D) / Math.SQRT2 + 5), 1.3 * ZK, 3.4 * ZK);
 const api = {
   state,
-  selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
-  selectAgent(deptKey, agentKey) { autoFocused = false; state.dept = deptKey; state.agent = agentKey; applySelection(); const b = buildings.get(deptKey), rb = b.robots.find((r) => r.userData.agent === agentKey), wp = rb.getWorldPosition(new THREE.Vector3()); flyTo(b.pos.clone().lerp(wp, 0.45).add(new THREE.Vector3(0, 1.5, 0)), zoomFor(b) * 1.15); },
+  selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); if (village && key === vKey) { flyTo(new THREE.Vector3(village.center.x, 0, village.center.z + 1), 2.7); return; } const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
+  selectAgent(deptKey, agentKey) { autoFocused = false; state.dept = deptKey; state.agent = agentKey; applySelection(); const b = bFor(deptKey, agentKey), rb = b.robots.find((r) => r.userData.agent === agentKey), wp = rb.getWorldPosition(new THREE.Vector3()); flyTo(b.pos.clone().lerp(wp, 0.45).add(new THREE.Vector3(0, 1.5, 0)), zoomFor(b) * 1.15); },
   zoom(f) { flyTo(controls.target.clone(), THREE.MathUtils.clamp(camera.zoom * f, controls.minZoom, controls.maxZoom), 350); },
   rotate(rad) { const off = camera.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.theta = THREE.MathUtils.clamp(sph.theta + rad, controls.minAzimuthAngle, controls.maxAzimuthAngle); const to = new THREE.Vector3().setFromSpherical(sph), from = camera.position.clone().sub(controls.target), t0 = performance.now(); const step = () => { const k = Math.min(1, (performance.now() - t0) / 450); camera.position.copy(controls.target).add(from.clone().lerp(to, ease(k))); if (k < 1) requestAnimationFrame(step); }; step(); },
-  district(x, z, n) { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(new THREE.Vector3(x, 0, z + 2), n > 1 ? 1.75 : 2.4); }, // a district of several buildings: all of them in view, none opened
+  district(x, z, n) { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(new THREE.Vector3(x, 0, z + 2), n > 1 ? 1.75 : n === 0 ? 2.7 : 2.4); }, // a district of several buildings: all of them in view, none opened
   reset() { autoFocused = false; state.dept = null; state.agent = null; applySelection(); flyTo(HOME, 1, 650, HOME_OFFSET); },
   clear() { api.reset(); },
   buildings,
@@ -512,6 +531,7 @@ const api = {
 const user = { // what a person does on the map: move the camera and tell the page, which owns the real state
   dept(k) { api.selectDept(k); opts.onFocusDept?.(k); },
   district(x, z, n) { api.district(x, z, n); opts.onReset?.(); },
+  house(d, k) { api.selectAgent(d, k); opts.onFocusDept?.(d); }, // a house of the village: fly to it and open it, the page focuses the department
   agent(d, k) { api.selectAgent(d, k); opts.onOpenAgent?.(d, k); },
   reset() { api.reset(); opts.onReset?.(); },
 };
@@ -528,13 +548,14 @@ function updateAutoOpen() {
   let best = null, bd = 1e9;
   buildings.forEach((b) => { const d = Math.hypot(controls.target.x - b.pos.x, controls.target.z - b.pos.z); if (d < bd) { bd = d; best = b; } });
   const z = camera.zoom, cur = best && autoKey === best.key;
-  autoKey = best && bd < (cur ? 17 : 14) && z > (cur ? 1.55 : 1.95) * ZK ? best.key : null;
+  autoKey = best && bd < (best.reach ? best.reach + (cur ? 2 : 0) : (cur ? 17 : 14)) && z > (cur ? 1.55 : 1.95) * ZK ? best.key : null;
   if (window.__noAuto) autoKey = null; // debugging aid: keep every building closed
   // The page's interface follows the building: when one opens by zoom the page gets the same focus a click would give it (no camera flight, the camera is
   // already there), and when it closes again by zoom the focus is released. Not while a flight is running: then the camera is moving on purpose.
   if (!tween && autoKey !== prevAuto) {
-    if (autoKey && state.dept !== autoKey) { state.dept = autoKey; state.agent = null; autoFocused = true; applySelection(); opts.onFocusDept?.(autoKey); }
-    else if (!autoKey && autoFocused && state.dept === prevAuto) { state.dept = null; state.agent = null; autoFocused = false; applySelection(); opts.onReset?.(); }
+    const ab = autoKey && buildings.get(autoKey), adk = ab ? (ab.dept || autoKey) : null, aag = ab && ab.village ? ab.agentKey : null;
+    if (autoKey && (state.dept !== adk || state.agent !== aag)) { state.dept = adk; state.agent = aag; autoFocused = true; applySelection(); opts.onFocusDept?.(adk); }
+    else if (!autoKey && autoFocused && state.dept === (buildings.get(prevAuto)?.dept || prevAuto)) { state.dept = null; state.agent = null; autoFocused = false; applySelection(); opts.onReset?.(); }
     prevAuto = autoKey;
   }
 }
@@ -569,12 +590,13 @@ function frame() {
   updateAutoOpen();
   dn.update(dt);
   if (halo) halo.material.size = 30 * Math.min(1.8, Math.max(0.85, Math.pow(camera.zoom, 0.55)));
-  buildings.forEach((b) => { b.setOpen((state.dept === b.key && camera.zoom > 1.15 * ZK) || autoKey === b.key); b.update(dt, t, reduce); });
+  buildings.forEach((b) => { b.setOpen(((b.village ? state.dept === b.dept && state.agent === b.agentKey : state.dept === b.key) && camera.zoom > 1.15 * ZK) || autoKey === b.key); b.update(dt, t, reduce); });
   deptLabels.forEach((l) => { const dim = l.b.open > 0.2 || (l.quarter && camera.zoom < 1.45); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } });
-  districtLabels.forEach((l) => { const dim = l.keys.some((k) => buildings.get(k).open > 0.2) || (l.many && camera.zoom >= 1.45); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } }); // an opened district hands over to its own flags
-  agentLabels.forEach((l) => { const show = buildings.get(l.dept).open > 0.55; if (l.el.hidden === show) l.el.hidden = !show; });
+  districtLabels.forEach((l) => { const dim = l.keys.some((k) => buildings.get(k).open > 0.2) || (l.many && camera.zoom >= (l.thr || 1.45)); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } }); // an opened district hands over to its own flags
+  agentLabels.forEach((l) => { const show = l.b.open > 0.55; if (l.el.hidden === show) l.el.hidden = !show; });
   if (!reduce) tickCarts(dt, t);
   tickRoutes(dt, clock.elapsedTime);
+  if (village && !reduce) village.tick(dt, t);
   parkTicks.forEach((fn) => fn(t));
   if (selRing.visible) { const wp = selRing.userData.target.getWorldPosition(new THREE.Vector3()); selRing.position.set(wp.x, wp.y + 0.12, wp.z); selRing.scale.setScalar(1 + Math.sin(t * 4) * 0.06); }
   const atMin = camera.zoom <= controls.minZoom + 0.04; // zoomed out as far as it goes: go back to the standard view
@@ -615,12 +637,13 @@ raf = requestAnimationFrame(frame);
 const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([e]) => setPaused(!e.isIntersecting)) : null; io?.observe(root);
 const onVis = () => setPaused(document.hidden); document.addEventListener('visibilitychange', onVis);
 function setPaused(v) { paused = v; if (!v && !raf && !disposed) { clock.getDelta(); lastAdapt = performance.now(); raf = requestAnimationFrame(frame); } }
-if (opts.debug) window.__app = { loopState: () => ({ paused, raf, disposed, hidden: document.hidden }), frameStats: () => { const o = { ...FRAME_STATS, avg: FRAME_STATS.n ? FRAME_STATS.sum / FRAME_STATS.n : 0 }; FRAME_STATS.n = 0; FRAME_STATS.sum = 0; FRAME_STATS.max = 0; return o; }, setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
+if (opts.debug) window.__app = { hero, heroStop, village, loopState: () => ({ paused, raf, disposed, hidden: document.hidden }), frameStats: () => { const o = { ...FRAME_STATS, avg: FRAME_STATS.n ? FRAME_STATS.sum / FRAME_STATS.n : 0 }; FRAME_STATS.n = 0; FRAME_STATS.sum = 0; FRAME_STATS.max = 0; return o; }, setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
 
 // fresh states from the page (real activity): recolour the hats and the boxes
 function setRunStatus(map) {
-  DEPTS.forEach((d) => { const b = buildings.get(d.key); if (!b) return; d.agents.forEach((a, i) => {
-    const run = map && map[a.key] && RUN[map[a.key]] ? map[a.key] : 'inactive', rb = b.robots[i], l = agentLabels.find((x) => x.dept === d.key && x.key === a.key);
+  DEPTS.forEach((d) => { if (!buildings.get(d.key) && !(village && d.key === vKey)) return; d.agents.forEach((a, i) => {
+    const bb = bFor(d.key, a.key); if (!bb) return;
+    const run = map && map[a.key] && RUN[map[a.key]] ? map[a.key] : 'inactive', rb = bb.robots[bb.village ? 0 : i], l = agentLabels.find((x) => x.dept === d.key && x.key === a.key);
     setRobotRun(rb, run);
     if (l) { const r = RUN[run]; l.el.style.setProperty('--c', r.css); l.el.style.setProperty('--ci', r.ink); const st = l.el.querySelector('.an-st'); if (st) st.lastChild.textContent = r.label; }
   }); });
