@@ -9,18 +9,18 @@ import { instancedProto } from './park.js';
 import { doorPool, NIGHT } from './night.js';
 import { RUN, runOf } from './runstatus.js';
 
-const HW = 10.6, HD = 9.4, HH = 6.6; // a house
+export const HW = 10.6, HD = 9.4, HH = 6.6; // a house
 const RP = 15.5, RW = 8; // the ring ROAD for cars: centre line and width
 const RS = 21.6, SW = 3.2; // the sidewalk ring outside it, where the agents walk
 const G = 0.43; // the ground level of the village in its own frame (the lawn of the super-block)
 const LAWN = 0xe3d3f1, STONE = 0xfcf7fd, ASPHALT = 0xd0b6dc;
 const ANGLES = [155, 200, 235, 305, 340, 20, 65, 110]; // houses on an ellipse round the plaza; built agents take the first six (the chain goes round, with a gap in the north for the entrance), planned ones stand in the south, near the camera
 const ELL = { a: 60, b: 34 };
-const ROOF = ['flat', 'gable', 'shed', 'gable', 'flat', 'shed'];
-const PROPS = ['calendar', 'pen', 'palette', 'check', 'plane', 'chart', 'eye', 'bubble'];
+export const ROOF = ['flat', 'gable', 'shed', 'gable', 'flat', 'shed'];
+export const PROPS = ['calendar', 'pen', 'palette', 'check', 'plane', 'chart', 'eye', 'bubble'];
 
 
-function signTex(text) {
+export function signTex(text) {
   return canvasTex(512, 128, (c, w, h) => {
     const gr = c.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#b544b5'); gr.addColorStop(1, '#661466'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
     c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -29,13 +29,13 @@ function signTex(text) {
     lines.forEach((ln, k) => c.fillText(ln, w / 2, h / 2 + (k - (lines.length - 1) / 2) * (size + 4), w - 40));
   });
 }
-function gable(parent, w, d, h, color, ax) { // a pitched roof: a triangle extruded along the ridge
+export function gable(parent, w, d, h, color, ax) { // a pitched roof: a triangle extruded along the ridge
   const s = new THREE.Shape(), half = (ax === 'x' ? d : w) / 2; s.moveTo(-half - 0.5, 0); s.lineTo(half + 0.5, 0); s.lineTo(0, h); s.closePath();
   const len = (ax === 'x' ? w : d) + 1.0, g = new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled: true, bevelSize: 0.12, bevelThickness: 0.12, bevelSegments: 2 });
   g.translate(0, 0, -len / 2); if (ax === 'x') g.rotateY(Math.PI / 2);
   const m = new THREE.Mesh(g, mat(color, { rough: 0.6 })); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
 }
-function roofProp(g, kind, y) {
+export function roofProp(g, kind, y) {
   const p = new THREE.Group(); p.position.set(0, y, 0); g.add(p);
   if (kind === 'calendar') { box(p, 2.2, 1.8, 0.3, C.white, 0, 0.3, 0, 0.08); box(p, 2.2, 0.5, 0.34, C.plum, 0, 1.6, 0, 0.06); for (let i = 0; i < 3; i++) box(p, 0.4, 0.3, 0.36, C.mid, -0.7 + i * 0.7, 0.7, 0, 0.04); }
   else if (kind === 'pen') { const b = cyl(p, 0.22, 0.22, 2.6, C.plum, 0, 0.3, 0); b.rotation.z = 0.6; const t = cyl(p, 0, 0.22, 0.7, C.deep, 0, 0, 0); t.position.set(-0.78, 0.1, 0); t.rotation.z = 0.6 + Math.PI; }

@@ -5,6 +5,7 @@ import { C, box, cyl, makeCart, mat, canvasTex } from './models.js';
 import { loadAssets, makeCartGlb, setRobotRun } from './assets.js';
 import { createBuilding } from './buildings.js';
 import { buildVillage } from './village.js';
+import { buildZone } from './zone.js';
 import { buildPark, instancedProto } from './park.js';
 import { buildForecourts } from './forecourt.js';
 import { initDayNight, collectEmissives } from './daynight.js';
@@ -29,21 +30,23 @@ const ICONS = {
 const LAYOUT = {
   slots: [
     { id: 'admin', keys: ['management'], shape: 'management', cell: [0, 0] },
-    { id: 'client-research', keys: ['client-research', 'strategy-research'], shape: 'strategy-research', cell: [1, -3] },
-    { id: 'client-creative', keys: ['client-creative', 'performance-creative'], shape: 'performance-creative', cell: [2, -3] },
-    { id: 'client-ads', keys: ['client-ads', 'performance-delivery'], shape: 'performance-delivery', cell: [1, -2] },
-    { id: 'client-reports', keys: ['client-reports', 'client-success'], shape: 'client-success', cell: [2, -2] },
+    { id: 'client-research', keys: ['client-research', 'strategy-research'], shape: 'strategy-research', cell: [-3.5, -3], zone: true },
+    { id: 'client-creative', keys: ['client-creative', 'performance-creative'], shape: 'performance-creative', cell: [-1.5, -3], zone: true },
+    { id: 'client-ads', keys: ['client-ads', 'performance-delivery'], shape: 'performance-delivery', cell: [1.5, -3], zone: true },
+    { id: 'client-reports', keys: ['client-reports', 'client-success'], shape: 'client-success', cell: [3.5, -3], zone: true },
     { id: 'sales', keys: ['sales'], shape: 'sales', cell: [-2, 0] },
     { id: 'internal', keys: ['internal', 'data-tracking-reporting'], shape: 'data-tracking-reporting', cell: [3, 1] },
     { id: 'social', keys: ['social'], shape: 'performance-creative', cell: [0, 2.5], village: true }, // a village of small houses, one per agent, over six blocks centred on the main building (the streets between them are taken by its island)
   ],
-  parks: [[-1, 0]], strip: [], strip2: [[0, 1]], villageCells: [[-1, 2], [0, 2], [1, 2], [-1, 3], [0, 3], [1, 3]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
+  parks: [[-1, 0]], strip: [], strip2: [[0, 1], [0, -2], [0, -3], [0, -4]],
+  // the back of the city: four zones of the Client district (two columns of blocks and three rows each), the column in the middle is a boulevard along the axis of the main building
+  zones: [{ slot: 'client-research', cols: [-4, -3] }, { slot: 'client-creative', cols: [-2, -1] }, { slot: 'client-ads', cols: [1, 2] }, { slot: 'client-reports', cols: [3, 4] }], zoneRows: [-4, -2], villageCells: [[-1, 2], [0, 2], [1, 2], [-1, 3], [0, 3], [1, 3]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
   // the waters run through whole rows and columns of blocks, never along a street: the streets run beside them and cross them by bridges at right angles
   water: [{ w: 9, pts: [[-170, -34], [-100, -30], [-30, -34], [30, -30], [100, -34], [170, -30]] }, { w: 7, pts: [[-96, -32], [-97, 10], [-95, 60], [-96, 120], [-96, 170]] }],
   bank: [[-4, -1], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [4, -1], [-3, 0], [-3, 1], [-3, 2], [-3, 3], [-3, 4]],
   home: [8, -6], viewH: 170, pan: [-80, 112, -112, 112], lim: 120, range: 4, lamp: 112, lampStreets: [-80, -48, -16, 16, 48, 80], vx: [-16, 16, 48],
   districts: [
-    { n: 'Клієнтський район', sub: 'проєкти клієнтів · 4 квартали', slots: ['client-research', 'client-creative', 'client-ads', 'client-reports'] },
+    { n: 'Клієнтський район', sub: 'проєкти клієнтів · 4 зони', plaque: [0, 24, -66], slots: ['client-research', 'client-creative', 'client-ads', 'client-reports'] },
     { n: 'Адміністративний район', sub: 'нагляд за агентами', slots: ['admin'] },
     { n: 'Продажний район', sub: 'нові клієнти', slots: ['sales'] },
     { n: 'Внутрішній район', sub: 'SEO сайту Mon’Archi', slots: ['internal'] },
@@ -121,12 +124,15 @@ function fadeTex() {
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(270, 270), new THREE.MeshStandardMaterial({ color: ASPHALT, alphaMap: fadeTex(), transparent: true, roughness: 0.95 }));
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; world.add(ground);
 const RING_ORDER = LAY.slots.filter((sl) => sl.id !== 'admin').map((sl) => [...slotOf].find(([, v]) => v === sl)?.[0]).filter(Boolean); // the order of the chain (also the demo route)
-const PLOT = Object.fromEntries([...slotOf].filter(([, sl]) => !sl.village).map(([k, sl]) => [k, sl.cell]));
+const PLOT = Object.fromEntries([...slotOf].filter(([, sl]) => !sl.village && !sl.zone).map(([k, sl]) => [k, sl.cell]));
 const PARKS = LAY.parks;
 // the area of the village: its blocks and the streets between them become one plate of its own, so no block, street or dash of the old grid is left under it
 const VC = LAY.villageCells || [], vci = VC.map((c) => c[0]), vcj = VC.map((c) => c[1]);
 const VREC = VC.length ? { x0: Math.min(...vci) * GRID - BLOCK / 2, x1: Math.max(...vci) * GRID + BLOCK / 2, z0: Math.min(...vcj) * GRID - BLOCK / 2, z1: Math.max(...vcj) * GRID + BLOCK / 2 } : null;
-const inVC = (i, j) => VC.some((c) => c[0] === i && c[1] === j), inVR = (x, z) => !!VREC && x > VREC.x0 && x < VREC.x1 && z > VREC.z0 && z < VREC.z1;
+const ZONEDEF = (LAY.zones || []).map((z) => ({ ...z, rect: { x0: Math.min(...z.cols) * GRID - BLOCK / 2, x1: Math.max(...z.cols) * GRID + BLOCK / 2, z0: LAY.zoneRows[0] * GRID - BLOCK / 2, z1: LAY.zoneRows[1] * GRID + BLOCK / 2 } }));
+const VRECS = [VREC, ...ZONEDEF.map((z) => z.rect)].filter(Boolean); // every plate that replaces a part of the grid
+const inVC = (i, j) => VC.some((c) => c[0] === i && c[1] === j) || ZONEDEF.some((z) => i >= Math.min(...z.cols) && i <= Math.max(...z.cols) && j >= LAY.zoneRows[0] && j <= LAY.zoneRows[1]);
+const inVR = (x, z) => VRECS.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
 // the zebra crossings sit where the door drives meet the street; the lane dashes leave them free
 const CROSSINGS = Object.values(PLOT).map(([i, j]) => [i * GRID, j * GRID + GRID / 2]);
 // lane dashes down the middle of every street (not across crossings)
@@ -162,8 +168,16 @@ RING_ORDER.forEach((k, i) => { if (PLOT[k]) addBuilding(DEPTS.find((d) => d.key 
 const rng = (() => { let s = 11; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
 const vSlot = LAY.slots.find((q) => q.village), vKey = vSlot ? [...slotOf].find(([, v]) => v === vSlot)?.[0] : null;
 const village = vKey ? buildVillage({ world, assets, agents: DEPTS.find((d) => d.key === vKey).agents, deptKey: vKey, center: { x: vSlot.cell[0] * GRID, z: vSlot.cell[1] * GRID }, S: 0.6, rng, rect: { w: VREC.x1 - VREC.x0, d: VREC.z1 - VREC.z0 } }) : null;
-if (village) village.houses.forEach((h) => { buildings.set(h.key, h); pickables.push(h.root); });
-const bFor = (deptKey, agentKey) => (village && deptKey === vKey ? buildings.get(vKey + '/' + (agentKey || '')) || null : buildings.get(deptKey));
+if (village) { village.deptKey = vKey; village.kind = 'village'; village.flagZoom = 2.0; }
+const zones = ZONEDEF.map((z) => {
+  const sl = LAY.slots.find((q) => q.id === z.slot), key = [...slotOf].find(([, v]) => v === sl)?.[0], d = key && DEPTS.find((x) => x.key === key);
+  if (!d) return null;
+  const pl = buildZone({ world, assets, agents: d.agents, deptKey: key, label: d.label, center: { x: (z.rect.x0 + z.rect.x1) / 2, z: (z.rect.z0 + z.rect.z1) / 2 }, S: 0.78, rng, rect: { w: z.rect.x1 - z.rect.x0, d: z.rect.z1 - z.rect.z0 }, streetZ: LAY.zoneRows[1] * GRID + GRID / 2 });
+  pl.flagZoom = 1.75; return pl;
+}).filter(Boolean);
+const places = [village, ...zones].filter(Boolean), placeOf = new Map(places.map((q) => [q.deptKey, q]));
+places.forEach((q) => q.houses.forEach((h) => { buildings.set(h.key, h); pickables.push(h.root); }));
+const bFor = (deptKey, agentKey) => (placeOf.has(deptKey) ? buildings.get(deptKey + '/' + (agentKey || '')) || null : buildings.get(deptKey));
 const plots = [...buildings.values()].filter((b) => !b.village);
 const padRect = (b) => ({ x0: b.cell.x - (b.W + 4.6) / 2 - 1.2, x1: b.cell.x + (b.W + 4.6) / 2 + 1.2, z0: b.pos.z - (b.D + 4.6) / 2 - 1.2, z1: b.cell.z + BLOCK / 2 });
 const inPad = (x, z) => plots.some((b) => { const r = padRect(b); return x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1; });
@@ -174,7 +188,7 @@ const parkTicks = [];
 const parkLamps = [];
 PARKS.forEach(([i, j]) => buildPark(world, blockCentre(i, j), assets, BLOCK, parkTicks, parkLamps));
 // ---- forests, long green squares, two waters with bridges
-const reserved = new Set([...Object.values(PLOT), ...PARKS, ...(LAY.strip || []), ...(LAY.strip2 || []), ...(LAY.forest || []), ...(LAY.bank || []), ...(LAY.villageCells || [])].map(([i, j]) => i + ',' + j));
+const reserved = new Set([...Object.values(PLOT), ...PARKS, ...(LAY.strip || []), ...(LAY.strip2 || []), ...(LAY.forest || []), ...(LAY.bank || []), ...(LAY.villageCells || []), ...ZONEDEF.flatMap((z) => z.cols.flatMap((i) => [-4, -3, -2].map((j) => [i, j])))].map(([i, j]) => i + ',' + j));
 const waterCurves = (LAY.water || []).map((sp) => { const curve = new THREE.CatmullRomCurve3(sp.pts.map(([x, z]) => new THREE.Vector3(x, 0, z))); return { sp, curve, P: curve.getSpacedPoints(Math.max(8, Math.round(curve.getLength() / 2))) }; });
 function nearWater(x, z, r) { return waterCurves.some(({ sp, P }) => P.some((q) => Math.hypot(q.x - x, q.z - z) < r + sp.w / 2)); }
 (LAY.forest || []).forEach(([i, j]) => {
@@ -243,7 +257,7 @@ LAY.lampStreets.forEach((st) => { // two lamps per block side, at ±8 from the b
     if (!nearWater(off, u, 7) && Math.abs(u) <= LAY.lamp) lampPts.push([off, u]);
   }
 });
-if (village) { const keep = lampPts.filter(([x, z]) => !village.contains(x, z, 1.2)); lampPts.length = 0; lampPts.push(...keep, ...village.lamps); } // the island of the village has its own lamps
+if (places.length) { const keep = lampPts.filter(([x, z]) => !places.some((q) => q.contains(x, z, 1.2))); lampPts.length = 0; lampPts.push(...keep, ...places.flatMap((q) => q.lamps)); } // the plates of the village and the zones have their own lamps
 instancedProto(world, assets, 'lamp_post', lampPts.map(([x, z]) => [x, z, 1.0]));
 const lampAll = [...lampPts.map(([x, z]) => [x, z, 2.75]), ...parkLamps.map(([x, z]) => [x, z, 2.5])];
 {
@@ -297,13 +311,13 @@ function laneOffset(points) {
 }
 function drive(cart, p, dt) { // sit on the road and turn smoothly towards the direction of travel
   let y = 0.03; for (const r of bridgeRects) { const d = r.half - Math.abs(r.axis === 'x' ? p.x - r.x : p.z - r.z), lat = Math.abs(r.axis === 'x' ? p.z - r.z : p.x - r.x); if (d > 0 && lat < ROADW) y = Math.max(y, 0.03 + 0.28 * Math.min(1, d / 1.6)); } // up the ramp onto a bridge deck and down again
-  if (VREC) { const dp = Math.min(p.x - VREC.x0, VREC.x1 - p.x, p.z - VREC.z0, VREC.z1 - p.z); if (dp > 0) y = Math.max(y, 0.03 + 0.31 * Math.min(1, dp / 1.6)); } // the ground of the village is a little higher than the street
+  for (const R of VRECS) { const dp = Math.min(p.x - R.x0, R.x1 - p.x, p.z - R.z0, R.z1 - p.z); if (dp > 0) y = Math.max(y, 0.03 + 0.31 * Math.min(1, dp / 1.6)); } // the ground of the village is a little higher than the street
   cart.position.set(p.x, y, p.z);
   const target = -Math.atan2(p.dz, p.dx); let d = target - (cart.userData.ang ?? target); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   cart.userData.ang = (cart.userData.ang ?? target) + d * Math.min(1, dt * 9); cart.rotation.y = cart.userData.ang;
 }
 // the demo task visits the departments in the order of the chain and comes back along the streets
-const stops = RING_ORDER.map((k) => (village && k === vKey ? new THREE.Vector3(village.gate.x, 0.5, village.gate.z) : buildings.get(k).door));
+const stops = RING_ORDER.map((k) => (placeOf.has(k) ? new THREE.Vector3(placeOf.get(k).gate.x, 0.5, placeOf.get(k).gate.z) : buildings.get(k).door));
 const heroRaw = [{ x: stops[0].x, z: stops[0].z }];
 for (let i = 1; i <= stops.length; i++) { const a2 = heroRaw[heroRaw.length - 1], b2 = stops[i % stops.length]; route(a2, { x: b2.x, z: b2.z }).forEach((q) => heroRaw.push(q)); }
 const heroLane = laneOffset(heroRaw);
@@ -407,17 +421,21 @@ const districtLabels = LAY.districts.map((dd) => {
     el.addEventListener('click', () => user.dept(key));
   }
   else { el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.addEventListener('click', () => user.district(cx, cz, present.length)); present.forEach((sl) => { const k = [...slotOf].find(([, v]) => v === sl)[0], dl = deptLabels.find((q) => q.d.key === k); if (dl) dl.quarter = true; }); } // the quarters' own flags would pile up over the whole district: the plaque stands for them until you come closer; a click on the plaque brings the whole district into view
-  const keys = present.map((sl) => [...slotOf].find(([, v]) => v === sl)[0]);
-  return { el, keys, many: present.length > 1, pos: new THREE.Vector3(cx, present.length > 1 ? 46 : 30, cz + 4) };
+  const keys = present.flatMap((sl) => { const k = [...slotOf].find(([, v]) => v === sl)[0]; return placeOf.has(k) ? placeOf.get(k).houses.map((h) => h.key) : [k]; });
+  return { el, keys, many: present.length > 1, pos: dd.plaque ? new THREE.Vector3(...dd.plaque) : new THREE.Vector3(cx, present.length > 1 ? 46 : 30, cz + 4) };
 }).filter(Boolean);
-const houseLabels = village ? village.flags.map((f) => { // the name of every house of the village, a small flag that shows once you are close
+const houseLabels = places.flatMap((pl) => pl.flags.map((f) => ({ f, pl }))).map(({ f, pl }) => { // the name of every house of a village or a zone, a small flag that shows once you are close
   const el = document.createElement('div'), col = f.built ? RUN[runOf(f.a)].css : '#7C8CF8'; el.className = 'dept-label hname'; el.style.pointerEvents = 'auto'; el.style.cursor = f.built ? 'pointer' : 'default';
-  el.innerHTML = `<span class="lv-head"><i class="sd" style="background:${col}"></i><b>${f.a.name}</b></span>`; labelLayer.appendChild(el); if (f.built) el.addEventListener('click', () => user.house(vKey, f.a.key)); return { el, f };
-}) : [];
+  el.innerHTML = `<span class="lv-head"><i class="sd" style="background:${col}"></i><b>${f.a.name}</b></span>`; labelLayer.appendChild(el); if (f.built) el.addEventListener('click', () => user.house(pl.deptKey, f.a.key)); return { el, f, pl };
+});
+const zoneLabels = zones.map((z) => { // the name of a zone over it: the quarter of the Client district
+  const el = document.createElement('div'); el.className = 'district-label is-zone'; const n0 = z.houses.length + z.sites.length; el.innerHTML = `<b>${z.label}</b><small>${n0} ${plural(n0)}</small>`; el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; labelLayer.appendChild(el);
+  el.addEventListener('click', () => user.dept(z.deptKey)); return { el, z, pos: new THREE.Vector3(z.center.x, 20, z.center.z) };
+});
 const STATUS_DOT = { live: 'live', in_development: 'dev', not_started: 'plan' };
 const agentLabels = [];
 const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
-DEPTS.forEach((d) => { if (!buildings.get(d.key) && !(village && d.key === vKey)) return; d.agents.forEach((a, i) => {
+DEPTS.forEach((d) => { if (!buildings.get(d.key) && !placeOf.has(d.key)) return; d.agents.forEach((a, i) => {
   const b = bFor(d.key, a.key); if (!b) return;
   const run = RUN[runOf(a)], el = document.createElement('div'); el.className = 'agent-label'; el.hidden = true; el.style.setProperty('--c', run.css); el.style.setProperty('--ci', run.ink);
   el.innerHTML = `<b class="pin">${i + 1}</b><button type="button" class="abox" aria-label="Відкрити агента: ${a.name}"><span class="an-top"><span class="an-name">${a.name}</span><span class="an-go">${CHEV}</span></span><span class="an-st"><i></i>${run.label}</span></button>`;
@@ -433,8 +451,9 @@ function updateLabels() {
   const pxu = stage.clientHeight / (camera.top - camera.bottom) * camera.zoom, ls = THREE.MathUtils.clamp(pxu * 0.02, 0.5, 1.05);
   if (Math.abs(ls - lastLs) > 0.01) { lastLs = ls; labelLayer.style.setProperty('--ls', ls.toFixed(2)); labelLayer.classList.toggle('mini', ls < 0.6); }
   deptLabels.forEach(({ el, b }) => { place(el, tmp.set(b.pos.x, b.topY, b.pos.z)); });
-  houseLabels.forEach((l) => { const hide = camera.zoom < 2.0 || (l.f.built && l.f.b.open > 0.2); if (l.hid !== hide) { l.hid = hide; l.el.classList.toggle('is-dim', hide); } if (!hide) place(l.el, tmp.set(l.f.x, l.f.y, l.f.z)); });
+  houseLabels.forEach((l) => { const hide = camera.zoom < l.pl.flagZoom || (l.f.built && l.f.b.open > 0.2); if (l.hid !== hide) { l.hid = hide; l.el.classList.toggle('is-dim', hide); } if (!hide) place(l.el, tmp.set(l.f.x, l.f.y, l.f.z)); });
   districtLabels.forEach(({ el, pos }) => { place(el, tmp.copy(pos)); });
+  zoneLabels.forEach((l) => { const hide = camera.zoom < 1.45 || camera.zoom >= l.z.flagZoom || l.z.houses.some((h) => h.open > 0.2); if (l.hid !== hide) { l.hid = hide; l.el.classList.toggle('is-dim', hide); } if (!hide) place(l.el, tmp.copy(l.pos)); });
   const vis = agentLabels.filter((l) => !l.el.hidden), mini = labelLayer.classList.contains('mini'), W = stage.clientWidth, H = stage.clientHeight;
   vis.forEach((l) => { l.robot.getWorldPosition(tmp); tmp.y += 3.7; tmp.project(camera); l.sx = (tmp.x * 0.5 + 0.5) * W; l.sy = (-tmp.y * 0.5 + 0.5) * H; l.ow = l.el.offsetWidth; l.oh = l.el.offsetHeight; });
   // declutter: nearer boxes (lower on screen) keep their place, a box that would cover one of them is lifted above it and its stem grows
@@ -519,7 +538,7 @@ let autoFocused = false; // the focus came from zooming in on a building (not fr
 const selRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.06, 10, 40), new THREE.MeshBasicMaterial({ color: C.glow })); selRing.rotation.x = Math.PI / 2; selRing.visible = false; scene.add(selRing);
 function applySelection() {
   buildings.forEach((b, k) => { b.sel.material.opacity = (b.village ? state.dept === b.dept && state.agent === b.agentKey : state.dept === k) ? 0.9 : 0; });
-  houseLabels.forEach((l) => l.el.classList.toggle('is-on', l.f.built && state.dept === vKey && state.agent === l.f.a.key));
+  houseLabels.forEach((l) => l.el.classList.toggle('is-on', l.f.built && state.dept === l.pl.deptKey && state.agent === l.f.a.key));
   deptLabels.forEach(({ el }) => { el.classList.toggle('is-on', state.dept === el.dataset.key); });
   agentLabels.forEach((l) => { l.el.classList.toggle('is-on', l.key === state.agent && l.dept === state.dept); });
   selRing.visible = false;
@@ -529,7 +548,7 @@ function applySelection() {
 const zoomFor = (b) => THREE.MathUtils.clamp(0.7 * (Math.max(VIEW_H, 104 / (stage.clientWidth / stage.clientHeight)) * stage.clientWidth / stage.clientHeight) / ((b.W + b.D) / Math.SQRT2 + 5), 1.3 * ZK, 3.4 * ZK);
 const api = {
   state,
-  selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); if (village && key === vKey) { flyTo(new THREE.Vector3(village.center.x, 0, village.center.z + 1), 2.2); return; } const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
+  selectDept(key) { autoFocused = false; state.dept = key; state.agent = null; applySelection(); if (placeOf.has(key)) { const pl = placeOf.get(key); flyTo(new THREE.Vector3(pl.center.x, 0, pl.center.z + 1), pl.kind === 'zone' ? 1.85 : 2.2); return; } const b = buildings.get(key); flyTo(b.pos.clone().add(new THREE.Vector3(1.0, 2.0, 1.0)), zoomFor(b)); },
   selectAgent(deptKey, agentKey) { autoFocused = false; state.dept = deptKey; state.agent = agentKey; applySelection(); const b = bFor(deptKey, agentKey), rb = b.robots.find((r) => r.userData.agent === agentKey), wp = rb.getWorldPosition(new THREE.Vector3()); flyTo(b.pos.clone().lerp(wp, 0.45).add(new THREE.Vector3(0, 1.5, 0)), zoomFor(b) * 1.15); },
   zoom(f) { flyTo(controls.target.clone(), THREE.MathUtils.clamp(camera.zoom * f, controls.minZoom, controls.maxZoom), 350); },
   rotate(rad) { const off = camera.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(off); sph.theta = THREE.MathUtils.clamp(sph.theta + rad, controls.minAzimuthAngle, controls.maxAzimuthAngle); const to = new THREE.Vector3().setFromSpherical(sph), from = camera.position.clone().sub(controls.target), t0 = performance.now(); const step = () => { const k = Math.min(1, (performance.now() - t0) / 450); camera.position.copy(controls.target).add(from.clone().lerp(to, ease(k))); if (k < 1) requestAnimationFrame(step); }; step(); },
@@ -616,7 +635,7 @@ function frame() {
   agentLabels.forEach((l) => { const show = l.b.open > 0.55; if (l.el.hidden === show) l.el.hidden = !show; });
   if (!reduce) tickCarts(dt, t);
   tickRoutes(dt, clock.elapsedTime);
-  if (village && !reduce) village.tick(dt, t);
+  if (!reduce) places.forEach((q) => q.tick(dt, t));
   parkTicks.forEach((fn) => fn(t));
   if (selRing.visible) { const wp = selRing.userData.target.getWorldPosition(new THREE.Vector3()); selRing.position.set(wp.x, wp.y + 0.12, wp.z); selRing.scale.setScalar(1 + Math.sin(t * 4) * 0.06); }
   // Zooming all the way out always ends in the same place: the home point and the standard angle, exactly as the home button does it (one flight, nothing else moves the camera).
@@ -658,11 +677,11 @@ raf = requestAnimationFrame(frame);
 const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([e]) => setPaused(!e.isIntersecting)) : null; io?.observe(root);
 const onVis = () => setPaused(document.hidden); document.addEventListener('visibilitychange', onVis);
 function setPaused(v) { paused = v; if (!v && !raf && !disposed) { clock.getDelta(); lastAdapt = performance.now(); raf = requestAnimationFrame(frame); } }
-if (opts.debug) window.__app = { hero, heroStop, village, loops, pathAt, loopState: () => ({ paused, raf, disposed, hidden: document.hidden }), frameStats: () => { const o = { ...FRAME_STATS, avg: FRAME_STATS.n ? FRAME_STATS.sum / FRAME_STATS.n : 0 }; FRAME_STATS.n = 0; FRAME_STATS.sum = 0; FRAME_STATS.max = 0; return o; }, setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
+if (opts.debug) window.__app = { hero, heroStop, village, zones, places, loops, pathAt, loopState: () => ({ paused, raf, disposed, hidden: document.hidden }), frameStats: () => { const o = { ...FRAME_STATS, avg: FRAME_STATS.n ? FRAME_STATS.sum / FRAME_STATS.n : 0 }; FRAME_STATS.n = 0; FRAME_STATS.sum = 0; FRAME_STATS.max = 0; return o; }, setPaused: (v) => setPaused(v), api, camera, controls, scene, buildings, renderer, getFocus: () => focus && { agent: focus.rb.userData.agent, sx: focus.sx, sy: focus.sy }, ptr };
 
 // fresh states from the page (real activity): recolour the hats and the boxes
 function setRunStatus(map) {
-  DEPTS.forEach((d) => { if (!buildings.get(d.key) && !(village && d.key === vKey)) return; d.agents.forEach((a, i) => {
+  DEPTS.forEach((d) => { if (!buildings.get(d.key) && !placeOf.has(d.key)) return; d.agents.forEach((a, i) => {
     const bb = bFor(d.key, a.key); if (!bb) return;
     const run = map && map[a.key] && RUN[map[a.key]] ? map[a.key] : 'inactive', rb = bb.robots[bb.village ? 0 : i], l = agentLabels.find((x) => x.dept === d.key && x.key === a.key);
     setRobotRun(rb, run);

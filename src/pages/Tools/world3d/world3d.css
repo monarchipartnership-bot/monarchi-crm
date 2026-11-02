@@ -94,3 +94,6 @@
 .w3d .dept-label.hname .lv-head b { font-size: 12px; }
 .w3d .dept-label.hname .sd { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px #ffffffaa; }
 .w3d .dept-label.hname::after { height: 12px; }
+
+/* the name of a zone of the Client district: smaller than the plaque of a district */
+.district-label.is-zone { padding: 7px 18px 8px; border-radius: 16px; } .district-label.is-zone b { font-size: 15px; } .district-label.is-zone small { font-size: 11px; } .district-label.is-zone::after { height: 22px; }
