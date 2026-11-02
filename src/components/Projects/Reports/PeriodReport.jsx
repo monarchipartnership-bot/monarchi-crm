@@ -14,7 +14,7 @@ import CreativePickerDialog from '../CreativePickerDialog';
 import { REPORT_STATUS, canApprove, isRunning, monthKey } from '../../../lib/projectHistory';
 import { fetchProjectDecks } from '../../../lib/api/projectDecks';
 import { EMPTY_SECTIONS, buildWhatWasDone, comparisonPeriod, pullReportData, reportPayload } from '../../../lib/reportEngine';
-import { reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
+import { reportBlocks, snapshotOf, withFunnel } from '../../../lib/reportTemplate';
 import { metricKeys } from '../../../lib/clientReport';
 import { platformInfo } from '../../../lib/adAccounts';
 import { missingColumns } from '../../../lib/platformColumns';
@@ -209,7 +209,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
 
   // Saves the report with the given status and gives the saved row back. A report a person saves is theirs (source «manual»): the agent never overwrites it.
   async function persist(nextStatus) {
-    const payload = reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note, template: snap || newSnap(), campaignSel: ctx.selections ? ctx.selections[platform] : null });
+    const payload = reportPayload({ kind: ctx.kind, data, compare: cmp, period, prev, selection, options, sections, note, template: withFunnel(snap || newSnap(), ctx.layout), campaignSel: ctx.selections ? ctx.selections[platform] : null });
     if (creatives?.items?.length) payload.creatives = { count: creatives.count, items: creatives.items, source: 'manual', at: new Date().toISOString() };
     const row = await saveProjectReport({ projectId, periodType, periodStart: period.start, periodEnd: period.end, platform: ctx.scope, status: nextStatus, source: 'manual', createdBy: email, data: payload });
     setStatus(row.status);
@@ -387,7 +387,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={snap?.metrics || null} metricOrder={ctx.layout?.metricOrder} baseMetrics={ctx.layout?.baseMetrics}
+            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={snap?.metrics || null} funnel={withFunnel(snap || newSnap(), ctx.layout).funnel} metricOrder={ctx.layout?.metricOrder} baseMetrics={ctx.layout?.baseMetrics}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
             campaignMode="selected" selection={selection}

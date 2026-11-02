@@ -65,14 +65,15 @@ export function FunnelChart({ model, sample = false }) {
 
 // The box a report shows. `view.funnel` is the layout's setting ({ enabled, stages }); the numbers come from the totals of the report. Nothing is drawn when the funnel is off or has fewer than
 // two numbers. In the builder (`builder`) a funnel without data is drawn with example numbers, so the person sees what the client will see.
-export default function FunnelBox({ view, custom = [], builder = false }) {
+export default function FunnelBox({ view, custom = [], builder = false, hint = false }) {
   const f = view?.funnel;
   if (!f?.enabled) return null;
   const labelOf = (k) => metricInfo(k, custom).label;
   const real = funnelModel({ stages: f.stages, total: view.total, prev: view.prev?.total || null, custom, labelOf });
   const sample = !real && builder ? funnelModel({ stages: f.stages, total: SAMPLE_TOTAL, custom, labelOf }) : null;
   const model = real || sample;
-  if (!model) return null;
+  // the team's views say why there is no picture; the client's page just does not show an empty box
+  if (!model) return hint ? <div className="pacc-hint" role="note">Воронка ввімкнена, але в цьому звіті немає чисел етапів (перегляди, кошик, оформлення). Оновіть цифри кнопкою «Підтягнути дані»: стовпці воронки вже додано до кабінету.</div> : null;
   return (
     <Box icon="bars" title="Funnel" sub="Where the customers drop off">
       <div className="gx"><FunnelChart model={model} sample={!real} /></div>

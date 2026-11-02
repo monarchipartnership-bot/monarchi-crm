@@ -28,7 +28,7 @@ import { collectCreatives, creativeCandidates, creativesOf, pickCreative } from 
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { REPORT_STATUS, buildMonths, canApprove, clientVisible, inWork, isRunning, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
-import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, customBlocks, normalizeTemplate, orderMetricKeys, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
+import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, customBlocks, normalizeTemplate, orderMetricKeys, reportBlocks, snapshotOf, withFunnel } from '../src/lib/reportTemplate.js';
 import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
@@ -2981,6 +2981,15 @@ await ok('standard metrics can be removed and replaced: the layout keeps a base 
   // a report made with the layout carries the list, in the layout's order
   const layout = normalizeTemplate({ baseMetrics: ['spend', 'roas', 'leads'], metricOrder: ['roas'] });
   assert.deepEqual(snapshotOf(layout, 'monthly', { metrics: metricKeys('ecom', ['mx_add_to_cart'], [], layout.baseMetrics) }).metrics, ['roas', 'spend', 'leads', 'mx_add_to_cart']);
+});
+
+await ok('funnel in older reports: a snapshot without the funnel takes the layout setting once, a snapshot that chose «no funnel» keeps its choice', () => {
+  const on = { funnel: { enabled: true, stages: ['mx_view_content', 'purchases'] } };
+  assert.deepEqual(withFunnel({ blocks: [] }, on).funnel, { enabled: true, stages: ['mx_view_content', 'purchases'] }); // made before the funnel existed
+  assert.equal(withFunnel({ blocks: [] }, null).funnel, null); // the layout has none
+  assert.equal(withFunnel({ blocks: [], funnel: null }, on).funnel, null); // it chose no funnel: unchanged
+  assert.deepEqual(withFunnel({ blocks: [], funnel: { enabled: true, stages: ['purchases', 'mx_add_to_cart'] } }, on).funnel.stages, ['purchases', 'mx_add_to_cart']); // its own stays
+  assert.equal(withFunnel(null, on), null);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

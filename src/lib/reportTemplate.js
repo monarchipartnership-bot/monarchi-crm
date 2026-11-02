@@ -126,6 +126,10 @@ export function orderMetricKeys(keys, order) {
   return [...first, ...rest];
 }
 
+// A report made before the funnel existed has no `funnel` in its snapshot (undefined): it takes the layout's setting when it is opened and saved again, so the funnel reaches it too.
+// A snapshot that says null made its choice (no funnel) and keeps it.
+export const withFunnel = (snapshot, layout) => (snapshot && snapshot.funnel === undefined ? { ...snapshot, funnel: normalizeTemplate(layout).funnel.enabled ? normalizeTemplate(layout).funnel : null } : snapshot);
+
 // The metric keys a table shows: the list a saved report was made with (only metrics that exist), otherwise the standard set.
 // `known`: the keys that can be computed (built-in ones are always known; custom and extra ones come from the caller).
 export function metricKeysOf(template, defaults, known = []) {

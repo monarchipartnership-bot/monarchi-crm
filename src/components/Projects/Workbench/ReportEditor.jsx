@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useConfirm } from '../../common/ConfirmDialog';
@@ -8,13 +8,13 @@ import CreativeGrid from '../CreativeGrid';
 import CreativePickerDialog from '../CreativePickerDialog';
 import { Panel, PanelContext, SelectionPanel } from '../Builder/BuilderSettings';
 import { reportPeriodText, reportPlatformLabel } from '../ArchiveReportModal';
-import { deleteProjectReport, refreshMonthTotal, saveReportData } from '../../../lib/api/projectReportStore';
+import { deleteProjectReport, fetchReportLayout, refreshMonthTotal, saveReportData } from '../../../lib/api/projectReportStore';
 import { suggestCreatives } from '../../../lib/api/reportCreatives';
 import { extraKeysOf } from '../../../lib/projectReportContext';
 import { groupsForPlatform, selectionFromColumns } from '../../../lib/campaignGroups';
 import { regroupData } from '../../../lib/periodReport';
 import { metricKeys } from '../../../lib/clientReport';
-import { metricKeysOf, reportBlocks, snapshotOf } from '../../../lib/reportTemplate';
+import { metricKeysOf, reportBlocks, snapshotOf, withFunnel } from '../../../lib/reportTemplate';
 import { metricOptions } from '../../../lib/reportMetrics';
 import { REPORT_STATUS, canApprove, isRunning, monthKey, reviewPatch } from '../../../lib/projectHistory';
 import '../../../styles/projectReports.css';
@@ -67,6 +67,16 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const isAll = platform === 'all';
   const kind = data.kind || 'ecom';
   const approver = canApprove(email, ctx.approvers);
+  // the funnel: the report's own snapshot; a report made before the funnel existed takes the layout's setting of its platform
+  const [layout, setLayout] = useState(null);
+  useEffect(() => {
+    if (isAll || isCustom) return undefined;
+    let off = false;
+    fetchReportLayout(row.project_id, platform).then((r) => { if (!off && r.exists) setLayout(r.layout); });
+    return () => { off = true; };
+  }, [row.project_id, platform, isAll, isCustom]);
+  const funnel = isCustom ? null : (withFunnel(data.template || {}, layout).funnel ?? null);
+  const withFunnelData = () => (!isCustom && data.template && data.template.funnel === undefined && layout ? { ...data, template: withFunnel(data.template, layout) } : data);
   const groupsHere = useMemo(() => groupsForPlatform(ctx.groups || [], platform), [ctx.groups, platform]);
   const extraKeys = extraKeysOf(ctx.columns, { ...row, data });
   const defaults = metricKeys(kind, extraKeys, ctx.custom);
@@ -118,7 +128,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   async function save() {
     setBusy('save');
     setError('');
-    try { await saveReportData(row.id, { data }); setDirty(false); setMessage('Збережено.'); await onChanged(); } catch (e) { setError(e.message || 'Не вдалося зберегти.'); } finally { setBusy(''); }
+    try { await saveReportData(row.id, { data: withFunnelData() }); setDirty(false); setMessage('Збережено.'); await onChanged(); } catch (e) { setError(e.message || 'Не вдалося зберегти.'); } finally { setBusy(''); }
   }
   async function approve() {
     if (!(await confirm({ title: 'Підтвердити звіт?', body: 'Звіт потрапить в «Історію проекту» і на сторінку клієнта. Його можна буде повернути на доопрацювання з історії.', confirmLabel: 'Підтверджено' }))) return;
@@ -126,7 +136,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
     setError('');
     try {
       const patch = reviewPatch({ status: row.status, data }, 'approve', email);
-      await saveReportData(row.id, { data: { ...data, review: patch.review }, status: patch.status });
+      await saveReportData(row.id, { data: { ...withFunnelData(), review: patch.review }, status: patch.status });
       if (row.period_type === 'weekly') {
         const r = await refreshMonthTotal(row.project_id, monthKey(row.period_start));
         if (r.error) setError('Звіт підтверджено, але підсумок місяця не вдалося перерахувати: ' + r.error);
@@ -187,7 +197,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
             <div className="wbe-bh"><Medal n="metrics" cls="wbe-md" /><b>Таблиця звіту</b><span className="wbe-sp" />{!isCustom && <span className="wbe-mut">Око: чи бачить клієнт показник</span>}</div>
             {Object.keys(data.platforms || {}).length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
               <ResultView
-                data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} noExport={!isCustom} exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']}
+                data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} funnel={funnel} noExport={!isCustom} exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']}
                 lockTotal={isAll} extraKeys={isAll ? [] : extraKeys} title={ctx.project?.name || ''} subtitle={`${TYPE_LABEL[row.period_type]} · ${reportPeriodText(row)}`}
                 fileBase={isCustom ? `${ctx.project?.name || 'report'}_custom_${row.period_start}_${row.period_end}_${platform}` : 'draft'} campaignMode="selected" selection={[]} options={{ groups: true }} curLabel={reportPeriodText(row)} prevLabel={prevLabel}
                 clientEye={isCustom ? null : { hidden, onToggle: toggleHidden }}

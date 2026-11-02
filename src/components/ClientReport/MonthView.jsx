@@ -33,6 +33,7 @@ function Week({ week, ctx, model }) {
         <div className="l"><MetricTable view={v} keys={viewKeys(v, model)} {...ctx} /></div>
         <div className="r"><ReportTexts view={v} /><Creatives items={v.creatives} /></div>
       </div>
+      <FunnelBox view={v} custom={model.custom} />
     </Box>
   );
 }

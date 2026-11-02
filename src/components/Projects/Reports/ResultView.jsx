@@ -7,6 +7,8 @@ import { METRIC_SETS, computeMetric, formatMetric, metricMeta } from '../../../l
 import { metricKeysOf } from '../../../lib/reportTemplate';
 import { platformInfo } from '../../../lib/adAccounts';
 import { exportCsv, exportXlsx, exportPdf, safeFileName } from '../../../lib/reportExport';
+import FunnelBox from '../../ClientReport/Funnel';
+import '../../../styles/clientReportHub.css';
 
 // A fetched period shown as tables: a switcher (each platform + the sum of them
 // when they share a currency), the metrics table with the comparison, the
@@ -18,7 +20,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, templateMetrics = null, metricOrder = null, baseMetrics = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null, exportApi = null, onXlsx = null }) {
+export default function ResultView({ data, kind, custom, templateMetrics = null, metricOrder = null, baseMetrics = null, funnel = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null, exportApi = null, onXlsx = null }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -97,6 +99,7 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
           <div className="prep-capture-sub">{subtitle} · {tabLabel}{cur.accountName ? ` · ${cur.accountName}` : ''}</div>
         </div>
         <ReportMetricsTable rows={rows} showPrev={showPrev} curLabel={curLabel} prevLabel={prevLabel} clientEye={clientEye} />
+        {funnel?.enabled && <div className="crh crh-embed"><FunnelBox view={{ funnel, total: cur.total, prev: prevSrc ? { total: prevSrc.total } : null }} custom={custom} hint /></div>}
         {splitByCurrency && <div className="pacc-hint">Кабінети у різних валютах, тому суму не порахувати: кожна платформа показана окремо.</div>}
         {isTotal && <div className="pacc-hint">Сума платформ в одній валюті. Охоплення складається простою сумою, тож люди, яких побачили обидві платформи, враховані двічі.</div>}
         {groups.length > 0 && (
