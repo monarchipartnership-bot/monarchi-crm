@@ -12,6 +12,7 @@ export const MAX_BLOCKS = 12;
 export const MAX_TITLE = 60;
 export const MAX_PROMPT = 800;
 export const MAX_HIDDEN = 60;
+export const MAX_METRIC_ORDER = 120;
 export const MAX_SELECTED = 300;
 export const MAX_CREATIVES = { weekly: 6, monthly: 8 };
 
@@ -36,6 +37,7 @@ export const DEFAULT_TEMPLATE = Object.freeze({
   creatives: { weekly: CREATIVE_COUNT.weekly, monthly: CREATIVE_COUNT.monthly },
   kind: null, // 'ecom' | 'leadgen'; null: from the project's business type
   hiddenMetrics: [], // metrics the client does not see (the team always sees the full report)
+  metricOrder: [], // the order of the metric rows (keys); metrics not listed follow in their usual order
   campaignSel: { groups: [], campaigns: [] }, // the campaigns of the report: groups (ids) and campaigns ('platform|name') the layout selected
 });
 
@@ -65,11 +67,13 @@ export function normalizeTemplate(raw) {
   // the three system blocks are always there; one that is missing in the saved list is simply switched off
   SYSTEM_BLOCKS.forEach((s) => { if (!seen.has(s.key)) blocks.push(raw && Array.isArray(r.blocks) && r.blocks.length ? { ...s, weekly: false, monthly: false } : { ...s }); });
   const hiddenMetrics = Array.isArray(r.hiddenMetrics) ? [...new Set(r.hiddenMetrics.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))].slice(0, MAX_HIDDEN) : [];
+  const metricOrder = Array.isArray(r.metricOrder) ? [...new Set(r.metricOrder.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))].slice(0, MAX_METRIC_ORDER) : [];
   return {
     blocks,
     creatives: { weekly: clampInt(r.creatives?.weekly, 0, MAX_CREATIVES.weekly, CREATIVE_COUNT.weekly), monthly: clampInt(r.creatives?.monthly, 0, MAX_CREATIVES.monthly, CREATIVE_COUNT.monthly) },
     kind: r.kind === 'ecom' || r.kind === 'leadgen' ? r.kind : null,
     hiddenMetrics,
+    metricOrder,
     campaignSel: {
       groups: [...new Set((Array.isArray(r.campaignSel?.groups) ? r.campaignSel.groups : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_SELECTED),
       campaigns: [...new Set((Array.isArray(r.campaignSel?.campaigns) ? r.campaignSel.campaigns : []).map((k) => cleanText(k, 200)).filter((k) => k.includes('|')))].slice(0, MAX_SELECTED),
@@ -88,7 +92,7 @@ export const creativeCount = (template, periodType) => normalizeTemplate(templat
 // table, base + the platform's extra columns + the project's own metrics, or null for the standard set) and the ones the client does not see.
 export function snapshotOf(template, periodType, { metrics = null } = {}) {
   const t = normalizeTemplate(template);
-  return { blocks: t.blocks.filter((b) => b[periodFlag(periodType)]).map((b) => ({ key: b.key, title: b.title, client: b.client })), metrics: metrics && metrics.length ? [...metrics] : null, hiddenMetrics: [...t.hiddenMetrics] };
+  return { blocks: t.blocks.filter((b) => b[periodFlag(periodType)]).map((b) => ({ key: b.key, title: b.title, client: b.client })), metrics: metrics && metrics.length ? orderMetricKeys(metrics, t.metricOrder) : null, hiddenMetrics: [...t.hiddenMetrics] };
 }
 
 // The metrics the client does not see in a saved report.
@@ -103,11 +107,21 @@ export function reportBlocks(data) {
   return [...snap.map((b) => ({ key: b.key, title: b.title, client: b.client !== false })), ...extra];
 }
 
+// The keys in the order the layout chose: the listed ones first, in that order; the rest follow in their usual order. Nothing is added or lost.
+export function orderMetricKeys(keys, order) {
+  const list = Array.isArray(order) ? order : [];
+  if (!list.length) return keys;
+  const have = new Set(keys);
+  const first = [...new Set(list)].filter((k) => have.has(k));
+  const rest = keys.filter((k) => !first.includes(k));
+  return [...first, ...rest];
+}
+
 // The metric keys a table shows: the list a saved report was made with (only metrics that exist), otherwise the standard set.
 // `known`: the keys that can be computed (built-in ones are always known; custom and extra ones come from the caller).
 export function metricKeysOf(template, defaults, known = []) {
   const own = Array.isArray(template?.metrics) ? [...new Set(template.metrics.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))] : null;
-  if (!own || !own.length) return defaults;
+  if (!own || !own.length) return orderMetricKeys(defaults, template?.metricOrder); // the layout's order applies to the standard set (a saved report keeps its own list as it is)
   const ok = new Set([...Object.keys(METRICS), ...known]);
   const keys = own.filter((k) => ok.has(k));
   return keys.length ? keys : defaults;

@@ -28,7 +28,7 @@ import { collectCreatives, creativeCandidates, creativesOf, pickCreative } from 
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { REPORT_STATUS, buildMonths, canApprove, clientVisible, inWork, isRunning, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
-import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, normalizeTemplate, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
+import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, normalizeTemplate, orderMetricKeys, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
 import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
@@ -2905,6 +2905,21 @@ await ok('meta onboarding engine: once a day after 08:00, the first run learns, 
   assert.deepEqual(waiting.map((a) => a.id), ['2']);
   const project = await importAccount({ db: fakeDb(t2), account: raw('2', 'Waits'), email: 'me@x.y', now: T('2026-11-05T10:00:00Z') });
   assert.deepEqual([project.name, t2.project_ad_accounts.at(-1).account_id], ['Waits', '2']);
+});
+
+await ok('report template: the order of the metric rows — listed keys first in their order, the rest as before; cleaned, kept in a report snapshot, used for the standard set only', () => {
+  const keys = ['spend', 'cpc', 'ctr', 'roas', 'mx_cart'];
+  assert.deepEqual(orderMetricKeys(keys, []), keys); assert.deepEqual(orderMetricKeys(keys, undefined), keys);
+  assert.deepEqual(orderMetricKeys(keys, ['roas', 'spend']), ['roas', 'spend', 'cpc', 'ctr', 'mx_cart']);
+  assert.deepEqual(orderMetricKeys(keys, ['gone', 'ctr', 'ctr']), ['ctr', 'spend', 'cpc', 'roas', 'mx_cart']); // an unknown key and a repeat change nothing; nothing is lost
+  const t = normalizeTemplate({ metricOrder: ['roas', 'bad key!', 'roas', 'spend', ''] });
+  assert.deepEqual(t.metricOrder, ['roas', 'spend']); assert.deepEqual(normalizeTemplate(null).metricOrder, []); assert.deepEqual(normalizeTemplate({ metricOrder: 'x' }).metricOrder, []);
+  assert.equal(normalizeTemplate({ metricOrder: Array.from({ length: 300 }, (_, i) => 'k' + i) }).metricOrder.length, 120);
+  // a new report is made with the layout's order; a saved report keeps its own list as it is
+  assert.deepEqual(snapshotOf({ metricOrder: ['roas'] }, 'weekly', { metrics: keys }).metrics, ['roas', 'spend', 'cpc', 'ctr', 'mx_cart']);
+  assert.equal(snapshotOf({ metricOrder: ['roas'] }, 'weekly').metrics, null);
+  assert.deepEqual(metricKeysOf({ metrics: ['cpc', 'spend'] }, keys, []), ['cpc', 'spend']);
+  assert.deepEqual(metricKeysOf({ metrics: null, metricOrder: ['ctr', 'spend'] }, keys, []), ['ctr', 'spend', 'cpc', 'roas', 'mx_cart']); // the standard set follows the layout
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

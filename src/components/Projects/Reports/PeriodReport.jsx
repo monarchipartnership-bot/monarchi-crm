@@ -387,7 +387,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={snap?.metrics || null}
+            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={snap?.metrics || null} metricOrder={ctx.layout?.metricOrder}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
             campaignMode="selected" selection={selection}

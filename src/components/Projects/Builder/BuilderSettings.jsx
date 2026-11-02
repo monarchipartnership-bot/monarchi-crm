@@ -6,6 +6,7 @@ import { deleteCampaignGroup, deleteCustomMetric, saveReportColumns } from '../.
 import { buildColumns, filterCampaigns, groupMatches, campaignKey } from '../../../lib/campaignGroups';
 import { MAX_BLOCKS, MAX_CREATIVES, MAX_PROMPT, MAX_TITLE, PRESETS, newBlockKey } from '../../../lib/reportTemplate';
 import { METRIC_SETS, metricMeta } from '../../../lib/reportMetrics';
+import { orderMetricKeys } from '../../../lib/reportTemplate';
 import '../../../styles/projectHistory.css';
 
 // The settings panels under the live layout of the «Конструктор звіту». Every panel changes the DRAFT (`draft`, `set`); the groups and the
@@ -73,15 +74,27 @@ export function KindPanel({ draft, set, projectKind }) {
   );
 }
 
-export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, onOpen, onChanged }) {
+// Metrics in the order the layout chose. The chips can be dragged, or picked (a click) and moved with the arrows; the order is part of the layout (saved by «Зберегти макет»).
+export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, order = [], onOrder, onOpen, onChanged }) {
   const [confirm, confirmDialog] = useConfirm();
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const base = (METRIC_SETS[kind] || METRIC_SETS.ecom).map((k) => metricMeta(k, custom).label);
-  const extras = [
-    ...extraKeys.map((k) => ({ id: 'c:' + k, label: metricMeta(k, custom).label, remove: { type: 'column', key: k } })),
-    ...custom.map((c) => ({ id: 'm:' + c.id, label: c.name, remove: { type: 'custom', metric: c } })),
-  ];
+  const [picked, setPicked] = useState('');
+  const [dragKey, setDragKey] = useState('');
+  const baseKeys = (METRIC_SETS[kind] || METRIC_SETS.ecom);
+  const base = baseKeys.map((k) => metricMeta(k, custom).label);
+  const removable = new Map([
+    ...extraKeys.map((k) => [k, { id: 'c:' + k, remove: { type: 'column', key: k } }]),
+    ...custom.map((c) => [c.key, { id: 'm:' + c.id, remove: { type: 'custom', metric: c } }]),
+  ]);
+  const allKeys = useMemo(() => orderMetricKeys([...baseKeys, ...extraKeys, ...custom.map((c) => c.key)], order), [baseKeys, extraKeys, custom, order]);
+  const moveKey = (key, to) => {
+    const from = allKeys.indexOf(key);
+    if (from < 0 || to < 0 || to >= allKeys.length || from === to) return;
+    const next = [...allKeys];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    onOrder?.(next);
+  };
 
   async function remove(item) {
     const r = item.remove;
@@ -104,16 +117,26 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, onO
   }
 
   return (
-    <Panel id="metrics" title="Метрики" summary={`${base.length} + ${extras.length}`} note="Базові є завжди; додаткові: стовпці кабінету й власні формули. Зберігаються одразу, окремо від «Зберегти макет». Око біля метрики на макеті ховає її від клієнта.">
-      <div className="bld-chips" aria-label="Базові метрики">{base.map((l) => <span className="bld-chip" key={l}>{l}</span>)}</div>
-      <div className="bld-chips" aria-label="Додаткові метрики">
-        {extras.length ? extras.map((it) => (
-          <span className="bld-chip bld-chip--extra" key={it.id}>
-            {it.label}
-            <button type="button" className="bld-chip-x" disabled={busy === it.id} aria-label={`Прибрати метрику ${it.label}`} title="Прибрати метрику" onClick={() => remove(it)}>&times;</button>
-          </span>
-        )) : <span className="ph-share-meta">Додаткових метрик ще немає.</span>}
+    <Panel id="metrics" title="Метрики" summary={`${base.length} + ${removable.size}`} note="Базові є завжди; додаткові (виділені) — стовпці кабінету й власні формули: вони додаються й видаляються одразу. Порядок метрик: перетягніть або натисніть метрику й пересуньте стрілками; він зберігається разом з макетом. Око біля метрики на макеті ховає її від клієнта.">
+      <div className="bld-chips bld-chips--order" aria-label="Метрики в порядку звіту">
+        {allKeys.map((key, i) => {
+          const it = removable.get(key);
+          const on = picked === key;
+          return (
+            <span key={key} className={'bld-chip' + (it ? ' bld-chip--extra' : '') + (on ? ' bld-chip--picked' : '') + (dragKey === key ? ' bld-chip--drag' : '')}
+              draggable onDragStart={(e) => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', key); }}
+              onDragOver={(e) => { if (dragKey) e.preventDefault(); }}
+              onDrop={(e) => { e.preventDefault(); if (dragKey) moveKey(dragKey, i); setDragKey(''); }}
+              onDragEnd={() => setDragKey('')}>
+              {on && <button type="button" className="bld-chip-mv" disabled={i === 0} aria-label={`${metricMeta(key, custom).label}: перемістити ліворуч`} onClick={() => moveKey(key, i - 1)}>&lsaquo;</button>}
+              <button type="button" className="bld-chip-label" aria-pressed={on} title="Натисніть, щоб обрати й пересунути стрілками, або перетягніть" onClick={() => setPicked(on ? '' : key)}>{metricMeta(key, custom).label}</button>
+              {on && <button type="button" className="bld-chip-mv" disabled={i === allKeys.length - 1} aria-label={`${metricMeta(key, custom).label}: перемістити праворуч`} onClick={() => moveKey(key, i + 1)}>&rsaquo;</button>}
+              {it && <button type="button" className="bld-chip-x" disabled={busy === it.id} aria-label={`Прибрати метрику ${metricMeta(key, custom).label}`} title="Прибрати метрику" onClick={() => remove(it)}>&times;</button>}
+            </span>
+          );
+        })}
       </div>
+      {order.length > 0 && <div className="rte-row"><button type="button" className="btn" onClick={() => { setPicked(''); onOrder?.([]); }}>Скинути порядок</button></div>}
       {error && <div className="pacc-err">{error}</div>}
       <div className="rte-row"><button type="button" className="btn" onClick={onOpen}>{PLUS_ICON} Метрика</button></div>
       {confirmDialog}

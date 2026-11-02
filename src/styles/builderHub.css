@@ -57,6 +57,14 @@
 .bld-chip { padding: 3px 12px; border-radius: 999px; background: #F3E3F7; color: #682768; font: 700 12px 'Onest', sans-serif; }
 .bld-chip--extra { display: inline-flex; align-items: center; gap: 6px; padding-right: 5px; background: #F1DCF5; box-shadow: inset 0 0 0 1.5px #D9A6DF; }
 .bld-chip-x { all: unset; box-sizing: border-box; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #ffffff99; color: #682768; font-size: 14px; line-height: 1; cursor: pointer; }
+.bld-chips--order .bld-chip { display: inline-flex; align-items: center; gap: 4px; cursor: grab; }
+.bld-chip-label { all: unset; cursor: pointer; font: inherit; color: inherit; }
+.bld-chip-label:focus-visible, .bld-chip-mv:focus-visible { outline: 2px solid #682768; outline-offset: 2px; border-radius: 999px; }
+.bld-chip--picked { background: #682768; color: #fff; box-shadow: none; }
+.bld-chip--picked .bld-chip-x { background: #ffffff33; color: #fff; }
+.bld-chip-mv { all: unset; box-sizing: border-box; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #ffffff33; color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
+.bld-chip-mv:disabled { opacity: .4; cursor: default; }
+.bld-chip--drag { opacity: .45; }
 
 /* text blocks: cards with switches */
 .bld-blocks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
