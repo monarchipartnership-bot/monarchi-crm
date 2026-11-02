@@ -46,6 +46,8 @@ import { EXTRACT_KEYS, buildExtractPrompt, parseExtraction, planWrites } from '.
 import { WIZARD_STEPS, hasCabinet, wizardSummary } from '../src/lib/agents/projectWizard.js';
 import { campaignTotals, stepLevel, dueStepNotices, capReached, digestDue, digestOf, dayWindow, stepMessage } from '../src/lib/agents/spendNotices.js';
 import { runSpendNotices } from '../api/_lib/spendNotify.js';
+import { estimateCampaign, estimateSummary } from '../src/lib/agents/campaignEstimate.js';
+import { estimateInputs } from '../api/_lib/estimateInputs.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
@@ -1429,6 +1431,7 @@ function fakeDb(tables) {
         in(c, vs) { q.filters.push((r) => vs.includes(r[c])); return api; },
         not(c, op, v) { q.filters.push((r) => (op === 'is' && v === null ? r[c] != null : true)); return api; },
         or(clause) { q.filters.push((r) => matchOr(r, clause)); return api; },
+        gt(c, v) { q.filters.push((r) => r[c] != null && Number(r[c]) > Number(v)); return api; },
         gte(c, v) { q.filters.push((r) => r[c] != null && String(r[c]) >= String(v)); return api; },
         lt(c, v) { q.filters.push((r) => r[c] != null && (typeof r[c] === 'number' ? r[c] < Number(v) : String(r[c]) < String(v))); return api; },
         ilike(c, v) { q.filters.push((r) => String(r[c] || '').toLowerCase() === String(v).toLowerCase()); return api; },
@@ -2557,6 +2560,37 @@ await ok('money notices: a notice for every step of dollars per campaign (once),
   tables.ag_campaign_spend[0].higgsfield_usd = 4;
   assert.equal((await runSpendNotices({ db: fakeDb(tables), telegram: null, now: new Date('2026-11-02T08:03:00Z') })).caps, 1); // no Telegram: only the bell
   assert.equal((await runSpendNotices({ db: fakeDb({ ai_agent_settings: [{ id: 1, enabled: false }] }), telegram: tg })).skipped, 'off');
+});
+
+await ok('pre-launch estimate: the agents of the mode at their own average (a rough price when they have not run), the pictures at the Higgsfield price, a month for the repeating modes, the cap', async () => {
+  const none = estimateCampaign({ mode: 'nope' });
+  assert.equal(none.once, 0);
+  // only creatives: the department for 2 concepts in 2 formats = 4 pictures; nothing of the campaign team
+  const c = estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 2, ratios: ['4:5', '9:16'], hfUnitUsd: 0.2, history: { creative_maker: 0.3 } });
+  assert.deepEqual(c.rows.map((r) => r.role), ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker', 'creative_quality']);
+  assert.equal(c.rows.find((r) => r.role === 'creative_maker').basis, 'history'); assert.equal(c.rows.find((r) => r.role === 'creative_brief').basis, 'default');
+  assert.equal(c.images, 4); assert.equal(c.higgsfield.total, 0.8); assert.equal(c.higgsfield.exact, true);
+  assert.equal(c.once, Math.round((c.claude + 0.8) * 100) / 100); assert.equal(c.monthly, null); assert.equal(c.repeats, false);
+  // without the Higgsfield price the pictures are counted but not priced
+  const noPrice = estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 1, ratios: ['4:5'] });
+  assert.equal(noPrice.higgsfield.total, null); assert.equal(noPrice.higgsfield.exact, false); assert.match(estimateSummary(noPrice), /Оцінити вартість/);
+  // no concepts → no department, no pictures
+  assert.equal(estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 0 }).rows.length, 0);
+  assert.match(estimateSummary(estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 0 })), /нічого не витрачає/);
+  // a repeating mode: a week of the team, a month = four weeks; the cap is exceeded by the first start
+  const full = estimateCampaign({ mode: 'full', platforms: ['meta', 'google'], concepts: 1, ratios: ['4:5'], hfUnitUsd: 0.2, capUsd: 1 });
+  assert.equal(full.repeats, true); assert.equal(full.monthly, Math.round(full.claudeTeam * 4 * 100) / 100); assert.equal(full.overCap, true);
+  assert.match(estimateSummary(full), /Далі щотижня/);
+  // strategy has no department even when concepts are given
+  assert.ok(estimateCampaign({ mode: 'strategy', platforms: [], concepts: 3, ratios: ['1:1'], hfUnitUsd: 0.2 }).rows.every((r) => r.group === 'team'));
+  // the server inputs: average of the recent runs per role and the price of one picture from the free estimate
+  const tables = { ag_agents: [{ id: 1, role: 'creative_maker' }, { id: 2, role: 'creative_brief' }], ag_runs: [{ id: 1, agent_id: 1, cost_usd: 0.1 }, { id: 2, agent_id: 1, cost_usd: 0.3 }, { id: 3, agent_id: 2, cost_usd: 0.05 }, { id: 4, agent_id: 9, cost_usd: 1 }] };
+  const asked = [];
+  const inputs = await estimateInputs({ db: fakeDb(tables), hfImage: { estimate: async ({ request }) => { asked.push(request); return 0.21; } } });
+  assert.deepEqual(inputs.history, { creative_maker: 0.2, creative_brief: 0.05 }); assert.equal(inputs.unitUsd, 0.21); assert.equal(inputs.configured, true);
+  assert.equal(asked.length, 1); // one free question, not one per picture
+  assert.equal((await estimateInputs({ db: fakeDb(tables), hfImage: null })).configured, false);
+  assert.match((await estimateInputs({ db: fakeDb(tables), hfImage: { estimate: async () => { throw new Error('boom'); } } })).error, /boom/);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

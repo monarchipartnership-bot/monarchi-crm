@@ -12,6 +12,7 @@
 //   POST { action: 'pass_on', taskId }               the person's OK on a result that waited (confirm_before_pass): the next agents start
 //   POST { action: 'site_speed' }                    Google PageSpeed of the site's front page (phone and computer, 10-30 s)
 //   POST { action: 'site_overview' }                 the website analyst's main page: is GA4 / Search Console connected, and the live figures
+//   POST { action: 'estimate_inputs' }               the numbers of the pre-launch estimate: the price of one picture at Higgsfield and the average run of each agent
 //   POST { action: 'poll_assets' }                   look at the pictures/videos being generated; { action: 'redo_visual', postId, note? }; { action: 'status' }
 // A person acts with their own session (row-level security applies); the cron signs in as the agent user. The model key stays on the server.
 import { createClient } from '@supabase/supabase-js';
@@ -20,6 +21,7 @@ import { getModelClient } from './_lib/ai.js';
 import { generateCreatives, generatorState, pollCreatives } from './_lib/creativeMake.js';
 import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
 import { cancelRequest, passOn, startRequest } from './_lib/creativeEngine.js';
+import { estimateInputs } from './_lib/estimateInputs.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { siteOverview } from './_lib/googleSiteData.js';
 import { collectSpeed, speedFindings, speedKeyFromEnv } from './_lib/pageSpeed.js';
@@ -71,6 +73,7 @@ export default async function handler(req, res) {
     else if (action === 'dry_run') out = await dryRun(ctx, Number(body.agentId), { campaignId: body.campaignId, requestId: body.requestId, promptBody: body.promptBody });
     else if (action === 'pass_on') { out = await passOn(ctx, Number(body.taskId)); out.queue = await processQueue(ctx, { maxMs: 60000 }); } // the person's OK on a result that waited: the chain goes on
     else if (action === 'status') out = { higgsfield: generatorReady(ctx) };
+    else if (action === 'estimate_inputs') out = await estimateInputs(ctx, { ratio: typeof body.ratio === 'string' ? body.ratio : '4:5' }); // the price of one picture + the average cost of each agent run (nothing is spent)
     else if (action === 'site_speed') { // PageSpeed of the front page (10-30 s, so apart from the quick overview)
       const speed = await collectSpeed({ url: await siteUrlOf(ctx.db), key: speedKeyFromEnv() });
       out = { speed, ...speedFindings(speed) };
