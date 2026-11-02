@@ -4,8 +4,10 @@ import Select from '../../common/Select';
 import { useConfirm } from '../../common/ConfirmDialog';
 import { useAuth } from '../../../contexts/AuthContext';
 import { FILE_TYPES, MAX_FILE_MB } from '../../../lib/api/creatives';
-import { deleteAsset, fetchProjectCreative, saveInput, saveSettings, uploadAsset } from '../../../lib/api/projectCreative';
-import { ASSET_KINDS, CTA_MODES, FRESH_DAYS, INPUT_FIELDS, inputState } from '../../../lib/agents/projectCreative';
+import { deleteAsset, fetchProjectAccounts, fetchProjectCreative, saveInput, saveSettings, uploadAsset } from '../../../lib/api/projectCreative';
+import { ASSET_KINDS, CTA_MODES, FRESH_DAYS, INPUT_FIELDS, PROFILE_FIELDS, inputState } from '../../../lib/agents/projectCreative';
+import { agentsNeeding, filledFields, readinessByMode } from '../../../lib/agents/agentRequirements';
+import { MODES, MODE_ORDER } from '../../../lib/agents/campaignModes';
 import { HubTitle } from '../hubIcons';
 import '../../../styles/projectCreative.css';
 
@@ -13,8 +15,8 @@ const KIND_OPTIONS = Object.entries(ASSET_KINDS).map(([value, label]) => ({ valu
 const STATE_TEXT = { wait: 'Чекає даних', ok: 'Заповнено', old: 'Застарів' };
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) : '');
 
-// The «Креативи» tab of the project card: what the creative department needs to know about this client. Three blocks: the materials, the brand and the
-// rules, and the data other departments' agents deliver (their fields exist already and can be filled by hand until those agents are built).
+// The «AI-агенти» tab of the project card (it was «Креативи»): everything the agents need to know about this client. Readiness for each kind of campaign, what the
+// manager tells about the client, the materials, the brand and the rules, and the data other departments' agents deliver (can be filled by hand meanwhile).
 export default function ProjectCreativeTab({ projectId }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
@@ -26,11 +28,13 @@ export default function ProjectCreativeTab({ projectId }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState(null); // { key, text } of the field being filled by hand
+  const [accounts, setAccounts] = useState([]);
 
   const load = useCallback(async () => {
     setError('');
     try {
-      const d = await fetchProjectCreative(projectId);
+      const [d, acc] = await Promise.all([fetchProjectCreative(projectId), fetchProjectAccounts(projectId).catch(() => [])]);
+      setAccounts(acc);
       setData(d);
       setForm({ figma_url: d.settings.figma_url, cta_mode: d.settings.cta_mode, cta_text: d.settings.cta_text, restrictions: d.settings.restrictions });
     } catch (e) {
@@ -78,10 +82,86 @@ export default function ProjectCreativeTab({ projectId }) {
 
   if (!data) return <div className="pcr-wrap"><div className="empty-hint">Завантаження…</div></div>;
   const settings = data.settings;
+  const have = filledFields({ settings, assets: data.assets, accounts });
+  const platforms = [...new Set(accounts.map((a) => a.platform).filter((p) => p === 'meta' || p === 'google'))];
+  const ready = readinessByMode(have, platforms);
+
+  // one row of a field: its name, who fills it, the value (or the hint), the state and the button
+  const renderRows = (fields, whoOf) => fields.map((f) => {
+    const item = settings?.inputs?.[f.key];
+    const st = inputState(item);
+    const open = editing?.key === f.key;
+    const need = agentsNeeding(f.key);
+    return (
+      <li key={f.key} className={'pcr-input-row is-' + st.state}>
+        <div className="pcr-input-name">
+          <b>{f.label}</b>
+          <small>{whoOf(f)}</small>
+          {(need.required.length > 0 || need.recommended.length > 0) && <small className="pcr-need">{need.required.length ? `Потрібне для: ${need.required.join(', ')}` : `Бажане для: ${need.recommended.slice(0, 4).join(', ')}`}</small>}
+        </div>
+        <div className="pcr-input-body">
+          {open ? (
+            <>
+              <AutoResizeTextarea className="pcr-input" value={editing.text} onChange={(v) => setEditing({ key: f.key, text: v })} placeholder={f.hint} maxLength={8000} autoFocus />
+              <div className="pcr-row-actions">
+                <button type="button" className="btn btn-p" disabled={!!busy} onClick={() => saveField(f.key, editing.text)}>{busy === 'input:' + f.key ? 'Зберігаємо…' : 'Зберегти'}</button>
+                <button type="button" className="btn" disabled={!!busy} onClick={() => setEditing(null)}>Скасувати</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className={'pcr-input-text' + (st.state === 'wait' ? ' is-empty' : '')}>{st.state === 'wait' ? f.hint : item.body}</p>
+              {item && <small className="pcr-input-meta">{item.source === 'manual' ? `Введено вручну${item.by ? `, ${item.by}` : ''}` : `Агент: ${item.by || f.agent}`}{item.filled_at ? ` · ${fmtDate(item.filled_at)}` : ''}</small>}
+            </>
+          )}
+        </div>
+        <div className="pcr-input-side">
+          <span className={'pcr-state is-' + st.state}>{STATE_TEXT[st.state]}{st.state === 'old' && st.days != null ? ` · ${st.days} дн.` : ''}</span>
+          {!open && <button type="button" className="btn" disabled={!settings || !!busy} onClick={() => setEditing({ key: f.key, text: item?.body || '' })}>{st.state === 'wait' ? 'Заповнити вручну' : 'Редагувати'}</button>}
+        </div>
+      </li>
+    );
+  });
 
   return (
     <div className="pcr-wrap">
       {error && <p className="pcr-error" role="alert">{error}</p>}
+
+      <section className="pcr-card" aria-label="Готовність до кампаній">
+        <div className="pcr-head">
+          <div>
+            <HubTitle icon="users">Готовність до кампаній</HubTitle>
+            <p className="pcr-sub">Чого агентам ще не вистачає, щоб кампанія кожного типу працювала як слід. Обовʼязкове без якого агент не зробить нічого корисного, бажане покращує результат.</p>
+          </div>
+        </div>
+        <ul className="pcr-ready">
+          {MODE_ORDER.map((mode) => {
+            const m = ready[mode];
+            const state = m.required.length ? 'bad' : m.recommended.length ? 'warn' : 'ok';
+            return (
+              <li key={mode} className={'pcr-ready-row is-' + state}>
+                <b>{MODES[mode].title}</b>
+                <span className={'pcr-state is-' + (state === 'ok' ? 'ok' : state === 'warn' ? 'old' : 'wait')}>{state === 'ok' ? 'Усе є' : state === 'warn' ? 'Є бажане' : 'Бракує обовʼязкового'}</span>
+                <span className="pcr-ready-text">
+                  {m.required.length > 0 && <>Обовʼязкове: {m.required.map((x) => x.label).join(', ')}. </>}
+                  {m.recommended.length > 0 && <>Бажане: {m.recommended.map((x) => x.label).join(', ')}.</>}
+                  {!m.required.length && !m.recommended.length && 'Нічого додавати не потрібно.'}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section className="pcr-card" aria-label="Про клієнта">
+        <div className="pcr-head">
+          <div>
+            <HubTitle icon="users">Про клієнта</HubTitle>
+            <p className="pcr-sub">Це розповідаєте ви: більше ніхто цього не знає. Усі агенти беруть ці дані звідси, тому їх не треба повторювати в кожній кампанії.</p>
+          </div>
+        </div>
+        <ul className="pcr-inputs">{renderRows(PROFILE_FIELDS, () => 'Заповнюється тут')}</ul>
+      </section>
 
       <section className="pcr-card" aria-label="Матеріали клієнта">
         <div className="pcr-head">
@@ -152,41 +232,7 @@ export default function ProjectCreativeTab({ projectId }) {
             <p className="pcr-sub">Ці поля мають заповнювати агенти інших відділів. Поки їх немає, можна заповнити вручну. Старше {FRESH_DAYS} днів агент вважає дані застарілими й каже про це.</p>
           </div>
         </div>
-        <ul className="pcr-inputs">
-          {INPUT_FIELDS.map((f) => {
-            const item = settings?.inputs?.[f.key];
-            const st = inputState(item);
-            const open = editing?.key === f.key;
-            return (
-              <li key={f.key} className={'pcr-input-row is-' + st.state}>
-                <div className="pcr-input-name">
-                  <b>{f.label}</b>
-                  <small>Заповнює: {f.agent}</small>
-                </div>
-                <div className="pcr-input-body">
-                  {open ? (
-                    <>
-                      <AutoResizeTextarea className="pcr-input" value={editing.text} onChange={(v) => setEditing({ key: f.key, text: v })} placeholder={f.hint} maxLength={8000} autoFocus />
-                      <div className="pcr-row-actions">
-                        <button type="button" className="btn btn-p" disabled={!!busy} onClick={() => saveField(f.key, editing.text)}>{busy === 'input:' + f.key ? 'Зберігаємо…' : 'Зберегти'}</button>
-                        <button type="button" className="btn" disabled={!!busy} onClick={() => setEditing(null)}>Скасувати</button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p className={'pcr-input-text' + (st.state === 'wait' ? ' is-empty' : '')}>{st.state === 'wait' ? f.hint : item.body}</p>
-                      {item && <small className="pcr-input-meta">{item.source === 'manual' ? `Введено вручну${item.by ? `, ${item.by}` : ''}` : `Агент: ${item.by || f.agent}`}{item.filled_at ? ` · ${fmtDate(item.filled_at)}` : ''}</small>}
-                    </>
-                  )}
-                </div>
-                <div className="pcr-input-side">
-                  <span className={'pcr-state is-' + st.state}>{STATE_TEXT[st.state]}{st.state === 'old' && st.days != null ? ` · ${st.days} дн.` : ''}</span>
-                  {!open && <button type="button" className="btn" disabled={!settings || !!busy} onClick={() => setEditing({ key: f.key, text: item?.body || '' })}>{st.state === 'wait' ? 'Заповнити вручну' : 'Редагувати'}</button>}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <ul className="pcr-inputs">{renderRows(INPUT_FIELDS, (f) => `Заповнює: ${f.agent}`)}</ul>
       </section>
       {confirmDialog}
     </div>

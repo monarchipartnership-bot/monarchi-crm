@@ -53,3 +53,12 @@
   .pcr-input-row { grid-template-columns: minmax(0, 1fr); }
   .pcr-input-side { flex-direction: row; align-items: center; justify-content: space-between; }
 }
+
+/* the readiness of the project for each kind of campaign (tab «AI-агенти») */
+.pcr-ready { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pcr-ready-row { display: grid; grid-template-columns: 190px 170px minmax(0, 1fr); gap: 12px; align-items: start; padding: 9px 0; }
+.pcr-ready-row + .pcr-ready-row { border-top: 1px solid rgba(139, 61, 139, .18); }
+.pcr-ready-row b { font-weight: 800; }
+.pcr-ready-text { font-size: .84rem; line-height: 1.5; opacity: .85; }
+.pcr-need { display: block; margin-top: 2px; opacity: .75; }
+@media (max-width: 760px) { .pcr-ready-row { grid-template-columns: minmax(0, 1fr); } }

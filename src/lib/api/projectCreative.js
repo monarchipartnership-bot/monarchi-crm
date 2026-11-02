@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { ASSET_KINDS, INPUT_KEYS, cleanSettings, manualInput } from '../agents/projectCreative';
+import { ALL_INPUT_KEYS, ASSET_KINDS, cleanSettings, manualInput } from '../agents/projectCreative';
 import { BUCKET, FILE_TYPES, MAX_FILE_MB, safeName } from './creatives';
 
 // «Креативи» of a project (migration 20261042): the client's materials, the brand and the rules, and the data other departments' agents deliver for the
@@ -8,6 +8,11 @@ const nowIso = () => new Date().toISOString();
 const must = ({ data, error }) => { if (error) throw error; return data; };
 
 export const DEFAULT_SETTINGS = { figma_url: '', cta_mode: 'always', cta_text: '', restrictions: '', inputs: {} };
+
+// the ad accounts of the project (which cabinets the agents can read): only the platforms
+export async function fetchProjectAccounts(projectId) {
+  return must(await supabase.from('project_ad_accounts').select('platform').eq('project_id', projectId)) || [];
+}
 
 export async function fetchProjectCreative(projectId) {
   const [row, assets] = await Promise.all([
@@ -25,7 +30,7 @@ export const saveSettings = (projectId, input, email) => upsert(projectId, clean
 
 // One field of the data from other departments, written by hand: the rest of `inputs` is kept as it is. An empty text clears the field.
 export async function saveInput(projectId, key, body, email) {
-  if (!INPUT_KEYS.includes(key)) throw new Error('Невідоме поле.');
+  if (!ALL_INPUT_KEYS.includes(key)) throw new Error('Невідоме поле.');
   const row = must(await supabase.from('project_creative').select('inputs').eq('project_id', projectId).maybeSingle());
   const inputs = { ...(row?.inputs || {}) };
   const item = manualInput(body, email);

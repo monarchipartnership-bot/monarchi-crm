@@ -42,6 +42,8 @@ import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/cr
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
 import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
+import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
+import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
 import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
@@ -2435,6 +2437,36 @@ await ok('download of the creatives: the file keeps its own bytes and format (no
   const [first, second] = cockpit.requests[0].items;
   assert.deepEqual([first.url, first.downloadUrl, first.kind, first.fileName], ['https://x/final.png', 'https://x/final.png', 'image', 'Mellowdiamond_One_4x5_n7.png']); // the picture with the words is what is downloaded
   assert.deepEqual([second.url, second.status], ['', 'planned']);
+});
+
+await ok('what the agents need to know about a client: the fields of the card, the table of requirements per agent, what is missing for each kind of campaign', () => {
+  // the registry: the fields filled by a person are keys of `inputs` too (same age and author as the data of the agents), no clash
+  assert.equal(new Set(ALL_INPUT_KEYS).size, INPUT_KEYS.length + PROFILE_KEYS.length);
+  assert.deepEqual(PROFILE_FIELDS.map((f) => f.key), ['about', 'offer', 'tone', 'brand', 'markets', 'seasonality', 'goals', 'budget', 'examples']);
+  // every requirement names a field that exists, and every role of every mode has a row (the legacy creative copies of the campaign team have none, on purpose)
+  const known = new Set(Object.keys(FIELD_LABELS));
+  Object.values(REQUIREMENTS).forEach((r) => [...r.required, ...r.recommended].forEach((k) => assert.ok(known.has(k), k)));
+  for (const mode of MODE_ORDER) modeAgentRoles(mode, ['meta', 'google']).forEach((role) => assert.ok(REQUIREMENTS[role], `${mode}: ${role}`));
+  // an empty project: the creatives need the offer, the strategy needs the description and the goals, the analysts need their cabinet
+  const empty = filledFields({});
+  const creatives = readinessByMode(empty, [])
+    .creative;
+  assert.deepEqual(creatives.required.map((x) => x.key).sort(), ['cabinet', 'offer']); // the creative analyst needs a cabinet, the strategist and the copywriter the offer
+  assert.deepEqual(creatives.required.find((x) => x.key === 'offer').agents.sort(), ['Копірайтер', 'Креативний стратег']);
+  assert.ok(creatives.recommended.some((x) => x.key === 'materials'));
+  assert.equal(creatives.recommended.some((x) => x.key === 'offer'), false); // required once, never also listed as recommended
+  // a project with one Meta cabinet, the offer and the library
+  const have = filledFields({ settings: { inputs: { offer: { body: 'Wigs' }, about: { body: ' ' }, goals: { body: 'ROAS 3' } }, restrictions: 'No claims', cta_mode: 'always', cta_text: 'Shop now', figma_url: '' }, assets: [{ id: 1 }], accounts: [{ platform: 'meta' }] });
+  assert.deepEqual([...have].sort(), ['cabinet', 'cabinet_meta', 'cta', 'goals', 'materials', 'offer', 'restrictions']); // an empty or blank value does not count
+  const ready = readinessByMode(have, ['meta']);
+  assert.deepEqual(ready.creative.required, []); // creatives can start
+  assert.deepEqual(ready.strategy.required.map((x) => x.key).sort(), ['about', 'competitors']); // the strategy lacks the description of the business and the competitors for their researcher
+  assert.deepEqual(ready.ads.required, []); // a Meta cabinet and the goals are there
+  assert.deepEqual(readinessByMode(have, ['google']).ads.required.map((x) => x.key).sort(), ['cabinet_google']); // the cabinet of the other platform is not enough
+  // who needs a field
+  assert.ok(agentsNeeding('goals').required.includes('Маркетинговий стратег'));
+  assert.ok(agentsNeeding('materials').recommended.includes('Креативщик'));
+  assert.deepEqual(missingFor(['no_such_role'], have), { required: [], recommended: [] });
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

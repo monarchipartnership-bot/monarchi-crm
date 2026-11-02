@@ -43,7 +43,7 @@ const TABS = [
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'AI Агент', icon: PAGE_ICONS['page.ai-agents'].src },
-  { key: 'creative', label: 'Креативи', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
+  { key: 'creative', label: 'AI-агенти', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
 ];
 
 const STATUSES = ['active', 'paused', 'completed'];

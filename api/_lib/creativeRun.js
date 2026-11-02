@@ -7,7 +7,7 @@
 // (ctx.read, ctx.campaignDeps), so tests run it with stand-ins.
 import { PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
 import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, directionLimit } from '../../src/lib/agents/creativeTeam.js';
-import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, inputState } from '../../src/lib/agents/projectCreative.js';
+import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, PROFILE_FIELDS, inputState } from '../../src/lib/agents/projectCreative.js';
 import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
 import { fetchBlock, loadAccounts, siteBlocks, summaryOf } from './campaignRun.js';
 import { readJson } from './agentContent.js';
@@ -283,6 +283,11 @@ async function projectCreativeBlocks(db, projectId, now, { inputs = false } = {}
     row?.restrictions ? `Обмеження клієнта: ${clip(row.restrictions, 2000)}` : '',
   ].filter(Boolean);
   blocks.push({ title: 'Правила клієнта для креативів (вкладка «Креативи» проєкту)', text: rules.join('\n') });
+  // what the manager told about the client (the section «AI-агенти» of the project card): every role reads it
+  PROFILE_FIELDS.forEach((f) => {
+    const item = row?.inputs?.[f.key];
+    if (String(item?.body || '').trim()) blocks.push({ title: `${f.label} (картка проєкту, ${item.by ? `вказав ${item.by}` : 'вказано вручну'})`, text: clip(item.body, 3000) });
+  });
   blocks.push({ title: 'Бібліотека матеріалів клієнта (вкладка «Креативи» проєкту)', text: assets.length ? assets.map((a) => `- ${a.name} (${ASSET_KINDS[a.kind] || a.kind})`).join('\n') : 'Бібліотека порожня.' });
   const have = new Set();
   if (inputs) {

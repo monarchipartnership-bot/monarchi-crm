@@ -1,4 +1,4 @@
-// Vercel Cron calls this every 15 minutes (see vercel.json). It proves itself with CRON_SECRET; no person is
+// Vercel Cron calls this every minute (see vercel.json): the queue of the agents must not wait. It proves itself with CRON_SECRET; no person is
 // involved. It starts the reports that are due for the project agents that are switched on.
 import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';

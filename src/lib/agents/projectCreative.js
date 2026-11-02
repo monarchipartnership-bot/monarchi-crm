@@ -9,9 +9,25 @@ export const INPUT_FIELDS = [
   { key: 'audience', label: 'Аудиторія', agent: 'Агент дослідження аудиторії', hint: 'Хто купує, чому, що його зупиняє.' },
   { key: 'strategy', label: 'Стратегія кампанії', agent: 'Маркетинговий стратег', hint: 'Позиціонування й ключові меседжі кампанії.' },
   { key: 'cabinet', label: 'Результати кабінету', agent: 'Аналітик Meta Ads, Аналітик Google Ads', hint: 'Витрати, CPA, ROAS за кампаніями за останній період.' },
-  { key: 'tracking', label: 'Проблеми з трекінгом', agent: 'Агент контролю трекінгу та цілісності даних', hint: 'Чи можна довіряти цифрам кабінету.' },
+  { key: 'tracking', label: 'Проблеми з трекінгом', agent: 'Агент контролю трекінгу клієнта', hint: 'Чи можна довіряти цифрам кабінету.' },
 ];
 export const INPUT_KEYS = INPUT_FIELDS.map((f) => f.key);
+
+// What the manager tells about the client here (the section «AI-агенти» of the project card): nobody else delivers it. Stored in the same `inputs` as the data of
+// the agents (key -> { body, source: 'manual', by, filled_at }), so the age of a value is known too. Which agent needs which field: lib/agents/agentRequirements.js.
+export const PROFILE_FIELDS = [
+  { key: 'about', label: 'Опис бізнесу', hint: 'Чим займається клієнт, що продає, де працює, коротка історія й сайт.' },
+  { key: 'offer', label: 'Оффер і відмінності', hint: 'Головна пропозиція, чим клієнт відрізняється від конкурентів, акції й умови (лише те, що точно є).' },
+  { key: 'tone', label: 'Тон і стиль бренду', hint: 'Як бренд говорить: тепло чи стримано, на «ви» чи на «ти», слова, яких уникати.' },
+  { key: 'brand', label: 'Бренд: кольори й шрифти', hint: 'Основні кольори (коди), шрифти, правила використання логотипу.' },
+  { key: 'markets', label: 'Ринки й мови', hint: 'У яких країнах і якою мовою рекламуємось.' },
+  { key: 'seasonality', label: 'Сезонність і акції', hint: 'Коли найбільший попит, які розпродажі й дати плануються.' },
+  { key: 'goals', label: 'Цілі та KPI', hint: 'Наприклад: 200 лідів на місяць за CPL до $15, або ROAS від 3.' },
+  { key: 'budget', label: 'Бюджет', hint: 'Діапазон на місяць загалом і по каналах.' },
+  { key: 'examples', label: 'Приклади креативів', hint: 'Посилання або опис креативів, які подобаються чи ні (скриншоти додайте в матеріали).' },
+];
+export const PROFILE_KEYS = PROFILE_FIELDS.map((f) => f.key);
+export const ALL_INPUT_KEYS = [...INPUT_KEYS, ...PROFILE_KEYS];
 export const FRESH_DAYS = 14; // older than this: «Застарів»
 
 export const ASSET_KINDS = { logo: 'Логотип', product: 'Фото продукту', style: 'Приклад стилю', other: 'Інше' };
