@@ -1,48 +1,49 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Box } from './kit';
 import { fmtValue, metricInfo } from '../../lib/clientReport';
 import { funnelModel } from '../../lib/reportFunnel';
 
 // The funnel of a report (variant C, chosen by the owner 2026-11-03): one smooth silhouette, the layers go from light lilac to dark plum, the step conversion sits in
-// callouts on the right, the weakest step is amber. The widths are not the data (the picture would be unreadable at 1%): the numbers and percentages are.
-const W = 680;
-const CX = 230;
-const TOP = 28;
-const LAYER = 72;
-const GAP = 20;
+// callouts, the weakest step is amber. The widths are not the data (the picture would be unreadable at 1%): the numbers and percentages are.
+// Two drawings of the same picture: wide (callouts to the right of the silhouette) and compact (a phone: the callouts sit between the layers), so the text keeps a readable size.
 const FROM = [215, 169, 220]; // #D7A9DC
 const TO = [82, 27, 82]; // #521B52
+const COMPACT_BELOW = 520; // px of the box
 
 const mix = (t) => `rgb(${FROM.map((a, i) => Math.round(a + (TO[i] - a) * t)).join(',')})`;
-const pct = (n) => `${String(n).replace('.', ',')}%`; // the report is read by people who write decimals with a comma
+// the client page is in English: numbers are written like in the tables (12,480 and 12.3%)
+const pct = (n) => `${Number(n).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
+const cut = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+const stepNote = (s) => (s.fromPrev > 100 ? 'more than at the step before' : `go on to ${s.label}`);
 
 export const SAMPLE_TOTAL = { x_view_content: 1000, x_add_to_cart: 100, x_initiate_checkout: 80, purchases: 10 };
 
-export function FunnelChart({ model, sample = false }) {
+function Layer({ s, i, n, cx, y, wt, wb, layer, big, small, stroke }) {
+  const t = n > 1 ? i / (n - 1) : 0;
+  const fill = mix(t);
+  const dark = t < 0.4;
+  return (
+    <g>
+      <path d={`M${cx - wt / 2} ${y} L${cx + wt / 2} ${y} L${cx + wb / 2} ${y + layer} L${cx - wb / 2} ${y + layer} Z`} fill={fill} stroke={fill} strokeWidth={stroke} strokeLinejoin="round" />
+      <text x={cx} y={y + layer * 0.4} textAnchor="middle" fontSize={small} fill={dark ? '#4a1d4d' : '#ffffff'}>{cut(s.label, 26)}</text>
+      <text x={cx} y={y + layer * 0.75} textAnchor="middle" fontSize={i === n - 1 ? big - 4 : big} fontWeight="600" fill={dark ? '#3b1a3d' : '#ffffff'}>{fmtValue(s.key, s.value, 'number')}</text>
+    </g>
+  );
+}
+
+// wide: 680 units across, the callouts to the right
+function WideChart({ model, sample }) {
+  const W = 680; const CX = 230; const TOP = 28; const LAYER = 72; const GAP = 20;
   const n = model.steps.length;
   const step = Math.min(70, (300 - 130) / n);
   const height = TOP + n * (LAYER + GAP) + 30;
   const widthAt = (i, bottom) => 330 - i * step - (bottom ? step * 0.8 : 0);
   const yOf = (i) => TOP + i * (LAYER + GAP);
-  const last = model.steps[n - 1];
-  const overall = last.fromFirst;
+  const overall = model.steps[n - 1].fromFirst;
   return (
     <svg className="fnl" viewBox={`0 0 ${W} ${height}`} width="100%" role="img" aria-label="Funnel of the stages with the share that goes on at every step">
       <title>Funnel</title>
-      {model.steps.map((s, i) => {
-        const y = yOf(i);
-        const t = n > 1 ? i / (n - 1) : 0;
-        const wt = widthAt(i, false);
-        const wb = widthAt(i, true);
-        const fill = mix(t);
-        const dark = t < 0.4;
-        return (
-          <g key={s.key}>
-            <path d={`M${CX - wt / 2} ${y} L${CX + wt / 2} ${y} L${CX + wb / 2} ${y + LAYER} L${CX - wb / 2} ${y + LAYER} Z`} fill={fill} stroke={fill} strokeWidth="10" strokeLinejoin="round" />
-            <text x={CX} y={y + 29} textAnchor="middle" fontSize="12" fill={dark ? '#4a1d4d' : '#ffffff'}>{s.label}</text>
-            <text x={CX} y={y + 54} textAnchor="middle" fontSize={i === n - 1 ? 18 : 22} fontWeight="600" fill={dark ? '#3b1a3d' : '#ffffff'}>{fmtValue(s.key, s.value, 'number')}</text>
-          </g>
-        );
-      })}
+      {model.steps.map((s, i) => <Layer key={s.key} s={s} i={i} n={n} cx={CX} y={yOf(i)} wt={widthAt(i, false)} wb={widthAt(i, true)} layer={LAYER} big={22} small={12} stroke={10} />)}
       {model.steps.slice(1).map((s, k) => {
         const i = k + 1;
         const gapY = yOf(i) - GAP / 2;
@@ -52,8 +53,8 @@ export function FunnelChart({ model, sample = false }) {
           <g key={`c-${s.key}`}>
             <path d={`M${edge} ${gapY} L440 ${gapY}`} stroke="#C9A3CE" strokeWidth="1" strokeDasharray="3 3" fill="none" />
             <rect x="440" y={gapY - 23} width="214" height="46" rx="12" fill={weak ? '#FFF1D6' : '#F3E3F7'} stroke={weak ? '#F0B955' : '#E0C2E6'} />
-            <text x="456" y={gapY - 3} fontSize="15" fontWeight="600" fill={weak ? '#6b4300' : '#682768'}>{s.fromPrev == null ? '—' : pct(s.fromPrev)}</text>
-            <text x="456" y={gapY + 14} fontSize="11" fill={weak ? '#6b4300' : '#682768'}>{`go on to ${s.label}${weak ? ' · biggest drop' : ''}`.slice(0, 40)}</text>
+            <text x="456" y={gapY - 3} fontSize="15" fontWeight="600" fill={weak ? '#6b4300' : '#682768'}>{s.fromPrev == null ? '—' : pct(s.fromPrev)}{weak && <tspan fontSize="11" fontWeight="500"> · biggest drop</tspan>}</text>
+            <text x="456" y={gapY + 14} fontSize="11" fill={weak ? '#6b4300' : '#682768'}>{cut(stepNote(s), 34)}</text>
           </g>
         );
       })}
@@ -61,6 +62,53 @@ export function FunnelChart({ model, sample = false }) {
       {sample && <text x="24" y="18" fontSize="11" fill="#7a5a7d">Example: the real numbers appear with the data</text>}
     </svg>
   );
+}
+
+// compact: 300 units across (about a phone), the callout sits in the gap under the layer it follows
+function CompactChart({ model, sample }) {
+  const W = 300; const CX = 150; const TOP = sample ? 22 : 4; const LAYER = 62; const GAP = 40;
+  const n = model.steps.length;
+  const step = Math.min(30, (280 - 170) / n);
+  const height = TOP + n * LAYER + (n - 1) * GAP + 30;
+  const widthAt = (i, bottom) => 280 - i * step - (bottom ? step * 0.8 : 0);
+  const yOf = (i) => TOP + i * (LAYER + GAP);
+  const overall = model.steps[n - 1].fromFirst;
+  return (
+    <svg className="fnl" viewBox={`0 0 ${W} ${height}`} width="100%" role="img" aria-label="Funnel of the stages with the share that goes on at every step">
+      <title>Funnel</title>
+      {sample && <text x="150" y="13" textAnchor="middle" fontSize="11" fill="#7a5a7d">Example: the real numbers appear with the data</text>}
+      {model.steps.map((s, i) => <Layer key={s.key} s={s} i={i} n={n} cx={CX} y={yOf(i)} wt={widthAt(i, false)} wb={widthAt(i, true)} layer={LAYER} big={20} small={12} stroke={8} />)}
+      {model.steps.slice(1).map((s, k) => {
+        const i = k + 1;
+        const mid = yOf(i) - GAP / 2;
+        const weak = s.weakest;
+        const text = s.fromPrev == null ? '—' : s.fromPrev > 100 ? `${pct(s.fromPrev)} · more than before` : `${pct(s.fromPrev)} go on${weak ? ' · biggest drop' : ''}`;
+        return (
+          <g key={`c-${s.key}`}>
+            <rect x="40" y={mid - 12} width="220" height="24" rx="12" fill={weak ? '#FFF1D6' : '#F3E3F7'} stroke={weak ? '#F0B955' : '#E0C2E6'} />
+            <text x={CX} y={mid + 4.5} textAnchor="middle" fontSize="12" fontWeight="600" fill={weak ? '#6b4300' : '#682768'}>{text}</text>
+          </g>
+        );
+      })}
+      {overall != null && <text x={CX} y={height - 10} textAnchor="middle" fontSize="12" fill="#7a5a7d">{`Overall: ${pct(overall)} go all the way`}</text>}
+    </svg>
+  );
+}
+
+export function FunnelChart({ model, sample = false }) {
+  const box = useRef(null);
+  const [compact, setCompact] = useState(false);
+  useLayoutEffect(() => { // measured before the first paint: a phone never flashes the wide drawing
+    const el = box.current;
+    if (!el) return undefined;
+    const read = () => setCompact(el.getBoundingClientRect().width < COMPACT_BELOW);
+    read();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return <div ref={box} style={{ width: '100%' }}>{compact ? <CompactChart model={model} sample={sample} /> : <WideChart model={model} sample={sample} />}</div>;
 }
 
 // The box a report shows. `view.funnel` is the layout's setting ({ enabled, stages }); the numbers come from the totals of the report. Nothing is drawn when the funnel is off or has fewer than

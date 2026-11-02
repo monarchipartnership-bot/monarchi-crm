@@ -75,7 +75,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
     fetchReportLayout(row.project_id, platform).then((r) => { if (!off && r.exists) setLayout(r.layout); });
     return () => { off = true; };
   }, [row.project_id, platform, isAll, isCustom]);
-  const funnel = isCustom ? null : (withFunnel(data.template || {}, layout).funnel ?? null);
+  const funnel = isAll ? null : (withFunnel(data.template || {}, layout).funnel ?? null); // a custom report always states its own (null or the funnel it was saved with)
   const withFunnelData = () => (!isCustom && data.template && data.template.funnel === undefined && layout ? { ...data, template: withFunnel(data.template, layout) } : data);
   const groupsHere = useMemo(() => groupsForPlatform(ctx.groups || [], platform), [ctx.groups, platform]);
   const extraKeys = extraKeysOf(ctx.columns, { ...row, data });

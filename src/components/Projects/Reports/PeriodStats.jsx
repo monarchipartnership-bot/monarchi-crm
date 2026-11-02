@@ -54,6 +54,8 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   const navigate = useNavigate();
   const [archive, setArchive] = useState({ busy: false, msg: '', id: null });
   const isTotal = platform === 'total';
+  // the funnel of the platform's layout (not for the sum of the platforms: the stages come from Meta only); a saved custom report keeps it
+  const periodFunnel = !isTotal && ctx.layout?.funnel?.enabled ? { enabled: true, stages: [...ctx.layout.funnel.stages] } : null;
   const initial = presetRange('7');
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -148,7 +150,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     try {
       const period = { start: state.range.from, end: state.range.to };
       const prev = state.prev ? { start: state.prev.from, end: state.prev.to } : null;
-      const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection: [], options: { groups: true }, sections, template: { blocks: customBlocks(ctx.layout), metrics: null, hiddenMetrics: [], funnel: null } });
+      const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection: [], options: { groups: true }, sections, template: { blocks: customBlocks(ctx.layout), metrics: null, hiddenMetrics: [], funnel: periodFunnel } });
       if (creatives?.items?.length) payload.creatives = { count: creatives.count, items: creatives.items, source: 'manual', at: new Date().toISOString() };
       const row = await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'final', data: { ...payload, label: null }, createdBy: email });
       setArchive({ busy: false, msg: 'Збережено в «Історія проекту» → «Кастомні звіти».', id: row.id });
@@ -227,7 +229,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
             {state.prev && <i className="ch-chp">порівняння з {fmt(state.prev.from)} – {fmt(state.prev.to)}</i>}
           </div>
           <ResultView
-            data={shown} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} metricOrder={ctx.layout?.metricOrder} baseMetrics={ctx.layout?.baseMetrics}
+            data={shown} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} metricOrder={ctx.layout?.metricOrder} baseMetrics={ctx.layout?.baseMetrics} funnel={periodFunnel}
             title={ctx.project.name} subtitle={`${fmt(state.range.from)} – ${fmt(state.range.to)}`}
             fileBase={`${ctx.project.name}_${state.range.from}_${state.range.to}`}
             curLabel={`${fmt(state.range.from)}–${fmt(state.range.to)}`}

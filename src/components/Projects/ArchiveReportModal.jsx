@@ -114,7 +114,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
     <>
       {platforms.length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
         <ResultView
-          data={{ platforms: data.platforms, previous: data.previous || null }} kind={data.kind || 'ecom'} custom={custom} templateMetrics={data.template?.metrics || null}
+          data={{ platforms: data.platforms, previous: data.previous || null }} kind={data.kind || 'ecom'} custom={custom} templateMetrics={data.template?.metrics || null} funnel={isCombined ? null : (data.template?.funnel || null)}
           lockTotal={isCombined} extraKeys={isCombined ? [] : extraKeys}
           title={projectName + label} subtitle={TYPE_LABEL[row.period_type] + ' · ' + reportPeriodText(row)}
           fileBase={`${projectName}_${row.period_type}_${row.period_start}_${row.platform}`}
