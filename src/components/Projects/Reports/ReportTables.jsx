@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { computeMetric, formatMetric, metricMeta, deltaPct, deltaTone } from '../../../lib/reportMetrics';
+import { useRowTools } from '../../ClientReport/rowTools';
 
 function Delta({ delta, tone }) {
   if (delta == null) return <span className="prep-delta prep-delta--none">—</span>;
@@ -37,7 +38,9 @@ export function bestOf(values, goodWhen) {
 // Metrics table for one set of numbers: value, the previous period and the change.
 // `rows` come from metricRows() in lib/periodReport.js.
 // `clientEye`: { hidden: [keys], onToggle(key) } puts an eye before every metric (the workspace of a report: what the client does not see).
-export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей період', prevLabel = 'Попередній', clientEye = null }) {
+// `tools`: { onChange(action, key, toKey, toIndex), options(key) } lets a person drag a metric, replace it or remove it (the same buttons as in the report builder).
+export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей період', prevLabel = 'Попередній', clientEye = null, tools = null }) {
+  const rt = useRowTools(tools);
   return (
     <table className="prep-table">
       <thead>
@@ -49,9 +52,10 @@ export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей �
         </tr>
       </thead>
       <tbody>
-        {rows.map((r) => (
-          <tr key={r.key} className={clientEye && clientEye.hidden.includes(r.key) ? 'rt-off' : undefined}>
-            <td className="lbl">
+        {rows.map((r, ri) => (
+          <tr key={r.key} {...rt.rowAttrs(r.key, ri, clientEye && clientEye.hidden.includes(r.key) ? 'rt-off' : '')}>
+            <td className="lbl" {...rt.cellAttrs(r.key, ri, rows.map((x) => x.key))}>
+              {rt.toolbar(r.key, r.label)}
               {clientEye && (() => {
                 const on = !clientEye.hidden.includes(r.key);
                 return (
@@ -60,7 +64,8 @@ export function ReportMetricsTable({ rows, showPrev = true, curLabel = 'Цей �
                   </button>
                 );
               })()}
-              {r.label}
+              {rt.name(r.key, r.label)}
+              {rt.replaceBox(r.key, r.label)}
             </td>
             <td className="num strong">{formatMetric(r.value, r.format, r.currency)}</td>
             {showPrev && <td className="num muted">{formatMetric(r.before, r.format, r.currency)}</td>}

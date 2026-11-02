@@ -90,7 +90,7 @@ export function normalizeTemplate(raw) {
 const periodFlag = (periodType) => (periodType === 'monthly' ? 'monthly' : 'weekly');
 
 // The text blocks of a custom report («Показники за період»): every block the layout has for a weekly or a monthly report, in the layout's order.
-export const customBlocks = (template) => normalizeTemplate(template).blocks.filter((b) => b.weekly || b.monthly).map((b) => ({ key: b.key, title: b.title, client: false }));
+export const customBlocks = (template) => normalizeTemplate(template).blocks.filter((b) => b.weekly || b.monthly).map((b) => ({ key: b.key, title: b.title, client: b.client }));
 
 // The blocks a report of this period type has, in the template's order.
 export const blocksFor = (template, periodType) => normalizeTemplate(template).blocks.filter((b) => b[periodFlag(periodType)]);

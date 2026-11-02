@@ -110,7 +110,7 @@ export function reportView(report, ctx) {
     // the text blocks of the template this report was made with, and only those the client may see; its own metric list, if it had one
     blocks: reportBlocks(report.data).filter((b) => b.client),
     templateMetrics: report.data?.template?.metrics || null,
-    creatives: (report.data?.creatives || []).slice(0, report.type === 'monthly' ? 4 : 3),
+    creatives: (report.data?.creatives || []).slice(0, report.type === 'monthly' ? 4 : report.type === 'custom' ? 12 : 3),
     kind: report.data?.kind || ctx.kind, // the type the report was made with
     hiddenMetrics: hiddenMetricsOf(report.data), // what the client does not see (the team sees everything)
     funnel: report.data?.template?.funnel || null, // the funnel the report was made with (null: none)
@@ -127,7 +127,7 @@ export function viewKeys(view, model, { all = false } = {}) {
 export function prevName(view) {
   if (!view.prev) return '';
   if (view.type === 'monthly') return monthName(monthKey(view.prev.period.start));
-  return 'previous week';
+  return view.type === 'custom' ? 'previous period' : 'previous week';
 }
 
 // ---- the KPI cards ----
@@ -262,7 +262,9 @@ export function buildClientModel(payload) {
     return { key: m.key, short: m.short, partial: m.running, spend: val('spend'), revenue: val('revenue'), purchases: val('purchases'), leads: val('leads'), ctr: val('ctr'), cpm: val('cpm'), cpa: val('cpp'), cpl: val('cpl'), aov: val('aov'), roas: val('roas'), currency: m.monthly.currency };
   });
   const stamps = months.map((m) => m.asOf).filter(Boolean).sort();
-  return { project: payload.project || { name: '' }, platform: payload.platform, kind, hidden, columns: payload.columns || [], custom: payload.custom || [], months, history, asOf: stamps.length ? stamps[stamps.length - 1] : null };
+  // a link of one custom report: that report is the whole page
+  const single = payload.single === true ? views.find((v) => v.type === 'custom') || null : null;
+  return { project: payload.project || { name: '' }, platform: payload.platform, kind, hidden, columns: payload.columns || [], custom: payload.custom || [], months, history, single, isSingle: payload.single === true, asOf: single ? (single.updatedAt || '').slice(0, 10) || null : stamps.length ? stamps[stamps.length - 1] : null };
 }
 
 // ---- what the agent writes a custom block of the report template from ----

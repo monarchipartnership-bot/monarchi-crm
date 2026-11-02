@@ -196,7 +196,7 @@ export async function fetchAllMonthlyReportsForMonth(monthStartIso) {
 // One active link per project + platform scope. → { id, token, created_at, opens, last_opened_at } or null.
 export async function fetchReportShare(projectId, platform) {
   const { data, error } = await supabase.from('report_shares').select('id, token, created_at, opens, last_opened_at')
-    .eq('project_id', projectId).eq('platform', platform).eq('active', true).maybeSingle();
+    .eq('project_id', projectId).eq('platform', platform).eq('active', true).is('report_id', null).maybeSingle();
   if (error) { console.warn('fetchReportShare failed', error); return null; }
   return data;
 }
@@ -207,7 +207,23 @@ export async function issueReportShare(projectId, platform, by) {
   return data;
 }
 export async function revokeReportShare(projectId, platform) {
-  const { error } = await supabase.from('report_shares').update({ active: false, revoked_at: nowIso() }).eq('project_id', projectId).eq('platform', platform).eq('active', true);
+  const { error } = await supabase.from('report_shares').update({ active: false, revoked_at: nowIso() }).eq('project_id', projectId).eq('platform', platform).eq('active', true).is('report_id', null);
+  if (error) throw error;
+}
+
+// The link of ONE custom report («Показники за період» → «Зберегти»): the page shows that report only (migration 20261053000000_custom_report_shares.sql).
+export async function fetchReportShareFor(reportId) {
+  const { data, error } = await supabase.from('report_shares').select('id, token, created_at, opens, last_opened_at').eq('report_id', reportId).eq('active', true).maybeSingle();
+  if (error) { console.warn('fetchReportShareFor failed', error); return null; }
+  return data;
+}
+export async function issueReportShareFor(reportId, by) {
+  const { data, error } = await supabase.rpc('issue_report_share_for_report', { p_report: reportId, p_by: by || null });
+  if (error) throw error;
+  return data;
+}
+export async function revokeReportShareFor(reportId) {
+  const { error } = await supabase.from('report_shares').update({ active: false, revoked_at: nowIso() }).eq('report_id', reportId).eq('active', true);
   if (error) throw error;
 }
 

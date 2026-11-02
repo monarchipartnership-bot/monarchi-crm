@@ -6,6 +6,7 @@ import { Icon, Medallion } from '../../components/ClientReport/kit';
 import { MonarchiLogo } from '../../components/ClientReport/parts';
 import MonthView from '../../components/ClientReport/MonthView';
 import AllMonths from '../../components/ClientReport/AllMonths';
+import PeriodView from '../../components/ClientReport/PeriodView';
 import '../../styles/clientReportHub.css';
 
 // The page a client opens by a link (/r/<token>): no password, outside the CRM. It reads ONLY get_shared_report(token) — approved weeks and the
@@ -84,7 +85,9 @@ export default function ClientReportPage() {
         <MonarchiLogo />
       </div>
 
-      {months.length === 0 ? (
+      {model.isSingle ? (
+        model.single ? <PeriodView view={model.single} model={model} /> : <div className="emp crh-state">This report is not available any more. Please ask your Mon&apos;Archi manager for a new link.</div>
+      ) : months.length === 0 ? (
         <div className="emp crh-state">The first report will appear here as soon as it is approved. This page updates itself — you can keep the link.</div>
       ) : (
         <>

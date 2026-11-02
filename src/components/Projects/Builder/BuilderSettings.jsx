@@ -45,7 +45,7 @@ export function Panel({ id, icon, title, note, summary, children }) {
   );
 }
 
-function Switch({ on, onChange, label }) {
+export function Switch({ on, onChange, label }) {
   return (
     <label className="bld-switch">
       <button type="button" role="switch" aria-checked={on} className={'bld-tgl' + (on ? ' on' : '')} onClick={() => onChange(!on)}><i /></button>

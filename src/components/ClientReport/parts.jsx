@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, Medallion, Mark } from './kit';
 import { LOGO_SVG } from './logoSvg';
 import { metricTable, prevName, rangeText } from '../../lib/clientReport';
-import Select from '../common/Select';
+import { useRowTools } from './rowTools';
 
 // The parts a week and a month are built of: the table with the groups in columns, the text cards, the creatives with a magnifier.
 
@@ -90,56 +90,7 @@ function hintText(view, folded) {
 //   remove it: the buttons appear to the left of the metric. Alt + ↑ / ↓ on the focused metric moves it for the keyboard.
 export function MetricTable({ view, keys, custom, platformLabel, builder = null }) {
   const [showAll, setShowAll] = useState(false);
-  const [sel, setSel] = useState(null); // the metric row that is picked (builder)
-  const [replacing, setReplacing] = useState(false);
-  const tools = builder?.tools || null;
-  const act = (action, key, toKey, toIndex) => { setReplacing(false); if (action === 'remove' || action === 'replace') setSel(null); tools.onChange(action, key, toKey, toIndex); };
-  // ---- dragging a row: it follows the pointer, the rows it passes slide out of the way, and on release it settles into its place
-  const rowEls = useRef(new Map());
-  const skipClick = useRef(false);
-  const [drag, setDrag] = useState(null); // { key, from, to, dy, h, settling }
-  const SETTLE_MS = 160;
-  function startRowDrag(e, key, from, rowKeys) {
-    if (!tools || e.button !== 0 || e.target.closest('.mt-tools, .mt-replace, .crh-eye')) return;
-    const rects = rowKeys.map((k) => rowEls.current.get(k)?.getBoundingClientRect());
-    if (rects.some((r) => !r)) return;
-    const startY = e.clientY;
-    const h = rects[from].height;
-    const mids = rects.map((r) => r.top + r.height / 2);
-    let started = false;
-    let last = { to: from, dy: 0 };
-    const move = (ev) => {
-      const dy = ev.clientY - startY;
-      if (!started && Math.abs(dy) < 6) return; // a click is not a drag
-      started = true;
-      const centre = mids[from] + dy;
-      const to = mids.filter((m, i) => i !== from && m < centre).length; // the place in the new order: how many other rows are above the dragged one
-      last = { to, dy };
-      setDrag({ key, from, to, dy, h, settling: false });
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-      if (!started) return;
-      skipClick.current = true;
-      setTimeout(() => { skipClick.current = false; }, 0);
-      const { to } = last;
-      const slot = to > from ? rects[to].top + rects[to].height - h : rects[to].top; // where the row ends up
-      setDrag({ key, from, to, dy: slot - rects[from].top, h, settling: true });
-      setTimeout(() => { setDrag(null); if (to !== from) act('move', key, null, to); }, SETTLE_MS);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
-  }
-  const rowStyle = (rowIndex, key) => {
-    if (!drag) return undefined;
-    const base = { position: 'relative' };
-    if (key === drag.key) return { ...base, transform: `translateY(${drag.dy}px)`, transition: drag.settling ? `transform ${SETTLE_MS}ms ease` : 'none', zIndex: 3, boxShadow: '0 8px 22px rgba(104,39,104,.25)', background: '#fff' };
-    const shift = drag.from < drag.to && rowIndex > drag.from && rowIndex <= drag.to ? -drag.h : drag.from > drag.to && rowIndex >= drag.to && rowIndex < drag.from ? drag.h : 0;
-    return { ...base, transform: shift ? `translateY(${shift}px)` : 'none', transition: `transform ${SETTLE_MS}ms ease` };
-  };
+  const rt = useRowTools(builder?.tools || null);
   const t = metricTable(view, { keys, custom, platformLabel, showAll });
   const canToggle = t.foldable;
   return (
@@ -149,21 +100,12 @@ export function MetricTable({ view, keys, custom, platformLabel, builder = null 
           <thead><tr><th />{t.columns.map((c) => <th key={c.id}>{c.label}</th>)}</tr></thead>
           <tbody>
             {t.rows.map((r, ri) => (
-              <tr key={r.key} ref={(el) => { if (el) rowEls.current.set(r.key, el); else rowEls.current.delete(r.key); }} style={rowStyle(ri, r.key)} className={(builder && builder.hidden.includes(r.key) ? 'crh-off' : '') + (tools && sel === r.key ? ' crh-picked' : '') + (tools ? ' mt-row' : '') + (drag?.key === r.key ? ' mt-dragging' : '') || undefined}>
-                <td onPointerDown={tools ? (e) => startRowDrag(e, r.key, ri, t.rows.map((x) => x.key)) : undefined}>
-                  {tools && sel === r.key && (
-                    <span className="mt-tools" role="toolbar" aria-label={`Дії з метрикою ${r.label}`}>
-                      <button type="button" className={'mt-tool' + (replacing ? ' on' : '')} aria-expanded={replacing} aria-label="Замінити" title="Замінити" onClick={() => setReplacing((v) => !v)}>&#8644;</button>
-                      <button type="button" className="mt-tool mt-tool--bad" aria-label="Видалити" title="Видалити" onClick={() => act('remove', r.key)}>&times;</button>
-                    </span>
-                  )}
+              <tr key={r.key} {...rt.rowAttrs(r.key, ri, builder && builder.hidden.includes(r.key) ? 'crh-off' : '')}>
+                <td {...rt.cellAttrs(r.key, ri, t.rows.map((x) => x.key))}>
+                  {rt.toolbar(r.key, r.label)}
                   {builder && <EyeToggle on={!builder.hidden.includes(r.key)} onToggle={() => builder.onToggle(r.key)} label={r.label} />}
-                  {tools ? <button type="button" className="mt-name" aria-pressed={sel === r.key} title="Перетягніть вгору чи вниз, щоб змінити порядок; натисніть, щоб замінити або видалити" onKeyDown={(e) => { if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); act('up', r.key); } else if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); act('down', r.key); } }} onClick={() => { if (skipClick.current) return; setReplacing(false); setSel(sel === r.key ? null : r.key); }}>{r.label}</button> : r.label}
-                  {tools && sel === r.key && replacing && (
-                    <div className="mt-replace">
-                      <Select value="" searchable placeholder="Замінити на…" ariaLabel={`Замінити метрику ${r.label}`} options={tools.options(r.key)} onChange={(to) => to && act('replace', r.key, to)} />
-                    </div>
-                  )}
+                  {rt.name(r.key, r.label)}
+                  {rt.replaceBox(r.key, r.label)}
                 </td>
                 {r.cells.map((c, i) => (
                   <td key={t.columns[i].id} className={i === 0 || t.columns[i].kind === 'sum' ? 'gen' : c.cls}>

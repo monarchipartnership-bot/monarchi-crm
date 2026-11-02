@@ -6,7 +6,8 @@ import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import ResultView from '../Reports/ResultView';
 import CreativeGrid from '../CreativeGrid';
 import CreativePickerDialog from '../CreativePickerDialog';
-import { Panel, PanelContext, SelectionPanel } from '../Builder/BuilderSettings';
+import ShareLinkBox from '../ShareLinkBox';
+import { Panel, PanelContext, SelectionPanel, Switch } from '../Builder/BuilderSettings';
 import { reportPeriodText, reportPlatformLabel } from '../ArchiveReportModal';
 import { deleteProjectReport, fetchReportLayout, refreshMonthTotal, saveReportData } from '../../../lib/api/projectReportStore';
 import { suggestCreatives } from '../../../lib/api/reportCreatives';
@@ -15,7 +16,11 @@ import { groupsForPlatform, selectionFromColumns } from '../../../lib/campaignGr
 import { regroupData } from '../../../lib/periodReport';
 import { metricKeys } from '../../../lib/clientReport';
 import { metricKeysOf, reportBlocks, snapshotOf, withFunnel } from '../../../lib/reportTemplate';
-import { metricOptions } from '../../../lib/reportMetrics';
+import { computeMetric, metricMeta, metricOptions } from '../../../lib/reportMetrics';
+import { planMetricChange } from '../../../lib/reportMetricOps';
+import { DEFAULT_FUNNEL_STAGES, FUNNEL_CANDIDATES, normalizeFunnel } from '../../../lib/reportFunnel';
+import { rowBlock, sheetNameOf } from '../../../lib/reportWorkbook';
+import { saveReportWorkbook } from '../../../lib/reportWorkbookExport';
 import { REPORT_STATUS, canApprove, isRunning, monthKey, reviewPatch } from '../../../lib/projectHistory';
 import '../../../styles/projectReports.css';
 import '../../../styles/workbench.css';
@@ -45,8 +50,8 @@ const Eye = ({ on, onToggle, label }) => (
 
 // One report of «Робота над звітами» opened in the workspace: the numbers as they will look, what is in the report (metrics, groups and campaigns), the texts, the
 // creatives. «Зберегти» keeps the status, «Підтверджено» sends the report to the history and to the client's page.
-// A custom report («Показники за період» → «Зберегти», opened from «Історія проекту» → «Кастомні звіти») has no status and never goes to the client; it has the table,
-// what is in it, the texts and the creatives of its dates, saving, downloading and deleting.
+// A custom report («Показники за період» → «Зберегти», opened from «Історія проекту» → «Кастомні звіти») has no status and no approval: it can do everything the others can
+// (metric tools, texts, creatives, funnel, the eye for the client, downloads, a presentation) and it goes to the client by a link of its own, made here.
 export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const { email } = useAuth();
   const navigate = useNavigate();
@@ -98,6 +103,27 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
     if (next.length) setTemplate({ metrics: next });
   };
   const toggleHidden = (key) => setTemplate({ hiddenMetrics: hidden.includes(key) ? hidden.filter((k) => k !== key) : [...hidden, key] });
+  // the metric tools of the table (the same buttons as in the report builder): they change this report's own list and order only
+  const changeMetric = (action, key, toKey, toIndex) => {
+    setError('');
+    const plan = planMetricChange({ action, key, toKey, toIndex, keys: shownKeys, baseKeys: shownKeys, extraKeys: [], custom: [] });
+    if (plan.error) { setError(plan.error); return; }
+    const next = plan.order || plan.baseMetrics;
+    if (next) setTemplate({ metrics: next });
+  };
+  const replaceOptions = (key) => metricOptions(ctx.custom, extraKeys).filter((o) => o.key !== key && !shownKeys.includes(o.key)).map((o) => ({ value: o.key, label: o.label }));
+  // the funnel of this report: on / off and its stages (the numbers come from the saved ones: a stage the report has no number for is left out of the picture)
+  const funnelNow = funnel || { enabled: false, stages: DEFAULT_FUNNEL_STAGES };
+  const reportTotal = isAll ? null : data.platforms?.[platform]?.total || null;
+  const hasStage = (k) => reportTotal != null && Number.isFinite(computeMetric(k, reportTotal, ctx.custom));
+  const setFunnel = (next) => { const f = normalizeFunnel(next); setTemplate({ funnel: next.enabled ? { enabled: f.enabled, stages: f.stages } : null }); };
+  const toggleStage = (k) => {
+    const has = funnelNow.stages.includes(k);
+    const stages = FUNNEL_CANDIDATES.filter((c) => (c === k ? !has : funnelNow.stages.includes(c)));
+    if (stages.length < 2) { setError('У воронці мають бути щонайменше два етапи.'); return; }
+    setError('');
+    setFunnel({ enabled: true, stages });
+  };
   const setSelection = (patch) => {
     const next = patch.campaignSel;
     edit((d) => {
@@ -156,6 +182,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   }
 
   const options = metricOptions(ctx.custom, extraKeys);
+  const onXlsx = () => saveReportWorkbook([rowBlock({ ...row, data }, { custom: ctx.custom, extraKeys })], { filename: `${ctx.project?.name || 'report'}_custom_${row.period_start}_${row.period_end}_${platform}`, sheetName: sheetNameOf(row) });
   const review = data.review || {};
   const prevLabel = data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній';
 
@@ -172,7 +199,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
           <b>{isCustom ? 'Кастомний звіт' : (TYPE_LABEL[row.period_type] || row.period_type) + ' звіт'} · {reportPeriodText(row)}</b>
           <div className="wbe-sub">
             <i className={'wbh-plt wbh-plt--' + platform}>{reportPlatformLabel(platform)}</i>
-            {isCustom ? <i className="wbh-chip wbh-chip--custom">Кастомний · клієнту не йде</i> : <i className={'wbh-chip wbh-chip--' + row.status}>{statusLabel}</i>}
+            {isCustom ? <i className="wbh-chip wbh-chip--custom">Кастомний · без затвердження</i> : <i className={'wbh-chip wbh-chip--' + row.status}>{statusLabel}</i>}
             <span className="wbe-upd">оновлено {stamp(row.updated_at)}</span>
             {dirty && <span className="bld-state dirty"><i />Є незбережені зміни</span>}
           </div>
@@ -194,13 +221,14 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
       <div className="wbe-grid">
         <div className="wbe-main">
           <section className="wbe-block">
-            <div className="wbe-bh"><Medal n="metrics" cls="wbe-md" /><b>Таблиця звіту</b><span className="wbe-sp" />{!isCustom && <span className="wbe-mut">Око: чи бачить клієнт показник</span>}</div>
+            <div className="wbe-bh"><Medal n="metrics" cls="wbe-md" /><b>Таблиця звіту</b><span className="wbe-sp" /><span className="wbe-mut">Око: чи бачить клієнт · потягніть метрику, щоб змінити порядок; натисніть, щоб замінити чи видалити</span></div>
             {Object.keys(data.platforms || {}).length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
               <ResultView
-                data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} funnel={funnel} noExport={!isCustom} exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']}
+                data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} funnel={funnel} noExport={!isCustom} exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} onXlsx={isCustom ? onXlsx : null}
+                rowTools={running ? null : { onChange: changeMetric, options: replaceOptions }}
                 lockTotal={isAll} extraKeys={isAll ? [] : extraKeys} title={ctx.project?.name || ''} subtitle={`${TYPE_LABEL[row.period_type]} · ${reportPeriodText(row)}`}
                 fileBase={isCustom ? `${ctx.project?.name || 'report'}_custom_${row.period_start}_${row.period_end}_${platform}` : 'draft'} campaignMode="selected" selection={[]} options={{ groups: true }} curLabel={reportPeriodText(row)} prevLabel={prevLabel}
-                clientEye={isCustom ? null : { hidden, onToggle: toggleHidden }}
+                clientEye={{ hidden, onToggle: toggleHidden }}
               />
             )}
           </section>
@@ -213,12 +241,19 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
                   <div className={'wbe-text' + (b.client ? '' : ' off')} key={b.key}>
                     <div className="wbe-text-head">
                       <label htmlFor={'wb-t-' + b.key}>{b.title}</label>
-                      {!isCustom && <Eye on={b.client} onToggle={() => setBlockClient(b.key, !b.client)} label={b.title} />}
+                      <Eye on={b.client} onToggle={() => setBlockClient(b.key, !b.client)} label={b.title} />
                     </div>
                     <AutoResizeTextarea id={'wb-t-' + b.key} value={data.sections?.[b.key] || ''} onChange={(v) => setText(b.key, v)} placeholder={b.title + '…'} />
                   </div>
                 ))}
               </div>
+            </section>
+          )}
+
+          {isCustom && (
+            <section className="wbe-block">
+              <ShareLinkBox projectId={row.project_id} scope={platform} label={reportPlatformLabel(platform)} reportId={row.id} />
+              {dirty && <div className="pacc-hint">Є незбережені зміни: клієнт бачить збережену версію. Натисніть «Зберегти», і вона зʼявиться за тим самим посиланням.</div>}
             </section>
           )}
 
@@ -246,6 +281,18 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
                 })}
               </div>
             </Panel>
+            {!isAll && (
+              <Panel id="funnel" title="Воронка" summary={funnel ? `${funnel.stages.length} етапи` : 'вимкнена'} note="Картинка для клієнта: перегляд товару, кошик, оформлення, продаж, і де людей стає найменше. Тільки для цього звіту.">
+                <Switch on={Boolean(funnel)} onChange={(v) => setFunnel({ ...funnelNow, enabled: v })} label="Показувати воронку в звіті" />
+                <div className="bld-chips" aria-label="Етапи воронки">
+                  {FUNNEL_CANDIDATES.map((k) => {
+                    const on = funnelNow.stages.includes(k);
+                    return <button type="button" key={k} className={'bld-chip' + (on ? ' bld-chip--picked' : '')} aria-pressed={on} title={hasStage(k) ? undefined : 'У збережених цифрах цього звіту немає такого етапу'} onClick={() => toggleStage(k)}>{metricMeta(k, []).label}{hasStage(k) ? '' : ' ·  —'}</button>;
+                  })}
+                </div>
+                <div className="pacc-hint">Етапи йдуть у порядку шляху клієнта. Етап без числа в збережених цифрах (позначений «—») у картинку не потрапить: додайте його стовпець у макеті платформи й оновіть звіт.</div>
+              </Panel>
+            )}
             {!isAll && <SelectionPanel platform={platform} groups={groupsHere} campaigns={campaigns} problem="" draft={{ campaignSel: sel }} set={setSelection} />}
           </PanelContext.Provider>
         </aside>

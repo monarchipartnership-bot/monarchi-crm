@@ -2957,6 +2957,21 @@ await ok('report template: the funnel setting is cleaned, off by default, and a 
   assert.deepEqual(snap.funnel, { enabled: true, stages: ['mx_view_content', 'purchases'] });
 });
 
+await ok('link of one custom report: the page model is that report alone (with its funnel, hidden metrics and every creative), a project link has no single report', () => {
+  const report = { id: 9, type: 'custom', start: '2026-10-26', end: '2026-11-01', status: 'final', updatedAt: '2026-11-02T10:00:00Z', toDate: false,
+    data: { kind: 'ecom', platforms: { meta: { currency: 'USD', total: { spend: 100, revenue: 300, purchases: 3, x_view_content: 341, x_add_to_cart: 4 }, groups: [] } },
+      sections: { whatWasDone: 'Done' }, template: { blocks: [{ key: 'whatWasDone', title: 'What was done', client: true }, { key: 'plans', title: 'Plans', client: false }], metrics: ['spend', 'roas'], hiddenMetrics: ['roas'], funnel: { enabled: true, stages: ['mx_view_content', 'mx_add_to_cart'] } },
+      creatives: Array.from({ length: 6 }, (_, i) => ({ caption: 'c' + i, imageUrl: 'u' + i })) } };
+  const m = buildClientModel({ project: { name: 'P', kind: 'ecom' }, platform: 'meta', single: true, reports: [report] });
+  assert.equal(m.isSingle, true); assert.equal(m.single.type, 'custom'); assert.equal(m.single.creatives.length, 6); // a custom report shows all of its creatives
+  assert.deepEqual(m.single.blocks.map((b) => b.key), ['whatWasDone']); // the text the client may not see is not drawn
+  assert.deepEqual(m.single.hiddenMetrics, ['roas']); assert.equal(m.single.funnel.stages.length, 2);
+  assert.deepEqual(viewKeys(m.single, m), ['spend']); // the hidden metric is not in the client's table
+  assert.equal(prevName({ prev: { period: { start: '2026-10-19' } }, type: 'custom' }), 'previous period');
+  const project = buildClientModel({ project: { name: 'P' }, platform: 'meta', reports: [] });
+  assert.equal(project.isSingle, false); assert.equal(project.single, null);
+});
+
 await ok('custom report («Показники за період»): it has the text blocks of the layout (weekly or monthly), in the layout order, and a saved one shows them from its own snapshot', () => {
   const layout = normalizeTemplate({ blocks: [
     { key: 'whatWasDone', title: 'What was done', weekly: true, monthly: true },
@@ -2965,7 +2980,7 @@ await ok('custom report («Показники за період»): it has the t
   ] });
   const blocks = customBlocks(layout);
   assert.ok(blocks.some((b) => b.key === 'whatWasDone') && blocks.some((b) => b.key === 'b_week')); assert.ok(!blocks.some((b) => b.key === 'b_none'));
-  assert.equal(blocks[0].key, 'whatWasDone'); assert.ok(blocks.every((b) => b.client === false)); // a custom report never goes to the client
+  assert.equal(blocks[0].key, 'whatWasDone'); assert.ok(blocks.every((b) => b.client === layout.blocks.find((x) => x.key === b.key).client)); // the client's eye starts as the layout has it (a custom report goes to the client by its own link)
   // the report keeps what it was made with: its own blocks and the texts written for them
   const saved = { template: { blocks, metrics: null, hiddenMetrics: [], funnel: null }, sections: { whatWasDone: 'Done', b_week: 'Week text', lost: 'Kept anyway' } };
   assert.deepEqual(reportBlocks(saved).map((b) => b.key), [...blocks.map((b) => b.key), 'lost']);

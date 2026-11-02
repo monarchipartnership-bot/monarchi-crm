@@ -20,7 +20,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, templateMetrics = null, metricOrder = null, baseMetrics = null, funnel = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null, exportApi = null, onXlsx = null }) {
+export default function ResultView({ data, kind, custom, templateMetrics = null, metricOrder = null, baseMetrics = null, funnel = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null, rowTools = null, exportApi = null, onXlsx = null }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -71,6 +71,8 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
     };
   }
 
+  const downloadMenu = <ExportMenu model={{ title, sheets }} targetRef={captureRef} fileBase={`${fileBase}_${tabLabel}`} formats={exportFormats} onXlsx={onXlsx} />;
+
   return (
     <div className="prep-result">
       {(tabs.length > 1 || Boolean(children) || (!noExport && !exportPortal)) && (
@@ -84,21 +86,18 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
           ) : <span />}
           <div className="prep-result-actions">
             {children}
-            {(() => {
-              if (noExport) return null;
-              const menu = <ExportMenu model={{ title, sheets }} targetRef={captureRef} fileBase={`${fileBase}_${tabLabel}`} formats={exportFormats} onXlsx={onXlsx} />;
-              return exportPortal ? createPortal(menu, exportPortal) : menu;
-            })()}
+            {!noExport && !exportPortal && downloadMenu}
           </div>
         </div>
       )}
+      {!noExport && exportPortal && createPortal(downloadMenu, exportPortal) /* the menu lives in the caller's bar, also when this view has no bar of its own (one platform) */}
 
       <div className="prep-capture" ref={captureRef}>
         <div className="prep-capture-head">
           <div className="prep-capture-title">{title}</div>
           <div className="prep-capture-sub">{subtitle} · {tabLabel}{cur.accountName ? ` · ${cur.accountName}` : ''}</div>
         </div>
-        <ReportMetricsTable rows={rows} showPrev={showPrev} curLabel={curLabel} prevLabel={prevLabel} clientEye={clientEye} />
+        <ReportMetricsTable rows={rows} showPrev={showPrev} curLabel={curLabel} prevLabel={prevLabel} clientEye={clientEye} tools={rowTools} />
         {funnel?.enabled && <div className="crh crh-embed"><FunnelBox view={{ funnel, total: cur.total, prev: prevSrc ? { total: prevSrc.total } : null }} custom={custom} hint /></div>}
         {splitByCurrency && <div className="pacc-hint">Кабінети у різних валютах, тому суму не порахувати: кожна платформа показана окремо.</div>}
         {isTotal && <div className="pacc-hint">Сума платформ в одній валюті. Охоплення складається простою сумою, тож люди, яких побачили обидві платформи, враховані двічі.</div>}
