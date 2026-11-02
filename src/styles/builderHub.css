@@ -90,3 +90,16 @@
 .bld-crn { display: flex; flex-wrap: wrap; gap: 16px; }
 .bld-crn label { display: grid; gap: 4px; font: 600 12.5px 'Onest', sans-serif; }
 .bld-crn input[type="number"] { width: 110px; }
+
+/* the tools of a picked metric row in the layout preview: they appear to the left of the metric */
+.crh .hubt .mt-name { all: unset; cursor: pointer; font: inherit; color: inherit; }
+.crh .hubt .mt-name:focus-visible { outline: 2px solid #682768; outline-offset: 2px; border-radius: 4px; }
+.crh .hubt .crh-picked .mt-name { color: #682768; font-weight: 700; }
+.crh .hubt .mt-tools { display: inline-flex; gap: 4px; margin-right: 8px; vertical-align: middle; }
+.crh .hubt .mt-tool { all: unset; box-sizing: border-box; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #F3E3F7; color: #682768; font-size: 14px; line-height: 1; cursor: pointer; }
+.crh .hubt .mt-tool:hover:not(:disabled) { background: #E8CDEE; }
+.crh .hubt .mt-tool:focus-visible { outline: 2px solid #682768; outline-offset: 2px; }
+.crh .hubt .mt-tool:disabled { opacity: .4; cursor: default; }
+.crh .hubt .mt-tool.on { background: #682768; color: #fff; }
+.crh .hubt .mt-tool--bad { background: #FBEAEA; color: #C23232; }
+.crh .hubt .mt-replace { margin-top: 6px; max-width: 260px; }

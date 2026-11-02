@@ -12,15 +12,17 @@ import FunnelBox from '../../ClientReport/Funnel';
 import { BlocksPanel, CreativesPanel, FunnelPanel, GroupsPanel, KindPanel, MetricsPanel, PanelContext, SelectionPanel } from './BuilderSettings';
 import '../../../styles/builderHub.css';
 import { loadReportContext } from '../../../lib/projectReportContext';
-import { fetchCampaignGroups, fetchReportLayout, saveReportLayout } from '../../../lib/api/projectReportStore';
+import { deleteCustomMetric, fetchCampaignGroups, fetchReportLayout, saveReportColumns, saveReportLayout } from '../../../lib/api/projectReportStore';
 import { accountPlatforms, accountsForTab } from '../../../lib/reportScope';
 import { buildColumns, groupsForPlatform } from '../../../lib/campaignGroups';
 import { fetchProjectCampaigns } from '../../../lib/periodReport';
 import { builderView, viewKeys } from '../../../lib/clientReport';
 import { normalizeTemplate } from '../../../lib/reportTemplate';
+import { planMetricChange } from '../../../lib/reportMetricOps';
+import { PLATFORM_COLUMNS } from '../../../lib/platformColumns';
 import { cleanColumns } from '../../../lib/platformColumns';
 import { platformInfo } from '../../../lib/adAccounts';
-import { projectKind } from '../../../lib/reportMetrics';
+import { METRICS, METRIC_SETS, metricMeta, projectKind } from '../../../lib/reportMetrics';
 import { comparisonPeriod, dueReportPeriod, pullReportData } from '../../../lib/reportEngine';
 import { todayIso } from '../../../lib/dateHelpers';
 import '../../../styles/clientReportHub.css';
@@ -143,6 +145,36 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
   if (!state || !draft) return <div className="empty-hint">Завантаження...</div>;
 
   const label = platformInfo(platform).label;
+  // a click on a metric row of the layout: up / down / replace / remove (the plan says what changes, see lib/reportMetricOps.js)
+  const baseKeys = draft.baseMetrics ?? (METRIC_SETS[kind] || METRIC_SETS.ecom);
+  async function changeMetric(action, key, toKey) {
+    setError('');
+    const plan = planMetricChange({ action, key, toKey, keys, baseKeys, extraKeys, custom: ctx.custom });
+    if (plan.error) { setError(plan.error); return; }
+    if (plan.noop) return;
+    try {
+      if (plan.deleteCustom) {
+        const m = plan.deleteCustom;
+        const ok = await confirm({ title: 'Видалити метрику?', body: m.project_id == null ? `«${m.name}» є спільною: вона є в усіх проєктах, і її буде видалено скрізь. Створені раніше звіти не змінюються.` : `Видалити метрику «${m.name}»? Створені раніше звіти не змінюються.`, confirmLabel: 'Видалити метрику', danger: true });
+        if (!ok) return;
+        await deleteCustomMetric(m.id);
+        await changed();
+        return;
+      }
+      if (plan.extraKeys) { await saveReportColumns(projectId, platform, plan.extraKeys); await changed(); }
+      const patch = {};
+      if (plan.baseMetrics) patch.baseMetrics = plan.baseMetrics;
+      if (plan.order) patch.metricOrder = plan.order;
+      if (Object.keys(patch).length) set(patch);
+    } catch (e) { setError(e.message || 'Не вдалося змінити метрику.'); }
+  }
+  const replaceOptions = (key) => {
+    const shown = new Set(keys);
+    shown.delete(key);
+    const builtin = Object.keys(METRICS).filter((k) => !k.startsWith('mx_') && !shown.has(k)).map((k) => ({ value: k, label: metricMeta(k, []).label }));
+    const columns = (PLATFORM_COLUMNS[platform] || []).filter((m) => !shown.has(m.key)).map((m) => ({ value: m.key, label: m.label }));
+    return [...builtin, ...columns];
+  };
   const toggleMetric = (key) => set({ hiddenMetrics: draft.hiddenMetrics.includes(key) ? draft.hiddenMetrics.filter((k) => k !== key) : [...draft.hiddenMetrics, key] });
   const toggleBlock = (key) => set({ blocks: draft.blocks.map((b) => (b.key === key ? { ...b, client: b.client === false } : b)) });
   const creativeCount = draft.creatives[periodType];
@@ -183,7 +215,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
         {periodType === 'monthly' && <Kpis view={view} all />}
         <Box icon="cal" title={periodType === 'monthly' ? `${real.period ? 'Month' : 'Month'} summary` : 'Week'} sub={real.period ? `${real.period.start.split('-').reverse().join('.')} – ${real.period.end.split('-').reverse().join('.')}` : 'макет'} right={<Pill tone="wa">{real.data ? 'З даними' : 'Макет'}</Pill>}>
           <div className="split">
-            <div className="l"><MetricTable view={view} keys={keys} custom={model.custom} platformLabel={platformLabel} builder={{ hidden: draft.hiddenMetrics, onToggle: toggleMetric }} /></div>
+            <div className="l"><MetricTable view={view} keys={keys} custom={model.custom} platformLabel={platformLabel} builder={{ hidden: draft.hiddenMetrics, onToggle: toggleMetric, tools: { onChange: changeMetric, options: replaceOptions } }} /></div>
             <div className="r">
               <ReportTexts view={view} builder={{ placeholder: 'Тут буде текст блоку', onToggle: toggleBlock }} />
               <Creatives items={placeholders} />

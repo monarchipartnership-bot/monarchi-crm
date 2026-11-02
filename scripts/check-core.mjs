@@ -55,6 +55,7 @@ import { DEFAULT_FUNNEL_STAGES, funnelColumns, funnelModel, normalizeFunnel } fr
 import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cycleState, describeSchedule, instructionBlock, modeOfAgent, scheduleRows } from '../src/lib/agents/campaignCycles.js';
 import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFromAccount } from '../src/lib/metaOnboarding.js';
 import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
+import { planMetricChange } from '../src/lib/reportMetricOps.js';
 import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
 import { auditAfter, checkRights, loadRights } from '../api/_lib/agentAudit.js';
 import { addInstruction, cappedCampaigns, editOutput, openCycle, removeInstruction, setAgentMode, setAgentSchedule, syncCycles } from '../api/_lib/campaignCycles.js';
@@ -3033,6 +3034,26 @@ await ok('meta catalog: every Ads Manager column family is there (all CTR kinds,
   assert.equal(unknownFieldOf({ code: 100, message: '(#100) Tried accessing nonexisting field (video_15_sec_watched_actions) on node type (AdgroupInsights)' }), 'video_15_sec_watched_actions');
   assert.equal(unknownFieldOf({ code: 100, message: '(#100) total_card_view is not valid for fields param. please check' }), 'total_card_view');
   assert.equal(unknownFieldOf({ code: 190, message: 'Tried accessing nonexisting field (x)' }), null); assert.equal(unknownFieldOf({ code: 100, message: 'Invalid parameter' }), null);
+});
+
+await ok('metric row tools: up / down swap neighbours, remove goes to the right home (standard list, extra column, own formula), replace keeps the place, bad moves are refused', () => {
+  const keys = ['spend', 'cpm', 'mx_link_ctr', 'roas', 'my_ratio'];
+  const ctx = { keys, baseKeys: ['spend', 'cpm', 'roas'], extraKeys: ['mx_link_ctr'], custom: [{ key: 'my_ratio', id: 7, name: 'Ratio' }] };
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'up', key: 'roas' }).order, ['spend', 'cpm', 'roas', 'mx_link_ctr', 'my_ratio']);
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'down', key: 'spend' }).order, ['cpm', 'spend', 'mx_link_ctr', 'roas', 'my_ratio']);
+  assert.equal(planMetricChange({ ...ctx, action: 'up', key: 'spend' }).noop, true); assert.equal(planMetricChange({ ...ctx, action: 'down', key: 'my_ratio' }).noop, true); // the ends stay
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'remove', key: 'cpm' }), { baseMetrics: ['spend', 'roas'] }); // a standard metric: the layout's list
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'remove', key: 'mx_link_ctr' }), { extraKeys: [] }); // a column of the cabinet: saved at once
+  assert.equal(planMetricChange({ ...ctx, action: 'remove', key: 'my_ratio' }).deleteCustom.id, 7); // an own formula: deleted (after a question)
+  assert.match(planMetricChange({ ...ctx, keys: ['spend'], baseKeys: ['spend'], extraKeys: [], custom: [], action: 'remove', key: 'spend' }).error, /хоча б одна/); // the last one stays
+  // replace: a standard metric by another standard one, by a cabinet column, a column by a standard metric; the new one takes the place
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'replace', key: 'cpm', toKey: 'leads' }), { order: ['spend', 'leads', 'mx_link_ctr', 'roas', 'my_ratio'], baseMetrics: ['spend', 'roas', 'leads'] });
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'replace', key: 'spend', toKey: 'mx_ctr_outbound' }), { order: ['mx_ctr_outbound', 'cpm', 'mx_link_ctr', 'roas', 'my_ratio'], baseMetrics: ['cpm', 'roas'], extraKeys: ['mx_link_ctr', 'mx_ctr_outbound'] });
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'replace', key: 'mx_link_ctr', toKey: 'cpc' }), { order: ['spend', 'cpm', 'cpc', 'roas', 'my_ratio'], baseMetrics: ['spend', 'cpm', 'roas', 'cpc'], extraKeys: [] });
+  assert.match(planMetricChange({ ...ctx, action: 'replace', key: 'cpm', toKey: 'roas' }).error, /вже є/); // already in the table
+  assert.match(planMetricChange({ ...ctx, action: 'replace', key: 'my_ratio', toKey: 'leads' }).error, /лише видалити/); // an own formula is not swapped
+  assert.match(planMetricChange({ ...ctx, action: 'up', key: 'nope' }).error, /немає в таблиці/);
+  assert.equal(planMetricChange({ ...ctx, action: 'replace', key: 'cpm', toKey: 'cpm' }).noop, true);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

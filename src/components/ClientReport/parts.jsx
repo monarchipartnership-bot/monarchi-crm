@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, Medallion, Mark } from './kit';
 import { LOGO_SVG } from './logoSvg';
 import { metricTable, prevName, rangeText } from '../../lib/clientReport';
+import Select from '../common/Select';
 
 // The parts a week and a month are built of: the table with the groups in columns, the text cards, the creatives with a magnifier.
 
@@ -85,8 +86,13 @@ function hintText(view, folded) {
 
 // The numbers of one report: «General» + a column per campaign group. With many groups the top ones are shown by name and the client opens the rest.
 // `builder`: { hidden: [keys], onToggle(key) } puts an eye on every row (the metric is shown to the client or not).
+//   builder.tools = { onChange(action, key, toKey), options(key) } lets a person click a metric and move it up or down, replace it or remove it: the buttons appear to the left of the metric.
 export function MetricTable({ view, keys, custom, platformLabel, builder = null }) {
   const [showAll, setShowAll] = useState(false);
+  const [sel, setSel] = useState(null); // the metric row that is picked (builder)
+  const [replacing, setReplacing] = useState(false);
+  const tools = builder?.tools || null;
+  const act = (action, key, toKey) => { setReplacing(false); if (action === 'remove' || action === 'replace') setSel(null); tools.onChange(action, key, toKey); };
   const t = metricTable(view, { keys, custom, platformLabel, showAll });
   const canToggle = t.foldable;
   return (
@@ -95,9 +101,25 @@ export function MetricTable({ view, keys, custom, platformLabel, builder = null 
         <table className="hubt fx" style={{ minWidth: 176 + t.columns.length * 132 }}>
           <thead><tr><th />{t.columns.map((c) => <th key={c.id}>{c.label}</th>)}</tr></thead>
           <tbody>
-            {t.rows.map((r) => (
-              <tr key={r.key} className={builder && builder.hidden.includes(r.key) ? 'crh-off' : undefined}>
-                <td>{builder && <EyeToggle on={!builder.hidden.includes(r.key)} onToggle={() => builder.onToggle(r.key)} label={r.label} />}{r.label}</td>
+            {t.rows.map((r, ri) => (
+              <tr key={r.key} className={(builder && builder.hidden.includes(r.key) ? 'crh-off' : '') + (tools && sel === r.key ? ' crh-picked' : '') || undefined}>
+                <td>
+                  {tools && sel === r.key && (
+                    <span className="mt-tools" role="toolbar" aria-label={`Дії з метрикою ${r.label}`}>
+                      <button type="button" className="mt-tool" disabled={ri === 0} aria-label="Вище" title="Вище" onClick={() => act('up', r.key)}>&uarr;</button>
+                      <button type="button" className="mt-tool" disabled={ri === t.rows.length - 1} aria-label="Нижче" title="Нижче" onClick={() => act('down', r.key)}>&darr;</button>
+                      <button type="button" className={'mt-tool' + (replacing ? ' on' : '')} aria-expanded={replacing} aria-label="Замінити" title="Замінити" onClick={() => setReplacing((v) => !v)}>&#8644;</button>
+                      <button type="button" className="mt-tool mt-tool--bad" aria-label="Видалити" title="Видалити" onClick={() => act('remove', r.key)}>&times;</button>
+                    </span>
+                  )}
+                  {builder && <EyeToggle on={!builder.hidden.includes(r.key)} onToggle={() => builder.onToggle(r.key)} label={r.label} />}
+                  {tools ? <button type="button" className="mt-name" aria-pressed={sel === r.key} title="Натисніть, щоб перемістити, замінити або видалити" onClick={() => { setReplacing(false); setSel(sel === r.key ? null : r.key); }}>{r.label}</button> : r.label}
+                  {tools && sel === r.key && replacing && (
+                    <div className="mt-replace">
+                      <Select value="" searchable placeholder="Замінити на…" ariaLabel={`Замінити метрику ${r.label}`} options={tools.options(r.key)} onChange={(to) => to && act('replace', r.key, to)} />
+                    </div>
+                  )}
+                </td>
                 {r.cells.map((c, i) => (
                   <td key={t.columns[i].id} className={i === 0 || t.columns[i].kind === 'sum' ? 'gen' : c.cls}>
                     {c.text}
