@@ -49,6 +49,7 @@ import { runSpendNotices } from '../api/_lib/spendNotify.js';
 import { estimateCampaign, estimateSummary } from '../src/lib/agents/campaignEstimate.js';
 import { estimateInputs } from '../api/_lib/estimateInputs.js';
 import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spendReport.js';
+import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
@@ -2618,6 +2619,37 @@ await ok('spend report: day / month / year on the Kyiv clock, against the previo
   assert.equal(day.total, 2.75); assert.equal(day.series[23].claude, 0.25); // 23:30 Kyiv
   assert.equal(day.change, null); // nothing on the 1st to compare with
   assert.equal(buildSpendReport([], m).total, 0);
+});
+
+await ok('system state: the clock, the keys (only set / not set), the queue (stuck, waiting, failed) and the notices, each ok / warn / bad', () => {
+  const now = new Date('2026-11-02T12:00:00Z');
+  const env = Object.fromEntries(KEYS.map((k) => [k.env, true]));
+  const settings = { enabled: true, tg_chat_id: '-100', notify_emails: ['a@x.y'], last_tick_at: '2026-11-02T11:59:00Z', last_tick_report: { errors: [] } };
+  const good = buildSystemState({ env, settings, tasks: [{ status: 'done', created_at: '2026-11-02T11:00:00Z' }], now });
+  assert.equal(good.status, 'ok'); assert.ok(good.checks.every((c) => c.status === 'ok'));
+  assert.ok(!JSON.stringify(good).includes('sk-')); // only labels and words, never a value
+  const by = (r, key) => r.checks.find((c) => c.key === key);
+  // the clock: late = warn, dead = bad, never = warn, errors in the last pass = warn
+  assert.equal(by(buildSystemState({ env, settings: { ...settings, last_tick_at: '2026-11-02T11:50:00Z' }, now }), 'cron').status, 'warn');
+  assert.equal(by(buildSystemState({ env, settings: { ...settings, last_tick_at: '2026-11-02T10:00:00Z' }, now }), 'cron').status, 'bad');
+  assert.equal(by(buildSystemState({ env, settings: { ...settings, last_tick_at: null }, now }), 'cron').status, 'warn');
+  assert.equal(by(buildSystemState({ env, settings: { ...settings, last_tick_report: { errors: ['x'] } }, now }), 'cron').status, 'warn');
+  // keys: the brain missing is bad, the optional ones warn
+  const noKeys = buildSystemState({ env: { ...env, ANTHROPIC_API_KEY: false, HF_API_KEY_ID: false }, settings, now });
+  assert.equal(by(noKeys, 'key:ANTHROPIC_API_KEY').status, 'bad'); assert.equal(by(noKeys, 'key:HF_API_KEY_ID').status, 'warn'); assert.equal(noKeys.status, 'bad');
+  // the queue
+  const q = buildSystemState({ env, settings, now, tasks: [
+    { status: 'running', lease_until: '2026-11-02T11:30:00Z' }, { status: 'running', lease_until: '2026-11-02T11:58:00Z' },
+    { status: 'queued', created_at: '2026-11-02T11:00:00Z' }, { status: 'queued', created_at: '2026-11-02T11:55:00Z' },
+    { status: 'failed', finished_at: '2026-11-02T01:00:00Z' }, { status: 'failed', finished_at: '2026-10-30T01:00:00Z' },
+  ] });
+  assert.deepEqual([by(q, 'stuck').status, by(q, 'waiting').status, by(q, 'failed').status], ['bad', 'warn', 'warn']);
+  assert.match(by(q, 'stuck').detail, /^1 /); assert.match(by(q, 'failed').detail, /^1 /); // an old failure and a fresh lease do not count
+  // the notices
+  assert.equal(by(buildSystemState({ env, settings: { ...settings, tg_chat_id: null }, now }), 'notices').status, 'ok');
+  assert.equal(by(buildSystemState({ env, settings: { ...settings, tg_chat_id: null, notify_emails: [] }, now }), 'notices').status, 'warn');
+  assert.equal(by(buildSystemState({ env, settings: { ...settings, enabled: false }, now }), 'notices').status, 'warn');
+  assert.equal(buildSystemState({ env: {}, settings: null, now }).status, 'bad'); // nothing known: not ok
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

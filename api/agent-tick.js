@@ -23,6 +23,10 @@ export default async function handler(req, res) {
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + agent.accessToken } }, auth: { persistSession: false, autoRefreshToken: false } });
     const repo = createAgentRepo(db, agent.email);
     const post = makeInternalPost(agent.accessToken);
+    // The heartbeat of the clock for the page «Стан системи»: once when the pass starts, once with its report (best effort: it must never break a pass).
+    const startedAt = Date.now();
+    const beat = (report) => db.from('ai_agent_settings').update(report ? { last_tick_at: new Date().toISOString(), last_tick_report: report } : { last_tick_at: new Date().toISOString() }).eq('id', 1).then(() => null, () => null);
+    await beat();
     // The project agents and the SMM team are independent: a failure of one must not stop the other.
     let result = { checked: 0, due: 0, started: [], waiting: 0 };
     let projectsError = null;
@@ -44,6 +48,7 @@ export default async function handler(req, res) {
     // Money notices: a notice for every few dollars of a campaign and the daily total.
     let spend = { steps: 0 };
     try { spend = await runSpendNotices({ db, telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, now: new Date(), senderEmail: agent.email }); } catch (e) { spend = { error: e.message || String(e) }; }
+    await beat({ ms: Date.now() - startedAt, processed: team.processed ?? 0, started: result.started?.length ?? 0, errors: [projectsError, team.error, reminders.error, spend.error, ...(spend.errors || [])].filter(Boolean).map((e) => String(e).slice(0, 200)).slice(0, 5) });
     res.status(projectsError ? 500 : 200).json({ ...result, team, reminders, spend, ...(projectsError ? { error: projectsError } : {}) });
   } catch (e) {
     res.status(500).json({ error: e.message || String(e) });
