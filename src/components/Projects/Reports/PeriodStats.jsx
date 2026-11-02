@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import ResultView from './ResultView';
 import CompareModal from './CompareModal';
 import { saveProjectReport } from '../../../lib/api/projectReportStore';
-import { reportPayload } from '../../../lib/reportEngine';
+import { EMPTY_SECTIONS, reportPayload } from '../../../lib/reportEngine';
+import { customBlocks } from '../../../lib/reportTemplate';
+import PeriodExtras from './PeriodExtras';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useReportContext } from './useReportContext';
 import { fetchProjectRange, regroupData } from '../../../lib/periodReport';
@@ -60,6 +62,8 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   const [cmp, setCmp] = useState(null);
   const [state, setState] = useState({ status: 'idle' });
   const [modal, setModal] = useState(null);
+  const [sections, setSections] = useState(EMPTY_SECTIONS); // the texts and the creatives of the dates on screen (saved with the custom report)
+  const [creatives, setCreatives] = useState(null);
   const [askOff, setAskOff] = useState(() => { try { return localStorage.getItem('prep-ask-compare') === 'off'; } catch { return false; } });
 
   const previousOf = (range) => {
@@ -72,6 +76,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   async function run(range = { from, to }, c = cmp, columns = ctx.fetchColumns, quiet = false) {
     if (range.from > range.to) { setState({ status: 'error', error: 'Початок періоду пізніше за кінець.' }); return; }
     setState({ status: 'loading' }); setArchive({ busy: false, msg: '', id: null });
+    if (!state.range || state.range.from !== range.from || state.range.to !== range.to) { setSections(EMPTY_SECTIONS); setCreatives(null); } // other dates: the texts and creatives of the old ones do not belong here
     const prev = compareRange(range, c);
     try {
       const [cur, before] = await Promise.all([
@@ -143,7 +148,8 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     try {
       const period = { start: state.range.from, end: state.range.to };
       const prev = state.prev ? { start: state.prev.from, end: state.prev.to } : null;
-      const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection: [], options: { groups: true } });
+      const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection: [], options: { groups: true }, sections, template: { blocks: customBlocks(ctx.layout), metrics: null, hiddenMetrics: [], funnel: null } });
+      if (creatives?.items?.length) payload.creatives = { count: creatives.count, items: creatives.items, source: 'manual', at: new Date().toISOString() };
       const row = await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'final', data: { ...payload, label: null }, createdBy: email });
       setArchive({ busy: false, msg: 'Збережено в «Історія проекту» → «Кастомні звіти».', id: row.id });
     } catch (e) {
@@ -228,6 +234,14 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
             prevLabel={state.prev ? `${fmt(state.prev.from)}–${fmt(state.prev.to)}` : ''}
           />
         </section>
+      )}
+
+      {state.status === 'ok' && !loading && Object.keys(shown.platforms).length > 0 && (
+        <PeriodExtras
+          projectId={projectId} ctx={ctx} range={state.range} blocks={customBlocks(ctx.layout)}
+          sections={sections} onSections={(s) => { setSections(s); setArchive((a) => (a.id ? { busy: false, msg: '', id: null } : a)); }}
+          creatives={creatives} onCreatives={(c) => { setCreatives(c); setArchive((a) => (a.id ? { busy: false, msg: '', id: null } : a)); }}
+        />
       )}
 
       {state.status === 'idle' && (

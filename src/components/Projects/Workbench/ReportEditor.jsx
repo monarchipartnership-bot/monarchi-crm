@@ -45,8 +45,8 @@ const Eye = ({ on, onToggle, label }) => (
 
 // One report of «Робота над звітами» opened in the workspace: the numbers as they will look, what is in the report (metrics, groups and campaigns), the texts, the
 // creatives. «Зберегти» keeps the status, «Підтверджено» sends the report to the history and to the client's page.
-// A custom report («Показники за період» → «Зберегти», opened from «Історія проекту» → «Кастомні звіти») has no status, texts or creatives and never goes to the
-// client: only the table, what is in it, saving, downloading and deleting.
+// A custom report («Показники за період» → «Зберегти», opened from «Історія проекту» → «Кастомні звіти») has no status and never goes to the client; it has the table,
+// what is in it, the texts and the creatives of its dates, saving, downloading and deleting.
 export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const { email } = useAuth();
   const navigate = useNavigate();
@@ -103,7 +103,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   // ---- creatives (Meta)
   const items = data.creatives?.items || [];
   const count = data.creatives?.count || (row.period_type === 'monthly' ? 4 : 3);
-  const canCreatives = !isCustom && (platform === 'meta' || isAll);
+  const canCreatives = platform === 'meta' || isAll;
   const setItems = (next) => edit((d) => ({ ...d, creatives: { count, items: next, source: 'manual', at: new Date().toISOString() } }));
   async function suggest() {
     setCbusy(true);
@@ -195,7 +195,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
             )}
           </section>
 
-          {!isCustom && (
+          {(
             <section className="wbe-block">
               <div className="wbe-bh"><Medal n="texts" cls="wbe-md" /><b>Тексти</b><span className="wbe-sp" /><span className={'wbe-count' + (filled === blocks.length ? ' ok' : '')}>{filled} з {blocks.length} заповнено</span></div>
               <div className="wbe-texts">
@@ -203,7 +203,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
                   <div className={'wbe-text' + (b.client ? '' : ' off')} key={b.key}>
                     <div className="wbe-text-head">
                       <label htmlFor={'wb-t-' + b.key}>{b.title}</label>
-                      <Eye on={b.client} onToggle={() => setBlockClient(b.key, !b.client)} label={b.title} />
+                      {!isCustom && <Eye on={b.client} onToggle={() => setBlockClient(b.key, !b.client)} label={b.title} />}
                     </div>
                     <AutoResizeTextarea id={'wb-t-' + b.key} value={data.sections?.[b.key] || ''} onChange={(v) => setText(b.key, v)} placeholder={b.title + '…'} />
                   </div>

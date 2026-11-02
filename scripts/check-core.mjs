@@ -28,7 +28,7 @@ import { collectCreatives, creativeCandidates, creativesOf, pickCreative } from 
 import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js';
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { REPORT_STATUS, buildMonths, canApprove, clientVisible, inWork, isRunning, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
-import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, normalizeTemplate, orderMetricKeys, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
+import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, customBlocks, normalizeTemplate, orderMetricKeys, reportBlocks, snapshotOf } from '../src/lib/reportTemplate.js';
 import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
@@ -2954,6 +2954,20 @@ await ok('report template: the funnel setting is cleaned, off by default, and a 
   assert.equal(snapshotOf(normalizeTemplate(null), 'monthly').funnel, null); // off: the snapshot has none
   const snap = snapshotOf({ funnel: { enabled: true, stages: ['mx_view_content', 'purchases'] } }, 'monthly');
   assert.deepEqual(snap.funnel, { enabled: true, stages: ['mx_view_content', 'purchases'] });
+});
+
+await ok('custom report («Показники за період»): it has the text blocks of the layout (weekly or monthly), in the layout order, and a saved one shows them from its own snapshot', () => {
+  const layout = normalizeTemplate({ blocks: [
+    { key: 'whatWasDone', title: 'What was done', weekly: true, monthly: true },
+    { key: 'b_week', title: 'Only weekly', prompt: 'x', weekly: true, monthly: false },
+    { key: 'b_none', title: 'Off everywhere', prompt: 'x', weekly: false, monthly: false },
+  ] });
+  const blocks = customBlocks(layout);
+  assert.ok(blocks.some((b) => b.key === 'whatWasDone') && blocks.some((b) => b.key === 'b_week')); assert.ok(!blocks.some((b) => b.key === 'b_none'));
+  assert.equal(blocks[0].key, 'whatWasDone'); assert.ok(blocks.every((b) => b.client === false)); // a custom report never goes to the client
+  // the report keeps what it was made with: its own blocks and the texts written for them
+  const saved = { template: { blocks, metrics: null, hiddenMetrics: [], funnel: null }, sections: { whatWasDone: 'Done', b_week: 'Week text', lost: 'Kept anyway' } };
+  assert.deepEqual(reportBlocks(saved).map((b) => b.key), [...blocks.map((b) => b.key), 'lost']);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
