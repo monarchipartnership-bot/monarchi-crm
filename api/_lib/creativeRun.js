@@ -9,6 +9,7 @@ import { PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
 import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, directionLimit } from '../../src/lib/agents/creativeTeam.js';
 import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, PROFILE_FIELDS, inputState } from '../../src/lib/agents/projectCreative.js';
 import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
+import { MEMORY_LIMITS, buildDossier, memoryBlock } from '../../src/lib/agents/clientMemory.js';
 import { fetchBlock, loadAccounts, siteBlocks, summaryOf } from './campaignRun.js';
 import { readJson } from './agentContent.js';
 import { readSite } from './siteReader.js';
@@ -289,6 +290,9 @@ async function projectCreativeBlocks(db, projectId, now, { inputs = false } = {}
     if (String(item?.body || '').trim()) blocks.push({ title: `${f.label} (картка проєкту, ${item.by ? `вказав ${item.by}` : 'вказано вручну'})`, text: clip(item.body, 3000) });
   });
   blocks.push({ title: 'Бібліотека матеріалів клієнта (вкладка «Креативи» проєкту)', text: assets.length ? assets.map((a) => `- ${a.name} (${ASSET_KINDS[a.kind] || a.kind})`).join('\n') : 'Бібліотека порожня.' });
+  // the recorded history of the manager's decisions on this client's materials (what was approved, returned and why)
+  const memory = memoryBlock(buildDossier((await db.from('ag_client_events').select('kind, subject, body, actor, created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(MEMORY_LIMITS.events)).data || []));
+  if (memory) blocks.push(memory);
   const have = new Set();
   if (inputs) {
     const missing = [];

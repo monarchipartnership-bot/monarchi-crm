@@ -50,6 +50,7 @@ import { estimateCampaign, estimateSummary } from '../src/lib/agents/campaignEst
 import { estimateInputs } from '../api/_lib/estimateInputs.js';
 import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spendReport.js';
 import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
+import { buildDossier, memoryBlock } from '../src/lib/agents/clientMemory.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
@@ -2650,6 +2651,26 @@ await ok('system state: the clock, the keys (only set / not set), the queue (stu
   assert.equal(by(buildSystemState({ env, settings: { ...settings, tg_chat_id: null, notify_emails: [] }, now }), 'notices').status, 'warn');
   assert.equal(by(buildSystemState({ env, settings: { ...settings, enabled: false }, now }), 'notices').status, 'warn');
   assert.equal(buildSystemState({ env: {}, settings: null, now }).status, 'bad'); // nothing known: not ok
+});
+
+await ok('client memory: a short dossier of what the manager approved, returned (with the reason) and commented, newest first, kept short', () => {
+  assert.deepEqual(buildDossier([]), { text: '', counts: { approved: 0, returned: 0, comments: 0, notes: 0 } });
+  assert.equal(memoryBlock(buildDossier([])), null);
+  const ev = [
+    { kind: 'creative_approved', subject: 'Концепт A · 4:5', body: '', created_at: '2026-10-20T10:00:00Z' },
+    { kind: 'creative_rejected', subject: 'Концепт B · 4:5', body: 'Забагато тексту на картинці, клієнт просив мінімалізм', created_at: '2026-10-21T10:00:00Z' },
+    { kind: 'creative_rejected', subject: 'Концепт C · 9:16', body: '', created_at: '2026-10-25T10:00:00Z' },
+    { kind: 'creative_comment', subject: 'Концепт A · 9:16', body: 'Світліше фон', created_at: '2026-10-22T10:00:00Z' },
+    { kind: 'decision', subject: 'Не показувати ціни', body: 'за словами власника', created_at: '2026-10-23T10:00:00Z' },
+  ];
+  const d = buildDossier(ev);
+  assert.deepEqual(d.counts, { approved: 1, returned: 2, comments: 1, notes: 1 });
+  assert.ok(d.text.indexOf('2026-10-25 Концепт C') < d.text.indexOf('2026-10-21 Концепт B')); // newest first
+  assert.match(d.text, /Концепт C · 9:16 \(причину не вказано\)/); assert.match(d.text, /мінімалізм/); assert.match(d.text, /Не показувати ціни/);
+  assert.match(memoryBlock(d).title, /не вигадка/);
+  const long = buildDossier(Array.from({ length: 60 }, (_, i) => ({ kind: 'creative_rejected', subject: 'S' + i, body: 'x'.repeat(400), created_at: `2026-10-${String(1 + (i % 28)).padStart(2, '0')}T10:00:00Z` })));
+  assert.ok(long.text.length <= 3200); assert.equal(long.counts.returned, 60); // the dossier is cut, the counts are not
+  assert.ok(long.text.split('\n').filter((l) => l.startsWith('- ')).length <= 8);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
