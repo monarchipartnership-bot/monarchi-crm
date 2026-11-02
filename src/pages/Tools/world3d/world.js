@@ -101,7 +101,7 @@ const HOME_OFFSET = camera.position.clone().sub(controls.target); // the standar
 // ------------------------------------------------------------ light (the sun follows the camera target so shadows stay sharp)
 const hemi = new THREE.HemisphereLight(0xffffff, 0xe3b9ef, 0.95); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2ff, 2.6);
-sun.castShadow = true; sun.shadow.mapSize.set(3072, 3072);
+sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
 Object.assign(sun.shadow.camera, { left: -44, right: 44, top: 44, bottom: -44, near: 1, far: 220 });
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.05; sun.shadow.radius = 4;
 const SUN_OFF = new THREE.Vector3(-34, 70, 44);
@@ -575,7 +575,15 @@ const clock = new THREE.Clock();
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 resize();
 const ro = new ResizeObserver(() => { if (stage.clientWidth > 0 && stage.clientHeight > 0) resize(); }); ro.observe(stage);
-let prevZoom = camera.zoom, wheelOut = 0, hadTween = false;
+let prevZoom = camera.zoom, wheelOut = 0, hadTween = false, shadowHalf = 44;
+// The shadow map covers a square round the camera target. The map is wide, so a fixed square left the rest without shadows and its edge moved with the camera
+// (a «rectangle of shadow» under the city). The square now grows with what is visible: the whole city far out, a tight square when close.
+function fitShadow() {
+  const a = stage.clientWidth / Math.max(1, stage.clientHeight), H = Math.max(VIEW_H, 104 / a), z = Math.max(0.5, camera.zoom);
+  const half = Math.min(200, Math.max(44, Math.hypot(H * a / 2 / z, (H / 2 / z) * 1.4) * 1.08));
+  if (Math.abs(half - shadowHalf) < 1.5) return;
+  shadowHalf = half; const c = sun.shadow.camera; c.left = -half; c.right = half; c.top = half; c.bottom = -half; c.updateProjectionMatrix();
+}
 const atHome = () => !state.dept && controls.target.distanceTo(HOME) < 0.6 && camera.position.clone().sub(controls.target).distanceTo(HOME_OFFSET) < 0.6;
 renderer.domElement.addEventListener('wheel', (e) => { if (e.deltaY > 0) wheelOut = performance.now(); }, { passive: true });
 // Adaptive resolution: if frames take too long (a weak or busy GPU, a game running next to the browser, a hi-dpi screen) draw fewer pixels instead of freezing;
@@ -615,7 +623,7 @@ function frame() {
   const zoomingOut = camera.zoom < prevZoom - 1e-4 || performance.now() - wheelOut < 150;
   const flightEnded = hadTween && !tween; // the «−» button reaches the far end by a flight: that counts as zooming out as well
   if (!tween && (zoomingOut || flightEnded) && camera.zoom <= controls.minZoom + 0.15 && !atHome()) user.reset();
-  hadTween = !!tween; prevZoom = camera.zoom;
+  hadTween = !!tween; prevZoom = camera.zoom; fitShadow();
   stepTween(performance.now());
   { // the camera may reach every district: the room to move opens with the zoom (none when the whole city is in view) and is the box around all of them
     const s = THREE.MathUtils.smoothstep(camera.zoom, controls.minZoom + 0.05, controls.minZoom + 0.75), B = LAY.pan;
