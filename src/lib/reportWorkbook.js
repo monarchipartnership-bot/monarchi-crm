@@ -7,6 +7,7 @@
 import { dmy, metricInfo, metricTable, monthName, prevName, reportView, viewKeys } from './clientReport.js';
 import { monthKey, monthWeeks } from './projectHistory.js';
 import { reportBlocks } from './reportTemplate.js';
+import { monthNameIn, normLang, trFor } from './clientLang.js';
 
 const PURPLE = 'FF661466';
 const LILAC = 'FFF3E8F5';
@@ -20,32 +21,33 @@ const money = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : 
 
 // A saved report row of the project → the block of the sheet: the table, the texts, the creatives. null when the report holds no numbers.
 // title / dates are the words of the block's bar; extraKeys / custom are the project's extra metric columns and formulas.
-export function reportBlock({ row, title, custom = [], extraKeys = [], platformLabel = '' }) {
+export function reportBlock({ row, title, custom = [], extraKeys = [], platformLabel = '', lang = null }) {
   // a saved report keeps its creatives as { count, items }; the client's model wants the list
   const data = { ...(row.data || {}), creatives: Array.isArray(row.data?.creatives) ? row.data.creatives : row.data?.creatives?.items || [] };
   const report = { id: row.id, type: row.period_type, start: row.period_start, end: row.period_end, toDate: Boolean(data.toDate), status: row.status, updatedAt: row.updated_at, data };
-  const view = reportView(report, { kind: data.kind || 'ecom' });
+  const view = reportView(report, { kind: data.kind || 'ecom', lang: lang || undefined }); // the report's own language wins, then the one handed in
   if (!view) return null;
+  const t = trFor(view.lang);
   const keys = viewKeys(view, { kind: view.kind, columns: extraKeys, custom }, { all: true }); // the team's file has every metric, nothing is hidden
   const table = metricTable(view, { keys, custom, platformLabel, showAll: true });
   const texts = reportBlocks(data).map((b) => ({ key: b.key, title: b.title, text: String(data.sections?.[b.key] || '').trim() })).filter((t) => t.text);
   const creatives = (view.creatives || []).map((c) => ({ caption: c.caption || '', imageUrl: c.imageUrl || '', metrics: c.metrics || {} }));
   const period = `${dmy(view.start)} – ${dmy(view.end)}`;
-  const prev = view.prev ? ` · compared with ${prevName(view)}` : '';
-  const now = view.toDate ? ' · to date' : '';
+  const prev = view.prev ? ` · ${t('compared with {name}', { name: prevName(view) })}` : '';
+  const now = view.toDate ? ` · ${t('to date')}` : '';
   return {
     id: row.id, kind: view.type, title, subtitle: `${period}${platformLabel ? ` · ${platformLabel}` : ''} · ${view.currency}${now}${prev}`,
-    table, texts, creatives, metricLabel: (k) => metricInfo(k, custom, platformLabel).label,
+    lang: view.lang, table, texts, creatives, metricLabel: (k) => metricInfo(k, custom, platformLabel, view.lang).label,
   };
 }
 
 // The title of a block in the client's words: «Week 4», «OCTOBER SUMMARY».
-export const weekTitle = (n) => `Week ${n}`;
-export const monthSummaryTitle = (start) => `${monthName(monthKey(start)).toUpperCase()} SUMMARY`;
+export const weekTitle = (n, lang = 'en') => trFor(lang)('Week {n}', { n });
+export const monthSummaryTitle = (start, lang = 'en') => trFor(lang)('{month} summary', { month: monthNameIn(monthKey(start), lang) }).toUpperCase();
 
-const valueCell = (cell, column) => {
+const valueCell = (cell, column, t = trFor('en')) => {
   const text = [{ text: cell.text, font: { bold: column.kind === 'general' || column.kind === 'sum', size: 11 } }];
-  if (cell.isNew) text.push({ text: '\nnew', font: { size: 8, color: { argb: GREY } } });
+  if (cell.isNew) text.push({ text: `\n${t('new')}`, font: { size: 8, color: { argb: GREY } } });
   else if (cell.change) {
     const sign = cell.change.arrow === '▲' ? '▲ +' : cell.change.arrow === '▼' ? '▼ -' : '';
     text.push({ text: `\n${sign}${cell.change.pct}`, font: { size: 8, color: { argb: TONE[cell.change.tone] || GREY } } });
@@ -84,7 +86,7 @@ export async function buildWorkbook(ExcelJS, blocks, { sheetName = 'Report', fet
     // the header of the table and of the texts
     const head = r;
     const headStyle = { font: { bold: true }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: LILAC } }, alignment: { vertical: 'middle', horizontal: 'center', wrapText: true }, border: ALL_BORDERS };
-    Object.assign(ws.getCell(head, 2), { value: 'Metric', ...headStyle, alignment: { ...headStyle.alignment, horizontal: 'left' } });
+    Object.assign(ws.getCell(head, 2), { value: trFor(block.lang)('Metric'), ...headStyle, alignment: { ...headStyle.alignment, horizontal: 'left' } });
     block.table.columns.forEach((col, i) => { Object.assign(ws.getCell(head, generalCol + i), { value: col.label, ...headStyle }); });
     block.texts.forEach((t, i) => { Object.assign(ws.getCell(head, textStart + i), { value: t.title, ...headStyle }); });
     ws.getRow(head).height = 34;
@@ -96,7 +98,7 @@ export async function buildWorkbook(ExcelJS, blocks, { sheetName = 'Report', fet
       row.cells.forEach((cell, i) => {
         const col = block.table.columns[i];
         const fill = cell.cls === 'best' ? 'FFDCFCE7' : cell.cls === 'worst' ? 'FFFEE2E2' : col.kind === 'sum' ? LILAC : null;
-        Object.assign(ws.getCell(r, generalCol + i), { value: { richText: valueCell(cell, col) }, alignment: { vertical: 'middle', horizontal: 'center', wrapText: true }, border: ALL_BORDERS, ...(fill ? { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } } } : {}) });
+        Object.assign(ws.getCell(r, generalCol + i), { value: { richText: valueCell(cell, col, trFor(block.lang)) }, alignment: { vertical: 'middle', horizontal: 'center', wrapText: true }, border: ALL_BORDERS, ...(fill ? { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } } } : {}) });
       });
       ws.getRow(r).height = row.cells.some((c) => c.change || c.isNew) ? 32 : 20;
       r += 1;
@@ -111,7 +113,7 @@ export async function buildWorkbook(ExcelJS, blocks, { sheetName = 'Report', fet
     // the creatives
     if (block.creatives.length) {
       ws.mergeCells(r, 2, r, lastCol);
-      Object.assign(ws.getCell(r, 2), { value: 'Most effective creatives', font: { bold: true }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: LILAC } }, alignment: { vertical: 'middle', indent: 1 } });
+      Object.assign(ws.getCell(r, 2), { value: trFor(block.lang)('Most effective creatives'), font: { bold: true }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: LILAC } }, alignment: { vertical: 'middle', indent: 1 } });
       ws.getRow(r).height = 22;
       r += 1;
       const imgRow = r;
@@ -126,7 +128,8 @@ export async function buildWorkbook(ExcelJS, blocks, { sheetName = 'Report', fet
           ws.addImage(id, { tl: { col: c - 1 + 0.06, row: imgRow - 1 + 0.06 }, ext: { width: 120, height: 120 }, editAs: 'oneCell' });
         }
         const m = cr.metrics || {};
-        const numbers = [m.purchases != null ? `${m.purchases} purchases` : null, money(m.spend) ? `spent ${money(m.spend)}` : null, m.roas != null && !Number.isNaN(Number(m.roas)) ? `ROAS ${Number(m.roas).toFixed(2)}x` : null].filter(Boolean).join(' · ');
+        const tw = trFor(block.lang);
+        const numbers = [m.purchases != null ? `${m.purchases} ${tw('purchases')}` : null, money(m.spend) ? `${tw('spent')} ${money(m.spend)}` : null, m.roas != null && !Number.isNaN(Number(m.roas)) ? `ROAS ${Number(m.roas).toFixed(2)}x` : null].filter(Boolean).join(' · ');
         const cap = [`${i + 1}. ${cr.caption}`.trim(), numbers, got || !cr.imageUrl ? '' : cr.imageUrl].filter(Boolean).join('\n');
         Object.assign(ws.getCell(imgRow + 1, c), { value: cap, alignment: { vertical: 'top', wrapText: true }, font: { size: 9 }, border: ALL_BORDERS });
         Object.assign(ws.getCell(imgRow, c), { border: ALL_BORDERS });
@@ -171,16 +174,18 @@ const PLATFORM_EN = { meta: 'Meta', google: 'Google', tiktok: 'TikTok', all: '' 
 export const platformEn = (p) => (p in PLATFORM_EN ? PLATFORM_EN[p] : String(p || ''));
 
 // The words of a block's bar for a saved report: «Week 4», «OCTOBER SUMMARY», «Custom period».
-export function titleOfRow(row) {
+export function titleOfRow(row, lang = null) {
+  const lg = normLang(row.data?.template?.lang || lang);
+  const t = trFor(lg);
   if (row.period_type === 'weekly') {
     const w = monthWeeks(monthKey(row.period_start)).find((x) => x.start === row.period_start);
-    return w ? weekTitle(w.n) : `Week ${dmy(row.period_start)} – ${dmy(row.period_end)}`;
+    return w ? weekTitle(w.n, lg) : `${t('Week {n}', { n: `${dmy(row.period_start)} – ${dmy(row.period_end)}` })}`;
   }
-  if (row.period_type === 'monthly') return `${monthSummaryTitle(row.period_start)}${row.data?.toDate ? ' (TO DATE)' : ''}`;
-  return 'Custom period';
+  if (row.period_type === 'monthly') return `${monthSummaryTitle(row.period_start, lg)}${row.data?.toDate ? ` (${t('to date').toUpperCase()})` : ''}`;
+  return t('Custom period');
 }
 
-export const rowBlock = (row, { custom = [], extraKeys = [] } = {}) => reportBlock({ row, title: titleOfRow(row), custom, extraKeys, platformLabel: platformEn(row.platform) });
+export const rowBlock = (row, { custom = [], extraKeys = [], lang = null } = {}) => reportBlock({ row, title: titleOfRow(row, lang), custom, extraKeys, platformLabel: platformEn(row.platform), lang });
 
 // The name of the one sheet: «Meta | Week 4», «Meta | October».
 export function sheetNameOf(row) {

@@ -98,7 +98,7 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
           <div className="prep-capture-sub">{subtitle} · {tabLabel}{cur.accountName ? ` · ${cur.accountName}` : ''}</div>
         </div>
         <ReportMetricsTable rows={rows} showPrev={showPrev} curLabel={curLabel} prevLabel={prevLabel} clientEye={clientEye} tools={rowTools} />
-        {funnel?.enabled && <div className="crh crh-embed"><FunnelBox view={{ funnel, total: cur.total, prev: prevSrc ? { total: prevSrc.total } : null }} custom={custom} hint /></div>}
+        {funnel?.enabled && <div className="crh crh-embed"><FunnelBox view={{ funnel, lang: funnel.lang, total: cur.total, prev: prevSrc ? { total: prevSrc.total } : null }} custom={custom} hint /></div>}
         {splitByCurrency && <div className="pacc-hint">Кабінети у різних валютах, тому суму не порахувати: кожна платформа показана окремо.</div>}
         {isTotal && <div className="pacc-hint">Сума платформ в одній валюті. Охоплення складається простою сумою, тож люди, яких побачили обидві платформи, враховані двічі.</div>}
         {groups.length > 0 && (

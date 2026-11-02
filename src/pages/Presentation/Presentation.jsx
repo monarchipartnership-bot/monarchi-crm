@@ -1,3 +1,4 @@
+import { normLang } from '../../lib/clientLang';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Builder from '../../components/Presentation/Builder';
@@ -100,7 +101,9 @@ export default function Presentation() {
           savedDeck.current = d;
           setSavedAt(saved.updated_at);
         } else {
-          const d = emptyDeck({ platform: sel.platform, lang: sel.lang });
+          const lg = normLang(row?.data?.template?.lang || proj?.report_lang); // the language of the report, else the project's
+          const d = emptyDeck({ platform: sel.platform, lang: lg });
+          setSel((s) => (s.lang === lg ? s : { ...s, lang: lg }));
           reset(d);
           savedDeck.current = d;
           setSavedAt(null);

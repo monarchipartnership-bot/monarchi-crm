@@ -68,7 +68,7 @@ function parseTab(params) {
 // The Overview fields in reading order. Empty ones are hidden while viewing.
 const FIELD_GROUPS = [
   { title: 'Основне', hint: 'Хто веде проєкт і в якому він стані', items: ['manager', 'specialist', 'status', 'period', 'services', 'stop_reason'] },
-  { title: 'Клієнт', hint: 'Хто клієнт і де він працює', items: ['client', 'country', 'website', 'business_type', 'contacts', 'timezone'] },
+  { title: 'Клієнт', hint: 'Хто клієнт і де він працює', items: ['client', 'country', 'website', 'business_type', 'report_lang', 'contacts', 'timezone'] },
   { title: 'Комунікація та оплата', hint: 'Початок співпраці, оплата, робочий простір', items: ['comm_start_date', 'payment_channel', 'cost', 'worksection_link'] },
 ];
 
@@ -322,6 +322,20 @@ export default function ProjectDetail() {
             <AutoField value={project.manager} placeholder="Ім'я менеджера" ariaLabel="Продакт (менеджер)" onCommit={(v) => commit({ manager: v.trim() || null })} />
           </div>
         );
+      case 'report_lang': {
+        const lang = project.report_lang === 'uk' ? 'uk' : 'en';
+        return (
+          <div className="ov-field-box" key={key}>
+            <div className="ov-field-label"><FieldIcon name="country" />Мова звітів для клієнта</div>
+            <div className="status-picker" role="group" aria-label="Мова звітів для клієнта">
+              {[['en', 'English'], ['uk', 'Українська']].map(([v, label]) => (
+                <button key={v} type="button" aria-pressed={lang === v} className={'status-btn' + (lang === v ? ' on active' : '')} onClick={() => { if (lang !== v) commit({ report_lang: v }); }}>{label}</button>
+              ))}
+            </div>
+            <div className="ov-field-hint">Сторінка клієнта, Excel і презентація. У кожному звіті мову можна змінити окремо.</div>
+          </div>
+        );
+      }
       case 'status':
         return (
           <div className="ov-field-box" key={key}>

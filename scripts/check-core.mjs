@@ -29,7 +29,7 @@ import { refreshMonthToDate, toDateComparison } from '../api/_lib/monthToDate.js
 import { createAgentRepo } from '../api/_lib/agentRepo.js';
 import { REPORT_STATUS, buildMonths, canApprove, clientVisible, inWork, isRunning, monthLabel, monthWeeks, reportActions, reviewPatch } from '../src/lib/projectHistory.js';
 import { MAX_BLOCKS, MAX_PROMPT, blocksFor, creativeCount, hiddenMetricsOf, metricKeysOf, customBlocks, normalizeTemplate, orderMetricKeys, reportBlocks, snapshotOf, withFunnel } from '../src/lib/reportTemplate.js';
-import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
+import { TOP_GROUPS, buildClientModel, change, figuresText, fmtValue, groupLabel, kpiCards, metricKeys, metricTable, prevName, roasBars, shareUrl, spendSlices, viewKeys } from '../src/lib/clientReport.js';
 import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api/_lib/pageSpeed.js';
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
@@ -56,6 +56,7 @@ import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cyc
 import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFromAccount } from '../src/lib/metaOnboarding.js';
 import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
 import { planMetricChange } from '../src/lib/reportMetricOps.js';
+import { daysText, monthNameIn, monthShortIn, normLang, trFor } from '../src/lib/clientLang.js';
 import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
 import { auditAfter, checkRights, loadRights } from '../api/_lib/agentAudit.js';
 import { addInstruction, cappedCampaigns, editOutput, openCycle, removeInstruction, setAgentMode, setAgentSchedule, syncCycles } from '../api/_lib/campaignCycles.js';
@@ -2957,6 +2958,31 @@ await ok('report template: the funnel setting is cleaned, off by default, and a 
   assert.deepEqual(snap.funnel, { enabled: true, stages: ['mx_view_content', 'purchases'] });
 });
 
+await ok('report language: English as ever by default, the project sets Ukrainian, a report can have its own; numbers, names, months and hints follow it', () => {
+  const rep = (id, tplLang) => ({ id, type: 'monthly', start: '2026-10-01', end: '2026-10-31', status: 'final', updatedAt: '2026-11-02T10:00:00Z', toDate: false,
+    data: { kind: 'ecom', platforms: { meta: { currency: 'UAH', total: { spend: 12480.5, revenue: 30000, purchases: 10, reach: 5000 }, groups: [] } },
+      previous: { period: { start: '2026-09-01', end: '2026-09-30' }, platforms: { meta: { currency: 'UAH', total: { spend: 10000, revenue: 20000, purchases: 8, reach: 4000 }, groups: [] } } },
+      template: { blocks: [], metrics: null, hiddenMetrics: [], funnel: null, ...(tplLang ? { lang: tplLang } : {}) } } });
+  const en = buildClientModel({ project: { name: 'P', lang: 'en' }, platform: 'meta', reports: [rep(1)] });
+  assert.equal(en.lang, 'en'); assert.equal(kpiCards(en.months[0].monthly)[0].label, 'Spent'); assert.match(kpiCards(en.months[0].monthly)[0].value, /^UAH\s12,481$/); assert.equal(prevName(en.months[0].monthly), 'September');
+  const uk = buildClientModel({ project: { name: 'P', lang: 'uk' }, platform: 'meta', reports: [rep(1), { ...rep(2, 'en'), start: '2026-10-01' }].slice(0, 1) });
+  const v = uk.months[0].monthly;
+  assert.equal(uk.lang, 'uk'); assert.equal(v.lang, 'uk'); // a report without its own language follows the project
+  assert.equal(kpiCards(v)[0].label, 'Витрачено'); assert.match(kpiCards(v)[0].value, /^12\s481\s₴$/); assert.equal(kpiCards(v)[0].change.pct, '24,8%'); // a decimal comma, spaces in thousands
+  assert.equal(prevName(v), 'вересня'); // «відносно вересня»
+  assert.equal(metricTable(v, { keys: ['spend', 'roas'] }).columns[0].label, 'Загальні рекламні показники');
+  assert.equal(metricTable(v, { keys: ['spend'] }).rows[0].label, 'Витрати'); // the Ukrainian name of the metric
+  assert.equal(metricTable(en.months[0].monthly, { keys: ['spend'] }).rows[0].label, 'Spent');
+  // a report of its own language beats the project's
+  const own = buildClientModel({ project: { name: 'P', lang: 'uk' }, platform: 'meta', reports: [rep(3, 'en')] });
+  assert.equal(own.lang, 'uk'); assert.equal(own.months[0].monthly.lang, 'en'); assert.equal(kpiCards(own.months[0].monthly)[0].label, 'Spent');
+  // the words: a text that is not in the dictionary is shown as it is, a value is put in
+  assert.equal(trFor('uk')('Week {n}', { n: 3 }), 'Тиждень 3'); assert.equal(trFor('uk')('Nothing like this'), 'Nothing like this'); assert.equal(trFor('en')('Week {n}', { n: 3 }), 'Week 3');
+  assert.equal(daysText(1, 'uk'), '1 день'); assert.equal(daysText(3, 'uk'), '3 дні'); assert.equal(daysText(11, 'uk'), '11 днів'); assert.equal(daysText(7, 'en'), '7 days');
+  assert.equal(monthNameIn('2026-10', 'uk'), 'Жовтень'); assert.equal(monthShortIn('2026-03', 'uk'), 'Бер'); assert.equal(monthShortIn('2026-03', 'en'), 'Mar');
+  assert.equal(normLang('fr'), 'en'); assert.equal(normLang(null), 'en');
+});
+
 await ok('link of one custom report: the page model is that report alone (with its funnel, hidden metrics and every creative), a project link has no single report', () => {
   const report = { id: 9, type: 'custom', start: '2026-10-26', end: '2026-11-01', status: 'final', updatedAt: '2026-11-02T10:00:00Z', toDate: false,
     data: { kind: 'ecom', platforms: { meta: { currency: 'USD', total: { spend: 100, revenue: 300, purchases: 3, x_view_content: 341, x_add_to_cart: 4 }, groups: [] } },
@@ -4063,6 +4089,15 @@ await ok('client model (selected columns): group sum first and highlighted, its 
   assert.deepEqual(spendSlices(v).map((s) => s.label).slice(0, 2), ['Catalog A', 'Kinky Bang']); // campaigns by spend, no group sum
   assert.equal(spendSlices(v).at(-1).label, 'Other campaigns'); // the rest of the account (unselected campaigns and the small ones)
   assert.ok(!roasBars(v).some((b) => b.label === 'Catalog'));
+});
+
+await ok('client page: a long campaign name becomes a short readable header (stage tag + the meaningful words), the full name stays for the tooltip', () => {
+  const g = groupLabel('TOF | CBO | US | Hybrid Wig RTS | 2026-07-30');
+  assert.equal(g.stage, 'TOF');
+  assert.equal(g.text, 'Hybrid Wig RTS'); // the budget type, the country and the launch date are noise on a client's page
+  assert.equal(g.full, 'TOF | CBO | US | Hybrid Wig RTS | 2026-07-30');
+  assert.equal(groupLabel('Catalog A').text, 'Catalog A'); // a plain name is left as it is
+  assert.equal(groupLabel('Catalog A').stage, '');
 });
 
 await ok('creatives: no request uses the deprecated «ids» batch read; a refused token is an error, one missing ad only loses its own picture', async () => {

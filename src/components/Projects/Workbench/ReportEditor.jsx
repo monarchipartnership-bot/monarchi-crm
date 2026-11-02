@@ -19,6 +19,7 @@ import { metricKeysOf, reportBlocks, snapshotOf, withFunnel } from '../../../lib
 import { computeMetric, metricMeta, metricOptions } from '../../../lib/reportMetrics';
 import { planMetricChange } from '../../../lib/reportMetricOps';
 import { DEFAULT_FUNNEL_STAGES, FUNNEL_CANDIDATES, normalizeFunnel } from '../../../lib/reportFunnel';
+import { normLang } from '../../../lib/clientLang';
 import { rowBlock, sheetNameOf } from '../../../lib/reportWorkbook';
 import { saveReportWorkbook } from '../../../lib/reportWorkbookExport';
 import { REPORT_STATUS, canApprove, isRunning, monthKey, reviewPatch } from '../../../lib/projectHistory';
@@ -125,6 +126,9 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
     setError('');
     setFunnel({ enabled: true, stages });
   };
+  // the language of this report (the client's page, the Excel, the presentation): its own, else the project's
+  const lang = normLang(data.template?.lang || ctx.project?.report_lang);
+  const setLang = (v) => { if (v !== lang) setTemplate({ lang: v }); };
   const setSelection = (patch) => {
     const next = patch.campaignSel;
     edit((d) => {
@@ -183,7 +187,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   }
 
   const options = metricOptions(ctx.custom, extraKeys);
-  const onXlsx = () => saveReportWorkbook([rowBlock({ ...row, data }, { custom: ctx.custom, extraKeys })], { filename: `${ctx.project?.name || 'report'}_custom_${row.period_start}_${row.period_end}_${platform}`, sheetName: sheetNameOf(row) });
+  const onXlsx = () => saveReportWorkbook([rowBlock({ ...row, data }, { custom: ctx.custom, extraKeys, lang })], { filename: `${ctx.project?.name || 'report'}_custom_${row.period_start}_${row.period_end}_${platform}`, sheetName: sheetNameOf(row) });
   const review = data.review || {};
   const prevLabel = data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній';
 
@@ -206,6 +210,9 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
           </div>
         </div>
         <div className="wbe-actions">
+          <div className="wbe-lang" role="group" aria-label="Мова звіту" title="Мова звіту для клієнта: сторінка, Excel, презентація">
+            {['en', 'uk'].map((v) => <button key={v} type="button" aria-pressed={lang === v} className={'wbe-lang-b' + (lang === v ? ' on' : '')} disabled={running} onClick={() => setLang(v)}>{v === 'en' ? 'EN' : 'УКР'}</button>)}
+          </div>
           {isCustom && <span ref={setSlot} className="wbe-slot" />}
           {isCustom && <button type="button" className={'btn' + (shareOpen ? ' prep-btn-on' : '')} aria-expanded={shareOpen} onClick={() => setShareOpen((o) => !o)}>Посилання клієнту</button>}
           {isCustom && <button type="button" className="btn" disabled={dirty || !!busy || !Object.keys(data.platforms || {}).length} title={dirty ? 'Спершу збережіть зміни' : 'Створити презентацію з цього звіту'} onClick={() => navigate(`/clients?project=${row.project_id}&type=custom&start=${row.period_start}&end=${row.period_end}&platform=${isAll ? Object.keys(data.platforms)[0] : platform}`)}>Зробити презентацію</button>}
@@ -232,7 +239,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
             <div className="wbe-bh"><Medal n="metrics" cls="wbe-md" /><b>Таблиця звіту</b><span className="wbe-sp" /><span className="wbe-mut">Око: чи бачить клієнт · потягніть метрику, щоб змінити порядок; натисніть, щоб замінити чи видалити</span></div>
             {Object.keys(data.platforms || {}).length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
               <ResultView
-                data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} funnel={funnel} noExport={!isCustom} exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} onXlsx={isCustom ? onXlsx : null}
+                data={{ platforms: data.platforms, previous: data.previous || null }} kind={kind} custom={ctx.custom} templateMetrics={shownKeys} funnel={funnel ? { ...funnel, lang } : null} noExport={!isCustom} exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} onXlsx={isCustom ? onXlsx : null}
                 rowTools={running ? null : { onChange: changeMetric, options: replaceOptions }}
                 lockTotal={isAll} extraKeys={isAll ? [] : extraKeys} title={ctx.project?.name || ''} subtitle={`${TYPE_LABEL[row.period_type]} · ${reportPeriodText(row)}`}
                 fileBase={isCustom ? `${ctx.project?.name || 'report'}_custom_${row.period_start}_${row.period_end}_${platform}` : 'draft'} campaignMode="selected" selection={[]} options={{ groups: true }} curLabel={reportPeriodText(row)} prevLabel={prevLabel}

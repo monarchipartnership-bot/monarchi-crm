@@ -104,7 +104,7 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
 // The numbers and the texts of one saved report. Used by the window above and by the combined month document.
 export function ReportBody({ row, projectName, custom, extraKeys, slot = null, edit = null, noExport = false, exportApi = null }) {
   // Excel of a report of the history: one sheet with the table, the texts and the creatives (reportWorkbook.js)
-  const onXlsx = () => saveReportWorkbook([rowBlock(row, { custom, extraKeys })], { filename: `${projectName}_${row.period_type}_${row.period_start}_${row.platform}`, sheetName: sheetNameOf(row) });
+  const onXlsx = () => saveReportWorkbook([rowBlock(row, { custom, extraKeys, lang: row.data?.template?.lang })], { filename: `${projectName}_${row.period_type}_${row.period_start}_${row.platform}`, sheetName: sheetNameOf(row) });
   const data = row.data || {};
   const platforms = Object.keys(data.platforms || {});
   const isCombined = row.platform === 'all';
@@ -114,7 +114,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
     <>
       {platforms.length === 0 ? <div className="empty-hint">У цьому звіті немає цифр.</div> : (
         <ResultView
-          data={{ platforms: data.platforms, previous: data.previous || null }} kind={data.kind || 'ecom'} custom={custom} templateMetrics={data.template?.metrics || null} funnel={isCombined ? null : (data.template?.funnel || null)}
+          data={{ platforms: data.platforms, previous: data.previous || null }} kind={data.kind || 'ecom'} custom={custom} templateMetrics={data.template?.metrics || null} funnel={isCombined || !data.template?.funnel ? null : { ...data.template.funnel, lang: data.template.lang }}
           lockTotal={isCombined} extraKeys={isCombined ? [] : extraKeys}
           title={projectName + label} subtitle={TYPE_LABEL[row.period_type] + ' · ' + reportPeriodText(row)}
           fileBase={`${projectName}_${row.period_type}_${row.period_start}_${row.platform}`}

@@ -5,6 +5,7 @@
 import { METRICS, METRIC_SETS, computeMetric, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
 import { monthKey, monthRange, monthWeeks } from './projectHistory.js';
 import { hiddenMetricsOf, metricKeysOf, reportBlocks } from './reportTemplate.js';
+import { localeOf, monthOfIn, normLang, trFor } from './clientLang.js';
 
 export const TOP_GROUPS = 5; // groups shown by name; the rest fold into «Other (N groups)» until the client asks to see all
 
@@ -18,30 +19,30 @@ export const dmy = (iso) => `${dm(iso)}.${String(iso).slice(0, 4)}`;
 export const rangeText = (a, b) => `${dm(a)} – ${dm(b)}`;
 
 // ---- numbers as the client reads them ----
-const nf = (v, d = 0) => Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const nf = (v, d = 0, lang = 'en') => Number(v).toLocaleString(localeOf(lang), { minimumFractionDigits: d, maximumFractionDigits: d });
 const TWO_DECIMALS = new Set(['cpm', 'cpc']);
 
-function money(v, currency, d) {
-  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', minimumFractionDigits: d, maximumFractionDigits: d }).format(v); } catch { return nf(v, d); }
+function money(v, currency, d, lang = 'en') {
+  try { return new Intl.NumberFormat(localeOf(lang), { style: 'currency', currency: currency || 'USD', currencyDisplay: normLang(lang) === 'uk' ? 'narrowSymbol' : 'symbol', minimumFractionDigits: d, maximumFractionDigits: d }).format(v); } catch { return nf(v, d, lang); }
 }
 
 // key: the metric; format: its kind (number | money | percent | ratio). ROAS reads as a percentage, like in the client's own sheet.
-export function fmtValue(key, value, format, currency) {
+export function fmtValue(key, value, format, currency, lang = 'en') {
   if (value == null || !Number.isFinite(Number(value))) return '—';
   const v = Number(value);
-  if (key === 'roas') return `${nf(v * 100)}%`;
-  if (format === 'money') return money(v, currency, TWO_DECIMALS.has(key) ? 2 : 0);
-  if (format === 'percent') return `${nf(v, 2)}%`;
-  if (format === 'ratio') return `${nf(v, 2)}×`;
-  return nf(v);
+  if (key === 'roas') return `${nf(v * 100, 0, lang)}%`;
+  if (format === 'money') return money(v, currency, TWO_DECIMALS.has(key) ? 2 : 0, lang);
+  if (format === 'percent') return `${nf(v, 2, lang)}%`;
+  if (format === 'ratio') return `${nf(v, 2, lang)}×`;
+  return nf(v, 0, lang);
 }
 
 // An arrow and a percentage against the previous period; tone: good | bad | neu (costs: lower is better). null when there is nothing to compare.
-export function change(key, cur, prev, goodWhen) {
+export function change(key, cur, prev, goodWhen, lang = 'en') {
   const d = deltaPct(cur, prev);
   if (d == null) return null;
   const t = deltaTone(d, goodWhen);
-  return { arrow: d > 0.05 ? '▲' : d < -0.05 ? '▼' : '', pct: `${Math.abs(d).toFixed(1)}%`, tone: t === 'neutral' ? 'neu' : t, value: d };
+  return { arrow: d > 0.05 ? '▲' : d < -0.05 ? '▼' : '', pct: `${nf(Math.abs(d), 1, lang)}%`, tone: t === 'neutral' ? 'neu' : t, value: d };
 }
 
 // ---- one report → the scope the page shows ----
@@ -83,9 +84,9 @@ const active = (g) => (Number(g.spend) || 0) > 0 || (Number(g.impressions) || 0)
 export function metricKeys(kind, columns = [], custom = [], base = null) {
   return [...(Array.isArray(base) ? base : METRIC_SETS[kind] || METRIC_SETS.ecom).filter((k) => METRICS[k]), ...columns.filter((k) => METRICS[k]), ...custom.map((c) => c.key)];
 }
-export function metricInfo(key, custom = [], platformLabel = '') {
+export function metricInfo(key, custom = [], platformLabel = '', lang = 'en') {
   const m = METRICS[key];
-  if (m) return { key, label: key === 'roas' && platformLabel ? `ROAS (${platformLabel})` : m.en || m.label, format: m.format, goodWhen: m.goodWhen };
+  if (m) return { key, label: key === 'roas' && platformLabel ? `ROAS (${platformLabel})` : normLang(lang) === 'uk' ? m.label : m.en || m.label, format: m.format, goodWhen: m.goodWhen };
   const c = custom.find((x) => x.key === key);
   return { key, label: c?.name || key, format: c?.format || 'number', goodWhen: 'up' };
 }
@@ -94,12 +95,14 @@ const mergeBase = (list) => sumBase(list);
 
 // A report row → what the page needs of it (total, groups, previous period).
 export function reportView(report, ctx) {
+  const lang = normLang(report.data?.template?.lang || ctx?.lang); // the report's own language, else the project's
   const cur = scopeOf(report.data?.platforms);
   if (!cur) return null;
   const prevScope = report.data?.previous ? scopeOf(report.data.previous.platforms) : null;
   const prevPeriod = report.data?.previous?.period || null;
   return {
     id: report.id, type: report.type, start: report.start, end: report.end, toDate: Boolean(report.toDate), status: report.status,
+    lang,
     updatedAt: report.updatedAt || null,
     currency: cur.currency,
     total: cur.total,
@@ -126,8 +129,9 @@ export function viewKeys(view, model, { all = false } = {}) {
 // The name of the compared period: «August» for a month, «previous week» for a week.
 export function prevName(view) {
   if (!view.prev) return '';
-  if (view.type === 'monthly') return monthName(monthKey(view.prev.period.start));
-  return view.type === 'custom' ? 'previous period' : 'previous week';
+  const t = trFor(view.lang);
+  if (view.type === 'monthly') return monthOfIn(monthKey(view.prev.period.start), view.lang);
+  return t(view.type === 'custom' ? 'previous period' : 'previous week');
 }
 
 // ---- the KPI cards ----
@@ -137,13 +141,32 @@ const KPI_SETS = {
 };
 // A metric switched off for the client takes its card with it (`all`: the team's own view).
 export function kpiCards(view, { all = false } = {}) {
+  const t = trFor(view.lang);
   return (KPI_SETS[view.kind] || KPI_SETS.ecom).filter(([key]) => all || !(view.hiddenMetrics || []).includes(key)).map(([key, label, icon]) => {
     const info = metricInfo(key);
     const cur = computeMetric(key, view.total);
     const prev = view.prev ? computeMetric(key, view.prev.total) : null;
-    return { key, label, icon, value: fmtValue(key, cur, info.format, view.currency), change: change(key, cur, prev, info.goodWhen) };
+    return { key, label: t(label), icon, value: fmtValue(key, cur, info.format, view.currency, view.lang), change: change(key, cur, prev, info.goodWhen, view.lang) };
   });
 }
+
+// A campaign group name as the client reads it: «TOF | CBO | US | Hybrid Wig RTS | 2026-07-30» → { stage: 'TOF', text: 'Hybrid Wig RTS', full }. The funnel stage becomes a
+// small tag, the technical parts (budget type, country, dates, amounts) are dropped, and an ALL-CAPS name is written in words. A name that does not
+// look like a structured one is kept as it is. The full name always stays available (`full`) for a tooltip.
+const STAGE_TAG = /^(TOF|MOF|BOF)$/i;
+const NOISE_PART = /^(CBO|ABO|US)$|^\d{4}-\d{2}-\d{2}$|^\d{1,2}\.\d{2}(\.\d{2,4})?$|^\d+\$$/i;
+const softCaps = (t) => (t === t.toUpperCase() && /[A-Z]{4,}/.test(t) ? t.split(' ').map((w) => (w.length > 3 ? w[0] + w.slice(1).toLowerCase() : w)).join(' ') : t);
+export function groupLabel(name) {
+  const full = String(name || '').trim();
+  const parts = full.split(/\s*\|\s*|\s+I\s+/).map((x) => x.trim()).filter(Boolean);
+  if (parts.length < 2) return { stage: '', text: full, full };
+  const stage = STAGE_TAG.test(parts[0]) ? parts[0].toUpperCase() : '';
+  const rest = (stage ? parts.slice(1) : parts).filter((x) => !NOISE_PART.test(x));
+  const text = softCaps(rest.join(' · ').replace(/\s+/g, ' ').trim());
+  return { stage, text: text || full, full };
+}
+
+const labelParts = (name) => { const l = groupLabel(name); return { short: l.text, stage: l.stage, full: l.full }; };
 
 // ---- the table: general numbers + the groups (the top ones by name, the rest folded) ----
 const hasValue = (v) => v != null && Number.isFinite(v) && v > 0;
@@ -156,6 +179,7 @@ function extreme(list, high) {
 // → { columns: [{ id, label, kind }], rows: [{ key, label, cells: [{ text, change, isNew, cls }] }], hidden, folded }
 // `showAll`: every group by name. Otherwise the top TOP_GROUPS and one «Other (N groups)» column (its numbers are the sum of the rest, no arrows).
 export function metricTable(view, { keys, custom = [], platformLabel = '', showAll = false }) {
+  const t = trFor(view.lang);
   const groups = view.groups;
   const explicit = Boolean(view.explicit);
   const folded = !explicit && !showAll && groups.length > TOP_GROUPS + 1; // «Other» of a single group would be that group (the selected columns are never folded)
@@ -164,9 +188,10 @@ export function metricTable(view, { keys, custom = [], platformLabel = '', showA
   const idOf = (g) => g.id ?? g.name;
   const prevByName = view.prev ? new Map(view.prev.groups.map((g) => [idOf(g), g])) : null;
   // a group's own column is its total (highlighted); the campaigns of the report are columns of their own
-  const columns = [{ id: 'general', label: 'General advertising metrics', kind: 'general' }, ...shown.map((g) => (g.kind === 'group' ? { id: idOf(g), label: `${g.name} · group total`, kind: 'sum' } : { id: idOf(g), label: g.name, kind: 'group' }))];
+  const nameOf = (g) => (g.name === OTHER_CAMPAIGNS ? t(OTHER_CAMPAIGNS) : g.name); // the name of the folded campaigns is ours, the others are the client's own
+  const columns = [{ id: 'general', label: t('General advertising metrics'), kind: 'general' }, ...shown.map((g) => (g.kind === 'group' ? { id: idOf(g), label: t('{name} · group total', { name: g.name }), kind: 'sum' } : { id: idOf(g), label: nameOf(g), kind: 'group', ...(() => { const l = groupLabel(nameOf(g)); return { short: l.text, stage: l.stage, full: l.full }; })() }))];
   const bases = [view.total, ...shown];
-  if (rest.length) { columns.push({ id: '__other', label: `Other (${rest.length} groups)`, kind: 'other' }); bases.push(mergeBase(rest)); }
+  if (rest.length) { columns.push({ id: '__other', label: t('Other ({n} groups)', { n: rest.length }), kind: 'other' }); bases.push(mergeBase(rest)); }
   const prevs = [view.prev ? view.prev.total : null, ...shown.map((g) => (prevByName ? prevByName.get(idOf(g)) || 'new' : null))];
   if (rest.length) prevs.push(null);
   // the best / the weakest group cells (only among the groups shown by name)
@@ -177,7 +202,7 @@ export function metricTable(view, { keys, custom = [], platformLabel = '', showA
   const worst = roases.length > 2 ? Math.min(...roases) : null;
 
   const rows = keys.map((key) => {
-    const info = metricInfo(key, custom, platformLabel);
+    const info = metricInfo(key, custom, platformLabel, view.lang);
     return {
       key, label: info.label,
       cells: bases.map((b, i) => {
@@ -191,7 +216,7 @@ export function metricTable(view, { keys, custom = [], platformLabel = '', showA
           else if (key === 'cpp' && v === best.cpp) cls = 'best';
           else if (key === 'ctr' && v === best.ctr) cls = 'best';
         }
-        return { text: fmtValue(key, v, info.format, view.currency), change: p && p !== 'new' ? change(key, v, computeMetric(key, p), info.goodWhen) : null, isNew: p === 'new', cls };
+        return { text: fmtValue(key, v, info.format, view.currency, view.lang), change: p && p !== 'new' ? change(key, v, computeMetric(key, p), info.goodWhen, view.lang) : null, isNew: p === 'new', cls };
       }),
     };
   });
@@ -201,23 +226,25 @@ export function metricTable(view, { keys, custom = [], platformLabel = '', showA
 // ---- charts of a month / a week ----
 // Slices of the spend by group: the top ones and «Other».
 export function spendSlices(view, top = TOP_GROUPS) {
+  const t = trFor(view.lang);
   if (view.explicit) {
     // the campaigns of the report (group totals would count the same money twice); what is not among them is «Other campaigns»
     const c = view.groups.filter((x) => x.kind !== 'group' && (Number(x.spend) || 0) > 0).sort(bySpend);
-    const shownCampaigns = c.slice(0, top).map((x) => ({ label: x.name, value: Math.round(Number(x.spend) || 0) }));
+    const shownCampaigns = c.slice(0, top).map((x) => ({ label: x.name, ...labelParts(x.name), value: Math.round(Number(x.spend) || 0) }));
     const rest = Math.round((Number(view.total.spend) || 0) - shownCampaigns.reduce((a, x) => a + x.value, 0));
-    return rest > 0 ? [...shownCampaigns, { label: 'Other campaigns', value: rest }] : shownCampaigns;
+    return rest > 0 ? [...shownCampaigns, { label: t('Other campaigns'), value: rest }] : shownCampaigns;
   }
   const g = view.groups.filter((x) => (Number(x.spend) || 0) > 0);
   const named = g.length > top + 1 ? g.slice(0, top) : g;
   const rest = g.length > top + 1 ? g.slice(top) : [];
-  const out = named.map((x) => ({ label: x.name, value: Math.round(Number(x.spend) || 0) }));
-  if (rest.length) out.push({ label: `Other (${rest.length} groups)`, value: Math.round(rest.reduce((a, x) => a + (Number(x.spend) || 0), 0)) });
+  const out = named.map((x) => ({ label: x.name === OTHER_CAMPAIGNS ? t(OTHER_CAMPAIGNS) : x.name, ...(x.name === OTHER_CAMPAIGNS ? {} : labelParts(x.name)), value: Math.round(Number(x.spend) || 0) }));
+  if (rest.length) out.push({ label: t('Other ({n} groups)', { n: rest.length }), value: Math.round(rest.reduce((a, x) => a + (Number(x.spend) || 0), 0)) });
   return out;
 }
 // ROAS of the groups, best first (the top ones by spend; the rest are not drawn as bars).
 export function roasBars(view, top = TOP_GROUPS) {
-  return view.groups.filter((x) => !view.explicit || x.kind !== 'group').filter((x) => (Number(x.spend) || 0) > 0).slice(0, top).map((x) => ({ label: x.name, value: computeMetric('roas', x) })).filter((x) => x.value != null).sort((a, b) => b.value - a.value);
+  const t = trFor(view.lang);
+  return view.groups.filter((x) => !view.explicit || x.kind !== 'group').filter((x) => (Number(x.spend) || 0) > 0).slice(0, top).map((x) => ({ label: x.name === OTHER_CAMPAIGNS ? t(OTHER_CAMPAIGNS) : x.name, ...(x.name === OTHER_CAMPAIGNS ? {} : labelParts(x.name)),  value: computeMetric('roas', x) })).filter((x) => x.value != null).sort((a, b) => b.value - a.value);
 }
 
 // The address a client opens (the token is the only secret in it: long, random, never shown anywhere else).
@@ -226,18 +253,18 @@ export const shareUrl = (origin, token) => `${String(origin).replace(/\/+$/, '')
 // ---- the «Конструктор звіту»: the report as the layout will make it ----
 // A view for the live preview. Without `data` it is the skeleton: the selected columns ({ id, name, kind }), every number a dash. With `data` (a fetched
 // period: { platforms, previous }) the same view carries real numbers. The text blocks, creatives and hidden metrics always come from the draft layout.
-export function builderView({ layout, periodType = 'weekly', kind, columns = [], data = null, period = null }) {
-  const real = data ? reportView({ id: 0, type: periodType, start: period?.start || '', end: period?.end || '', status: 'final', data: { kind, platforms: data.platforms, previous: data.previous || null } }, { kind }) : null;
+export function builderView({ layout, periodType = 'weekly', kind, columns = [], data = null, period = null, lang = 'en' }) {
+  const real = data ? reportView({ id: 0, type: periodType, start: period?.start || '', end: period?.end || '', status: 'final', data: { kind, platforms: data.platforms, previous: data.previous || null } }, { kind, lang }) : null;
   const base = real || { id: 0, type: periodType, start: '', end: '', toDate: false, status: 'final', updatedAt: null, currency: 'USD', total: {}, explicit: true, groups: columns, prev: null, sections: {}, kind };
   const blocks = (layout.blocks || []).filter((b) => b[periodType === 'monthly' ? 'monthly' : 'weekly']).map((b) => ({ key: b.key, title: b.title, client: b.client !== false }));
-  return { ...base, kind, blocks, hiddenMetrics: layout.hiddenMetrics || [], metricOrder: layout.metricOrder || [], baseMetrics: layout.baseMetrics ?? null, funnel: layout.funnel?.enabled ? layout.funnel : null, templateMetrics: null, creatives: [], sections: base.sections || {} };
+  return { ...base, kind, lang: normLang(lang), blocks, hiddenMetrics: layout.hiddenMetrics || [], metricOrder: layout.metricOrder || [], baseMetrics: layout.baseMetrics ?? null, funnel: layout.funnel?.enabled ? layout.funnel : null, templateMetrics: null, creatives: [], sections: base.sections || {} };
 }
 
 // ---- the whole page ----
 // payload = get_shared_report(...) → { project, platform, months: [...], history: [...], asOf }
 export function buildClientModel(payload) {
   if (!payload) return null;
-  const ctx = { kind: payload.project?.kind || 'ecom' };
+  const ctx = { kind: payload.project?.kind || 'ecom', lang: normLang(payload.project?.lang) }; // the project's language; a report may have its own
   const views = (payload.reports || []).map((r) => reportView(r, ctx)).filter(Boolean);
   const kind = views.length ? views[views.length - 1].kind : ctx.kind; // the page follows the type of the newest report
   const hidden = views.length ? views[views.length - 1].hiddenMetrics : [];
@@ -264,7 +291,7 @@ export function buildClientModel(payload) {
   const stamps = months.map((m) => m.asOf).filter(Boolean).sort();
   // a link of one custom report: that report is the whole page
   const single = payload.single === true ? views.find((v) => v.type === 'custom') || null : null;
-  return { project: payload.project || { name: '' }, platform: payload.platform, kind, hidden, columns: payload.columns || [], custom: payload.custom || [], months, history, single, isSingle: payload.single === true, asOf: single ? (single.updatedAt || '').slice(0, 10) || null : stamps.length ? stamps[stamps.length - 1] : null };
+  return { project: payload.project || { name: '' }, lang: ctx.lang, platform: payload.platform, kind, hidden, columns: payload.columns || [], custom: payload.custom || [], months, history, single, isSingle: payload.single === true, asOf: single ? (single.updatedAt || '').slice(0, 10) || null : stamps.length ? stamps[stamps.length - 1] : null };
 }
 
 // ---- what the agent writes a custom block of the report template from ----

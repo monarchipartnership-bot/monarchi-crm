@@ -127,3 +127,8 @@
 .project-detail-page.pw .wbh-chip--live { background: #E3F6E8; color: #168a3a; }
 .project-detail-page.pw .wbh-card--live { border-color: #8FDDA9; background: linear-gradient(#FBFFFC, #F1FBF4); }
 .project-detail-page.pw .wbh-note--live { background: #E3F6E8; color: #166534; }
+.project-detail-page.pw .wbe-lang { display: inline-flex; padding: 3px; border-radius: 999px; background: #F3E3F7; gap: 2px; }
+.project-detail-page.pw .wbe-lang-b { border: 0; background: none; color: #682768; font: 700 12px 'Onest', sans-serif; height: 26px; padding: 0 12px; border-radius: 999px; cursor: pointer; }
+.project-detail-page.pw .wbe-lang-b.on { background: linear-gradient(135deg, #AE40AE, #682768); color: #fff; box-shadow: 0 3px 8px -2px #68276888; }
+.project-detail-page.pw .wbe-lang-b:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
+.project-detail-page.pw .wbe-lang-b:disabled { opacity: .45; cursor: default; }

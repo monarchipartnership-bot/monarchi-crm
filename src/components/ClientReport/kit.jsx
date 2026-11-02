@@ -46,6 +46,24 @@ export function Box({ icon, title, sub, right, cls = '', children }) {
   );
 }
 
+// A section of the page: its heading (a medallion, the title, a line under it) and the anchor the section ribbon jumps to. The ribbon is built from
+// the sections that are really on the page (`data-secnav`), so a section that has nothing to show is simply not in it.
+export function Sec({ id, icon, title, nav, sub, right, children }) {
+  return (
+    <section className="cx-sec" id={`s-${id}`} data-secnav={nav || title}>
+      <div className="cx-sh">
+        <Medallion icon={icon} cls="sm" />
+        <div><h2>{title}</h2>{sub && <small>{sub}</small>}</div>
+        {right && (<><span className="sp" />{right}</>)}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// A small chip of the header: an icon and a line («Period 10.10.2026 – 30.10.2026»).
+export const Chip = ({ icon, tone = '', children }) => <span className={`cx-chip${tone ? ` ${tone}` : ''}`}>{icon && <Icon name={icon} />}<span>{children}</span></span>;
+
 export const Pill = ({ tone = 'ok', children }) => <span className={`pill ${tone}`}><i />{children}</span>;
 
 // An arrow + percentage against the previous period (see clientReport.change). Nothing to compare → a dash.
@@ -156,7 +174,7 @@ export function Donut({ slices, center, caption, fmt = (v) => String(v) }) {
       </svg>
       <div className="sl">
         {slices.map((x) => (
-          <div className="slr" key={x.label}><i style={{ background: `linear-gradient(135deg,${x.g[0]},${x.g[1]})` }} /><span>{x.label}</span><b>{fmt(x.value)}</b><em>{Math.round((x.value / tot) * 100)}%</em></div>
+          <div className="slr" key={x.label}><i style={{ background: `linear-gradient(135deg,${x.g[0]},${x.g[1]})` }} /><span title={x.full || x.label}>{x.short || x.label}{x.stage && <small className="cx-stg">{x.stage}</small>}</span><b>{fmt(x.value)}</b><em>{Math.round((x.value / tot) * 100)}%</em></div>
         ))}
       </div>
     </div>
@@ -169,7 +187,7 @@ export function HBars({ items }) {
   return (
     <div className="hbars">
       {items.map((i) => (
-        <div className="hbr" key={i.label}><span>{i.label}</span><div className="hpt"><div className="hpb" style={{ width: `${Math.max((i.value / mx) * 100, 16)}%`, background: `linear-gradient(100deg,${i.g[0]},${i.g[1]})` }}><em>{i.text}</em></div></div></div>
+        <div className="hbr" key={i.label}><span title={i.full || i.label}>{i.short || i.label}{i.stage && <small className="cx-stg">{i.stage}</small>}</span><div className="hpt"><div className="hpb" style={{ width: `${Math.max((i.value / mx) * 100, 16)}%`, background: `linear-gradient(100deg,${i.g[0]},${i.g[1]})` }}><em>{i.text}</em></div></div></div>
       ))}
     </div>
   );
