@@ -52,6 +52,8 @@ import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spen
 import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
 import { buildDossier, memoryBlock } from '../src/lib/agents/clientMemory.js';
 import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cycleState, describeSchedule, instructionBlock, modeOfAgent, scheduleRows } from '../src/lib/agents/campaignCycles.js';
+import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
+import { auditAfter, checkRights, loadRights } from '../api/_lib/agentAudit.js';
 import { addInstruction, cappedCampaigns, editOutput, openCycle, removeInstruction, setAgentMode, setAgentSchedule, syncCycles } from '../api/_lib/campaignCycles.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
@@ -2784,6 +2786,53 @@ await ok('money cap: a campaign over its cap starts nothing new (requests, pictu
   assert.equal((await generateCreatives({ db: fakeDb(tables), hfImage: { estimate: async () => 0.2 } }, 11, { estimateOnly: true })).ok, true); // the price may be asked: it costs nothing
   tables.ag_campaigns[0].spend_cap_usd = 20; // raised
   assert.deepEqual([...await cappedCampaigns(fakeDb(tables))], []);
+});
+
+await ok('rights: nobody chosen = anyone; approvers and operations managers may start paid work and confirm results; pricing is open; the list is cleaned', () => {
+  const me = 'a@monarchi.agency';
+  assert.equal(canDo({ action: 'launch_campaign', email: me, approvers: [] }).ok, true); // as the approvers of project reports: empty = anyone
+  const only = ['boss@monarchi.agency'];
+  const no = canDo({ action: 'generate_creatives', email: me, approvers: only });
+  assert.equal(no.ok, false); assert.match(no.reason, /Генерація зображень у Higgsfield.*boss@monarchi\.agency/);
+  assert.equal(canDo({ action: 'generate_creatives', email: 'BOSS@monarchi.agency', approvers: only }).ok, true); // letters do not matter
+  assert.equal(canDo({ action: 'pass_on', email: me, approvers: only, isOps: true }).ok, true); // an operations manager always may
+  assert.equal(canDo({ action: 'generate_creatives', email: me, approvers: only, estimateOnly: true }).ok, true); // asking the price costs nothing
+  assert.equal(canDo({ action: 'set_agent_mode', email: me, approvers: only }).ok, true); // free to do, only journaled
+  assert.equal(canDo({ action: 'process', email: me, approvers: only }).ok, true);
+  assert.ok(['launch_campaign', 'start_request', 'run_agent', 'retry_task'].every((a) => ACTION_RULES[a].level === 'paid') && ['pass_on', 'edit_output'].every((a) => ACTION_RULES[a].level === 'result'));
+  assert.deepEqual(cleanApprovers([' A@X.y ', 'a@x.y', '', 'b@x.y']), ['a@x.y', 'b@x.y']); assert.throws(() => cleanApprovers(['not-an-email']), /не схоже/);
+  // the entries of the journal
+  assert.equal(auditEntry('process'), null); assert.equal(auditEntry('generate_creatives', { estimateOnly: true }), null); assert.equal(auditEntry('nope'), null);
+  assert.match(auditEntry('generate_creatives', { requestId: 4 }, { submitted: 3, estimateUsd: 0.6 }).summary, /3 зображ\., ≈ \$0\.60/);
+  assert.match(auditEntry('set_agent_mode', { agentId: 1, mode: 'confirm' }).summary, /з підтвердженням/);
+  assert.match(auditEntry('add_instruction', { text: 'Без знижок' }).summary, /Без знижок/);
+  const d = deniedEntry('launch_campaign', 'причина'); assert.deepEqual([d.action, d.meta.attempted], ['denied', 'launch_campaign']);
+  assert.ok(AUDIT_LABELS.creative_approved && AUDIT_LABELS.denied && AUDIT_LABELS.launch_campaign);
+});
+
+await ok('rights on the server: a refused action is not run and is journaled; an allowed one is journaled with its campaign and project; the cron is not checked', async () => {
+  const tables = {
+    ai_agent_settings: [{ id: 1, approvers: ['boss@monarchi.agency'] }],
+    profiles: [{ email: 'ops@monarchi.agency', role: 'ops_manager' }, { email: 'm@monarchi.agency', role: 'member' }],
+    ag_campaigns: [{ id: 5, project_id: 10 }], ag_creative_requests: [{ id: 70, campaign_id: 5 }], ag_audit_log: [],
+    ag_agents: [{ id: 1, team: 'campaign', scope_id: '5' }], ag_tasks: [{ id: 9, campaign_id: null, agent_id: 1 }],
+  };
+  const ctx = (email, trigger = 'user') => ({ db: fakeDb(tables), email, trigger });
+  assert.deepEqual(await loadRights(fakeDb(tables), 'OPS@monarchi.agency'), { approvers: ['boss@monarchi.agency'], isOps: true });
+  const refused = await checkRights(ctx('m@monarchi.agency'), 'start_request', { requestId: 70 });
+  assert.equal(refused.ok, false);
+  assert.deepEqual([tables.ag_audit_log[0].action, tables.ag_audit_log[0].actor, tables.ag_audit_log[0].campaign_id, tables.ag_audit_log[0].project_id], ['denied', 'm@monarchi.agency', 5, 10]); // the attempt is in the journal, with its client
+  assert.equal((await checkRights(ctx('boss@monarchi.agency'), 'start_request', { requestId: 70 })).ok, true);
+  assert.equal((await checkRights(ctx('ops@monarchi.agency'), 'launch_campaign', { campaignId: 5 })).ok, true);
+  assert.equal((await checkRights(ctx('m@monarchi.agency', 'cron'), 'launch_campaign', { campaignId: 5 })).ok, true); // the clock is the system itself
+  assert.equal((await checkRights(ctx('m@monarchi.agency'), 'set_agent_mode', { agentId: 1 })).ok, true);
+  assert.equal(tables.ag_audit_log.length, 1); // a check that passes writes nothing: the journal is written after the action
+  await auditAfter(ctx('boss@monarchi.agency'), 'pass_on', { taskId: 9 }, { ok: true });
+  const last = tables.ag_audit_log[1];
+  assert.deepEqual([last.action, last.campaign_id, last.project_id, last.actor], ['pass_on', 5, 10, 'boss@monarchi.agency']); // task → agent → campaign → project
+  assert.equal(await auditAfter(ctx('boss@monarchi.agency', 'cron'), 'pass_on', { taskId: 9 }, {}), false); // the clock writes nothing here
+  assert.equal(await auditAfter(ctx('boss@monarchi.agency'), 'process', {}, {}), false); // not a journaled action
+  assert.equal(tables.ag_audit_log.length, 2);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

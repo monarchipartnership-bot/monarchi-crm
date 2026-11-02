@@ -24,6 +24,7 @@ import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, passOn
 import { addInstruction, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from './_lib/campaignCycles.js';
 import { cancelRequest, startRequest } from './_lib/creativeEngine.js';
 import { estimateInputs } from './_lib/estimateInputs.js';
+import { auditAfter, checkRights } from './_lib/agentAudit.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { siteOverview } from './_lib/googleSiteData.js';
 import { collectSpeed, speedFindings, speedKeyFromEnv } from './_lib/pageSpeed.js';
@@ -53,6 +54,9 @@ export default async function handler(req, res) {
     const ctx = { db: clientFor(token), model: getModelClient(token), email, trigger, now: () => new Date() };
     const body = req.body || {};
     const action = trigger === 'cron' ? 'process' : String(body.action || 'process');
+    // Rights: paid work and results are confirmed by the approvers (src/lib/agents/rights.js); a refused attempt is written to the journal.
+    const gate = await checkRights(ctx, action, body);
+    if (!gate.ok) { bad(res, 403, gate.reason); return; }
     let out;
     if (action === 'process') out = await processQueue(ctx);
     else if (action === 'approve_plan') out = await approvePlan(ctx, Number(body.planId)); // the page then calls `process` until the queue is empty
@@ -89,6 +93,7 @@ export default async function handler(req, res) {
       out = await siteOverview({ config: cfg, db: ctx.db });
     }
     else { bad(res, 400, 'Невідома дія'); return; }
+    await auditAfter(ctx, action, body, out); // the journal of what people did (best effort)
     res.status(200).json(out);
   } catch (e) {
     if (e instanceof BudgetError) { bad(res, 429, e.message); return; }
