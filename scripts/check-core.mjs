@@ -2992,6 +2992,49 @@ await ok('funnel in older reports: a snapshot without the funnel takes the layou
   assert.equal(withFunnel(null, on), null);
 });
 
+await ok('meta catalog: every Ads Manager column family is there (all CTR kinds, unique and outbound clicks, video, messages, every event in every channel), keys are unique and short, counts are read from the row', async () => {
+  const { META_METRIC_LIST, COUNTS, extractCounts, insightFieldsFor, cleanColumns } = await import('../src/lib/metaColumns.js');
+  const keys = META_METRIC_LIST.map((m) => m.key);
+  assert.equal(new Set(keys).size, keys.length); assert.ok(keys.length > 280);
+  assert.ok(keys.every((k) => /^mx_[A-Za-z0-9_]+$/.test(k) && k.length <= 40)); // the layout keeps keys with a 40 character limit
+  assert.ok(META_METRIC_LIST.every((m) => m.label && m.en && m.group && (m.needs || []).every((n) => COUNTS[n] || ['impressions', 'reach', 'clicks', 'spend', 'purchases'].includes(n))));
+  // the seven kinds of CTR of Ads Manager (all and link clicks are the standard CTR and mx_link_ctr)
+  ['mx_link_ctr', 'mx_ctr_outbound', 'mx_ctr_unique_all', 'mx_ctr_unique_link', 'mx_ctr_unique_outbound', 'mx_mm_link_click_rate'].forEach((k) => assert.ok(keys.includes(k), k));
+  // events: every standard event in the channels it has; a purchase also has its value and ROAS
+  ['mx_act_view_content_all', 'mx_act_view_content_web', 'mx_act_view_content_app', 'mx_act_purchase_web', 'mx_val_purchase_all', 'mx_roas_purchase_web', 'mx_act_subscribe_app', 'mx_cost_act_add_to_cart_all'].forEach((k) => assert.ok(keys.includes(k), k));
+  const row = {
+    impressions: '1000', reach: '400', clicks: '50', spend: '20',
+    unique_clicks: '30', unique_inline_link_clicks: '20', outbound_clicks: [{ action_type: 'outbound_click', value: '15' }],
+    video_play_actions: [{ action_type: 'video_view', value: '200' }], video_time_watched_actions: [{ action_type: 'video_view', value: '1000' }],
+    marketing_messages_sent: '100', marketing_messages_delivered: '90', marketing_messages_spend: '9',
+    results: [{ indicator: 'actions:link_click', values: [{ value: '40' }] }],
+    actions: [{ action_type: 'omni_purchase', value: '3' }, { action_type: 'offsite_conversion.fb_pixel_purchase', value: '2' }, { action_type: 'omni_view_content', value: '70' }],
+    action_values: [{ action_type: 'omni_purchase', value: '150' }, { action_type: 'offsite_conversion.fb_pixel_purchase', value: '90' }],
+  };
+  const picked = ['mx_ctr_unique_all', 'mx_ctr_outbound', 'mx_cost_video_plays', 'mx_video_avg_time', 'mx_mm_delivery_rate', 'mx_cost_mm_delivered', 'mx_cost_result', 'mx_roas_purchase_all', 'mx_roas_purchase_web', 'mx_act_view_content_web'];
+  const c = extractCounts(row, picked);
+  assert.deepEqual([c.x_unique_clicks, c.x_outbound_clicks, c.x_video_plays, c.x_video_time, c.x_mm_sent, c.x_mm_delivered, c.x_mm_spend, c.x_results], [30, 15, 200, 1000, 100, 90, 9, 40]);
+  assert.deepEqual([c.x_val_purchase_all, c.x_val_purchase_web, c.x_act_view_content_web], [150, 90, 0]); // an event the account does not have is 0, not a guess
+  const by = (k) => META_METRIC_LIST.find((m) => m.key === k);
+  const total = { ...row, impressions: 1000, reach: 400, spend: 20, ...c };
+  assert.equal(by('mx_ctr_unique_all').calc(total), 7.5); // unique clicks per person reached
+  assert.equal(by('mx_ctr_outbound').calc(total), 1.5);
+  assert.equal(by('mx_cost_video_plays').calc(total), 0.1); assert.equal(by('mx_video_avg_time').calc(total), 5);
+  assert.equal(by('mx_mm_delivery_rate').calc(total), 90); assert.equal(by('mx_cost_mm_delivered').calc(total), 0.1); // the price of messages uses their own spend
+  assert.equal(by('mx_cost_result').calc(total), 0.5);
+  assert.equal(by('mx_roas_purchase_all').calc(total), 7.5); assert.equal(by('mx_roas_purchase_web').calc(total), 4.5);
+  assert.equal(by('mx_act_view_content_web').calc({ ...total, x_act_view_content_web: undefined }), null); // never fetched: «—»
+  // only what is picked is asked from Meta
+  assert.deepEqual(insightFieldsFor(['mx_ctr_unique_all', 'mx_results_none']).sort(), ['unique_clicks']);
+  assert.ok(insightFieldsFor(['mx_cost_result']).includes('results'));
+  assert.deepEqual(cleanColumns('meta', ['mx_ctr_outbound', 'mx_nope']), ['mx_ctr_outbound']);
+  // a field Meta does not know is named, so it can be dropped instead of failing the whole report
+  const { unknownFieldOf } = await import('../src/lib/metaColumns.js');
+  assert.equal(unknownFieldOf({ code: 100, message: '(#100) Tried accessing nonexisting field (video_15_sec_watched_actions) on node type (AdgroupInsights)' }), 'video_15_sec_watched_actions');
+  assert.equal(unknownFieldOf({ code: 100, message: '(#100) total_card_view is not valid for fields param. please check' }), 'total_card_view');
+  assert.equal(unknownFieldOf({ code: 190, message: 'Tried accessing nonexisting field (x)' }), null); assert.equal(unknownFieldOf({ code: 100, message: 'Invalid parameter' }), null);
+});
+
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
   assert.deepEqual(MODE_ORDER, ['creative', 'full', 'strategy', 'ads', 'report']);
   assert.equal(MODE_ORDER.filter((m) => MODES[m].safe).join(), 'creative'); // only «Тільки креативи» is the safe one (nothing starts by itself)

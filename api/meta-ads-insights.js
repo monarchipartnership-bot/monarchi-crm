@@ -18,7 +18,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { formatRow, GRAPH, graphGet, LEVELS, listMetaAccounts, MAX_PAGES } from './_lib/metaAdsData.js';
 import { metaErrorText } from '../src/lib/metaOnboarding.js';
-import { cleanColumns, insightFieldsFor } from '../src/lib/metaColumns.js';
+import { cleanColumns, insightFieldsFor, unknownFieldOf } from '../src/lib/metaColumns.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -114,12 +114,24 @@ export default async function handler(req, res) {
 
     let url = GRAPH + act + '/insights?' + new URLSearchParams(params);
     const rows = [];
+    // a picked column whose field Meta does not know (an account or API version without it) must not break the whole report: it is dropped and named in `unavailable`
+    const unavailable = [];
     for (let page = 0; page < MAX_PAGES && url; page += 1) {
-      const body = await graphGet(url, metaToken);
+      let body;
+      for (let attempt = 0; ; attempt += 1) {
+        try { body = await graphGet(url, metaToken); break; } catch (err) {
+          const bad = page === 0 ? unknownFieldOf(err) : null;
+          const list = params.fields.split(',');
+          if (!bad || !list.includes(bad) || attempt >= 6) throw err;
+          unavailable.push(bad);
+          params.fields = list.filter((f) => f !== bad).join(',');
+          url = GRAPH + act + '/insights?' + new URLSearchParams(params);
+        }
+      }
       rows.push(...(body.data || []));
       url = body.paging?.next || null;
     }
-    res.status(200).json({ account: act, level, rows: rows.map((r) => formatRow(r, raw, columns)), truncated: Boolean(url) });
+    res.status(200).json({ account: act, level, rows: rows.map((r) => formatRow(r, raw, columns)), truncated: Boolean(url), ...(unavailable.length ? { unavailable } : {}) });
   } catch (err) {
     res.status(err.status && err.status < 500 ? 400 : 502).json({ error: metaErrorText(err) || 'Meta API: ' + err.message, code: err.code });
   }

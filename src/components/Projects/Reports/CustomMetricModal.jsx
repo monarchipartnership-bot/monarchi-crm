@@ -38,13 +38,16 @@ export default function CustomMetricModal({ projectId, platform, columnKeys = []
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     const out = [];
-    (catalog || []).filter((m) => !q || m.label.toLowerCase().includes(q) || m.en.toLowerCase().includes(q)).forEach((m) => {
+    (catalog || []).filter((m) => !q || m.label.toLowerCase().includes(q) || m.en.toLowerCase().includes(q) || m.group.toLowerCase().includes(q)).forEach((m) => {
       let g = out.find((x) => x.name === m.group);
       if (!g) { g = { name: m.group, items: [] }; out.push(g); }
       g.items.push(m);
     });
     return out;
   }, [catalog, query]);
+  const [openGroups, setOpenGroups] = useState(() => new Set()); // the catalog is long: the groups are closed until opened (a search opens every group that has a match)
+  const searching = query.trim().length > 0;
+  const toggleOpen = (name) => setOpenGroups((s) => { const n = new Set(s); if (n.has(name)) n.delete(name); else n.add(name); return n; });
   const changedCols = picked.size !== columnKeys.length || columnKeys.some((k) => !picked.has(k));
   const toggle = (k) => setPicked((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const toggleGroup = (items) => setPicked((s) => { const n = new Set(s); const all = items.every((m) => n.has(m.key)); items.forEach((m) => (all ? n.delete(m.key) : n.add(m.key))); return n; });
@@ -121,17 +124,22 @@ export default function CustomMetricModal({ projectId, platform, columnKeys = []
               {groups.map((g) => (
                 <div className="mc-group" key={g.name}>
                   <div className="mc-group-head">
-                    <b>{g.name}</b>
+                    <button type="button" className="mc-group-toggle" aria-expanded={searching || openGroups.has(g.name)} onClick={() => toggleOpen(g.name)}>
+                      <span aria-hidden="true">{searching || openGroups.has(g.name) ? '▾' : '▸'}</span> <b>{g.name}</b>
+                      <small>{g.items.length}{g.items.some((m) => picked.has(m.key)) ? ` · обрано ${g.items.filter((m) => picked.has(m.key)).length}` : ''}</small>
+                    </button>
                     <button type="button" className="pacc-link" onClick={() => toggleGroup(g.items)}>{g.items.every((m) => picked.has(m.key)) ? 'Зняти групу' : 'Обрати групу'}</button>
                   </div>
-                  <div className="mc-grid">
-                    {g.items.map((m) => (
-                      <label key={m.key} className={'cg-item' + (picked.has(m.key) ? ' on' : '')}>
-                        <input type="checkbox" checked={picked.has(m.key)} onChange={() => toggle(m.key)} />
-                        <span className="cg-item-name">{m.label}</span>
-                      </label>
-                    ))}
-                  </div>
+                  {(searching || openGroups.has(g.name)) && (
+                    <div className="mc-grid">
+                      {g.items.map((m) => (
+                        <label key={m.key} className={'cg-item' + (picked.has(m.key) ? ' on' : '')}>
+                          <input type="checkbox" checked={picked.has(m.key)} onChange={() => toggle(m.key)} />
+                          <span className="cg-item-name">{m.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

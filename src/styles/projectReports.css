@@ -154,6 +154,9 @@
 .mc-columns { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .mc-group { display: flex; flex-direction: column; gap: 8px; }
 .mc-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mc-group-toggle { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: baseline; gap: 6px; }
+.mc-group-toggle small { color: #7a5a7d; font-size: .75rem; }
+.mc-group-toggle:focus-visible { outline: 2px solid #682768; outline-offset: 2px; border-radius: 6px; }
 .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
 @media (max-width: 560px) { .mc-grid { grid-template-columns: 1fr; } }
 
