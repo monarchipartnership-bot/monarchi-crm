@@ -21,7 +21,8 @@ import * as higgsfield from './higgsfield.js';
 import { pollCreatives } from './creativeMake.js';
 import { campaignRole } from './campaignRun.js';
 import { creativeRole } from './creativeRun.js';
-import { fanOutRequest, settleRequest, touchClientLink } from './creativeEngine.js';
+import { fanOutRequest, passOn, settleRequest, touchClientLink } from './creativeEngine.js';
+import { openCycle, syncCycles } from './campaignCycles.js';
 import { CREATIVE_TEAM } from '../../src/lib/agents/creativeTeam.js';
 import { CAMPAIGN_TEAM } from '../../src/lib/agents/campaignTeam.js';
 import { LANGUAGES, MAX_POSTS_PER_RUN, nextMonday, PLATFORM_KEYS } from './smmContent.js';
@@ -386,8 +387,8 @@ export async function redoVisual(ctx, postId, note = '') {
 // Claims a queued task (only one process can) and runs it. → the finished task row, or null when someone else took it.
 // A link with confirm_before_pass keeps the result until the person gives the OK (action `pass_on`): the output is marked, nothing starts.
 async function confirmGate(ctx, task, agent, outcome) {
-  const link = (await ctx.db.from('ag_agent_clients').select('confirm_before_pass').eq('agent_id', agent.id).eq('campaign_id', task.campaign_id).maybeSingle()).data;
-  if (!link?.confirm_before_pass) return false;
+  const wait = agent.team === CAMPAIGN_TEAM ? !!agent.config?.confirm_before_pass : !!(await ctx.db.from('ag_agent_clients').select('confirm_before_pass').eq('agent_id', agent.id).eq('campaign_id', task.campaign_id).maybeSingle()).data?.confirm_before_pass;
+  if (!wait) return false;
   await ctx.db.from('ag_tasks').update({ output: { ...outcome.output, awaiting_pass: true } }).eq('id', task.id);
   return true;
 }
@@ -415,7 +416,7 @@ export async function runTask(ctx, team, task) {
   if (agent) await db.from('ag_agents').update({ last_run_at: finished, last_status: outcome.ok ? 'ok' : 'problem', last_message: String(outcome.ok ? outcome.summary : outcome.error).slice(0, 500) }).eq('id', agent.id);
   if (agent?.team === CREATIVE_TEAM) { try { await touchClientLink(ctx, task, outcome.ok); } catch (e) { console.warn('touchClientLink failed:', e?.message || e); } }
   // a result that must wait for the person's OK before it goes on (confirm_before_pass of the client's link) does not start the next agents
-  const gate = outcome.ok && agent?.team === CREATIVE_TEAM ? await confirmGate(ctx, task, agent, outcome) : false;
+  const gate = outcome.ok && (agent?.team === CREATIVE_TEAM || agent?.team === CAMPAIGN_TEAM) ? await confirmGate(ctx, task, agent, outcome) : false;
   if (outcome.ok && agent && !gate) { try { await fanOut(ctx, team, agent, task); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
   if (task.request_id) { try { await settleRequest(ctx, task.request_id, outcome.ok ? null : `${agent?.name || 'Агент'}: ${outcome.error}`); } catch (e) { console.warn('settleRequest failed:', e?.message || e); } }
   if (outcome.ok && outcome.advance) { try { await advancePost(ctx, team, outcome.advance); } catch (e) { console.warn('advancePost failed:', e?.message || e); } }
@@ -483,6 +484,7 @@ async function scheduleDue(ctx, all) {
     if (open.length) continue;
     const same = a.last_scheduled === verdict.scheduledFor;
     must(await ctx.db.from('ag_agents').update({ last_scheduled: verdict.scheduledFor, attempts: same ? (a.attempts || 0) + 1 : 1, last_attempt_at: iso(ctx.now()) }).eq('id', a.id), 'agent');
+    if (a.team === CAMPAIGN_TEAM) { try { await openCycle(ctx, Number(a.scope_id)); } catch (e) { console.warn('openCycle failed:', e?.message || e); } }
     await enqueue(ctx.db, { agent: a, type: typeOf(a), brief: { scheduled: true, scheduledFor: verdict.scheduledFor }, by: 'розклад' });
     started.push(a.role);
   }
@@ -517,6 +519,7 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
   const states = chainStates(all.agents, all.links);
   stats.left = rest.filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).length;
   stats.waiting = rest.length - stats.left;
+  try { stats.cycles = await syncCycles(ctx); } catch (e) { console.warn('syncCycles failed:', e?.message || e); }
   return stats;
 }
 
@@ -555,11 +558,25 @@ export async function launchCampaign(ctx, campaignId) {
   if (!mine.length) throw new Error('Увімкніть хоча б одного агента.');
   must(await ctx.db.from('ag_campaigns').update({ status: 'active', launched_at: now, updated_at: now }).eq('id', campaign.id), 'campaign');
   must(await ctx.db.from('ag_agents').update({ enabled_since: now, attempts: 0 }).eq('team', CAMPAIGN_TEAM).eq('scope_id', String(campaign.id)).eq('enabled', true), 'agents');
+  try { await openCycle(ctx, campaign.id); } catch (e) { console.warn('openCycle failed:', e?.message || e); }
   let started = 0;
   for (const a of mine) {
     if (['initial', 'schedule'].includes(a.config?.trigger)) { await enqueue(ctx.db, { agent: a, type: 'report', brief: { launch: true }, by: ctx.email }); started += 1; }
   }
   return { started, agents: mine.length };
+}
+
+// The person's OK on a result that waited (confirm_before_pass): the creative department has its own chain, a campaign agent passes on through the campaign team.
+export async function passOnAny(ctx, taskId) {
+  const task = must(await ctx.db.from('ag_tasks').select('*').eq('id', taskId).maybeSingle(), 'task');
+  if (!task) throw new Error('Завдання не знайдено.');
+  const all = await loadAll(ctx.db);
+  const agent = all.byId.get(task.agent_id);
+  if (agent?.team !== CAMPAIGN_TEAM) return passOn(ctx, taskId);
+  if (task.status !== 'done' || !task.output?.awaiting_pass) throw new Error('Цей результат не чекає на підтвердження.');
+  must(await ctx.db.from('ag_tasks').update({ output: { ...task.output, awaiting_pass: false, passed_by: ctx.email || null } }).eq('id', taskId), 'task');
+  await fanOut(ctx, subTeam(all, agent), agent, task);
+  return { ok: true };
 }
 
 // «Restart the agent»: what hangs is put back in the queue: tasks that are «running» (the worker died) and the failed tasks of the last 7 days; the

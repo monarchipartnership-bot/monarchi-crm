@@ -4,6 +4,7 @@
 // (editable instruction + client-specific instruction + locked rules) and saves the report as the task's output.
 // Everything the outside world provides is handed in (deps), so scripts/check-core.mjs runs it with stand-ins.
 import { roleDef, PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
+import { instructionBlock } from '../../src/lib/agents/campaignCycles.js';
 import { composeCampaignSystem } from '../../src/lib/agents/locked.js';
 import { runGoogleAdsReport } from './googleAdsData.js';
 import { fetchMetaInsights } from './metaAdsData.js';
@@ -99,6 +100,8 @@ export async function campaignRole({ ctx, team: sub, agent, task, prompt, rec })
     `Платформи: ${campaign.platforms.map((p) => PLATFORMS[p]?.label || p).join(', ')}`,
     cc.brief ? `Бриф: ${clip(cc.brief, 2500)}` : 'Бриф не заповнено.', cc.goals ? `Цілі: ${clip(cc.goals, 1200)}` : '',
   ].filter(Boolean).join('\n') });
+  const orders = instructionBlock(cc.instructions, agent.role); // what the manager asked of this campaign's agents
+  if (orders) blocks.push(orders);
   for (const f of def.fields) {
     if (f.key === 'pasted' || f.key === 'sources' || f.key === 'competitors') continue;
     if (String(cfg[f.key] || '').trim()) blocks.push({ title: f.label, text: clip(cfg[f.key], 1500) });

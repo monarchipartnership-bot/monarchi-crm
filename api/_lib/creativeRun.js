@@ -9,6 +9,7 @@ import { PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
 import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, directionLimit } from '../../src/lib/agents/creativeTeam.js';
 import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, PROFILE_FIELDS, inputState } from '../../src/lib/agents/projectCreative.js';
 import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
+import { instructionBlock } from '../../src/lib/agents/campaignCycles.js';
 import { MEMORY_LIMITS, buildDossier, memoryBlock } from '../../src/lib/agents/clientMemory.js';
 import { fetchBlock, loadAccounts, siteBlocks, summaryOf } from './campaignRun.js';
 import { readJson } from './agentContent.js';
@@ -338,6 +339,8 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   const blocks = [projectBlock(project, campaign)];
   for (const f of def.clientFields || []) if (String(mine[f.key] || '').trim()) blocks.push({ title: `${f.label} (клієнт)`, text: clip(mine[f.key], 1500) });
   for (const f of def.fields || []) if (String(cfg[f.key] || '').trim()) blocks.push({ title: f.label, text: clip(cfg[f.key], 1800) });
+  const orders = instructionBlock(campaign.config?.instructions, agent.role); // what the manager asked of this campaign's agents
+  if (orders) blocks.push(orders);
   if (req) blocks.push(requestBlock(req), materialsBlock(req.materials));
   const own = await projectCreativeBlocks(db, campaign.project_id, now, { inputs: agent.role === 'creative_strategy' });
   if (agent.role !== 'creative_analyst') blocks.push(...own.blocks);

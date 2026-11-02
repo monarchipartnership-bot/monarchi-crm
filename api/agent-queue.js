@@ -12,6 +12,7 @@
 //   POST { action: 'pass_on', taskId }               the person's OK on a result that waited (confirm_before_pass): the next agents start
 //   POST { action: 'site_speed' }                    Google PageSpeed of the site's front page (phone and computer, 10-30 s)
 //   POST { action: 'site_overview' }                 the website analyst's main page: is GA4 / Search Console connected, and the live figures
+//   POST { action: 'set_agent_schedule' | 'set_agent_mode' | 'add_instruction' | 'remove_instruction' | 'edit_output' }  the manager's control over a campaign while it works
 //   POST { action: 'estimate_inputs' }               the numbers of the pre-launch estimate: the price of one picture at Higgsfield and the average run of each agent
 //   POST { action: 'poll_assets' }                   look at the pictures/videos being generated; { action: 'redo_visual', postId, note? }; { action: 'status' }
 // A person acts with their own session (row-level security applies); the cron signs in as the agent user. The model key stays on the server.
@@ -19,8 +20,9 @@ import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { getModelClient } from './_lib/ai.js';
 import { generateCreatives, generatorState, pollCreatives } from './_lib/creativeMake.js';
-import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
-import { cancelRequest, passOn, startRequest } from './_lib/creativeEngine.js';
+import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, passOnAny, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
+import { addInstruction, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from './_lib/campaignCycles.js';
+import { cancelRequest, startRequest } from './_lib/creativeEngine.js';
 import { estimateInputs } from './_lib/estimateInputs.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { siteOverview } from './_lib/googleSiteData.js';
@@ -71,8 +73,13 @@ export default async function handler(req, res) {
     else if (action === 'cancel_request') out = await cancelRequest(ctx, Number(body.requestId));
     else if (action === 'restart_agent') { out = await restartAgent(ctx, Number(body.agentId)); if (out.requeued) out.queue = await processQueue(ctx, { maxMs: 60000 }); }
     else if (action === 'dry_run') out = await dryRun(ctx, Number(body.agentId), { campaignId: body.campaignId, requestId: body.requestId, promptBody: body.promptBody });
-    else if (action === 'pass_on') { out = await passOn(ctx, Number(body.taskId)); out.queue = await processQueue(ctx, { maxMs: 60000 }); } // the person's OK on a result that waited: the chain goes on
+    else if (action === 'pass_on') { out = await passOnAny(ctx, Number(body.taskId)); out.queue = await processQueue(ctx, { maxMs: 60000 }); } // the person's OK on a result that waited: the chain goes on
     else if (action === 'status') out = { higgsfield: generatorReady(ctx) };
+    else if (action === 'set_agent_schedule') out = await setAgentSchedule(ctx, Number(body.agentId), body.schedule ?? null); // { weekday 1..7, time 'HH:MM' } or null
+    else if (action === 'set_agent_mode') out = await setAgentMode(ctx, Number(body.agentId), String(body.mode || '')); // auto | confirm | paused
+    else if (action === 'add_instruction') out = await addInstruction(ctx, Number(body.campaignId), { role: body.role || null, text: body.text });
+    else if (action === 'remove_instruction') out = await removeInstruction(ctx, Number(body.campaignId), String(body.at || ''));
+    else if (action === 'edit_output') out = await editOutput(ctx, Number(body.taskId), body.text); // the person corrects a result before the next agents read it
     else if (action === 'estimate_inputs') out = await estimateInputs(ctx, { ratio: typeof body.ratio === 'string' ? body.ratio : '4:5' }); // the price of one picture + the average cost of each agent run (nothing is spent)
     else if (action === 'site_speed') { // PageSpeed of the front page (10-30 s, so apart from the quick overview)
       const speed = await collectSpeed({ url: await siteUrlOf(ctx.db), key: speedKeyFromEnv() });
