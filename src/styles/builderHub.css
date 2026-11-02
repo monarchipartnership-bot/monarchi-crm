@@ -103,3 +103,6 @@
 .crh .hubt .mt-tool.on { background: #682768; color: #fff; }
 .crh .hubt .mt-tool--bad { background: #FBEAEA; color: #C23232; }
 .crh .hubt .mt-replace { margin-top: 6px; max-width: 260px; }
+.crh .hubt .mt-row td:first-child { user-select: none; -webkit-user-select: none; cursor: grab; }
+.crh .hubt .mt-row .mt-name { touch-action: none; }
+.crh .hubt .mt-dragging td:first-child { cursor: grabbing; }

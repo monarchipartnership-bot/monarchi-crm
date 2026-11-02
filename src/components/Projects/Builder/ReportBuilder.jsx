@@ -147,9 +147,9 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
   const label = platformInfo(platform).label;
   // a click on a metric row of the layout: up / down / replace / remove (the plan says what changes, see lib/reportMetricOps.js)
   const baseKeys = draft.baseMetrics ?? (METRIC_SETS[kind] || METRIC_SETS.ecom);
-  async function changeMetric(action, key, toKey) {
+  async function changeMetric(action, key, toKey, toIndex) {
     setError('');
-    const plan = planMetricChange({ action, key, toKey, keys, baseKeys, extraKeys, custom: ctx.custom });
+    const plan = planMetricChange({ action, key, toKey, toIndex, keys, baseKeys, extraKeys, custom: ctx.custom });
     if (plan.error) { setError(plan.error); return; }
     if (plan.noop) return;
     try {

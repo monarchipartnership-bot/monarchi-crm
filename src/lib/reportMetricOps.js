@@ -3,12 +3,21 @@
 //   keys       the metric rows now, in order              baseKeys   the standard list of the layout (or the report type's own)
 //   extraKeys  the extra columns of the cabinet           custom     the project's own formulas [{ key, id, name }]
 // → { error } | { noop } | { order?, baseMetrics?, extraKeys?, deleteCustom? }
+// 'move' puts the metric at `toIndex` of the table (a drag of the row); 'up' / 'down' move it by one (the keyboard: Alt + arrow).
 
 const isColumn = (k) => String(k).startsWith('mx_');
 
-export function planMetricChange({ action, key, toKey = null, keys = [], baseKeys = [], extraKeys = [], custom = [] }) {
+export function planMetricChange({ action, key, toKey = null, toIndex = null, keys = [], baseKeys = [], extraKeys = [], custom = [] }) {
   const i = keys.indexOf(key);
   if (i < 0) return { error: 'Цієї метрики немає в таблиці.' };
+  if (action === 'move') {
+    if (toIndex == null || !Number.isFinite(Number(toIndex))) return { noop: true };
+    const to = Math.max(0, Math.min(keys.length - 1, Math.round(Number(toIndex))));
+    if (to === i) return { noop: true };
+    const order = keys.filter((k) => k !== key);
+    order.splice(to, 0, key);
+    return { order };
+  }
   if (action === 'up' || action === 'down') {
     const j = i + (action === 'up' ? -1 : 1);
     if (j < 0 || j >= keys.length) return { noop: true };

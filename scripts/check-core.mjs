@@ -3053,6 +3053,12 @@ await ok('metric row tools: up / down swap neighbours, remove goes to the right 
   assert.match(planMetricChange({ ...ctx, action: 'replace', key: 'cpm', toKey: 'roas' }).error, /вже є/); // already in the table
   assert.match(planMetricChange({ ...ctx, action: 'replace', key: 'my_ratio', toKey: 'leads' }).error, /лише видалити/); // an own formula is not swapped
   assert.match(planMetricChange({ ...ctx, action: 'up', key: 'nope' }).error, /немає в таблиці/);
+  // a drag of the row: the metric goes to the place it was dropped at
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'move', key: 'spend', toIndex: 3 }).order, ['cpm', 'mx_link_ctr', 'roas', 'spend', 'my_ratio']);
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'move', key: 'my_ratio', toIndex: 0 }).order, ['my_ratio', 'spend', 'cpm', 'mx_link_ctr', 'roas']);
+  assert.equal(planMetricChange({ ...ctx, action: 'move', key: 'cpm', toIndex: 1 }).noop, true); // dropped where it was
+  assert.equal(planMetricChange({ ...ctx, action: 'move', key: 'cpm' }).noop, true); // no place given: nothing moves
+  assert.deepEqual(planMetricChange({ ...ctx, action: 'move', key: 'spend', toIndex: 99 }).order, ['cpm', 'mx_link_ctr', 'roas', 'my_ratio', 'spend']); // beyond the end: the end
   assert.equal(planMetricChange({ ...ctx, action: 'replace', key: 'cpm', toKey: 'cpm' }).noop, true);
 });
 
