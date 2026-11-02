@@ -22,7 +22,7 @@ import { pollCreatives } from './creativeMake.js';
 import { campaignRole } from './campaignRun.js';
 import { creativeRole } from './creativeRun.js';
 import { fanOutRequest, passOn, settleRequest, touchClientLink } from './creativeEngine.js';
-import { openCycle, syncCycles } from './campaignCycles.js';
+import { CAP_MESSAGE, cappedCampaigns, openCycle, syncCycles } from './campaignCycles.js';
 import { CREATIVE_TEAM } from '../../src/lib/agents/creativeTeam.js';
 import { CAMPAIGN_TEAM } from '../../src/lib/agents/campaignTeam.js';
 import { LANGUAGES, MAX_POSTS_PER_RUN, nextMonday, PLATFORM_KEYS } from './smmContent.js';
@@ -475,7 +475,9 @@ async function scheduleClients(ctx, all, states, a) {
 async function scheduleDue(ctx, all) {
   const states = chainStates(all.agents, all.links);
   const started = [];
+  const capped = await cappedCampaigns(ctx.db).catch(() => new Set());
   for (const a of all.agents) {
+    if (a.team === CAMPAIGN_TEAM && capped.has(String(a.scope_id))) continue;
     if (a.team === CREATIVE_TEAM) { started.push(...await scheduleClients(ctx, all, states, a)); continue; }
     if (!a.schedule || !runnable(all, states, a) || !a.enabled) continue;
     const verdict = agentDue({ agent: a, now: ctx.now() });
@@ -507,7 +509,9 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
     const now = iso(ctx.now());
     const tasks = must(await ctx.db.from('ag_tasks').select('*').or(`status.eq.queued,and(status.eq.running,lease_until.lt.${now})`).order('created_at', { ascending: true }).limit(40), 'tasks') || [];
     const prio = (t) => all.clients.get(`${t.agent_id}:${t.campaign_id}`)?.priority ?? 100;
-    const ready = tasks.filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).sort((a, b) => prio(a) - prio(b) || a.id - b.id); // clients by priority, then in turn
+    const capped = await cappedCampaigns(ctx.db).catch(() => new Set()); // a campaign over its money cap starts nothing new
+    const campaignOfTask = (t) => String(t.campaign_id || (all.byId.get(t.agent_id)?.team === CAMPAIGN_TEAM ? all.byId.get(t.agent_id).scope_id : ''));
+    const ready = tasks.filter((t) => !capped.has(campaignOfTask(t))).filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).sort((a, b) => prio(a) - prio(b) || a.id - b.id); // clients by priority, then in turn
     stats.waiting = tasks.length - ready.length;
     stats.left = ready.length;
     if (!ready.length) break;
@@ -547,6 +551,7 @@ export async function launchCampaign(ctx, campaignId) {
   const campaign = must(await ctx.db.from('ag_campaigns').select('*').eq('id', campaignId).maybeSingle(), 'campaign');
   if (!campaign) throw new Error('Кампанію не знайдено.');
   if (campaign.status === 'active') throw new Error('Кампанію вже запущено.');
+  if ((await cappedCampaigns(ctx.db)).has(String(campaign.id))) throw new Error(CAP_MESSAGE);
   const now = iso(ctx.now());
   // «Тільки креативи»: the client is only connected to the creative department, which works on requests. The campaign becomes active (the department
   // runs only for active campaigns) but no agent of the campaign team starts and nothing is spent.

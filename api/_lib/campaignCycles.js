@@ -3,6 +3,7 @@
 //                            progress are recomputed from the tasks it contains (src/lib/agents/campaignCycles.js decides the state)
 //   setAgentSchedule / setAgentMode / addInstruction / removeInstruction / editOutput   what the person can change while the campaign works
 // db is the Supabase client of whoever acts (a person's own session, or the agent user in the cron).
+import { capReached } from '../../src/lib/agents/spendNotices.js';
 import { STALE_CYCLE_DAYS, addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cycleState } from '../../src/lib/agents/campaignCycles.js';
 import { CAMPAIGN_TEAM } from '../../src/lib/agents/campaignTeam.js';
 
@@ -56,6 +57,17 @@ export async function syncCycles(ctx) {
   }
   return { checked: cycles.length, changed };
 }
+
+// The campaigns whose money cap is reached: nothing new starts for them until the cap is raised (the work that is already running is not cut in half). → Set of ids as strings
+export async function cappedCampaigns(db) {
+  const withCap = must(await db.from('ag_campaigns').select('id, spend_cap_usd').not('spend_cap_usd', 'is', null), 'campaigns') || [];
+  if (!withCap.length) return new Set();
+  const spent = must(await db.from('ag_campaign_spend').select('campaign_id, claude_usd, higgsfield_usd').in('campaign_id', withCap.map((c) => c.id)), 'spend') || [];
+  const total = new Map(spent.map((r) => [r.campaign_id, (Number(r.claude_usd) || 0) + (Number(r.higgsfield_usd) || 0)]));
+  return new Set(withCap.filter((c) => capReached(c, total.get(c.id) || 0)).map((c) => String(c.id)));
+}
+
+export const CAP_MESSAGE = 'Кампанія досягла ліміту витрат: нові запуски зупинено, поки ви не підвищите ліміт.';
 
 // ---------------------------------------------------------------------------------------------------- what the person changes
 async function campaignAgent(db, agentId) {

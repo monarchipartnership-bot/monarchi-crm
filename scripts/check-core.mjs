@@ -52,7 +52,7 @@ import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spen
 import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
 import { buildDossier, memoryBlock } from '../src/lib/agents/clientMemory.js';
 import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cycleState, describeSchedule, instructionBlock, modeOfAgent, scheduleRows } from '../src/lib/agents/campaignCycles.js';
-import { addInstruction, editOutput, openCycle, removeInstruction, setAgentMode, setAgentSchedule, syncCycles } from '../api/_lib/campaignCycles.js';
+import { addInstruction, cappedCampaigns, editOutput, openCycle, removeInstruction, setAgentMode, setAgentSchedule, syncCycles } from '../api/_lib/campaignCycles.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
@@ -2769,6 +2769,21 @@ await ok('campaign control: cycles open once per pass and follow their tasks; sc
   assert.equal(tables.ag_client_events.length, 2); assert.equal(tables.ag_client_events[0].project_id, 10);
   tables.ag_tasks.push({ id: 51, agent_id: 1, status: 'running' });
   await assert.rejects(() => editOutput(ctx(T0), 51, 'x y z'), /завершений/);
+});
+
+await ok('money cap: a campaign over its cap starts nothing new (requests, pictures); under the cap or with no cap it works; a raised cap frees it', async () => {
+  const tables = {
+    ag_campaigns: [{ id: 1, spend_cap_usd: 5, status: 'active' }, { id: 2, spend_cap_usd: null, status: 'active' }, { id: 3, spend_cap_usd: 10, status: 'active' }],
+    ag_campaign_spend: [{ campaign_id: 1, claude_usd: 2, higgsfield_usd: 3 }, { campaign_id: 2, claude_usd: 99, higgsfield_usd: 99 }, { campaign_id: 3, claude_usd: 1, higgsfield_usd: 1 }],
+    ag_creative_requests: [{ id: 11, campaign_id: 1, status: 'draft', brief: { goal: 'Нові креативи' } }],
+  };
+  assert.deepEqual([...await cappedCampaigns(fakeDb(tables))], ['1']); // 5 of 5 is the cap; no cap is never capped
+  await assert.rejects(() => startRequest({ db: fakeDb(tables), now: () => new Date() }, 11), /ліміту витрат/);
+  const pics = await generateCreatives({ db: fakeDb(tables), hfImage: { estimate: async () => 0.2 } }, 11, {});
+  assert.deepEqual([pics.ok, pics.capped], [false, true]);
+  assert.equal((await generateCreatives({ db: fakeDb(tables), hfImage: { estimate: async () => 0.2 } }, 11, { estimateOnly: true })).ok, true); // the price may be asked: it costs nothing
+  tables.ag_campaigns[0].spend_cap_usd = 20; // raised
+  assert.deepEqual([...await cappedCampaigns(fakeDb(tables))], []);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

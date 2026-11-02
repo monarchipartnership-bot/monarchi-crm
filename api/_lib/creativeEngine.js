@@ -4,7 +4,7 @@
 // last agent has delivered the request goes to the person (status «review»). Standalone on purpose (no import of agentEngine): the engine calls
 // into this file.
 import { ancestorsOf } from '../../src/lib/agents/chain.js';
-import { openCycle } from './campaignCycles.js';
+import { CAP_MESSAGE, cappedCampaigns, openCycle } from './campaignCycles.js';
 import { CREATIVE_TEAM, REQUEST_ENTRY_ROLE, isCreativeRole, requestRoles } from '../../src/lib/agents/creativeTeam.js';
 
 export const MAX_REWORK_ROUNDS = 2; // the quality checker may send the work back twice; the third time it goes to the person as it is
@@ -46,6 +46,7 @@ export async function startRequest(ctx, requestId) {
   if (!campaign) throw new Error('Кампанію не знайдено.');
   if (['paused', 'archived'].includes(campaign.status)) throw new Error('Кампанію призупинено або в архіві: відділ креативів не працює.');
   if (!String(req.brief?.goal || '').trim()) throw new Error('У запиті немає опису задачі.');
+  if ((await cappedCampaigns(db)).has(String(req.campaign_id))) throw new Error(CAP_MESSAGE);
   const dept = await loadDepartment(db);
   const entry = dept.byRole.get(REQUEST_ENTRY_ROLE);
   const links = await loadClientLinks(db, req.campaign_id);
