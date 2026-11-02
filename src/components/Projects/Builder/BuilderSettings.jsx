@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Select from '../../common/Select';
 import GroupsStrip from '../Reports/GroupsStrip';
 import { useConfirm } from '../../common/ConfirmDialog';
@@ -85,8 +85,11 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, ord
   const [error, setError] = useState('');
   const [picked, setPicked] = useState('');
   const [dragKey, setDragKey] = useState('');
-  const dragRef = useRef(null);
   const skipClick = useRef(false);
+  const boxRef = useRef(null); // the row of chips
+  const chipEls = useRef(new Map());
+  const placed = useRef(new Map()); // where every chip was laid out the last time (to slide the ones that moved)
+  const drag = useRef(null); // { key, grabX, grabY, px, py, raf }
   const baseKeys = baseMetrics ?? (METRIC_SETS[kind] || METRIC_SETS.ecom);
   const removable = new Map([
     ...baseKeys.map((k) => [k, { id: 'b:' + k, remove: { type: 'base', key: k } }]),
@@ -106,23 +109,76 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, ord
   const live = useRef({});
   useEffect(() => { live.current = { allKeys, moveKey }; });
 
+  // The chips that moved (because the dragged one passed them) slide from their old place to the new one instead of jumping.
+  useLayoutEffect(() => {
+    const next = new Map();
+    chipEls.current.forEach((el, k) => next.set(k, { left: el.offsetLeft, top: el.offsetTop }));
+    next.forEach((pos, k) => {
+      const was = placed.current.get(k);
+      if (!was || (was.left === pos.left && was.top === pos.top) || drag.current?.key === k) return;
+      const el = chipEls.current.get(k);
+      el.style.transition = 'none';
+      el.style.transform = `translate(${was.left - pos.left}px, ${was.top - pos.top}px)`;
+      el.getBoundingClientRect(); // start from the old place
+      el.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)';
+      el.style.transform = '';
+    });
+    placed.current = next;
+  });
+
+  // the dragged chip follows the pointer exactly, whatever the row it has been moved to in the layout
+  function followPointer() {
+    const d = drag.current;
+    if (!d) return;
+    const el = chipEls.current.get(d.key);
+    const box = boxRef.current;
+    if (el && box) {
+      const r = box.getBoundingClientRect();
+      el.style.transition = 'none';
+      el.style.transform = `translate(${d.px - r.left - d.grabX - el.offsetLeft}px, ${d.py - r.top - d.grabY - el.offsetTop}px) scale(1.07)`;
+    }
+    d.raf = requestAnimationFrame(followPointer);
+  }
+
   function startDrag(e, key) {
     if (e.button !== 0 || e.target.closest('.bld-chip-x, .bld-chip-mv')) return;
-    const d = { key, x: e.clientX, y: e.clientY, moved: false };
-    dragRef.current = d;
+    const el = chipEls.current.get(key);
+    const box = boxRef.current;
+    if (!el || !box) return;
+    if (e.pointerType === 'mouse') e.preventDefault(); // no text selection while dragging
+    const cr = el.getBoundingClientRect();
+    const d = { key, grabX: e.clientX - cr.left, grabY: e.clientY - cr.top, px: e.clientX, py: e.clientY, x0: e.clientX, y0: e.clientY, moved: false, raf: 0 };
     const move = (ev) => {
-      if (!d.moved && Math.hypot(ev.clientX - d.x, ev.clientY - d.y) < 6) return; // a click is not a drag
-      if (!d.moved) { d.moved = true; setDragKey(key); }
-      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-mkey]')?.getAttribute('data-mkey');
-      if (over && over !== key) live.current.moveKey(key, live.current.allKeys.indexOf(over));
+      d.px = ev.clientX; d.py = ev.clientY;
+      if (!d.moved) {
+        if (Math.hypot(d.px - d.x0, d.py - d.y0) < 6) return; // a click is not a drag
+        d.moved = true;
+        drag.current = d;
+        box.style.minHeight = `${box.offsetHeight}px`; // the block keeps its height while chips change rows: the page below must not jump
+        setDragKey(key);
+        d.raf = requestAnimationFrame(followPointer);
+      }
+      const hit = document.elementFromPoint(d.px, d.py)?.closest('[data-mkey]');
+      const over = hit?.getAttribute('data-mkey');
+      if (!over || over === key) return;
+      const r = hit.getBoundingClientRect();
+      const inside = (d.px - r.left) / r.width;
+      if (inside < 0.2 || inside > 0.8) return; // only once well inside the other chip: no flicker at the edge
+      live.current.moveKey(key, live.current.allKeys.indexOf(over));
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      if (d.moved) { skipClick.current = true; setTimeout(() => { skipClick.current = false; }, 0); } // the click that ends a drag must not pick the chip
-      dragRef.current = null;
+      if (!d.moved) return;
+      cancelAnimationFrame(d.raf);
+      drag.current = null;
+      skipClick.current = true;
+      setTimeout(() => { skipClick.current = false; }, 0); // the click that ends a drag must not pick the chip
+      el.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)'; // it settles into its place
+      el.style.transform = '';
       setDragKey('');
+      setTimeout(() => { box.style.minHeight = ''; }, 260);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -165,13 +221,13 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, ord
 
   return (
     <Panel id="metrics" title="Метрики" summary={`${allKeys.length}`} note="Усі метрики, і стандартні теж, можна прибрати або замінити. Порядок: перетягніть метрику або натисніть її й пересуньте стрілками. Набір і порядок зберігаються разом з макетом; стовпці кабінету й власні формули додаються й видаляються одразу. Око біля метрики на макеті ховає її від клієнта.">
-      <div className="bld-chips bld-chips--order" aria-label="Метрики в порядку звіту">
+      <div className="bld-chips bld-chips--order" ref={boxRef} aria-label="Метрики в порядку звіту">
         {allKeys.map((key, i) => {
           const it = removable.get(key);
           const extra = it && it.remove.type !== 'base';
           const on = picked === key;
           return (
-            <span key={key} data-mkey={key} className={'bld-chip' + (extra ? ' bld-chip--extra' : '') + (on ? ' bld-chip--picked' : '') + (dragKey === key ? ' bld-chip--drag' : '')} onPointerDown={(e) => startDrag(e, key)}>
+            <span key={key} data-mkey={key} ref={(el) => { if (el) chipEls.current.set(key, el); else chipEls.current.delete(key); }} className={'bld-chip' + (extra ? ' bld-chip--extra' : '') + (on ? ' bld-chip--picked' : '') + (dragKey === key ? ' bld-chip--drag' : '')} onPointerDown={(e) => startDrag(e, key)}>
               {on && <button type="button" className="bld-chip-mv" disabled={i === 0} aria-label={`${label(key)}: перемістити ліворуч`} onClick={() => moveKey(key, i - 1)}>&lsaquo;</button>}
               <button type="button" className="bld-chip-label" aria-pressed={on} title="Перетягніть, щоб змінити порядок, або натисніть, щоб обрати й пересунути стрілками" onClick={() => { if (skipClick.current) return; setPicked(on ? '' : key); }}>{label(key)}</button>
               {on && <button type="button" className="bld-chip-mv" disabled={i === allKeys.length - 1} aria-label={`${label(key)}: перемістити праворуч`} onClick={() => moveKey(key, i + 1)}>&rsaquo;</button>}
