@@ -44,6 +44,8 @@ import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '.
 import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
 import { EXTRACT_KEYS, buildExtractPrompt, parseExtraction, planWrites } from '../src/lib/agents/profileExtract.js';
 import { WIZARD_STEPS, hasCabinet, wizardSummary } from '../src/lib/agents/projectWizard.js';
+import { campaignTotals, stepLevel, dueStepNotices, capReached, digestDue, digestOf, dayWindow, stepMessage } from '../src/lib/agents/spendNotices.js';
+import { runSpendNotices } from '../api/_lib/spendNotify.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
@@ -1428,6 +1430,7 @@ function fakeDb(tables) {
         not(c, op, v) { q.filters.push((r) => (op === 'is' && v === null ? r[c] != null : true)); return api; },
         or(clause) { q.filters.push((r) => matchOr(r, clause)); return api; },
         gte(c, v) { q.filters.push((r) => r[c] != null && String(r[c]) >= String(v)); return api; },
+        lt(c, v) { q.filters.push((r) => r[c] != null && (typeof r[c] === 'number' ? r[c] < Number(v) : String(r[c]) < String(v))); return api; },
         ilike(c, v) { q.filters.push((r) => String(r[c] || '').toLowerCase() === String(v).toLowerCase()); return api; },
         order(c, o) { q.order = c; q.asc = o?.ascending === true; return api; },
         limit(n) { q.limitN = n; return api; },
@@ -2505,6 +2508,55 @@ await ok('quick fill of a project: the words are laid over the fields of the car
   assert.ok(sum.recommended.every((r) => !sum.blockers.some((b) => b.key === r.key)));
   const all = wizardSummary({ extracted: null, settings: { inputs: { about: { body: 'a' }, offer: { body: 'o' }, goals: { body: 'g' }, competitors: { body: 'c' } }, cta_mode: 'always' }, assets: [{ id: 1 }], accounts: [{ platform: 'meta' }] });
   assert.deepEqual(all.blockers, []); assert.equal(all.hasStep2, false);
+});
+
+await ok('money notices: a notice for every step of dollars per campaign (once), a cap notice, one daily total after the chosen hour', async () => {
+  const totals = campaignTotals([{ campaign_id: 1, cost_usd: 0.4 }, { campaign_id: 1, cost_usd: 0.8 }, { campaign_id: null, cost_usd: 1 }], [{ campaign_id: 1, usd: 3.3 }, { campaign_id: 2, usd: 1.5 }]);
+  assert.deepEqual(totals.get(1), { claude: 1.2, higgsfield: 3.3, total: 4.5 });
+  assert.equal(totals.get('none').total, 1);
+  assert.equal([stepLevel(5.3, 2), stepLevel(1.99, 2), stepLevel(4, 2), stepLevel(3, 0)].join(), '4,0,4,0');
+  const camps = [{ id: 1, status: 'active', notify_step_usd: 2, notified_usd: 2 }, { id: 2, status: 'active', notify_step_usd: 2, notified_usd: 0 }, { id: 3, status: 'cancelled', notify_step_usd: 2, notified_usd: 0 }];
+  const due = dueStepNotices(camps, new Map([...totals, [3, { claude: 9, higgsfield: 0, total: 9 }]]));
+  assert.deepEqual(due.map((d) => [d.campaign.id, d.level]), [[1, 4]]); // 4.5 passed the 4 step; 1.5 has not passed 2; a cancelled campaign is silent
+  assert.equal(capReached({ spend_cap_usd: 10 }, 9.99), false); assert.equal(capReached({ spend_cap_usd: 10 }, 10), true); assert.equal(capReached({ spend_cap_usd: null }, 100), false);
+  assert.match(stepMessage({ ...due[0], campaign: { ...due[0].campaign, label: 'A <b>' } }).html, /A &lt;b&gt;/); // names are escaped for Telegram
+  // the daily total: yesterday, once, after the hour in Kyiv
+  const st = { enabled: true, digest_hour: 9, last_digest_date: '2026-11-01' };
+  assert.equal(digestDue({ settings: st, now: new Date('2026-11-02T05:00:00Z') }).due, false); // 07:00 in Kyiv: early
+  assert.deepEqual(digestDue({ settings: st, now: new Date('2026-11-02T08:00:00Z') }), { due: true, day: '2026-11-01', today: '2026-11-02' });
+  assert.equal(digestDue({ settings: { ...st, last_digest_date: '2026-11-02' }, now: new Date('2026-11-02T08:00:00Z') }).due, false);
+  assert.equal(digestDue({ settings: { ...st, enabled: false }, now: new Date('2026-11-02T08:00:00Z') }).due, false);
+  assert.deepEqual(dayWindow('2026-11-01'), { from: '2026-10-31T22:00:00.000Z', to: '2026-11-01T22:00:00.000Z' }); // winter time after 25 Oct
+  const d = digestOf({ tasks: [{ campaign_id: 1, cost_usd: 0.5 }], spends: [{ campaign_id: 2, usd: 2 }], campaigns: [{ id: 1, label: 'Перший' }, { id: 2, label: 'Другий' }] });
+  assert.deepEqual(d.rows.map((r) => r.name), ['Другий', 'Перший']); assert.equal(d.total, 2.5);
+
+  // the engine over the stand-in database
+  const tables = {
+    ai_agent_settings: [{ id: 1, enabled: true, tg_chat_id: '-100', spend_thread_id: 7, attention_thread_id: 8, notify_emails: ['a@x.y'], digest_hour: 9, last_digest_date: '2026-11-01' }],
+    ag_campaigns: [{ id: 1, project_id: 10, name: 'Креативи', status: 'active', notify_step_usd: 2, notified_usd: 2, spend_cap_usd: 4, config: {} }, { id: 2, project_id: 10, name: 'Інша', status: 'active', notify_step_usd: 2, notified_usd: 0, spend_cap_usd: null, config: {} }],
+    ag_campaign_spend: [{ campaign_id: 1, claude_usd: 1.2, higgsfield_usd: 3.3 }, { campaign_id: 2, claude_usd: 0.5, higgsfield_usd: 0 }],
+    projects: [{ id: 10, name: 'Wigs' }], notifications: [],
+    ag_tasks: [{ campaign_id: 1, cost_usd: 0.6, finished_at: '2026-11-01T10:00:00Z' }, { campaign_id: 1, cost_usd: 9, finished_at: '2026-10-30T10:00:00Z' }],
+    ag_creative_spend: [{ campaign_id: 1, usd: 2, created_at: '2026-11-01T12:00:00Z' }],
+  };
+  const sentTg = [];
+  const tg = { send: async (m) => { sentTg.push(m); return { ok: true }; } };
+  const r1 = await runSpendNotices({ db: fakeDb(tables), telegram: tg, now: new Date('2026-11-02T08:00:00Z') });
+  assert.deepEqual([r1.steps, r1.caps, r1.digest, r1.errors.length], [1, 1, true, 0]);
+  assert.equal(tables.ag_campaigns[0].notified_usd, 4); assert.equal(tables.ag_campaigns[0].config.cap_notified, 4); assert.equal(tables.ag_campaigns[1].notified_usd, 0);
+  assert.equal(tables.notifications.length, 3); assert.ok(tables.notifications.every((n) => n.type === 'ai_agent' && n.recipient_email === 'a@x.y'));
+  assert.deepEqual(sentTg.map((m) => m.threadId), [7, 8, 7]); // step and total → the spending topic, the cap → the attention topic
+  assert.equal(sentTg[2].silent, true); assert.match(sentTg[2].text, /Wigs — Креативи — \$2\.60/);
+  assert.equal(tables.ai_agent_settings[0].last_digest_date, '2026-11-02');
+  // a second minute: nothing is repeated
+  const r2 = await runSpendNotices({ db: fakeDb(tables), telegram: tg, now: new Date('2026-11-02T08:01:00Z') });
+  assert.deepEqual([r2.steps, r2.caps, r2.digest], [0, 0, false]); assert.equal(sentTg.length, 3);
+  // a raised cap is a new cap: told again when it is reached
+  tables.ag_campaigns[0].spend_cap_usd = 5;
+  assert.equal((await runSpendNotices({ db: fakeDb(tables), telegram: tg, now: new Date('2026-11-02T08:02:00Z') })).caps, 0); // 4.5 < 5
+  tables.ag_campaign_spend[0].higgsfield_usd = 4;
+  assert.equal((await runSpendNotices({ db: fakeDb(tables), telegram: null, now: new Date('2026-11-02T08:03:00Z') })).caps, 1); // no Telegram: only the bell
+  assert.equal((await runSpendNotices({ db: fakeDb({ ai_agent_settings: [{ id: 1, enabled: false }] }), telegram: tg })).skipped, 'off');
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
