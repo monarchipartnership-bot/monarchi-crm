@@ -196,7 +196,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
       <PanelContext.Provider value={{ open: openPanel, toggle: (id) => setOpenPanel((cur) => (cur === id ? '' : id)) }}>
       <div className="bld-panels">
         <KindPanel draft={draft} set={set} projectKind={projectKind(ctx.project)} />
-        <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} order={draft.metricOrder} onOrder={(metricOrder) => set({ metricOrder })} onOpen={() => setModal('metric')} onChanged={changed} />
+        <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} order={draft.metricOrder} onOrder={(metricOrder) => set({ metricOrder })} baseMetrics={draft.baseMetrics} onBase={(baseMetrics) => set({ baseMetrics })} onOpen={() => setModal('metric')} onChanged={changed} />
         <FunnelPanel projectId={projectId} platform={platform} draft={draft} set={set} extraKeys={extraKeys} onChanged={changed} />
         <SelectionPanel platform={platform} groups={platformGroups} campaigns={campaignList} problem={campaignProblem} draft={draft} set={set} />
         <GroupsPanel groups={platformGroups} campaigns={campaignList} onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={changed} />

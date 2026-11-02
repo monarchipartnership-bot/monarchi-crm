@@ -80,8 +80,8 @@ const bySpend = (a, b) => (Number(b.spend) || 0) - (Number(a.spend) || 0);
 const active = (g) => (Number(g.spend) || 0) > 0 || (Number(g.impressions) || 0) > 0;
 
 // Metrics the table shows: the project's set + its extra columns + its own formulas, each with the label and format.
-export function metricKeys(kind, columns = [], custom = []) {
-  return [...(METRIC_SETS[kind] || METRIC_SETS.ecom).filter((k) => METRICS[k]), ...columns.filter((k) => METRICS[k]), ...custom.map((c) => c.key)];
+export function metricKeys(kind, columns = [], custom = [], base = null) {
+  return [...(Array.isArray(base) ? base : METRIC_SETS[kind] || METRIC_SETS.ecom).filter((k) => METRICS[k]), ...columns.filter((k) => METRICS[k]), ...custom.map((c) => c.key)];
 }
 export function metricInfo(key, custom = [], platformLabel = '') {
   const m = METRICS[key];
@@ -119,7 +119,7 @@ export function reportView(report, ctx) {
 
 // The metric rows of one report's table: its template's own list, else the standard set + the project's extra columns and formulas.
 export function viewKeys(view, model, { all = false } = {}) {
-  const keys = metricKeysOf({ metrics: view.templateMetrics, metricOrder: view.metricOrder }, metricKeys(view.kind || model.kind, model.columns, model.custom), [...model.columns, ...model.custom.map((c) => c.key)]);
+  const keys = metricKeysOf({ metrics: view.templateMetrics, metricOrder: view.metricOrder }, metricKeys(view.kind || model.kind, model.columns, model.custom, view.baseMetrics), [...model.columns, ...model.custom.map((c) => c.key)]);
   return all ? keys : keys.filter((k) => !(view.hiddenMetrics || []).includes(k));
 }
 
@@ -230,7 +230,7 @@ export function builderView({ layout, periodType = 'weekly', kind, columns = [],
   const real = data ? reportView({ id: 0, type: periodType, start: period?.start || '', end: period?.end || '', status: 'final', data: { kind, platforms: data.platforms, previous: data.previous || null } }, { kind }) : null;
   const base = real || { id: 0, type: periodType, start: '', end: '', toDate: false, status: 'final', updatedAt: null, currency: 'USD', total: {}, explicit: true, groups: columns, prev: null, sections: {}, kind };
   const blocks = (layout.blocks || []).filter((b) => b[periodType === 'monthly' ? 'monthly' : 'weekly']).map((b) => ({ key: b.key, title: b.title, client: b.client !== false }));
-  return { ...base, kind, blocks, hiddenMetrics: layout.hiddenMetrics || [], metricOrder: layout.metricOrder || [], funnel: layout.funnel?.enabled ? layout.funnel : null, templateMetrics: null, creatives: [], sections: base.sections || {} };
+  return { ...base, kind, blocks, hiddenMetrics: layout.hiddenMetrics || [], metricOrder: layout.metricOrder || [], baseMetrics: layout.baseMetrics ?? null, funnel: layout.funnel?.enabled ? layout.funnel : null, templateMetrics: null, creatives: [], sections: base.sections || {} };
 }
 
 // ---- the whole page ----

@@ -205,7 +205,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
       }
 
       // 4. Save the report as a draft.
-      const payload = reportPayload({ kind, data: scoped, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '', campaignSel: layout.campaignSel, template: snapshotOf(layout, periodType, { metrics: metricKeys(kind, cleanColumns(scope, columns?.[scope]), custom) }) });
+      const payload = reportPayload({ kind, data: scoped, compare, period, prev, selection: [], options: { groups: true }, sections, note: config.note || '', campaignSel: layout.campaignSel, template: snapshotOf(layout, periodType, { metrics: metricKeys(kind, cleanColumns(scope, columns?.[scope]), custom, layout.baseMetrics) }) });
       // The report is a draft: it waits in «Робота над звітами», where the people responsible fill in what is missing and press «Підтверджено».
       payload.review = { createdBy: 'AI-агент', createdAt: new Date().toISOString() };
       const picked = await creativesFor(scope);

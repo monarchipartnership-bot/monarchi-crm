@@ -2970,6 +2970,19 @@ await ok('custom report («Показники за період»): it has the t
   assert.deepEqual(reportBlocks(saved).map((b) => b.key), [...blocks.map((b) => b.key), 'lost']);
 });
 
+await ok('standard metrics can be removed and replaced: the layout keeps a base list (or none = the standard set), it is cleaned, and new reports are made with it', () => {
+  assert.equal(normalizeTemplate(null).baseMetrics, null); assert.equal(normalizeTemplate({ baseMetrics: 'x' }).baseMetrics, null);
+  assert.deepEqual(normalizeTemplate({ baseMetrics: ['roas', 'bad key!', 'roas', 'mx_add_to_cart', 'leads', 'nope'] }).baseMetrics, ['roas', 'leads']); // only built-in metrics, no repeats
+  assert.deepEqual(normalizeTemplate({ baseMetrics: [] }).baseMetrics, []); // all removed is a choice too (the extra columns may remain)
+  const std = metricKeys('ecom', ['mx_add_to_cart'], []);
+  assert.ok(std.includes('cpm') && std.includes('mx_add_to_cart'));
+  assert.deepEqual(metricKeys('ecom', ['mx_add_to_cart'], [], ['spend', 'leads']), ['spend', 'leads', 'mx_add_to_cart']); // a list replaces the standard set
+  assert.deepEqual(metricKeys('ecom', [], [], []), []); assert.deepEqual(metricKeys('ecom', [], [], null), metricKeys('ecom', [], []));
+  // a report made with the layout carries the list, in the layout's order
+  const layout = normalizeTemplate({ baseMetrics: ['spend', 'roas', 'leads'], metricOrder: ['roas'] });
+  assert.deepEqual(snapshotOf(layout, 'monthly', { metrics: metricKeys('ecom', ['mx_add_to_cart'], [], layout.baseMetrics) }).metrics, ['roas', 'spend', 'leads', 'mx_add_to_cart']);
+});
+
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
   assert.deepEqual(MODE_ORDER, ['creative', 'full', 'strategy', 'ads', 'report']);
   assert.equal(MODE_ORDER.filter((m) => MODES[m].safe).join(), 'creative'); // only «Тільки креативи» is the safe one (nothing starts by itself)

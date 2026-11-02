@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import Select from '../../common/Select';
 import GroupsStrip from '../Reports/GroupsStrip';
 import { useConfirm } from '../../common/ConfirmDialog';
 import { deleteCampaignGroup, deleteCustomMetric, saveReportColumns } from '../../../lib/api/projectReportStore';
 import { buildColumns, filterCampaigns, groupMatches, campaignKey } from '../../../lib/campaignGroups';
 import { MAX_BLOCKS, MAX_CREATIVES, MAX_PROMPT, MAX_TITLE, PRESETS, newBlockKey } from '../../../lib/reportTemplate';
-import { METRIC_SETS, metricMeta } from '../../../lib/reportMetrics';
+import { METRICS, METRIC_SETS, metricMeta } from '../../../lib/reportMetrics';
 import { orderMetricKeys } from '../../../lib/reportTemplate';
 import { FUNNEL_CANDIDATES, funnelColumns } from '../../../lib/reportFunnel';
 import '../../../styles/projectHistory.css';
@@ -76,20 +76,25 @@ export function KindPanel({ draft, set, projectKind }) {
   );
 }
 
-// Metrics in the order the layout chose. The chips can be dragged, or picked (a click) and moved with the arrows; the order is part of the layout (saved by «Зберегти макет»).
-export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, order = [], onOrder, onOpen, onChanged }) {
+// Metrics in the order the layout chose. Every metric, the standard ones too, can be removed; a standard metric can be replaced by another built-in one, and the removed
+// ones come back from «Додати стандартну метрику». The chips are moved by dragging (pointer events: mouse, pen and touch) or by picking one (a click) and using the arrows.
+// The set of standard metrics and the order are part of the layout (saved by «Зберегти макет»); the extra columns and the own formulas are added and removed at once.
+export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, order = [], onOrder, baseMetrics = null, onBase, onOpen, onChanged }) {
   const [confirm, confirmDialog] = useConfirm();
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [picked, setPicked] = useState('');
   const [dragKey, setDragKey] = useState('');
-  const baseKeys = (METRIC_SETS[kind] || METRIC_SETS.ecom);
-  const base = baseKeys.map((k) => metricMeta(k, custom).label);
+  const dragRef = useRef(null);
+  const skipClick = useRef(false);
+  const baseKeys = baseMetrics ?? (METRIC_SETS[kind] || METRIC_SETS.ecom);
   const removable = new Map([
+    ...baseKeys.map((k) => [k, { id: 'b:' + k, remove: { type: 'base', key: k } }]),
     ...extraKeys.map((k) => [k, { id: 'c:' + k, remove: { type: 'column', key: k } }]),
     ...custom.map((c) => [c.key, { id: 'm:' + c.id, remove: { type: 'custom', metric: c } }]),
   ]);
   const allKeys = useMemo(() => orderMetricKeys([...baseKeys, ...extraKeys, ...custom.map((c) => c.key)], order), [baseKeys, extraKeys, custom, order]);
+  const label = (k) => metricMeta(k, custom).label;
   const moveKey = (key, to) => {
     const from = allKeys.indexOf(key);
     if (from < 0 || to < 0 || to >= allKeys.length || from === to) return;
@@ -97,9 +102,41 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, ord
     next.splice(to, 0, next.splice(from, 1)[0]);
     onOrder?.(next);
   };
+  // the latest state for the listeners of a drag that is in progress
+  const live = useRef({});
+  useEffect(() => { live.current = { allKeys, moveKey }; });
+
+  function startDrag(e, key) {
+    if (e.button !== 0 || e.target.closest('.bld-chip-x, .bld-chip-mv')) return;
+    const d = { key, x: e.clientX, y: e.clientY, moved: false };
+    dragRef.current = d;
+    const move = (ev) => {
+      if (!d.moved && Math.hypot(ev.clientX - d.x, ev.clientY - d.y) < 6) return; // a click is not a drag
+      if (!d.moved) { d.moved = true; setDragKey(key); }
+      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-mkey]')?.getAttribute('data-mkey');
+      if (over && over !== key) live.current.moveKey(key, live.current.allKeys.indexOf(over));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (d.moved) { skipClick.current = true; setTimeout(() => { skipClick.current = false; }, 0); } // the click that ends a drag must not pick the chip
+      dragRef.current = null;
+      setDragKey('');
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }
+
+  const available = Object.keys(METRICS).filter((k) => !k.startsWith('mx_') && !allKeys.includes(k));
+  const last = allKeys.length <= 1;
 
   async function remove(item) {
     const r = item.remove;
+    if (last) { setError('У таблиці має лишитися хоча б одна метрика.'); return; }
+    setError('');
+    if (r.type === 'base') { onBase?.(baseKeys.filter((k) => k !== r.key)); if (picked === r.key) setPicked(''); return; }
     if (r.type === 'custom') {
       const shared = r.metric.project_id == null;
       const ok = await confirm({
@@ -110,7 +147,6 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, ord
       if (!ok) return;
     }
     setBusy(item.id);
-    setError('');
     try {
       if (r.type === 'column') await saveReportColumns(projectId, platform, extraKeys.filter((k) => k !== r.key));
       else await deleteCustomMetric(r.metric.id);
@@ -118,27 +154,48 @@ export function MetricsPanel({ projectId, platform, kind, extraKeys, custom, ord
     } catch (e) { setError(e.message || 'Не вдалося видалити метрику.'); } finally { setBusy(''); }
   }
 
+  const addBase = (k) => { setError(''); onBase?.([...baseKeys, k]); };
+  const replaceBase = (to) => {
+    const from = picked;
+    onBase?.(baseKeys.map((k) => (k === from ? to : k)));
+    if (order.length) onOrder?.(allKeys.map((k) => (k === from ? to : k))); // it takes the place of the one it replaces
+    setPicked(to);
+  };
+  const pickedIsBase = picked && baseKeys.includes(picked);
+
   return (
-    <Panel id="metrics" title="Метрики" summary={`${base.length} + ${removable.size}`} note="Базові є завжди; додаткові (виділені) — стовпці кабінету й власні формули: вони додаються й видаляються одразу. Порядок метрик: перетягніть або натисніть метрику й пересуньте стрілками; він зберігається разом з макетом. Око біля метрики на макеті ховає її від клієнта.">
+    <Panel id="metrics" title="Метрики" summary={`${allKeys.length}`} note="Усі метрики, і стандартні теж, можна прибрати або замінити. Порядок: перетягніть метрику або натисніть її й пересуньте стрілками. Набір і порядок зберігаються разом з макетом; стовпці кабінету й власні формули додаються й видаляються одразу. Око біля метрики на макеті ховає її від клієнта.">
       <div className="bld-chips bld-chips--order" aria-label="Метрики в порядку звіту">
         {allKeys.map((key, i) => {
           const it = removable.get(key);
+          const extra = it && it.remove.type !== 'base';
           const on = picked === key;
           return (
-            <span key={key} className={'bld-chip' + (it ? ' bld-chip--extra' : '') + (on ? ' bld-chip--picked' : '') + (dragKey === key ? ' bld-chip--drag' : '')}
-              draggable onDragStart={(e) => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', key); }}
-              onDragOver={(e) => { if (dragKey) e.preventDefault(); }}
-              onDrop={(e) => { e.preventDefault(); if (dragKey) moveKey(dragKey, i); setDragKey(''); }}
-              onDragEnd={() => setDragKey('')}>
-              {on && <button type="button" className="bld-chip-mv" disabled={i === 0} aria-label={`${metricMeta(key, custom).label}: перемістити ліворуч`} onClick={() => moveKey(key, i - 1)}>&lsaquo;</button>}
-              <button type="button" className="bld-chip-label" aria-pressed={on} title="Натисніть, щоб обрати й пересунути стрілками, або перетягніть" onClick={() => setPicked(on ? '' : key)}>{metricMeta(key, custom).label}</button>
-              {on && <button type="button" className="bld-chip-mv" disabled={i === allKeys.length - 1} aria-label={`${metricMeta(key, custom).label}: перемістити праворуч`} onClick={() => moveKey(key, i + 1)}>&rsaquo;</button>}
-              {it && <button type="button" className="bld-chip-x" disabled={busy === it.id} aria-label={`Прибрати метрику ${metricMeta(key, custom).label}`} title="Прибрати метрику" onClick={() => remove(it)}>&times;</button>}
+            <span key={key} data-mkey={key} className={'bld-chip' + (extra ? ' bld-chip--extra' : '') + (on ? ' bld-chip--picked' : '') + (dragKey === key ? ' bld-chip--drag' : '')} onPointerDown={(e) => startDrag(e, key)}>
+              {on && <button type="button" className="bld-chip-mv" disabled={i === 0} aria-label={`${label(key)}: перемістити ліворуч`} onClick={() => moveKey(key, i - 1)}>&lsaquo;</button>}
+              <button type="button" className="bld-chip-label" aria-pressed={on} title="Перетягніть, щоб змінити порядок, або натисніть, щоб обрати й пересунути стрілками" onClick={() => { if (skipClick.current) return; setPicked(on ? '' : key); }}>{label(key)}</button>
+              {on && <button type="button" className="bld-chip-mv" disabled={i === allKeys.length - 1} aria-label={`${label(key)}: перемістити праворуч`} onClick={() => moveKey(key, i + 1)}>&rsaquo;</button>}
+              {it && <button type="button" className="bld-chip-x" disabled={busy === it.id} aria-label={`Прибрати метрику ${label(key)}`} title="Прибрати метрику" onClick={() => remove(it)}>&times;</button>}
             </span>
           );
         })}
       </div>
-      {order.length > 0 && <div className="rte-row"><button type="button" className="btn" onClick={() => { setPicked(''); onOrder?.([]); }}>Скинути порядок</button></div>}
+      <div className="rte-row">
+        <Select
+          value="" placeholder="+ Додати стандартну метрику…" ariaLabel="Додати стандартну метрику" disabled={!available.length}
+          options={available.map((k) => ({ value: k, label: label(k) }))}
+          onChange={(k) => k && addBase(k)}
+        />
+        {pickedIsBase && (
+          <Select
+            value="" placeholder={`Замінити «${label(picked)}» на…`} ariaLabel="Замінити обрану метрику" disabled={!available.length}
+            options={available.map((k) => ({ value: k, label: label(k) }))}
+            onChange={(k) => k && replaceBase(k)}
+          />
+        )}
+        {baseMetrics != null && <button type="button" className="btn" onClick={() => { setPicked(''); onBase?.(null); }}>Повернути стандартний набір</button>}
+        {order.length > 0 && <button type="button" className="btn" onClick={() => { setPicked(''); onOrder?.([]); }}>Скинути порядок</button>}
+      </div>
       {error && <div className="pacc-err">{error}</div>}
       <div className="rte-row"><button type="button" className="btn" onClick={onOpen}>{PLUS_ICON} Метрика</button></div>
       {confirmDialog}

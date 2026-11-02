@@ -18,7 +18,7 @@ export const campaignKey = (platform, name) => `${platform}|${name}`;
 
 // lockTotal: the «Разом» tab of a project. Only the sum is shown (one platform: its own numbers); platforms that cannot be added up
 // (different currencies) fall back to one tab each, with a note.
-export default function ResultView({ data, kind, custom, templateMetrics = null, metricOrder = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null, exportApi = null, onXlsx = null }) {
+export default function ResultView({ data, kind, custom, templateMetrics = null, metricOrder = null, baseMetrics = null, noExport = false, title, subtitle, fileBase, prevLabel, curLabel, children, lockTotal = false, extraKeys = [], exportPortal = null, exportFormats, campaignMode = 'all', selection = [], onSelectionChange, options = {}, onOptionsChange, clientEye = null, exportApi = null, onXlsx = null }) {
   const platformKeys = Object.keys(data.platforms);
   const combined = useMemo(() => combinePlatforms(data.platforms), [data]);
   const prevCombined = useMemo(() => (data.previous ? combinePlatforms(data.previous.platforms) : null), [data]);
@@ -31,10 +31,10 @@ export default function ResultView({ data, kind, custom, templateMetrics = null,
 
   const extraId = extraKeys.join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const metricsId = (templateMetrics || []).join(',') + '|' + (metricOrder || []).join(',');
+  const metricsId = (templateMetrics || []).join(',') + '|' + (metricOrder || []).join(',') + '|' + (baseMetrics || []).join(',');
   // the template's own metric list (when the project has one) replaces the standard rows
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const keys = useMemo(() => metricKeysOf({ metrics: templateMetrics, metricOrder }, visibleKeys(METRIC_SETS[kind], custom, extraKeys), [...extraKeys, ...custom.map((c) => c.key)]), [kind, custom, extraId, metricsId]);
+  const keys = useMemo(() => metricKeysOf({ metrics: templateMetrics, metricOrder }, visibleKeys(baseMetrics ?? METRIC_SETS[kind], custom, extraKeys), [...extraKeys, ...custom.map((c) => c.key)]), [kind, custom, extraId, metricsId]);
 
   if (!tabs.length) return null;
 

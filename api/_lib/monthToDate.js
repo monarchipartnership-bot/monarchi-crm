@@ -75,7 +75,7 @@ export async function refreshMonthToDate({ repo, post, projectId, monthKey: key 
       previous: data.previous ? { ...data.previous, platforms: data.previous.platforms?.[scope] ? { [scope]: data.previous.platforms[scope] } : {} } : null,
     };
     const conclusion = blocksFor(layouts[scope], 'monthly').some((b) => b.kind === 'conclusion') ? describeDynamics({ platforms: scoped.platforms, previous: scoped.previous, kind, custom, names: NAMES, unequal: false }) : '';
-    const payload = reportPayload({ kind, data: scoped, compare: { mode: 'custom' }, period, prev, selection: [], options: { groups: true }, sections: { ...EMPTY_SECTIONS, conclusion }, note: config.note || '', campaignSel: layouts[scope].campaignSel, template: snapshotOf(layouts[scope], 'monthly', { metrics: metricKeys(kind, cleanColumns(scope, columns?.[scope]), custom) }) });
+    const payload = reportPayload({ kind, data: scoped, compare: { mode: 'custom' }, period, prev, selection: [], options: { groups: true }, sections: { ...EMPTY_SECTIONS, conclusion }, note: config.note || '', campaignSel: layouts[scope].campaignSel, template: snapshotOf(layouts[scope], 'monthly', { metrics: metricKeys(kind, cleanColumns(scope, columns?.[scope]), custom, layouts[scope].baseMetrics) }) });
     payload.toDate = true;
     payload.approvedThrough = end;
     payload.label = `Місяць на сьогодні, по ${fmt(end)}`;

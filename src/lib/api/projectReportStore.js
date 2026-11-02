@@ -213,21 +213,21 @@ export async function revokeReportShare(projectId, platform) {
 
 // ---- The report layout of a project, one per ad platform (migration 20261035000000_report_layouts.sql) ----
 // → { exists, layout }: the saved layout, or the standard one (exists false) when nothing is saved yet (or the table is not there yet).
-const fromRow = (row) => (row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics, metricOrder: row.metric_order, funnel: row.funnel, campaignSel: row.campaign_selection } : null);
+const fromRow = (row) => (row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics, metricOrder: row.metric_order, baseMetrics: row.base_metrics, funnel: row.funnel, campaignSel: row.campaign_selection } : null);
 export async function fetchReportLayout(projectId, platform) {
-  const { data, error } = await supabase.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics, metric_order, funnel, campaign_selection').eq('project_id', projectId).eq('platform', platform).maybeSingle();
+  const { data, error } = await supabase.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics, metric_order, base_metrics, funnel, campaign_selection').eq('project_id', projectId).eq('platform', platform).maybeSingle();
   if (error) { console.warn('fetchReportLayout failed', error); return { exists: false, layout: normalizeTemplate(null) }; }
   return { exists: Boolean(data), layout: normalizeTemplate(fromRow(data)) };
 }
 // platform → the layout, only for the platforms that have one saved.
 export async function fetchReportLayouts(projectId) {
-  const { data, error } = await supabase.from('project_report_layouts').select('platform, kind, blocks, creatives, hidden_metrics, metric_order, funnel, campaign_selection').eq('project_id', projectId);
+  const { data, error } = await supabase.from('project_report_layouts').select('platform, kind, blocks, creatives, hidden_metrics, metric_order, base_metrics, funnel, campaign_selection').eq('project_id', projectId);
   if (error) { console.warn('fetchReportLayouts failed', error); return {}; }
   return Object.fromEntries((data ?? []).map((r) => [r.platform, normalizeTemplate(fromRow(r))]));
 }
 export async function saveReportLayout(projectId, platform, layout, by) {
   const t = normalizeTemplate(layout);
-  const { error } = await supabase.from('project_report_layouts').upsert({ project_id: projectId, platform, kind: t.kind, blocks: t.blocks, creatives: t.creatives, hidden_metrics: t.hiddenMetrics, metric_order: t.metricOrder, funnel: t.funnel, campaign_selection: t.campaignSel, updated_by: by || null, updated_at: nowIso() }, { onConflict: 'project_id,platform' });
+  const { error } = await supabase.from('project_report_layouts').upsert({ project_id: projectId, platform, kind: t.kind, blocks: t.blocks, creatives: t.creatives, hidden_metrics: t.hiddenMetrics, metric_order: t.metricOrder, base_metrics: t.baseMetrics, funnel: t.funnel, campaign_selection: t.campaignSel, updated_by: by || null, updated_at: nowIso() }, { onConflict: 'project_id,platform' });
   if (error) throw error;
   return t;
 }

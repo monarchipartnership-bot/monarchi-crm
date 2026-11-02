@@ -227,7 +227,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
             {state.prev && <i className="ch-chp">порівняння з {fmt(state.prev.from)} – {fmt(state.prev.to)}</i>}
           </div>
           <ResultView
-            data={shown} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys}
+            data={shown} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} metricOrder={ctx.layout?.metricOrder} baseMetrics={ctx.layout?.baseMetrics}
             title={ctx.project.name} subtitle={`${fmt(state.range.from)} – ${fmt(state.range.to)}`}
             fileBase={`${ctx.project.name}_${state.range.from}_${state.range.to}`}
             curLabel={`${fmt(state.range.from)}–${fmt(state.range.to)}`}

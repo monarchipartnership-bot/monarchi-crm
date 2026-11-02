@@ -14,6 +14,7 @@ export const MAX_TITLE = 60;
 export const MAX_PROMPT = 800;
 export const MAX_HIDDEN = 60;
 export const MAX_METRIC_ORDER = 120;
+export const MAX_BASE_METRICS = 30;
 export const MAX_SELECTED = 300;
 export const MAX_CREATIVES = { weekly: 6, monthly: 8 };
 
@@ -39,6 +40,7 @@ export const DEFAULT_TEMPLATE = Object.freeze({
   kind: null, // 'ecom' | 'leadgen'; null: from the project's business type
   hiddenMetrics: [], // metrics the client does not see (the team always sees the full report)
   metricOrder: [], // the order of the metric rows (keys); metrics not listed follow in their usual order
+  baseMetrics: null, // null = the standard set of the report type; a list of built-in metric keys replaces it (the standard ones can be removed and replaced)
   funnel: { enabled: false, stages: DEFAULT_FUNNEL_STAGES }, // the funnel picture for the client: product view → cart → checkout → sale
   campaignSel: { groups: [], campaigns: [] }, // the campaigns of the report: groups (ids) and campaigns ('platform|name') the layout selected
 });
@@ -76,6 +78,7 @@ export function normalizeTemplate(raw) {
     kind: r.kind === 'ecom' || r.kind === 'leadgen' ? r.kind : null,
     hiddenMetrics,
     metricOrder,
+    baseMetrics: Array.isArray(r.baseMetrics) ? [...new Set(r.baseMetrics.map((k) => cleanText(k, 40)).filter((k) => METRICS[k] && !k.startsWith('mx_')))].slice(0, MAX_BASE_METRICS) : null,
     funnel: normalizeFunnel(r.funnel),
     campaignSel: {
       groups: [...new Set((Array.isArray(r.campaignSel?.groups) ? r.campaignSel.groups : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_SELECTED),

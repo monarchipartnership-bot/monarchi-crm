@@ -72,8 +72,8 @@ export function createAgentRepo(db, agentEmail) {
     },
     // The report layout of one platform of the project (null: not set up yet, so the agent does not report that platform).
     async getLayout(projectId, platform) {
-      const row = must(await db.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics, metric_order, funnel, campaign_selection').eq('project_id', projectId).eq('platform', platform).maybeSingle());
-      return row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics, metricOrder: row.metric_order, funnel: row.funnel, campaignSel: row.campaign_selection } : null;
+      const row = must(await db.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics, metric_order, base_metrics, funnel, campaign_selection').eq('project_id', projectId).eq('platform', platform).maybeSingle());
+      return row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics, metricOrder: row.metric_order, baseMetrics: row.base_metrics, funnel: row.funnel, campaignSel: row.campaign_selection } : null;
     },
     async getCustomMetrics(projectId) { return must(await db.from('report_custom_metrics').select('*').or(`project_id.eq.${projectId},project_id.is.null`).order('id', { ascending: true })) || []; },
 

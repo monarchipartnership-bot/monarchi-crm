@@ -308,7 +308,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
 
   const hasAccounts = ctx.accounts.length > 0;
   // the text blocks of this report: its own snapshot, or the project's template for a new one (a text under a key outside the list is still shown)
-  const newSnap = () => snapshotOf(ctx.layout, periodType, { metrics: metricKeys(ctx.kind, ctx.extraKeys, ctx.custom) });
+  const newSnap = () => snapshotOf(ctx.layout, periodType, { metrics: metricKeys(ctx.kind, ctx.extraKeys, ctx.custom, ctx.layout.baseMetrics) });
   const textBlocks = reportBlocks({ template: snap || newSnap(), sections });
   const platData = !isTotal && data ? data.platforms?.[platform] : null;
   // columns picked in «+ Метрика» after this report was pulled: it has no numbers for them until it is refreshed
@@ -387,7 +387,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       {data && Object.keys(data.platforms).length > 0 && (
         <section className="report-section">
           <ResultView
-            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={snap?.metrics || null} metricOrder={ctx.layout?.metricOrder}
+            data={data} kind={ctx.kind} custom={ctx.custom} lockTotal={isTotal} extraKeys={ctx.extraKeys} templateMetrics={snap?.metrics || null} metricOrder={ctx.layout?.metricOrder} baseMetrics={ctx.layout?.baseMetrics}
             title={ctx.project.name} subtitle={period.label}
             fileBase={`${ctx.project.name}_${periodType}_${period.start}`}
             campaignMode="selected" selection={selection}
