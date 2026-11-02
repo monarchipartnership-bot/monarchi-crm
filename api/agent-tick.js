@@ -12,6 +12,8 @@ import { processQueue } from './_lib/agentEngine.js';
 import { runLeadReminders } from './_lib/siteLead.js';
 import { hasToken, sendMessage } from './_lib/telegram.js';
 import { runSpendNotices } from './_lib/spendNotify.js';
+import { runMetaSync } from './_lib/metaOnboarding.js';
+import { listMetaAccounts } from './_lib/metaAdsData.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -48,8 +50,11 @@ export default async function handler(req, res) {
     // Money notices: a notice for every few dollars of a campaign and the daily total.
     let spend = { steps: 0 };
     try { spend = await runSpendNotices({ db, telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, now: new Date(), senderEmail: agent.email }); } catch (e) { spend = { error: e.message || String(e) }; }
-    await beat({ ms: Date.now() - startedAt, processed: team.processed ?? 0, started: result.started?.length ?? 0, errors: [projectsError, team.error, reminders.error, spend.error, ...(spend.errors || [])].filter(Boolean).map((e) => String(e).slice(0, 200)).slice(0, 5) });
-    res.status(projectsError ? 500 : 200).json({ ...result, team, reminders, spend, ...(projectsError ? { error: projectsError } : {}) });
+    // New clients: the Meta accounts the CRM can see that have no project yet (once a day; the first run only learns what exists).
+    let meta = { skipped: 'no token' };
+    if (process.env.META_ACCESS_TOKEN) { try { meta = await runMetaSync({ db, listAccounts: async () => (await listMetaAccounts(process.env.META_ACCESS_TOKEN)).accounts, telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency', now: new Date(), email: agent.email }); } catch (e) { meta = { error: e.message || String(e) }; } }
+    await beat({ ms: Date.now() - startedAt, processed: team.processed ?? 0, started: result.started?.length ?? 0, errors: [projectsError, team.error, reminders.error, spend.error, meta.error, ...(spend.errors || [])].filter(Boolean).map((e) => String(e).slice(0, 200)).slice(0, 5) });
+    res.status(projectsError ? 500 : 200).json({ ...result, team, reminders, spend, meta, ...(projectsError ? { error: projectsError } : {}) });
   } catch (e) {
     res.status(500).json({ error: e.message || String(e) });
   }

@@ -75,6 +75,18 @@ export async function graphGet(url, token) {
   return body;
 }
 
+// Every ad account the token can see (`me/adaccounts`) in the shape the pages use. → { accounts: [{ id: 'act_…', name, status (Meta's number), currency, timezone, created }], truncated }
+export async function listMetaAccounts(token) {
+  let url = GRAPH + 'me/adaccounts?' + new URLSearchParams({ fields: 'account_id,name,account_status,currency,timezone_name,created_time', limit: '200', access_token: token });
+  const accounts = [];
+  for (let page = 0; page < MAX_PAGES && url; page += 1) {
+    const body = await graphGet(url, token);
+    accounts.push(...(body.data || []));
+    url = body.paging?.next || null;
+  }
+  return { accounts: accounts.map((a) => ({ id: 'act_' + a.account_id, name: a.name, status: a.account_status, currency: a.currency, timezone: a.timezone_name, created: a.created_time })), truncated: Boolean(url) };
+}
+
 // One insights request, read into plain rows. → { account, level, rows, truncated }. Throws an Error with .status and .code from Meta.
 export async function fetchMetaInsights({ accountId, level = 'account', datePreset = 'last_7d', timeRange = null, daily = false, token }) {
   const digits = String(accountId || '').replace(/^act_/, '').replace(/\D/g, '');

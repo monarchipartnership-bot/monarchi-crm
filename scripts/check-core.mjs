@@ -52,6 +52,8 @@ import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spen
 import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
 import { buildDossier, memoryBlock } from '../src/lib/agents/clientMemory.js';
 import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cycleState, describeSchedule, instructionBlock, modeOfAgent, scheduleRows } from '../src/lib/agents/campaignCycles.js';
+import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFromAccount } from '../src/lib/metaOnboarding.js';
+import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
 import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
 import { auditAfter, checkRights, loadRights } from '../api/_lib/agentAudit.js';
 import { addInstruction, cappedCampaigns, editOutput, openCycle, removeInstruction, setAgentMode, setAgentSchedule, syncCycles } from '../api/_lib/campaignCycles.js';
@@ -1422,6 +1424,7 @@ function fakeDb(tables) {
         const pass = (r) => q.filters.every((f) => f(r));
         if (q.mode === 'insert') { const made = q.rows.map((r, i) => ({ id: rows.length + i + 1, ...r })); rows.push(...made); return { data: made, error: null }; }
         if (q.mode === 'update') { const hit = rows.filter(pass); hit.forEach((r) => Object.assign(r, q.patch)); return { data: hit, error: null }; }
+        if (q.mode === 'delete') { const hit = rows.filter(pass); hit.forEach((r) => rows.splice(rows.indexOf(r), 1)); return { data: hit, error: null }; }
         let out = rows.filter(pass);
         const cmp = (x, y) => (typeof x === 'number' && typeof y === 'number' ? x - y : String(x) > String(y) ? 1 : String(x) < String(y) ? -1 : 0);
         if (q.order && q.asc) out = [...out].sort((a, b) => cmp(a[q.order], b[q.order]));
@@ -1433,6 +1436,7 @@ function fakeDb(tables) {
         select() { return api; },
         insert(r) { q.mode = 'insert'; q.rows = Array.isArray(r) ? r : [r]; return api; },
         update(p) { q.mode = 'update'; q.patch = p; return api; },
+        delete() { q.mode = 'delete'; return api; },
         eq(c, v) { q.filters.push((r) => r[c] === v); return api; },
         neq(c, v) { q.filters.push((r) => r[c] !== v); return api; },
         in(c, vs) { q.filters.push((r) => vs.includes(r[c])); return api; },
@@ -2833,6 +2837,74 @@ await ok('rights on the server: a refused action is not run and is journaled; an
   assert.equal(await auditAfter(ctx('boss@monarchi.agency', 'cron'), 'pass_on', { taskId: 9 }, {}), false); // the clock writes nothing here
   assert.equal(await auditAfter(ctx('boss@monarchi.agency'), 'process', {}, {}), false); // not a journaled action
   assert.equal(tables.ag_audit_log.length, 2);
+});
+
+await ok('meta onboarding: the first run only learns, later new live accounts become projects, closed / ignored / known ones do not; errors are told in Ukrainian', () => {
+  const acc = (id, name, status = 1) => ({ id: 'act_' + id, name, status, currency: 'UAH', timezone: 'Europe/Kyiv' });
+  assert.deepEqual(normalizeMetaAccount(acc('123', ' A ', 3)), { id: '123', name: 'A', currency: 'UAH', timezone: 'Europe/Kyiv', status: 'unsettled' });
+  assert.equal(digitsOf('act_55'), '55');
+  const list = [acc('1', 'Linked'), acc('2', 'Old unlinked'), acc('3', 'New'), acc('4', 'New closed', 101), acc('5', 'Ignored'), acc('6', 'New disabled', 2)];
+  // the first run: nothing is created, what exists without a project is remembered
+  const first = planMetaSync({ accounts: list, linked: ['1'], settings: { baseline_done: false, ignored_ids: ['5'] } });
+  assert.deepEqual([first.baseline, first.create.length, first.waiting.length], [['2', '3', '4', '6'], 0, 0]);
+  assert.deepEqual(first.skipped, [{ id: '5', reason: 'ignored' }]);
+  // later: an account that appeared after the first run becomes a project; the remembered ones wait for a person
+  const later = planMetaSync({ accounts: [...list, acc('7', 'Brand new')], linked: ['1'], settings: { baseline_done: true, seen_ids: ['2', '3', '4', '6'], ignored_ids: ['5'], auto_create: true } });
+  assert.deepEqual(later.create.map((a) => a.id), ['7']); assert.deepEqual(later.waiting.map((a) => a.id), ['2', '3']); // the closed and the disabled ones are skipped
+  assert.deepEqual(later.skipped.map((x) => x.reason).sort(), ['closed', 'disabled', 'ignored']);
+  // auto-create off: the new one waits too
+  const manual = planMetaSync({ accounts: [acc('7', 'Brand new')], linked: [], settings: { baseline_done: true, auto_create: false } });
+  assert.deepEqual([manual.create.length, manual.waiting.length], [0, 1]);
+  assert.deepEqual(projectFromAccount({ id: '7', name: 'Brand' }, '2026-11-03'), { name: 'Brand', status: 'active', services: ['Meta Ads'], start_date: '2026-11-03', timezone: null });
+  assert.match(metaErrorText({ code: 200, message: '(#200) Ad account owner has NOT grant ads_management or ads_read permission' }), /Призначити обʼєкти/);
+  assert.match(metaErrorText({ code: 190 }), /META_ACCESS_TOKEN/); assert.equal(metaErrorText({ code: 100, message: 'x' }), null);
+});
+
+await ok('meta onboarding engine: once a day after 08:00, the first run learns, a new account makes a project + link + bell notice, a failed link leaves no project, a list error is reported', async () => {
+  const mk = () => ({
+    meta_sync_settings: [{ id: 1, enabled: true, auto_create: true, baseline_done: false, seen_ids: [], ignored_ids: [], notify_emails: ['o@x.y'], last_run_date: null }],
+    project_ad_accounts: [{ account_id: '1', platform: 'meta' }], projects: [], notifications: [],
+  });
+  const raw = (id, name, status = 1) => ({ id: 'act_' + id, name, status, currency: 'USD', timezone: 'Europe/London' });
+  const T = (iso) => new Date(iso);
+  const tables = mk();
+  const list = async () => [raw('1', 'Linked'), raw('2', 'Old')];
+  const run = (when, extra = {}) => runMetaSync({ db: fakeDb(tables), listAccounts: list, now: T(when), email: 'agent@x.y', ...extra });
+  assert.equal((await run('2026-11-03T04:00:00Z')).skipped, 'not due'); // 06:00 Kyiv: too early
+  const r1 = await run('2026-11-03T08:00:00Z'); // 10:00 Kyiv
+  assert.deepEqual([r1.listed, r1.baselineLearned, r1.created.length], [2, 1, 0]);
+  assert.deepEqual([tables.meta_sync_settings[0].baseline_done, tables.meta_sync_settings[0].seen_ids], [true, ['2']]); assert.equal(tables.projects.length, 0);
+  assert.equal((await run('2026-11-03T12:00:00Z')).skipped, 'not due'); // the same day
+  // the next day a new account appears
+  list.n = 0;
+  const withNew = async () => [raw('1', 'Linked'), raw('2', 'Old'), raw('9', 'Brand New')];
+  const r2 = await runMetaSync({ db: fakeDb(tables), listAccounts: withNew, now: T('2026-11-04T08:00:00Z'), email: 'agent@x.y' });
+  assert.deepEqual([r2.created, r2.waiting], [['Brand New'], 1]);
+  assert.deepEqual([tables.projects[0].name, tables.projects[0].services, tables.projects[0].created_by], ['Brand New', ['Meta Ads'], 'agent@x.y']);
+  assert.deepEqual([tables.project_ad_accounts[1].account_id, tables.project_ad_accounts[1].currency, tables.project_ad_accounts[1].account_status], ['9', 'USD', 'active']);
+  assert.deepEqual([tables.notifications[0].type, tables.notifications[0].recipient_email, tables.notifications[0].link], ['meta_account', 'o@x.y', `/projects/${tables.projects[0].id}`]);
+  // a pass that overlaps (the day is already taken) does nothing
+  assert.equal((await runMetaSync({ db: fakeDb(tables), listAccounts: withNew, now: T('2026-11-04T08:01:00Z') })).skipped, 'not due');
+  // Meta answers with an error: told in Ukrainian, nothing is created, the person is notified
+  const failing = async () => { const e = new Error('(#200) Ad account owner has NOT grant ads_management or ads_read permission'); e.code = 200; throw e; };
+  const r3 = await runMetaSync({ db: fakeDb(tables), listAccounts: failing, now: T('2026-11-05T08:00:00Z') });
+  assert.match(r3.error, /Призначити обʼєкти/); assert.match(tables.notifications.at(-1).title, /Не вдалося перевірити/); assert.match(tables.meta_sync_settings[0].last_report.error, /системний користувач|Системний користувач/);
+  // forced run (the button) ignores the clock
+  const r4 = await runMetaSync({ db: fakeDb(tables), listAccounts: async () => [raw('1', 'Linked'), raw('9', 'Brand New'), raw('10', 'Newest')], now: T('2026-11-05T03:00:00Z'), force: true });
+  assert.deepEqual(r4.created, ['Newest']);
+  // a link that cannot be written leaves no project behind
+  const broken = fakeDb(tables);
+  const realFrom = broken.from.bind(broken);
+  broken.from = (name) => { const q = realFrom(name); if (name !== 'project_ad_accounts') return q; return { ...q, insert: () => ({ then: (res) => Promise.resolve({ data: null, error: { message: 'duplicate key' } }).then(res) }) }; };
+  const before = tables.projects.length;
+  const r5 = await runMetaSync({ db: broken, listAccounts: async () => [raw('1', 'Linked'), raw('77', 'Cannot link')], now: T('2026-11-05T03:00:00Z'), force: true });
+  assert.equal(r5.failed.length, 1); assert.equal(tables.projects.length, before);
+  // the banner list and the manual import
+  const t2 = mk(); t2.meta_sync_settings[0].baseline_done = true;
+  const waiting = await waitingAccounts({ db: fakeDb(t2), listAccounts: async () => [raw('1', 'Linked'), raw('2', 'Waits'), raw('3', 'Closed', 101)] });
+  assert.deepEqual(waiting.map((a) => a.id), ['2']);
+  const project = await importAccount({ db: fakeDb(t2), account: raw('2', 'Waits'), email: 'me@x.y', now: T('2026-11-05T10:00:00Z') });
+  assert.deepEqual([project.name, t2.project_ad_accounts.at(-1).account_id], ['Waits', '2']);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {

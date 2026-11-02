@@ -50,6 +50,7 @@ function plainDescribe(n) {
     case 'project_report':
     case 'project_agent_problem':
     case 'ai_agent':
+    case 'meta_account':
       return { title: n.title || 'Проєкт', body: n.body || '' };
     case 'assigned':
       return { title: 'Нова задача', body: rows.join('\n') };
@@ -133,11 +134,12 @@ function describe(n) {
         to: taskLink(n),
       };
     }
-    case 'ai_agent': {
+    case 'ai_agent':
+    case 'meta_account': {
       return {
         iconNode: <span dangerouslySetInnerHTML={{ __html: FIELD_ICONS.barChart }} />,
         accentColor: '#682768', tintColor: '#F3E8F9',
-        badge: { label: 'AI-агенти', color: '#682768', tint: '#F3E8F9' },
+        badge: { label: n.type === 'meta_account' ? 'Нові клієнти' : 'AI-агенти', color: '#682768', tint: '#F3E8F9' },
         title: n.title || 'AI-агенти',
         body: <div className="notif-card__fields"><div className="notif-card__field"><span>{n.body}</span></div></div>,
         to: n.link || null,

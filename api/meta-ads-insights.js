@@ -16,7 +16,8 @@
 //   activities — true → the account's change history for timeRange (who changed what)
 //   check      — true → only verify the token and return the account's name/status
 import { createClient } from '@supabase/supabase-js';
-import { formatRow, GRAPH, graphGet, LEVELS, MAX_PAGES } from './_lib/metaAdsData.js';
+import { formatRow, GRAPH, graphGet, LEVELS, listMetaAccounts, MAX_PAGES } from './_lib/metaAdsData.js';
+import { metaErrorText } from '../src/lib/metaOnboarding.js';
 import { cleanColumns, insightFieldsFor } from '../src/lib/metaColumns.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
@@ -50,30 +51,9 @@ export default async function handler(req, res) {
   const columns = cleanColumns('meta', req.body?.columns);
   if (list) {
     try {
-      let url = GRAPH + 'me/adaccounts?' + new URLSearchParams({
-        fields: 'account_id,name,account_status,currency,timezone_name,created_time',
-        limit: '200',
-        access_token: metaToken,
-      });
-      const accounts = [];
-      for (let page = 0; page < MAX_PAGES && url; page += 1) {
-        const body = await graphGet(url, metaToken);
-        accounts.push(...(body.data || []));
-        url = body.paging?.next || null;
-      }
-      res.status(200).json({
-        accounts: accounts.map((a) => ({
-          id: 'act_' + a.account_id,
-          name: a.name,
-          status: a.account_status,
-          currency: a.currency,
-          timezone: a.timezone_name,
-          created: a.created_time,
-        })),
-        truncated: Boolean(url),
-      });
+      res.status(200).json(await listMetaAccounts(metaToken));
     } catch (err) {
-      res.status(err.status && err.status < 500 ? 400 : 502).json({ error: 'Meta API: ' + err.message, code: err.code });
+      res.status(err.status && err.status < 500 ? 400 : 502).json({ error: metaErrorText(err) || 'Meta API: ' + err.message, code: err.code });
     }
     return;
   }
@@ -141,6 +121,6 @@ export default async function handler(req, res) {
     }
     res.status(200).json({ account: act, level, rows: rows.map((r) => formatRow(r, raw, columns)), truncated: Boolean(url) });
   } catch (err) {
-    res.status(err.status && err.status < 500 ? 400 : 502).json({ error: 'Meta API: ' + err.message, code: err.code });
+    res.status(err.status && err.status < 500 ? 400 : 502).json({ error: metaErrorText(err) || 'Meta API: ' + err.message, code: err.code });
   }
 }
