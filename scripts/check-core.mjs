@@ -51,6 +51,7 @@ import { estimateInputs } from '../api/_lib/estimateInputs.js';
 import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spendReport.js';
 import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
 import { buildDossier, memoryBlock } from '../src/lib/agents/clientMemory.js';
+import { DEFAULT_FUNNEL_STAGES, funnelColumns, funnelModel, normalizeFunnel } from '../src/lib/reportFunnel.js';
 import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cycleState, describeSchedule, instructionBlock, modeOfAgent, scheduleRows } from '../src/lib/agents/campaignCycles.js';
 import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFromAccount } from '../src/lib/metaOnboarding.js';
 import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
@@ -2920,6 +2921,31 @@ await ok('report template: the order of the metric rows — listed keys first in
   assert.equal(snapshotOf({ metricOrder: ['roas'] }, 'weekly').metrics, null);
   assert.deepEqual(metricKeysOf({ metrics: ['cpc', 'spend'] }, keys, []), ['cpc', 'spend']);
   assert.deepEqual(metricKeysOf({ metrics: null, metricOrder: ['ctr', 'spend'] }, keys, []), ['ctr', 'spend', 'cpc', 'roas', 'mx_cart']); // the standard set follows the layout
+});
+
+await ok('report funnel: stages from the totals, step conversion, share of the top, the weakest step, a stage without data is skipped, no funnel without two numbers', () => {
+  const total = { x_view_content: 1000, x_add_to_cart: 100, x_initiate_checkout: 80, purchases: 10 };
+  const m = funnelModel({ stages: DEFAULT_FUNNEL_STAGES, total, prev: { x_view_content: 800, x_add_to_cart: 100, x_initiate_checkout: 50, purchases: 10 }, labelOf: (k) => k.toUpperCase() });
+  assert.deepEqual(m.steps.map((s) => s.value), [1000, 100, 80, 10]);
+  assert.deepEqual(m.steps.map((s) => s.fromPrev), [null, 10, 80, 12.5]); // each step against the stage before it
+  assert.deepEqual(m.steps.map((s) => s.fromFirst), [100, 10, 8, 1]);
+  assert.deepEqual(m.steps.map((s) => s.share), [1, 0.1, 0.08, 0.01]);
+  assert.deepEqual(m.steps.map((s) => s.lost), [null, 900, 20, 70]);
+  assert.deepEqual(m.steps.map((s) => s.delta), [25, 0, 60, 0]); // against the previous period
+  assert.equal(m.weakest, 'mx_add_to_cart'); assert.deepEqual(m.steps.map((s) => s.weakest), [false, true, false, false]); assert.equal(m.steps[0].label, 'MX_VIEW_CONTENT');
+  // a stage the cabinet gave no number for is skipped; the rest still make a funnel
+  const part = funnelModel({ stages: DEFAULT_FUNNEL_STAGES, total: { x_view_content: 500, purchases: 5 } });
+  assert.deepEqual([part.steps.map((s) => s.key), part.skipped], [['mx_view_content', 'purchases'], ['mx_add_to_cart', 'mx_initiate_checkout']]);
+  assert.equal(funnelModel({ stages: DEFAULT_FUNNEL_STAGES, total: { purchases: 5 } }), null); // one number is not a funnel
+  assert.equal(funnelModel({ total: null }), null);
+  // zero at the top: no division by zero
+  const zero = funnelModel({ stages: ['mx_view_content', 'purchases'], total: { x_view_content: 0, purchases: 0 } });
+  assert.deepEqual([zero.steps[1].fromPrev, zero.steps[0].share, zero.weakest], [null, 0, null]);
+  // the layout's setting is cleaned
+  assert.deepEqual(normalizeFunnel(null), { enabled: false, stages: DEFAULT_FUNNEL_STAGES });
+  assert.deepEqual(normalizeFunnel({ enabled: true, stages: ['purchases', 'bad key', 'purchases', 'mx_add_to_cart'] }), { enabled: true, stages: ['purchases', 'mx_add_to_cart'] });
+  assert.deepEqual(normalizeFunnel({ enabled: true, stages: ['purchases'] }), { enabled: false, stages: DEFAULT_FUNNEL_STAGES }); // fewer than two stages: back to the default and off
+  assert.deepEqual(funnelColumns(DEFAULT_FUNNEL_STAGES), ['mx_view_content', 'mx_add_to_cart', 'mx_initiate_checkout']); // the sale is a base field, the rest are columns to ask Meta for
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
