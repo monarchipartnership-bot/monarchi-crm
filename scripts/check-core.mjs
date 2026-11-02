@@ -48,6 +48,7 @@ import { campaignTotals, stepLevel, dueStepNotices, capReached, digestDue, diges
 import { runSpendNotices } from '../api/_lib/spendNotify.js';
 import { estimateCampaign, estimateSummary } from '../src/lib/agents/campaignEstimate.js';
 import { estimateInputs } from '../api/_lib/estimateInputs.js';
+import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spendReport.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
@@ -2591,6 +2592,32 @@ await ok('pre-launch estimate: the agents of the mode at their own average (a ro
   assert.equal(asked.length, 1); // one free question, not one per picture
   assert.equal((await estimateInputs({ db: fakeDb(tables), hfImage: null })).configured, false);
   assert.match((await estimateInputs({ db: fakeDb(tables), hfImage: { estimate: async () => { throw new Error('boom'); } } })).error, /boom/);
+});
+
+await ok('spend report: day / month / year on the Kyiv clock, against the previous period, by agent, campaign and project, Claude and Higgsfield apart', () => {
+  const m = periodRange('month', '2026-11-02');
+  assert.deepEqual([m.from, m.to, m.prev.from, m.keys.length, m.label], ['2026-10-31T22:00:00.000Z', '2026-11-30T22:00:00.000Z', '2026-09-30T21:00:00.000Z', 30, 'листопад 2026']); // 25 Oct: the clocks went back
+  const y = periodRange('year', '2026-11-02');
+  assert.equal(y.keys.length, 12); assert.equal(y.keys[0], '2026-01'); assert.equal(y.label, '2026');
+  const d = periodRange('day', '2026-11-02'); assert.equal(d.keys.length, 24); assert.equal(d.from, '2026-11-01T22:00:00.000Z');
+  const tasks = [
+    { finished_at: '2026-11-02T10:00:00Z', cost_usd: 0.5, agent_id: 1, campaign_id: 7 }, { finished_at: '2026-11-02T21:30:00Z', cost_usd: 0.25, agent_id: 2, campaign_id: 7 }, // the second is 23:30 Kyiv: still the 2nd
+    { finished_at: '2026-11-02T22:30:00Z', cost_usd: 1, agent_id: 1, campaign_id: 8 }, // 00:30 on the 3rd
+    { finished_at: '2026-10-10T10:00:00Z', cost_usd: 0.6, agent_id: 1, campaign_id: 7 }, { finished_at: '2026-11-02T10:00:00Z', cost_usd: 0, agent_id: 1, campaign_id: 7 },
+  ];
+  const spends = [{ created_at: '2026-11-02T12:00:00Z', usd: 2, campaign_id: 7 }, { created_at: '2026-10-20T12:00:00Z', usd: 0.4, campaign_id: 7 }];
+  const rows = spendRows({ tasks, spends, agentKeyOf: (id) => ({ 1: 'creative_maker', 2: 'creative_brief' }[id]), projectOf: (c) => ({ 7: 10, 8: 11 }[c]) });
+  assert.equal(rows.length, 6); // the task with no cost is not a row
+  const r = buildSpendReport(rows, m, { agent: (k) => k.toUpperCase(), campaign: (id) => `C${id}`, project: (id) => `P${id}` });
+  assert.deepEqual([r.total, r.claude, r.higgsfield, r.prevTotal, r.change], [3.75, 1.75, 2, 1, 275]); // the 20th and the 10th of October are the previous month
+  assert.deepEqual(r.byCampaign.map((x) => [x.name, x.total]), [['C7', 2.75], ['C8', 1]]);
+  assert.deepEqual(r.byAgent.map((x) => x.name), ['CREATIVE_MAKER', 'CREATIVE_BRIEF']); // maker: 0.5 + 1 + the pictures 2
+  assert.equal(r.byAgent[0].total, 3.5); assert.equal(r.byProject[0].name, 'P10');
+  assert.equal(r.series.find((s) => s.key === '2026-11-02').claude, 0.75); assert.equal(r.series.find((s) => s.key === '2026-11-02').higgsfield, 2); assert.equal(r.series.find((s) => s.key === '2026-11-03').claude, 1);
+  const day = buildSpendReport(rows, d);
+  assert.equal(day.total, 2.75); assert.equal(day.series[23].claude, 0.25); // 23:30 Kyiv
+  assert.equal(day.change, null); // nothing on the 1st to compare with
+  assert.equal(buildSpendReport([], m).total, 0);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
