@@ -40,7 +40,7 @@ const LAYOUT = {
   ],
   parks: [[-1, 0]], strip: [], strip2: [[0, 1], [0, -2], [0, -3], [0, -4]],
   // the back of the city: four zones of the Client district (two columns of blocks and three rows each), the column in the middle is a boulevard along the axis of the main building
-  zones: [{ slot: 'client-research', cols: [-4, -3] }, { slot: 'client-creative', cols: [-2, -1] }, { slot: 'client-ads', cols: [1, 2] }, { slot: 'client-reports', cols: [3, 4] }], zoneRows: [-4, -2], villageCells: [[-1, 2], [0, 2], [1, 2], [-1, 3], [0, 3], [1, 3]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
+  zones: [{ slot: 'client-research', cols: [-4, -3], style: 'comb' }, { slot: 'client-creative', cols: [-2, -1], style: 'sbend' }, { slot: 'client-ads', cols: [1, 2], style: 'zig' }, { slot: 'client-reports', cols: [3, 4], style: 'arc' }], zoneRows: [-4, -2], villageCells: [[-1, 2], [0, 2], [1, 2], [-1, 3], [0, 3], [1, 3]], forest: [[2, 1], [3, 0], [3, 2], [2, 2], [4, 1], [4, 2], [4, 0], [2, 0]],
   // the waters run through whole rows and columns of blocks, never along a street: the streets run beside them and cross them by bridges at right angles
   water: [{ w: 9, pts: [[-170, -34], [-100, -30], [-30, -34], [30, -30], [100, -34], [170, -30]] }, { w: 7, pts: [[-96, -32], [-97, 10], [-95, 60], [-96, 120], [-96, 170]] }],
   bank: [[-4, -1], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [4, -1], [-3, 0], [-3, 1], [-3, 2], [-3, 3], [-3, 4]],
@@ -172,7 +172,7 @@ if (village) { village.deptKey = vKey; village.kind = 'village'; village.flagZoo
 const zones = ZONEDEF.map((z) => {
   const sl = LAY.slots.find((q) => q.id === z.slot), key = [...slotOf].find(([, v]) => v === sl)?.[0], d = key && DEPTS.find((x) => x.key === key);
   if (!d) return null;
-  const pl = buildZone({ world, assets, agents: d.agents, deptKey: key, label: d.label, center: { x: (z.rect.x0 + z.rect.x1) / 2, z: (z.rect.z0 + z.rect.z1) / 2 }, S: 0.78, rng, rect: { w: z.rect.x1 - z.rect.x0, d: z.rect.z1 - z.rect.z0 }, streetZ: LAY.zoneRows[1] * GRID + GRID / 2 });
+  const pl = buildZone({ world, assets, agents: d.agents, deptKey: key, label: d.label, center: { x: (z.rect.x0 + z.rect.x1) / 2, z: (z.rect.z0 + z.rect.z1) / 2 }, S: 0.68, rng, style: z.style, rect: { w: z.rect.x1 - z.rect.x0, d: z.rect.z1 - z.rect.z0 }, streetZ: LAY.zoneRows[1] * GRID + GRID / 2 });
   pl.flagZoom = 1.75; return pl;
 }).filter(Boolean);
 const places = [village, ...zones].filter(Boolean), placeOf = new Map(places.map((q) => [q.deptKey, q]));
@@ -430,7 +430,7 @@ const houseLabels = places.flatMap((pl) => pl.flags.map((f) => ({ f, pl }))).map
 });
 const zoneLabels = zones.map((z) => { // the name of a zone over it: the quarter of the Client district
   const el = document.createElement('div'); el.className = 'district-label is-zone'; const n0 = z.houses.length + z.sites.length; el.innerHTML = `<b>${z.label}</b><small>${n0} ${plural(n0)}</small>`; el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; labelLayer.appendChild(el);
-  el.addEventListener('click', () => user.dept(z.deptKey)); return { el, z, pos: new THREE.Vector3(z.center.x, 20, z.center.z) };
+  el.addEventListener('click', () => user.dept(z.deptKey)); return { el, z, pos: z.plaque.clone() };
 });
 const STATUS_DOT = { live: 'live', in_development: 'dev', not_started: 'plan' };
 const agentLabels = [];
@@ -453,7 +453,7 @@ function updateLabels() {
   deptLabels.forEach(({ el, b }) => { place(el, tmp.set(b.pos.x, b.topY, b.pos.z)); });
   houseLabels.forEach((l) => { const hide = camera.zoom < l.pl.flagZoom || (l.f.built && l.f.b.open > 0.2); if (l.hid !== hide) { l.hid = hide; l.el.classList.toggle('is-dim', hide); } if (!hide) place(l.el, tmp.set(l.f.x, l.f.y, l.f.z)); });
   districtLabels.forEach(({ el, pos }) => { place(el, tmp.copy(pos)); });
-  zoneLabels.forEach((l) => { const hide = camera.zoom < 1.45 || camera.zoom >= l.z.flagZoom || l.z.houses.some((h) => h.open > 0.2); if (l.hid !== hide) { l.hid = hide; l.el.classList.toggle('is-dim', hide); } if (!hide) place(l.el, tmp.copy(l.pos)); });
+  zoneLabels.forEach((l) => { const hide = camera.zoom < 1.3 || l.z.houses.some((h) => h.open > 0.2); if (l.hid !== hide) { l.hid = hide; l.el.classList.toggle('is-dim', hide); } if (!hide) place(l.el, tmp.copy(l.pos)); });
   const vis = agentLabels.filter((l) => !l.el.hidden), mini = labelLayer.classList.contains('mini'), W = stage.clientWidth, H = stage.clientHeight;
   vis.forEach((l) => { l.robot.getWorldPosition(tmp); tmp.y += 3.7; tmp.project(camera); l.sx = (tmp.x * 0.5 + 0.5) * W; l.sy = (-tmp.y * 0.5 + 0.5) * H; l.ow = l.el.offsetWidth; l.oh = l.el.offsetHeight; });
   // declutter: nearer boxes (lower on screen) keep their place, a box that would cover one of them is lifted above it and its stem grows
@@ -631,7 +631,7 @@ function frame() {
   if (halo) halo.material.size = 30 * Math.min(1.8, Math.max(0.85, Math.pow(camera.zoom, 0.55)));
   buildings.forEach((b) => { b.setOpen(((b.village ? state.dept === b.dept && state.agent === b.agentKey : state.dept === b.key) && camera.zoom > 1.15 * ZK) || autoKey === b.key); b.update(dt, t, reduce); });
   deptLabels.forEach((l) => { const dim = l.b.open > 0.2 || (l.quarter && camera.zoom < 1.45); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } });
-  districtLabels.forEach((l) => { const dim = l.keys.some((k) => buildings.get(k).open > 0.2) || (l.many && camera.zoom >= (l.thr || 1.45)); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } }); // an opened district hands over to its own flags
+  districtLabels.forEach((l) => { const dim = l.keys.some((k) => buildings.get(k).open > 0.2) || (l.many && camera.zoom >= (l.thr || 1.3)); if (l.dim !== dim) { l.dim = dim; l.el.classList.toggle('is-dim', dim); } }); // an opened district hands over to its own flags
   agentLabels.forEach((l) => { const show = l.b.open > 0.55; if (l.el.hidden === show) l.el.hidden = !show; });
   if (!reduce) tickCarts(dt, t);
   tickRoutes(dt, clock.elapsedTime);
