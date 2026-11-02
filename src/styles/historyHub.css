@@ -77,3 +77,7 @@
 .project-detail-page.pw .ph-cempty h3 { margin: 4px 0 0; font: 750 17px 'Onest', sans-serif; color: #270827; }
 .project-detail-page.pw .ph-cempty p { margin: 0; max-width: 520px; font: 500 13.5px/1.5 'Onest', sans-serif; color: #6b4a73; }
 .project-detail-page.pw .ph-clist .ph-grow { flex: 1; }
+.project-detail-page.pw .ph-clist .ph-crow { cursor: pointer; }
+.project-detail-page.pw .ph-clist .ph-crow:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
+.project-detail-page.pw .ph-clist .ph-cgo { display: inline-grid; place-items: center; width: 30px; height: 30px; color: #882e88; }
+.project-detail-page.pw .ph-clist .ph-cgo svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }

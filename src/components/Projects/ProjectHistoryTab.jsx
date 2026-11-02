@@ -153,7 +153,7 @@ export default function ProjectHistoryTab({ projectId }) {
           <div className="ph-tiles" role="tablist" aria-label="Розділи історії">
             {[
               { key: 'journey', title: 'Перебіг проекту', caption: 'Тижні й місяці: те, що бачить клієнт', n: months.length, icon: 'journey' },
-              { key: 'custom', title: 'Кастомні звіти', caption: 'Будь-який період, клієнту не йдуть', n: customRows.length, icon: 'range' },
+              { key: 'custom', title: 'Кастомні звіти', caption: 'Будь-який період; клієнту — за окремим посиланням', n: customRows.length, icon: 'range' },
             ].map((t) => (
               <button key={t.key} type="button" role="tab" aria-selected={section === t.key} className={'ph-tile' + (section === t.key ? ' on' : '')} onClick={() => pickSection(t.key)}>
                 <Medal n={t.icon} />
@@ -186,18 +186,14 @@ export default function ProjectHistoryTab({ projectId }) {
       ) : (
         <ul className="ph-clist">
           {customRows.map((r) => (
-            <li key={r.id}>
+            <li key={r.id} className="ph-crow" role="button" tabIndex={0} aria-label={`Відкрити звіт ${reportPeriodText(r)}`} onClick={() => openCustom(r.id)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCustom(r.id); } }}>
               <Medal n="range" />
               <div className="ph-ct">
                 <b>{reportPeriodText(r)}</b>
                 <span className="ph-cs"><i className={'ph-plt ph-plt--' + r.platform}>{reportPlatformLabel(r.platform)}</i><span>оновлено {stamp(r.updated_at)}</span></span>
               </div>
               <span className="ph-grow" />
-              <span className="ph-cact">
-                <button type="button" className="btn" onClick={() => openCustom(r.id)}><HubIcon n="open" />Відкрити</button>
-                <button type="button" className="btn" disabled={!Object.keys(r.data?.platforms || {}).length} onClick={() => presentation(r, r.platform === 'all' ? Object.keys(r.data.platforms)[0] : r.platform)}><HubIcon n="deck" />Презентація</button>
-                <button type="button" className="btn ph-cdel" onClick={() => remove(r)}><HubIcon n="trash" />Видалити</button>
-              </span>
+              <span className="ph-cgo" aria-hidden="true"><HubIcon n="open" /></span>
             </li>
           ))}
         </ul>

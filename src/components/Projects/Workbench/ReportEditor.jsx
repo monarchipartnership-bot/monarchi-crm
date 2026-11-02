@@ -65,6 +65,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const [cbusy, setCbusy] = useState(false);
   const [cerr, setCerr] = useState('');
   const [slot, setSlot] = useState(null); // where the download menu of a custom report is drawn: the bar
+  const [shareOpen, setShareOpen] = useState(false); // the client's link of a custom report, under the bar
   const [openPanel, setOpenPanel] = useState('metrics'); // the panels of the side column are an accordion, one open at a time
 
   const isCustom = row.period_type === 'custom';
@@ -206,6 +207,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
         </div>
         <div className="wbe-actions">
           {isCustom && <span ref={setSlot} className="wbe-slot" />}
+          {isCustom && <button type="button" className={'btn' + (shareOpen ? ' prep-btn-on' : '')} aria-expanded={shareOpen} onClick={() => setShareOpen((o) => !o)}>Посилання клієнту</button>}
           {isCustom && <button type="button" className="btn" disabled={dirty || !!busy || !Object.keys(data.platforms || {}).length} title={dirty ? 'Спершу збережіть зміни' : 'Створити презентацію з цього звіту'} onClick={() => navigate(`/clients?project=${row.project_id}&type=custom&start=${row.period_start}&end=${row.period_end}&platform=${isAll ? Object.keys(data.platforms)[0] : platform}`)}>Зробити презентацію</button>}
           <button type="button" className="btn wbe-del" disabled={!!busy || running} onClick={remove}>Видалити</button>
           <button type="button" className="btn" disabled={!dirty || !!busy || running} onClick={save}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти'}</button>
@@ -215,6 +217,12 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
       {running && <div className="wbe-note wbe-note--info" role="note"><Ic n="info" /><span><b>Цей звіт оновлюється автоматично до кінця місяця.</b> Поки місяць не завершився, його не можна змінити, зберегти, підтвердити чи видалити: агент оновлює його сам. Після завершення місяця він стане звичайною чернеткою.</span></div>}
       {row.status === 'rework' && review.returnedNote && <div className="wbe-note wbe-note--warn" role="note"><Ic n="ret" /><span><b>Повернуто на доопрацювання{review.returnedBy ? ` (${review.returnedBy})` : ''}:</b> {review.returnedNote}</span></div>}
       {!isCustom && !approver && <div className="wbe-note wbe-note--info"><Ic n="info" /><span>Підтвердити звіт можуть лише відповідальні, обрані в налаштуваннях агента. Ви можете працювати над ним і зберігати.</span></div>}
+      {isCustom && shareOpen && (
+        <section className="wbe-block">
+          <ShareLinkBox projectId={row.project_id} scope={platform} label={reportPlatformLabel(platform)} reportId={row.id} />
+          {dirty && <div className="pacc-hint">Є незбережені зміни: клієнт бачить збережену версію. Натисніть «Зберегти», і вона зʼявиться за тим самим посиланням.</div>}
+        </section>
+      )}
       {message && <div className="wbe-note wbe-note--ok" role="status"><Ic n="check" /><span>{message}</span></div>}
       {error && <div className="pacc-err">{error}</div>}
 
@@ -247,13 +255,6 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
                   </div>
                 ))}
               </div>
-            </section>
-          )}
-
-          {isCustom && (
-            <section className="wbe-block">
-              <ShareLinkBox projectId={row.project_id} scope={platform} label={reportPlatformLabel(platform)} reportId={row.id} />
-              {dirty && <div className="pacc-hint">Є незбережені зміни: клієнт бачить збережену версію. Натисніть «Зберегти», і вона зʼявиться за тим самим посиланням.</div>}
             </section>
           )}
 
