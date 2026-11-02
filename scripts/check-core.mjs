@@ -42,6 +42,8 @@ import { generateCreatives, generatorState, pollCreatives } from '../api/_lib/cr
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
 import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
+import { EXTRACT_KEYS, buildExtractPrompt, parseExtraction, planWrites } from '../src/lib/agents/profileExtract.js';
+import { WIZARD_STEPS, hasCabinet, wizardSummary } from '../src/lib/agents/projectWizard.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
@@ -2467,6 +2469,42 @@ await ok('what the agents need to know about a client: the fields of the card, t
   assert.ok(agentsNeeding('goals').required.includes('Маркетинговий стратег'));
   assert.ok(agentsNeeding('materials').recommended.includes('Креативщик'));
   assert.deepEqual(missingFor(['no_such_role'], have), { required: [], recommended: [] });
+});
+
+await ok('quick fill of a project: the words are laid over the fields of the card, links and files go to the next step, nothing that is already there is overwritten', () => {
+  assert.ok(EXTRACT_KEYS.includes('offer') && EXTRACT_KEYS.includes('audience') && EXTRACT_KEYS.includes('competitors') && !EXTRACT_KEYS.includes('strategy'));
+  const prompt = buildExtractPrompt('Клієнт продає перуки', 'uk');
+  assert.match(prompt.system, /ONLY what is in the text/); assert.match(prompt.system, /"offer": Оффер/); assert.match(prompt.user, /Клієнт продає перуки/);
+  // a reading of the model: fields, rules, button, a Figma link in the text that the model forgot, a link that it found, files mentioned
+  const raw = '```json\n' + JSON.stringify({ fields: { about: 'Продає перуки готові до носіння', offer: 'Знижка 15% до 10 листопада', strategy: 'не моє поле', goals: ' ' }, restrictions: 'Без слів «найдешевше»', cta: { mode: 'always', text: 'Shop now' }, figma: '', links: [{ url: 'https://shop.example/wigs', about: 'сайт' }], needsFiles: ['фото перук'], unplaced: ['щось незрозуміле'] }) + '\n```';
+  const x = parseExtraction(raw, 'Макет тут https://www.figma.com/design/abc, сайт https://shop.example/wigs. Ще є https://instagram.com/brand.');
+  assert.deepEqual(x.fields, { about: 'Продає перуки готові до носіння', offer: 'Знижка 15% до 10 листопада' }); // only the fields of the card, nothing empty
+  assert.equal(x.figma, 'https://www.figma.com/design/abc'); // found in the text although the model missed it
+  assert.deepEqual(x.links.map((l) => l.url), ['https://shop.example/wigs', 'https://instagram.com/brand']); // the figma link is not repeated, the instagram one is not lost
+  assert.deepEqual(x.cta, { mode: 'always', text: 'Shop now' });
+  assert.deepEqual([x.needsFiles, x.unplaced], [['фото перук'], ['щось незрозуміле']]);
+  assert.throws(() => parseExtraction('не json', ''), /Не вдалося розібрати/);
+  assert.equal(parseExtraction('{"fields":{}}', '').cta, null);
+  // the plan: an empty field is written, a filled one is a conflict, an equal one is skipped
+  const existing = { fields: { about: 'Стара версія', offer: 'Знижка 15% до 10 листопада' }, restrictions: '', cta_mode: 'always', cta_text: '', figma_url: '' };
+  const plan = planWrites({ ...x, fields: { ...x.fields, tone: 'Тепло' } }, existing);
+  assert.deepEqual(plan.writes, [{ key: 'tone', text: 'Тепло' }]);
+  assert.deepEqual(plan.conflicts.map((c) => c.key), ['about']); // the offer is the same, so it is not a conflict
+  assert.deepEqual(plan.settings, { restrictions: 'Без слів «найдешевше»', figma_url: 'https://www.figma.com/design/abc', cta_mode: 'always', cta_text: 'Shop now' });
+  assert.deepEqual(planWrites(x, { ...existing, cta_text: 'Buy' }).settings.cta_text, undefined); // an existing button text is kept
+  // the steps of the wizard: what goes to step 2 and what still blocks the agents
+  assert.deepEqual(WIZARD_STEPS.map((s) => s.key), ['project', 'facts', 'rest', 'campaign']);
+  assert.equal(hasCabinet([]), false); assert.equal(hasCabinet([{ platform: 'tiktok' }]), false); assert.equal(hasCabinet([{ platform: 'meta' }]), true);
+  const sum = wizardSummary({ extracted: x, settings: { inputs: {}, cta_mode: 'always' }, assets: [], accounts: [{ platform: 'meta' }] });
+  assert.equal(sum.plan.writes.length, 2);
+  assert.equal(sum.hasStep2, true);
+  assert.deepEqual(sum.step2.uploads, ['Логотип', 'Фото продукту']); // an empty library asks for a logo and a photo
+  assert.deepEqual(sum.step2.links.map((l) => l.url).length, 2);
+  // the description and the offer came from the words, so only the goals (the strategist) and the competitors (their researcher) block
+  assert.deepEqual(sum.blockers.map((b) => b.key).sort(), ['competitors', 'goals']);
+  assert.ok(sum.recommended.every((r) => !sum.blockers.some((b) => b.key === r.key)));
+  const all = wizardSummary({ extracted: null, settings: { inputs: { about: { body: 'a' }, offer: { body: 'o' }, goals: { body: 'g' }, competitors: { body: 'c' } }, cta_mode: 'always' }, assets: [{ id: 1 }], accounts: [{ platform: 'meta' }] });
+  assert.deepEqual(all.blockers, []); assert.equal(all.hasStep2, false);
 });
 
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
