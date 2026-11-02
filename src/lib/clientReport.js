@@ -113,6 +113,7 @@ export function reportView(report, ctx) {
     creatives: (report.data?.creatives || []).slice(0, report.type === 'monthly' ? 4 : 3),
     kind: report.data?.kind || ctx.kind, // the type the report was made with
     hiddenMetrics: hiddenMetricsOf(report.data), // what the client does not see (the team sees everything)
+    funnel: report.data?.template?.funnel || null, // the funnel the report was made with (null: none)
   };
 }
 
@@ -229,7 +230,7 @@ export function builderView({ layout, periodType = 'weekly', kind, columns = [],
   const real = data ? reportView({ id: 0, type: periodType, start: period?.start || '', end: period?.end || '', status: 'final', data: { kind, platforms: data.platforms, previous: data.previous || null } }, { kind }) : null;
   const base = real || { id: 0, type: periodType, start: '', end: '', toDate: false, status: 'final', updatedAt: null, currency: 'USD', total: {}, explicit: true, groups: columns, prev: null, sections: {}, kind };
   const blocks = (layout.blocks || []).filter((b) => b[periodType === 'monthly' ? 'monthly' : 'weekly']).map((b) => ({ key: b.key, title: b.title, client: b.client !== false }));
-  return { ...base, kind, blocks, hiddenMetrics: layout.hiddenMetrics || [], metricOrder: layout.metricOrder || [], templateMetrics: null, creatives: [], sections: base.sections || {} };
+  return { ...base, kind, blocks, hiddenMetrics: layout.hiddenMetrics || [], metricOrder: layout.metricOrder || [], funnel: layout.funnel?.enabled ? layout.funnel : null, templateMetrics: null, creatives: [], sections: base.sections || {} };
 }
 
 // ---- the whole page ----

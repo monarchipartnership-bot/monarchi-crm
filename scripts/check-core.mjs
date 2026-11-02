@@ -2948,6 +2948,14 @@ await ok('report funnel: stages from the totals, step conversion, share of the t
   assert.deepEqual(funnelColumns(DEFAULT_FUNNEL_STAGES), ['mx_view_content', 'mx_add_to_cart', 'mx_initiate_checkout']); // the sale is a base field, the rest are columns to ask Meta for
 });
 
+await ok('report template: the funnel setting is cleaned, off by default, and a report keeps the funnel it was made with', () => {
+  assert.deepEqual(normalizeTemplate(null).funnel, { enabled: false, stages: DEFAULT_FUNNEL_STAGES });
+  assert.deepEqual(normalizeTemplate({ funnel: { enabled: true, stages: ['mx_add_to_cart', 'purchases', 'x y'] } }).funnel, { enabled: true, stages: ['mx_add_to_cart', 'purchases'] });
+  assert.equal(snapshotOf(normalizeTemplate(null), 'monthly').funnel, null); // off: the snapshot has none
+  const snap = snapshotOf({ funnel: { enabled: true, stages: ['mx_view_content', 'purchases'] } }, 'monthly');
+  assert.deepEqual(snap.funnel, { enabled: true, stages: ['mx_view_content', 'purchases'] });
+});
+
 await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
   assert.deepEqual(MODE_ORDER, ['creative', 'full', 'strategy', 'ads', 'report']);
   assert.equal(MODE_ORDER.filter((m) => MODES[m].safe).join(), 'creative'); // only «Тільки креативи» is the safe one (nothing starts by itself)

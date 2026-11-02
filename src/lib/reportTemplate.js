@@ -7,6 +7,7 @@
 // an approved report keeps its own titles, blocks and metrics.
 import { METRICS } from './reportMetrics.js';
 import { CREATIVE_COUNT } from './creatives.js';
+import { DEFAULT_FUNNEL_STAGES, normalizeFunnel } from './reportFunnel.js';
 
 export const MAX_BLOCKS = 12;
 export const MAX_TITLE = 60;
@@ -38,6 +39,7 @@ export const DEFAULT_TEMPLATE = Object.freeze({
   kind: null, // 'ecom' | 'leadgen'; null: from the project's business type
   hiddenMetrics: [], // metrics the client does not see (the team always sees the full report)
   metricOrder: [], // the order of the metric rows (keys); metrics not listed follow in their usual order
+  funnel: { enabled: false, stages: DEFAULT_FUNNEL_STAGES }, // the funnel picture for the client: product view → cart → checkout → sale
   campaignSel: { groups: [], campaigns: [] }, // the campaigns of the report: groups (ids) and campaigns ('platform|name') the layout selected
 });
 
@@ -74,6 +76,7 @@ export function normalizeTemplate(raw) {
     kind: r.kind === 'ecom' || r.kind === 'leadgen' ? r.kind : null,
     hiddenMetrics,
     metricOrder,
+    funnel: normalizeFunnel(r.funnel),
     campaignSel: {
       groups: [...new Set((Array.isArray(r.campaignSel?.groups) ? r.campaignSel.groups : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_SELECTED),
       campaigns: [...new Set((Array.isArray(r.campaignSel?.campaigns) ? r.campaignSel.campaigns : []).map((k) => cleanText(k, 200)).filter((k) => k.includes('|')))].slice(0, MAX_SELECTED),
@@ -92,7 +95,7 @@ export const creativeCount = (template, periodType) => normalizeTemplate(templat
 // table, base + the platform's extra columns + the project's own metrics, or null for the standard set) and the ones the client does not see.
 export function snapshotOf(template, periodType, { metrics = null } = {}) {
   const t = normalizeTemplate(template);
-  return { blocks: t.blocks.filter((b) => b[periodFlag(periodType)]).map((b) => ({ key: b.key, title: b.title, client: b.client })), metrics: metrics && metrics.length ? orderMetricKeys(metrics, t.metricOrder) : null, hiddenMetrics: [...t.hiddenMetrics] };
+  return { blocks: t.blocks.filter((b) => b[periodFlag(periodType)]).map((b) => ({ key: b.key, title: b.title, client: b.client })), metrics: metrics && metrics.length ? orderMetricKeys(metrics, t.metricOrder) : null, hiddenMetrics: [...t.hiddenMetrics], funnel: t.funnel.enabled ? { ...t.funnel, stages: [...t.funnel.stages] } : null };
 }
 
 // The metrics the client does not see in a saved report.

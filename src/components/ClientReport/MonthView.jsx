@@ -1,5 +1,6 @@
 import { Box, DeltaPill, GB, GP, HBars, Legend, Medallion, Pill, PALETTE, Wave, Donut } from './kit';
 import { Creatives, MetricTable, ReportTexts } from './parts';
+import FunnelBox from './Funnel';
 import { dmy, fmtValue, kpiCards, prevName, rangeText, roasBars, spendSlices, viewKeys } from '../../lib/clientReport';
 import { computeMetric } from '../../lib/reportMetrics';
 
@@ -90,6 +91,7 @@ export default function MonthView({ month, model }) {
           {bars.length > 0 && <Box icon="bars" title="ROAS by campaign group"><div className="gx"><HBars items={bars} /></div></Box>}
         </div>
       )}
+      {total && <FunnelBox view={total} custom={model.custom} />}
       {month.weeks.map((w) => <Week key={w.n} week={w} ctx={ctx} model={model} />)}
       {total ? (
         <Box icon="file" title={`${month.name} ${month.running ? 'so far' : 'summary'}`} sub={rangeText(total.start, total.end)} right={<Pill tone={month.running ? 'wa' : 'ok'}>{month.running ? 'To date' : 'Final'}</Pill>}>

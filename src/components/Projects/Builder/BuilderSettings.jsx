@@ -7,6 +7,7 @@ import { buildColumns, filterCampaigns, groupMatches, campaignKey } from '../../
 import { MAX_BLOCKS, MAX_CREATIVES, MAX_PROMPT, MAX_TITLE, PRESETS, newBlockKey } from '../../../lib/reportTemplate';
 import { METRIC_SETS, metricMeta } from '../../../lib/reportMetrics';
 import { orderMetricKeys } from '../../../lib/reportTemplate';
+import { FUNNEL_CANDIDATES, funnelColumns } from '../../../lib/reportFunnel';
 import '../../../styles/projectHistory.css';
 
 // The settings panels under the live layout of the «Конструктор звіту». Every panel changes the DRAFT (`draft`, `set`); the groups and the
@@ -20,6 +21,7 @@ const PANEL_ICONS = {
   metrics: <path d="M5 20V10M12 20V4M19 20v-7" />,
   groups: <><rect x="3" y="4" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="4" width="7.5" height="7.5" rx="2" /><rect x="3" y="14" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="14" width="7.5" height="7.5" rx="2" /></>,
   blocks: <path d="M5 6h14M5 11h14M5 16h9" />,
+  funnel: <path d="M4 5h16l-6 7v6l-4 2v-8z" />,
   creatives: <><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-8 8" /></>,
 };
 const UP_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>;
@@ -209,6 +211,45 @@ export function GroupsPanel({ groups, campaigns, onEdit, onCreate, onChanged }) 
         onEdit={onEdit} onCreate={onCreate}
         onDelete={async (id) => { await deleteCampaignGroup(id); await onChanged(); }}
       />
+    </Panel>
+  );
+}
+
+// The funnel picture for the client: which stages and whether it is shown. Meta gives the counts of the stages as extra columns of the cabinet, so choosing a stage
+// also adds its column to the report (saved at once, like the extra metrics); the switch and the choice of stages are part of the layout («Зберегти макет»).
+export function FunnelPanel({ projectId, platform, draft, set, extraKeys, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const f = draft.funnel || { enabled: false, stages: [] };
+  async function change(next) {
+    setError('');
+    const missing = funnelColumns(next.stages).filter((k) => !extraKeys.includes(k));
+    if (next.enabled && missing.length) {
+      setBusy(true);
+      try { await saveReportColumns(projectId, platform, [...extraKeys, ...missing]); await onChanged(); } catch (e) { setError(e.message || 'Не вдалося додати стовпці кабінету.'); setBusy(false); return; }
+      setBusy(false);
+    }
+    set({ funnel: next });
+  }
+  const toggleStage = (k) => {
+    const has = f.stages.includes(k);
+    const stages = FUNNEL_CANDIDATES.filter((c) => (c === k ? !has : f.stages.includes(c)));
+    if (stages.length < 2) { setError('У воронці мають бути щонайменше два етапи.'); return; }
+    change({ ...f, stages });
+  };
+  const meta = platform === 'meta';
+  return (
+    <Panel id="funnel" title="Воронка" summary={f.enabled ? `${f.stages.length} етапи` : 'вимкнена'} note="Картинка для клієнта: перегляд товару, кошик, оформлення, продаж, і де людей стає найменше.">
+      <Switch on={!!f.enabled} onChange={(v) => change({ ...f, enabled: v })} label="Показувати воронку в звіті" />
+      {!meta && <div className="pacc-hint">Етапи воронки (перегляди, кошик, оформлення) віддає кабінет Meta. Для цієї платформи є лише продажі, тож воронка не зʼявиться.</div>}
+      <div className="bld-chips" aria-label="Етапи воронки">
+        {FUNNEL_CANDIDATES.map((k) => {
+          const on = f.stages.includes(k);
+          return <button type="button" key={k} className={'bld-chip' + (on ? ' bld-chip--picked' : '')} aria-pressed={on} disabled={busy} onClick={() => toggleStage(k)}>{metricMeta(k, []).label}</button>;
+        })}
+      </div>
+      <div className="pacc-hint">Етапи йдуть у порядку шляху клієнта. Вибір етапу додає його стовпець із кабінету; зміни діють після «Зберегти макет».</div>
+      {error && <div className="pacc-err">{error}</div>}
     </Panel>
   );
 }

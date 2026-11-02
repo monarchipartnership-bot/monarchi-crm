@@ -8,7 +8,8 @@ import CustomMetricModal from '../Reports/CustomMetricModal';
 import { Box, Pill } from '../../ClientReport/kit';
 import { Creatives, MetricTable, ReportTexts } from '../../ClientReport/parts';
 import { Kpis } from '../../ClientReport/MonthView';
-import { BlocksPanel, CreativesPanel, GroupsPanel, KindPanel, MetricsPanel, PanelContext, SelectionPanel } from './BuilderSettings';
+import FunnelBox from '../../ClientReport/Funnel';
+import { BlocksPanel, CreativesPanel, FunnelPanel, GroupsPanel, KindPanel, MetricsPanel, PanelContext, SelectionPanel } from './BuilderSettings';
 import '../../../styles/builderHub.css';
 import { loadReportContext } from '../../../lib/projectReportContext';
 import { fetchCampaignGroups, fetchReportLayout, saveReportLayout } from '../../../lib/api/projectReportStore';
@@ -189,12 +190,14 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
             </div>
           </div>
         </Box>
+        <FunnelBox view={view} custom={model.custom} builder />
       </div>
 
       <PanelContext.Provider value={{ open: openPanel, toggle: (id) => setOpenPanel((cur) => (cur === id ? '' : id)) }}>
       <div className="bld-panels">
         <KindPanel draft={draft} set={set} projectKind={projectKind(ctx.project)} />
         <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} order={draft.metricOrder} onOrder={(metricOrder) => set({ metricOrder })} onOpen={() => setModal('metric')} onChanged={changed} />
+        <FunnelPanel projectId={projectId} platform={platform} draft={draft} set={set} extraKeys={extraKeys} onChanged={changed} />
         <SelectionPanel platform={platform} groups={platformGroups} campaigns={campaignList} problem={campaignProblem} draft={draft} set={set} />
         <GroupsPanel groups={platformGroups} campaigns={campaignList} onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={changed} />
         <BlocksPanel draft={draft} set={set} />
