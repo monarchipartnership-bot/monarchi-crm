@@ -150,7 +150,7 @@ export default function Dashboard() {
   }) ?? [];
 
   const statusSlices = [
-    { label: 'Активні', value: stats.statusCounts?.active ?? 0, grad: G.green },
+    { label: 'Поточні', value: stats.statusCounts?.active ?? 0, grad: G.green },
     { label: 'На паузі', value: stats.statusCounts?.paused ?? 0, grad: G.amber },
     { label: 'Завершені', value: stats.statusCounts?.completed ?? 0, grad: G.lilac },
   ];
@@ -162,10 +162,12 @@ export default function Dashboard() {
   const platformTotal = platformSlices.reduce((s, p) => s + p.value, 0);
   const monthLabel = MONTH_NAMES[m - 1];
 
+  // the week is still going (not Sunday): its total is compared with a whole week, so no «▼» is drawn that would only mean «the week is not over»
+  const weekOpen = new Date().getDay() !== 0;
   const kpis = [
-    { icon: 'stat', label: 'Активні проєкти', ring: totalProjects ? Math.round(((stats.statusCounts?.active ?? 0) / totalProjects) * 100) : 0, st: '', value: <>{stats.statusCounts?.active ?? 0} <span className="of">з {totalProjects}</span></>, sub: null, spark: null },
-    { icon: 'wallet', label: 'Витрати цього тижня', ring: ringOf(stats.thisWeek.spend, stats.lastWeek.spend), st: 'st-in', value: moneyFmt(stats.thisWeek.spend), sub: <><span>до минулого тижня ({moneyFmt(stats.lastWeek.spend)})</span><Delta diff={Math.round(stats.thisWeek.spend - stats.lastWeek.spend)} suffix=" $" /></>, spark: [stats.weeklySpendTrend, G.blue, 'pdk2'] },
-    { icon: 'coin', label: 'Дохід цього тижня', ring: ringOf(stats.thisWeek.revenue, stats.lastWeek.revenue), st: '', value: moneyFmt(stats.thisWeek.revenue), sub: <><span>до минулого тижня ({moneyFmt(stats.lastWeek.revenue)})</span><Delta diff={Math.round(stats.thisWeek.revenue - stats.lastWeek.revenue)} suffix=" $" /></>, spark: [stats.weeklyRevenueTrend, G.plum, 'pdk3'] },
+    { icon: 'stat', label: 'Поточні проєкти', ring: totalProjects ? Math.round(((stats.statusCounts?.active ?? 0) / totalProjects) * 100) : 0, st: '', value: <>{stats.statusCounts?.active ?? 0} <span className="of">з {totalProjects}</span></>, sub: null, spark: null },
+    { icon: 'wallet', label: 'Витрати цього тижня', ring: ringOf(stats.thisWeek.spend, stats.lastWeek.spend), st: 'st-in', value: moneyFmt(stats.thisWeek.spend), sub: <><span>до минулого тижня ({moneyFmt(stats.lastWeek.spend)})</span>{weekOpen ? <span className="pd-note">тиждень ще триває</span> : <Delta diff={Math.round(stats.thisWeek.spend - stats.lastWeek.spend)} suffix=" $" />}</>, spark: [stats.weeklySpendTrend, G.blue, 'pdk2'] },
+    { icon: 'coin', label: 'Дохід цього тижня', ring: ringOf(stats.thisWeek.revenue, stats.lastWeek.revenue), st: '', value: moneyFmt(stats.thisWeek.revenue), sub: <><span>до минулого тижня ({moneyFmt(stats.lastWeek.revenue)})</span>{weekOpen ? <span className="pd-note">тиждень ще триває</span> : <Delta diff={Math.round(stats.thisWeek.revenue - stats.lastWeek.revenue)} suffix=" $" />}</>, spark: [stats.weeklyRevenueTrend, G.plum, 'pdk3'] },
     {
       icon: 'roas', label: 'ROAS цього місяця', ring: stats.thisMonth.roas === null ? 0 : ringOf(stats.thisMonth.roas, stats.prevMonth.roas || stats.thisMonth.roas), st: 'st-ok', value: stats.thisMonth.roas === null ? '—' : stats.thisMonth.roas.toFixed(2) + 'x',
       sub: <><span>до минулого місяця ({stats.prevMonth.roas === null ? '—' : stats.prevMonth.roas.toFixed(2) + 'x'})</span>{stats.thisMonth.roas !== null && stats.prevMonth.roas !== null && <Delta diff={Math.round((stats.thisMonth.roas - stats.prevMonth.roas) * 100) / 100} />}</>,
@@ -226,7 +228,7 @@ export default function Dashboard() {
               right={<span className="pd-legsm"><i style={{ background: '#12A144' }} />Фінал<i style={{ background: '#2F6FED' }} />Доробка<i style={{ background: '#E08A06' }} />Чернетка<i style={{ background: '#A98BB3' }} />Немає</span>}
             />
             {activeProjects.length === 0 ? (
-              <div className="pd-empty">Активних проєктів ще немає.</div>
+              <div className="pd-empty">Поточних проєктів ще немає.</div>
             ) : (
               <div className="pd-wks">
                 {activeProjects.map((p) => {

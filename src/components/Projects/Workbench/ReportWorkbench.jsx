@@ -21,7 +21,7 @@ const stamp = (iso) => (iso ? new Date(iso).toLocaleString('uk-UA', { day: '2-di
 
 // «Робота над звітами»: the reports that are not ready yet. «Чернетки» are new ones (made by the agent or saved as a draft), «Доробка» are the ones returned from
 // the history. A report opens in the workspace; when it is confirmed it goes to the history and to the client.
-export default function ReportWorkbench({ projectId, onCount }) {
+export default function ReportWorkbench({ projectId, onCount, version = 0 }) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [rows, setRows] = useState(null);
@@ -48,7 +48,7 @@ export default function ReportWorkbench({ projectId, onCount }) {
     let off = false;
     Promise.all([loadReportContext(projectId), fetchCampaignGroups(projectId)]).then(([c, groups]) => { if (!off) setCtx({ ...c, groups }); }).catch(() => { if (!off) { setCtxError(true); setCtx({ project: null, accounts: [], custom: [], columns: {}, groups: [], approvers: ['-'] }); } }); // fail closed: with no list of approvers nobody may confirm
     return () => { off = true; };
-  }, [projectId]);
+  }, [projectId, version]); // read again (in place) when a layout, a metric or a cabinet was changed elsewhere
 
   const openId = Number(params.get('report')) || null;
   // the month-to-date report that renews itself goes first

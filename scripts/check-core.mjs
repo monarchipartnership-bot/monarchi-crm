@@ -3036,6 +3036,21 @@ await ok('own metric keys are Latin and unique; a link is safe; a client deck le
   assert.ok(/Own block text/.test(all) && /Did a thing/.test(all)); // a block of the template goes to the deck like the standard ones
 });
 
+await ok('client deck: the funnel is a table of the stages (weakest step marked), the creatives with a picture get a slide each, both in the deck language', () => {
+  const total = { spend: 100, revenue: 400, purchases: 1, x_view_content: 341, x_add_to_cart: 4, x_initiate_checkout: 2 };
+  const report = { id: 6, project_id: 3, period_type: 'weekly', period_start: '2026-10-05', period_end: '2026-10-11', data: { kind: 'ecom', platforms: { meta: { currency: 'USD', total, groups: [], campaigns: [] } },
+    creatives: { count: 3, items: [{ caption: 'Ad one', imageUrl: 'https://img/1.jpg' }, { caption: 'No picture' }, { caption: 'Ad two', imageUrl: 'https://img/2.jpg' }] },
+    template: { blocks: [], metrics: null, hiddenMetrics: [], funnel: { enabled: true, stages: ['mx_view_content', 'mx_add_to_cart', 'mx_initiate_checkout', 'purchases'] } } } };
+  const deck = buildDeckFromReport({ project: { name: 'T' }, report, platform: 'meta', lang: 'uk', custom: [], client: 'T', extraKeys: ['mx_view_content', 'mx_add_to_cart', 'mx_initiate_checkout'] });
+  const fun = deck.slides.find((s) => s.type === 'table');
+  assert.ok(fun && fun.data.rows.length === 4 && fun.data.rows[1][0].endsWith('◀')); // the weakest step (view → cart) is marked
+  assert.equal(fun.data.header[0], 'Етап');
+  const pics = deck.slides.filter((s) => s.image);
+  assert.equal(pics.length, 2); assert.equal(pics[0].image.src, 'https://img/1.jpg'); // a creative without a picture has no slide
+  const plain = buildDeckFromReport({ project: { name: 'T' }, report: { ...report, data: { ...report.data, template: { ...report.data.template, funnel: null }, creatives: null } }, platform: 'meta', lang: 'en', custom: [], client: 'T' });
+  assert.ok(!plain.slides.some((s) => s.type === 'table' || s.image)); // no funnel switched on, no creatives: nothing added
+});
+
 await ok('link of one custom report: the page model is that report alone (with its funnel, hidden metrics and every creative), a project link has no single report', () => {
   const report = { id: 9, type: 'custom', start: '2026-10-26', end: '2026-11-01', status: 'final', updatedAt: '2026-11-02T10:00:00Z', toDate: false,
     data: { kind: 'ecom', platforms: { meta: { currency: 'USD', total: { spend: 100, revenue: 300, purchases: 3, x_view_content: 341, x_add_to_cart: 4 }, groups: [] } },

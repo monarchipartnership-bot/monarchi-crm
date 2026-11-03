@@ -13,7 +13,7 @@ import '../../../styles/projectReports.css';
 // project (Meta, Google, later TikTok...), and always last «Разом». A tab is one platform's own periods, campaign groups and reports;
 // «Разом» is the sum of them all. The chosen tab is kept in the address (`?platform=`) so it stays when moving between the three sections.
 // mode: 'period' | 'weekly' | 'monthly'.
-export default function PlatformReports({ projectId, mode }) {
+export default function PlatformReports({ projectId, mode, version = 0 }) {
   const [params, setParams] = useSearchParams();
   const [accounts, setAccounts] = useState(null);
   const [confirm, confirmDialog] = useConfirm();
@@ -75,8 +75,8 @@ export default function PlatformReports({ projectId, mode }) {
         </>
       )}
       {mode === 'period'
-        ? <PeriodStats projectId={projectId} platform={tab} />
-        : <PeriodReport projectId={projectId} periodType={mode} platform={tab} unsavedRef={unsaved} />}
+        ? <PeriodStats projectId={projectId} platform={tab} version={version} />
+        : <PeriodReport projectId={projectId} periodType={mode} platform={tab} unsavedRef={unsaved} version={version} />}
       {confirmDialog}
     </>
   );

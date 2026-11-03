@@ -8,6 +8,7 @@ import { metricKeysOf, reportBlocks } from '../reportTemplate.js';
 import { text, listText } from './textModel.js';
 import { paginateBlocks } from './textFit.js';
 import { PLATFORMS, emptyDeck, labels, periodLabel, platformName, uid } from './deckModel.js';
+import { funnelModel } from '../reportFunnel.js';
 
 // How much fits on one slide (the editor still warns when a manual edit overflows).
 // Tables are never split over slides (their text shrinks to fit, see tableFit.js); the metrics list is a card grid that fits 16 cards; only texts run on to more slides.
@@ -162,6 +163,23 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
     slides.push({ id: uid(), type: 'dynamicsTable', data: { heading: text(L.dynamics), headers: [L.metric, L.previous, L.change, L.current], rows } });
   }
 
+  // The funnel of the report (the layout's switch kept in the report): a table of the stages with the share that goes on, the weakest step marked.
+  const fun = rd.template?.funnel;
+  if (cur && fun?.enabled && platform === 'meta') {
+    const model = funnelModel({ stages: fun.stages, total: cur, custom, labelOf: (k) => { const m = metricMeta(k, custom); return lang === 'uk' ? m.label : m.en; } });
+    if (model) {
+      const pctText = (n) => (n == null ? '—' : `${n.toLocaleString(lang === 'uk' ? 'uk-UA' : 'en-US', { maximumFractionDigits: 1 })}%`);
+      toc.push(L.funnel);
+      slides.push({
+        id: uid(), type: 'table',
+        data: {
+          heading: text(L.funnel), header: [L.stage, L.total, L.fromPrev, L.fromFirst],
+          rows: model.steps.map((s) => [s.label + (s.weakest ? ' ◀' : ''), fmtValue(s.value, 'number', currency, lang), pctText(s.fromPrev), pctText(s.fromFirst)]),
+        },
+      });
+    }
+  }
+
   // Texts of the report
   const sec = rd.sections || {};
   const addList = (title, str) => {
@@ -184,6 +202,13 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
     else if (b.key === 'plans') addList(L.plans, sec.plans);
     else addParagraphs(b.title, sec[b.key]);
   });
+
+  // The most effective creatives: one slide each, the picture beside its caption (only those with a picture)
+  const pics = (Array.isArray(rd.creatives) ? rd.creatives : rd.creatives?.items || []).filter((c) => c?.imageUrl);
+  if (pics.length && (platform === 'meta' || platform === 'all')) {
+    toc.push(L.creatives);
+    pics.slice(0, 6).forEach((c, i, all) => slides.push({ id: uid(), type: 'paragraph', image: { src: c.imageUrl }, data: { heading: text(withPart(L.creatives, i, all.length, L)), body: { paras: [{ runs: [{ t: String(c.caption || '').trim() || '—' }] }] } } }));
+  }
 
   agendaSlot.data.items = listText(toc.length ? toc : [L.keyMetrics], 'number');
   slides.push({ id: uid(), type: 'closing', data: { heading: text(L.thanks), body: text(L.thanksBody) } });

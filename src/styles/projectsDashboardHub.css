@@ -206,3 +206,5 @@
 .pd .pd-pg.arr .l { transform: rotate(90deg); } .pd .pd-pg.arr .r { transform: rotate(-90deg); }
 .pd .pd-pg:disabled { opacity: .4; cursor: default; }
 .pd .pd-pgn { margin-left: 10px; font-size: 12px; color: var(--pd-mut); }
+
+.pd-note { font-size: 12px; color: #9a7aa5; }

@@ -559,8 +559,8 @@ function ProjectDetailCard() {
         </div>
       )}
       {KEEP_ALIVE.filter((k) => visited.has(k)).map((k) => (
-        <div key={k + '-' + id + '-a' + accVersion + (k === 'builder' ? '' : '-' + cfgVersion)} hidden={paneKey !== k}>
-          {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : k === 'work' ? <ReportWorkbench projectId={id} onCount={setWorkCount} /> : <PlatformReports projectId={id} mode={k.split(':')[1]} />}
+        <div key={k + '-' + id + (k === 'builder' ? '-a' + accVersion : '')} hidden={paneKey !== k}>
+          {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : k === 'work' ? <ReportWorkbench projectId={id} onCount={setWorkCount} version={cfgVersion} /> : <PlatformReports projectId={id} mode={k.split(':')[1]} version={cfgVersion} />}
         </div>
       ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}

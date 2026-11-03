@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchProjectById } from '../../../lib/api/projects';
 import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
 import { fetchAgent } from '../../../lib/api/projectAgents';
@@ -12,7 +12,8 @@ import { groupsForPlatform } from '../../../lib/campaignGroups';
 // Everything a report screen needs about one project: the project row (its type
 // decides the metric set), linked ad accounts, campaign groups and custom metrics. `tab` (a platform id or 'total') narrows `accounts`
 // and `groups` to that tab; `allAccounts` / `allGroups` / `scope` (where its saved reports live) are there for the rest.
-export function useReportContext(projectId, tab = 'total') {
+// `version` grows when something the screen depends on was changed elsewhere: everything is read again without clearing the screen.
+export function useReportContext(projectId, tab = 'total', version = 0) {
   const [project, setProject] = useState(null);
   const [accounts, setAccounts] = useState(null);
   const [groups, setGroups] = useState([]);
@@ -22,27 +23,41 @@ export function useReportContext(projectId, tab = 'total') {
   const [error, setError] = useState('');
   const [approvers, setApprovers] = useState([]); // who may confirm reports (settings of the agent); empty: anyone
 
+  const loadBase = (isCancelled) => Promise.all([fetchProjectById(projectId), fetchProjectAccounts(projectId), fetchCampaignGroups(projectId), fetchCustomMetrics(projectId), fetchReportColumns(projectId), fetchAgent(projectId)])
+    .then(([p, a, g, c, cols, ag]) => { if (!isCancelled()) { setProject(p); setAccounts(a); setGroups(g); setCustom(c); setColumns(cols); setApprovers((ag?.agent?.config?.approvers || []).map((e) => String(e).toLowerCase())); } })
+    .catch((e) => { if (!isCancelled()) setError(e.message || 'Не вдалося завантажити проєкт.'); });
   useEffect(() => {
     let cancelled = false;
     setProject(null);
     setAccounts(null);
     setError('');
-    Promise.all([fetchProjectById(projectId), fetchProjectAccounts(projectId), fetchCampaignGroups(projectId), fetchCustomMetrics(projectId), fetchReportColumns(projectId), fetchAgent(projectId)])
-      .then(([p, a, g, c, cols, ag]) => { if (!cancelled) { setProject(p); setAccounts(a); setGroups(g); setCustom(c); setColumns(cols); setApprovers((ag?.agent?.config?.approvers || []).map((e) => String(e).toLowerCase())); } })
-      .catch((e) => { if (!cancelled) setError(e.message || 'Не вдалося завантажити проєкт.'); });
+    loadBase(() => cancelled);
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+  const seenVersion = useRef(version);
+  const baseVersion = useRef(version);
+  useEffect(() => {
+    if (baseVersion.current === version) return undefined;
+    baseVersion.current = version;
+    let cancelled = false;
+    loadBase(() => cancelled);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
 
   // The layout of this platform tab (set up in the «Конструктор звіту»). «Разом» has none: it keeps the standard one.
   useEffect(() => {
     let cancelled = false;
     if (tab === 'total') { setLayoutState({ exists: false, layout: normalizeTemplate(null), loaded: true, tab }); return undefined; }
-    setLayoutState((l) => ({ ...l, loaded: false }));
+    const silent = seenVersion.current !== version; // only the version changed: the current layout stays on screen until the new one arrives
+    seenVersion.current = version;
+    if (!silent) setLayoutState((l) => ({ ...l, loaded: false }));
     fetchReportLayout(projectId, tab)
       .then((r) => { if (!cancelled) setLayoutState({ ...r, loaded: true, tab }); })
       .catch((e) => { if (!cancelled) { setError('Не вдалося завантажити макет звіту: ' + (e.message || 'помилка мережі') + '. Оновіть сторінку.'); setLayoutState((l) => ({ ...l, loaded: false })); } });
     return () => { cancelled = true; };
-  }, [projectId, tab]);
+  }, [projectId, tab, version]);
 
   const reloadGroups = useCallback(async () => { const g = await fetchCampaignGroups(projectId); setGroups(g); return groupsForPlatform(g, tab); }, [projectId, tab]);
   const reloadCustom = useCallback(async () => setCustom(await fetchCustomMetrics(projectId)), [projectId]);

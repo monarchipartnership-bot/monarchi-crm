@@ -49,8 +49,8 @@ const PRESETS = [['7', '7 днів'], ['30', '30 днів'], ['month', 'Цей �
 // project's ad accounts as a table (optionally against the period right before it),
 // and download it. `platform` is the tab of PlatformReports: one platform's own numbers
 // and groups, or 'total' (the sum over every platform, without groups).
-export default function PeriodStats({ projectId, platform = 'total' }) {
-  const ctx = useReportContext(projectId, platform);
+export default function PeriodStats({ projectId, platform = 'total', version = 0 }) {
+  const ctx = useReportContext(projectId, platform, version);
   const { email } = useAuth();
   const navigate = useNavigate();
   const [confirm, confirmDialog] = useConfirm();

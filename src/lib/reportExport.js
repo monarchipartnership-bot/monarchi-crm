@@ -22,13 +22,13 @@ export function download(blob, filename) {
 
 function csvCell(v) {
   const s = v == null ? '' : String(v);
-  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
 export function exportCsv(model, filename) {
   const NL = String.fromCharCode(10);
   const parts = model.sheets.map((sh) => {
-    const lines = [sh.columns, ...sh.rows].map((r) => r.map(csvCell).join(','));
+    const lines = [sh.columns, ...sh.rows].map((r) => r.map(csvCell).join(';')); // «;»: opens in columns in the Excel of this office (cells with «;» or «,» are quoted)
     return (model.sheets.length > 1 ? csvCell(sh.name) + NL : '') + lines.join(NL);
   });
   // BOM so Excel opens Ukrainian text as UTF-8.

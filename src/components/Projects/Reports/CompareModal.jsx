@@ -22,6 +22,7 @@ export default function CompareModal({ current, presets, value, offer, onApply, 
   const box = useRef(null);
 
   function apply() {
+    if (never) onNeverAsk?.(); // the box «Більше не пропонувати» counts whichever button the person presses
     if (mode === 'none') { onApply(null); return; }
     if (mode !== 'custom') { onApply({ mode }); return; }
     if (!from || !to) { setError('Вкажіть початок і кінець періоду для порівняння.'); return; }

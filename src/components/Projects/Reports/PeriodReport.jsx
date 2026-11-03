@@ -51,11 +51,11 @@ function initialPicker() {
 // the text, save. Reports made by hand and (later) by the AI agent sit in one list.
 // `platform` is the tab of PlatformReports: that platform's own report (its accounts, its groups), or 'total' = «Разом», the report over every platform.
 // `unsavedRef` lets the tab row ask before leaving a report with unsaved changes.
-export default function PeriodReport({ projectId, periodType, platform = 'total', unsavedRef }) {
+export default function PeriodReport({ projectId, periodType, platform = 'total', unsavedRef, version = 0 }) {
   const [confirm, confirmDialog] = useConfirm();
   const { email } = useAuth();
   const navigate = useNavigate();
-  const ctx = useReportContext(projectId, platform);
+  const ctx = useReportContext(projectId, platform, version);
   const isTotal = platform === 'total';
   const approver = canApprove(email, ctx.approvers); // who may save a report as final
   const [picker, setPicker] = useState(initialPicker);

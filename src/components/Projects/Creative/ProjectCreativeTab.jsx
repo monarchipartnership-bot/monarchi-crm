@@ -50,10 +50,11 @@ export default function ProjectCreativeTab({ projectId }) {
   async function addFiles(list) {
     setError(''); setNotice(''); setBusy('upload');
     try {
-      const added = [];
-      for (const file of [...list]) added.push(await uploadAsset(projectId, file, kind, email));
-      setData((d) => ({ ...d, assets: [...d.assets, ...added] }));
-    } catch (e) { setError(e.message || 'Не вдалося завантажити файл.'); } finally { setBusy(''); if (fileInput.current) fileInput.current.value = ''; }
+      for (const file of [...list]) {
+        const one = await uploadAsset(projectId, file, kind, email);
+        setData((d) => ({ ...d, assets: [...d.assets, one] })); // shown at once: if a later file fails, these stay on the screen
+      }
+    } catch (e) { setError((e.message || 'Не вдалося завантажити файл.') + ' Файли, завантажені до цього, вже в бібліотеці: повторно їх не додавайте.'); } finally { setBusy(''); if (fileInput.current) fileInput.current.value = ''; }
   }
 
   async function removeAsset(a) {

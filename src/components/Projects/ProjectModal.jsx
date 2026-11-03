@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '../common/ConfirmDialog';
 import ClientPicker from '../Clients/ClientPicker';
 import AdAccountPicker from './AdAccountPicker';
 import Select from '../common/Select';
@@ -62,12 +63,20 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
   const [error, setError] = useState('');
   const [section, setSection] = useState('acc');
   const boxRef = useRef(null);
+  const [confirm, confirmDialog] = useConfirm();
+  // a form with something typed or an account picked is not thrown away by a stray click on the background or Esc: the person is asked first
+  const touched = JSON.stringify(form) !== JSON.stringify(EMPTY_FORM) || rows.length > 1 || rows.some((r) => r.account);
+  const closeRef = useRef(onClose);
+  closeRef.current = async () => {
+    if (touched && saving !== true && !(await confirm({ title: 'Закрити без створення?', body: 'Введені дані проєкту не збережуться.', confirmLabel: 'Закрити', cancelLabel: 'Залишитись' }))) return;
+    onClose();
+  };
 
   // Escape closes without creating anything; Tab / Shift+Tab stay inside the dialog.
   useEffect(() => {
     boxRef.current?.focus();
     const onKey = (e) => {
-      if (e.key === 'Escape') { if (dropdownOpen()) return; e.stopPropagation(); onClose(); return; }
+      if (e.key === 'Escape') { if (dropdownOpen()) return; e.stopPropagation(); closeRef.current(); return; }
       if (e.key !== 'Tab' || !boxRef.current) return;
       const f = [...boxRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((n) => n.offsetParent !== null);
       if (!f.length) return;
@@ -169,7 +178,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
   const sectionTitle = SECTIONS.find((x) => x.key === section)?.title;
 
   return (
-    <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) closeRef.current(); }}>
       <div ref={boxRef} data-dd="hub" className="modal-box pacc-modal proj-modal-folder pmh-dialog" role="dialog" aria-modal="true" aria-label="Створити проєкт" tabIndex={-1}>
         <aside className="pmh-rail">
           <div className="pmh-brand">
@@ -192,7 +201,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
         <div className="pmh-main">
           <div className="modal-head">
             <div><h3 id="proj-modal-title">{sectionTitle}</h3><small>Створити проєкт</small></div>
-            <button type="button" className="modal-close" onClick={onClose} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+            <button type="button" className="modal-close" onClick={() => closeRef.current()} aria-label="Закрити"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
           </div>
           <div className="modal-body">
             <section id="pmh-pane-acc" role="tabpanel" aria-labelledby="pmh-nav-acc" hidden={section !== 'acc'}>
@@ -294,11 +303,12 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
             {error && <div className="form-err">{error}</div>}
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn pf-bad" onClick={onClose}><BtnIcon name="x" />Скасувати</button>
+            <button type="button" className="btn pf-bad" onClick={() => closeRef.current()}><BtnIcon name="x" />Скасувати</button>
             <button type="button" className="btn btn-p pf-ok" onClick={handleSave} disabled={saving}>{!saving && <BtnIcon name="check" />}{saving ? '...' : 'Створити проєкт'}</button>
           </div>
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

@@ -17,7 +17,10 @@ const ALL_BORDERS = { top: BORDER, left: BORDER, bottom: BORDER, right: BORDER }
 const TONE = { good: 'FF15803D', bad: 'FFB91C1C', neu: GREY };
 const MIN_DATA_COLS = 3; // the creatives sit under the table: at least three columns for them
 
-const money = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : `$${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+export const money = (v, currency = 'USD') => {
+  if (v == null || v === '' || Number.isNaN(Number(v))) return null;
+  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(Number(v)); } catch { return Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+};
 
 // A saved report row of the project → the block of the sheet: the table, the texts, the creatives. null when the report holds no numbers.
 // title / dates are the words of the block's bar; extraKeys / custom are the project's extra metric columns and formulas.
@@ -37,7 +40,7 @@ export function reportBlock({ row, title, custom = [], extraKeys = [], platformL
   const now = view.toDate ? ` · ${t('to date')}` : '';
   return {
     id: row.id, kind: view.type, title, subtitle: `${period}${platformLabel ? ` · ${platformLabel}` : ''} · ${view.currency}${now}${prev}`,
-    lang: view.lang, table, texts, creatives, metricLabel: (k) => metricInfo(k, custom, platformLabel, view.lang).label,
+    lang: view.lang, currency: view.currency, table, texts, creatives, metricLabel: (k) => metricInfo(k, custom, platformLabel, view.lang).label,
   };
 }
 
@@ -129,7 +132,7 @@ export async function buildWorkbook(ExcelJS, blocks, { sheetName = 'Report', fet
         }
         const m = cr.metrics || {};
         const tw = trFor(block.lang);
-        const numbers = [m.purchases != null ? `${m.purchases} ${tw('purchases')}` : null, money(m.spend) ? `${tw('spent')} ${money(m.spend)}` : null, m.roas != null && !Number.isNaN(Number(m.roas)) ? `ROAS ${Number(m.roas).toFixed(2)}x` : null].filter(Boolean).join(' · ');
+        const numbers = [m.purchases != null ? `${m.purchases} ${tw('purchases')}` : null, money(m.spend, block.currency) ? `${tw('spent')} ${money(m.spend, block.currency)}` : null, m.roas != null && !Number.isNaN(Number(m.roas)) ? `ROAS ${Number(m.roas).toFixed(2)}x` : null].filter(Boolean).join(' · ');
         const cap = [`${i + 1}. ${cr.caption}`.trim(), numbers, got || !cr.imageUrl ? '' : cr.imageUrl].filter(Boolean).join('\n');
         Object.assign(ws.getCell(imgRow + 1, c), { value: cap, alignment: { vertical: 'top', wrapText: true }, font: { size: 9 }, border: ALL_BORDERS });
         Object.assign(ws.getCell(imgRow, c), { border: ALL_BORDERS });
