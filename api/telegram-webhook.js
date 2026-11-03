@@ -9,6 +9,14 @@ import { hasToken, peopleFromUpdate, webhookSecret } from './_lib/telegram.js';
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
 
+// The agent's session is reused while the function stays warm (a busy group sends an event for every message; a sign-in for each would crowd out the cron's own).
+let agentSession = null;
+async function agentFor() {
+  if (agentSession && Date.now() - agentSession.at < 40 * 60000) return agentSession;
+  agentSession = { ...(await signInAgent()), at: Date.now() };
+  return agentSession;
+}
+
 const same = (a, b) => { const x = Buffer.from(String(a || '')); const y = Buffer.from(String(b || '')); return x.length === y.length && timingSafeEqual(x, y); };
 
 export default async function handler(req, res) {
@@ -19,7 +27,7 @@ export default async function handler(req, res) {
     if (typeof update === 'string') { try { update = JSON.parse(update); } catch { update = {}; } }
     const { chat, members, topic } = peopleFromUpdate(update || {});
     if (chat && chat.type !== 'private') {
-      const agent = await signInAgent();
+      const agent = await agentFor();
       const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + agent.accessToken } }, auth: { persistSession: false, autoRefreshToken: false } });
       const now = new Date().toISOString();
       await db.from('tg_chats').upsert({ ...chat, last_seen_at: now }, { onConflict: 'chat_id' });
@@ -33,6 +41,7 @@ export default async function handler(req, res) {
       }
     }
   } catch (e) {
+    agentSession = null; // a stale session must not stay for the next events
     console.error('telegram-webhook failed', e?.message || e);
   }
   res.status(200).json({ ok: true }); // always 200: Telegram would otherwise retry the same update again and again

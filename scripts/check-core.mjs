@@ -57,6 +57,7 @@ import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFro
 import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
 import { planMetricChange } from '../src/lib/reportMetricOps.js';
 import { slugKey } from '../src/lib/reportMetrics.js';
+import { buildNotifications } from '../api/_lib/agentNotify.js';
 import { safeHref } from '../src/lib/safeHref.js';
 import { daysText, monthNameIn, monthShortIn, normLang, trFor } from '../src/lib/clientLang.js';
 import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
@@ -1206,6 +1207,36 @@ await ok('isDue: a failed run is retried after an hour, at most three times', ()
   assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [fail('2026-10-08T11:50:00Z')], now: NOW, dueStartOf }).due, false);
   assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [fail('2026-10-08T09:00:00Z')], now: NOW, dueStartOf }).due, true);
   assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [fail('2026-10-06T09:00:00Z'), fail('2026-10-07T09:00:00Z'), fail('2026-10-08T09:00:00Z')], now: NOW, dueStartOf }).due, false);
+});
+await ok('isDue: a failure before the run knew its period, and a run killed by the time limit, count as attempts of the due report (no retry every minute)', () => {
+  const dueStartOf = (d) => startOf('weekly', d);
+  const early = (at) => ({ status: 'problem', period_start: null, started_at: at, finished_at: at }); // «no cabinets»: failed before the period was known
+  const killed = (at) => ({ status: 'running', period_start: null, started_at: at, finished_at: null });
+  const day = (h) => `2026-10-${h}:00Z`;
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [early(day('08T11:50'))], now: NOW, dueStartOf }).due, false); // retried not before an hour has passed
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [early(day('06T09:00')), early(day('07T09:00')), early(day('08T09:00'))], now: NOW, dueStartOf }).due, false); // three attempts: enough
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [killed(day('06T09:00')), killed(day('07T09:00')), killed(day('08T08:00'))], now: NOW, dueStartOf }).due, false); // killed three times: enough
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [early(day('01T09:00'))], now: NOW, dueStartOf }).due, true); // a failure from before the scheduled moment is not this report's
+  assert.equal(isDue({ periodType: 'weekly', agent: agentRow(), runs: [{ status: 'skipped', period_start: null, started_at: day('08T11:59') }], now: NOW, dueStartOf }).due, true); // an empty «already working» row never blocks a real run
+});
+await ok('tick: two jobs of one project never run at once, and a pass stops starting new pairs when its time is used', async () => {
+  const agents = [agentRow({ project_id: 3 }), agentRow({ project_id: 4 })];
+  const order = [];
+  let active = 0; let overlap = 0;
+  const repo = { listEnabledAgents: async () => agents, getRecentRuns: async () => [] };
+  await runDueAgents({ repo, now: NOW, batch: 4, runFor: async (job) => { active += 1; if (active > 1 && order.length && order[order.length - 1].projectId === job.projectId) overlap += 1; order.push(job); await new Promise((r) => setTimeout(r, 5)); active -= 1; return { status: 'ok' }; } });
+  assert.ok(order.length >= 2); assert.equal(overlap, 0);
+  let t = 0; const started = [];
+  const r = await runDueAgents({ repo, now: NOW, batch: 4, budgetMs: 100, clock: () => (t += 60), runFor: async (job) => { started.push(job); return { status: 'ok' }; } });
+  assert.ok(started.length < 4 && r.waiting > 0, 'the rest wait for the next tick');
+});
+await ok('notices: a ready report tells the confirming people and the ones chosen for notices, a problem only the chosen', () => {
+  const cfg = { notify: true, approvers: ['A@x.com'], notifyEmails: ['b@x.com', 'a@x.com'] };
+  const ok1 = buildNotifications({ projectId: 1, projectName: 'P', periodType: 'weekly', status: 'ok', message: 'm', config: cfg });
+  assert.deepEqual(ok1.map((n) => n.recipient_email).sort(), ['a@x.com', 'b@x.com']);
+  const bad = buildNotifications({ projectId: 1, projectName: 'P', periodType: 'weekly', status: 'problem', message: 'm', config: cfg });
+  assert.deepEqual(bad.map((n) => n.recipient_email).sort(), ['a@x.com', 'b@x.com']);
+  assert.deepEqual(buildNotifications({ projectId: 1, projectName: 'P', periodType: 'weekly', status: 'ok', message: 'm', config: { notify: true, approvers: ['c@x.com'], notifyEmails: [] } }).map((n) => n.recipient_email), ['c@x.com']);
 });
 await ok('tick: starts due reports with the scheduled day as their date, a few per tick, leaves the rest for the next one', async () => {
   const agents = [3, 4, 5, 6, 7].map((id) => agentRow({ project_id: id, config: { tasks: { weeklyReport: true, monthlyReport: false }, schedule: SCHED } }));

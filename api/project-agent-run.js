@@ -32,8 +32,13 @@ export default async function handler(req, res) {
     if (!chatId) { res.status(400).json({ error: 'Оберіть Telegram-чат.' }); return; }
     if (!hasToken()) { res.status(200).json({ ok: false, error: 'TELEGRAM_BOT_TOKEN не налаштовано на сервері.' }); return; }
     const userDb = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
+    // a test goes only to a chat the bot has seen (not to any id a caller makes up), and not to one it has left
+    const { data: known } = await userDb.from('tg_chats').select('chat_id, bot_status').eq('chat_id', chatId).maybeSingle();
+    if (!known) { res.status(400).json({ error: 'Бот не бачив цього чату. Додайте бота в чат і напишіть там щось.' }); return; }
+    if (known.bot_status === 'left' || known.bot_status === 'kicked') { res.status(200).json({ ok: false, error: 'Бота видалено з цього чату.' }); return; }
     const { data: project } = await userDb.from('projects').select('name').eq('id', projectId).maybeSingle();
-    const due = dueReportPeriod(periodType, new Date().toISOString().slice(0, 10));
+    const kyivToday = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Kyiv' }).format(new Date());
+    const due = dueReportPeriod(periodType, kyivToday);
     const msg = buildReportMessage({ projectName: project?.name, period: due?.period, periodType, status: 'draft', action: reportAction(['«Plans for the next period»']), links: [{ label: 'Звіт', url: reportLink(crmUrl, projectId, periodType, null) }], test: true });
     const sent = await sendMessage({ chatId, threadId: req.body?.threadId || undefined, text: msg.text, buttons: msg.buttons });
     res.status(200).json(sent.ok ? { ok: true } : { ok: false, error: sent.error });

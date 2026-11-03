@@ -9,7 +9,8 @@ const TYPES = ['weekly', 'monthly'];
 // repo: { listEnabledAgents(), getRecentRuns(projectId, periodType) }
 // runFor({ projectId, periodType, scheduledFor }): does one run (see projectAgentRun.js).
 // → { checked, due: [{ projectId, periodType, scheduledFor }], started: [...results], waiting: n }
-export async function runDueAgents({ repo, runFor, now = new Date(), batch = 4 }) {
+export async function runDueAgents({ repo, runFor, now = new Date(), batch = 4, budgetMs = 150000, clock = () => Date.now() }) {
+  const began = clock();
   const agents = await repo.listEnabledAgents();
   const due = [];
   for (const agent of agents) {
@@ -25,13 +26,20 @@ export async function runDueAgents({ repo, runFor, now = new Date(), batch = 4 }
     }
   }
   const chosen = due.slice(0, batch);
-  // At most `batch` runs per tick, a couple at a time: the rest are picked up by the next tick.
+  // At most `batch` runs per tick, a couple at a time (never two of the same project at once: they share one lock, the second would only leave an empty «already working» run
+  // every minute). A new pair is not started when the pass has used its share of the function's time: the rest are picked up by the next tick.
   const started = [];
-  for (let i = 0; i < chosen.length; i += 2) {
-    const results = await Promise.all(chosen.slice(i, i + 2).map(async (job) => {
+  const left = [...chosen];
+  while (left.length && (started.length === 0 || clock() - began < budgetMs)) {
+    const wave = [];
+    for (let i = 0; i < left.length && wave.length < 2;) {
+      if (wave.some((j) => j.projectId === left[i].projectId)) { i += 1; continue; }
+      wave.push(left.splice(i, 1)[0]);
+    }
+    const results = await Promise.all(wave.map(async (job) => {
       try { return { ...job, ...(await runFor(job)) }; } catch (e) { return { ...job, status: 'problem', message: e?.message || String(e) }; }
     }));
     started.push(...results);
   }
-  return { checked: agents.length, due: due.length, started, waiting: Math.max(0, due.length - chosen.length) };
+  return { checked: agents.length, due: due.length, started, waiting: Math.max(0, due.length - started.length) };
 }

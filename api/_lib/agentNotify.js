@@ -10,7 +10,7 @@ export function buildNotifications({ projectId, projectName, periodType, status,
   if (status !== 'ok' && status !== 'problem') return [];
   // A finished report is a draft to work on, so the people who confirm reports are told (anyone chosen for notifications when nobody is chosen); a problem goes to the notification list.
   const ok0 = status === 'ok';
-  const chosen = ok0 && (config.approvers || []).length ? config.approvers : config.notifyEmails;
+  const chosen = ok0 ? [...(config.approvers || []), ...(config.notifyEmails || [])] : config.notifyEmails;
   const recipients = [...new Set((chosen || []).map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
     .filter((e) => !startedBy || e !== String(startedBy).toLowerCase());
   const name = projectName || `Проєкт ${projectId}`;

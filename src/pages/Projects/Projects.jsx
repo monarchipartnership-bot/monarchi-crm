@@ -59,7 +59,7 @@ export default function Projects() {
       setLoadError('');
     } catch (e) {
       console.warn('loadProjects failed', e);
-      setLoadError('Не вдалося завантажити проєкти. Можливо, таблицю ще не створено в Supabase.');
+      setLoadError('Не вдалося завантажити проєкти. Перевірте зʼєднання й оновіть сторінку.');
     } finally {
       setLoaded(true);
     }
@@ -113,7 +113,7 @@ export default function Projects() {
         await addProjectAccount({ projectId: created.id, platform: a.platform, account: a.account, createdBy: email });
       } catch (e) {
         console.warn('addProjectAccount failed', e);
-        failed.push(`${a.platform}: ${e.message || e}`);
+        failed.push(`${a.platform === 'meta' ? 'Meta' : a.platform === 'google' ? 'Google' : a.platform}: ${e.message || e}`);
       }
     }
     setSaving(false);

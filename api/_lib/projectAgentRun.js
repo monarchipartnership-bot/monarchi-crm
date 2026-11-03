@@ -24,7 +24,6 @@ import {
 const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [], telegram: { enabled: false, chatId: '', threadId: '' } };
 const PLATFORM_NAMES = Object.fromEntries(PLATFORMS.map((p) => [p.id, p.name]));
 const LABEL = { weekly: 'тижневий', monthly: 'місячний' };
-const GENITIVE = { weekly: 'тижневого', monthly: 'місячного' };
 const fmt = (s) => s.split('-').reverse().join('.');
 const LEASE_MINUTES = 10;
 
@@ -237,7 +236,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     // what a person still has to write: the plans, and every block the agent left empty (not the conclusion: the code always writes it)
     const missingBlocks = [...new Set(made.flatMap((m) => reports[m].blocks.filter((b) => b.kind === 'plans' || (b.kind !== 'conclusion' && !String(reports[m].payload.sections?.[b.key] || '').trim())).map((b) => `«${b.title}»`)))];
     const todo = missingBlocks.join(' і ');
-    const message = `Підготовлено ${GENITIVE[periodType]} звіт за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}${made.length > 1 ? `; звіти: ${made.map(scopeName).join(', ')}` : ''} і збережено в чернетках («Робота над звітами»). Потрібно заповнити: ${todo}; решту перевірити.`;
+    const message = `Підготовлено ${LABEL[periodType]} звіт за ${fmt(period.start)} – ${fmt(period.end)}${madeFor.length ? ` і презентацію (${madeFor.join(', ')})` : ''}${made.length > 1 ? `; звіти: ${made.map(scopeName).join(', ')}` : ''} і збережено в чернетках («Робота над звітами»). ${todo ? `Потрібно заповнити: ${todo}; решту перевірити.` : 'Перевірте тексти та цифри.'}`;
     // 6. The chat of the project: one message about the draft, a button per report (platform) under it that opens it in «Робота над звітами».
     if (config.telegram.enabled && config.telegram.chatId) {
       if (!telegram) {

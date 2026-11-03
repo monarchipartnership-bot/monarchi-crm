@@ -227,7 +227,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
 
       <div className="crh crh-embed bld-preview">
         {periodType === 'monthly' && <Kpis view={view} all />}
-        <Box icon="cal" title={periodType === 'monthly' ? `${real.period ? 'Month' : 'Month'} summary` : 'Week'} sub={real.period ? `${real.period.start.split('-').reverse().join('.')} – ${real.period.end.split('-').reverse().join('.')}` : 'макет'} right={<Pill tone="wa">{real.data ? 'З даними' : 'Макет'}</Pill>}>
+        <Box icon="cal" title={ctx?.project?.report_lang === 'uk' ? (periodType === 'monthly' ? 'Підсумок місяця' : 'Тиждень') : (periodType === 'monthly' ? 'Month summary' : 'Week')} sub={real.period ? `${real.period.start.split('-').reverse().join('.')} – ${real.period.end.split('-').reverse().join('.')}` : 'макет'} right={<Pill tone="wa">{real.data ? 'З даними' : 'Макет'}</Pill>}>
           <div className="split">
             <div className="l"><MetricTable view={view} keys={keys} custom={model.custom} platformLabel={platformLabel} builder={{ hidden: draft.hiddenMetrics, onToggle: toggleMetric, tools: { onChange: changeMetric, options: replaceOptions } }} /></div>
             <div className="r">
@@ -247,7 +247,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
         <SelectionPanel platform={platform} groups={platformGroups} campaigns={campaignList} problem={campaignProblem} draft={draft} set={set} />
         <GroupsPanel groups={platformGroups} campaigns={campaignList} onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={changed} />
         <BlocksPanel draft={draft} set={set} />
-        <CreativesPanel draft={draft} set={set} />
+        <CreativesPanel draft={draft} set={set} platform={platform} />
       </div>
       </PanelContext.Provider>
       <div className="bld-actions bld-actions--end">

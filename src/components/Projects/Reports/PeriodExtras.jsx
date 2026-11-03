@@ -47,7 +47,7 @@ export default function PeriodExtras({ projectId, ctx, range, blocks, sections, 
       {blocks.length > 0 && (
         <section className="report-section">
           <HubTitle icon="note">Текст звіту (англійською)</HubTitle>
-          <div className="pacc-hint">Це кастомний звіт: у клієнта він не з’являється, тексти потрібні вам і для вивантаження.</div>
+          <div className="pacc-hint">Тексти зберігаються разом із кастомним звітом. Клієнт бачить їх, лише якщо ви надішлете йому посилання на цей звіт (в «Історія проекту» → «Кастомні звіти»).</div>
           <div className="prep-texts">
             {blocks.map((b) => (
               <div className="ov-field-box" key={b.key}>

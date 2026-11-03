@@ -1,3 +1,4 @@
+import { pluralUk } from '../../../lib/pluralUk';
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Select from '../../common/Select';
 import GroupsStrip from '../Reports/GroupsStrip';
@@ -352,13 +353,13 @@ export function FunnelPanel({ projectId, platform, draft, set, extraKeys, onChan
   };
   const meta = platform === 'meta';
   return (
-    <Panel id="funnel" title="Воронка" summary={f.enabled ? `${f.stages.length} етапи` : 'вимкнена'} note="Картинка для клієнта: перегляд товару, кошик, оформлення, продаж, і де людей стає найменше.">
-      <Switch on={!!f.enabled} onChange={(v) => change({ ...f, enabled: v })} label="Показувати воронку в звіті" />
-      {!meta && <div className="pacc-hint">Етапи воронки (перегляди, кошик, оформлення) віддає кабінет Meta. Для цієї платформи є лише продажі, тож воронка не зʼявиться.</div>}
+    <Panel id="funnel" title="Воронка" summary={f.enabled ? `${f.stages.length} ${pluralUk(f.stages.length, ['етап', 'етапи', 'етапів'])}` : 'вимкнена'} note="Картинка для клієнта: перегляд товару, кошик, оформлення, продаж, і де людей стає найменше.">
+      <Switch on={!!f.enabled && meta} onChange={(v) => { if (meta) change({ ...f, enabled: v }); }} label="Показувати воронку в звіті" />
+      {!meta && <div className="pacc-hint">Етапи воронки (перегляди, кошик, оформлення) віддає лише кабінет Meta. Для цієї платформи воронки немає, вона вимкнена.</div>}
       <div className="bld-chips" aria-label="Етапи воронки">
         {FUNNEL_CANDIDATES.map((k) => {
           const on = f.stages.includes(k);
-          return <button type="button" key={k} className={'bld-chip' + (on ? ' bld-chip--picked' : '')} aria-pressed={on} disabled={busy} onClick={() => toggleStage(k)}>{metricMeta(k, []).label}</button>;
+          return <button type="button" key={k} className={'bld-chip' + (on ? ' bld-chip--picked' : '')} aria-pressed={on} disabled={busy || !meta} onClick={() => toggleStage(k)}>{metricMeta(k, []).label}</button>;
         })}
       </div>
       <div className="pacc-hint">Етапи йдуть у порядку шляху клієнта. Вибір етапу додає його стовпець із кабінету; зміни діють після «Зберегти макет».</div>
@@ -381,7 +382,7 @@ export function BlocksPanel({ draft, set }) {
   const full = blocks.length >= MAX_BLOCKS;
   const HOW = { whatWasDone: 'Агент пише з історії змін у рекламних кабінетах.', conclusion: 'Пишеться кодом з цифр звіту, без ШІ.', plans: 'Заповнює людина.' };
   return (
-    <Panel id="blocks" title="Текстові блоки" summary={`${blocks.length} ${blocks.length === 1 ? 'блок' : 'блоки'}`} note="Назва, у яких звітах блок є, і що агент має написати. Команда бачить усі блоки; клієнт лише ті, що ввімкнені оком на макеті.">
+    <Panel id="blocks" title="Текстові блоки" summary={`${blocks.length} ${pluralUk(blocks.length, ['блок', 'блоки', 'блоків'])}`} note="Назва, у яких звітах блок є, і що агент має написати. Команда бачить усі блоки; клієнт лише ті, що ввімкнені оком на макеті.">
       <ul className="bld-blocks">
         {blocks.map((b, i) => (
           <li key={b.key} className={'bld-block' + (!b.weekly && !b.monthly ? ' off' : '')}>
@@ -419,12 +420,15 @@ export function BlocksPanel({ draft, set }) {
   );
 }
 
-export function CreativesPanel({ draft, set }) {
+export function CreativesPanel({ draft, set, platform = 'meta' }) {
+  const meta = platform === 'meta';
+  // the number is kept between 0 and the most the report can hold (a typed 1e8 would otherwise build a hundred million placeholders)
   const num = (key, max) => (
-    <input type="number" min={0} max={max} value={draft.creatives[key]} onChange={(e) => set({ creatives: { ...draft.creatives, [key]: e.target.value === '' ? 0 : Number(e.target.value) } })} />
+    <input type="number" min={0} max={max} disabled={!meta} value={draft.creatives[key]} onChange={(e) => set({ creatives: { ...draft.creatives, [key]: e.target.value === '' ? 0 : Math.min(max, Math.max(0, Math.round(Number(e.target.value)) || 0)) } })} />
   );
   return (
     <Panel id="creatives" title="Креативи" summary={`${draft.creatives.weekly} / ${draft.creatives.monthly}`} note="Скільки найкращих оголошень Meta (Most effective creatives) потрапляє у звіт; відбір за ROAS. 0: блоку креативів немає.">
+      {!meta && <div className="pacc-hint">Найкращі оголошення тягнуться лише з Meta: для цієї платформи блоку креативів у звіті не буде.</div>}
       <div className="bld-crn">
         <label>Тижневий звіт {num('weekly', MAX_CREATIVES.weekly)}</label>
         <label>Місячний звіт {num('monthly', MAX_CREATIVES.monthly)}</label>

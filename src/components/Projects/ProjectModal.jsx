@@ -214,7 +214,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
                     </div>
                   );
                 })}
-                {!rows.length && <div className="pacc-hint">Проєкт без рекламного кабінету (SEO, розробка та інше). Кабінет можна підключити пізніше на сторінці проекту.</div>}
+                {!rows.length && <div className="pacc-hint">Проєкт без рекламного кабінету (SEO, розробка та інше). Кабінет можна підключити пізніше на сторінці проєкту.</div>}
                 {freePlatform && (
                   <button type="button" className="btn pacc-add" onClick={addRow}><BtnIcon name="plus" />{rows.length ? `Додати ще кабінет (${freePlatform.label})` : 'Підключити кабінет'}</button>
                 )}

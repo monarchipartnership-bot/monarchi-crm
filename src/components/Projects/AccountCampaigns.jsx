@@ -50,8 +50,8 @@ export default function AccountCampaigns({ account, period }) {
                 <tr><th>Кампанія</th><th>Витрати</th><th>Покази</th><th>Кліки</th><th>CTR</th><th>Покупки/ліди</th><th>Виручка</th><th>ROAS</th></tr>
               </thead>
               <tbody>
-                {visible.map((r) => (
-                  <tr key={r.name}>
+                {visible.map((r, i) => (
+                  <tr key={`${i}-${r.name}`}>
                     <td className="lbl">{r.name}</td>
                     <td>{formatMoney(r.spend, cur)}</td>
                     <td>{fmtNum(r.impressions)}</td>

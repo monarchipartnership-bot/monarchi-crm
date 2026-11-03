@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AutoResizeTextarea from '../../Reports/AutoResizeTextarea';
 import { useAuth } from '../../../contexts/AuthContext';
 import { fetchProjectAccounts } from '../../../lib/api/projectAccounts';
-import { DEFAULT_AGENT_CONFIG, addAgentEvent, connectAgent, disconnectAgent, fetchAgent, fetchAgentEvents, updateAgent } from '../../../lib/api/projectAgents';
+import { DEFAULT_AGENT_CONFIG, addAgentEvent, connectAgent, disconnectAgent, fetchAgent, fetchAgentEvents, fetchPlannerHeartbeat, updateAgent } from '../../../lib/api/projectAgents';
 import { STYLES } from '../../../lib/presentation/deckModel';
 import { platformInfo } from '../../../lib/adAccounts';
 import { fetchReportLayouts } from '../../../lib/api/projectReportStore';
@@ -132,7 +132,10 @@ export default function ProjectAgentTab({ projectId }) {
   const [tgChats, setTgChats] = useState([]); // chats the bot has seen (the choice for «Telegram-чат»)
   const [tgTest, setTgTest] = useState({ busy: false, ok: null, msg: '' });
 
+  const agentRef = useRef(null); // the agent as the last load saw it: a reload keeps the form when the person has changed it
+  const [tick, setTick] = useState(undefined); // when the clock that starts the agents last answered; undefined: not known
   const load = useCallback(async () => {
+    fetchPlannerHeartbeat().then(setTick);
     const [{ agent: a, missing: m }, accs, ev, profiles, chats, topics, lay] = await Promise.all([fetchAgent(projectId), fetchProjectAccounts(projectId), fetchAgentEvents(projectId), fetchAllProfiles(), fetchTgChats(), fetchTgTopics(), fetchReportLayouts(projectId)]);
     setLayouts(lay);
     setPeople(profiles);
@@ -142,7 +145,10 @@ export default function ProjectAgentTab({ projectId }) {
     setMissing(m);
     setAccounts(accs);
     setEvents(ev);
-    setForm(a ? { ...DEFAULT_AGENT_CONFIG, ...(a.config || {}) } : null);
+    // the settings on the screen are replaced by the saved ones only when the person has not changed them (an action such as «Створити звіт» reloads the tab for minutes)
+    const was = agentRef.current ? { ...DEFAULT_AGENT_CONFIG, ...(agentRef.current.config || {}) } : null;
+    setForm((cur) => (!cur || !was || !a || sameJson(cur, was) ? (a ? { ...DEFAULT_AGENT_CONFIG, ...(a.config || {}) } : null) : cur));
+    agentRef.current = a;
     setLoaded(true);
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
@@ -174,7 +180,7 @@ export default function ProjectAgentTab({ projectId }) {
     if (on && form.telegram?.enabled && !form.telegram?.chatId) throw new Error('Оберіть Telegram-чат для звітів або вимкніть надсилання в Telegram.');
     if (on && form.notify && !(form.notifyEmails || []).length) throw new Error('Оберіть, кому надсилати сповіщення про готові звіти, або вимкніть сповіщення.');
     // enabled_since: the scheduler only starts reports whose scheduled moment came after the agent was switched on.
-    await updateAgent(projectId, { enabled: on, enabled_since: on ? new Date().toISOString() : null, ...(on ? {} : { run_state: 'idle' }) });
+    await updateAgent(projectId, { enabled: on, enabled_since: on ? new Date().toISOString() : null }); // a run that is working goes on to its end (it holds the lock); the switch only stops the next ones
     await addAgentEvent({ projectId, kind: on ? 'enabled' : 'disabled', status: 'info', message: on ? 'Агента ввімкнено.' : 'Агента вимкнено.', createdBy: email });
   });
 
@@ -239,6 +245,9 @@ export default function ProjectAgentTab({ projectId }) {
                 ? <>Останній запуск: {fmtTime(agent.last_run_at)}{agent.enabled && nextRuns(agent.config).length > 0 && <> · Далі: {nextRuns(agent.config).join('; ')}</>}</>
                 : 'Агент допоможе робити тижневі й місячні звіти та презентації для цього проєкту.'}
             </div>
+            {agent?.enabled && tick !== undefined && (!tick || Date.now() - new Date(tick).getTime() > 5 * 60000) && (
+              <div className="pacc-err" role="alert">Планувальник не відповідає{tick ? ` (остання перевірка ${fmtTime(tick)})` : ' (жодної перевірки ще не було)'}: звіти за розкладом не створюватимуться, доки він не запрацює. Запуск вручну працює. Перевірте ключі CRON_SECRET, AGENT_EMAIL й AGENT_PASSWORD на сервері.</div>
+            )}
           </div>
         </div>
         <div className="pag-status-side">
@@ -308,7 +317,7 @@ export default function ProjectAgentTab({ projectId }) {
             </div>
           </PagSection>
 
-          <PagSection title="Розклад" hint="Час за Києвом. Агент перевіряє розклад кожні 15 хвилин, тож звіт зʼявиться в межах чверті години після вказаного часу.">
+          <PagSection title="Розклад" hint="Час за Києвом. Агент перевіряє розклад щохвилини, тож звіт зʼявиться в межах чверті години після вказаного часу.">
             <div className="pag-two">
               <div className={'pag-box' + (form.tasks.weeklyReport ? '' : ' is-off')}>
                 <div className="pag-sub">Тижневий звіт</div>
@@ -384,7 +393,7 @@ export default function ProjectAgentTab({ projectId }) {
                 ) : (
                   <div className="pag-row">
                     <Select value={form.telegram?.chatId || ''} onChange={(v) => setCfg({ telegram: { ...(form.telegram || {}), chatId: v, threadId: '' } })} ariaLabel="Telegram-чат"
-                      options={[{ value: '', label: 'Оберіть чат…' }, ...tgChats.map((c) => ({ value: String(c.chat_id), label: c.title || String(c.chat_id) }))]} />
+                      options={[{ value: '', label: 'Оберіть чат…' }, ...tgChats.filter((c) => c.bot_status !== 'left' && c.bot_status !== 'kicked').map((c) => ({ value: String(c.chat_id), label: c.title || String(c.chat_id) }))]} />
                     <button type="button" className="btn" onClick={sendTgTest} disabled={!form.telegram?.chatId || dirty || tgTest.busy} title={dirty ? 'Спершу збережіть налаштування' : ''}>{tgTest.busy ? 'Надсилаємо…' : 'Надіслати тест'}</button>
                   </div>
                 )}

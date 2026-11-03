@@ -268,7 +268,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
 
           {canCreatives && (
             <section className="wbe-block">
-              <div className="wbe-bh"><Medal n="images" cls="wbe-md" /><b>Most effective creatives</b><span className="wbe-sp" /><span className="wbe-count">{items.length}</span></div>
+              <div className="wbe-bh"><Medal n="images" cls="wbe-md" /><b>Найефективніші креативи</b><span className="wbe-sp" /><span className="wbe-count">{items.length}</span></div>
               {items.length > 0 ? <CreativeGrid items={items} onReplace={(i) => setPicking(i)} onRemove={(i) => setItems(items.filter((_, j) => j !== i))} /> : <div className="pacc-hint">Креативів у звіті ще немає.</div>}
               <div className="wbe-tools">
                 <button type="button" className="btn" disabled={cbusy} onClick={suggest}>{cbusy ? 'Працюємо…' : items.length ? 'Підібрати знову' : 'Підібрати креативи автоматично'}</button>

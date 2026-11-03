@@ -223,7 +223,7 @@ export default function Dashboard() {
           <section className="pd-box">
             <BoxHead
               icon="file" title="Тижневі звіти" sub={doneWeek ? `за ${fmtIso(doneWeek.start)} – ${fmtIso(doneWeek.end)}` : undefined}
-              right={<span className="pd-legsm"><i style={{ background: '#12A144' }} />Фінал<i style={{ background: '#2F6FED' }} />Перевірено<i style={{ background: '#E08A06' }} />Чернетка<i style={{ background: '#A98BB3' }} />Немає</span>}
+              right={<span className="pd-legsm"><i style={{ background: '#12A144' }} />Фінал<i style={{ background: '#2F6FED' }} />Доробка<i style={{ background: '#E08A06' }} />Чернетка<i style={{ background: '#A98BB3' }} />Немає</span>}
             />
             {activeProjects.length === 0 ? (
               <div className="pd-empty">Активних проєктів ще немає.</div>
@@ -256,8 +256,8 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="pd-pbars">
-                  {stats.projectRows.map((p) => (
-                    <div className="pd-pbr" key={p.name}>
+                  {stats.projectRows.map((p, i) => (
+                    <div className="pd-pbr" key={`${i}-${p.name}`}>
                       <span className="pd-pbn"><Medallion tx={initials(p.name)} size="xs" /><b>{p.name}</b></span>
                       <div className="pd-pbb">
                         <div className="pd-pb rv" style={{ width: Math.max((p.revenue / maxRevenue) * 100, 4) + '%' }}><em>{moneyK(p.revenue)}</em></div>
@@ -272,8 +272,8 @@ export default function Dashboard() {
                   <table className="pd-tbl">
                     <thead><tr><th>Проєкт</th><th className="num">Витрати</th><th className="num">Дохід</th><th className="num">ROAS</th></tr></thead>
                     <tbody>
-                      {stats.projectRows.map((p) => (
-                        <tr key={p.name}>
+                      {stats.projectRows.map((p, i) => (
+                        <tr key={`${i}-${p.name}`}>
                           <td className="lbl">{p.name}</td>
                           <td className="num">{moneyFmt(p.spend)}</td>
                           <td className="num">{moneyFmt(p.revenue)}</td>

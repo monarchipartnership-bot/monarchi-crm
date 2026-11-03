@@ -68,3 +68,10 @@ export async function fetchApprovers() {
   if (error) { console.warn('fetchApprovers failed', error); return new Map(); }
   return new Map((data ?? []).map((r) => [r.project_id, (r.config?.approvers || []).map((e) => String(e).toLowerCase())]));
 }
+
+// When the clock that starts the agents last answered (ai_agent_settings.last_tick_at), or null when it never did / cannot be read.
+export async function fetchPlannerHeartbeat() {
+  const { data, error } = await supabase.from('ai_agent_settings').select('last_tick_at').eq('id', 1).maybeSingle();
+  if (error) { console.warn('fetchPlannerHeartbeat failed', error); return undefined; }
+  return data?.last_tick_at || null;
+}

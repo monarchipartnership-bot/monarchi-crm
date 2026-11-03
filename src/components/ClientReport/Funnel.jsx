@@ -129,7 +129,7 @@ export default function FunnelBox({ view, custom = [], builder = false, hint = f
   const sample = !real && builder ? funnelModel({ stages: f.stages, total: SAMPLE_TOTAL, custom, labelOf }) : null;
   const model = real || sample;
   // the team's views say why there is no picture; the client's page just does not show an empty box
-  if (!model) return hint ? <div className="pacc-hint" role="note">Воронка ввімкнена, але в цьому звіті немає чисел етапів (перегляди, кошик, оформлення). Оновіть цифри кнопкою «Підтягнути дані»: стовпці воронки вже додано до кабінету.</div> : null;
+  if (!model) return hint ? <div className="pacc-hint" role="note">Воронка ввімкнена, але в цьому звіті немає чисел етапів (перегляди, кошик, оформлення). Оновіть цифри кнопкою «Підтягнути з кабінетів»: стовпці воронки вже додано.</div> : null;
   return (
     <LangProvider lang={lang}>
       <FunnelBoxInner model={model} sample={!real} section={section} />

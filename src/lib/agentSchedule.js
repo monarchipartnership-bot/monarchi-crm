@@ -78,11 +78,14 @@ export function isDue({ periodType, schedType = periodType, agent, runs, now = n
   const sched = lastScheduled(schedType, cfg.schedule || {}, now);
   if (agent.enabled_since && sched.at < new Date(agent.enabled_since)) return { due: false, reason: 'запланований момент був до вмикання агента' };
   const periodStart = dueStartOf(sched.date);
-  const mine = runs.filter((r) => r.period_start === periodStart);
   // A 'running' row only counts while it is fresh: a run that crashed must not block the project for ever.
   const live = (r) => r.status === 'running' && now.getTime() - new Date(r.started_at).getTime() < 15 * 60000;
+  // A run learns its period only part-way: one that failed before that (no cabinets, project gone) or was killed by the time limit has no period, but it was
+  // an attempt at THIS due report if it started after the scheduled moment. Without this such a failure would be retried every minute for ever.
+  const attempt = (r) => r.period_start == null && (r.status === 'problem' || (r.status === 'running' && !live(r))) && new Date(r.started_at).getTime() >= sched.at.getTime();
+  const mine = runs.filter((r) => r.period_start === periodStart || attempt(r));
   if (mine.some((r) => r.status === 'ok' || r.status === 'skipped' || live(r))) return { due: false, reason: 'вже виконано', scheduledFor: sched.date };
-  const failed = mine.filter((r) => r.status === 'problem');
+  const failed = mine.filter((r) => r.status === 'problem' || (r.status === 'running' && !live(r))); // a killed run (never finished) is a failed attempt, too
   if (failed.length >= MAX_TRIES) return { due: false, reason: 'вичерпано спроби', scheduledFor: sched.date };
   const lastFail = failed.map((r) => new Date(r.finished_at || r.started_at).getTime()).sort((a, b) => b - a)[0];
   if (lastFail && now.getTime() - lastFail < RETRY_AFTER_MIN * 60000) return { due: false, reason: 'чекаємо перед повтором', scheduledFor: sched.date };

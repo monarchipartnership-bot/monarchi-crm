@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     } catch (e) { projectsError = e.message || String(e); }
     // The agent framework (the SMM team's agents): scheduled starts and the queued tasks of the agents that are on.
     let team = { processed: 0 };
-    try { team = await processQueue({ db, model: getModelClient(agent.accessToken), email: agent.email, trigger: 'cron', now: () => new Date() }, { maxMs: 200000 }); } catch (e) { team = { error: e.message || String(e) }; }
+    try { team = await processQueue({ db, model: getModelClient(agent.accessToken), email: agent.email, trigger: 'cron', now: () => new Date() }, { maxMs: Math.max(20000, Math.min(200000, 270000 - (Date.now() - startedAt))) }); // what is left of the 300 s the function may live } catch (e) { team = { error: e.message || String(e) }; }
     // Reminders about website leads nobody has taken yet (off until switched on in the settings).
     let reminders = { sent: 0 };
     try {

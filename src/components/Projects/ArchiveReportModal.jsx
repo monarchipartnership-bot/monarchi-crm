@@ -126,7 +126,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
       )}
       {(data.creatives?.items?.length > 0 || edit) && (
         <div className="arc-creatives">
-          <div className="arc-block-title"><span className="arc-bi"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-8 8" /></svg></span>Most effective creatives</div>
+          <div className="arc-block-title"><span className="arc-bi"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-8 8" /></svg></span>Найефективніші креативи</div>
           {data.creatives?.items?.length > 0 ? (
             <CreativeGrid items={data.creatives.items} onReplace={edit ? edit.onReplace : undefined} onRemove={edit ? edit.onRemove : undefined} />
           ) : (
