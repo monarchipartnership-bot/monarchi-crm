@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ReportBody } from './ArchiveReportModal';
+import { waitFor } from '../../lib/waitFor';
 import { monthBlocks, platformEn, rowBlock, sheetNameOf } from '../../lib/reportWorkbook';
 import { saveReportWorkbook } from '../../lib/reportWorkbookExport';
 import useWorkAreaLeft from '../../lib/useWorkArea';
@@ -47,7 +48,7 @@ const FORMATS = [['xlsx', 'Excel'], ['csv', 'CSV'], ['pdf', 'PDF']];
 
 // The combined document of a month: the weeks one under another, then the month. It is a view of the saved reports, nothing is stored or pulled
 // again, so it opens at once. The same order is used by the page the client gets. Every block folds, a ribbon of contents jumps between them.
-export default function MonthDocument({ month, projectName, custom, extraKeys, onClose }) {
+export default function MonthDocument({ month, projectName, custom, extraKeys, onClose, lang = null }) {
   const box = useRef(null);
   const body = useRef(null);
   useDialogA11y(box, onClose);
@@ -82,10 +83,10 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
   useEffect(() => {
     if (!job) return undefined;
     let off = false;
-    const t = setTimeout(async () => {
-      try { await exportApi.current?.run(job.kind); if (!off) setMenu(false); } catch (e) { console.warn('export failed', e); if (!off) setDlError('Не вдалося зберегти файл.'); } finally { if (!off) setJob(null); }
-    }, 400);
-    return () => { off = true; clearTimeout(t); };
+    (async () => {
+      try { const handle = await waitFor(() => exportApi.current); await handle.run(job.kind); if (!off) setMenu(false); } catch (e) { console.warn('export failed', e); if (!off) setDlError('Не вдалося зберегти файл.'); } finally { if (!off) setJob(null); }
+    })();
+    return () => { off = true; };
   }, [job]);
   // Excel is the one-sheet file made from the saved rows (the weeks one under another, then the month; or one block); CSV and PDF come from the report mounted out of sight
   const [xbusy, setXbusy] = useState('');
@@ -94,8 +95,8 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
     setXbusy(id + ':xlsx');
     try {
       const platform = (weeks[0]?.row || monthly)?.platform || 'all';
-      if (sec) await saveReportWorkbook([rowBlock(sec.row, { custom, extraKeys: extraKeys(sec.row) })], { filename: `${projectName}_${sec.row.period_type}_${sec.row.period_start}_${sec.row.platform}`, sheetName: sheetNameOf(sec.row) });
-      else await saveReportWorkbook(monthBlocks(month, { custom, extraKeysOf: extraKeys }), { filename: `${projectName}_month_${month.key}_${platform}`, sheetName: [platformEn(platform), month.label.split(' ')[0]].filter(Boolean).join(' | ') });
+      if (sec) await saveReportWorkbook([rowBlock(sec.row, { custom, extraKeys: extraKeys(sec.row), lang })], { filename: `${projectName}_${sec.row.period_type}_${sec.row.period_start}_${sec.row.platform}`, sheetName: sheetNameOf(sec.row) });
+      else await saveReportWorkbook(monthBlocks(month, { custom, extraKeysOf: extraKeys, lang }), { filename: `${projectName}_month_${month.key}_${platform}`, sheetName: [platformEn(platform), month.label.split(' ')[0]].filter(Boolean).join(' | ') });
       setMenu(false);
     } catch (e) { console.warn('export failed', e); setDlError('Не вдалося зберегти файл.'); } finally { setXbusy(''); }
   }
@@ -205,7 +206,7 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
                   </button>
                   {isOpen && (
                     <div className="md-acb" id={'md-panel-' + s.id}>
-                      <ReportBody row={s.row} projectName={projectName} custom={custom} extraKeys={extraKeys(s.row)} noExport />
+                      <ReportBody row={s.row} projectName={projectName} custom={custom} extraKeys={extraKeys(s.row)} lang={lang} noExport />
                     </div>
                   )}
                 </section>
@@ -222,7 +223,7 @@ export default function MonthDocument({ month, projectName, custom, extraKeys, o
       </div>
       {jobSection && (
         <div className="md-offscreen" aria-hidden="true">
-          <ReportBody row={jobSection.row} projectName={projectName} custom={custom} extraKeys={extraKeys(jobSection.row)} noExport exportApi={exportApi} />
+          <ReportBody row={jobSection.row} projectName={projectName} custom={custom} extraKeys={extraKeys(jobSection.row)} lang={lang} noExport exportApi={exportApi} />
         </div>
       )}
     </div>

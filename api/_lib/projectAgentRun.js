@@ -143,10 +143,12 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
 
     // «Most effective creatives»: asked once for the Meta accounts, as many as the Meta layout says. A failure is a note, never a failed run.
     let metaCreatives; // undefined: not asked yet
+    let noToken = false;
     const creativesFor = async (scope) => {
-      if (scope !== 'meta' || !creatives || !layouts.meta) return null;
+      if (scope !== 'meta' || !layouts.meta) return null;
       const creativeTotal = creativeCount(layouts.meta, periodType);
       if (!creativeTotal) return null;
+      if (!creatives) { if (!noToken) { noToken = true; notes.push('Креативи не підібрано: на сервері не налаштовано META_ACCESS_TOKEN.'); } return null; }
       if (metaCreatives === undefined) {
         metaCreatives = null;
         if (platformIds.includes('meta')) {
@@ -185,6 +187,8 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
           if (result.empty) notes.push(who + result.empty);
           else if (result.writer !== 'ai') notes.push(who + 'Автоматичне оформлення «What was done» було недоступне: у звіті сирий список дій, його варто відредагувати.');
           Object.entries(result.info?.errors || {}).forEach(([p, m]) => notes.push(`Історія змін ${PLATFORM_NAMES[p] || p}: ${m}`));
+          // the month text was merged from the weeks that have one: the weeks without a text are not in it, and the person must know
+          if (result.info?.kind === 'weeks' && result.info.missing > 0 && !result.empty) notes.push(`${who}«What was done» зібрано з тижневих текстів: ${result.info.weeks.length} з ${result.info.weeks.length + result.info.missing} тижнів мають текст. Решти тижнів у ньому немає.`);
         } catch (e) {
           notes.push(`${scopeName(scope)}: не вдалося сформувати «What was done»: ${e.message || e}`);
         }

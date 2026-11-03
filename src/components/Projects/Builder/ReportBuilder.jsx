@@ -73,7 +73,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
       if (off) return;
       // a layout that is not saved yet starts from what the project showed so far: all its groups of this platform
       const layout = r.exists ? r.layout : { ...r.layout, campaignSel: { ...r.layout.campaignSel, groups: groupsForPlatform(ctx.groups, platform).map((g) => g.id) } };
-      setState({ saved: r.exists ? r.layout : normalizeTemplate(null), draft: layout, exists: r.exists });
+      setState({ saved: r.exists ? r.layout : normalizeTemplate(null), draft: layout, exists: r.exists, stamp: r.updatedAt });
     }).catch((e) => { if (!off) setLayoutError(e.message || 'Не вдалося завантажити макет.'); });
     return () => { off = true; };
   }, [projectId, platform]);
@@ -132,8 +132,14 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
     setSaving(true);
     setError('');
     try {
+      // somebody saved this layout after it was opened here: the person is told before it is overwritten
+      if (state.exists) {
+        const now = await fetchReportLayout(projectId, platform);
+        if (now.updatedAt && state.stamp && now.updatedAt !== state.stamp && !(await confirm({ title: 'Макет уже змінили', body: 'Цей макет збережено іншою людиною (або в іншій вкладці) після того, як ви його відкрили. Ваше збереження перезапише ті зміни.', confirmLabel: 'Перезаписати', cancelLabel: 'Скасувати' }))) { setSaving(false); return; }
+      }
       const t = await saveReportLayout(projectId, platform, draft, email);
-      setState({ saved: t, draft: t, exists: true });
+      const after = await fetchReportLayout(projectId, platform);
+      setState({ saved: t, draft: t, exists: true, stamp: after.updatedAt });
       onConfigChanged?.();
       setMessage('Макет збережено. Він діє у ручних звітах, в агента й на сторінці клієнта; створені раніше звіти не змінюються.');
     } catch (e) { setError(e.message || 'Не вдалося зберегти макет.'); } finally { setSaving(false); }

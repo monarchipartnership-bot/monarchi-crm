@@ -197,7 +197,7 @@ export function sheetNameOf(row) {
 }
 
 // A month card of the history (buildMonths) → the blocks of the sheet: the weeks in their order, then the month summary.
-export function monthBlocks(month, { custom = [], extraKeysOf = () => [] } = {}) {
+export function monthBlocks(month, { custom = [], extraKeysOf = () => [], lang = null } = {}) {
   const rows = [...month.weeks.filter((w) => w.row).map((w) => w.row), ...(month.monthly ? [month.monthly] : [])];
-  return rows.map((row) => rowBlock(row, { custom, extraKeys: extraKeysOf(row) })).filter(Boolean);
+  return rows.map((row) => rowBlock(row, { custom, extraKeys: extraKeysOf(row), lang })).filter(Boolean);
 }

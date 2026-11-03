@@ -72,3 +72,32 @@ begin
 end $$;
 revoke all on function get_shared_report(text) from public;
 grant execute on function get_shared_report(text) to anon, authenticated;
+
+-- Who made a link is the signed-in person (the token's e-mail), not whatever the caller writes in `p_by`.
+create or replace function issue_report_share(p_project bigint, p_platform text default 'all', p_by text default null)
+returns text language plpgsql as $$
+declare
+  t text := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
+begin
+  update report_shares set active = false, revoked_at = now() where project_id = p_project and platform = p_platform and active and report_id is null;
+  insert into report_shares (project_id, platform, token, created_by) values (p_project, p_platform, t, coalesce(nullif(auth.jwt() ->> 'email', ''), p_by));
+  return t;
+end $$;
+revoke all on function issue_report_share(bigint, text, text) from public, anon;
+grant execute on function issue_report_share(bigint, text, text) to authenticated;
+
+create or replace function issue_report_share_for_report(p_report bigint, p_by text default null)
+returns text language plpgsql as $$
+declare
+  r project_reports%rowtype;
+  t text := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
+begin
+  select * into r from project_reports where id = p_report;
+  if not found then raise exception 'Report not found'; end if;
+  if r.period_type <> 'custom' then raise exception 'Only a custom report has its own link'; end if;
+  update report_shares set active = false, revoked_at = now() where report_id = p_report and active;
+  insert into report_shares (project_id, platform, token, created_by, report_id) values (r.project_id, r.platform, t, coalesce(nullif(auth.jwt() ->> 'email', ''), p_by), p_report);
+  return t;
+end $$;
+revoke all on function issue_report_share_for_report(bigint, text) from public, anon;
+grant execute on function issue_report_share_for_report(bigint, text) to authenticated;

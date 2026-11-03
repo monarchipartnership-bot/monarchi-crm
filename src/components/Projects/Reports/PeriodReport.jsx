@@ -63,6 +63,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   const [decks, setDecks] = useState([]);
   const [savedLoaded, setSavedLoaded] = useState(false);
   const applied = useRef('');
+  const keepNotice = useRef(false); // set by a save: the reload that follows it must not erase «Збережено…» and the warnings
   const [data, setData] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
   // the template snapshot of the opened saved report (it keeps its own blocks and metrics); null for a new one, which takes the project's current template
@@ -166,8 +167,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       setMeta({ source: 'manual', id: null });
     }
     setDirty(false);
-    setMessage('');
-    setErrors({});
+    if (keepNotice.current) keepNotice.current = false; else { setMessage(''); setErrors({}); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saved, savedLoaded, period.start, projectId, periodType, dirty]);
 
@@ -192,6 +192,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       setErrors(pulled.errors);
       if (!Object.keys(pulled.data?.platforms || {}).length) { setMessage(Object.values(pulled.errors || {})[0] || 'Кабінети не повернули даних за цей період.'); return; } // nothing came: nothing to save
       setData(pulled.data);
+      setSnap((s) => (s?.metrics ? { ...s, metrics: [...s.metrics, ...ctx.extraKeys.filter((k) => !s.metrics.includes(k))] } : s));
       setDirty(true);
       // The period is on screen: offer a comparison (unless it is set already or switched off).
       if (!quiet && !c && !askOff) setModal('ask');
@@ -215,6 +216,8 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     try {
       const before = await fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups, undefined, ctx.fetchColumns, ctx.selections);
       if (curKey.current !== startedFor) return;
+      const failure = Object.values(before.errors || {})[0];
+      if (failure && !Object.keys(before.platforms || {}).length) { setMessage('Не вдалося отримати дані для порівняння: ' + failure); return; } // nothing came: no empty comparison
       setData((d) => ({ ...d, previous: { period: { start: pv.start, end: pv.end }, platforms: before.platforms } }));
     } catch (e) {
       setMessage(e.message || 'Не вдалося отримати дані для порівняння.');
@@ -236,6 +239,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     setStatus(row.status);
     setMeta({ source: row.source, id: row.id });
     setDirty(false);
+    keepNotice.current = true;
     return row;
   }
   // «Зберегти чернетку»: the report waits in «Робота над звітами» (a report returned for rework stays in rework).

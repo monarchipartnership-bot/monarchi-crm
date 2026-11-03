@@ -193,6 +193,7 @@ export default function ProjectAgentTab({ projectId }) {
   // The agent works as its own user on the server and answers when it is done (up to a few minutes).
   const runNow = () => run('run', async () => {
     if (dirty) throw new Error('Спершу збережіть налаштування, потім запускайте агента.');
+    if (!(await confirm({ title: 'Запустити агента зараз?', body: 'Агент ще раз складе звіт за поточний період: його власну чернетку буде оновлено (те, що ви вже змінили руками, він не чіпає), сповіщення й Telegram підуть знову, а на ШІ-тексти витратяться токени.', confirmLabel: 'Запустити' }))) return;
     setRunResult(null);
     const res = await authedPost('/api/project-agent-run', { projectId: Number(projectId), periodType: runType });
     setRunResult(res);

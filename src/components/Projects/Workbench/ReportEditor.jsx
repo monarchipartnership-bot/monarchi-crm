@@ -9,7 +9,7 @@ import CreativePickerDialog from '../CreativePickerDialog';
 import ShareLinkBox from '../ShareLinkBox';
 import { Panel, PanelContext, SelectionPanel, Switch } from '../Builder/BuilderSettings';
 import { reportPeriodText, reportPlatformLabel } from '../ArchiveReportModal';
-import { deleteProjectReport, fetchReportLayout, refreshMonthTotal, saveReportData } from '../../../lib/api/projectReportStore';
+import { deleteProjectReport, fetchReportLayout, fetchReportShareFor, refreshMonthTotal, saveReportData } from '../../../lib/api/projectReportStore';
 import { suggestCreatives } from '../../../lib/api/reportCreatives';
 import { extraKeysOf } from '../../../lib/projectReportContext';
 import { groupsForPlatform, selectionFromColumns } from '../../../lib/campaignGroups';
@@ -147,6 +147,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const canCreatives = platform === 'meta' || isAll;
   const setItems = (next) => edit((d) => ({ ...d, creatives: { count, items: next, source: 'manual', at: new Date().toISOString() } }));
   async function suggest() {
+    if (items.length && !(await confirm({ title: 'Підібрати креативи знову?', body: 'Поточні креативи звіту (в тому числі обрані вручну) буде замінено автоматичним добором.', confirmLabel: 'Замінити' }))) return;
     setCbusy(true);
     setCerr('');
     try {
@@ -178,7 +179,9 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
     } catch (e) { setError(e.message || 'Не вдалося підтвердити звіт.'); setBusy(''); }
   }
   async function remove() {
-    if (!(await confirm({ title: 'Видалити звіт?', body: 'Видалити цей звіт? Дію не можна скасувати.', confirmLabel: 'Видалити звіт', danger: true }))) return;
+    let linked = false;
+    if (isCustom) { try { linked = Boolean(await fetchReportShareFor(row.id)); } catch { /* the warning only gets less exact */ } }
+    if (!(await confirm({ title: 'Видалити звіт?', body: 'Видалити цей звіт? Дію не можна скасувати.' + (linked ? ' Посилання, надіслане клієнту, одразу перестане працювати.' : ''), confirmLabel: 'Видалити звіт', danger: true }))) return;
     setBusy('delete');
     try { await deleteProjectReport(row.id); await onChanged(); onBack(); } catch (e) { setError(e.message || 'Не вдалося видалити.'); setBusy(''); }
   }

@@ -6,7 +6,7 @@ import { G, Legend, Spark, TrendChart, StatusDonut, PlatformRings, money, moneyK
 import { lastCompletedWeek } from '../../lib/periodReport';
 import { fetchProjects } from '../../lib/api/projects';
 import { platformInfo } from '../../lib/adAccounts';
-import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatuses, fetchAgentDrafts } from '../../lib/api/projectReportStore';
+import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatuses, fetchAgentDrafts, readFailures } from '../../lib/api/projectReportStore';
 import { fetchAgentsOverview } from '../../lib/api/projectAgents';
 import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, MONTH_NAMES } from '../../lib/dateHelpers';
 import { PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
@@ -66,6 +66,7 @@ export default function Dashboard() {
     let cancelled = false;
     setLoading(true);
     setLoadError('');
+    const failuresBefore = readFailures.count;
     Promise.all([
       fetchProjects(),
       fetchAllWeeklyReportsForWeek(thisWeekStartIso),
@@ -78,6 +79,7 @@ export default function Dashboard() {
       fetchAgentDrafts(),
     ])
       .then(([projs, tw, lw, tm, pm, trend, statuses, agents, drafts]) => {
+        if (!cancelled && readFailures.count > failuresBefore) setLoadError('частина звітів не завантажилась');
         if (cancelled) return;
         setProjects(projs);
         setThisWeekRows(tw);

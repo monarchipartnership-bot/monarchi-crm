@@ -105,9 +105,13 @@ export default function PeriodStats({ projectId, platform = 'total', version = 0
     if (state.status !== 'ok') return;
     if (!c) { setState((st) => ({ ...st, data: { ...st.data, previous: null }, prev: null })); return; }
     const prev = compareRange(state.range, c);
+    const mine = runSeq.current; // a run of other dates or another platform started meanwhile: this answer is dropped
     setState((st) => ({ ...st, comparing: true }));
     try {
       const before = await fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, ctx.fetchColumns, ctx.selections);
+      if (mine !== runSeq.current) return;
+      const failure = Object.values(before.errors || {})[0];
+      if (failure && !Object.keys(before.platforms || {}).length) { setState((st) => ({ ...st, comparing: false, compareError: 'Не вдалося отримати дані для порівняння: ' + failure })); return; } // nothing came: no empty comparison chip
       setState((st) => ({ ...st, comparing: false, data: { ...st.data, previous: { platforms: before.platforms } }, prev }));
     } catch (e) {
       setState((st) => ({ ...st, comparing: false, compareError: e.message || 'Не вдалося отримати дані для порівняння.' }));

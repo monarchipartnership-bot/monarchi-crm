@@ -14,6 +14,9 @@ function nowIso() { return new Date().toISOString(); }
 // ---- Reports ----
 // `platform` (optional) = one scope: a platform id or 'all' («Разом»); without it every scope comes back.
 // `strict`: a failure is thrown instead of becoming an empty list (a screen that must tell «could not load» from «no reports»).
+// How many reads of the cross-project lists (the dashboard) failed and were turned into an empty list: the dashboard compares it before and after loading to say so.
+export const readFailures = { count: 0 };
+
 export async function fetchProjectReports(projectId, periodType, platform, strict = false) {
   let q = supabase
     .from('project_reports').select('*')
@@ -48,7 +51,7 @@ export async function saveProjectReport({ projectId, periodType, periodStart, pe
 export async function fetchAgentDrafts() {
   const { data, error } = await supabase.from('project_reports').select('id, project_id, period_type, period_start, period_end, platform, updated_at')
     .eq('source', 'agent').eq('status', 'draft').order('updated_at', { ascending: false }).limit(100);
-  if (error) { console.warn('fetchAgentDrafts failed', error); return []; }
+  if (error) { readFailures.count += 1; console.warn('fetchAgentDrafts failed', error); return []; }
   return data ?? [];
 }
 
@@ -161,7 +164,7 @@ export async function deleteCustomMetric(id) {
 // Which projects have a weekly report for the week starting `periodStart`, and in what state.
 export async function fetchWeeklyReportStatuses(periodStart) {
   const { data, error } = await supabase.from('project_reports').select('project_id, status').eq('period_type', 'weekly').eq('period_start', periodStart);
-  if (error) { console.warn('fetchWeeklyReportStatuses failed', error); return []; }
+  if (error) { readFailures.count += 1; console.warn('fetchWeeklyReportStatuses failed', error); return []; }
   return collapseStatuses(data ?? []);
 }
 
@@ -179,7 +182,7 @@ function mondayIsoOf(iso) {
 
 async function weeklyBetween(startIso, endIso) {
   const { data, error } = await supabase.from('project_reports').select('*').eq('period_type', 'weekly').gte('period_start', startIso).lte('period_start', endIso).order('period_start', { ascending: true });
-  if (error) { console.warn('weeklyBetween failed', error); return []; }
+  if (error) { readFailures.count += 1; console.warn('weeklyBetween failed', error); return []; }
   return data ?? [];
 }
 
@@ -199,7 +202,7 @@ export async function fetchWeeklyReportsBetween(startIso, endIso) {
 
 export async function fetchAllMonthlyReportsForMonth(monthStartIso) {
   const { data, error } = await supabase.from('project_reports').select('*').eq('period_type', 'monthly').eq('period_start', monthStartIso);
-  if (error) { console.warn('fetchAllMonthlyReportsForMonth failed', error); return []; }
+  if (error) { readFailures.count += 1; console.warn('fetchAllMonthlyReportsForMonth failed', error); return []; }
   return flatten(data ?? [], () => ({ month_start: monthStartIso }));
 }
 
@@ -240,11 +243,11 @@ export async function revokeReportShareFor(reportId) {
 
 // ---- The report layout of a project, one per ad platform (migration 20261035000000_report_layouts.sql) ----
 // → { exists, layout }: the saved layout, or the standard one (exists false) when nothing is saved yet (or the table is not there yet).
-const fromRow = (row) => (row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics, metricOrder: row.metric_order, baseMetrics: row.base_metrics, funnel: row.funnel, campaignSel: row.campaign_selection } : null);
+const fromRow = (row) => (row ? { updatedAt: row.updated_at, kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics, metricOrder: row.metric_order, baseMetrics: row.base_metrics, funnel: row.funnel, campaignSel: row.campaign_selection } : null);
 export async function fetchReportLayout(projectId, platform) {
-  const { data, error } = await supabase.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics, metric_order, base_metrics, funnel, campaign_selection').eq('project_id', projectId).eq('platform', platform).maybeSingle();
+  const { data, error } = await supabase.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics, metric_order, base_metrics, funnel, campaign_selection, updated_at').eq('project_id', projectId).eq('platform', platform).maybeSingle();
   if (error) throw error; // not «no layout»: a screen that took the standard one for it would save over the real layout
-  return { exists: Boolean(data), layout: normalizeTemplate(fromRow(data)) };
+  return { exists: Boolean(data), layout: normalizeTemplate(fromRow(data)), updatedAt: data?.updated_at || null };
 }
 // platform → the layout, only for the platforms that have one saved.
 export async function fetchReportLayouts(projectId) {

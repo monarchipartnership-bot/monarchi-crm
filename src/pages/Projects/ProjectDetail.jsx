@@ -42,8 +42,8 @@ const TABS = [
   { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
-  { key: 'agent', label: 'AI Агент', icon: PAGE_ICONS['page.ai-agents'].src },
-  { key: 'creative', label: 'AI-агенти', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
+  { key: 'agent', label: 'Агент звітів', icon: PAGE_ICONS['page.ai-agents'].src },
+  { key: 'creative', label: 'AI-креативи', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
 ];
 
 const STATUSES = ['active', 'paused', 'completed'];

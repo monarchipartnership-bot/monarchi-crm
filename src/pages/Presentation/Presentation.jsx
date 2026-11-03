@@ -17,6 +17,7 @@ import { cleanColumns } from '../../lib/platformColumns';
 import { periodFromPicker } from '../../lib/periodReport';
 import { computeWeeksForMonth, defaultWeekIndexFor, isoDate } from '../../lib/dateHelpers';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import '../../styles/presentationSlides.css';
 import '../../styles/presentationBuilder.css';
 
@@ -46,6 +47,7 @@ function initialSel(params) {
 // slide, exported to PDF or PPTX and saved with the report.
 export default function Presentation() {
   const navigate = useNavigate();
+  const [confirm, confirmDialog] = useConfirm();
   const [params] = useSearchParams();
   const { email } = useAuth();
   const [sel, setSel] = useState(() => initialSel(params));
@@ -110,7 +112,9 @@ export default function Presentation() {
         }
         // A report that has data for only one platform: switch to it.
         const have = row ? Object.keys(row.data?.platforms || {}) : [];
-        if (row && have.length && !have.includes(sel.platform)) setSel((s) => ({ ...s, platform: have[0] }));
+        const supported = have.filter((p) => p === 'meta' || p === 'google');
+        if (row && have.length && !supported.length) setMessage('Презентацію поки можна зробити лише для Meta і Google. У цьому звіті є дані тільки для: ' + have.join(', ') + '.');
+        else if (row && supported.length && !have.includes(sel.platform)) setSel((s) => ({ ...s, platform: supported[0] }));
       } catch (e) {
         if (!off) { setReportState('none'); setMessage(e.message || 'Не вдалося завантажити дані.'); }
       }
@@ -124,7 +128,7 @@ export default function Presentation() {
 
   async function build() {
     if (!report || !project) return;
-    if (deck.slides.length && !window.confirm('Усі слайди буде замінено новою презентацією зі звіту, включно з ручними правками. Це можна скасувати кнопкою «Скасувати». Продовжити?')) return;
+    if (deck.slides.length && !(await confirm({ title: 'Замінити презентацію?', body: 'Усі слайди буде замінено новою презентацією зі звіту, включно з ручними правками. Це можна скасувати кнопкою «Скасувати».', confirmLabel: 'Замінити' }))) return;
     setBuilding(true);
     setMessage('');
     try {
@@ -155,7 +159,7 @@ export default function Presentation() {
       setSavedAt(row.updated_at);
       setMessage('');
     } catch (e) {
-      setMessage((e.message || 'Не вдалося зберегти.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261009000000.');
+      setMessage(e.message || 'Не вдалося зберегти.');
     } finally {
       setSaveBusy(false);
     }
@@ -211,6 +215,7 @@ export default function Presentation() {
         onExport={exportDeck} exportBusy={exportBusy} exportMessage={exportMessage}
         onStyle={(style) => update((d) => setMeta(d, { style }))}
       />
+      {confirmDialog}
     </div>
   );
 }

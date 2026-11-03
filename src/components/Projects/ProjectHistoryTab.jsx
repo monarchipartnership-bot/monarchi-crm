@@ -159,7 +159,7 @@ export default function ProjectHistoryTab({ projectId }) {
       {row ? (
         <span className="ph-act">
           {(isRunning(row, today()) ? [] : reportActions(row.status, approver)).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
-          {Object.keys(row.data?.platforms || {}).length > 0 && <ReportDownload row={row} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, row)} />}
+          {Object.keys(row.data?.platforms || {}).length > 0 && <ReportDownload row={row} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, row)} lang={ctx.project?.report_lang} />}
           <button type="button" className="btn" onClick={() => (row.status === 'final' ? setOpenId(row.id) : navigate(`/projects/${projectId}?tab=work&report=${row.id}&platform=${row.platform}`))}>Відкрити</button>
         </span>
       ) : <span className="ph-missing">Зʼявиться, коли агент або менеджер створить звіт за цей період.</span>}
@@ -258,12 +258,12 @@ export default function ProjectHistoryTab({ projectId }) {
       )}
       {open && (
         <ArchiveReportModal
-          row={open} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, open)}
+          row={open} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, open)} lang={ctx.project?.report_lang}
           actions={isRunning(open, today()) ? [] : reportActions(open.status, approver)} onAction={onAction} onChanged={load}
           onClose={() => setOpenId(null)} onDelete={remove} onPresentation={presentation}
         />
       )}
-      {doc && <MonthDocument month={doc} projectName={projectName} custom={ctx.custom} extraKeys={(r) => extraKeysOf(ctx.columns, r)} onClose={() => setDocKey(null)} />}
+      {doc && <MonthDocument month={doc} projectName={projectName} custom={ctx.custom} extraKeys={(r) => extraKeysOf(ctx.columns, r)} lang={ctx.project?.report_lang} onClose={() => setDocKey(null)} />}
       {returning && (
         <ReportReturnDialog
           title={`${reportPlatformLabel(returning.platform)} · ${reportPeriodText(returning)}`}
