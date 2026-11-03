@@ -132,3 +132,5 @@
 .project-detail-page.pw .wbe-lang-b.on { background: linear-gradient(135deg, #AE40AE, #682768); color: #fff; box-shadow: 0 3px 8px -2px #68276888; }
 .project-detail-page.pw .wbe-lang-b:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
 .project-detail-page.pw .wbe-lang-b:disabled { opacity: .45; cursor: default; }
+.project-detail-page.pw .ov-field-hint { margin-top: 6px; font: 500 12px 'Onest', sans-serif; color: #8c6a96; line-height: 1.4; }
+@media (max-width: 760px) { .project-detail-page.pw .wbe-bar { position: static; } } /* on a phone the bar of a report has six controls: it scrolls away instead of covering the page */
