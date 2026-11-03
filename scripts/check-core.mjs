@@ -3016,6 +3016,15 @@ await ok('report language: English as ever by default, the project sets Ukrainia
   assert.equal(normLang('fr'), 'en'); assert.equal(normLang(null), 'en');
 });
 
+await ok('every server file of api/ parses (a syntax slip there takes the cron and the endpoints down on production, and importing the file in a test is not always done)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const { spawnSync } = await import('node:child_process');
+  const files = ['api', 'api/_lib'].flatMap((d) => readdirSync(d).filter((f) => f.endsWith('.js')).map((f) => `${d}/${f}`));
+  assert.ok(files.length > 20);
+  const bad = files.map((f) => ({ f, r: spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' }) })).filter((x) => x.r.status !== 0).map((x) => `${x.f}: ${String(x.r.stderr).split('
+').slice(0, 4).join(' ')}`);
+  assert.deepEqual(bad, []);
+});
 await ok('own metric keys are Latin and unique; a link is safe; a client deck leaves out what the eye hid and keeps the client blocks', () => {
   assert.equal(slugKey('Дохід на клік'), 'custom_dokhid_na_klik');
   assert.equal(slugKey('Дохід на клік', ['custom_dokhid_na_klik']), 'custom_dokhid_na_klik_2'); // never the key of another metric
