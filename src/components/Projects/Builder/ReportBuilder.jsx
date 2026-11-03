@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useConfirm } from '../../common/ConfirmDialog';
@@ -47,13 +47,16 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
   const [error, setError] = useState('');
   const [openPanel, setOpenPanel] = useState('blocks'); // the settings panels are an accordion: one open at a time
 
+  const [ctxError, setCtxError] = useState('');
+  const [layoutError, setLayoutError] = useState('');
+  const realSeq = useRef(0);
   const reload = useCallback(async () => {
     const [c, groups] = await Promise.all([loadReportContext(projectId), fetchCampaignGroups(projectId)]);
     setCtx({ ...c, groups });
   }, [projectId]);
   // after a change that the report pages must pick up (a saved layout, groups, metrics)
   const changed = useCallback(async () => { await reload(); onConfigChanged?.(); }, [reload, onConfigChanged]);
-  useEffect(() => { reload().catch(() => setCtx({ project: null, accounts: [], custom: [], columns: {}, groups: [] })); }, [reload]);
+  useEffect(() => { setCtxError(''); reload().catch((e) => setCtxError(e.message || 'Не вдалося завантажити проєкт.')); }, [reload]);
 
   const platforms = useMemo(() => (ctx ? accountPlatforms(ctx.accounts) : []), [ctx]);
   const wanted = params.get('platform');
@@ -65,12 +68,13 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
     setState(null);
     setReal({ data: null, period: null, busy: false, error: '' });
     setMessage('');
+    setLayoutError('');
     fetchReportLayout(projectId, platform).then((r) => {
       if (off) return;
       // a layout that is not saved yet starts from what the project showed so far: all its groups of this platform
       const layout = r.exists ? r.layout : { ...r.layout, campaignSel: { ...r.layout.campaignSel, groups: groupsForPlatform(ctx.groups, platform).map((g) => g.id) } };
       setState({ saved: r.exists ? r.layout : normalizeTemplate(null), draft: layout, exists: r.exists });
-    });
+    }).catch((e) => { if (!off) setLayoutError(e.message || 'Не вдалося завантажити макет.'); });
     return () => { off = true; };
   }, [projectId, platform]);
 
@@ -79,6 +83,13 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
   const [campaignProblem, setCampaignProblem] = useState('');
   const dirty = Boolean(state) && JSON.stringify(normalizeTemplate(state.draft)) !== JSON.stringify(state.saved);
   const set = (patch) => { setState((s) => ({ ...s, draft: { ...s.draft, ...patch } })); setMessage(''); };
+  // closing the tab or leaving the site with changes that are not saved: the browser asks first
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   const kind = draft ? draft.kind || projectKind(ctx?.project) : 'ecom';
   const platformAccounts = useMemo(() => (ctx ? accountsForTab(ctx.accounts, platform) : []), [ctx, platform]);
@@ -106,7 +117,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
       ...sel.campaigns.filter((k) => k.startsWith(platform + '|')).map((k) => ({ id: `c:${k}`, name: k.slice(platform.length + 1), kind: 'campaign' })),
     ];
   }, [draft, campaignList, platform, platformGroups]);
-  const view = useMemo(() => (draft ? builderView({ layout: draft, periodType, kind, columns: skeleton, data: real.data, period: real.period }) : null), [draft, periodType, kind, skeleton, real.data, real.period]);
+  const view = useMemo(() => (draft ? builderView({ layout: draft, periodType, kind, columns: skeleton, data: real.data, period: real.period, lang: ctx?.project?.report_lang }) : null), [draft, periodType, kind, skeleton, real.data, real.period, ctx?.project?.report_lang]);
   const keys = useMemo(() => (view ? viewKeys(view, model, { all: true }) : []), [view, model]);
 
   async function pick(next) {
@@ -129,19 +140,22 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
   }
 
   async function loadReal() {
+    const mine = ++realSeq.current;
     setReal((r) => ({ ...r, busy: true, error: '' }));
     try {
       const due = dueReportPeriod(periodType, todayIso());
       const prev = comparisonPeriod(periodType, due.picker, due.period, { mode: 'calendar' });
       const { data, errors } = await pullReportData({ accounts: platformAccounts, kind, groups: platformGroups, period: due.period, prev, columns: { [platform]: extraKeys }, selections: { [platform]: draft.campaignSel } });
       if (!data.platforms[platform]) throw new Error(Object.values(errors)[0] || 'Кабінет не повернув даних за цей період.');
-      setReal({ data, period: due.period, busy: false, error: '' });
-    } catch (e) { setReal({ data: null, period: null, busy: false, error: (e.message || 'Не вдалося отримати дані.') + ' Цифри підтягуються лише на робочому сайті.' }); }
+      if (mine === realSeq.current) setReal({ data, period: due.period, busy: false, error: '' });
+    } catch (e) { if (mine === realSeq.current) setReal({ data: null, period: null, busy: false, error: e.message || 'Не вдалося отримати дані.' }); }
   }
-  useEffect(() => { setReal({ data: null, period: null, busy: false, error: '' }); }, [periodType, kind]);
+  useEffect(() => { realSeq.current += 1; setReal({ data: null, period: null, busy: false, error: '' }); }, [periodType, kind, platform]);
 
+  if (ctxError && !ctx) return <div><div className="pacc-err" role="alert">Не вдалося завантажити конструктор: {ctxError}</div><button type="button" className="btn" onClick={() => { setCtxError(''); reload().catch((e) => setCtxError(e.message || 'Не вдалося завантажити проєкт.')); }}>Повторити</button></div>;
   if (!ctx) return <div className="empty-hint">Завантаження...</div>;
   if (!platforms.length) return <div className="empty-hint">Конструктор зʼявиться, коли до проєкту підключено рекламний кабінет (Meta або Google) на вкладці «Огляд».</div>;
+  if (layoutError) return <div className="pacc-err" role="alert">Не вдалося завантажити макет: {layoutError}. Збереження вимкнено, щоб не перезаписати справжній макет. Оновіть сторінку.</div>;
   if (!state || !draft) return <div className="empty-hint">Завантаження...</div>;
 
   const label = platformInfo(platform).label;

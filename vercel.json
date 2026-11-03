@@ -6,10 +6,16 @@
     "api/smm-generate.js": { "maxDuration": 300 },
     "api/smm-competitors-run.js": { "maxDuration": 300 },
     "api/smm-seo-audit.js": { "maxDuration": 300 },
-    "api/agent-queue.js": { "maxDuration": 300 }
+    "api/agent-queue.js": { "maxDuration": 300 },
+    "api/project-month-refresh.js": { "maxDuration": 60 },
+    "api/report-creatives.js": { "maxDuration": 60 },
+    "api/meta-ads-insights.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/agent-tick", "schedule": "* * * * *" }
+  ],
+  "headers": [
+    { "source": "/r/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "Referrer-Policy", "value": "no-referrer" }] }
   ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }

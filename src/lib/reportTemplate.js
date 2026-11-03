@@ -61,7 +61,7 @@ export function normalizeTemplate(raw) {
   (Array.isArray(r.blocks) ? r.blocks : []).forEach((b) => {
     if (!b || typeof b !== 'object' || blocks.length >= MAX_BLOCKS) return;
     const key = cleanText(b.key, 40);
-    if (!/^[A-Za-z0-9_]+$/.test(key) || seen.has(key)) return;
+    if (!/^[\p{L}\p{N}_]+$/u.test(key) || seen.has(key)) return;
     const system = SYSTEM_BLOCKS.find((s) => s.key === key);
     const title = cleanText(b.title, MAX_TITLE) || system?.title || '';
     if (!title) return;
@@ -70,8 +70,8 @@ export function normalizeTemplate(raw) {
   });
   // the three system blocks are always there; one that is missing in the saved list is simply switched off
   SYSTEM_BLOCKS.forEach((s) => { if (!seen.has(s.key)) blocks.push(raw && Array.isArray(r.blocks) && r.blocks.length ? { ...s, weekly: false, monthly: false } : { ...s }); });
-  const hiddenMetrics = Array.isArray(r.hiddenMetrics) ? [...new Set(r.hiddenMetrics.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))].slice(0, MAX_HIDDEN) : [];
-  const metricOrder = Array.isArray(r.metricOrder) ? [...new Set(r.metricOrder.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))].slice(0, MAX_METRIC_ORDER) : [];
+  const hiddenMetrics = Array.isArray(r.hiddenMetrics) ? [...new Set(r.hiddenMetrics.map((k) => cleanText(k, 40)).filter((k) => /^[\p{L}\p{N}_]+$/u.test(k)))].slice(0, MAX_HIDDEN) : [];
+  const metricOrder = Array.isArray(r.metricOrder) ? [...new Set(r.metricOrder.map((k) => cleanText(k, 40)).filter((k) => /^[\p{L}\p{N}_]+$/u.test(k)))].slice(0, MAX_METRIC_ORDER) : [];
   return {
     blocks,
     creatives: { weekly: clampInt(r.creatives?.weekly, 0, MAX_CREATIVES.weekly, CREATIVE_COUNT.weekly), monthly: clampInt(r.creatives?.monthly, 0, MAX_CREATIVES.monthly, CREATIVE_COUNT.monthly) },
@@ -133,7 +133,7 @@ export const withFunnel = (snapshot, layout) => (snapshot && snapshot.funnel ===
 // The metric keys a table shows: the list a saved report was made with (only metrics that exist), otherwise the standard set.
 // `known`: the keys that can be computed (built-in ones are always known; custom and extra ones come from the caller).
 export function metricKeysOf(template, defaults, known = []) {
-  const own = Array.isArray(template?.metrics) ? [...new Set(template.metrics.map((k) => cleanText(k, 40)).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))] : null;
+  const own = Array.isArray(template?.metrics) ? [...new Set(template.metrics.map((k) => cleanText(k, 40)).filter((k) => /^[\p{L}\p{N}_]+$/u.test(k)))] : null;
   if (!own || !own.length) return orderMetricKeys(defaults, template?.metricOrder); // the layout's order applies to the standard set (a saved report keeps its own list as it is)
   const ok = new Set([...Object.keys(METRICS), ...known]);
   const keys = own.filter((k) => ok.has(k));

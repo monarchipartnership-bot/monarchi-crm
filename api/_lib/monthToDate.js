@@ -35,6 +35,8 @@ export async function refreshMonthToDate({ repo, post, projectId, monthKey: key 
   const out = { updated: [], skipped: [] };
   const agent = await repo.getAgent(projectId);
   const config = agent?.config || {};
+  // the person switched the monthly reports of this project off: no running total is made for it
+  if (config.tasks?.monthlyReport === false) { out.skipped.push('Місячні звіти агента вимкнено в налаштуваннях проєкту.'); return out; }
   const [project, allAccounts, groups, custom, columns] = await Promise.all([repo.getProject(projectId), repo.getAccounts(projectId), repo.getGroups(projectId), repo.getCustomMetrics(projectId), repo.getColumns(projectId)]);
   if (!project) throw new Error('Проєкт не знайдено.');
   const accounts = config.platforms?.length ? allAccounts.filter((a) => config.platforms.includes(a.platform)) : allAccounts;

@@ -13,18 +13,29 @@ function nowIso() { return new Date().toISOString(); }
 
 // ---- Reports ----
 // `platform` (optional) = one scope: a platform id or 'all' («Разом»); without it every scope comes back.
-export async function fetchProjectReports(projectId, periodType, platform) {
+// `strict`: a failure is thrown instead of becoming an empty list (a screen that must tell «could not load» from «no reports»).
+export async function fetchProjectReports(projectId, periodType, platform, strict = false) {
   let q = supabase
     .from('project_reports').select('*')
     .eq('project_id', projectId);
   if (periodType) q = q.eq('period_type', periodType); // without it: every type, the archive's list
   if (platform) q = q.eq('platform', platform);
   const { data, error } = await q.order('period_start', { ascending: false });
-  if (error) { console.warn('fetchProjectReports failed', error); return []; }
+  if (error) { if (strict) throw error; console.warn('fetchProjectReports failed', error); return []; }
   return data ?? [];
 }
 
 export async function saveProjectReport({ projectId, periodType, periodStart, periodEnd, platform = 'all', source = 'manual', status = 'draft', data, createdBy }) {
+  if (periodType === 'monthly') {
+    // the running row of the month («month to date», made by the agent) moves to the final period: two monthly rows of one month would break the agent's own run
+    const { data: same } = await supabase.from('project_reports').select('id, source, status, data').eq('project_id', projectId).eq('period_type', 'monthly').eq('period_start', periodStart).eq('platform', platform).neq('period_end', periodEnd);
+    const mine = (same || []).find((r) => r.source === 'agent' && r.status === 'draft' && r.data?.toDate);
+    if (mine) {
+      const { data: moved, error: moveError } = await supabase.from('project_reports').update({ period_end: periodEnd, source, status, data, created_by: createdBy || null, updated_at: nowIso() }).eq('id', mine.id).select().single();
+      if (moveError) throw moveError;
+      return moved;
+    }
+  }
   const { data: row, error } = await supabase.from('project_reports').upsert({
     project_id: projectId, period_type: periodType, period_start: periodStart, period_end: periodEnd, platform,
     source, status, data, created_by: createdBy || null, updated_at: nowIso(),
@@ -72,7 +83,7 @@ export async function fetchProjectReport(id) {
 // The reports of a project that are still worked on (drafts and reports returned for rework), newest first, with their numbers: «Робота над звітами».
 export async function fetchWorkReports(projectId) {
   const { data, error } = await supabase.from('project_reports').select('*').eq('project_id', projectId).in('status', ['draft', 'reviewed', 'rework']).order('updated_at', { ascending: false });
-  if (error) { console.warn('fetchWorkReports failed', error); return []; }
+  if (error) throw error; // the workbench shows the failure with a retry instead of «no drafts»
   return data ?? [];
 }
 // How many reports of a project wait to be worked on (the badge of the tab).
@@ -197,7 +208,7 @@ export async function fetchAllMonthlyReportsForMonth(monthStartIso) {
 export async function fetchReportShare(projectId, platform) {
   const { data, error } = await supabase.from('report_shares').select('id, token, created_at, opens, last_opened_at')
     .eq('project_id', projectId).eq('platform', platform).eq('active', true).is('report_id', null).maybeSingle();
-  if (error) { console.warn('fetchReportShare failed', error); return null; }
+  if (error) throw error; // a failure is not «no link»: the page must not offer to create one (that would replace the link the client already has)
   return data;
 }
 // A new link; the previous one stops working at once. → the token.
@@ -214,7 +225,7 @@ export async function revokeReportShare(projectId, platform) {
 // The link of ONE custom report («Показники за період» → «Зберегти»): the page shows that report only (migration 20261053000000_custom_report_shares.sql).
 export async function fetchReportShareFor(reportId) {
   const { data, error } = await supabase.from('report_shares').select('id, token, created_at, opens, last_opened_at').eq('report_id', reportId).eq('active', true).maybeSingle();
-  if (error) { console.warn('fetchReportShareFor failed', error); return null; }
+  if (error) throw error;
   return data;
 }
 export async function issueReportShareFor(reportId, by) {
@@ -232,7 +243,7 @@ export async function revokeReportShareFor(reportId) {
 const fromRow = (row) => (row ? { kind: row.kind, blocks: row.blocks, creatives: row.creatives, hiddenMetrics: row.hidden_metrics, metricOrder: row.metric_order, baseMetrics: row.base_metrics, funnel: row.funnel, campaignSel: row.campaign_selection } : null);
 export async function fetchReportLayout(projectId, platform) {
   const { data, error } = await supabase.from('project_report_layouts').select('kind, blocks, creatives, hidden_metrics, metric_order, base_metrics, funnel, campaign_selection').eq('project_id', projectId).eq('platform', platform).maybeSingle();
-  if (error) { console.warn('fetchReportLayout failed', error); return { exists: false, layout: normalizeTemplate(null) }; }
+  if (error) throw error; // not «no layout»: a screen that took the standard one for it would save over the real layout
   return { exists: Boolean(data), layout: normalizeTemplate(fromRow(data)) };
 }
 // platform → the layout, only for the platforms that have one saved.

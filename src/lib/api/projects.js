@@ -35,6 +35,7 @@ export async function updateProject(id, payload) {
 }
 
 export async function deleteProject(id) {
-  const { error } = await supabase.from('projects').delete().eq('id', id);
+  const { data, error } = await supabase.from('projects').delete().eq('id', id).select('id');
   if (error) throw error;
+  if (!data || !data.length) throw new Error('Проєкт не видалено: немає прав або його вже немає.'); // a refusal by the database policy is not an error of the query itself
 }

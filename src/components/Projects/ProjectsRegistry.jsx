@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { STATUS_LABEL, fmtIsoDate } from '../../lib/projectConstants';
-import { fmtCost } from '../../lib/projectFields';
+import { fmtCost, safeHref } from '../../lib/projectFields';
 import { Ico, Medallion, initials } from './dashParts';
 
 // "Реєстр проєктів" on the Projects Dashboard in Hub style: one pill-row per project (ring medallion with the
@@ -98,7 +98,7 @@ export default function ProjectsRegistry({ projects }) {
                     <div className="wide"><small>Особливості роботи з клієнтом</small><b>{dash(p.notes)}</b></div>
                     <div className="pd-ardb">
                       <button type="button" className="pd-btn pri sm" onClick={() => navigate(`/projects/${p.id}`)}><Ico n="open" />Відкрити проєкт</button>
-                      {p.worksection_link ? <a className="pd-btn sec sm" href={p.worksection_link} target="_blank" rel="noreferrer"><Ico n="link" />Worksection</a> : null}
+                      {safeHref(p.worksection_link) ? <a className="pd-btn sec sm" href={safeHref(p.worksection_link)} target="_blank" rel="noreferrer"><Ico n="link" />Worksection</a> : null}
                     </div>
                   </div>
                 )}

@@ -62,9 +62,16 @@ export function metricOptions(customMetrics = [], extraKeys = []) {
   ];
 }
 
-export function slugKey(name) {
-  const base = String(name || '').toLowerCase().replace(/[^a-z0-9а-яіїєґ]+/gi, '_').replace(/^_+|_+$/g, '');
-  return 'custom_' + (base || Date.now());
+// The key of an own metric: Latin letters, digits and «_» only (the layout, the report snapshots and the funnel keep keys of that alphabet only), at most 40 characters,
+// and not one that is taken. A Ukrainian name is transliterated («Дохід на клік» → custom_dokhid_na_klik).
+const TRANSLIT = { а: 'a', б: 'b', в: 'v', г: 'h', ґ: 'g', д: 'd', е: 'e', є: 'ie', ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch', ь: '', ю: 'iu', я: 'ia', ы: 'y', э: 'e', ъ: '', ё: 'io' };
+export function slugKey(name, taken = []) {
+  const latin = String(name || '').toLowerCase().replace(/[а-яіїєґёыэъ]/g, (ch) => TRANSLIT[ch] ?? '');
+  const base = ('custom_' + (latin.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'metric')).slice(0, 34).replace(/_+$/, '');
+  const used = new Set([...taken, ...Object.keys(METRICS)]);
+  let key = base;
+  for (let n = 2; used.has(key); n += 1) key = `${base}_${n}`;
+  return key;
 }
 
 function operand(v, base, custom, depth) {

@@ -19,12 +19,23 @@ export default function ShareLinkBox({ projectId, scope, label, reportId = null 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [loadError, setLoadError] = useState(false); // the link could not be read: nothing is offered but a retry
   const input = useRef(null);
 
-  const load = useCallback(async () => { setShare(reportId ? await fetchReportShareFor(reportId) : await fetchReportShare(projectId, scope)); }, [projectId, scope, reportId]);
+  const seq = useRef(0); // a slow answer of a previous platform / report must not overwrite the current one
+  const load = useCallback(async () => {
+    const mine = ++seq.current;
+    try {
+      const got = reportId ? await fetchReportShareFor(reportId) : await fetchReportShare(projectId, scope);
+      if (mine === seq.current) { setShare(got); setLoadError(false); }
+    } catch (e) {
+      console.warn('share link load failed', e);
+      if (mine === seq.current) { setShare(undefined); setLoadError(true); }
+    }
+  }, [projectId, scope, reportId]);
   const issue = () => (reportId ? issueReportShareFor(reportId, email) : issueReportShare(projectId, scope, email));
   const revokeIt = () => (reportId ? revokeReportShareFor(reportId) : revokeReportShare(projectId, scope));
-  useEffect(() => { setShare(undefined); setError(''); setCopied(false); load(); }, [load]);
+  useEffect(() => { setShare(undefined); setError(''); setCopied(false); setLoadError(false); load(); }, [load]);
 
   async function run(fn) {
     setBusy(true);
@@ -51,7 +62,8 @@ export default function ShareLinkBox({ projectId, scope, label, reportId = null 
     <div className="ph-share">
       <HubTitle icon="link" as="h3" className="ph-share-title">Посилання для клієнта · {label}<InfoTip>{reportId ? 'Клієнт бачить цей звіт у тому вигляді, в якому він збережений: цифри, тексти, креативи й воронку. Що приховано оком, клієнт не бачить. Після змін натисніть «Зберегти»: посилання те саме. Пароля немає, доступу до рекламного кабінету теж.' : 'Клієнт бачить лише затверджені тижні та поточний підсумок місяця. Посилання одне й те саме: нові тижні зʼявляються на сторінці самі. Пароля немає, доступу до рекламного кабінету теж.'}</InfoTip></HubTitle>
       {error && <div className="pacc-err">{error}</div>}
-      {share === undefined && <div className="empty-hint">Завантаження…</div>}
+      {loadError && <div className="pacc-err" role="alert">Не вдалося завантажити посилання. Нове посилання не створюйте: воно замінить те, яке вже в клієнта. <button type="button" className="pacc-link" onClick={load}>Повторити</button></div>}
+      {share === undefined && !loadError && <div className="empty-hint">Завантаження…</div>}
       {share === null && (
         <div className="ph-share-row"><button type="button" className="btn btn-p" disabled={busy} onClick={() => run(issue)}>Створити посилання</button></div>
       )}

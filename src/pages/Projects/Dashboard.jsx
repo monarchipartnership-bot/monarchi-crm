@@ -39,6 +39,7 @@ const ringOf = (cur, prev) => (prev > 0 ? Math.max(0, Math.min(100, Math.round((
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [projects, setProjects] = useState([]);
   const [thisWeekRows, setThisWeekRows] = useState([]);
   const [lastWeekRows, setLastWeekRows] = useState([]);
@@ -64,6 +65,7 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError('');
     Promise.all([
       fetchProjects(),
       fetchAllWeeklyReportsForWeek(thisWeekStartIso),
@@ -87,7 +89,7 @@ export default function Dashboard() {
         setAgentRows(agents);
         setAgentDrafts(drafts);
       })
-      .catch((e) => console.warn('dashboard fetch failed', e))
+      .catch((e) => { console.warn('dashboard fetch failed', e); if (!cancelled) setLoadError(e.message || 'помилка мережі'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,6 +187,7 @@ export default function Dashboard() {
         <div className="pd-empty">Завантаження...</div>
       ) : (
         <div className="pd-stack">
+          {loadError && <div className="pacc-err" role="alert">Не вдалося завантажити частину даних: {loadError}. Цифри нижче можуть бути неповними. Оновіть сторінку.</div>}
           <div className="pd-kp">
             {kpis.map((k) => (
               <div className="pd-box pd-kc" key={k.label}>

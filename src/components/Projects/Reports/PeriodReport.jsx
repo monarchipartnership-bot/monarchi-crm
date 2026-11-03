@@ -103,11 +103,20 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   ];
   const unfinished = period.end >= todayIso();
 
+  const savedSeq = useRef(0); // the answer of an older tab / period must not become the list of the current one
+  const curKey = useRef('');
+  curKey.current = `${projectId}|${periodType}|${period.start}|${ctx.scope}`;
   const reloadSaved = useCallback(async () => {
-    const [rows, deckRows] = await Promise.all([fetchProjectReports(projectId, periodType, ctx.scope), fetchProjectDecks(projectId)]);
-    setSaved(rows);
-    setDecks(deckRows.filter((d) => d.period_type === periodType));
-    setSavedLoaded(true);
+    const mine = ++savedSeq.current;
+    try {
+      const [rows, deckRows] = await Promise.all([fetchProjectReports(projectId, periodType, ctx.scope, true), fetchProjectDecks(projectId)]);
+      if (mine !== savedSeq.current) return;
+      setSaved(rows);
+      setDecks(deckRows.filter((d) => d.period_type === periodType));
+      setSavedLoaded(true);
+    } catch (e) {
+      if (mine === savedSeq.current) setMessage('Не вдалося завантажити збережені звіти: ' + (e.message || 'помилка мережі') + '. Збереження вимкнено, щоб не перезаписати існуючий звіт. Оновіть сторінку.');
+    }
   }, [projectId, periodType, ctx.scope]);
   // Reports are kept per tab (platform, or «Разом»): another tab starts from its own saved reports, never from the previous tab's numbers.
   useEffect(() => {
@@ -115,6 +124,13 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     setSavedLoaded(false); setSaved([]); setData(null); applied.current = ''; reloadSaved();
   }, [reloadSaved, ctx.ready]);
   useEffect(() => { if (unsavedRef) unsavedRef.current = dirty; }, [dirty, unsavedRef]);
+  // closing the tab or leaving the site with changes that are not saved: the browser asks first
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   // Opening a period shows its saved report if there is one.
   useEffect(() => {
@@ -167,11 +183,14 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
 
   async function pull(c = cmp, columns = ctx.fetchColumns, quiet = false) {
     const pv = prevFor(c);
+    const startedFor = curKey.current;
     setBusy('pull');
     setMessage('');
     try {
       const pulled = await pullReportData({ accounts: ctx.accounts, kind: ctx.kind, groups: ctx.groups, period, prev: pv, columns, selections: ctx.selections });
+      if (curKey.current !== startedFor) return; // another week / month / platform is on screen now: these numbers belong to the old one
       setErrors(pulled.errors);
+      if (!Object.keys(pulled.data?.platforms || {}).length) { setMessage(Object.values(pulled.errors || {})[0] || 'Кабінети не повернули даних за цей період.'); return; } // nothing came: nothing to save
       setData(pulled.data);
       setDirty(true);
       // The period is on screen: offer a comparison (unless it is set already or switched off).
@@ -191,9 +210,11 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
     setDirty(true);
     if (!c) { setData((d) => ({ ...d, previous: null })); return; }
     const pv = prevFor(c);
+    const startedFor = curKey.current;
     setBusy('pull');
     try {
       const before = await fetchProjectRange(ctx.accounts, pv.start, pv.end, ctx.kind, ctx.groups, undefined, ctx.fetchColumns, ctx.selections);
+      if (curKey.current !== startedFor) return;
       setData((d) => ({ ...d, previous: { period: { start: pv.start, end: pv.end }, platforms: before.platforms } }));
     } catch (e) {
       setMessage(e.message || 'Не вдалося отримати дані для порівняння.');
@@ -228,7 +249,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       setSavedId(row.id);
       setMessage('Збережено в «Робота над звітами».');
     } catch (e) {
-      setMessage((e.message || 'Не вдалося зберегти.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261008000000.');
+      setMessage(e.message || 'Не вдалося зберегти.');
     } finally { setBusy(''); }
   }
   // «Зберегти як фінал»: the report goes to the history of the project and to the client's page at once.
@@ -503,11 +524,11 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
         <span className="ch-grow" />
         <div className="ch-sbtns">
           {status !== 'final' && (
-            <button type="button" className="btn" onClick={saveDraft} disabled={busy === 'save' || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)} title="Звіт ще дорабатується: він зʼявиться в розділі «Робота над звітами»">
+            <button type="button" className="btn" onClick={saveDraft} disabled={busy === 'save' || !savedLoaded || (!data && !sections.whatWasDone && !sections.conclusion && !sections.plans)} title="Звіт ще доопрацьовується: він зʼявиться в розділі «Робота над звітами»">
               <ChIcon n="save" />{busy === 'save' ? '...' : 'Зберегти чернетку'}
             </button>
           )}
-          <button type="button" className="btn ch-ok" onClick={saveFinal} disabled={busy === 'save' || !approver || !data} title={approver ? 'Звіт піде в «Історію проекту» і до клієнта' : 'Фінал зберігають лише відповідальні, обрані в налаштуваннях агента'}>
+          <button type="button" className="btn ch-ok" onClick={saveFinal} disabled={busy === 'save' || !savedLoaded || !approver || !data || Object.keys(errors).length > 0} title={Object.keys(errors).length ? 'Не всі кабінети віддали цифри (див. повідомлення вище): фінал із неповними даними не зберігаємо. Підтягніть дані ще раз' : approver ? 'Звіт піде в «Історію проекту» і до клієнта' : 'Фінал зберігають лише відповідальні, обрані в налаштуваннях агента'}>
             <ChIcon n="check" />{busy === 'save' ? '...' : status === 'final' ? 'Зберегти зміни' : 'Зберегти як фінал'}
           </button>
           <button

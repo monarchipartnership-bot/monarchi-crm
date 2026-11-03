@@ -4,7 +4,7 @@
 // number the report does not.
 import { METRIC_SETS, computeMetric, deltaPct, metricMeta, sumBase } from '../reportMetrics.js';
 import { visibleKeys } from '../periodReport.js';
-import { metricKeysOf } from '../reportTemplate.js';
+import { metricKeysOf, reportBlocks } from '../reportTemplate.js';
 import { text, listText } from './textModel.js';
 import { paginateBlocks } from './textFit.js';
 import { PLATFORMS, emptyDeck, labels, periodLabel, platformName, uid } from './deckModel.js';
@@ -85,7 +85,9 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
   const prevTotal = rd.previous?.platforms?.[platform]?.total || null;
   const cur = plat?.total || null;
   // the metrics of the template the report was made with (when it had its own list), else the standard set
-  const keys = metricKeysOf({ metrics: rd.template?.metrics }, visibleKeys(METRIC_SETS[kind], custom, extraKeys), [...extraKeys, ...custom.map((c) => c.key)]);
+  const hidden = Array.isArray(rd.template?.hiddenMetrics) ? rd.template.hiddenMetrics : []; // what the team switched off with the eye is not in a client deck
+  const allKeys = metricKeysOf({ metrics: rd.template?.metrics }, visibleKeys(METRIC_SETS[kind], custom, extraKeys), [...extraKeys, ...custom.map((c) => c.key)]);
+  const keys = allKeys.filter((k) => !hidden.includes(k)).length ? allKeys.filter((k) => !hidden.includes(k)) : allKeys;
 
   const deck = emptyDeck({
     projectId: report.project_id, reportId: report.id, periodType, periodStart: report.period_start, periodEnd: report.period_end,
@@ -168,13 +170,20 @@ export function buildDeckFromReport({ project, report, platform, style = 'brand-
     toc.push(title);
     pages.forEach((page, i) => slides.push({ id: uid(), type: 'bullets', data: { heading: text(withPart(title, i, pages.length, L)), list: listText(page, 'bullet') } }));
   };
-  addList(L.whatWasDone, sec.whatWasDone);
-  const concl = paginateParagraphs(sec.conclusion, style, platform);
-  if (concl.length) {
-    toc.push(L.conclusion);
-    concl.forEach((page, i) => slides.push({ id: uid(), type: 'paragraph', data: { heading: text(withPart(L.conclusion, i, concl.length, L)), body: { paras: page.map((p) => ({ runs: [{ t: p }] })) } } }));
-  }
-  addList(L.plans, sec.plans);
+  // the blocks the client may see (the eye of the report), in the template's order; the three standard ones keep their layout, any other block of the template is a text slide too
+  const shown = reportBlocks(rd).filter((b) => b.client);
+  const addParagraphs = (title, str) => {
+    const pages = paginateParagraphs(str, style, platform);
+    if (!pages.length) return;
+    toc.push(title);
+    pages.forEach((page, i) => slides.push({ id: uid(), type: 'paragraph', data: { heading: text(withPart(title, i, pages.length, L)), body: { paras: page.map((p) => ({ runs: [{ t: p }] })) } } }));
+  };
+  shown.forEach((b) => {
+    if (b.key === 'whatWasDone') addList(L.whatWasDone, sec.whatWasDone);
+    else if (b.key === 'conclusion') addParagraphs(L.conclusion, sec.conclusion);
+    else if (b.key === 'plans') addList(L.plans, sec.plans);
+    else addParagraphs(b.title, sec[b.key]);
+  });
 
   agendaSlot.data.items = listText(toc.length ? toc : [L.keyMetrics], 'number');
   slides.push({ id: uid(), type: 'closing', data: { heading: text(L.thanks), body: text(L.thanksBody) } });

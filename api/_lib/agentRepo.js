@@ -80,7 +80,8 @@ export function createAgentRepo(db, agentEmail) {
     // ---- reports and decks
     // A report belongs to a scope: one ad platform ('meta', 'google', ...) or 'all' («Разом»).
     async getReport(projectId, periodType, periodStart, platform = 'all') {
-      return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform).maybeSingle());
+      // a month may hold the running row and a full report side by side for a while: the one that reaches further is the report
+      return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).eq('period_start', periodStart).eq('platform', platform).order('period_end', { ascending: false }).limit(1).maybeSingle());
     },
     async getReports(projectId, periodType, platform = 'all') {
       return must(await db.from('project_reports').select('*').eq('project_id', projectId).eq('period_type', periodType).eq('platform', platform).order('period_start', { ascending: false })) || [];

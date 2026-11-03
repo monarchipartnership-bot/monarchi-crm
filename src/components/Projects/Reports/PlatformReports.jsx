@@ -17,17 +17,20 @@ export default function PlatformReports({ projectId, mode }) {
   const [params, setParams] = useSearchParams();
   const [accounts, setAccounts] = useState(null);
   const [confirm, confirmDialog] = useConfirm();
+  const [accountsError, setAccountsError] = useState('');
   const unsaved = useRef(false); // set by the report screen while it holds changes that are not saved
   const tabRefs = useRef({});
 
   useEffect(() => {
     let off = false;
     setAccounts(null);
-    fetchProjectAccounts(projectId).then((a) => { if (!off) setAccounts(a); }).catch(() => { if (!off) setAccounts([]); });
+    setAccountsError('');
+    fetchProjectAccounts(projectId).then((a) => { if (!off) setAccounts(a); }).catch((e) => { if (!off) { setAccountsError(e.message || 'помилка мережі'); setAccounts([]); } });
     return () => { off = true; };
   }, [projectId]);
 
   if (accounts === null) return <div className="empty-hint">Завантаження...</div>;
+  if (accountsError) return <div className="pacc-err" role="alert">Не вдалося завантажити кабінети проєкту: {accountsError}. Оновіть сторінку.</div>;
 
   const platforms = accountPlatforms(accounts);
   const tabs = [...platforms.map((p) => ({ key: p, label: platformInfo(p).label })), { key: TOTAL_TAB, label: 'Разом' }];

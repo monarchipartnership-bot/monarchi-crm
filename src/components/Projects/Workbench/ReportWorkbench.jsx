@@ -27,18 +27,26 @@ export default function ReportWorkbench({ projectId, onCount }) {
   const [rows, setRows] = useState(null);
   const [ctx, setCtx] = useState(null);
   const [cat, setCat] = useState('draft');
+  const [loadError, setLoadError] = useState('');
+  const [ctxError, setCtxError] = useState(false);
   const [extra, setExtra] = useState(null); // a report opened by a link that is not in the lists (for example an approved one)
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const load = useCallback(async () => {
-    const list = await fetchWorkReports(projectId);
-    setRows(list);
-    onCount?.(list.length);
+    try {
+      const list = await fetchWorkReports(projectId);
+      setRows(list);
+      setLoadError('');
+      onCount?.(list.length);
+    } catch (e) {
+      console.warn('fetchWorkReports failed', e);
+      setLoadError(e.message || 'Не вдалося завантажити звіти.');
+    }
   }, [projectId, onCount]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     let off = false;
-    Promise.all([loadReportContext(projectId), fetchCampaignGroups(projectId)]).then(([c, groups]) => { if (!off) setCtx({ ...c, groups }); }).catch(() => { if (!off) setCtx({ project: null, accounts: [], custom: [], columns: {}, groups: [], approvers: [] }); });
+    Promise.all([loadReportContext(projectId), fetchCampaignGroups(projectId)]).then(([c, groups]) => { if (!off) setCtx({ ...c, groups }); }).catch(() => { if (!off) { setCtxError(true); setCtx({ project: null, accounts: [], custom: [], columns: {}, groups: [], approvers: ['-'] }); } }); // fail closed: with no list of approvers nobody may confirm
     return () => { off = true; };
   }, [projectId]);
 
@@ -50,14 +58,17 @@ export default function ReportWorkbench({ projectId, onCount }) {
 
   useEffect(() => {
     if (!openId || rows == null || (rows || []).some((r) => r.id === openId) || (extra && extra.id === openId)) return;
-    fetchProjectReport(openId).then((r) => setExtra(r || { id: openId, missing: true })).catch(() => setExtra({ id: openId, missing: true }));
-  }, [openId, rows, extra]);
+    // a report of another project is «not found» here: it must not open with this project's context
+    fetchProjectReport(openId).then((r) => setExtra(r && Number(r.project_id) === Number(projectId) ? r : { id: openId, missing: true })).catch(() => setExtra({ id: openId, missing: true }));
+  }, [openId, rows, extra, projectId]);
   // the list shows the category of the opened report, and the one that has reports when the chosen one is empty
   useEffect(() => { if (opened?.status === 'rework') setCat('rework'); else if (opened) setCat('draft'); }, [opened?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = (id, platform) => { const next = new URLSearchParams(params); next.set('report', id); if (platform) next.set('platform', platform); setParams(next, { replace: true }); };
-  const close = () => { const next = new URLSearchParams(params); next.delete('report'); setParams(next, { replace: true }); setExtra(null); };
+  const [flash, setFlash] = useState(''); // what the closed editor wants the list to say (for example a failed recount of the month)
+  const close = (msg) => { const next = new URLSearchParams(params); next.delete('report'); setParams(next, { replace: true }); setExtra(null); setFlash(typeof msg === 'string' ? msg : ''); };
 
+  if (loadError && rows == null) return <div><div className="pacc-err" role="alert">Не вдалося завантажити звіти: {loadError}</div><button type="button" className="btn" onClick={load}>Повторити</button></div>;
   if (rows == null || !ctx) return <div className="empty-hint">Завантаження...</div>;
 
   if (openId) {
@@ -71,7 +82,12 @@ export default function ReportWorkbench({ projectId, onCount }) {
         </div>
       );
     }
-    return <ReportEditor key={opened.id} row={opened} ctx={ctx} onBack={close} onChanged={load} />;
+    return (
+      <>
+        {ctxError && <div className="pacc-err" role="alert">Налаштування проєкту не завантажились: підтвердити звіт зараз не можна. Оновіть сторінку.</div>}
+        <ReportEditor key={opened.id} row={opened} ctx={ctx} onBack={close} onChanged={load} />
+      </>
+    );
   }
 
   const list = cat === 'rework' ? rework : drafts;
@@ -90,6 +106,8 @@ export default function ReportWorkbench({ projectId, onCount }) {
           </button>
         ))}
       </div>
+      {flash && <div className="pacc-err" role="alert">{flash} <button type="button" className="pacc-link" onClick={() => setFlash('')}>Закрити</button></div>}
+      {loadError && <div className="pacc-err" role="alert">Список не оновився: {loadError} <button type="button" className="pacc-link" onClick={load}>Повторити</button></div>}
       <p className="wbh-hint">Відкрийте звіт, доопрацюйте тексти, креативи, метрики й кампанії та натисніть «Підтверджено»: він потрапить в історію проекту й до клієнта. Скачування й презентації в історії.</p>
       {list.length === 0 ? (
         <div className="wbh-empty">

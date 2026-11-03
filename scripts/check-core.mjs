@@ -56,6 +56,8 @@ import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cyc
 import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFromAccount } from '../src/lib/metaOnboarding.js';
 import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
 import { planMetricChange } from '../src/lib/reportMetricOps.js';
+import { slugKey } from '../src/lib/reportMetrics.js';
+import { safeHref } from '../src/lib/safeHref.js';
 import { daysText, monthNameIn, monthShortIn, normLang, trFor } from '../src/lib/clientLang.js';
 import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
 import { auditAfter, checkRights, loadRights } from '../api/_lib/agentAudit.js';
@@ -2981,6 +2983,26 @@ await ok('report language: English as ever by default, the project sets Ukrainia
   assert.equal(daysText(1, 'uk'), '1 день'); assert.equal(daysText(3, 'uk'), '3 дні'); assert.equal(daysText(11, 'uk'), '11 днів'); assert.equal(daysText(7, 'en'), '7 days');
   assert.equal(monthNameIn('2026-10', 'uk'), 'Жовтень'); assert.equal(monthShortIn('2026-03', 'uk'), 'Бер'); assert.equal(monthShortIn('2026-03', 'en'), 'Mar');
   assert.equal(normLang('fr'), 'en'); assert.equal(normLang(null), 'en');
+});
+
+await ok('own metric keys are Latin and unique; a link is safe; a client deck leaves out what the eye hid and keeps the client blocks', () => {
+  assert.equal(slugKey('Дохід на клік'), 'custom_dokhid_na_klik');
+  assert.equal(slugKey('Дохід на клік', ['custom_dokhid_na_klik']), 'custom_dokhid_na_klik_2'); // never the key of another metric
+  assert.equal(slugKey('Ціна ліда', Object.keys({})), 'custom_tsina_lida');
+  assert.ok(slugKey('Дуже довга назва метрики для перевірки обмеження довжини ключа').length <= 40);
+  assert.match(slugKey('!!!'), /^custom_metric/); // nothing to spell: still a valid key
+  const key = slugKey('Дохід на клік');
+  assert.deepEqual(normalizeTemplate({ hiddenMetrics: [key], metricOrder: [key] }).hiddenMetrics, [key]); // the layout keeps it (it used to drop a Cyrillic key)
+  assert.deepEqual(normalizeTemplate({ hiddenMetrics: ['custom_дохід'] }).hiddenMetrics, ['custom_дохід']); // keys made before stay valid
+  assert.equal(safeHref('example.com'), 'https://example.com'); assert.equal(safeHref('https://a.b/c'), 'https://a.b/c'); assert.equal(safeHref('javascript:alert(1)'), ''); assert.equal(safeHref(''), ''); assert.equal(safeHref('example.com:8080/x'), 'https://example.com:8080/x'); assert.equal(safeHref('mailto:a@b.c'), '');
+  const total = { spend: 100, revenue: 400, purchases: 4, impressions: 5000, clicks: 100 };
+  const report = { id: 5, project_id: 3, period_type: 'weekly', period_start: '2026-10-05', period_end: '2026-10-11', data: { kind: 'ecom', platforms: { meta: { currency: 'USD', total, groups: [], campaigns: [] } },
+    sections: { whatWasDone: '- Did a thing', plans: 'Secret plan', b_x: 'Own block text' },
+    template: { blocks: [{ key: 'whatWasDone', title: 'Done', client: true }, { key: 'plans', title: 'Plans', client: false }, { key: 'b_x', title: 'Own block', client: true }], metrics: null, hiddenMetrics: ['roas', 'cpp'], funnel: null } } };
+  const deck = buildDeckFromReport({ project: { name: 'T' }, report, platform: 'meta', lang: 'en', custom: [], client: 'T' });
+  const all = JSON.stringify(deck.slides);
+  assert.ok(!/ROAS/.test(all) && !/Secret plan/.test(all)); // the hidden metric and the block with the eye off are not in the deck
+  assert.ok(/Own block text/.test(all) && /Did a thing/.test(all)); // a block of the template goes to the deck like the standard ones
 });
 
 await ok('link of one custom report: the page model is that report alone (with its funnel, hidden metrics and every creative), a project link has no single report', () => {

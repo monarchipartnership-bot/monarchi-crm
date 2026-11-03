@@ -34,6 +34,8 @@ export function extraFieldsForm(project) {
   return out;
 }
 
+export { safeHref } from './safeHref.js';
+
 export function fmtCost(v) {
   const n = Number(v);
   if (v == null || v === '' || !Number.isFinite(n)) return '—';

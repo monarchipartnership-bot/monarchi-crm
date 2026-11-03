@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ResultView from './ResultView';
 import CompareModal from './CompareModal';
-import { saveProjectReport } from '../../../lib/api/projectReportStore';
+import { fetchProjectReports, saveProjectReport } from '../../../lib/api/projectReportStore';
+import { useConfirm } from '../../common/ConfirmDialog';
 import { EMPTY_SECTIONS, reportPayload } from '../../../lib/reportEngine';
 import { customBlocks } from '../../../lib/reportTemplate';
 import PeriodExtras from './PeriodExtras';
@@ -52,6 +53,8 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   const ctx = useReportContext(projectId, platform);
   const { email } = useAuth();
   const navigate = useNavigate();
+  const [confirm, confirmDialog] = useConfirm();
+  const runSeq = useRef(0); // the newest request wins: the answer of an older one (other dates, other platform) is dropped
   const [archive, setArchive] = useState({ busy: false, msg: '', id: null });
   const isTotal = platform === 'total';
   // the funnel of the platform's layout (not for the sum of the platforms: the stages come from Meta only); a saved custom report keeps it
@@ -77,6 +80,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
 
   async function run(range = { from, to }, c = cmp, columns = ctx.fetchColumns, quiet = false) {
     if (range.from > range.to) { setState({ status: 'error', error: 'Початок періоду пізніше за кінець.' }); return; }
+    const mine = ++runSeq.current;
     setState({ status: 'loading' }); setArchive({ busy: false, msg: '', id: null });
     if (!state.range || state.range.from !== range.from || state.range.to !== range.to) { setSections(EMPTY_SECTIONS); setCreatives(null); } // other dates: the texts and creatives of the old ones do not belong here
     const prev = compareRange(range, c);
@@ -85,11 +89,12 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
         fetchProjectRange(ctx.accounts, range.from, range.to, ctx.kind, ctx.groups, undefined, columns, ctx.selections),
         prev ? fetchProjectRange(ctx.accounts, prev.from, prev.to, ctx.kind, ctx.groups, undefined, columns, ctx.selections) : Promise.resolve(null),
       ]);
+      if (mine !== runSeq.current) return;
       setState({ status: 'ok', data: { platforms: cur.platforms, previous: before ? { platforms: before.platforms } : null }, errors: cur.errors, range, prev });
       // A new period is on screen: offer to add a comparison (unless switched off or already set).
       if (!quiet && !c && !askOff) setModal('ask');
     } catch (e) {
-      setState({ status: 'error', error: e.message || 'Не вдалося отримати дані.' });
+      if (mine === runSeq.current) setState({ status: 'error', error: e.message || 'Не вдалося отримати дані.' });
     }
   }
 
@@ -122,14 +127,24 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
   }
 
   // Another tab: its own platform's numbers for the same dates (a result already on screen is fetched again for the new tab).
+  // The run waits until the layout of the NEW tab is loaded (its campaigns and kind), otherwise the numbers are fetched with the previous platform's selection.
   const tabSeen = useRef(platform);
+  const pendingRange = useRef(null);
   useEffect(() => {
     if (tabSeen.current === platform) return;
     tabSeen.current = platform;
     setModal(null);
-    if (state.status === 'ok' && ctx.ready) run(state.range); else setState({ status: 'idle' });
+    runSeq.current += 1; // whatever is still on its way for the old tab is dropped
+    if (state.status === 'ok') { pendingRange.current = state.range; setState({ status: 'loading' }); } else { pendingRange.current = null; setState({ status: 'idle' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
+  useEffect(() => {
+    if (!pendingRange.current || !ctx.ready || ctx.tab !== platform) return;
+    const range = pendingRange.current;
+    pendingRange.current = null;
+    run(range);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx.ready, ctx.tab, platform]);
 
   // The campaigns of the table are the ones the layout selected (the «Конструктор звіту»). «Показати всі кампанії» adds every other campaign of the
   // period as a column too, without changing the layout.
@@ -149,13 +164,16 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
     setArchive({ busy: true, msg: '', id: null });
     try {
       const period = { start: state.range.from, end: state.range.to };
+      // the same dates are already saved: the texts, creatives and the client settings of that report (the eye, the language, the funnel) would be replaced
+      const had = (await fetchProjectReports(projectId, 'custom', ctx.scope, true)).find((r) => r.period_start === period.start && r.period_end === period.end);
+      if (had && !(await confirm({ title: 'Замінити збережений звіт?', body: 'За ці дати вже є збережений звіт. Його тексти, креативи й налаштування для клієнта (приховані метрики, мова, воронка) буде замінено тим, що зараз на екрані. Якщо клієнту надіслано посилання, він одразу побачить нову версію.', confirmLabel: 'Замінити' }))) { setArchive({ busy: false, msg: '', id: null }); return; }
       const prev = state.prev ? { start: state.prev.from, end: state.prev.to } : null;
       const payload = reportPayload({ kind: ctx.kind, data: { platforms: shown.platforms, previous: shown.previous ? { period: prev, platforms: shown.previous.platforms } : null }, compare: cmp, period, prev, selection: [], options: { groups: true }, sections, template: { blocks: customBlocks(ctx.layout), metrics: null, hiddenMetrics: [], funnel: periodFunnel } });
       if (creatives?.items?.length) payload.creatives = { count: creatives.count, items: creatives.items, source: 'manual', at: new Date().toISOString() };
       const row = await saveProjectReport({ projectId, periodType: 'custom', periodStart: period.start, periodEnd: period.end, platform: ctx.scope, source: 'manual', status: 'final', data: { ...payload, label: null }, createdBy: email });
       setArchive({ busy: false, msg: 'Збережено в «Історія проекту» → «Кастомні звіти».', id: row.id });
     } catch (e) {
-      setArchive({ busy: false, msg: (e.message || 'Не вдалося зберегти.') + ' Якщо це перше збереження, перевірте, що застосовано міграцію 20261030000000.', id: null });
+      setArchive({ busy: false, msg: e.message || 'Не вдалося зберегти звіт.', id: null });
     }
   }
 
@@ -281,6 +299,7 @@ export default function PeriodStats({ projectId, platform = 'total' }) {
           onNeverAsk={neverAsk}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

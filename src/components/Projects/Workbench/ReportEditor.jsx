@@ -79,7 +79,7 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   useEffect(() => {
     if (isAll || isCustom) return undefined;
     let off = false;
-    fetchReportLayout(row.project_id, platform).then((r) => { if (!off && r.exists) setLayout(r.layout); });
+    fetchReportLayout(row.project_id, platform).then((r) => { if (!off && r.exists) setLayout(r.layout); }).catch(() => {}); // only needed for a report made before the funnel existed
     return () => { off = true; };
   }, [row.project_id, platform, isAll, isCustom]);
   const funnel = isAll ? null : (withFunnel(data.template || {}, layout).funnel ?? null); // a custom report always states its own (null or the funnel it was saved with)
@@ -168,12 +168,13 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
     try {
       const patch = reviewPatch({ status: row.status, data }, 'approve', email);
       await saveReportData(row.id, { data: { ...withFunnelData(), review: patch.review }, status: patch.status });
+      let warning = '';
       if (row.period_type === 'weekly') {
         const r = await refreshMonthTotal(row.project_id, monthKey(row.period_start));
-        if (r.error) setError('Звіт підтверджено, але підсумок місяця не вдалося перерахувати: ' + r.error);
+        if (r.error) warning = 'Звіт підтверджено, але підсумок місяця не вдалося перерахувати: ' + r.error + '. Відкрийте «Історія проекту» і повторіть, або дочекайтесь наступного підтвердження тижня.';
       }
       await onChanged();
-      onBack();
+      onBack(warning);
     } catch (e) { setError(e.message || 'Не вдалося підтвердити звіт.'); setBusy(''); }
   }
   async function remove() {

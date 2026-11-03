@@ -77,7 +77,7 @@ export default function CustomMetricModal({ projectId, platform, columnKeys = []
     setSaving(true);
     setError('');
     try {
-      await addCustomMetric({ projectId, global, name: clean, key: slugKey(clean), formula: { a, op, b: bKind === NUMBER ? Number(bNumber) : bKind }, format, createdBy: email });
+      await addCustomMetric({ projectId, global, name: clean, key: slugKey(clean, custom.map((c) => c.key)), formula: { a, op, b: bKind === NUMBER ? Number(bNumber) : bKind }, format, createdBy: email });
       await onChanged();
       setName('');
     } catch (e) {

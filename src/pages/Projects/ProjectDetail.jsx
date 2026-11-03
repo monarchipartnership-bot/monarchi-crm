@@ -9,13 +9,13 @@ import { fetchProjectById, updateProject, deleteProject } from '../../lib/api/pr
 import { STATUS_LABEL, SERVICES, periodShare } from '../../lib/projectConstants';
 import { fetchProjectAccounts } from '../../lib/api/projectAccounts';
 import { platformInfo } from '../../lib/adAccounts';
-import { EXTRA_PROJECT_FIELDS, extraFieldsPayload } from '../../lib/projectFields';
+import { EXTRA_PROJECT_FIELDS, extraFieldsPayload, safeHref } from '../../lib/projectFields';
 import AutoField from '../../components/Projects/AutoField';
 import ProjectHistoryTab from '../../components/Projects/ProjectHistoryTab';
 import ReportWorkbench from '../../components/Projects/Workbench/ReportWorkbench';
 import '../../styles/workbench.css';
 import '../../styles/composeHub.css';
-import { countWorkReports } from '../../lib/api/projectReportStore';
+import { countWorkReports, fetchProjectReports } from '../../lib/api/projectReportStore';
 import ReportBuilder from '../../components/Projects/Builder/ReportBuilder';
 import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
@@ -91,6 +91,11 @@ function FieldIcon({ name }) {
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  return <ProjectDetailCard key={id} />; // a new project is a new card: no state, draft or late answer of the previous one is carried over
+}
+
+function ProjectDetailCard() {
+  const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [loadError, setLoadError] = useState('');
@@ -120,6 +125,7 @@ export default function ProjectDetail() {
   const tabRefs = useRef({});
   const [visited, setVisited] = useState(() => new Set([paneKey]));
   const [cfgVersion, setCfgVersion] = useState(0);
+  const [accVersion, setAccVersion] = useState(0); // grows when the cabinets of the project change (the builder reads them once)
   const [workCount, setWorkCount] = useState(0); // reports waiting in «Робота над звітами» (the badge of the tab)
   useEffect(() => { let off = false; countWorkReports(id).then((n) => { if (!off) setWorkCount(n); }); return () => { off = true; }; }, [id, tab]);
   useEffect(() => { setVisited((v) => (v.has(paneKey) ? v : new Set(v).add(paneKey))); }, [paneKey]);
@@ -181,11 +187,17 @@ export default function ProjectDetail() {
   useEffect(() => { reload(); }, [id]);
   useEffect(() => { fetchProjectAccounts(id).then(setLinkedAccounts); }, [id]);
 
+  // The text fields follow the project only while the person has not typed in them: a status change or any other saved field must not wipe a note that is not saved yet.
+  const syncedNotes = useRef('');
+  const syncedInfo = useRef('');
   useEffect(() => {
-    if (project) {
-      setNotesValue(project.notes || '');
-      setInfoValue(project.additional_info || '');
-    }
+    if (!project) return;
+    const n = project.notes || '';
+    const i = project.additional_info || '';
+    setNotesValue((cur) => (cur === syncedNotes.current ? n : cur));
+    setInfoValue((cur) => (cur === syncedInfo.current ? i : cur));
+    syncedNotes.current = n;
+    syncedInfo.current = i;
   }, [project]);
 
   // Saves one change at once. The card shows it straight away; if the database refuses, the old value comes back and the person is told.
@@ -232,7 +244,10 @@ export default function ProjectDetail() {
 
   async function handleDelete() {
     if (deleting) return;
-    if (!(await confirm({ title: 'Видалити проєкт?', body: 'Видалити цей проєкт? Дію не можна скасувати.', confirmLabel: 'Видалити проєкт', danger: true }))) return;
+    let reports = 0;
+    try { reports = (await fetchProjectReports(id)).length; } catch { /* the count only makes the warning more exact */ }
+    const body = `Разом із проєктом «${project.name || ''}» буде безповоротно видалено: ${reports ? `збережені звіти (${reports})` : 'збережені звіти'}, презентації, посилання для клієнта (вони одразу перестануть працювати), підключені кабінети, налаштування AI-агента й креативи. Дію не можна скасувати.`;
+    if (!(await confirm({ title: 'Видалити проєкт?', body, confirmLabel: 'Видалити проєкт', danger: true }))) return;
     setDeleting(true);
     try {
       await deleteProject(id);
@@ -275,7 +290,7 @@ export default function ProjectDetail() {
     return (
       <div className="report-page project-detail-page">
         <div className="page-actions">
-          <button type="button" className="btn" onClick={() => navigate('/projects')}>&#8592; Back</button>
+          <button type="button" className="btn" onClick={() => navigate('/projects')}>&#8592; До списку</button>
         </div>
         <div className="proj-empty">{loadError}</div>
       </div>
@@ -298,7 +313,7 @@ export default function ProjectDetail() {
     if (!f) return null;
     const raw = project[f.key];
     const save = (v) => commit({ [f.key]: extraFieldsPayload({ [f.key]: v })[f.key] });
-    const link = (f.key === 'worksection_link' || f.type === 'url') && !isEmpty(raw) ? <a className="ov-link ov-open" href={raw} target="_blank" rel="noreferrer">Відкрити ↗</a> : null;
+    const link = (f.key === 'worksection_link' || f.type === 'url') && !isEmpty(raw) && safeHref(raw) ? <a className="ov-link ov-open" href={safeHref(raw)} target="_blank" rel="noreferrer">Відкрити ↗</a> : null;
     return (
       <div className="ov-field-box" key={key}>
         <div className="ov-field-label">{f.label}{link}</div>
@@ -398,7 +413,7 @@ export default function ProjectDetail() {
       case 'website':
         return (
           <div className="ov-field-box" key={key}>
-            <div className="ov-field-label"><FieldIcon name="website" />Сайт{!isEmpty(project.website) ? <a className="ov-link ov-open" href={project.website} target="_blank" rel="noreferrer">Відкрити ↗</a> : null}</div>
+            <div className="ov-field-label"><FieldIcon name="website" />Сайт{!isEmpty(project.website) && safeHref(project.website) ? <a className="ov-link ov-open" href={safeHref(project.website)} target="_blank" rel="noreferrer">Відкрити ↗</a> : null}</div>
             <AutoField value={project.website} placeholder="https://..." ariaLabel="Сайт" onCommit={(v) => commit({ website: v.trim() || null })} />
           </div>
         );
@@ -496,7 +511,7 @@ export default function ProjectDetail() {
           </aside>
 
           <div className="pw-ov-main">
-            <ProjectAccountsPanel projectId={id} services={project.services} onAddService={addService} onAccountsChange={setLinkedAccounts} />
+            <ProjectAccountsPanel projectId={id} services={project.services} onAddService={addService} onAccountsChange={(a) => { setLinkedAccounts(a); setCfgVersion((v) => v + 1); setAccVersion((v) => v + 1); }} />
 
             <div className="pw-notes">
               <section className="report-section pw-card">
@@ -544,7 +559,7 @@ export default function ProjectDetail() {
         </div>
       )}
       {KEEP_ALIVE.filter((k) => visited.has(k)).map((k) => (
-        <div key={k + '-' + id + (k === 'builder' ? '' : '-' + cfgVersion)} hidden={paneKey !== k}>
+        <div key={k + '-' + id + '-a' + accVersion + (k === 'builder' ? '' : '-' + cfgVersion)} hidden={paneKey !== k}>
           {k === 'builder' ? <ReportBuilder projectId={id} onConfigChanged={() => setCfgVersion((v) => v + 1)} /> : k === 'work' ? <ReportWorkbench projectId={id} onCount={setWorkCount} /> : <PlatformReports projectId={id} mode={k.split(':')[1]} />}
         </div>
       ))}

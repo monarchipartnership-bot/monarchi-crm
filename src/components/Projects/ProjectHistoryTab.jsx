@@ -15,7 +15,7 @@ import { fetchProjectDecks } from '../../lib/api/projectDecks';
 import { loadReportContext, extraKeysOf } from '../../lib/projectReportContext';
 import { accountPlatforms, TOTAL_TAB } from '../../lib/reportScope';
 import { platformInfo } from '../../lib/adAccounts';
-import { buildMonths, canApprove, monthKey, reportActions, REPORT_STATUS } from '../../lib/projectHistory';
+import { buildMonths, canApprove, isRunning, monthKey, reportActions, REPORT_STATUS } from '../../lib/projectHistory';
 import '../../styles/projectReports.css';
 import '../../styles/projectHistory.css';
 import '../../styles/historyHub.css';
@@ -50,6 +50,7 @@ export default function ProjectHistoryTab({ projectId }) {
   const [decks, setDecks] = useState([]);
   const [ctx, setCtx] = useState({ project: null, accounts: [], custom: [], columns: {}, approvers: [] });
   const [groups, setGroups] = useState([]);
+  const [ctxReady, setCtxReady] = useState(false); // who may approve is known only when the settings are loaded (fail closed)
   const [openId, setOpenId] = useState(null);
   const [docKey, setDocKey] = useState(null);
   const [returning, setReturning] = useState(null);
@@ -59,14 +60,21 @@ export default function ProjectHistoryTab({ projectId }) {
   const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
-    const [r, d] = await Promise.all([fetchProjectReports(projectId), fetchProjectDecks(projectId)]);
-    setRows(r);
-    setDecks(d);
+    try {
+      const [r, d] = await Promise.all([fetchProjectReports(projectId, undefined, undefined, true), fetchProjectDecks(projectId)]);
+      setRows(r);
+      setDecks(d);
+      setError((e) => (e.startsWith('Не вдалося завантажити історію') ? '' : e));
+    } catch (e) {
+      console.warn('history load failed', e);
+      setError('Не вдалося завантажити історію: ' + (e.message || 'помилка мережі') + '. Натисніть «Повторити».');
+    }
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     let off = false;
-    loadReportContext(projectId).then((c) => { if (!off) setCtx(c); }).catch(() => {});
+    setCtxReady(false);
+    loadReportContext(projectId).then((c) => { if (!off) { setCtx(c); setCtxReady(true); } }).catch(() => { if (!off) setError('Не вдалося завантажити налаштування проєкту: підтверджувати й видаляти звіти зараз не можна. Оновіть сторінку.'); });
     fetchCampaignGroups(projectId).then((g) => { if (!off) setGroups(g); }).catch(() => {});
     return () => { off = true; };
   }, [projectId]);
@@ -81,7 +89,7 @@ export default function ProjectHistoryTab({ projectId }) {
   const months = useMemo(() => buildMonths(scopeRows.filter((r) => r.period_type !== 'custom'), today()), [scopeRows]);
   const customRows = useMemo(() => scopeRows.filter((r) => r.period_type === 'custom').sort((a, b) => String(b.period_start).localeCompare(String(a.period_start)) || String(b.updated_at).localeCompare(String(a.updated_at))), [scopeRows]);
   const customOpen = section === 'custom' ? customRows.find((r) => r.id === Number(params.get('report'))) || null : null;
-  const approver = canApprove(email, ctx.approvers);
+  const approver = ctxReady && canApprove(email, ctx.approvers);
   const projectName = ctx.project?.name || '';
 
   const open = (rows || []).find((r) => r.id === openId) || null;
@@ -123,9 +131,23 @@ export default function ProjectHistoryTab({ projectId }) {
     if (action === 'return') { setReturning(row); return; }
     act(row, action);
   }
+  // a returned report leaves the client's page, so the running total of its month is counted again
+  async function recountMonth(row) {
+    if (row.period_type !== 'weekly') return;
+    setNote('Оновлюємо підсумок місяця…');
+    try {
+      const r = await refreshMonthTotal(projectId, monthKey(row.period_start));
+      if (r.error) setError('Звіт оновлено, але підсумок місяця не вдалося перерахувати: ' + r.error);
+    } finally { setNote(''); }
+  }
   async function remove(r) {
-    if (!(await confirm({ title: 'Видалити звіт?', body: 'Видалити збережений звіт з історії? Дію не можна скасувати. Презентація, зроблена з нього, залишиться.', confirmLabel: 'Видалити звіт', danger: true }))) return;
-    try { await deleteProjectReport(r.id); setOpenId(null); await load(); } catch (e) { setError(e.message || 'Не вдалося видалити.'); }
+    const final = r.status === 'final';
+    if (final && !approver) { setError('Затверджені звіти видаляють лише відповідальні, обрані в налаштуваннях агента.'); return; }
+    const body = final
+      ? 'Цей звіт затверджено: він зникне зі сторінки клієнта' + (r.period_type === 'weekly' ? ', а підсумок місяця буде перераховано' : '') + '. Дію не можна скасувати. Презентація, зроблена з нього, залишиться.'
+      : 'Видалити збережений звіт з історії? Дію не можна скасувати. Презентація, зроблена з нього, залишиться.';
+    if (!(await confirm({ title: 'Видалити звіт?', body, confirmLabel: 'Видалити звіт', danger: true }))) return;
+    try { await deleteProjectReport(r.id); setOpenId(null); if (final) await recountMonth(r); await load(); } catch (e) { setError(e.message || 'Не вдалося видалити.'); }
   }
   const presentation = (r, platform) => navigate(`/clients?project=${projectId}&type=${r.period_type}&start=${r.period_start}&end=${r.period_end}&platform=${platform}`);
 
@@ -133,10 +155,10 @@ export default function ProjectHistoryTab({ projectId }) {
     <li key={key}>
       <span className="ph-name">{row?.data?.toDate ? `${name} · на сьогодні` : name}</span>
       <span className="ph-dates">{row?.data?.toDate ? `${fmt(row.period_start)} – ${fmt(row.period_end)}` : dates}</span>
-      {row ? <Chip status={row.status} toDate={row.data?.toDate} /> : <Chip />}
+      {row ? <Chip status={row.status} toDate={isRunning(row, today())} /> : <Chip />}
       {row ? (
         <span className="ph-act">
-          {(row.data?.toDate ? [] : reportActions(row.status, approver)).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
+          {(isRunning(row, today()) ? [] : reportActions(row.status, approver)).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
           {Object.keys(row.data?.platforms || {}).length > 0 && <ReportDownload row={row} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, row)} />}
           <button type="button" className="btn" onClick={() => (row.status === 'final' ? setOpenId(row.id) : navigate(`/projects/${projectId}?tab=work&report=${row.id}&platform=${row.platform}`))}>Відкрити</button>
         </span>
@@ -172,7 +194,7 @@ export default function ProjectHistoryTab({ projectId }) {
         </>
       )}
       {section === 'journey' && <ShareLinkBox projectId={projectId} scope={scopeOf(tab)} label={tabs.find((t) => t.key === tab)?.label || ''} />}
-      {error && <div className="pacc-err">{error}</div>}
+      {error && <div className="pacc-err" role="alert">{error}{error.startsWith('Не вдалося завантажити історію') && <> <button type="button" className="pacc-link" onClick={load}>Повторити</button></>}</div>}
       {note && <div className="pacc-hint" role="status">{note}</div>}
       {rows == null && <div className="empty-hint">Завантаження...</div>}
       {rows && section === 'custom' && (customOpen ? (
@@ -203,7 +225,7 @@ export default function ProjectHistoryTab({ projectId }) {
           {months.map((m, i) => {
             const isOpen = closed[m.key] === undefined ? i === 0 : !closed[m.key];
             const share = m.counts.total ? Math.round((m.counts.approved / m.counts.total) * 100) : 0;
-            const tone = m.counts.total && share === 100 && m.monthly?.status === 'approved' ? ' st-ok' : m.counts.rework ? ' st-paused' : '';
+            const tone = m.counts.total && share === 100 && m.monthly?.status === 'final' ? ' st-ok' : m.counts.rework ? ' st-paused' : '';
             return (
               <article key={m.key} className={'ph-month' + (isOpen ? ' open' : '')}>
                 <header onClick={() => setClosed((c) => ({ ...c, [m.key]: isOpen }))}>
@@ -237,7 +259,7 @@ export default function ProjectHistoryTab({ projectId }) {
       {open && (
         <ArchiveReportModal
           row={open} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, open)}
-          actions={open.data?.toDate ? [] : reportActions(open.status, approver)} onAction={onAction} onChanged={load}
+          actions={isRunning(open, today()) ? [] : reportActions(open.status, approver)} onAction={onAction} onChanged={load}
           onClose={() => setOpenId(null)} onDelete={remove} onPresentation={presentation}
         />
       )}
@@ -246,7 +268,7 @@ export default function ProjectHistoryTab({ projectId }) {
         <ReportReturnDialog
           title={`${reportPlatformLabel(returning.platform)} · ${reportPeriodText(returning)}`}
           onClose={() => setReturning(null)}
-          onSubmit={async (note) => { await setReportStatus(returning.id, 'return', { by: email, note }); setReturning(null); setOpenId(null); await load(); }}
+          onSubmit={async (note) => { const row = returning; await setReportStatus(row.id, 'return', { by: email, note }); setReturning(null); setOpenId(null); await recountMonth(row); await load(); }}
         />
       )}
       {confirmDialog}
