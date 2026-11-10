@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ActionIcon from '../../../components/common/ActionIcon';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -28,6 +28,15 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
   const [report, setReport] = useState(null);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState(null); // 'copy' | 'template'
+  const [menuOpen, setMenuOpen] = useState(false); // the «···» menu of the secondary actions
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
 
   const reload = useCallback(async () => {
     const t = await loadCampaignTeam(campaign, email);
@@ -78,21 +87,26 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
   return (
     <div className="cmp-page">
       <div className="cmp-page-head">
-        <button type="button" className="cmp-btn" onClick={onBack}><ActionIcon name="back" size={18} />Усі операції</button>
+        <button type="button" className="cmp-back" onClick={onBack} aria-label="Усі операції" title="Усі операції"><ActionIcon name="back" size={18} /></button>
         <div className="cmp-page-title">
           <span className="cmp-kicker">{project?.name || 'Проєкт'}{project?.client ? ` · ${project.client}` : ''}</span>
           <h2>{campaign.name}</h2>
           <div className="cmp-chips-ro">{creativeOnly ? <span className="cmp-status cmp-status--active">Тільки креативи</span> : campaign.platforms.map((p) => <em key={p} style={{ '--c': PLATFORMS[p]?.color }}>{PLATFORMS[p]?.label || p}</em>)}<span className={'cmp-status cmp-status--' + tone}>{label}</span></div>
         </div>
-        <div className="cmp-page-actions">
-          {campaign.status !== 'draft' && <button type="button" className="cmp-btn" onClick={() => setDialog('copy')}>Копіювати на інший проєкт</button>}
-          {campaign.status !== 'draft' && <button type="button" className="cmp-btn" onClick={() => setDialog('template')}>Зберегти як шаблон</button>}
+        <div className="cmp-page-actions" ref={menuRef}>
           {campaign.status === 'draft' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={launchDraft}>Запустити</button>}
-          {campaign.status === 'active' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('paused', 'Операцію призупинено: усі її агенти зупинені.')}>Призупинити</button>}
+          {campaign.status === 'active' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={() => setStatus('paused', 'Операцію призупинено: усі її агенти зупинені.')}>Призупинити</button>}
           {campaign.status === 'paused' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={() => setStatus('active', 'Операцію відновлено.')}>Відновити</button>}
-          {campaign.status !== 'archived' && campaign.status !== 'draft' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('archived', 'Операцію перенесено в архів.')}>В архів</button>}
-          {campaign.status === 'archived' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('paused', 'Операцію повернуто з архіву на паузу.')}>Повернути з архіву</button>}
-          {(campaign.status === 'draft' || campaign.status === 'archived' || campaign.status === 'paused') && <button type="button" className="cmp-btn cmp-btn--danger" disabled={busy} onClick={remove}>Видалити</button>}
+          {campaign.status === 'archived' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={() => setStatus('paused', 'Операцію повернуто з архіву на паузу.')}>Повернути з архіву</button>}
+          <button type="button" className="cmp-more" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Ще дії" title="Ще дії"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg></button>
+          {menuOpen && (
+            <div className="cmp-menu" role="menu">
+              {campaign.status !== 'draft' && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setDialog('copy'); }}>Копіювати на інший проєкт</button>}
+              {campaign.status !== 'draft' && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setDialog('template'); }}>Зберегти як шаблон</button>}
+              {campaign.status !== 'archived' && campaign.status !== 'draft' && <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); setStatus('archived', 'Операцію перенесено в архів.'); }}>В архів</button>}
+              {(campaign.status === 'draft' || campaign.status === 'archived' || campaign.status === 'paused') && <button type="button" role="menuitem" className="is-danger" disabled={busy} onClick={() => { setMenuOpen(false); remove(); }}>Видалити</button>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -103,7 +117,7 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
       <section className="cmp-live">
         <div className="cmp-live-head"><h3>Схема агентів операції</h3><span className="cmp-muted">Натисніть агента, щоб відкрити його промти, налаштування й історію.</span></div>
         <div className="cmp-scheme"><ChainDiagram active={active} states={states} onSelect={(role) => byRole.get(role) && setOpenRole(role)} selected={openRole} /></div>
-        <p className="cmp-legend"><i style={{ background: '#5FE0A1' }} />працює <i style={{ background: '#8D7A93' }} />вимкнено <i style={{ background: '#FF7A9A' }} />зупинено (залежить від вимкненого) <i style={{ background: '#F2B94B' }} />операція на паузі</p>
+        <p className="cmp-legend cmp-legend--caps"><span><i style={{ background: '#3FD98A' }} />працює</span><span><i style={{ background: '#8D7A93' }} />вимкнено</span><span><i style={{ background: '#FF8A8A' }} />зупинено (залежить від вимкненого)</span><span><i style={{ background: '#FFB547' }} />операція на паузі</span></p>
       </section>
       )}
 

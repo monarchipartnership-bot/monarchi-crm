@@ -44,6 +44,8 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
   const shown = useMemo(() => (campaigns || []).filter((c) => (view === 'archive' ? c.status === 'archived' : c.status !== 'archived')), [campaigns, view]);
   const counts = { current: (campaigns || []).filter((c) => c.status !== 'archived').length, archive: (campaigns || []).filter((c) => c.status === 'archived').length };
   const open = campaigns?.find((c) => c.id === openId) || null;
+  const paused = (campaigns || []).filter((c) => c.status === 'paused').length;
+  const withErrors = (campaigns || []).filter((c) => (failed[String(c.id)]?.failed || 0) > 0 && c.status !== 'archived').length;
 
   if (open) {
     return (
@@ -57,22 +59,28 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
   return (
     <div className="ai-section cmp-section" role="region" aria-label="Операції клієнтів">
       {toast && <div className={'cmp-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
-      <div className="ai-section-head">
-        <div className="ai-section-icon" aria-hidden="true"><ActionIcon name="generate" size={26} /></div>
-        <div>
+      <div className="ai-section-head cmp-head">
+        <div className="cmp-head-tt">
           <div className="ai-section-kicker">Команди агентів</div>
           <h1>Операції клієнтів</h1>
           <p>Для кожного клієнта з рекламним кабінетом у CRM створюється команда агентів операції: вона аналізує кабінети, пропонує оптимізацію, готує звіт і лист клієнту. Клієнт також підключається до спільного відділу креативів, який за запитами менеджера робить технічні завдання, тексти й креативи. Усе проходить через вашу перевірку.</p>
         </div>
+        <div className="cmp-rings" role="group" aria-label="Підсумок">
+          <div className="cmp-ringc"><b>{counts.current}</b><small>поточних</small></div>
+          <div className="cmp-ringc"><b>{paused}</b><small>на паузі</small></div>
+          <div className={'cmp-ringc' + (withErrors ? ' is-bad' : '')}><b>{withErrors}</b><small>з помилкою</small></div>
+        </div>
       </div>
 
-      <div className="ai-section-pills" role="tablist" aria-label="Розділи операцій">
-        <button type="button" className="ai-section-btn ai-section-btn-primary" onClick={() => setWizard(true)}><ActionIcon name="create" size={18} />Створити операцію</button>
-        <button type="button" className="ai-section-btn" onClick={() => setFromTemplate(true)}>З шаблону</button>
-        <span className="agent-catalog-pill-sep" aria-hidden="true" />
-        <button type="button" role="tab" aria-selected={view === 'current'} className={'ai-section-pill' + (view === 'current' ? ' active' : '')} onClick={() => setView('current')}>Поточні операції ({counts.current})</button>
-        <button type="button" role="tab" aria-selected={view === 'calendar'} className={'ai-section-pill' + (view === 'calendar' ? ' active' : '')} onClick={() => setView('calendar')}>Календар</button>
-        <button type="button" role="tab" aria-selected={view === 'archive'} className={'ai-section-pill' + (view === 'archive' ? ' active' : '')} onClick={() => setView('archive')}>Архів ({counts.archive})</button>
+      <div className="cmp-onebar" role="group" aria-label="Операції">
+        <button type="button" className="cmp-ob-btn cmp-ob-main" onClick={() => setWizard(true)}><ActionIcon name="create" size={18} />Створити операцію</button>
+        <button type="button" className="cmp-ob-btn" onClick={() => setFromTemplate(true)}>З шаблону</button>
+        <span className="cmp-ob-sep" aria-hidden="true" />
+        <div className="cmp-ob-views" role="tablist" aria-label="Розділи операцій">
+          <button type="button" role="tab" aria-selected={view === 'current'} className={view === 'current' ? 'on' : ''} onClick={() => setView('current')}>Поточні операції<em>{counts.current}</em></button>
+          <button type="button" role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>Календар</button>
+          <button type="button" role="tab" aria-selected={view === 'archive'} className={view === 'archive' ? 'on' : ''} onClick={() => setView('archive')}>Архів<em>{counts.archive}</em></button>
+        </div>
       </div>
 
       {view === 'calendar' && campaigns && <CampaignCalendar campaigns={campaigns} projects={projects} onOpen={(id) => setOpenId(id)} />}
@@ -91,10 +99,11 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
           const f = failed[String(c.id)] || {};
           const [label, tone] = CAMPAIGN_STATUS[c.status] || ['—', 'draft'];
           return (
-            <button key={c.id} type="button" className="cmp-card" onClick={() => setOpenId(c.id)}>
+            <button key={c.id} type="button" className={'cmp-card' + (f.failed ? ' is-bad' : c.status === 'paused' ? ' is-warn' : '')} onClick={() => setOpenId(c.id)}>
               <span className="cmp-card-top"><span className="cmp-kicker">{p?.name || 'Проєкт'}</span><span className={'cmp-status cmp-status--' + tone}>{label}</span></span>
               <b className="cmp-card-name">{c.name}</b>
               <span className="cmp-chips-ro">{c.platforms.map((x) => <em key={x} style={{ '--c': PLATFORMS[x]?.color }}>{PLATFORMS[x]?.label || x}</em>)}</span>
+              <span className="cmp-card-bar" aria-hidden="true"><i style={{ width: (mine.length ? (on / mine.length) * 100 : 0) + '%' }} /></span>
               <span className="cmp-card-meta">
                 <span>{on} з {mine.length} агентів увімкнено</span>
                 <span>{last ? `остання робота ${fmtDateTime(last)}` : 'ще не працювала'}</span>

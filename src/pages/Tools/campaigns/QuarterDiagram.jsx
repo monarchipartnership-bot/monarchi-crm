@@ -49,11 +49,16 @@ export default function QuarterDiagram({ lit }) {
   return (
     <svg className="cmp-diagram cmp-diagram--quarters" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Схема звʼязків між агентами за кварталами Клієнтського району">
       <defs>
-        <marker id={`qa-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1 9 5 1 9z" fill="#EB9CEF" /></marker>
-        <marker id={`qd-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1 9 5 1 9z" fill="#7C5C85" /></marker>
+        <marker id={`qa-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1 9 5 1 9z" fill="#c76dff" /></marker>
+        <marker id={`qd-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1 9 5 1 9z" fill="#6b5a85" /></marker>
       </defs>
-      {QUARTERS.map((q, i) => <rect key={q.key} className={'cmp-col' + (quarterLit[i] ? ' is-lit' : '')} x={panelX(i)} y={TOP_LANE} width={PANEL_W} height={PANEL_H} rx="20" />)}
-      {QUARTERS.map((q, i) => <text key={q.key} className="cmp-stage-title" x={panelX(i) + PANEL_W / 2} y={TOP_LANE + 23} textAnchor="middle">{q.label}</text>)}
+      {QUARTERS.map((q, i) => (
+        <g key={q.key} className={'cmp-colhead' + (quarterLit[i] ? ' is-lit' : '')}>
+          <circle className="cmp-colhead-dot" cx={panelX(i) + PAD_IN + 6} cy={TOP_LANE + 19} r="4" />
+          <text className="cmp-stage-title" x={panelX(i) + PAD_IN + 18} y={TOP_LANE + 23}>{q.label}</text>
+          <line className="cmp-colhead-line" x1={panelX(i) + PAD_IN} y1={TOP_LANE + 30} x2={panelX(i) + PAD_IN + NODE_W} y2={TOP_LANE + 30} />
+        </g>
+      ))}
       <g className="cmp-edges">
         {links.map((l) => <path key={l.from + l.to} className={'cmp-edge' + (l.on ? ' is-lit' : '') + (l.required ? ' is-required' : '')} d={linkPath(l)} markerEnd={`url(#${l.on ? 'qa' : 'qd'}-${uid})`} fill="none" />)}
       </g>
@@ -63,7 +68,7 @@ export default function QuarterDiagram({ lit }) {
           const on = lit.has(n.id);
           return (
             <g key={n.id} className={'cmp-node' + (on ? ' is-lit' : ' is-dim') + (n.planned ? ' is-planned' : '')} transform={`translate(${p.x} ${p.y})`} style={{ '--accent': accentOf(n) }} aria-label={n.name + (n.planned ? ', заплановано' : '')}>
-              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="14" />
+              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="16" />
               <rect className="cmp-node-bar" x="0" y="12" width="4" height={NODE_H - 24} rx="2" />
               <text className="cmp-node-name" x="16" y="22">{n.name}</text>
               <text className="cmp-node-short" x="16" y="39">{n.short}</text>

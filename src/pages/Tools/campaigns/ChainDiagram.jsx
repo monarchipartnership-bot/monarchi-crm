@@ -4,7 +4,7 @@ import { CAMPAIGN_LINKS, CAMPAIGN_ROLES, PLATFORMS, STAGES } from '../../../lib/
 // The structural scheme of the campaign team: who depends on whom. Columns are the stages of the work, arrows are the links.
 // `active` (a Set of roles) is the part of the chain that works on the chosen campaign: it glows, the rest fades. `states`
 // (role -> 'on' | 'off' | 'blocked' | 'paused') paints a live campaign.
-const NODE_W = 186;
+const NODE_W = 204;
 const NODE_H = 54;
 const COL_GAP = 44;
 const ROW_GAP = 14;
@@ -26,7 +26,7 @@ export function layout() {
   return { pos, width: PAD * 2 + STAGES.length * NODE_W + (STAGES.length - 1) * COL_GAP, height: HEAD + 6 + colH + 8, colH };
 }
 
-const STATE_DOT = { on: '#5FE0A1', off: '#8D7A93', blocked: '#FF7A9A', paused: '#F2B94B' };
+const STATE_DOT = { on: '#3FD98A', off: '#8D7A93', blocked: '#FF8A8A', paused: '#FFB547' };
 
 export default function ChainDiagram({ active, states, selected, onSelect, compact = false }) {
   const uid = useId().replace(/:/g, '');
@@ -41,17 +41,21 @@ export default function ChainDiagram({ active, states, selected, onSelect, compa
   return (
     <svg className={'cmp-diagram' + (compact ? ' is-compact' : '')} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Схема звʼязків між агентами операції">
       <defs>
-        <marker id={`arrow-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#EB9CEF" /></marker>
-        <marker id={`arrow-dim-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#7C5C85" /></marker>
+        <marker id={`arrow-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#c76dff" /></marker>
+        <marker id={`arrow-dim-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#6b5a85" /></marker>
         <filter id={`glow-${uid}`} x="-30%" y="-40%" width="160%" height="180%"><feGaussianBlur stdDeviation="5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
       </defs>
 
-      {STAGES.map((s, i) => (
-        <rect key={s.key} className="cmp-col" x={PAD + i * (NODE_W + COL_GAP) - 8} y={HEAD - 4} width={NODE_W + 16} height={colH + 16} rx="18" />
-      ))}
-      {STAGES.map((s, i) => (
-        <text key={s.key} className="cmp-stage-title" x={PAD + i * (NODE_W + COL_GAP) + NODE_W / 2} y={HEAD - 12} textAnchor="middle">{s.label}</text>
-      ))}
+      {STAGES.map((s, i) => {
+        const x = PAD + i * (NODE_W + COL_GAP);
+        return (
+          <g key={s.key} className="cmp-colhead">
+            <circle className="cmp-colhead-dot" cx={x + 6} cy={HEAD - 17} r="4" />
+            <text className="cmp-stage-title" x={x + 18} y={HEAD - 13}>{s.label}</text>
+            <line className="cmp-colhead-line" x1={x} y1={HEAD - 6} x2={x + NODE_W} y2={HEAD - 6} />
+          </g>
+        );
+      })}
 
       <g className="cmp-edges">
         {edges.map((l) => {
@@ -90,7 +94,7 @@ export default function ChainDiagram({ active, states, selected, onSelect, compa
               onKeyDown={onSelect && lit ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(def.role); } } : undefined}
               aria-label={def.name + (st ? ', ' + st : '')}
             >
-              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="14" filter={lit && active ? `url(#glow-${uid})` : undefined} />
+              <rect className="cmp-node-box" width={NODE_W} height={NODE_H} rx="16" filter={lit && active ? `url(#glow-${uid})` : undefined} />
               <rect className="cmp-node-bar" x="0" y="12" width="4" height={NODE_H - 24} rx="2" />
               <text className="cmp-node-name" x="16" y="23">{def.name}</text>
               <text className="cmp-node-short" x="16" y="40">{def.short}</text>

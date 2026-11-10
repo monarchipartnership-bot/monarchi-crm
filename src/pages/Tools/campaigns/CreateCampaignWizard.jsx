@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ActionIcon from '../../../components/common/ActionIcon';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -37,6 +37,9 @@ function Field({ id, label, hint, children }) {
 
 // «Створити операцію»: 1) the client and the channels, with the chain of agents lighting up for the chosen channels,
 // 2) every agent set up for this client one after another, 3) the summary and the launch.
+// the accent of an agent: the colour of its channel, violet for the common ones (the medallions of the agent menu)
+const accentOfRole = (role) => { const d = roleDef(role); return !d || d.platforms.includes('*') ? '#c76dff' : PLATFORMS[d.platforms[0]]?.color || '#c76dff'; };
+
 export default function CreateCampaignWizard({ onClose, onLaunched, notify, initialProjectId = null }) {
   const { email } = useAuth();
   const box = useRef(null);
@@ -203,17 +206,22 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
 
   return createPortal(
     <div className="cmp-overlay ai-immersive" data-ai-safe>
-      <div ref={box} className="cmp-wizard" role="dialog" aria-modal="true" aria-labelledby="cmp-wiz-title" tabIndex={-1}>
+      <div ref={box} className="cmp-wizard cpw cow" role="dialog" aria-modal="true" aria-labelledby="cmp-wiz-title" tabIndex={-1}>
         <header className="cmp-wiz-head">
           <div>
             <span className="cmp-kicker">Нова операція</span>
             <h2 id="cmp-wiz-title">Створити команду агентів для клієнта</h2>
           </div>
-          <ol className="cmp-steps" aria-label="Кроки">
-            {STEPS.map((s, i) => <li key={s} className={step === i + 1 ? 'is-current' : step > i + 1 ? 'is-done' : ''}><i>{step > i + 1 ? <ActionIcon name="select" size={14} /> : i + 1}</i>{s}</li>)}
-          </ol>
           <button type="button" className="cmp-x" onClick={onClose} disabled={busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
         </header>
+        <ol className="cpw-line" aria-label="Кроки">
+          {STEPS.map((st, i) => (
+            <Fragment key={st}>
+              {i > 0 && <li className={'cpw-ln' + (step >= i + 1 ? ' is-done' : '')} aria-hidden="true" />}
+              <li className={'cpw-st' + (step === i + 1 ? ' is-current' : step > i + 1 ? ' is-done' : '')} aria-current={step === i + 1 ? 'step' : undefined}><i>{step > i + 1 ? <ActionIcon name="select" size={14} /> : i + 1}</i>{st}</li>
+            </Fragment>
+          ))}
+        </ol>
 
         <div className="cmp-wiz-body">
           {error && <p className="cmp-error" role="alert">{error}</p>}
@@ -240,8 +248,8 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                   {list.map((c) => (
                     <li key={c.id}>
                       <button type="button" className={'cmp-client' + (project?.id === c.id ? ' is-active' : '')} onClick={() => choose(c)} aria-pressed={project?.id === c.id}>
-                        <span className="cmp-client-name">{c.name}</span>
-                        <span className="cmp-client-sub">{c.client || '—'}</span>
+                        <span className="cpw-av" aria-hidden="true">{(c.name || '?').charAt(0).toUpperCase()}</span>
+                        <span className="cpw-cl-tx"><span className="cmp-client-name">{c.name}</span><span className="cmp-client-sub">{c.client || '—'}</span></span>
                         <span className="cmp-client-badges">{c.accounts.map((a) => <em key={a.platform} style={{ '--c': PLATFORMS[a.platform]?.color || '#EB9CEF' }}>{platformLabel(a.platform)}</em>)}</span>
                       </button>
                     </li>
@@ -349,11 +357,11 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
             <div className="cmp-step2">
               <nav className="cmp-agentnav" aria-label="Агенти операції">
                 <ol>
-                  {modeDef.brief && <li><button type="button" className={idx === 0 ? 'is-current' : seen.has(0) ? 'is-seen' : ''} onClick={() => go(0)} disabled={busy}>Загальне про операцію</button></li>}
+                  {modeDef.brief && <li><button type="button" className={idx === 0 ? 'is-current' : seen.has(0) ? 'is-seen' : ''} style={{ '--c': '#c76dff' }} onClick={() => go(0)} disabled={busy}><i className="cow-n" aria-hidden="true">·</i><span>Загальне про операцію</span></button></li>}
                   {ordered.map((a, i) => (
                     <li key={a.id}>
-                      <button type="button" className={(idx === i + 1 ? 'is-current ' : seen.has(i + 1) ? 'is-seen ' : '') + (forms[a.id]?.enabled ? '' : 'is-off')} onClick={() => go(i + 1)} disabled={busy}>
-                        <span>{a.name}</span>{!forms[a.id]?.enabled && <small>вимкнено</small>}
+                      <button type="button" className={(idx === i + 1 ? 'is-current ' : seen.has(i + 1) ? 'is-seen ' : '') + (forms[a.id]?.enabled ? '' : 'is-off')} style={{ '--c': accentOfRole(a.role) }} onClick={() => go(i + 1)} disabled={busy}>
+                        <i className="cow-n" aria-hidden="true">{i + 1}</i><span>{a.name}</span>{!forms[a.id]?.enabled && <small>вимкнено</small>}
                       </button>
                     </li>
                   ))}
@@ -362,7 +370,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                     const n = ordered.length + j + 1;
                     return (
                       <li key={it.agent.id}>
-                        <button type="button" className={idx === n ? 'is-current' : seen.has(n) ? 'is-seen' : ''} onClick={() => go(n)} disabled={busy}><span>{it.agent.name}</span></button>
+                        <button type="button" className={idx === n ? 'is-current' : seen.has(n) ? 'is-seen' : ''} style={{ '--c': '#c76dff' }} onClick={() => go(n)} disabled={busy}><i className="cow-n" aria-hidden="true">{n}</i><span>{it.agent.name}</span></button>
                       </li>
                     );
                   })}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ActionIcon from '../../../components/common/ActionIcon';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -118,11 +118,16 @@ export default function CreateProjectWizard({ onClose, onDone, notify }) {
       <div ref={box} className="cmp-wizard cpw" role="dialog" aria-modal="true" aria-labelledby="cpw-title" tabIndex={-1}>
         <header className="cmp-wiz-head">
           <div><span className="cmp-kicker">Новий проєкт</span><h2 id="cpw-title">Що агенти мають знати про клієнта</h2></div>
-          <ol className="cmp-steps" aria-label="Кроки">
-            {WIZARD_STEPS.map((s, i) => <li key={s.key} className={step === i ? 'is-current' : step > i ? 'is-done' : ''}><i>{step > i ? <ActionIcon name="select" size={14} /> : i + 1}</i>{s.label}</li>)}
-          </ol>
           <button type="button" className="cmp-x" onClick={onClose} disabled={!!busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
         </header>
+        <ol className="cpw-line" aria-label="Кроки">
+          {WIZARD_STEPS.map((st, i) => (
+            <Fragment key={st.key}>
+              {i > 0 && <li className={'cpw-ln' + (step >= i ? ' is-done' : '')} aria-hidden="true" />}
+              <li className={'cpw-st' + (step === i ? ' is-current' : step > i ? ' is-done' : '')} aria-current={step === i ? 'step' : undefined}><i>{step > i ? <ActionIcon name="select" size={14} /> : i + 1}</i>{st.label}</li>
+            </Fragment>
+          ))}
+        </ol>
 
         <div className="cmp-wiz-body">
           {error && <p className="cmp-error" role="alert">{error}</p>}
@@ -138,8 +143,8 @@ export default function CreateProjectWizard({ onClose, onDone, notify }) {
                 {list.map((c) => (
                   <li key={c.id}>
                     <button type="button" className={'cmp-client' + (project?.id === c.id ? ' is-active' : '')} onClick={() => setProject(c)} aria-pressed={project?.id === c.id}>
-                      <span className="cmp-client-name">{c.name}</span>
-                      <span className="cmp-client-sub">{c.client || '—'}</span>
+                      <span className="cpw-av" aria-hidden="true">{(c.name || '?').charAt(0).toUpperCase()}</span>
+                      <span className="cpw-cl-tx"><span className="cmp-client-name">{c.name}</span><span className="cmp-client-sub">{c.client || '—'}</span></span>
                       <span className="cmp-client-badges">{c.accounts.map((a) => <em key={a.platform + a.account_id} style={{ '--c': PLATFORMS[a.platform]?.color || '#EB9CEF' }}>{platformLabel(a.platform)}</em>)}</span>
                     </button>
                   </li>
@@ -153,8 +158,8 @@ export default function CreateProjectWizard({ onClose, onDone, notify }) {
               <h3>2. Розкажіть про клієнта «{project.name}»</h3>
               {!mode && (
                 <div className="cpw-choice">
-                  <button type="button" className="cpw-card" onClick={() => pick('quick')}><b>Швидке заповнення</b><span>Розкажіть голосом або напишіть своїми словами: модель розкладе все по полях, а ви перевірите.</span></button>
-                  <button type="button" className="cpw-card" onClick={() => pick('manual')}><b>Ручне заповнення</b><span>Усі поля форми: заповнюєте самі, нічого не вгадується.</span></button>
+                  <button type="button" className="cpw-card" onClick={() => pick('quick')}><span className="cpw-bm"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6z" /></svg></span><b>Швидке заповнення</b><span>Розкажіть голосом або напишіть своїми словами: модель розкладе все по полях, а ви перевірите.</span></button>
+                  <button type="button" className="cpw-card" onClick={() => pick('manual')}><span className="cpw-bm"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M9 9h6M9 13h6M9 17h3" /></svg></span><b>Ручне заповнення</b><span>Усі поля форми: заповнюєте самі, нічого не вгадується.</span></button>
                 </div>
               )}
 
