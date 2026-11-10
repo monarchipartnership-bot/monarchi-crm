@@ -67,12 +67,12 @@ export default function StudioSection({ campaign, notify, onCampaign = null, aut
         </div>
         <div className="stu-head-actions">
           <button type="button" className="cmp-btn" disabled={!team} onClick={() => setOpenRole(CREATIVE_ROLES.find((r) => r.entry).role)}>Агенти відділу{team ? ` (${agentsOn} з ${team.agents.length})` : ''}</button>
-          <button type="button" className="cmp-btn cmp-btn--primary" disabled={!team || ['paused', 'archived'].includes(campaign.status)} onClick={() => setForm({ initial: null })}>Новий запит</button>
+          <button type="button" className="cmp-btn cmp-btn--primary" disabled={!team || ['paused', 'archived'].includes(campaign.status)} onClick={() => setForm({ initial: null })}>Новий цикл (запит на креативи)</button>
         </div>
       </div>
-      {['paused', 'archived'].includes(campaign.status) && <p className="cmp-note">Кампанія на паузі або в архіві: студія не працює.</p>}
+      {['paused', 'archived'].includes(campaign.status) && <p className="cmp-note">Операція на паузі або в архіві: студія не працює.</p>}
 
-      {requests && !requests.length && <p className="cmp-muted">Запитів ще немає. Натисніть «Новий запит»: опишіть задачу клієнта й додайте його матеріали.</p>}
+      {requests && !requests.length && <p className="cmp-muted">Запитів ще немає. Натисніть «Новий цикл (запит на креативи)»: опишіть задачу клієнта й додайте його матеріали.</p>}
       <div className="stu-list">
         {(requests || []).map((r) => {
           const [label, tone] = REQUEST_STATUS[r.status] || ['—', 'draft'];

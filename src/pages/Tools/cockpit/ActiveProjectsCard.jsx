@@ -1,6 +1,20 @@
-import { Avatar, IconBadge, Ic, Progress, WaitChip } from './parts';
+import { Avatar, Ic, Progress, WaitChip } from './parts';
 import { plural } from './format';
 import './cockpit.css';
+
+// the medallion of the header (owner's pick 2026-11-10): the ring round the folder shows the average progress of all the projects
+function RingBadge({ value = 0 }) {
+  const size = 40, w = 4, r = (size - w) / 2, C = 2 * Math.PI * r, v = Math.max(0, Math.min(1, Number(value) || 0));
+  return (
+    <span className="apc-med" style={{ width: size, height: size }} aria-hidden="true">
+      <svg className="apc-ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ck-track)" strokeWidth={w} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--apc-acc, #c76dff)" strokeWidth={w} strokeLinecap="round" strokeDasharray={`${C * v} ${C}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <Ic n="folder" size={18} />
+    </span>
+  );
+}
 
 // «Активні проєкти»: the card at the bottom right of the map (variant A of 2026-11-02). The projects agents work on right now, one row each:
 // the client, the mode, the stage, the progress and the mark «чекає на вас: N» (amber; red when a step failed) or «усе гаразд».
@@ -8,10 +22,11 @@ import './cockpit.css';
 export default function ActiveProjectsCard({ projects = [], collapsed = false, onToggle, onOpen, loading = false, onOpenAll }) {
   const waiting = projects.filter((p) => p.waiting > 0).length;
   const n = projects.length;
+  const avg = n ? projects.reduce((a, p) => a + (Number(p.progress) || 0), 0) / n : 0;
   return (
-    <section className={'ckp ckp-card' + (collapsed ? ' is-collapsed' : '')} aria-label="Активні проєкти" data-ai-safe>
+    <section className={'ckp ckp-card apc' + (collapsed ? ' is-collapsed' : '')} aria-label="Активні проєкти" data-ai-safe>
       <header className="ckp-ph">
-        <IconBadge n="folder" />
+        <RingBadge value={avg} />
         <h3>Активні проєкти</h3>
         {collapsed && n > 0 && <span className="ckp-chip">{n}</span>}
         {collapsed && waiting > 0 && <span className="ckp-chip is-warn">{waiting} {plural(waiting, 'чекає', 'чекають', 'чекають')}</span>}

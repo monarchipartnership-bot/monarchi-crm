@@ -100,7 +100,9 @@ export function KnowledgeCategory({ category, onArticle, onAdd }) {
 }
 
 // Results of the search box: every hit as a card with the sentence that matched.
-export function KnowledgeSearch({ results, query, categories, onArticle }) {
+export function KnowledgeSearch({ results, query, categories, onArticle, smart = null, onSmart, allArticles = [] }) {
+  const byId = new Map(allArticles.map((a) => [a.id, a]));
+  const smartRows = (smart?.results || []).map((r) => ({ ...r, article: byId.get(r.id) })).filter((r) => r.article);
   return (
     <div className="kb-page">
       <section className="kb-cat-head kb-cat-head-search">
@@ -111,6 +113,24 @@ export function KnowledgeSearch({ results, query, categories, onArticle }) {
           <p>{results.length} {plural(results.length, 'результат', 'результати', 'результатів')}</p>
         </div>
       </section>
+      {onSmart && (
+        <section className="kb-smart" aria-label="Пошук за змістом">
+          <div className="kb-smart-head">
+            <div><b>Пошук за змістом</b><span>Шукає розділи, які відповідають на запит по суті, навіть якщо в них інші слова. Один запит до моделі, кілька центів.</span></div>
+            <button type="button" className="kb-btn kb-btn-primary" onClick={onSmart} disabled={smart?.loading || query.trim().length < 3}>{smart?.loading ? 'Шукаю…' : smart ? 'Шукати ще раз' : 'Шукати за змістом'}</button>
+          </div>
+          {smart?.error && <p className="kb-smart-err" role="alert">{smart.error}</p>}
+          {smart && !smart.loading && !smart.error && !smartRows.length && <p className="kb-smart-none">За змістом нічого відповідного не знайдено.</p>}
+          {smartRows.length > 0 && (
+            <ol className="kb-smart-list">
+              {smartRows.map((r) => {
+                const cat = categories.find((c) => c.articles.some((x) => x.id === r.id)) || { label: r.article.categoryLabel, color: r.article.categoryColor };
+                return <li key={r.id}><button type="button" onClick={() => onArticle(r.id)} style={{ '--kb-c': cat.color || '#b544b5' }}><span className="kb-card-tag"><i className="kb-dot" />{cat.label}</span><b>{r.article.title}</b><span>{r.why}</span></button></li>;
+              })}
+            </ol>
+          )}
+        </section>
+      )}
       <div className="kb-grid kb-grid-2">
         {results.map((a) => {
           const cat = categories.find((c) => c.articles.some((x) => x.id === a.id)) || { label: a.categoryLabel, color: a.categoryColor };

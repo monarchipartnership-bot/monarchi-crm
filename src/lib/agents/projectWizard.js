@@ -1,15 +1,15 @@
 // The steps of «Створити проєкт» (spec 2026-11-02, section 4) as pure code, so the screens only draw:
 //   0 the choice of a project of the CRM that has a cabinet     1 the facts about the client (quick fill by words or by hand)
-//   2 what cannot be said (links, files, examples) and what is still missing     3 «Створити кампанію» or «Зробити пізніше»
+//   2 what cannot be said (links, files, examples) and what is still missing     3 «Створити операцію» or «Зробити пізніше»
 import { filledFields, readinessByMode } from './agentRequirements.js';
 import { MODES } from './campaignModes.js';
-import { planWrites } from './profileExtract.js';
+import { EXTRACT_KEYS as DRAFT_KEYS, planWrites } from './profileExtract.js';
 
 export const WIZARD_STEPS = [
   { key: 'project', label: 'Проєкт' },
   { key: 'facts', label: 'Інформація' },
   { key: 'rest', label: 'Посилання й дозаповнення' },
-  { key: 'campaign', label: 'Кампанія' },
+  { key: 'campaign', label: 'Операція' },
 ];
 
 // A cabinet of the CRM project is the condition to start (the agents read its numbers).
@@ -49,4 +49,23 @@ export function wizardSummary({ extracted = null, settings = {}, assets = [], ac
     unplaced: extracted?.unplaced || [],
   };
   return { plan, step2, blockers, recommended, hasStep2: step2.links.length + step2.needsFiles.length + step2.uploads.length + step2.unplaced.length > 0 };
+}
+
+// ---- the screen «Зрозумів так» / the hand form of step 1: ONE editable draft for both ways of filling
+export { DRAFT_KEYS };
+
+// x: the model's reading (parseExtraction) or what the card holds now ({ fields, restrictions, cta_mode, cta_text, figma_url }) → the draft the form edits.
+export function draftFrom(x = {}) {
+  const fields = {};
+  DRAFT_KEYS.forEach((k) => { fields[k] = String(x.fields?.[k] || ''); });
+  const cta = x.cta || (x.cta_mode === 'none' ? { mode: 'none', text: '' } : x.cta_text ? { mode: 'always', text: x.cta_text } : null);
+  return { fields, restrictions: String(x.restrictions || ''), figma: String(x.figma ?? x.figma_url ?? ''), ctaMode: cta?.mode === 'none' ? 'none' : 'always', ctaText: cta?.mode === 'none' ? '' : String(cta?.text || '') };
+}
+
+// the draft back into the shape planWrites()/saveExtracted() take (empty fields are left out; links and files come from the reading, they are not edited here)
+export function extractedFromDraft(draft, meta = {}) {
+  const fields = {};
+  DRAFT_KEYS.forEach((k) => { const v = String(draft.fields?.[k] || '').trim(); if (v) fields[k] = v; });
+  const cta = draft.ctaMode === 'none' ? { mode: 'none', text: '' } : String(draft.ctaText || '').trim() ? { mode: 'always', text: String(draft.ctaText).trim() } : null;
+  return { fields, restrictions: String(draft.restrictions || '').trim(), cta, figma: String(draft.figma || '').trim(), links: meta.links || [], needsFiles: meta.needsFiles || [], unplaced: meta.unplaced || [] };
 }

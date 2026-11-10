@@ -86,7 +86,7 @@ export async function campaignRole({ ctx, team: sub, agent, task, prompt, rec })
   if (!def) throw new Error('Невідома роль агента.');
   const { db } = ctx;
   const campaign = (await db.from('ag_campaigns').select('*').eq('id', Number(agent.scope_id)).maybeSingle()).data;
-  if (!campaign) throw new Error('Кампанію не знайдено (можливо, видалена).');
+  if (!campaign) throw new Error('Операцію не знайдено (можливо, видалена).');
   const project = (await db.from('projects').select('*').eq('id', campaign.project_id).maybeSingle()).data || {};
   const accounts = await loadAccounts(db, campaign.project_id);
   const cfg = agent.config || {};
@@ -115,7 +115,7 @@ export async function campaignRole({ ctx, team: sub, agent, task, prompt, rec })
   if (agent.role === 'business_research') {
     const sites = await siteBlocks(cfg.sources, { limit: 2, read: ctx.read || readSite });
     blocks.push(...sites);
-    if (!sites.length && !cc.brief) throw new Error('Немає з чого працювати: заповніть бриф кампанії або вкажіть адресу сайту клієнта в налаштуваннях агента.');
+    if (!sites.length && !cc.brief) throw new Error('Немає з чого працювати: заповніть бриф операції або вкажіть адресу сайту клієнта в налаштуваннях агента.');
   }
   if (agent.role === 'competitor_research') {
     const comps = String(cfg.competitors || '').trim();

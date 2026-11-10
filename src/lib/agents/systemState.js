@@ -53,3 +53,18 @@ export function buildSystemState({ env = {}, settings = null, tasks = [], now = 
 
   return { status: worst(checks), checks };
 }
+
+// The agents whose work hangs: a task still «running» more than 10 minutes after its booking ended (the worker died). tasks: [{ agent_id, status, lease_until }]
+// → the ids of the agents to restart (each once)
+export function stuckAgents(tasks = [], now = new Date()) {
+  const t = now.getTime();
+  return [...new Set(tasks.filter((x) => x.status === 'running' && x.lease_until && new Date(x.lease_until).getTime() < t - 10 * MIN).map((x) => x.agent_id).filter((id) => id != null))];
+}
+
+// The test message of the page «Стан системи»: which topic it goes to and what it says.
+export function telegramTest(settings, thread = 'attention', by = '') {
+  const chatId = String(settings?.tg_chat_id || '').trim();
+  if (!chatId) throw new Error('Чат Telegram не вказано: заповніть його в «Сповіщення» і збережіть.');
+  const threadId = thread === 'spend' ? settings.spend_thread_id : settings.attention_thread_id;
+  return { chatId, threadId: threadId || undefined, text: `✅ <b>Перевірка сповіщень AI Agents</b>\nГілка: ${thread === 'spend' ? 'витрати' : 'потрібна увага'}.${by ? `\nНадіслав: ${String(by).replace(/[<>&]/g, '')}` : ''}` };
+}

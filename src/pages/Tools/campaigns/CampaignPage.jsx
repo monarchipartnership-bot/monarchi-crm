@@ -3,12 +3,15 @@ import ActionIcon from '../../../components/common/ActionIcon';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { useAuth } from '../../../contexts/AuthContext';
 import { kickQueue } from '../../../lib/api/agents';
-import { deleteCampaign, fetchLatestOutputs, loadCampaignTeam, updateCampaign } from '../../../lib/api/campaigns';
+import { deleteCampaign, fetchLatestOutputs, launchCampaign, loadCampaignTeam, updateCampaign } from '../../../lib/api/campaigns';
 import { agentState } from '../../../lib/agents/chain';
 import { participants, PLATFORMS } from '../../../lib/agents/campaignTeam';
 import Markdown from '../../Smm/Markdown';
 import { fmtDateTime } from '../../Smm/agentUi';
 import AgentWindow from './AgentWindow';
+import CampaignControl from './CampaignControl';
+import Deliverables from './Deliverables';
+import { CopyOperationDialog, SaveTemplateDialog } from './OperationTools';
 import ChainDiagram from './ChainDiagram';
 import StudioSection from './studio/StudioSection';
 
@@ -24,13 +27,14 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
   const [openRole, setOpenRole] = useState(null);
   const [report, setReport] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState(null); // 'copy' | 'template'
 
   const reload = useCallback(async () => {
     const t = await loadCampaignTeam(campaign, email);
     setTeam(t);
     setOutputs(await fetchLatestOutputs(t.agents.map((a) => a.id)));
   }, [campaign, email]);
-  useEffect(() => { reload().catch((e) => notify(e.message || 'Не вдалося завантажити кампанію.', true)); }, [reload, notify]);
+  useEffect(() => { reload().catch((e) => notify(e.message || 'Не вдалося завантажити операцію.', true)); }, [reload, notify]);
 
   const working = team ? Object.values(team.counts).some((c) => c.queued || c.running) : false;
   useEffect(() => {
@@ -55,10 +59,15 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
     setBusy(true);
     try { const c = await updateCampaign(campaign.id, { status }); setCampaign(c); onChanged(); notify(okText); if (status === 'active') kickQueue().catch(() => {}); } catch (e) { notify(e.message || 'Не вдалося змінити.', true); } finally { setBusy(false); }
   }
-  async function remove() {
-    if (!(await confirm({ title: `Видалити кампанію «${campaign.name}»?`, body: 'Буде видалено її агентів, промти, завдання й історію запитів. Це не можна скасувати.', confirmLabel: 'Видалити', danger: true }))) return;
+  async function launchDraft() {
+    if (!(await confirm({ title: 'Запустити операцію?', body: 'Агенти почнуть працювати й витрачати кошти (Claude, Higgsfield).', confirmLabel: 'Запустити' }))) return;
     setBusy(true);
-    try { await deleteCampaign(campaign.id); onChanged(); onBack(); notify('Кампанію видалено.'); } catch (e) { notify(e.message || 'Не вдалося видалити.', true); setBusy(false); }
+    try { await launchCampaign(campaign.id); setCampaign((await updateCampaign(campaign.id, {}))); onChanged(); notify('Операцію запущено.'); kickQueue().catch(() => {}); } catch (e) { notify(e.message || 'Не вдалося запустити.', true); } finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!(await confirm({ title: `Видалити операцію «${campaign.name}»?`, body: 'Буде видалено її агентів, промти, завдання й історію запитів. Це не можна скасувати.', confirmLabel: 'Видалити', danger: true }))) return;
+    setBusy(true);
+    try { await deleteCampaign(campaign.id); onChanged(); onBack(); notify('Операцію видалено.'); } catch (e) { notify(e.message || 'Не вдалося видалити.', true); setBusy(false); }
   }
 
   const creativeOnly = campaign.config?.mode === 'creative'; // «Тільки креативи»: no campaign team, only the creative department
@@ -69,31 +78,38 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
   return (
     <div className="cmp-page">
       <div className="cmp-page-head">
-        <button type="button" className="cmp-btn" onClick={onBack}><ActionIcon name="back" size={18} />Усі кампанії</button>
+        <button type="button" className="cmp-btn" onClick={onBack}><ActionIcon name="back" size={18} />Усі операції</button>
         <div className="cmp-page-title">
           <span className="cmp-kicker">{project?.name || 'Проєкт'}{project?.client ? ` · ${project.client}` : ''}</span>
           <h2>{campaign.name}</h2>
           <div className="cmp-chips-ro">{creativeOnly ? <span className="cmp-status cmp-status--active">Тільки креативи</span> : campaign.platforms.map((p) => <em key={p} style={{ '--c': PLATFORMS[p]?.color }}>{PLATFORMS[p]?.label || p}</em>)}<span className={'cmp-status cmp-status--' + tone}>{label}</span></div>
         </div>
         <div className="cmp-page-actions">
-          {campaign.status === 'active' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('paused', 'Кампанію призупинено: усі її агенти зупинені.')}>Призупинити</button>}
-          {campaign.status === 'paused' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={() => setStatus('active', 'Кампанію відновлено.')}>Відновити</button>}
-          {campaign.status !== 'archived' && campaign.status !== 'draft' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('archived', 'Кампанію перенесено в архів.')}>В архів</button>}
-          {campaign.status === 'archived' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('paused', 'Кампанію повернуто з архіву на паузу.')}>Повернути з архіву</button>}
+          {campaign.status !== 'draft' && <button type="button" className="cmp-btn" onClick={() => setDialog('copy')}>Копіювати на інший проєкт</button>}
+          {campaign.status !== 'draft' && <button type="button" className="cmp-btn" onClick={() => setDialog('template')}>Зберегти як шаблон</button>}
+          {campaign.status === 'draft' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={launchDraft}>Запустити</button>}
+          {campaign.status === 'active' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('paused', 'Операцію призупинено: усі її агенти зупинені.')}>Призупинити</button>}
+          {campaign.status === 'paused' && <button type="button" className="cmp-btn cmp-btn--primary" disabled={busy} onClick={() => setStatus('active', 'Операцію відновлено.')}>Відновити</button>}
+          {campaign.status !== 'archived' && campaign.status !== 'draft' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('archived', 'Операцію перенесено в архів.')}>В архів</button>}
+          {campaign.status === 'archived' && <button type="button" className="cmp-btn" disabled={busy} onClick={() => setStatus('paused', 'Операцію повернуто з архіву на паузу.')}>Повернути з архіву</button>}
           {(campaign.status === 'draft' || campaign.status === 'archived' || campaign.status === 'paused') && <button type="button" className="cmp-btn cmp-btn--danger" disabled={busy} onClick={remove}>Видалити</button>}
         </div>
       </div>
 
-      {campaign.status === 'draft' && <p className="cmp-note">Це чернетка: кампанію створено, але не запущено. Видаліть її або створіть заново через «Створити кампанію».</p>}
+      {campaign.status === 'draft' && <p className="cmp-note">Це чернетка: операцію створено, але не запущено. Видаліть її або створіть заново через «Створити операцію».</p>}
       {failedTotal > 0 && <p className="cmp-warnbox" role="status"><b>Є завдання з помилкою ({failedTotal}).</b> Відкрийте агента зі статусом помилки, вкладка «Завдання», і натисніть «Повторити».</p>}
 
       {!creativeOnly && (
       <section className="cmp-live">
-        <div className="cmp-live-head"><h3>Схема агентів кампанії</h3><span className="cmp-muted">Натисніть агента, щоб відкрити його промти, налаштування й історію.</span></div>
+        <div className="cmp-live-head"><h3>Схема агентів операції</h3><span className="cmp-muted">Натисніть агента, щоб відкрити його промти, налаштування й історію.</span></div>
         <div className="cmp-scheme"><ChainDiagram active={active} states={states} onSelect={(role) => byRole.get(role) && setOpenRole(role)} selected={openRole} /></div>
-        <p className="cmp-legend"><i style={{ background: '#5FE0A1' }} />працює <i style={{ background: '#8D7A93' }} />вимкнено <i style={{ background: '#FF7A9A' }} />зупинено (залежить від вимкненого) <i style={{ background: '#F2B94B' }} />кампанія на паузі</p>
+        <p className="cmp-legend"><i style={{ background: '#5FE0A1' }} />працює <i style={{ background: '#8D7A93' }} />вимкнено <i style={{ background: '#FF7A9A' }} />зупинено (залежить від вимкненого) <i style={{ background: '#F2B94B' }} />операція на паузі</p>
       </section>
       )}
+
+      {campaign.status !== 'draft' && <Deliverables campaignId={campaign.id} notify={notify} />}
+
+      {campaign.status !== 'draft' && <CampaignControl campaign={campaign} notify={notify} />}
 
       <StudioSection campaign={campaign} notify={notify} onCampaign={(c) => { setCampaign(c); onChanged(); }} autoOpenForm={openNewRequest} />
 
@@ -126,6 +142,8 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
       {openRole && team && byRole.get(openRole) && (
         <AgentWindow role={openRole} team={team} setRole={(r) => byRole.get(r) && setOpenRole(r)} onClose={() => setOpenRole(null)} onChanged={reload} kick={() => kickQueue().then(reload).catch(() => {})} />
       )}
+      {dialog === 'copy' && <CopyOperationDialog campaign={campaign} notify={notify} onClose={() => setDialog(null)} onDone={() => { setDialog(null); onChanged(); }} />}
+      {dialog === 'template' && <SaveTemplateDialog campaign={campaign} notify={notify} onClose={() => setDialog(null)} />}
       {confirmDialog}
     </div>
   );

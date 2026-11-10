@@ -549,8 +549,8 @@ export async function runNow(ctx, agentId, brief = {}) {
 export async function launchCampaign(ctx, campaignId) {
   const all = await loadAll(ctx.db);
   const campaign = must(await ctx.db.from('ag_campaigns').select('*').eq('id', campaignId).maybeSingle(), 'campaign');
-  if (!campaign) throw new Error('Кампанію не знайдено.');
-  if (campaign.status === 'active') throw new Error('Кампанію вже запущено.');
+  if (!campaign) throw new Error('Операцію не знайдено.');
+  if (campaign.status === 'active') throw new Error('Операцію вже запущено.');
   if ((await cappedCampaigns(ctx.db)).has(String(campaign.id))) throw new Error(CAP_MESSAGE);
   const now = iso(ctx.now());
   // «Тільки креативи»: the client is only connected to the creative department, which works on requests. The campaign becomes active (the department

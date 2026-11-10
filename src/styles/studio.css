@@ -1,4 +1,4 @@
-/* AI Agents → «Кампанії» → «Креативна студія»: the requests of the client, the form, the window of one request. Plain first version in the dark plum
+/* AI Agents → «Операції» → «Креативна студія»: the requests of the client, the form, the window of one request. Plain first version in the dark plum
    look of campaignsSection.css (the Hub-style pass comes later). */
 
 .stu-section-wrap { margin-top: 28px; display: flex; flex-direction: column; gap: 14px; }

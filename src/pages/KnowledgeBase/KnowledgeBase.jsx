@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchKnowledgeBase, updateKnowledgeArticle, createKnowledgeArticle, deleteKnowledgeArticle } from '../../lib/api/knowledgeBase';
+import { fetchKnowledgeBase, updateKnowledgeArticle, createKnowledgeArticle, deleteKnowledgeArticle, searchKnowledge } from '../../lib/api/knowledgeBase';
+import { kbPrivacyWarnings } from '../../lib/kbSearch';
 import KnowledgeNav from './KnowledgeNav';
 import ArticleView from './ArticleView';
 import { KnowledgeHome, KnowledgeCategory, KnowledgeSearch } from './KnowledgeHome';
@@ -20,6 +21,7 @@ export default function KnowledgeBase({ onClose }) {
   const [draft, setDraft] = useState({ title: '', content: '' });
   const [saving, setSaving] = useState(false);
   const [newArticle, setNewArticle] = useState({ title: '', content: '' });
+  const [smart, setSmart] = useState(null); // the search by meaning: { query, loading, results: [{ id, why }], error }
   const searchRef = useRef(null);
   const mainRef = useRef(null);
 
@@ -81,6 +83,7 @@ export default function KnowledgeBase({ onClose }) {
 
   async function saveEdit() {
     if (!selected) return;
+    if (!privacyOk(`${draft.title}\n${draft.content}`)) return;
     setSaving(true);
     try {
       const updated = await updateKnowledgeArticle(selected.id, draft);
@@ -113,6 +116,7 @@ export default function KnowledgeBase({ onClose }) {
 
   async function saveNewArticle() {
     if (!newArticle.title.trim() || !categoryId) return;
+    if (!privacyOk(`${newArticle.title}\n${newArticle.content}`)) return;
     setSaving(true);
     try {
       const created = await createKnowledgeArticle(categoryId, newArticle);
@@ -128,11 +132,19 @@ export default function KnowledgeBase({ onClose }) {
   }
 
   const loading = categories === null;
+  // the search by meaning: asked by the button on the results page, for the words typed now
+  async function runSmart() {
+    const q = query;
+    setSmart({ query: q, loading: true, results: [], error: '' });
+    try { const r = await searchKnowledge(q); setSmart((s) => (s?.query === q ? { query: q, loading: false, results: r, error: '' } : s)); } catch (e) { setSmart((s) => (s?.query === q ? { query: q, loading: false, results: [], error: e.message || 'Не вдалося виконати пошук.' } : s)); }
+  }
+  // secrets and payment data are not for the base: saving them asks for an explicit yes
+  const privacyOk = (text) => { const stop = kbPrivacyWarnings(text).filter((w) => w.level === 'stop'); return !stop.length || confirm(`У тексті є те, чого не можна класти в базу:\n\n${stop.map((w) => '• ' + w.text).join('\n')}\n\nБазу читають AI-агенти, тож текст потрапляє до постачальника моделі. Зберегти все одно?`); };
   const navView = searchResults ? 'search' : view;
   const total = allArticles.length;
 
   let main = null;
-  if (searchResults) main = <KnowledgeSearch results={searchResults} query={query} categories={categories} onArticle={goArticle} />;
+  if (searchResults) main = <KnowledgeSearch results={searchResults} query={query} categories={categories} onArticle={goArticle} smart={smart?.query === query ? smart : null} onSmart={runSmart} allArticles={allArticles} />;
   else if (view === 'home') main = <KnowledgeHome categories={categories} allArticles={allArticles} onCategory={goCategory} onArticle={goArticle} />;
   else if (view === 'category' && category) main = <KnowledgeCategory category={category} onArticle={goArticle} onAdd={goCreate} />;
   else main = (
@@ -164,8 +176,8 @@ export default function KnowledgeBase({ onClose }) {
           <span className="kb-search-kbd">/</span>
         </label>
 
-        <button type="button" className="kb-back" onClick={onClose}>
-          <span className="kb-bi" dangerouslySetInnerHTML={{ __html: ICON.back }} /> До мапи
+        <button type="button" className="kb-back" onClick={onClose} aria-label="До мапи" title="До мапи">
+          <span className="kb-bi" dangerouslySetInnerHTML={{ __html: ICON.arrowLeft }} />
         </button>
       </header>
 

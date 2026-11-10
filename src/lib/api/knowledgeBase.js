@@ -45,3 +45,10 @@ export async function deleteKnowledgeArticle(id) {
   const { error } = await supabase.from('kb_articles').delete().eq('id', id);
   if (error) throw error;
 }
+
+// The search by meaning (the model names the sections that answer the question). → [{ id, why }]
+export async function searchKnowledge(query) {
+  const { authedPost } = await import('../adAccounts');
+  const json = await authedPost('/api/kb-search', { query });
+  return json.results || [];
+}

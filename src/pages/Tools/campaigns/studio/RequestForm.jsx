@@ -129,7 +129,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave 
     <div className="cmp-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div ref={box} className="cmp-wizard stu-form qr" role="dialog" aria-modal="true" aria-labelledby="stu-form-title" tabIndex={-1}>
         <header className="cmp-wiz-head">
-          <div><span className="cmp-kicker">Креативна студія · {campaign.name}</span><h2 id="stu-form-title">Новий запит на креативи</h2></div>
+          <div><span className="cmp-kicker">Креативна студія · {campaign.name}</span><h2 id="stu-form-title">Новий цикл: запит на креативи</h2></div>
           <button type="button" className="cmp-x" onClick={onClose} disabled={!!busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
         </header>
         <div className="cmp-wiz-body qr-body">

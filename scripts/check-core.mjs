@@ -57,6 +57,7 @@ import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFro
 import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
 import { planMetricChange } from '../src/lib/reportMetricOps.js';
 import { slugKey } from '../src/lib/reportMetrics.js';
+import { buildMapTasks, carrierLabel } from '../src/lib/agents/mapTasks.js';
 import { buildNotifications } from '../api/_lib/agentNotify.js';
 import { safeHref } from '../src/lib/safeHref.js';
 import { daysText, monthNameIn, monthShortIn, normLang, trFor } from '../src/lib/clientLang.js';
@@ -87,6 +88,14 @@ import { PLATFORM_COLUMNS, cleanColumns as cleanPlatformColumns, missingColumns 
 import { buildReportMessage, reportAction, reportLink, workLink } from '../src/lib/projectReportMessage.js';
 import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.js';
 import { visibleKeys } from '../src/lib/periodReport.js';
+import { cleanNotices, noticeDraft, noticesChanged, pickList } from '../src/lib/agents/settingsForm.js';
+import { buildCampaignSpend, monthlySpend, periodStart } from '../src/lib/agents/campaignSpend.js';
+import { DRAFT_KEYS, draftFrom, extractedFromDraft } from '../src/lib/agents/projectWizard.js';
+import { buildTaskPath, currentStep } from '../src/lib/agents/mapTasks.js';
+import { stuckAgents, telegramTest } from '../src/lib/agents/systemState.js';
+import { KB_SEARCH_MAX, buildKbSearchPrompt, kbPrivacyWarnings, parseKbSearch } from '../src/lib/kbSearch.js';
+import { buildCalendar, cleanTemplate, planApply, platformsFor, snapshotOperation } from '../src/lib/agents/campaignTemplates.js';
+import { counts as dlvCounts, decisionEvent, fileNameOf as dlvFileName, groupDeliverables, inputFromDeliverable, inputKeyOf } from '../src/lib/agents/deliverables.js';
 
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
@@ -2698,7 +2707,7 @@ await ok('system state: the clock, the keys (only set / not set), the queue (stu
 });
 
 await ok('client memory: a short dossier of what the manager approved, returned (with the reason) and commented, newest first, kept short', () => {
-  assert.deepEqual(buildDossier([]), { text: '', counts: { approved: 0, returned: 0, comments: 0, notes: 0 } });
+  assert.deepEqual(buildDossier([]), { text: '', counts: { approved: 0, returned: 0, comments: 0, notes: 0, cycles: 0 } });
   assert.equal(memoryBlock(buildDossier([])), null);
   const ev = [
     { kind: 'creative_approved', subject: 'Концепт A · 4:5', body: '', created_at: '2026-10-20T10:00:00Z' },
@@ -2708,7 +2717,7 @@ await ok('client memory: a short dossier of what the manager approved, returned 
     { kind: 'decision', subject: 'Не показувати ціни', body: 'за словами власника', created_at: '2026-10-23T10:00:00Z' },
   ];
   const d = buildDossier(ev);
-  assert.deepEqual(d.counts, { approved: 1, returned: 2, comments: 1, notes: 1 });
+  assert.deepEqual(d.counts, { approved: 1, returned: 2, comments: 1, notes: 1, cycles: 0 });
   assert.ok(d.text.indexOf('2026-10-25 Концепт C') < d.text.indexOf('2026-10-21 Концепт B')); // newest first
   assert.match(d.text, /Концепт C · 9:16 \(причину не вказано\)/); assert.match(d.text, /мінімалізм/); assert.match(d.text, /Не показувати ціни/);
   assert.match(memoryBlock(d).title, /не вигадка/);
@@ -2790,7 +2799,7 @@ await ok('campaign control: cycles open once per pass and follow their tasks; sc
   const sch = await setAgentSchedule(ctx(T0), 1, { weekday: 3, time: '10:30' });
   assert.deepEqual(sch.schedule, { weekday: 3, time: '10:30' });
   assert.deepEqual([tables.ag_agents[0].enabled_since, tables.ag_agents[0].attempts, tables.ag_agents[0].last_scheduled], ['2026-11-02T07:00:00.000Z', 0, null]);
-  await assert.rejects(() => setAgentSchedule(ctx(T0), 9, { weekday: 3, time: '10:30' }), /агентах кампанії/); // the department's agents are shared, not per campaign
+  await assert.rejects(() => setAgentSchedule(ctx(T0), 9, { weekday: 3, time: '10:30' }), /агентах операції/); // the department's agents are shared, not per campaign
   await assert.rejects(() => setAgentSchedule(ctx(T0), 1, { weekday: 9 }), /День тижня/);
   // the mode
   await setAgentMode(ctx(T0), 1, 'confirm'); assert.deepEqual([tables.ag_agents[0].enabled, tables.ag_agents[0].config.confirm_before_pass, tables.ag_agents[0].config.trigger], [true, true, 'schedule']);
@@ -3024,6 +3033,28 @@ await ok('every server file of api/ parses (a syntax slip there takes the cron a
   const bad = files.map((f) => ({ f, r: spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' }) })).filter((x) => x.r.status !== 0).map((x) => x.f + ': ' + String(x.r.stderr).replace(/\s+/g, ' ').slice(0, 200));
   assert.deepEqual(bad, []);
 });
+await ok('map carriers: one per agent and campaign and kind, the open work of real tables, a failure first, only agents that have a desk', () => {
+  const agents = [{ id: 1, role: 'creative_strategy', team: 'creative' }, { id: 2, role: 'studio_copywriter', team: 'campaign' }, { id: 3, role: 'unknown_role', team: 'x' }];
+  const tasks = [
+    { id: 10, agent_id: 1, status: 'running', campaign_id: 7, created_at: '2026-11-10T10:00:00Z' },
+    { id: 11, agent_id: 1, status: 'queued', campaign_id: 7, created_at: '2026-11-10T10:01:00Z' },
+    { id: 12, agent_id: 1, status: 'queued', campaign_id: 7, created_at: '2026-11-10T10:02:00Z' },
+    { id: 13, agent_id: 2, status: 'failed', campaign_id: 8, created_at: '2026-11-10T09:00:00Z' },
+    { id: 14, agent_id: 2, status: 'done', campaign_id: 8, output: { awaiting_pass: 'true' }, created_at: '2026-11-10T08:00:00Z' },
+    { id: 15, agent_id: 2, status: 'done', campaign_id: 8, output: {}, created_at: '2026-11-10T08:30:00Z' }, // finished and passed on: not open work
+    { id: 16, agent_id: 3, status: 'running', campaign_id: 8, created_at: '2026-11-10T08:40:00Z' }, // a role without a card
+    { id: 17, agent_id: 99, status: 'running', campaign_id: 8, created_at: '2026-11-10T08:41:00Z' }, // an agent that is not in the list
+  ];
+  const campaigns = [{ id: 7, name: 'Mellow creatives', project_id: 1 }, { id: 8, name: 'Other', project_id: 2 }];
+  const projects = [{ id: 1, name: 'Mellow' }, { id: 2, name: 'Oxygen' }];
+  const list = buildMapTasks({ tasks, agents, campaigns, projects });
+  assert.deepEqual(list.map((c) => [c.agentKey, c.kind, c.count]), [['performance-copywriter', 'failed', 1], ['performance-copywriter', 'review', 1], ['creative-strategist', 'running', 1], ['creative-strategist', 'queued', 2]]);
+  assert.equal(list[2].project, 'Mellow'); assert.equal(list[2].campaignId, 7);
+  assert.equal(carrierLabel(list[3]), 'Mellow · 2 у черзі'); assert.equal(carrierLabel(list[1]), 'Oxygen · чекає вашого OK');
+  assert.equal(buildMapTasks({ tasks, agents, campaigns, projects, knownKeys: new Set(['creative-strategist']) }).length, 2); // only the agents the map has
+  assert.deepEqual(buildMapTasks({}), []);
+});
+
 await ok('own metric keys are Latin and unique; a link is safe; a client deck leaves out what the eye hid and keeps the client blocks', () => {
   assert.equal(slugKey('Дохід на клік'), 'custom_dokhid_na_klik');
   assert.equal(slugKey('Дохід на клік', ['custom_dokhid_na_klik']), 'custom_dokhid_na_klik_2'); // never the key of another metric
@@ -4186,6 +4217,265 @@ await ok('creatives: no request uses the deprecated «ids» batch read; a refuse
   const flaky = async (url, t) => { if (url.includes('/2?')) throw new Error('(#100) boom'); return graphFn(url, t); };
   assert.deepEqual([...(await creativesOf(['1', '2'], { token: 'T', graphFn: flaky })).keys()], ['1']);
   assert.equal((await creativesOf([], { token: 'T', graphFn })).size, 0);
+});
+
+await ok('system state page: the notices form is checked before it is saved (chat id, thread numbers, hour, addresses) and an unchanged form is not «changed»', () => {
+  const row = { enabled: true, tg_chat_id: '-1001234567890', attention_thread_id: 5, spend_thread_id: null, digest_hour: 9, notify_emails: ['a@x.com'] };
+  const d = noticeDraft(row);
+  assert.deepEqual(cleanNotices(d), { enabled: true, tg_chat_id: '-1001234567890', attention_thread_id: 5, spend_thread_id: null, digest_hour: 9, notify_emails: ['a@x.com'] });
+  assert.equal(noticesChanged(d, row), false);
+  assert.equal(noticesChanged({ ...d, spend: '7' }, row), true);
+  assert.equal(cleanNotices({ ...d, chat: '  ', attention: '', hour: '' }).tg_chat_id, null); // an empty chat = no Telegram; an empty hour = 9
+  assert.equal(cleanNotices({ ...d, chat: '@monarchi_ai' }).tg_chat_id, '@monarchi_ai');
+  assert.throws(() => cleanNotices({ ...d, chat: 'abc' }), /Чат Telegram/);
+  assert.throws(() => cleanNotices({ ...d, attention: '0' }), /Гілка/);
+  assert.throws(() => cleanNotices({ ...d, spend: '1.5' }), /Гілка/);
+  assert.throws(() => cleanNotices({ ...d, hour: '24' }), /Година/);
+  assert.throws(() => cleanNotices({ ...d, emails: ['not-an-email'] }), /електронну пошту/);
+  assert.equal(noticesChanged({ ...d, chat: 'abc' }, row), true); // a draft that does not pass is still «changed»
+  assert.equal(noticeDraft(null).hour, '9');
+});
+
+await ok('system state page: the pick list shows every profile and keeps an address that is no longer in the CRM so that it can be removed', () => {
+  const list = pickList([{ email: 'B@x.com', first_name: 'Bob', last_name: '' }, { email: 'a@x.com', first_name: '', last_name: '' }], ['old@x.com', 'a@x.com']);
+  assert.deepEqual(list.map((p) => p.email), ['a@x.com', 'B@x.com'.toLowerCase(), 'old@x.com']);
+  assert.equal(list.find((p) => p.email === 'old@x.com').extra, true);
+  assert.equal(list.find((p) => p.email === 'b@x.com').label, 'Bob');
+});
+
+await ok('spend by campaign: Claude + Higgsfield per campaign and period (Kyiv days), the cap is compared with the all-time total, a quiet draft is left out', () => {
+  const now = new Date('2026-11-10T10:00:00Z'); // 12:00 in Kyiv
+  const campaigns = [
+    { id: 1, project_id: 3, name: 'Mellow', status: 'active', spend_cap_usd: 10, notify_step_usd: 2 },
+    { id: 2, project_id: 4, name: 'Quiet draft', status: 'draft', spend_cap_usd: null, notify_step_usd: null },
+    { id: 3, project_id: 4, name: 'Paused', status: 'paused', spend_cap_usd: null, notify_step_usd: 5 },
+  ];
+  const tasks = [
+    { campaign_id: 1, cost_usd: '1.5', created_at: '2026-11-10T08:00:00Z' }, // today
+    { campaign_id: 1, cost_usd: '2', created_at: '2026-11-05T08:00:00Z' }, // this month, not this week... (5th is within 7 days: 4th..10th)
+    { campaign_id: 1, cost_usd: '6.5', created_at: '2026-10-20T08:00:00Z' }, // last month
+    { campaign_id: null, cost_usd: '0.25', created_at: '2026-11-10T09:00:00Z' }, // an agent without a campaign
+    { campaign_id: 99, cost_usd: '0.25', created_at: '2026-11-10T09:00:00Z' }, // a campaign that is gone
+  ];
+  const spends = [{ campaign_id: 1, usd: '0.5', created_at: '2026-11-10T07:00:00Z' }];
+  const projects = [{ id: 3, name: 'Mellow Diamond' }];
+  const month = buildCampaignSpend({ campaigns, projects, tasks, spends, period: 'month', now });
+  const m = month.rows.find((r) => r.id === 1);
+  assert.deepEqual([m.claude, m.higgsfield, m.total, m.allTime], [3.5, 0.5, 4, 10.5]);
+  assert.equal(m.project, 'Mellow Diamond');
+  assert.equal(m.pct, 1); // 10.5 of 10, never over 100%
+  assert.equal(m.hot, true);
+  assert.ok(!month.rows.some((r) => r.name === 'Quiet draft')); // never spent and not at work
+  assert.ok(month.rows.some((r) => r.name === 'Paused')); // at work: kept even with 0
+  const none = month.rows.find((r) => r.id === null);
+  assert.equal(none.total, 0.5); // the agent without a campaign + the vanished campaign
+  assert.equal(month.total.total, 4.5);
+  assert.equal(buildCampaignSpend({ campaigns, tasks, spends, period: 'today', now }).rows.find((r) => r.id === 1).total, 2);
+  assert.equal(buildCampaignSpend({ campaigns, tasks, spends, period: 'all', now }).rows.find((r) => r.id === 1).total, 10.5);
+  assert.equal(month.days.length, 30);
+  assert.equal(month.days.at(-1).date, '2026-11-10');
+  assert.equal(month.days.at(-1).claude, 2); // 1.5 + 0.25 + 0.25 today
+  assert.equal(month.days.at(-1).higgsfield, 0.5);
+  assert.equal(periodStart('all', now), null);
+  assert.equal(periodStart('month', now).toISOString(), '2026-10-31T22:00:00.000Z'); // 1 November 00:00 in Kyiv (UTC+2)
+});
+
+await ok('map cars: an open cycle is ONE car at the agent of its most important open task, with the cycle number and progress; work outside any cycle stays per agent', () => {
+  const agents = [{ id: 1, role: 'studio_copywriter', team: 'campaign' }, { id: 2, role: 'creative_strategy', team: 'creative' }, { id: 3, role: 'meta_analyst', team: 'campaign' }];
+  const campaigns = [{ id: 7, name: 'Mellow creatives', project_id: 1 }];
+  const projects = [{ id: 1, name: 'Mellow' }];
+  const tasks = [
+    { id: 1, agent_id: 1, status: 'running', campaign_id: 7, request_id: 70, created_at: '2026-11-10T10:00:00Z' },
+    { id: 2, agent_id: 2, status: 'queued', campaign_id: 7, request_id: 70, created_at: '2026-11-10T10:01:00Z' },
+    { id: 3, agent_id: 3, status: 'running', campaign_id: 7, request_id: null, created_at: '2026-11-10T09:00:00Z' }, // a scheduled pass of the same campaign
+    { id: 4, agent_id: 3, status: 'queued', campaign_id: 7, request_id: null, created_at: '2026-10-01T09:00:00Z' }, // older than the pass: not in the cycle
+  ];
+  const cycles = [
+    { id: 5, campaign_id: 7, number: 2, status: 'running', progress: '0.4', request_id: 70, started_at: '2026-11-10T09:59:00Z' },
+    { id: 6, campaign_id: 7, number: 3, status: 'running', progress: 0, request_id: null, started_at: '2026-11-10T08:00:00Z' },
+    { id: 8, campaign_id: 7, number: 1, status: 'done', progress: 1, request_id: null, started_at: '2026-10-01T08:00:00Z' }, // finished: no car
+  ];
+  const list = buildMapTasks({ tasks, agents, campaigns, projects, cycles });
+  const cars = list.filter((c) => c.cycleId);
+  assert.equal(cars.length, 2);
+  const a = cars.find((c) => c.cycleId === 5);
+  assert.deepEqual([a.agentKey, a.kind, a.count, a.cycleNumber], ['performance-copywriter', 'running', 2, 2]); // the running task wins over the queued one
+  assert.equal(carrierLabel(a), 'Mellow · цикл 2 · 40% · у роботі');
+  const b = cars.find((c) => c.cycleId === 6);
+  assert.deepEqual([b.agentKey, b.count], ['meta-ads-analyst', 1]);
+  const rest = list.filter((c) => !c.cycleId);
+  assert.equal(rest.length, 1); // the old queued task belongs to no open cycle
+  assert.equal(rest[0].kind, 'queued');
+  assert.equal(buildMapTasks({ tasks, agents, campaigns, projects }).filter((c) => c.cycleId).length, 0); // no cycles given: as before
+});
+
+await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
+  const reading = { fields: { about: 'Jewellery shop', tone: 'warm' }, restrictions: 'no discounts', cta: { mode: 'always', text: 'Shop now' }, figma: '', links: [{ url: 'https://x.com', about: 'site' }], needsFiles: ['logo'], unplaced: [] };
+  const d = draftFrom(reading);
+  assert.equal(d.fields.about, 'Jewellery shop');
+  assert.equal(d.fields.offer, ''); // every key has a field, empty when nothing was said
+  assert.equal(Object.keys(d.fields).length, DRAFT_KEYS.length);
+  d.fields.about = 'Jewellery shop in the US'; // the person corrects it
+  const out = extractedFromDraft(d, reading);
+  assert.deepEqual(Object.keys(out.fields).sort(), ['about', 'tone']); // empty fields are left out
+  assert.deepEqual(out.cta, { mode: 'always', text: 'Shop now' });
+  assert.equal(out.links.length, 1); // the links come from the reading
+  assert.equal(draftFrom({ fields: {}, cta_mode: 'none' }).ctaMode, 'none');
+  assert.equal(extractedFromDraft(draftFrom({ fields: {}, cta_mode: 'none' })).cta.mode, 'none');
+  assert.equal(extractedFromDraft(draftFrom({})).cta, null); // nothing said about the button
+  const existing = { fields: { about: 'Old text' }, restrictions: '', cta_mode: 'always', cta_text: '', figma_url: '' };
+  const plan = planWrites(out, existing);
+  assert.deepEqual(plan.conflicts.map((c) => c.key), ['about']); // never replaced without the person's yes
+  assert.deepEqual(plan.writes.map((w) => w.key), ['tone']);
+  const sum = wizardSummary({ extracted: { fields: {}, links: reading.links, needsFiles: ['logo'], unplaced: [] }, settings: { inputs: { about: { body: 'x' } } }, assets: [], accounts: [{ platform: 'meta' }] });
+  assert.ok(sum.blockers.some((b) => b.key === 'goals')); // the strategist needs the goals
+  assert.ok(!sum.blockers.some((b) => b.key === 'about')); // already filled
+  assert.deepEqual(sum.step2.uploads, ['Логотип', 'Фото продукту']); // an empty library
+  assert.equal(sum.hasStep2, true);
+});
+
+await ok('ready materials: grouped by kind newest first, filtered by decision; an approved strategy becomes a field of the card; a return keeps its reason for the memory', () => {
+  const list = [
+    { id: 1, kind: 'strategy', title: 'Маркетинговий стратег', status: 'draft', body: 'Стратегія', meta: { role: 'marketing_strategist' }, created_at: '2026-11-09T10:00:00Z', project_id: 3 },
+    { id: 2, kind: 'creative', title: 'Концепт 1 · 4:5', status: 'approved', file_url: 'https://x/y/a.jpg?token=1', created_at: '2026-11-10T09:00:00Z' },
+    { id: 3, kind: 'creative', title: 'Концепт 2 · 1:1', status: 'rejected', file_url: 'https://x/y/b.webp', created_at: '2026-11-10T10:00:00Z' },
+    { id: 4, kind: 'weird', title: 'Щось', status: 'draft', created_at: '2026-11-01T00:00:00Z' },
+  ];
+  const g = groupDeliverables(list);
+  assert.deepEqual(g.map((x) => x.kind), ['creative', 'strategy', 'other']); // an unknown kind goes to «Інше»
+  assert.deepEqual(g[0].items.map((d) => d.id), [3, 2]); // newest first
+  assert.deepEqual(groupDeliverables(list, { status: 'draft' }).flatMap((x) => x.items.map((d) => d.id)).sort(), [1, 4]);
+  assert.deepEqual(dlvCounts(list), { all: 4, draft: 2, approved: 1, rejected: 1 });
+  assert.equal(inputKeyOf(list[0]), 'strategy');
+  assert.equal(inputKeyOf(list[1]), null); // a creative never becomes a field
+  const item = inputFromDeliverable(list[0], 'a@x.com', new Date('2026-11-10T12:00:00Z'));
+  assert.deepEqual([item.source, item.by, item.body], ['agent', 'a@x.com', 'Стратегія']);
+  assert.equal(inputFromDeliverable({ body: '  ' }), null);
+  assert.equal(dlvFileName(list[1]), 'Концепт 1 · 4 5 2026-11-10.jpg');
+  assert.equal(dlvFileName(list[0]), 'Маркетинговий стратег 2026-11-09.md');
+  const ev = decisionEvent(list[2], 'rejected', ' надто темно ', 'a@x.com');
+  assert.deepEqual([ev.kind, ev.body, ev.meta.status], ['creative_rejected', 'надто темно', 'rejected']);
+  assert.equal(decisionEvent(list[0], 'rejected', 'x', null).kind, 'decision');
+});
+
+await ok('client memory: the dossier tells the results of the last cycles too', () => {
+  const d = buildDossier([{ kind: 'cycle', subject: 'Цикл 2 · Mellow', body: 'Цикл завершено. Виконано кроків: 7, витрати: $1.2', created_at: '2026-11-10T10:00:00Z' }, { kind: 'note', subject: 'N', body: 'b', created_at: '2026-11-09T10:00:00Z' }]);
+  assert.match(d.text, /Підсумки останніх циклів[\s\S]*Цикл 2 · Mellow: Цикл завершено/);
+  assert.equal(d.counts.cycles, 1);
+});
+
+await ok('operation templates: a snapshot keeps the setup and drops the client data; apply maps agents by role, drops channels without a cabinet; the calendar puts every schedule on its weekday', () => {
+  const campaign = { id: 4, name: 'Mellow', platforms: ['meta', 'google'], spend_cap_usd: '12.5', notify_step_usd: '3', config: { mode: 'full', language: 'en', brief: 'SECRET BRIEF', goals: 'G', creative: { enabled: true, roles: ['creative_strategy'] }, instructions: [{ role: null, text: 'Be short', by: 'a@x', at: '2026-11-01T00:00:00Z' }] } };
+  const agents = [{ id: 1, role: 'meta_analyst', name: 'Аналітик Meta', enabled: true, config: { x: 1 }, schedule: { weekday: 1, time: '10:00' } }, { id: 2, role: 'google_analyst', name: 'Аналітик Google', enabled: false, config: {}, schedule: null }];
+  const snap = snapshotOperation({ campaign, agents });
+  assert.equal(JSON.stringify(snap).includes('SECRET BRIEF'), false); // nothing of the client
+  assert.deepEqual([snap.mode, snap.language, snap.spendCapUsd, snap.notifyStepUsd], ['full', 'en', 12.5, 3]);
+  assert.deepEqual(snap.instructions, [{ role: null, text: 'Be short' }]); // no author, no date
+  assert.equal(snapshotOperation({ campaign, agents, withInstructions: false }).instructions.length, 0);
+  const t = cleanTemplate(JSON.parse(JSON.stringify(snap)));
+  assert.deepEqual(platformsFor(t, [{ platform: 'meta' }]), { platforms: ['meta'], dropped: ['google'] });
+  assert.deepEqual(platformsFor({ ...t, platforms: ['tiktok'] }, []).platforms, ['tiktok']);
+  const plan = planApply(t, [{ id: 91, role: 'meta_analyst' }, { id: 92, role: 'tracking_integrity' }], { now: new Date('2026-11-10T00:00:00Z'), by: 'me@x' });
+  assert.deepEqual(plan.patches.map((p) => [p.id, p.enabled, p.schedule?.weekday]), [[91, true, 1]]);
+  assert.deepEqual(plan.missing, ['google_analyst']); // the new team has no such agent
+  assert.equal(plan.config.brief, ''); assert.equal(plan.config.instructions[0].by, 'me@x'); assert.equal(plan.config.agentsConfigured, true);
+  assert.throws(() => cleanTemplate({}), /пошкоджено/);
+  assert.equal(cleanTemplate({ platforms: [], spendCapUsd: -3 }).spendCapUsd, null);
+
+  const now = new Date('2026-11-10T08:00:00Z'); // Tuesday
+  const cal = buildCalendar({
+    agents: [
+      { id: 1, scope_id: '4', role: 'meta_analyst', name: 'Аналітик Meta', enabled: true, config: {}, schedule: { weekday: 1, time: '10:00' }, sort: 1 },
+      { id: 2, scope_id: '4', role: 'google_analyst', name: 'Аналітик Google', enabled: true, config: { confirm_before_pass: true }, schedule: { weekday: 1, time: '09:00' }, sort: 2 },
+      { id: 3, scope_id: '4', role: 'tracking_integrity', name: 'Трекінг', enabled: false, config: {}, schedule: { weekday: 3, time: '12:00' }, sort: 3 },
+      { id: 4, scope_id: '9', role: 'meta_analyst', name: 'Чернетка', enabled: true, config: {}, schedule: { weekday: 2, time: '12:00' }, sort: 1 },
+    ],
+    campaigns: [{ id: 4, name: 'Mellow', status: 'active', project_id: 3 }, { id: 9, name: 'Draft', status: 'draft', project_id: 3 }],
+    projects: [{ id: 3, name: 'Mellow Diamond' }], now,
+  });
+  assert.deepEqual(cal.days[0].map((x) => x.time), ['09:00', '10:00']); // Monday, by time
+  assert.equal(cal.days[0][0].mode, 'confirm');
+  assert.equal(cal.days[2][0].paused, true); // a paused agent is shown, dimmed
+  assert.equal(cal.days[1].length, 0); // a draft operation has no calendar
+  assert.equal(cal.total, 3);
+  assert.equal(cal.upcoming.length, 2); // the paused one never «runs next»
+  assert.ok(cal.upcoming[0].nextAt <= cal.upcoming[1].nextAt);
+  assert.equal(cal.days[0][0].project, 'Mellow Diamond');
+});
+
+await ok('task flow: the path of a car is its agents in the order they started, the latest task of an agent decides its state, the car stands at the first unfinished step', () => {
+  const agents = [{ id: 1, role: 'studio_client_analyst', name: 'Аналітик' }, { id: 2, role: 'studio_brief_writer', name: 'Автор ТЗ' }, { id: 3, role: 'studio_copywriter', name: 'Копірайтер' }, { id: 4, role: 'nobody', name: 'X' }];
+  const tasks = [
+    { agent_id: 2, status: 'failed', created_at: '2026-11-10T10:05:00Z' },
+    { agent_id: 1, status: 'done', output: {}, created_at: '2026-11-10T10:00:00Z' },
+    { agent_id: 2, status: 'done', output: { awaiting_pass: true }, created_at: '2026-11-10T10:09:00Z' }, // the retry worked and waits for the person
+    { agent_id: 3, status: 'queued', created_at: '2026-11-10T10:10:00Z' },
+    { agent_id: 99, status: 'running', created_at: '2026-11-10T10:11:00Z' }, // an agent that is gone
+  ];
+  const path = buildTaskPath({ tasks, agents });
+  assert.deepEqual(path.map((s) => [s.name, s.state]), [['Аналітик', 'done'], ['Автор ТЗ', 'review'], ['Копірайтер', 'queued']]);
+  assert.equal(path[1].count, 2);
+  assert.equal(path[0].agentKey, 'creative-performance-analyst');
+  assert.equal(currentStep(path), 1);
+  assert.equal(currentStep(buildTaskPath({ tasks: [tasks[1]], agents })), -1); // everything is done
+  assert.deepEqual(buildTaskPath({}), []);
+});
+
+await ok('spend: the year period starts on 1 January (Kyiv) and the months stand side by side with the change against the month before', () => {
+  const now = new Date('2026-11-10T10:00:00Z');
+  assert.equal(periodStart('year', now).toISOString(), '2025-12-31T22:00:00.000Z');
+  const tasks = [{ cost_usd: '4', created_at: '2026-10-15T10:00:00Z' }, { cost_usd: '1', created_at: '2026-11-02T10:00:00Z' }, { cost_usd: '9', created_at: '2025-01-01T10:00:00Z' }]; // the last one is older than the window
+  const spends = [{ usd: '2', created_at: '2026-11-03T10:00:00Z' }, { usd: '1', created_at: '2026-10-31T23:30:00Z' }]; // 31 Oct 23:30 UTC is already 1 November in Kyiv
+  const m = monthlySpend({ tasks, spends, now, months: 3 });
+  assert.deepEqual(m.map((x) => x.month), ['2026-09', '2026-10', '2026-11']);
+  assert.deepEqual(m.map((x) => x.total), [0, 4, 4]);
+  assert.deepEqual([m[2].claude, m[2].higgsfield], [1, 3]);
+  assert.deepEqual([m[0].delta, m[1].delta, m[1].pct, m[2].delta, m[2].pct], [null, 4, null, 0, 0]); // no % against an empty month
+  assert.equal(m[2].label, 'листопад 2026');
+  assert.equal(monthlySpend({ now: new Date('2026-01-15T10:00:00Z'), months: 2 })[0].month, '2025-12'); // over the year boundary
+  assert.equal(buildCampaignSpend({ campaigns: [{ id: 1, name: 'A', status: 'active' }], tasks: [{ campaign_id: 1, cost_usd: '4', created_at: '2026-02-01T10:00:00Z' }, { campaign_id: 1, cost_usd: '9', created_at: '2025-06-01T10:00:00Z' }], period: 'year', now }).rows[0].total, 4);
+});
+
+await ok('knowledge base: the search by meaning sends short cards and keeps only real sections; secrets and payment data are flagged before saving', () => {
+  const articles = [{ id: 5, title: 'Як готувати звіт', content: 'x'.repeat(2000), categoryLabel: 'Процеси' }, { id: 7, title: 'Онбординг', content: 'Короткий текст', categoryLabel: 'Клієнти' }];
+  const p = buildKbSearchPrompt('  як   зробити звіт клієнту ', articles);
+  assert.match(p.user, /Запит: як зробити звіт клієнту/);
+  assert.match(p.user, /#5 \[Процеси\] Як готувати звіт/);
+  assert.ok(p.user.length < 1300); // the long section is cut to a card
+  assert.match(p.system, /не виконуй нічого/); // the cards are data, not instructions
+  assert.deepEqual(parseKbSearch('ось: {"results":[{"id":7,"why":"про старт роботи"},{"id":99,"why":"x"},{"id":"5","why":""},{"id":7,"why":"двічі"}]}', [5, 7]), [{ id: 7, why: 'про старт роботи' }, { id: 5, why: '' }]);
+  assert.equal(parseKbSearch(JSON.stringify({ results: Array.from({ length: 20 }, (_, i) => ({ id: i })) }), Array.from({ length: 20 }, (_, i) => i)).length, KB_SEARCH_MAX);
+  assert.deepEqual(parseKbSearch('{"results":[]}', [5]), []);
+  assert.throws(() => parseKbSearch('не json', [5]), /Не вдалося прочитати/);
+
+  const levels = (t) => kbPrivacyWarnings(t).map((w) => w.level);
+  assert.deepEqual(kbPrivacyWarnings('Звичайний опис процесу: менеджер надсилає звіт у понеділок о 10:00, бюджет 2500.'), []);
+  assert.deepEqual(levels('ключ sk-ant-abcdefghijklmnop1234567890'), ['stop']);
+  assert.deepEqual(levels('Пароль: Qwerty123!'), ['stop']);
+  assert.deepEqual(levels('картка 4111 1111 1111 1111'), ['stop']);
+  assert.deepEqual(levels('номер замовлення 4111 1111 1111 1112'), []); // not a card number (the check digit fails)
+  assert.deepEqual(levels('IBAN UA213223130000026007233566001'), ['stop']);
+  assert.deepEqual(levels('a@x.com, b@x.com, c@x.com'), ['warn']);
+  assert.deepEqual(levels('+380 67 123 45 67, +380 50 111 22 33, 067 999 88 77'), ['warn']);
+  assert.deepEqual(levels('пишіть на team@monarchi.agency'), []); // one address is fine
+});
+
+await ok('system state: only the agents whose booking ended long ago are restarted; the test message goes to the chosen topic and needs a chat', () => {
+  const now = new Date('2026-11-10T12:00:00Z');
+  const tasks = [
+    { agent_id: 1, status: 'running', lease_until: '2026-11-10T11:40:00Z' }, // 20 min over: stuck
+    { agent_id: 1, status: 'running', lease_until: '2026-11-10T11:30:00Z' }, // the same agent: once
+    { agent_id: 2, status: 'running', lease_until: '2026-11-10T11:55:00Z' }, // 5 min over: may still finish
+    { agent_id: 3, status: 'running', lease_until: null },
+    { agent_id: 4, status: 'queued', lease_until: '2026-11-10T10:00:00Z' },
+  ];
+  assert.deepEqual(stuckAgents(tasks, now), [1]);
+  assert.deepEqual(stuckAgents([], now), []);
+  const settings = { tg_chat_id: '-100123', attention_thread_id: 7, spend_thread_id: 9 };
+  assert.deepEqual([telegramTest(settings).chatId, telegramTest(settings).threadId, telegramTest(settings, 'spend').threadId], ['-100123', 7, 9]);
+  assert.match(telegramTest(settings, 'spend', 'a<b>@x.com').text, /витрати[\s\S]*ab@x\.com/); // the name cannot break the message
+  assert.equal(telegramTest({ tg_chat_id: '-1', attention_thread_id: null }).threadId, undefined);
+  assert.throws(() => telegramTest({ tg_chat_id: ' ' }), /Чат Telegram не вказано/);
 });
 
 console.log(`\n${passed} checks passed`);

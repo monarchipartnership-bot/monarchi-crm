@@ -35,9 +35,9 @@ function Field({ id, label, hint, children }) {
   return <div className="cmp-field"><label htmlFor={id}>{label}</label>{children}{hint && <span className="cmp-hint">{hint}</span>}</div>;
 }
 
-// «Створити кампанію»: 1) the client and the channels, with the chain of agents lighting up for the chosen channels,
+// «Створити операцію»: 1) the client and the channels, with the chain of agents lighting up for the chosen channels,
 // 2) every agent set up for this client one after another, 3) the summary and the launch.
-export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
+export default function CreateCampaignWizard({ onClose, onLaunched, notify, initialProjectId = null }) {
   const { email } = useAuth();
   const box = useRef(null);
   const [step, setStep] = useState(1);
@@ -59,7 +59,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
   const [error, setError] = useState('');
   useDialogA11y(box, () => { if (!busy) onClose(); });
 
-  useEffect(() => { fetchClientsForCampaigns().then(setClients).catch((e) => { setClients([]); setError(e.message || 'Не вдалося завантажити клієнтів.'); }); }, []);
+  useEffect(() => { fetchClientsForCampaigns().then((list) => { setClients(list); const p = initialProjectId != null ? list.find((c) => c.id === initialProjectId && c.accounts.length) : null; if (p) choose(p); }).catch((e) => { setClients([]); setError(e.message || 'Не вдалося завантажити клієнтів.'); }); }, []);
 
   const available = useMemo(() => new Set(project ? [...project.accounts.map((a) => a.platform).filter((p) => PLATFORMS[p]), 'tiktok'] : []), [project]);
   const choose = (p) => {
@@ -70,7 +70,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
   const toggle = (k) => setPlatforms((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
   const modeDef = MODES[mode];
   const roles = useMemo(() => modeRoles(mode, platforms), [mode, platforms]); // the agents of the campaign team this mode switches on
-  const creativeOn = modeHasDepartment(mode, creative.enabled); // the department works in «Тільки креативи» and, when wanted, in «Повна кампанія»
+  const creativeOn = modeHasDepartment(mode, creative.enabled); // the department works in «Тільки креативи» and, when wanted, in «Повна операція»
   const lit = useMemo(() => litNodes(mode, platforms, { departmentWanted: creative.enabled, optional: creative.optional }), [mode, platforms, creative]);
   const chosenRoles = useMemo(() => (creativeOn ? [...CREATIVE_REQUIRED, ...CREATIVE_OPTIONAL.filter((r) => creative.optional[r])] : []), [creative, creativeOn]);
   const list = useMemo(() => (clients || []).filter((c) => c.accounts.length && (`${c.name} ${c.client || ''}`).toLowerCase().includes(query.trim().toLowerCase())), [clients, query]);
@@ -109,7 +109,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
       t.agents.forEach((a) => { f[a.id] = { enabled: c.config?.agentsConfigured ? a.enabled : true, config: { ...(a.config || {}) }, schedule: a.schedule }; });
       const first = modeDef.brief ? 0 : 1; // only some modes have the general page (the brief); the others start with the first agent
       setForms(f); setStep(2); setIdx(first); setSeen(new Set([first]));
-    } catch (e) { setError(e.message || 'Не вдалося створити кампанію.'); } finally { setBusy(false); }
+    } catch (e) { setError(e.message || 'Не вдалося створити операцію.'); } finally { setBusy(false); }
   }
 
   const ordered = useMemo(() => (team ? CAMPAIGN_ROLES.filter((r) => roles.includes(r.role)).map((r) => team.agents.find((a) => a.role === r.role)).filter(Boolean) : []), [team, roles]);
@@ -174,7 +174,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
     if (!team || step !== 3 || mode === 'creative') return [];
     const w = [];
     const cfg = campaign?.config || {};
-    if (!cfg.brief) w.push('Бриф кампанії порожній: агенти працюватимуть лише з даними кабінетів. Краще заповнити бриф.');
+    if (!cfg.brief) w.push('Бриф операції порожній: агенти працюватимуть лише з даними кабінетів. Краще заповнити бриф.');
     platforms.forEach((p) => { if (!project.accounts.some((a) => a.platform === p) && p !== 'tiktok') w.push(`До проєкту не привʼязано кабінет ${platformLabel(p)}: аналітик цього каналу не зможе працювати.`); });
     const by = (r) => team.agents.find((a) => a.role === r);
     if (by('tiktok_analyst')?.enabled && !String(by('tiktok_analyst').config?.pasted || '').trim()) w.push('Для TikTok немає прямого підключення: вставте дані з рекламного кабінету в налаштуваннях аналітика TikTok, інакше він зупиниться з повідомленням.');
@@ -191,11 +191,11 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
     try {
       await launchCampaign(campaign.id);
       if (mode === 'creative') {
-        notify?.('Клієнта підключено до відділу креативів. Заповніть новий запит.');
+        notify?.('Клієнта підключено до відділу креативів. Заповніть новий цикл (запит на креативи).');
         onLaunched(campaign.id, { newRequest: true });
       } else {
         kickQueue().catch(() => {});
-        notify?.('Кампанію запущено: перші агенти вже працюють.');
+        notify?.('Операцію запущено: перші агенти вже працюють.');
         onLaunched(campaign.id);
       }
     } catch (e) { setError(e.message || 'Не вдалося запустити.'); setBusy(false); }
@@ -206,7 +206,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
       <div ref={box} className="cmp-wizard" role="dialog" aria-modal="true" aria-labelledby="cmp-wiz-title" tabIndex={-1}>
         <header className="cmp-wiz-head">
           <div>
-            <span className="cmp-kicker">Нова кампанія</span>
+            <span className="cmp-kicker">Нова операція</span>
             <h2 id="cmp-wiz-title">Створити команду агентів для клієнта</h2>
           </div>
           <ol className="cmp-steps" aria-label="Кроки">
@@ -292,7 +292,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                     {modeDef.channels ? (
                       <div className="cmp-platforms">
                         <h3>3. Які канали ведемо для «{project.name}»?</h3>
-                        <div className="cmp-chips" role="group" aria-label="Канали кампанії">
+                        <div className="cmp-chips" role="group" aria-label="Канали операції">
                           {PLATFORM_KEYS.map((k) => {
                             const ok = available.has(k);
                             const hasAccount = project.accounts.some((a) => a.platform === k);
@@ -311,7 +311,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                     {mode !== 'creative' && (<>
                       <div className="cmp-scheme"><QuarterDiagram lit={lit} /></div>
                       <p className="cmp-legend cmp-legend--scheme"><span><i className="is-solid" />обовʼязковий звʼязок</span><span><i className="is-dash" />необовʼязковий</span><span>Згаслі картки: цього режиму чи каналу немає, цих агентів не буде</span></p>
-                      <p className="cmp-count">Агентів кампанії в цьому режимі: <b>{roles.length}</b>{creativeOn ? ` + ${chosenRoles.length} у відділі креативів` : ''}</p>
+                      <p className="cmp-count">Агентів операції в цьому режимі: <b>{roles.length}</b>{creativeOn ? ` + ${chosenRoles.length} у відділі креативів` : ''}</p>
                     </>)}
                     {(mode === 'creative' || mode === 'full') && (
                       <div className={'cmp-dept' + (creativeOn ? '' : ' is-off')}>
@@ -347,9 +347,9 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
 
           {step === 2 && team && (
             <div className="cmp-step2">
-              <nav className="cmp-agentnav" aria-label="Агенти кампанії">
+              <nav className="cmp-agentnav" aria-label="Агенти операції">
                 <ol>
-                  {modeDef.brief && <li><button type="button" className={idx === 0 ? 'is-current' : seen.has(0) ? 'is-seen' : ''} onClick={() => go(0)} disabled={busy}>Загальне про кампанію</button></li>}
+                  {modeDef.brief && <li><button type="button" className={idx === 0 ? 'is-current' : seen.has(0) ? 'is-seen' : ''} onClick={() => go(0)} disabled={busy}>Загальне про операцію</button></li>}
                   {ordered.map((a, i) => (
                     <li key={a.id}>
                       <button type="button" className={(idx === i + 1 ? 'is-current ' : seen.has(i + 1) ? 'is-seen ' : '') + (forms[a.id]?.enabled ? '' : 'is-off')} onClick={() => go(i + 1)} disabled={busy}>
@@ -372,12 +372,12 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
               <section className="cmp-agentform">
                 {idx === 0 && (
                   <>
-                    <h3>Загальне про кампанію</h3>
-                    <p className="cmp-muted">Це бачать усі агенти кампанії. Чим конкретніше, тим точніші їхні висновки.</p>
-                    <Field id="cmp-name" label="Назва кампанії"><input id="cmp-name" className="cmp-input" value={general.name} onChange={(e) => setGeneral((g) => ({ ...g, name: e.target.value }))} maxLength={120} /></Field>
+                    <h3>Загальне про операцію</h3>
+                    <p className="cmp-muted">Це бачать усі агенти операції. Чим конкретніше, тим точніші їхні висновки.</p>
+                    <Field id="cmp-name" label="Назва операції"><input id="cmp-name" className="cmp-input" value={general.name} onChange={(e) => setGeneral((g) => ({ ...g, name: e.target.value }))} maxLength={120} /></Field>
                     <Field id="cmp-lang" label="Мова звітів"><select id="cmp-lang" className="cmp-input" value={general.language} onChange={(e) => setGeneral((g) => ({ ...g, language: e.target.value }))}><option value="uk">Українська</option><option value="en">English</option></select></Field>
                     <Field id="cmp-brief" label="Бриф: чим займається бізнес клієнта" hint="Що продають, кому, у якій країні, ціновий рівень, сезонність, що вже пробували."><textarea id="cmp-brief" className="cmp-input" rows={6} value={general.brief} onChange={(e) => setGeneral((g) => ({ ...g, brief: e.target.value }))} maxLength={4000} /></Field>
-                    <Field id="cmp-goals" label="Цілі кампанії і KPI" hint="Наприклад: 200 лідів на місяць за CPL до $15, або ROAS від 3 при бюджеті $5000."><textarea id="cmp-goals" className="cmp-input" rows={3} value={general.goals} onChange={(e) => setGeneral((g) => ({ ...g, goals: e.target.value }))} maxLength={1500} /></Field>
+                    <Field id="cmp-goals" label="Цілі операції і KPI" hint="Наприклад: 200 лідів на місяць за CPL до $15, або ROAS від 3 при бюджеті $5000."><textarea id="cmp-goals" className="cmp-input" rows={3} value={general.goals} onChange={(e) => setGeneral((g) => ({ ...g, goals: e.target.value }))} maxLength={1500} /></Field>
                   </>
                 )}
                 {deptItem && deptForm && (
@@ -397,7 +397,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                         {(deptItem.def.clientFields || []).map((fld) => (
                           <Field key={fld.key} id={'cmp-d-' + fld.key} label={fld.label} hint={fld.hint}>
                             <textarea id={'cmp-d-' + fld.key} className="cmp-input" rows={fld.rows || 3} value={deptForm.config[fld.key] || ''} onChange={(e) => setDeptCfg(fld.key, e.target.value)} maxLength={1500} />
-                            {deptForm.filled[fld.key] && <span className="cmp-dept-from">{deptForm.filled[fld.key] === 'project' ? 'Заповнено з вкладки «Креативи» проєкту (обмеження клієнта)' : 'Заповнено з цілей кампанії'}: перевірте й поправте</span>}
+                            {deptForm.filled[fld.key] && <span className="cmp-dept-from">{deptForm.filled[fld.key] === 'project' ? 'Заповнено з вкладки «Креативи» проєкту (обмеження клієнта)' : 'Заповнено з цілей операції'}: перевірте й поправте</span>}
                           </Field>
                         ))}
                         <p className="cmp-muted">Правила відділу, промти й режим роботи агента налаштовуються на його сторінці в AI Agents. Те, що не заповнене, лишається порожнім: нічого не вигадується.</p>
@@ -424,8 +424,8 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                             : <textarea id={'cmp-f-' + fld.key} className="cmp-input" rows={fld.rows || 3} value={forms[current.id].config[fld.key] || ''} onChange={(e) => setCfg(fld.key, e.target.value)} maxLength={12000} />}
                         </Field>
                       ))}
-                      <Field id="cmp-extra" label="Додаткова інструкція для цього клієнта" hint="Додається до промту агента лише для цієї кампанії. Повний промт можна редагувати після запуску.">
-                        <textarea id="cmp-extra" className="cmp-input" rows={3} value={forms[current.id].config.extra || ''} onChange={(e) => setCfg('extra', e.target.value)} maxLength={2000} placeholder="Наприклад: писати коротко, завжди називати кампанії за іменем" />
+                      <Field id="cmp-extra" label="Додаткова інструкція для цього клієнта" hint="Додається до промту агента лише для цієї операції. Повний промт можна редагувати після запуску.">
+                        <textarea id="cmp-extra" className="cmp-input" rows={3} value={forms[current.id].config.extra || ''} onChange={(e) => setCfg('extra', e.target.value)} maxLength={2000} placeholder="Наприклад: писати коротко, завжди називати операції за іменем" />
                       </Field>
                       {def.schedule && forms[current.id].schedule && (
                         <div className="cmp-row2">
@@ -458,7 +458,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                 <b>Що буде далі</b>
                 <ol>
                   <li>Відкриється сторінка клієнта з блоком «Відділ креативів».</li>
-                  <li>Одразу відкриється форма «Новий запит»: опишіть, що потрібно (канал, формати, настрій).</li>
+                  <li>Одразу відкриється форма «Новий цикл (запит на креативи)»: опишіть, що потрібно (канал, формати, настрій).</li>
                   <li>Стратег складе план, агент по ТЗ сформує завдання, копірайтер і креативщик підготують матеріали.</li>
                   <li>Готове перевірить контролер і віддасть вам на затвердження.</li>
                 </ol>
@@ -473,7 +473,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                 <p className="cmp-strip cmp-strip--warn" role="status"><b>Агенти стартують одразу</b> після «Запустити» й витрачають гроші на виклики моделі.</p>
                 <dl>
                   <div><dt>Клієнт</dt><dd>{project.name}{project.client ? ` · ${project.client}` : ''}</dd></div>
-                  <div><dt>Кампанія</dt><dd>{campaign.name}</dd></div>
+                  <div><dt>Операція</dt><dd>{campaign.name}</dd></div>
                   <div><dt>Режим</dt><dd>{modeDef.title}</dd></div>
                   {modeDef.channels && <div><dt>Канали</dt><dd>{platforms.map(platformLabel).join(', ')}</dd></div>}
                   <div><dt>Мова звітів</dt><dd>{campaign.config?.language === 'en' ? 'English' : 'Українська'}</dd></div>
@@ -488,7 +488,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
                   <b>Що буде після запуску</b>
                   <ol>
                     {modeDef.flow.map((t) => <li key={t}>{t}</li>)}
-                    {creativeOn && mode !== 'creative' && <li>Відділ креативів чекає запитів: на сторінці кампанії, у блоці «Відділ креативів», натисніть «Новий запит» і опишіть задачу.</li>}
+                    {creativeOn && mode !== 'creative' && <li>Відділ креативів чекає запитів: на сторінці операції, у блоці «Відділ креативів», натисніть «Новий цикл (запит на креативи)» і опишіть задачу.</li>}
                   </ol>
                 </div>
                 <ul className="cmp-agentlist">
@@ -517,7 +517,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify }) {
               {idx < stepItems.length && <button type="button" className="cmp-btn" onClick={() => go('summary')} disabled={busy}>Пропустити решту</button>}
             </>
           )}
-          {step === 3 && (<><button type="button" className="cmp-btn" onClick={() => setStep(2)} disabled={busy}>Назад до налаштувань</button><button type="button" className="cmp-btn cmp-btn--primary cmp-btn--launch" onClick={launch} disabled={busy || (mode !== 'creative' && !enabledAgents.length)}>{busy ? (mode === 'creative' ? 'Створюємо…' : 'Запускаємо…') : mode === 'creative' ? 'Створити й відкрити новий запит' : 'Запустити'}</button></>)}
+          {step === 3 && (<><button type="button" className="cmp-btn" onClick={() => setStep(2)} disabled={busy}>Назад до налаштувань</button><button type="button" className="cmp-btn cmp-btn--primary cmp-btn--launch" onClick={launch} disabled={busy || (mode !== 'creative' && !enabledAgents.length)}>{busy ? (mode === 'creative' ? 'Створюємо…' : 'Запускаємо…') : mode === 'creative' ? 'Створити й відкрити новий цикл' : 'Запустити'}</button></>)}
         </footer>
       </div>
     </div>,

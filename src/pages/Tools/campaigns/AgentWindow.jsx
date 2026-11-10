@@ -29,11 +29,11 @@ export default function AgentWindow({ role, team, onClose, onChanged, setRole, k
   const current = tabs.find((t) => t.key === sub) || tabs[0];
   return (
     <AgentWindowFrame
-      label={agent?.name || 'Агент кампанії'} onClose={onClose} closeLabel="До кампанії"
-      who={agent && { name: agent.name, sub: 'Команда кампанії', ring }}
+      label={agent?.name || 'Агент операції'} onClose={onClose} closeLabel="До операції"
+      who={agent && { name: agent.name, sub: 'Команда операції', ring }}
       sections={tabs.map((t) => ({ key: t.key, label: t.label, icon: SUB_ICONS[t.key] || 'info' }))}
       active={current?.key} onSection={(k) => setState({ role, sub: k })}
-      eyebrow={meta.short || 'Агент кампанії'} title={current?.label || 'Агент'}
+      eyebrow={meta.short || 'Агент операції'} title={current?.label || 'Агент'}
       headRight={agent && (
         <>
           <span className={'dwa-chip ' + (health.key === 'ok' ? 'ok' : health.key === 'bad' ? 'bad' : '')} title={health.note}><i />{health.label}</span>

@@ -43,8 +43,8 @@ export async function startRequest(ctx, requestId) {
   if (!req) throw new Error('Запит не знайдено.');
   if (req.status === 'running') throw new Error('Запит уже в роботі.');
   const campaign = must(await db.from('ag_campaigns').select('*').eq('id', req.campaign_id).maybeSingle(), 'campaign');
-  if (!campaign) throw new Error('Кампанію не знайдено.');
-  if (['paused', 'archived'].includes(campaign.status)) throw new Error('Кампанію призупинено або в архіві: відділ креативів не працює.');
+  if (!campaign) throw new Error('Операцію не знайдено.');
+  if (['paused', 'archived'].includes(campaign.status)) throw new Error('Операцію призупинено або в архіві: відділ креативів не працює.');
   if (!String(req.brief?.goal || '').trim()) throw new Error('У запиті немає опису задачі.');
   if ((await cappedCampaigns(db)).has(String(req.campaign_id))) throw new Error(CAP_MESSAGE);
   const dept = await loadDepartment(db);

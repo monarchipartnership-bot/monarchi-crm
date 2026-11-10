@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { ICON } from './kbIcons';
 import { formatDate, parseBlocks, readMinutes } from './kbText';
+import { KB_RULES, kbPrivacyWarnings } from '../../lib/kbSearch';
 
 // Presentation only: no article is re-authored; the text is split into the blocks it already has (see kbText.parseBlocks).
 function ArticleBody({ blocks }) {
@@ -23,6 +24,7 @@ function ArticleBody({ blocks }) {
 }
 
 function EditForm({ title, content, onTitleChange, onContentChange, onCancel, onSave, saving, saveLabel, titleAutoFocus, heading }) {
+  const warnings = kbPrivacyWarnings(`${title}\n${content}`);
   return (
     <div className="kb-edit-form">
       <div className="kb-kicker">{heading}</div>
@@ -36,6 +38,13 @@ function EditForm({ title, content, onTitleChange, onContentChange, onCancel, on
         value={content} onChange={(e) => onContentChange(e.target.value)}
       />
       <div className="kb-edit-hint">Порожній рядок розділяє блоки. Рядок з двокрапкою на початку блоку стане його заголовком, рядки з «- » стануть списком.</div>
+      <details className="kb-rules">
+        <summary>Що можна і чого не можна класти в базу</summary>
+        <p>Базу читають AI-агенти, тому все, що в ній є, потрапляє до постачальника моделі (Anthropic).</p>
+        <p><b>Можна:</b> {KB_RULES.yes.join('; ')}.</p>
+        <p><b>Не можна:</b> {KB_RULES.no.join('; ')}.</p>
+      </details>
+      {warnings.length > 0 && <ul className="kb-warnings" role="status">{warnings.map((w) => <li key={w.text} className={'is-' + w.level}>{w.text}</li>)}</ul>}
       <div className="kb-edit-actions">
         <button type="button" className="kb-btn kb-btn-ghost" onClick={onCancel} disabled={saving}>Скасувати</button>
         <button type="button" className="kb-btn kb-btn-primary" onClick={onSave} disabled={saving || !title.trim()}>

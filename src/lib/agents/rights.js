@@ -4,7 +4,7 @@
 
 // level: 'paid' (starts work that costs money), 'result' (confirms or changes what the agents delivered), 'logged' (free to do, but written to the journal), null (not journaled)
 export const ACTION_RULES = {
-  launch_campaign: { level: 'paid', label: 'Запуск кампанії' },
+  launch_campaign: { level: 'paid', label: 'Запуск операції' },
   start_request: { level: 'paid', label: 'Запуск запиту на креативи' },
   generate_creatives: { level: 'paid', label: 'Генерація зображень у Higgsfield' },
   run_agent: { level: 'paid', label: 'Ручний запуск агента' },
@@ -20,7 +20,7 @@ export const ACTION_RULES = {
   cancel_request: { level: 'logged', label: 'Зупинка запиту' },
   set_agent_schedule: { level: 'logged', label: 'Зміна розкладу агента' },
   set_agent_mode: { level: 'logged', label: 'Зміна режиму агента' },
-  add_instruction: { level: 'logged', label: 'Вказівка для кампанії' },
+  add_instruction: { level: 'logged', label: 'Вказівка для операції' },
   remove_instruction: { level: 'logged', label: 'Видалення вказівки' },
 };
 
@@ -68,7 +68,7 @@ export function auditEntry(action, body = {}, out = {}) {
       summary = out.submitted ? `Відправив у Higgsfield ${out.submitted} зображ., ≈ $${Number(out.estimateUsd || 0).toFixed(2)}` : 'Спроба генерації: нічого не відправлено';
       meta.requestId = body.requestId; meta.submitted = out.submitted ?? 0; meta.estimateUsd = out.estimateUsd ?? 0;
       break;
-    case 'launch_campaign': summary = `Запустив кампанію (агентів: ${out.agents ?? '—'}${out.creativeOnly ? ', лише креативи' : ''})`; break;
+    case 'launch_campaign': summary = `Запустив операцію (агентів: ${out.agents ?? '—'}${out.creativeOnly ? ', лише креативи' : ''})`; break;
     case 'start_request': summary = 'Запустив запит на креативи'; meta.requestId = body.requestId; break;
     case 'cancel_request': summary = 'Зупинив запит на креативи'; meta.requestId = body.requestId; break;
     case 'run_agent': summary = 'Запустив агента вручну'; meta.agentId = body.agentId; break;
@@ -96,5 +96,5 @@ export const deniedEntry = (action, reason) => ({ action: 'denied', subject: ACT
 export const AUDIT_LABELS = {
   ...Object.fromEntries(Object.entries(ACTION_RULES).map(([k, v]) => [k, v.label])),
   creative_approved: 'Затвердження креативу', creative_rejected: 'Відхилення креативу', money_limits_changed: 'Зміна лімітів витрат',
-  campaign_status: 'Статус кампанії', approvers_changed: 'Зміна утверджувачів', denied: 'Спроба без права',
+  campaign_status: 'Статус операції', approvers_changed: 'Зміна утверджувачів', denied: 'Спроба без права',
 };

@@ -1,0 +1,38 @@
+/* «Карта 3D»: the shell, the loader and the little interface the scene draws over the canvas (labels, the home button, the agent panel, the side menu). */
+.am3-shell { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: #120a24; color: #efe6ff; }
+.am3-host { position: absolute; inset: 0; }
+.am3-loader { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; pointer-events: none; font-family: Onest, system-ui, sans-serif; }
+.am3-loader-mark { width: 64px; height: 64px; border-radius: 50%; box-shadow: 0 0 0 6px #EB9CEF26, 0 10px 26px #68276866; animation: am3Pulse 1.8s ease-in-out infinite; }
+.am3-loader-text { font-size: 14px; font-weight: 600; opacity: .85; }
+.am3-failed { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+@keyframes am3Pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@media (prefers-reduced-motion: reduce) { .am3-loader-mark { animation: none; } }
+
+.am3-root { position: absolute; inset: 0; overflow: hidden; font-family: Onest, system-ui, sans-serif; color: #efe6ff; }
+.am3-root canvas { display: block; width: 100%; height: 100%; outline: none; }
+.am3-root .lbl { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 7px 16px 7px 7px; border-radius: 999px; background: rgba(32, 18, 60, 0.82); border: 1px solid color-mix(in srgb, var(--tc) 50%, rgba(190, 150, 255, 0.3)); box-shadow: 0 0 22px color-mix(in srgb, var(--tc) 36%, transparent); backdrop-filter: blur(8px); white-space: nowrap; }
+.am3-root .lbl .med { position: relative; flex: none; width: 46px; height: 46px; display: grid; place-items: center; }
+.am3-root .lbl .med svg { position: absolute; inset: 0; }
+.am3-root .lbl .med img { position: relative; width: 20px; height: 20px; }
+.am3-root .lbl .col { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.am3-root .lbl .col b { font-size: 14px; font-weight: 600; line-height: 1.2; }
+.am3-root .lbl .col small { font-size: 11.5px; color: #b9a7e6; font-variant-numeric: tabular-nums; }
+.am3-root .lbl .pips { display: flex; flex-wrap: wrap; gap: 4px; max-width: 200px; }
+.am3-root .lbl .pips i { width: 10px; height: 10px; border-radius: 50%; }
+.am3-root .lbl.lbl-wide .pips { max-width: 300px; }
+.am3-home { z-index: 4; }
+/* the hint of the scene (the chosen island): bottom centre, clear of «Активні проєкти» (right) and «Рух задач» (left) */
+.am3-panel { position: absolute; left: 50%; transform: translateX(-50%); bottom: 76px; width: 270px; padding: 14px 16px; border-radius: 16px; background: rgba(32, 18, 60, 0.85); border: 1px solid rgba(190, 150, 255, 0.45); display: none; backdrop-filter: blur(10px); z-index: 4; }
+.am3-panel b { font-size: 15px; }
+.am3-panel p { margin: 6px 0 0; font-size: 12px; opacity: 0.8; }
+.am3-open { margin-top: 10px; width: 100%; height: 34px; border: 0; border-radius: 10px; cursor: pointer; color: #fff; font: 600 13px Onest, system-ui, sans-serif; background: linear-gradient(135deg, #8a4dff, #6a35d8); box-shadow: 0 0 14px rgba(138, 77, 255, 0.55); }
+
+/* the strip of departments at the bottom while a department is open (AgentMap3D.jsx): switch the department or go back to the whole map */
+.am3-strip { position: absolute; z-index: 5; left: 310px; right: 480px; bottom: 20px; display: flex; gap: 6px; justify-content: safe center; overflow-x: auto; padding: 6px; border-radius: 999px; background: rgba(24, 12, 44, .88); border: 1.5px solid rgba(190, 120, 255, .4); box-shadow: 0 12px 34px rgba(10, 4, 24, .5); backdrop-filter: blur(10px); scrollbar-width: none; font-family: Onest, system-ui, sans-serif; width: fit-content; max-width: calc(100% - 790px); margin: 0 auto; }
+.am3-strip::-webkit-scrollbar { display: none; }
+.am3-strip button { flex: none; height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: #d9c8f5; font: 600 12.5px Onest, system-ui, sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.am3-strip button small { min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: rgba(255, 255, 255, .12); font-size: 10.5px; }
+.am3-strip .is-on { background: linear-gradient(100deg, #b544b5, #661466); color: #fff; }
+.am3-strip-all { border-right: 1px solid rgba(190, 120, 255, .3) !important; border-radius: 999px 0 0 999px !important; color: #fff !important; }
+.am3-strip button:focus-visible { outline: 3px solid #d9a6ff; outline-offset: -2px; }
+@media (max-width: 1180px) { .am3-strip { left: 12px; right: 12px; max-width: calc(100% - 24px); bottom: 76px; } }

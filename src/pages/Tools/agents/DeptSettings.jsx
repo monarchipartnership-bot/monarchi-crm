@@ -7,7 +7,7 @@ import Markdown from '../../Smm/Markdown';
 import AgentPrompts from '../../Smm/AgentPrompts';
 import AgentSettings from '../../Smm/AgentSettings';
 
-const clientName = (c) => c.project?.name || c.campaign?.name || `Кампанія ${c.campaign_id}`;
+const clientName = (c) => c.project?.name || c.campaign?.name || `Операція ${c.campaign_id}`;
 
 // What the agent knows about ONE client: the card of the project is read automatically at every run; here are the client's own fields of this agent and
 // the extra instruction for this client.
@@ -77,7 +77,7 @@ function PromptTest({ agent, clients, prompts, reload, notify }) {
     setBusy(true);
     try { await savePrompt(current, { name: current.name, body, note: 'Після пробного запуску' }, email); notify('Збережено як нову версію поточного промту.'); setResult(null); await reload(); } catch (e) { notify(e.message || 'Не вдалося зберегти.', true); } finally { setBusy(false); }
   }
-  if (!clients.length) return <p className="smm-muted">Для пробного запуску потрібен клієнт: підключіть його при створенні кампанії.</p>;
+  if (!clients.length) return <p className="smm-muted">Для пробного запуску потрібен клієнт: підключіть його при створенні операції.</p>;
   return (
     <>
       <p className="smm-muted">Агент попрацює для обраного клієнта з текстом нижче й покаже результат. Нічого не зберігається, нічого не передається далі, у журнал не пишеться. Один пробний запуск це один виклик моделі, ≈ $0.02–0.05{calls > 1 ? ' (два з порівнянням)' : ''}.</p>

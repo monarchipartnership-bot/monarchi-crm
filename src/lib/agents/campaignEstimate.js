@@ -40,7 +40,7 @@ export function estimateCampaign({ mode, platforms = [], concepts = 0, ratios = 
 
 // The sentence under the numbers (what the person reads before pressing «Запустити»).
 export function estimateSummary(e) {
-  if (!e.rows.length && !e.images) return 'Ця кампанія нічого не витрачає, поки не буде запиту.';
+  if (!e.rows.length && !e.images) return 'Ця операція нічого не витрачає, поки не буде запиту.';
   const parts = [`Claude ≈ $${e.claude.toFixed(2)}`];
   if (e.images) parts.push(e.higgsfield.total != null ? `Higgsfield ≈ $${e.higgsfield.total.toFixed(2)} (${e.images} зображ.)` : `Higgsfield: ${e.images} зображ., ціну покаже «Оцінити вартість»`);
   let text = `Перший запуск: ${parts.join(' + ')}${e.higgsfield.total != null ? ` = $${e.once.toFixed(2)}` : ''}.`;

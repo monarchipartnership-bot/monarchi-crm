@@ -52,7 +52,7 @@ export function digestDue({ settings, now = new Date() }) {
 // rows of one day → { total, claude, higgsfield, rows: [{ campaignId, name, usd }] sorted from the biggest }
 export function digestOf({ tasks = [], spends = [], campaigns = [] }) {
   const totals = campaignTotals(tasks, spends);
-  const name = (id) => (id === 'none' ? 'Без кампанії' : campaigns.find((c) => c.id === id)?.label || `Кампанія ${id}`);
+  const name = (id) => (id === 'none' ? 'Без операції' : campaigns.find((c) => c.id === id)?.label || `Операція ${id}`);
   const rows = [...totals.entries()].map(([id, t]) => ({ campaignId: id, name: name(id), usd: t.total })).sort((a, b) => b.usd - a.usd);
   const sum = (k) => round([...totals.values()].reduce((s, t) => s + t[k], 0));
   return { total: sum('total'), claude: sum('claude'), higgsfield: sum('higgsfield'), rows };
@@ -60,19 +60,19 @@ export function digestOf({ tasks = [], spends = [], campaigns = [] }) {
 
 // ---- the texts (Telegram HTML: everything that comes from the data is escaped)
 export function stepMessage(n) {
-  const label = n.campaign.label || n.campaign.name || `Кампанія ${n.campaign.id}`;
+  const label = n.campaign.label || n.campaign.name || `Операція ${n.campaign.id}`;
   return {
     title: `Витрати: ${label} — ${usd(n.level)}`,
-    plain: `Кампанія «${label}» витратила вже ${usd(n.total)} (Claude ${usd(n.claude)}, Higgsfield ${usd(n.higgsfield)}).`,
+    plain: `Операція «${label}» витратила вже ${usd(n.total)} (Claude ${usd(n.claude)}, Higgsfield ${usd(n.higgsfield)}).`,
     html: `💸 <b>${esc(label)}</b>: вже ${usd(n.total)}\nClaude ${usd(n.claude)} · Higgsfield ${usd(n.higgsfield)}\nНаступне сповіщення при ${usd(n.level + Number(n.campaign.notify_step_usd))}.`,
   };
 }
 
 export function capMessage(campaign, total) {
-  const label = campaign.label || campaign.name || `Кампанія ${campaign.id}`;
+  const label = campaign.label || campaign.name || `Операція ${campaign.id}`;
   return {
     title: `Ліміт витрат: ${label}`,
-    plain: `Кампанія «${label}» досягла ліміту ${usd(campaign.spend_cap_usd)} (витрачено ${usd(total)}). Нові запуски зупинено, поки ви не підвищите ліміт.`,
+    plain: `Операція «${label}» досягла ліміту ${usd(campaign.spend_cap_usd)} (витрачено ${usd(total)}). Нові запуски зупинено, поки ви не підвищите ліміт.`,
     html: `🛑 <b>${esc(label)}</b>: ліміт ${usd(campaign.spend_cap_usd)} досягнуто (витрачено ${usd(total)}).\nНові запуски зупинено, поки ви не підвищите ліміт.`,
   };
 }

@@ -33,7 +33,7 @@ export async function fetchSpendReport(kind = 'month', anchor) {
   const roleName = new Map(agents.map((a) => [a.role, a.name]));
   const report = buildSpendReport(rows, range, {
     agent: (key) => roleName.get(key) || key,
-    campaign: (id) => { const c = campaignById.get(id); return c ? [projectById.get(c.project_id)?.name, c.name].filter(Boolean).join(' — ') : `Кампанія ${id}`; },
+    campaign: (id) => { const c = campaignById.get(id); return c ? [projectById.get(c.project_id)?.name, c.name].filter(Boolean).join(' — ') : `Операція ${id}`; },
     project: (id) => projectById.get(id)?.name || `Проєкт ${id}`,
   });
   return { report, campaigns, projects };

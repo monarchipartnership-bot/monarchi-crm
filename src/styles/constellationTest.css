@@ -22,9 +22,6 @@
 .constellation-page.ai-immersive *, .constellation-page.ai-immersive *::before, .constellation-page.ai-immersive *::after { box-sizing: border-box; }
 .ai-immersive :focus-visible { outline: 2px solid #edb5f0; outline-offset: 3px; }
 /* SVG controls get a round ring instead of the browser's rectangular outline */
-.ai-immersive .ai-node:focus-visible, .ai-immersive .ai-sat:focus-visible, .ai-immersive .dept-graph-agent:focus-visible, .ai-immersive .dept-graph-root:focus-visible { outline: none; }
-.ai-focus-ring { fill: none; stroke: #edb5f0; stroke-width: 2px; vector-effect: non-scaling-stroke; opacity: 0; pointer-events: none; }
-.ai-node:focus-visible .ai-focus-ring, .ai-sat:focus-visible .ai-focus-ring, .dept-graph-agent:focus-visible .ai-focus-ring, .dept-graph-root:focus-visible .ai-focus-ring { opacity: 1; }
 
 .ai-pill {
   background: var(--ai-pill); border: 1px solid var(--ai-border); border-radius: 999px; color: var(--ai-text);
@@ -34,7 +31,7 @@
 
 /* ---------------- header: brand / section capsule / back to Hub ---------------- */
 .ai-brand { position: absolute; top: 20px; left: 28px; z-index: 6; display: flex; align-items: center; gap: 12px; }
-.ai-brand-icon { width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(174, 64, 174, .45)); }
+
 .ai-brand-text { display: flex; flex-direction: column; gap: 2px; }
 .ai-brand h1 { margin: 0; font-family: var(--font-head); font-size: 26px; line-height: 28px; font-weight: 700; color: var(--ai-text); letter-spacing: -.2px; }
 .ai-brand-text span { font-size: 14px; line-height: 18px; color: var(--ai-secondary); }
@@ -95,191 +92,39 @@
 /* "what's new" banner (§4.8) — compact pill under the brand */
 
 /* ---------------- stage: energy core + live SVG map ---------------- */
-.constellation-stage { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
-.ai-core {
-  position: absolute; left: 50%; top: calc(50% + var(--core-dy, 0px)); width: clamp(120px, 18vh, 190px); height: auto; object-fit: contain; pointer-events: none; user-select: none;
-  transform: translate(-50%, -50%); animation: aiCoreIn .5s cubic-bezier(.22, 1, .36, 1) .1s both, aiCoreBreath 5s ease-in-out .7s infinite;
-  transition: opacity .65s cubic-bezier(.22, 1, .36, 1);
-}
-.ai-core.is-quiet { opacity: .22 !important; animation: none; }
+
 @keyframes aiCoreIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.82); } to { opacity: .94; transform: translate(-50%, -50%) scale(1); } }
 @keyframes aiCoreBreath {
   0%, 100% { opacity: .9; transform: translate(-50%, -50%) scale(1); filter: brightness(.96); }
   50% { opacity: 1; transform: translate(-50%, -50%) scale(1.035); filter: brightness(1.14); }
 }
-.constellation-svg { position: relative; z-index: 2; width: 100%; height: 100%; overflow: visible; display: block; }
 
 /* overview group: leaves the scene softly when a department takes focus */
-.ai-overview { transform-box: view-box; transform-origin: 0px 0px; transition: opacity .45s cubic-bezier(.22, 1, .36, 1), transform .65s cubic-bezier(.22, 1, .36, 1); }
-.ai-overview.is-focused { opacity: 0; transform: scale(1.1); pointer-events: none; }
 
 /* rings, spokes, orbits (decorative guides; thin 0.75-1px, selected 1.5px) */
-.ai-ring { fill: none; stroke: #eb9cef; stroke-width: .9px; vector-effect: non-scaling-stroke; }
-.ai-ring-nodes { stroke-opacity: .4; stroke-width: 1.2px; stroke-dasharray: 1 7; stroke-linecap: round; }
-.ai-ring-solid { stroke-opacity: .24; }
-.ai-ring-faint { stroke-opacity: .15; }
-.ai-ring-dotted { stroke-opacity: .3; stroke-dasharray: 1 6; stroke-linecap: round; }
-.ai-ring-orbit { stroke: #f0b2f0; stroke-opacity: .36; }
-.ai-spoke { stroke: #eb9cef; stroke-opacity: .5; stroke-width: 1px; stroke-dasharray: 1 5; stroke-linecap: round; vector-effect: non-scaling-stroke; transition: stroke-opacity .16s ease, stroke-width .16s ease; }
-.ai-spoke.is-on { stroke-opacity: .88; stroke-width: 1.5px; stroke-dasharray: none; }
-.ai-spoke.is-dim { stroke-opacity: .16; }
-.ai-orbit-light circle { filter: drop-shadow(0 0 5px rgba(235, 156, 239, .9)); }
 
 /* department node: glossy sphere + canonical icon + count badge */
-.ai-dept { transition: opacity .16s ease; }
-.ai-dept.is-dim { opacity: .42; }
-.ai-dept-inner { animation: aiDeptIn .32s cubic-bezier(.22, 1, .36, 1) both; animation-delay: calc(250ms + var(--i, 0) * 60ms); }
-.ai-sat, .ai-sat-line, .ai-dept-label { animation: aiFadeIn .23s ease-out both; animation-delay: calc(420ms + var(--i, 0) * 50ms); }
+
 @keyframes aiDeptIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes aiFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.ai-node { cursor: pointer; outline: none; }
-.ai-node-hit { fill: transparent; }
-.ai-node-halo { fill: url(#ai-g-halo); opacity: .55; transition: opacity .16s ease; pointer-events: none; }
-.ai-node:hover .ai-node-halo, .ai-dept.is-on .ai-node-halo, .ai-node:focus-visible .ai-node-halo { opacity: 1; }
-.ai-node-sphere { fill: url(#ai-g-sphere); stroke: #facbfa; stroke-width: 1.2px; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 10px rgba(174, 64, 174, .6)); pointer-events: none; }
-.ai-node:focus-visible .ai-node-sphere { stroke: #fff; stroke-width: 3px; }
-.ai-node-spec { fill: rgba(255, 255, 255, .26); pointer-events: none; }
-.ai-node-icon { pointer-events: none; filter: drop-shadow(0 2px 4px rgba(39, 8, 39, .45)); }
-.ai-node-badge circle { fill: #682768; stroke: #f9edf9; stroke-width: 2px; vector-effect: non-scaling-stroke; }
-.ai-node-badge text { fill: #f9edf9; font-family: var(--font-head); font-weight: 700; pointer-events: none; }
-
-.ai-dept-label { cursor: pointer; }
-.ai-dept-label-hit { fill: transparent; pointer-events: all; }
-.ai-dept-title { fill: var(--ai-text); font-family: var(--font-head); font-weight: 700; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 6px; stroke-linejoin: round; pointer-events: none; }
-.ai-dept-count { fill: #d07be0; font-family: var(--font-body); font-weight: 600; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
-
 /* agent satellites: one shared glossy sphere + separate label */
-.ai-sat { cursor: pointer; outline: none; }
-.ai-sat-hit { fill: transparent; }
-.ai-sat-glow { fill: url(#ai-g-halo); opacity: .5; pointer-events: none; transition: opacity .16s ease; }
-.ai-sat-body { fill: url(#ai-g-sat); stroke: #fadcfb; stroke-width: 1px; vector-effect: non-scaling-stroke; pointer-events: none; }
-.ai-sat-spec { fill: rgba(255, 255, 255, .4); pointer-events: none; }
-.ai-sat-label { fill: #f0d9f3; font-family: var(--font-body); font-weight: 500; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; transition: fill .16s ease; }
-.ai-sat-line { stroke: #eb9cef; stroke-opacity: .32; stroke-width: .8px; vector-effect: non-scaling-stroke; }
-.ai-sat:hover .ai-sat-glow, .ai-sat:focus-visible .ai-sat-glow, .ai-sat.is-selected .ai-sat-glow { opacity: 1; }
-.ai-sat:hover .ai-sat-label, .ai-sat:focus-visible .ai-sat-label, .ai-sat.is-selected .ai-sat-label { fill: #fff; }
-.ai-sat:focus-visible .ai-sat-body, .ai-sat.is-selected .ai-sat-body { stroke: #fff; stroke-width: 2.2px; }
-.ai-sat.is-more .ai-sat-label { fill: #d07be0; }
 
 /* ---------------- bottom chrome (overview only) ---------------- */
-.ai-kb-btn {
-  position: absolute; left: 28px; bottom: 24px; z-index: 6; display: inline-flex; align-items: center; gap: 12px; height: 48px; padding: 0 22px;
-  font-family: var(--font-body); font-size: 15px; font-weight: 500; cursor: pointer; transition: border-color .16s ease;
-}
-.ai-kb-btn:hover { border-color: rgba(235, 156, 239, .6); }
-.ai-kb-icon { display: inline-flex; color: var(--ai-text); }
-.ai-kb-icon svg { width: 22px; height: 22px; }
-.ai-footer {
-  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 18px; height: 44px; padding: 0 24px;
-  font-size: 15px; white-space: nowrap; max-width: calc(100vw - 32px);
-}
-.ai-footer-total { font-weight: 600; }
-.ai-footer-item { display: inline-flex; align-items: center; gap: 8px; color: var(--ai-text); }
-.ai-footer-item::before, .ai-footer-total::after { content: "·"; color: var(--ai-secondary); margin-right: 8px; }
-.ai-footer-total::after { margin: 0 0 0 18px; display: none; }
-.ai-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.ai-dot-live { background: var(--ai-st-live); box-shadow: 0 0 8px var(--ai-st-live); }
-.ai-dot-dev { background: var(--ai-st-dev); box-shadow: 0 0 8px rgba(245, 155, 91, .8); }
-.ai-dot-plan { background: var(--ai-st-plan); box-shadow: 0 0 8px rgba(124, 140, 248, .8); }
 
 /* ---------------- focused department chrome ---------------- */
-.constellation-overlay { position: absolute; top: 90px; left: 28px; z-index: 6; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: calc(100vw - 56px); }
-.constellation-reset { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; font-family: var(--font-body); font-size: 15px; font-weight: 600; cursor: pointer; transition: border-color .16s ease; }
-.constellation-reset:hover { border-color: rgba(235, 156, 239, .6); }
-
-
-.constellation-carousel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; height: 120px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.constellation-carousel button {
-  position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; pointer-events: auto;
-  background: var(--ai-pill); border: 1px solid var(--ai-border); color: var(--ai-text); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px);
-  transition: border-color .16s ease;
-}
-.constellation-carousel button:hover { border-color: rgba(235, 156, 239, .65); }
-.constellation-carousel button:first-of-type { left: 28px; }
-.constellation-carousel button:last-of-type { right: 28px; }
-.chev-prev { transform: rotate(180deg); }
-.constellation-carousel-info { width: 100%; height: 100%; padding: 0 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.constellation-carousel-name {
-  font-family: var(--font-head); font-weight: 700; color: var(--ai-text); letter-spacing: .01em; line-height: 1.1; text-align: center;
-  max-width: 100%; font-size: clamp(1.5rem, 3.4vw, 2.6rem); text-shadow: 0 0 24px rgba(174, 64, 174, .7);
-}
 
 /* subtitle line shared by the phone department list */
-.dept-panel-subtitle { font-size: 13px; color: var(--ai-secondary); margin-bottom: 12px; }
 
 /* touch list that replaces the focused SVG graph on narrow screens */
-.dept-sheet { position: relative; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-.dept-sheet-head h2 { margin: 0 0 4px; font-family: var(--font-head); font-size: 18px; line-height: 24px; color: var(--ai-text); }
-.dept-sheet-group h4 { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ai-lilac); }
-.dept-sheet-agent { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 10px; text-align: left; border: none; border-radius: 12px; background: rgba(53, 17, 63, .7); color: var(--ai-text); font-family: var(--font-body); font-size: 14px; cursor: pointer; margin-bottom: 6px; }
-.dept-sheet-dot { width: 22px; height: 22px; flex: none; border-radius: 50%; background: radial-gradient(circle at 32% 24%, #f5c3f6, #b544b5 55%, #682768); box-shadow: 0 0 10px rgba(174, 64, 174, .6); }
-.dept-sheet-name { flex: 1; min-width: 0; font-weight: 500; line-height: 1.3; }
-.dept-sheet-status { flex: none; font-size: 11px; color: var(--ai-secondary); }
 
 /* ---------------- focused department graph (Department -> Function -> Agent) ---------------- */
-.dept-graph { animation: aiFadeIn .5s cubic-bezier(.22, 1, .36, 1) .12s both; }
-.dept-graph-orbit { fill: none; stroke: #eb9cef; stroke-width: 1px; stroke-dasharray: 1 10; opacity: .16; pointer-events: none; vector-effect: non-scaling-stroke; }
-.dept-graph-edge { fill: none; stroke: #eb9cef; vector-effect: non-scaling-stroke; }
-.dept-graph-edge-fn { stroke-width: 1.2px; opacity: .5; }
-.dept-graph-edge-agent { stroke-width: .8px; opacity: .3; }
-.dept-graph-edge-agent.is-on { stroke-width: 1.5px; opacity: .9; }
-.dept-graph-dot { fill: #f9edf9; opacity: .6; filter: drop-shadow(0 0 3px #eb9cef); pointer-events: none; }
-.dept-graph-dot-small { opacity: .38; filter: none; }
-
-.dept-graph-fn { pointer-events: none; }
-.dept-graph-fn-halo { fill: url(#ai-g-halo); opacity: .8; }
-.dept-graph-fn-circle { fill: url(#ai-g-sat); stroke: #fadcfb; stroke-width: 1px; vector-effect: non-scaling-stroke; }
-.dept-graph-fn-label { fill: #eb9cef; font-family: var(--font-body); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 5px; stroke-linejoin: round; }
-
-.dept-graph-agent { cursor: pointer; outline: none; }
-.dept-graph-agent-hit { fill: transparent; }
-.dept-graph-agent-glow { fill: url(#ai-g-halo); opacity: .5; pointer-events: none; transition: opacity .16s ease; }
-.dept-graph-agent-circle { fill: url(#ai-g-sat); stroke: #fadcfb; stroke-width: 1.1px; vector-effect: non-scaling-stroke; transition: r .16s ease; filter: drop-shadow(0 0 8px rgba(174, 64, 174, .5)); }
-.dept-graph-agent-spec { fill: rgba(255, 255, 255, .34); pointer-events: none; }
-.dept-graph-agent:hover .dept-graph-agent-glow, .dept-graph-agent.active .dept-graph-agent-glow, .dept-graph-agent:focus-visible .dept-graph-agent-glow { opacity: 1; }
-.dept-graph-agent:focus-visible .dept-graph-agent-circle, .dept-graph-agent.active .dept-graph-agent-circle { stroke: #fff; stroke-width: 2.2px; }
-.dept-graph-agent-label { fill: #f0d9f3; font-family: var(--font-body); font-weight: 500; paint-order: stroke fill; stroke: rgba(23, 5, 28, .85); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; transition: fill .16s ease; }
-.dept-graph-agent:hover .dept-graph-agent-label, .dept-graph-agent.active .dept-graph-agent-label, .dept-graph-agent:focus-visible .dept-graph-agent-label { fill: #fff; }
-.dept-graph-agent-status { fill: #d07be0; font-size: .82em; font-weight: 600; opacity: 0; transition: opacity .16s ease; }
-.dept-graph-agent:hover .dept-graph-agent-status, .dept-graph-agent.active .dept-graph-agent-status, .dept-graph-agent:focus-visible .dept-graph-agent-status { opacity: 1; }
-.dept-graph-agent foreignObject span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: #f9edf9; pointer-events: none; }
-.dept-graph-agent foreignObject svg { width: calc(14px * var(--ui-scale, 1)); height: calc(14px * var(--ui-scale, 1)); }
-
-.dept-graph-root { cursor: pointer; outline: none; }
-.dept-graph-root-halo { fill: url(#ai-g-halo); opacity: .9; pointer-events: none; }
-.dept-graph-root-circle { fill: url(#ai-g-sphere); stroke: #facbfa; stroke-width: 1.4px; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 12px rgba(174, 64, 174, .6)); }
-.dept-graph-root:focus-visible .dept-graph-root-circle { stroke: #fff; stroke-width: 3px; }
-
 
 /* ---------------- agent info modal (read-only spec) ---------------- */
-.agent-modal-backdrop { position: fixed; inset: 0; background: rgba(23, 5, 28, .6); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; animation: aiFadeIn .24s ease-out; }
+
 .agent-modal { width: min(640px, 100%); max-height: 88vh; overflow-y: auto; position: relative; background: rgba(39, 8, 39, .97); border: 1px solid var(--ai-border); border-radius: 22px; padding: 30px 32px; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, .7); color: var(--ai-text); scrollbar-width: thin; }
-.agent-modal-close { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: none; background: none; color: var(--ai-secondary); border-radius: 12px; cursor: pointer; }
-.agent-modal-close:hover { color: var(--ai-text); }
-.agent-modal-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; padding-right: 40px; }
-.agent-badge { font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; }
-.agent-badge.autonomy { background: rgba(174, 64, 174, .24); color: var(--ai-text); }
-.agent-badge.status-live { background: rgba(176, 124, 224, .2); color: #d9bdf6; }
-.agent-badge.status-not_started { background: rgba(124, 140, 248, .16); color: #aab4fb; }
-.agent-badge.status-in_development { background: rgba(245, 155, 91, .16); color: #f8b684; }
-.agent-badge.wave-1 { background: rgba(74, 222, 128, .16); color: #86efac; }
-.agent-badge.wave-2 { background: rgba(125, 211, 252, .16); color: #7dd3fc; }
-.agent-badge.wave-3 { background: rgba(235, 156, 239, .18); color: var(--ai-lilac); }
-.agent-modal-breadcrumb { font-size: 12px; color: var(--ai-secondary); margin-bottom: 6px; }
+
 .agent-modal h2 { font-family: var(--font-head); font-size: 1.35rem; color: var(--ai-text); margin: 0 0 10px; }
-.agent-modal-desc { font-size: 14px; color: #ecd3ef; line-height: 1.55; margin: 0 0 18px; }
-.agent-modal-section { margin-bottom: 16px; }
-.agent-modal-section h4 { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ai-lilac); margin: 0 0 8px; }
-.agent-modal-section p { font-size: 14px; color: #ecd3ef; line-height: 1.55; margin: 0; }
-.agent-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-.agent-pill { font-size: 12px; color: var(--ai-text); background: rgba(174, 64, 174, .16); border: 1px solid var(--ai-border); border-radius: 999px; padding: 5px 12px; }
-.agent-ladder { display: flex; flex-direction: column; gap: 8px; }
-.ladder-row { display: flex; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(53, 17, 63, .6); border: 1px solid var(--ai-border); }
-.ladder-row.current { border-color: rgba(235, 156, 239, .7); background: rgba(174, 64, 174, .22); }
-.ladder-row-label { flex: none; width: 130px; font-size: 12px; font-weight: 800; color: var(--ai-text); }
-.ladder-row-text { font-size: 13px; color: #ecd3ef; line-height: 1.45; }
-.agent-modal-cta { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--ai-border); }
 
 /* ---------------- phones / narrow windows (JS-driven: .is-compact) ----------------
    The header (brand / section capsule / back) stays fixed; everything else
@@ -287,9 +132,9 @@
    Knowledge Base button and the footer — so nothing can overlap on a short
    phone screen, and the map never shrinks to unreadable text. */
 .ai-flow { display: contents; }
-.constellation-page.is-compact .ai-core { width: clamp(96px, 13vh, 140px); }
+
 .constellation-page.is-compact .ai-brand { top: 12px; left: 16px; gap: 10px; }
-.constellation-page.is-compact .ai-brand-icon { width: 40px; height: 40px; }
+
 .constellation-page.is-compact .ai-brand h1 { font-size: 20px; line-height: 22px; }
 .constellation-page.is-compact .ai-brand-text span { font-size: 12px; line-height: 14px; }
 .constellation-page.is-compact .constellation-exit { top: 14px; right: 16px; height: 44px; padding: 0 16px; font-size: 14px; }
@@ -302,35 +147,22 @@
   position: absolute; top: 124px; left: 0; right: 0; bottom: 0; z-index: 3; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: 10px; padding: 0 12px 14px; scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .35) transparent;
 }
+/* the column of cards lies over the map: only the cards take the clicks, the map between and under them stays alive (robots, islands, turning the view) */
+.constellation-page.is-compact .ai-flow { pointer-events: none; }
+.constellation-page.is-compact .ai-flow > * { pointer-events: auto; }
 .constellation-page.is-compact .ai-flow > * { position: relative !important; inset: auto !important; transform: none !important; margin: 0; width: auto; max-width: none; flex: none; }
 .constellation-page.is-compact .agent-search { order: 1; width: auto; }
-.constellation-page.is-compact .constellation-overlay { order: 3; }
-.constellation-page.is-compact .dept-sheet { order: 5; max-height: none; overflow: visible; }
-.constellation-page.is-compact .constellation-stage { order: 7; height: clamp(480px, calc(100dvh - 300px), 720px); }
-.constellation-page.is-compact .ai-kb-btn { order: 8; align-self: flex-start; height: 44px; padding: 0 18px; font-size: 14px; }
-.constellation-page.is-compact .ai-footer { order: 9; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; padding: 8px 14px; font-size: 13px; height: auto; min-height: 50px; border-radius: 22px; }
-.constellation-page.is-compact .ai-footer-total { flex-basis: 100%; text-align: center; }
-.constellation-page.is-compact .ai-footer-item::before { display: none; }
-.constellation-page.is-compact .constellation-carousel { order: 10; position: sticky !important; bottom: 0 !important; height: 76px; background: linear-gradient(180deg, rgba(23, 5, 28, 0), rgba(23, 5, 28, .92) 40%); }
-.constellation-page.is-compact .constellation-carousel button { width: 44px; height: 44px; }
-.constellation-page.is-compact .constellation-carousel button:first-of-type { left: 0; }
-.constellation-page.is-compact .constellation-carousel button:last-of-type { right: 0; }
-.constellation-page.is-compact .constellation-carousel-info { padding: 0 52px; }
-.constellation-page.is-compact .constellation-carousel-name { font-size: 1.1rem; }
+
 .constellation-page.is-compact .agent-modal { padding: 24px 20px; }
-.constellation-page.is-compact .ladder-row { flex-direction: column; gap: 4px; }
-.constellation-page.is-compact .ladder-row-label { width: auto; }
 
 /* ---------------- reduced motion ---------------- */
 @media (prefers-reduced-motion: reduce) {
-  .ai-core { animation: aiCoreIn .1s linear both !important; }
-  .ai-overview, .ai-dept, .ai-spoke, .ai-node-halo, .ai-sat-glow, .dept-graph-agent-glow { transition: opacity .1s linear !important; }
-  .ai-overview.is-focused { transform: none; }
-  .ai-dept-inner, .ai-sat, .ai-sat-line, .ai-dept-label, .dept-graph { animation: none !important; }
-  .constellation-section-tab, .constellation-carousel button { transition: none; }
+  
+  
+  
+  
+  .constellation-section-tab { transition: none; }
 }
-.constellation-page.is-still .ai-core { animation: aiCoreIn .1s linear both; }
-
 
 /* ---------------- Hub style top bar (2026-10-24): brand with the emblem, section capsule, search / back pills, KPI cards ----------------
    Dark plum glass by default; on the 3D map by day the same pieces turn light glass (is-map-light), like the city under them. */
@@ -368,79 +200,28 @@
 .agent-search-input::placeholder { color: var(--tb-sec); opacity: .8; }
 .agent-search:focus-within { box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
 
-.ai-kpis { position: absolute; z-index: 4; top: 76px; left: 20px; display: flex; gap: 10px; flex-wrap: wrap; max-width: 560px; }
-.ai-kpi {
-  display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 14px; border-radius: 22px; background: var(--tb-panel); color: var(--tb-ink);
-  box-shadow: inset 0 0 0 1.5px var(--tb-line), var(--tb-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-}
-.ai-kpi b { display: block; font-family: var(--font-head); font-size: 22px; font-weight: 800; line-height: 1; letter-spacing: -.4px; }
-.ai-kpi small { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--tb-sec); }
-.ai-kpi-dot { width: 30px; height: 30px; border-radius: 50%; position: relative; flex: 0 0 auto; background: var(--tb-dot-bg); box-shadow: inset 0 0 0 1.5px var(--tb-dot-ring); }
-.ai-kpi-dot::after { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: #b544b5; }
-.ai-kpi.k-live .ai-kpi-dot::after { background: var(--ai-st-live); }
-.ai-kpi.k-dev .ai-kpi-dot::after { background: var(--ai-st-dev); }
-.ai-kpi.k-plan .ai-kpi-dot::after { background: var(--ai-st-plan); }
-
 .constellation-page.is-compact .ai-brand { top: 12px; left: 16px; }
 .constellation-page.is-compact .ai-brand-logo { width: 40px; height: 40px; }
 .constellation-page.is-compact .constellation-exit.ai-pill { top: 14px; right: 16px; height: 40px; }
 .constellation-page.is-compact .constellation-section-nav { top: 66px; height: 46px; }
 .constellation-page.is-compact .agent-search.ai-pill { order: 1; width: auto; }
-.constellation-page.is-compact .ai-kpis { order: 2; max-width: none; gap: 8px; }
-.constellation-page.is-compact .ai-kpi { flex: 1 1 calc(50% - 8px); padding: 8px 12px 8px 10px; border-radius: 18px; }
-.constellation-page.is-compact .ai-kpi b { font-size: 19px; }
+
+/* the gear: «Стан системи» (a round button in the row with the search and «До Hub»; 40px + 10px gap to the search) */
+.constellation-gear { position: absolute; z-index: 40; top: 20px; right: calc(148px + clamp(150px, 14vw, 220px)); width: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.constellation-gear.ai-pill { height: 40px; background: var(--tb-panel); border: 0; color: var(--tb-sec); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 0 4px #ae40ae14; }
+.constellation-gear.active { color: var(--tb-deep); box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
+.constellation-gear:focus-visible { outline: 3px solid #d9a6ff; outline-offset: 2px; }
+@media (max-width: 1180px) { .constellation-gear { top: 72px; right: 270px; } }
+.constellation-page.is-compact .constellation-gear { top: 14px; right: 136px; }
 
 /* ---------------- "Рух задачі по відділах" (bottom left) and the knowledge base button (bottom right) ---------------- */
-.ai-kb-btn { left: auto; right: 20px; bottom: 20px; height: 44px; padding: 0 20px; font-size: 14px; font-weight: 600; background: var(--tb-panel); border: 0; color: var(--tb-ink); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 0 4px #ae40ae14; }
-.ai-kb-btn:hover { box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
-.ai-kb-icon { color: var(--tb-sec); }
-.ai-flowcard {
-  position: absolute; left: 20px; bottom: 20px; z-index: 5; width: min(540px, calc(50% - 210px)); min-width: 400px; padding: 14px 16px; display: grid; gap: 10px;
-  border-radius: 24px; background: var(--tb-panel); color: var(--tb-ink); box-shadow: inset 0 0 0 1.5px var(--tb-line), var(--tb-shadow);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-}
-.ai-flowcard header { display: flex; align-items: center; gap: 10px; font-size: 14px; }
-.ai-flowcard header b { font-weight: 800; }
-.ai-flowcard-tag { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #ffebdd; color: #a8500f; white-space: nowrap; }
-.ai-flowcard-ic { width: 32px; height: 32px; border-radius: 50%; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; background: var(--tb-dot-bg); box-shadow: inset 0 0 0 1.5px var(--tb-dot-ring); color: var(--tb-deep); }
-.ai-flowcard-ic svg { width: 17px; height: 17px; }
-.ai-flowcard-ic.sm { width: 28px; height: 28px; }
-.ai-flowcard ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); position: relative; }
-.ai-flowcard ol::before { content: ''; position: absolute; left: 8%; right: 8%; top: 14px; height: 3px; border-radius: 2px; background: var(--tb-dot-bg); }
-.ai-flowcard li { position: relative; }
-.ai-flowcard li button { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0; cursor: pointer; font-family: var(--font-body); font-weight: 600; font-size: 12px; color: var(--tb-sec); }
-.ai-flowcard li i {
-  font-style: normal; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;
-  background: var(--tb-panel-solid); box-shadow: inset 0 0 0 2px var(--tb-dot-ring); color: var(--tb-sec); position: relative; z-index: 1;
-}
-.ai-flowcard li.is-done i { background: #b544b5; box-shadow: none; color: #fff; }
-.ai-flowcard li.is-now i { background: linear-gradient(88deg, #b544b5, #661466); box-shadow: 0 0 0 5px #ae40ae33; color: #fff; }
-.ai-flowcard li.is-now button, .ai-flowcard li.is-done button { color: var(--tb-ink); }
-.ai-flowcard-now { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 18px; background: var(--tb-chip); }
-.ai-flowcard-now b { display: block; font-size: 13px; font-weight: 700; }
-.ai-flowcard-now small { display: block; font-size: 11.5px; color: var(--tb-sec); }
+
 .constellation-page.ai-immersive { --tb-panel-solid: #3a1c58; }
 .constellation-page.is-map-light { --tb-panel-solid: #ffffff; }
-.constellation-page.is-compact .ai-flowcard { order: 8; width: auto; min-width: 0; }
-.constellation-page.is-compact .ai-flowcard-tag { display: none; }
-.constellation-page.is-compact .ai-kb-btn { order: 9; right: auto; }
-.constellation-page.is-compact .ai-flowcard li button { font-size: 10px; gap: 5px; }
-.constellation-page.is-compact .ai-flowcard li i { width: 26px; height: 26px; }
-.constellation-page.is-compact .ai-flowcard ol::before { top: 12px; }
+
 @media (max-width: 1180px) { .agent-search { top: 72px; right: 20px; width: 240px; } } /* a narrow window has no room beside the section capsule: the search drops under «До Hub» */
 
 /* the live requests of the creative department under the demo task of «Рух задачі по відділах» */
-.ai-flowcard-real { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--tb-dot-bg); }
-.ai-flowcard-real > b { font-size: 12.5px; font-weight: 800; }
-.ai-flowcard-real ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow: auto; }
-.ai-flowcard .ai-flowcard-real li button { width: 100%; display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; border: 0; background: var(--tb-chip); border-radius: 14px; padding: 6px 10px; cursor: pointer; text-align: left; color: var(--tb-ink); font: inherit; }
-.ai-flowcard-req { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.ai-flowcard-req b { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-flowcard-req small { font-size: 11px; color: var(--tb-sec); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-flowcard-chip { font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #3fc77a33; color: #0e4d2b; white-space: nowrap; }
-.ai-flowcard-chip.is-review { background: #f5c23844; color: #4d3a00; }
-.ai-flowcard-chip.is-problem { background: #ef4d5e33; color: #5a0e18; }
-.ai-flowcard-real em { font-style: normal; font-size: 11px; font-weight: 800; color: var(--tb-sec); }
 
 /* «До Hub» is the main way out of the section: the one plum-gradient button of the top bar (Hub style: gradient = the main action), day and night alike */
 .constellation-page .constellation-exit.ai-pill, .constellation-page .constellation-exit.ai-pill:hover {
@@ -451,3 +232,43 @@
 .constellation-page.ai-immersive:not(.is-map-light) .constellation-exit.ai-pill, .constellation-page.ai-immersive:not(.is-map-light) .constellation-exit.ai-pill:hover {
   box-shadow: 0 0 0 4px #ae40ae44, 0 10px 20px -8px #000000aa;
 }
+
+
+/* ---------------- the section menu, glass ribbon (owner's pick 2026-11-10): one glass pill, every item = ring medallion + label, the active item has a light line under it ---------------- */
+.constellation-page .constellation-section-nav { height: 52px; padding: 4px; gap: 2px; background: var(--tb-panel); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 24px rgba(138, 77, 255, .25), var(--tb-shadow); }
+.constellation-page .constellation-section-tab { gap: 9px; padding: 0 16px 0 7px; font-size: 14px; font-weight: 500; }
+.constellation-page .constellation-section-tab .cst-ico { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--tb-chip); box-shadow: inset 0 0 0 1.5px var(--tb-line); color: var(--tb-ink); }
+.constellation-page .constellation-section-tab .cst-ico svg { width: 19px; height: 19px; }
+.constellation-page .constellation-section-tab.active { background: rgba(255, 255, 255, .08); box-shadow: none; color: var(--tb-ink); font-weight: 600; }
+.constellation-page.is-map-light .constellation-section-tab.active { background: rgba(102, 20, 102, .08); }
+.constellation-page .constellation-section-tab.active .cst-ico { box-shadow: inset 0 0 0 1.5px #c76dff, 0 0 12px rgba(199, 109, 255, .55); color: #fff; background: rgba(199, 109, 255, .22); }
+.constellation-page.is-map-light .constellation-section-tab.active .cst-ico { color: #661466; box-shadow: inset 0 0 0 1.5px #b544b5, 0 0 10px rgba(181, 68, 181, .35); background: #f1dcf5; }
+.constellation-page .constellation-section-tab.active::after { content: ""; position: absolute; left: 16%; right: 16%; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, #c76dff, transparent); box-shadow: 0 0 10px #c76dff; }
+.constellation-page.is-map-light .constellation-section-tab.active::after { background: linear-gradient(90deg, transparent, #b544b5, transparent); box-shadow: 0 0 8px #b544b5; }
+/* a narrow window: only the active item keeps its label */
+.constellation-page.is-compact .constellation-section-nav { height: 48px; }
+.constellation-page.is-compact .constellation-section-tab { padding: 0 7px; gap: 0; }
+.constellation-page.is-compact .constellation-section-tab:not(.active) .cst-lab { display: none; }
+.constellation-page.is-compact .constellation-section-tab.active { gap: 7px; padding: 0 12px 0 7px; }
+.constellation-page.is-compact .constellation-section-tab .cst-ico { width: 32px; height: 32px; }
+
+
+/* ---------------- the tools ribbon (owner's pick 2026-11-10): search icon that opens into a field | settings medallion | round «До Hub», one glass pill ---------------- */
+.constellation-page .constellation-tools { position: absolute; top: 16px; right: 20px; z-index: 40; display: flex; align-items: center; gap: 4px; height: 52px; padding: 6px; border-radius: 999px; background: var(--tb-panel); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 24px rgba(138, 77, 255, .25), var(--tb-shadow); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.constellation-page .cst-sep { flex: none; width: 1px; height: 22px; background: var(--tb-line); }
+.constellation-page .cst-tool { flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer; background: var(--tb-chip); color: var(--tb-ink); box-shadow: inset 0 0 0 1.5px var(--tb-line); }
+.constellation-page .cst-tool:focus-visible, .constellation-page .cst-hub:focus-visible { outline: 3px solid #d9a6ff; outline-offset: 2px; }
+.constellation-page .cst-gear.active { color: #fff; background: rgba(199, 109, 255, .22); box-shadow: inset 0 0 0 1.5px #c76dff, 0 0 12px rgba(199, 109, 255, .55); }
+.constellation-page .cst-hub { flex: none; width: 40px; height: 40px; border-radius: 50%; display: inline-grid; place-items: center; text-decoration: none; color: #fff; background: linear-gradient(135deg, #b544b5, #661466); box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.constellation-page .constellation-tools .agent-search { position: relative; top: auto; right: auto; width: auto; height: 40px; padding: 0; display: flex; align-items: center; background: none; border: 0; box-shadow: none; }
+.constellation-page .constellation-tools .agent-search-field { display: flex; align-items: center; gap: 9px; height: 40px; width: clamp(170px, 15vw, 230px); padding: 0 14px; border-radius: 999px; background: var(--tb-chip); box-shadow: inset 0 0 0 1.5px var(--tb-line); animation: cstSearchOpen .18s ease-out; }
+@keyframes cstSearchOpen { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .constellation-page .constellation-tools .agent-search-field { animation: none; } }
+.constellation-page .constellation-tools .agent-search-results { top: calc(100% + 14px); }
+/* a narrow window has no room beside the menu: the ribbon drops under it */
+@media (max-width: 1180px) { .constellation-page .constellation-tools { top: 76px; } }
+.constellation-page.is-compact .constellation-tools { top: 12px; right: 12px; }
+/* the lamp on the gear: amber = something to check, red = a problem (the planner, a key or stuck work) */
+.cst-gear { position: relative; overflow: visible; }
+.constellation-gear-lamp { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #2a1340; background: #ffb347; }
+.constellation-gear-lamp.is-bad { background: #ff5a6a; box-shadow: 0 0 8px #ff5a6a; }

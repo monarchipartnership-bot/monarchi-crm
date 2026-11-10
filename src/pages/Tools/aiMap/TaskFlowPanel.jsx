@@ -1,60 +1,89 @@
-// "Рух задачі по відділах": the demo task going through the chain of departments, in step with the demo van on the 3D map.
-// It is a demonstration only (the tag says so): no real task is behind it.
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../../../lib/supabaseClient';
+import { KIND_LABEL, PATH_STATE_LABEL, buildTaskPath, carrierLabel, currentStep } from '../../../lib/agents/mapTasks';
+import './TaskFlowPanel.css';
 
-const CHAIN = [
-  { key: 'client-research', short: 'Стратегія' },
-  { key: 'client-creative', short: 'Креативи' },
-  { key: 'client-ads', short: 'Реклама' },
-  { key: 'client-reports', short: 'Звіти' },
-];
+// The tasks of one car, for its path: a cycle of a request → the tasks of the request; a scheduled cycle → the tasks of the operation since the cycle began;
+// open work outside a cycle → the tasks of the operation of the last two weeks.
+async function fetchPath(car) {
+  let q = supabase.from('ag_tasks').select('agent_id, status, output, created_at').order('created_at', { ascending: true }).limit(300);
+  if (car.requestId) q = q.eq('request_id', car.requestId);
+  else if (car.campaignId != null) q = q.eq('campaign_id', car.campaignId).gte('created_at', car.cycleId && car.since ? car.since : new Date(Date.now() - 14 * 86400000).toISOString());
+  else return null; // an agent without an operation: there is no chain to show
+  const [tasks, agents] = await Promise.all([q, supabase.from('ag_agents').select('id, role, name')]);
+  if (tasks.error || agents.error) throw tasks.error || agents.error;
+  return buildTaskPath({ tasks: tasks.data || [], agents: agents.data || [] });
+}
 
-const PARCEL = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 3 4 7v10l8 4 8-4V7z" /><path d="M4 7l8 4 8-4M12 11v10" />
-  </svg>
-);
+// «Рух задач» (spec 2026-11-02, §2): the list of every active task of the map and the chain of the chosen one — which agents it passed, where it stands now, what is ahead.
+// Choosing a row chooses its car on the map (and the other way round).
+//   tasks: the carriers of the map (lib/agents/mapTasks.js)  selectedId / onSelect(id | null)  onFocus(agentKey): fly the camera there  onOpenOperation(campaignId)
+export default function TaskFlowPanel({ tasks = [], selectedId = null, onSelect, onFocus, onOpenOperation }) {
+  const [open, setOpen] = useState(false);
+  const [path, setPath] = useState(undefined); // undefined = loading, null = no chain
+  const car = useMemo(() => tasks.find((t) => t.id === selectedId) || null, [tasks, selectedId]);
+  const carKey = car ? `${car.id}:${car.kind}:${car.count}:${car.progress ?? ''}` : '';
 
-const REQUEST_STATUS = { running: 'В роботі', review: 'Чекає вашої перевірки', problem: 'Помилка' };
+  useEffect(() => { if (selectedId) setOpen(true); }, [selectedId]); // a click on a car on the map opens the panel
+  useEffect(() => {
+    if (!car) { setPath(undefined); return undefined; }
+    let alive = true;
+    setPath(undefined);
+    fetchPath(car).then((p) => { if (alive) setPath(p); }).catch(() => { if (alive) setPath(null); });
+    return () => { alive = false; };
+  }, [carKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-export default function TaskFlowPanel({ step, agentDepts, onSelectDept, requests = [], onOpenRequest = null }) {
-  const cur = CHAIN[step % CHAIN.length];
-  const curLabel = agentDepts[cur.key]?.label || cur.short;
+  const here = path ? currentStep(path) : -1;
+  const attention = tasks.filter((t) => t.kind === 'failed' || t.kind === 'review').length;
+
+  if (!open) {
+    return (
+      <button type="button" className={'tfp-pill' + (attention ? ' is-warn' : '')} onClick={() => setOpen(true)} aria-expanded="false" data-ai-safe>
+        <i aria-hidden="true" />Рух задач<b>{tasks.length}</b>{attention > 0 && <em>{attention} чекають вас</em>}
+      </button>
+    );
+  }
   return (
-    <section className="ai-flowcard" aria-label="Рух задачі по відділах" data-ai-safe>
-      <header>
-        <span className="ai-flowcard-ic">{PARCEL}</span>
-        <b>Рух задачі по відділах</b>
-        <em className="ai-flowcard-tag">демо-рух, не реальні задачі</em>
+    <aside className="tfp ai-panel" role="region" aria-label="Рух задач" data-ai-safe>
+      <header className="tfp-head">
+        <b>Рух задач</b><span>{tasks.length ? `активних: ${tasks.length}` : 'зараз нічого не в роботі'}</span>
+        <button type="button" className="tfp-x" onClick={() => { setOpen(false); onSelect?.(null); }} aria-label="Згорнути">&times;</button>
       </header>
-      <ol>
-        {CHAIN.map((d, i) => (
-          <li key={d.key} className={i < step ? 'is-done' : i === step ? 'is-now' : ''}>
-            <button type="button" onClick={() => onSelectDept(d.key)} aria-label={`${d.short}: показати відділ`}>
-              <i>{i < step ? '✓' : i + 1}</i><span>{d.short}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-      <div className="ai-flowcard-now">
-        <span className="ai-flowcard-ic sm">{PARCEL}</span>
-        <span><b>Зараз: {curLabel}</b><small>Демо-задача «Запит клієнта на кампанію»</small></span>
-      </div>
-      {requests.length > 0 && (
-        <div className="ai-flowcard-real">
-          <b>Живі запити відділу креативів</b>
-          <ul>
-            {requests.map((r) => (
-              <li key={r.id}>
-                <button type="button" onClick={() => onOpenRequest?.(r)} title="Відкрити сторінку Агента креативний стратег">
-                  <span className="ai-flowcard-req"><b>{r.client || 'Клієнт'}</b><small>{r.title}</small></span>
-                  <span className={'ai-flowcard-chip is-' + r.status}>{REQUEST_STATUS[r.status] || r.status}</span>
-                  {r.total > 0 && <em>{r.done} з {r.total}</em>}
-                </button>
-              </li>
-            ))}
-          </ul>
+      {!tasks.length && <p className="tfp-empty">Коли операція працює, її завдання зʼявляється тут і на мапі: видно, у якого агента воно зараз і що далі.</p>}
+      {tasks.length > 0 && (
+        <ul className="tfp-list">
+          {tasks.map((t) => (
+            <li key={t.id}>
+              <button type="button" className={'tfp-row k-' + t.kind + (t.id === selectedId ? ' is-on' : '')} aria-pressed={t.id === selectedId} onClick={() => { onSelect?.(t.id === selectedId ? null : t.id); if (t.id !== selectedId) onFocus?.(t.agentKey); }}>
+                <i aria-hidden="true" /><span>{carrierLabel(t)}</span><small>{KIND_LABEL[t.kind]}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {car && (
+        <div className="tfp-path">
+          <div className="tfp-path-head"><b>{car.project || car.campaign || 'Завдання'}</b>{car.cycleNumber ? <span>цикл {car.cycleNumber} · {Math.round((car.progress || 0) * 100)}%</span> : null}</div>
+          {path === undefined && <p className="tfp-empty">Завантажую шлях…</p>}
+          {path === null && <p className="tfp-empty">Це завдання агента без операції: ланцюжка немає.</p>}
+          {path && !path.length && <p className="tfp-empty">Кроків ще немає.</p>}
+          {path && path.length > 0 && (
+            <ol className="tfp-steps">
+              {path.map((s, i) => (
+                <li key={s.role + i} className={'s-' + s.state + (i === here ? ' is-here' : '')}>
+                  <i aria-hidden="true" />
+                  <button type="button" disabled={!s.agentKey} onClick={() => s.agentKey && onFocus?.(s.agentKey)} title={s.agentKey ? 'Показати на мапі' : undefined}>{s.name}</button>
+                  <small>{i === here ? `зараз тут · ${PATH_STATE_LABEL[s.state]}` : PATH_STATE_LABEL[s.state]}</small>
+                </li>
+              ))}
+            </ol>
+          )}
+          <div className="tfp-actions">
+            <button type="button" className="tfp-btn" onClick={() => onFocus?.(car.agentKey)}>Показати на мапі</button>
+            {car.campaignId != null && <button type="button" className="tfp-btn is-primary" onClick={() => onOpenOperation?.(car.campaignId)}>Відкрити операцію</button>}
+          </div>
         </div>
       )}
-    </section>
+    </aside>
   );
 }

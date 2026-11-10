@@ -9,6 +9,7 @@ import { ASSET_KINDS, CTA_MODES, FRESH_DAYS, INPUT_FIELDS, PROFILE_FIELDS, input
 import { agentsNeeding, filledFields, readinessByMode } from '../../../lib/agents/agentRequirements';
 import { MODES, MODE_ORDER } from '../../../lib/agents/campaignModes';
 import { HubTitle } from '../hubIcons';
+import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
 import '../../../styles/projectCreative.css';
 
 const KIND_OPTIONS = Object.entries(ASSET_KINDS).map(([value, label]) => ({ value, label }));
@@ -26,6 +27,7 @@ export default function ProjectCreativeTab({ projectId }) {
   const [kind, setKind] = useState('product');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const notifyMaterials = useCallback((text, isError) => setError(isError ? text : ''), []); // «Готові матеріали»: only a failure is told here, a success is seen in the list
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState(null); // { key, text } of the field being filled by hand
   const [accounts, setAccounts] = useState([]);
@@ -128,11 +130,11 @@ export default function ProjectCreativeTab({ projectId }) {
     <div className="pcr-wrap">
       {error && <p className="pcr-error" role="alert">{error}</p>}
 
-      <section className="pcr-card" aria-label="Готовність до кампаній">
+      <section className="pcr-card" aria-label="Готовність до операцій">
         <div className="pcr-head">
           <div>
-            <HubTitle icon="users">Готовність до кампаній</HubTitle>
-            <p className="pcr-sub">Чого агентам ще не вистачає, щоб кампанія кожного типу працювала як слід. Обовʼязкове без якого агент не зробить нічого корисного, бажане покращує результат.</p>
+            <HubTitle icon="users">Готовність до операцій</HubTitle>
+            <p className="pcr-sub">Чого агентам ще не вистачає, щоб операція кожного типу працювала як слід. Обовʼязкове без якого агент не зробить нічого корисного, бажане покращує результат.</p>
           </div>
         </div>
         <ul className="pcr-ready">
@@ -154,11 +156,16 @@ export default function ProjectCreativeTab({ projectId }) {
         </ul>
       </section>
 
+      <Deliverables
+        light projectId={projectId} notify={notifyMaterials}
+        head={<div className="pcr-head"><div><HubTitle icon="file">Готові матеріали</HubTitle><p className="pcr-sub">Усе, що агенти зробили для цього клієнта в усіх операціях: креативи, стратегії, звіти, аналізи. Схваліть, поверніть із причиною, виправте текст або завантажте.</p></div></div>}
+      />
+
       <section className="pcr-card" aria-label="Про клієнта">
         <div className="pcr-head">
           <div>
             <HubTitle icon="users">Про клієнта</HubTitle>
-            <p className="pcr-sub">Це розповідаєте ви: більше ніхто цього не знає. Усі агенти беруть ці дані звідси, тому їх не треба повторювати в кожній кампанії.</p>
+            <p className="pcr-sub">Це розповідаєте ви: більше ніхто цього не знає. Усі агенти беруть ці дані звідси, тому їх не треба повторювати в кожній операції.</p>
           </div>
         </div>
         <ul className="pcr-inputs">{renderRows(PROFILE_FIELDS, () => 'Заповнюється тут')}</ul>

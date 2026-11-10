@@ -188,3 +188,46 @@
 /* a button that spends money (a paid generation): amber, with the wallet icon, so it is not taken for a plain «OK» */
 .ckp-btn.is-money { background: linear-gradient(100deg, #F5B04A, #C27A0B); color: #fff; box-shadow: 0 0 0 4px #f5b04a40, 0 10px 20px -8px #a8650b99; font-weight: 700; }
 .ckp-arow.is-stack { grid-template-columns: 28px minmax(0, 1fr); row-gap: 6px; } .ckp-arow.is-stack .ckp-ac2 { grid-column: 2; justify-content: space-between; }
+
+
+/* ---------- «Активні проєкти» on the map, map style (owner's pick 2026-11-10): ring medallion header, capsule rows, plum capsule button, collapsed = a capsule with chips ---------- */
+.ckp-card.apc { --apc-acc: #c76dff; padding: 12px; box-shadow: inset 0 0 0 1.5px var(--ck-ln), 0 0 26px rgba(138, 77, 255, .25), var(--tb-shadow, 0 18px 44px rgba(0, 0, 0, .45)); }
+.constellation-page.is-map-light .ckp-card.apc { --apc-acc: #b544b5; }
+.apc .apc-med { position: relative; flex: none; display: grid; place-items: center; color: var(--ck-ink); }
+.apc .apc-med .apc-ring { position: absolute; inset: 0; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--apc-acc) 70%, transparent)); }
+.ckp-card.apc.is-collapsed { width: auto; min-width: 0; padding: 6px 8px 6px 6px; border-radius: 999px; gap: 0; }
+.apc.is-collapsed .ckp-ph { gap: 10px; }
+.apc.is-collapsed .ckp-ph h3 { flex: none; font-size: 14px; }
+.apc .ckp-row { grid-template-columns: 42px minmax(0, 1fr) auto; padding: 6px 14px 6px 6px; border-radius: 999px; }
+.apc .ckp-row .ckp-av { width: 42px; height: 42px; border-radius: 50%; box-shadow: none; }
+.apc .ckp-all { height: 38px; padding: 0 16px; justify-content: center; gap: 8px; border-radius: 999px; background: linear-gradient(135deg, #8a4dff, #6a35d8); color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 0 14px rgba(138, 77, 255, .5); }
+.constellation-page.is-compact .ckp-card.apc.is-collapsed { align-self: flex-start; }
+.ckp-create { height: 38px; padding: 0 18px; border: 0; border-radius: 999px; background: linear-gradient(100deg, #b544b5, #661466); color: #fff; font: 700 13.5px 'Onest', sans-serif; cursor: pointer; box-shadow: 0 0 0 4px #ae40ae33, 0 10px 20px -8px #66146699; margin-left: auto; }
+.ckp-create:focus-visible { outline: 3px solid #d9a6ff; outline-offset: 2px; }
+
+
+/* ---------- the page «Проєкти», map style (owner's pick 2026-11-10): heading + ring counters | glass ribbon filter | capsule «Створити проєкт» | glass cards with a bar and a coloured frame when something waits ---------- */
+.ckp-page { --pg-acc: #c76dff; --pg-glass: var(--tb-panel, rgba(32, 18, 60, .84)); --pg-warn: #FFB547; --pg-bad: #FF8A8A; }
+.constellation-page.is-map-light .ckp-page { --pg-acc: #b544b5; --pg-warn: #A8650B; --pg-bad: #C23232; }
+.ckp-page .ckp-pg-head { align-items: center; margin-bottom: 20px; }
+.ckp-pg-title { flex: 1; min-width: 260px; }
+.ckp-pg-kicker { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--ck-sec); }
+.ckp-page .ckp-pg-head h2 { margin: 4px 0 6px; font-size: 32px; line-height: 1.1; font-weight: 800; letter-spacing: -.5px; }
+.ckp-pg-rings { display: flex; gap: 12px; }
+.ckp-ringc { width: 86px; height: 86px; border-radius: 50%; display: grid; place-content: center; text-align: center; line-height: 1.1; background: var(--pg-glass); box-shadow: inset 0 0 0 1.5px var(--pg-acc), 0 0 16px color-mix(in srgb, var(--pg-acc) 35%, transparent); }
+.ckp-ringc.is-warn { box-shadow: inset 0 0 0 1.5px var(--pg-warn), 0 0 16px color-mix(in srgb, var(--pg-warn) 30%, transparent); }
+.ckp-ringc b { display: block; font-size: 22px; font-weight: 800; }
+.ckp-ringc small { font-size: 10.5px; color: var(--ck-sec); }
+.ckp-pg-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.ckp-ribbon { display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--pg-glass); box-shadow: inset 0 0 0 1.5px var(--ck-ln); }
+.ckp-ribbon button { position: relative; height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--ck-ink); font: 500 13px 'Onest', system-ui, sans-serif; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.ckp-ribbon button em { font-style: normal; font-size: 11.5px; color: var(--ck-sec); background: var(--ck-chip); padding: 0 7px; border-radius: 99px; }
+.ckp-ribbon button.is-on { background: color-mix(in srgb, var(--ck-ink) 8%, transparent); font-weight: 600; }
+.ckp-ribbon button.is-on::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--pg-acc), transparent); box-shadow: 0 0 10px var(--pg-acc); }
+.ckp-page .ckp-create { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px 0 12px; background: linear-gradient(135deg, #8a4dff, #6a35d8); box-shadow: 0 0 14px rgba(138, 77, 255, .55); margin-left: auto; }
+.ckp-page .ckp-pcard { border-radius: 24px; background: color-mix(in srgb, var(--ck-ink) 5%, transparent); box-shadow: inset 0 0 0 1.5px var(--ck-ln); cursor: pointer; }
+.ckp-page .ckp-pcard.is-warn { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--pg-warn) 60%, transparent), 0 0 18px color-mix(in srgb, var(--pg-warn) 22%, transparent); }
+.ckp-page .ckp-pcard.is-bad { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--pg-bad) 60%, transparent), 0 0 18px color-mix(in srgb, var(--pg-bad) 22%, transparent); }
+.ckp-page .ckp-pcard .ckp-av { border-radius: 50%; box-shadow: none; }
+.ckp-page .ckp-prog i { background: linear-gradient(90deg, #8a4dff, #c76dff); box-shadow: 0 0 8px rgba(199, 109, 255, .5); }
+@media (max-width: 760px) { .ckp-pg-rings { width: 100%; } .ckp-page .ckp-create { margin-left: 0; } }

@@ -5,7 +5,7 @@ export const ACTIVE_PROJECTS = [
   { id: 14, name: 'Осінній розпродаж', client: 'Mellow Diamond', modeLabel: 'Креативи', stageLabel: 'Готово до перегляду', progress: 0.8, waiting: 5, tone: 'attention', updatedAt: ago(4) },
   { id: 21, name: 'Нова лінійка', client: 'Auto Plaza', modeLabel: 'Креативи', stageLabel: 'Креативщик: помилка кроку', progress: 0.6, waiting: 1, tone: 'problem', updatedAt: ago(35) },
   { id: 9, name: 'Позиціонування', client: 'Nordic Pet', modeLabel: 'Стратегія', stageLabel: 'Стратег чекає відповіді', progress: 0.2, waiting: 1, tone: 'attention', updatedAt: ago(70) },
-  { id: 7, name: 'Весняна кампанія', client: 'Salon-Fresh', modeLabel: 'Повна кампанія', stageLabel: 'Копірайтер працює', progress: 0.45, waiting: 0, tone: 'ok', updatedAt: ago(2) },
+  { id: 7, name: 'Весняна операція', client: 'Salon-Fresh', modeLabel: 'Повна операція', stageLabel: 'Копірайтер працює', progress: 0.45, waiting: 0, tone: 'ok', updatedAt: ago(2) },
   { id: 5, name: 'Оптимізація жовтня', client: 'Bakery Lviv', modeLabel: 'Аналіз і оптимізація', stageLabel: 'Контроль якості', progress: 0.9, waiting: 0, tone: 'ok', updatedAt: ago(12) },
 ];
 
@@ -62,7 +62,7 @@ export const COCKPIT_WAITING = {
 };
 
 export const COCKPIT_CALM = {
-  id: 7, name: 'Весняна кампанія', client: 'Salon-Fresh', modeLabel: 'Повна кампанія', tone: 'ok', waiting: 0, status: 'active', activeRequestId: 7,
+  id: 7, name: 'Весняна операція', client: 'Salon-Fresh', modeLabel: 'Повна операція', tone: 'ok', waiting: 0, status: 'active', activeRequestId: 7,
   stages: [
     { key: 'strategy', label: 'Стратег', state: 'done', note: 'готово' },
     { key: 'brief', label: 'ТЗ', state: 'done', note: 'готово' },
@@ -74,7 +74,7 @@ export const COCKPIT_CALM = {
   currentStageKey: 'copy',
   attention: [],
   requests: [
-    { id: 7, title: 'Весняна кампанія', status: 'running', statusLabel: 'працює', updatedAt: ago(2), creatives: { total: 0, review: 0, approved: 0, failed: 0 } },
+    { id: 7, title: 'Весняна операція', status: 'running', statusLabel: 'працює', updatedAt: ago(2), creatives: { total: 0, review: 0, approved: 0, failed: 0 } },
     { id: 6, title: 'Бренд-платформа', status: 'approved', statusLabel: 'затверджено', updatedAt: ago(60 * 24 * 4), creatives: { total: 0, review: 0, approved: 0, failed: 0 } },
   ],
   spend: { model: 0.68, higgsfield: 2.42, total: 3.1, currency: 'USD' },

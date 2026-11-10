@@ -39,7 +39,7 @@ export const CAMPAIGN_ROLES = [
   { role: 'audience_research', name: 'Дослідник аудиторії', short: 'хто купує і чому', stage: 'research', row: 2, platforms: ['*'], trigger: 'initial', registry: 'audience-research-agent', data: [], schedule: null,
     description: 'Описує аудиторії, на які працюватимуть кампанії, і гіпотези, які варто перевірити.',
     fields: [] },
-  { role: 'marketing_strategist', name: 'Маркетинговий стратег', short: 'стратегія кампанії', stage: 'strategy', row: 1, platforms: ['*'], trigger: 'upstream', registry: 'marketing-strategist', data: [], schedule: null,
+  { role: 'marketing_strategist', name: 'Маркетинговий стратег', short: 'стратегія операції', stage: 'strategy', row: 1, platforms: ['*'], trigger: 'upstream', registry: 'marketing-strategist', data: [], schedule: null,
     description: 'Зводить дослідження й цілі в робочу стратегію: цілі, аудиторії, роль каналів, перші 30 днів.',
     fields: [KPI] },
   { role: 'meta_analyst', name: 'Аналітик Meta Ads', short: 'що змінилось у Meta і чому', stage: 'analysis', row: 0, platforms: ['meta'], trigger: 'schedule', registry: 'meta-ads-analyst', schedule: sched(1, '09:00'),

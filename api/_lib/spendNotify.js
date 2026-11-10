@@ -28,7 +28,7 @@ export async function runSpendNotices({ db, telegram = null, now = new Date(), s
   const totals = new Map(spendRows.map((r) => [r.campaign_id, { claude: Number(r.claude_usd) || 0, higgsfield: Number(r.higgsfield_usd) || 0, total: (Number(r.claude_usd) || 0) + (Number(r.higgsfield_usd) || 0) }]));
   const projectIds = [...new Set(campaigns.map((c) => c.project_id).filter(Boolean))];
   const projects = projectIds.length ? must(await db.from('projects').select('id, name').in('id', projectIds)) : [];
-  campaigns.forEach((c) => { const p = projects.find((x) => x.id === c.project_id); c.label = [p?.name, c.name].filter(Boolean).join(' — ') || `Кампанія ${c.id}`; });
+  campaigns.forEach((c) => { const p = projects.find((x) => x.id === c.project_id); c.label = [p?.name, c.name].filter(Boolean).join(' — ') || `Операція ${c.id}`; });
 
   for (const n of dueStepNotices(campaigns, totals)) {
     // claim the step first: if another run took it already, nothing is sent twice

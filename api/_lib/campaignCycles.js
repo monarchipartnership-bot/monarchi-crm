@@ -67,13 +67,13 @@ export async function cappedCampaigns(db) {
   return new Set(withCap.filter((c) => capReached(c, total.get(c.id) || 0)).map((c) => String(c.id)));
 }
 
-export const CAP_MESSAGE = 'Кампанія досягла ліміту витрат: нові запуски зупинено, поки ви не підвищите ліміт.';
+export const CAP_MESSAGE = 'Операція досягла ліміту витрат: нові запуски зупинено, поки ви не підвищите ліміт.';
 
 // ---------------------------------------------------------------------------------------------------- what the person changes
 async function campaignAgent(db, agentId) {
   const agent = must(await db.from('ag_agents').select('*').eq('id', agentId).maybeSingle(), 'agent');
   if (!agent) throw new Error('Агента не знайдено.');
-  if (agent.team !== CAMPAIGN_TEAM) throw new Error('Розклад і режим змінюються в агентах кампанії.');
+  if (agent.team !== CAMPAIGN_TEAM) throw new Error('Розклад і режим змінюються в агентах операції.');
   return agent;
 }
 
@@ -99,7 +99,7 @@ export async function setAgentMode(ctx, agentId, mode) {
 
 async function loadCampaign(db, campaignId) {
   const c = must(await db.from('ag_campaigns').select('id, config').eq('id', campaignId).maybeSingle(), 'campaign');
-  if (!c) throw new Error('Кампанію не знайдено.');
+  if (!c) throw new Error('Операцію не знайдено.');
   return c;
 }
 

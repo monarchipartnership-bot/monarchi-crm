@@ -52,7 +52,7 @@ function RunDialog({ agent, prompts, onClose, onRun }) {
       )}
     >
       <form id="smm-run-form" className="smm-form" onSubmit={submit}>
-        <p className="smm-note smm-field--wide">{RUN_NOTE[agent.role] || 'Агент прочитає дані кампанії та результати агентів, від яких залежить, і складе звіт. Це займає до двох хвилин.'}{!agent.enabled ? ' Агент вимкнений: це разовий запуск вручну, розклад він не вмикає.' : ''}</p>
+        <p className="smm-note smm-field--wide">{RUN_NOTE[agent.role] || 'Агент прочитає дані операції та результати агентів, від яких залежить, і складе звіт. Це займає до двох хвилин.'}{!agent.enabled ? ' Агент вимкнений: це разовий запуск вручну, розклад він не вмикає.' : ''}</p>
         {agent.role === 'strategist' && (
           <>
             <div className="smm-field"><label>Тиждень починається (понеділок)</label><DatePicker value={weekStart} onChange={setWeekStart} /></div>

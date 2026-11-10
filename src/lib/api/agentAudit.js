@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { cleanApprovers } from '../agents/rights';
+import { cleanNotices } from '../agents/settingsForm';
 
 const must = ({ data, error }) => { if (error) throw error; return data; };
 
@@ -16,6 +17,19 @@ export async function saveApprovers(list) {
   const approvers = cleanApprovers(list);
   must(await supabase.from('ai_agent_settings').update({ approvers, updated_at: new Date().toISOString() }).eq('id', 1).select());
   return approvers;
+}
+
+// The whole settings row (notices, approvers, the heartbeat of the planner) or null when it does not exist yet.
+export async function fetchAgentSettings() {
+  return must(await supabase.from('ai_agent_settings').select('*').eq('id', 1).maybeSingle()) || null;
+}
+
+// Saves the «Сповіщення» form (settingsForm.cleanNotices); returns the saved row.
+export async function saveNotices(draft, email) {
+  const patch = { ...cleanNotices(draft), updated_by: String(email || '').toLowerCase() || null, updated_at: new Date().toISOString() };
+  const rows = must(await supabase.from('ai_agent_settings').update(patch).eq('id', 1).select());
+  if (!rows?.length) throw new Error('Рядок налаштувань не знайдено: застосуйте міграції агентів.');
+  return rows[0];
 }
 
 // The journal, newest first. filters: { campaignId, projectId, actor, action, from (ISO), to (ISO), limit }

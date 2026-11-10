@@ -14,12 +14,12 @@ export default function DeptProjects({ agent, team, clients, tasks, reload, noti
   };
   const patch = (c, p, okText) => run(c.id, () => updateClientLink(c.id, p), okText);
   const runsAlone = agent.role === 'creative_analyst'; // the others work on the requests of the client (started in the campaign), not on their own
-  const clientName = (c) => c.project?.name || c.campaign?.name || `Кампанія ${c.campaign_id}`;
+  const clientName = (c) => c.project?.name || c.campaign?.name || `Операція ${c.campaign_id}`;
 
   return (
     <section className="smm-block">
       <h3>Проєкти агента ({clients.length})</h3>
-      <p className="smm-muted">Агент працює з клієнтами зверху вниз. Порядок рядків це пріоритет. Нового клієнта підключає майстер створення кампанії.</p>
+      <p className="smm-muted">Агент працює з клієнтами зверху вниз. Порядок рядків це пріоритет. Нового клієнта підключає майстер створення операції.</p>
       {!clients.length && <p className="smm-muted">Клієнтів ще немає.</p>}
       {clients.length > 0 && (
         <div className="dpt-table-wrap">
@@ -53,7 +53,7 @@ export default function DeptProjects({ agent, team, clients, tasks, reload, noti
                     <td>
                       {runsAlone
                         ? <button type="button" className="smm-btn" disabled={busy === c.id || !c.enabled} onClick={run(c.id, async () => { await runForClient(agent.id, c.campaign_id); kickQueue().then(() => reload()).catch(() => {}); }, 'Аналіз запущено.')}>Запустити зараз</button>
-                        : <small className="smm-muted">за запитом у кампанії</small>}
+                        : <small className="smm-muted">за запитом у операції</small>}
                     </td>
                   </tr>
                 );

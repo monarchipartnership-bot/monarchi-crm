@@ -6,18 +6,20 @@ import { PLATFORMS } from '../../../lib/agents/campaignTeam';
 import { fmtDateTime } from '../../Smm/agentUi';
 import CampaignPage, { CAMPAIGN_STATUS } from './CampaignPage';
 import CreateCampaignWizard from './CreateCampaignWizard';
+import { CampaignCalendar, FromTemplateDialog } from './OperationTools';
 import '../../../styles/aiAgentsSection.css';
 import '../../../styles/campaignsSection.css';
 
-// «Кампанії»: the teams of agents that work on the campaigns of the clients. Create a campaign (a window with the chain of agents),
+// «Операції»: the teams of agents that work on the campaigns of the clients. Create a campaign (a window with the chain of agents),
 // the current campaigns, the archive.
-export default function CampaignsSection({ openCampaignId = null, openNewRequest = false }) {
+export default function CampaignsSection({ openCampaignId = null, openNewRequest = false, startProjectId = null }) {
   const [campaigns, setCampaigns] = useState(null);
   const [projects, setProjects] = useState([]);
   const [agents, setAgents] = useState([]);
   const [failed, setFailed] = useState({});
-  const [view, setView] = useState('current'); // current | archive
-  const [wizard, setWizard] = useState(false);
+  const [view, setView] = useState('current'); // current | archive | calendar
+  const [fromTemplate, setFromTemplate] = useState(false);
+  const [wizard, setWizard] = useState(Boolean(startProjectId)); // opens at once when the project wizard says «Створити операцію»
   const [openId, setOpenId] = useState(openCampaignId);
   const [newRequest, setNewRequest] = useState(openNewRequest); // «Тільки креативи» was just created: the request form opens at once
   const [toast, setToast] = useState(null);
@@ -45,7 +47,7 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
 
   if (open) {
     return (
-      <div className="ai-section cmp-section" role="region" aria-label="Кампанія">
+      <div className="ai-section cmp-section" role="region" aria-label="Операція">
         {toast && <div className={'cmp-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
         <CampaignPage key={open.id} campaign={open} project={projectOf(open.project_id)} openNewRequest={newRequest} onBack={() => { setOpenId(null); setNewRequest(false); reload(); }} onChanged={reload} notify={notify} />
       </div>
@@ -53,30 +55,35 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
   }
 
   return (
-    <div className="ai-section cmp-section" role="region" aria-label="Кампанії клієнтів">
+    <div className="ai-section cmp-section" role="region" aria-label="Операції клієнтів">
       {toast && <div className={'cmp-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
       <div className="ai-section-head">
         <div className="ai-section-icon" aria-hidden="true"><ActionIcon name="generate" size={26} /></div>
         <div>
           <div className="ai-section-kicker">Команди агентів</div>
-          <h1>Кампанії клієнтів</h1>
-          <p>Для кожного клієнта з рекламним кабінетом у CRM створюється команда агентів кампанії: вона аналізує кабінети, пропонує оптимізацію, готує звіт і лист клієнту. Клієнт також підключається до спільного відділу креативів, який за запитами менеджера робить технічні завдання, тексти й креативи. Усе проходить через вашу перевірку.</p>
+          <h1>Операції клієнтів</h1>
+          <p>Для кожного клієнта з рекламним кабінетом у CRM створюється команда агентів операції: вона аналізує кабінети, пропонує оптимізацію, готує звіт і лист клієнту. Клієнт також підключається до спільного відділу креативів, який за запитами менеджера робить технічні завдання, тексти й креативи. Усе проходить через вашу перевірку.</p>
         </div>
       </div>
 
-      <div className="ai-section-pills" role="tablist" aria-label="Розділи кампаній">
-        <button type="button" className="ai-section-btn ai-section-btn-primary" onClick={() => setWizard(true)}><ActionIcon name="create" size={18} />Створити кампанію</button>
+      <div className="ai-section-pills" role="tablist" aria-label="Розділи операцій">
+        <button type="button" className="ai-section-btn ai-section-btn-primary" onClick={() => setWizard(true)}><ActionIcon name="create" size={18} />Створити операцію</button>
+        <button type="button" className="ai-section-btn" onClick={() => setFromTemplate(true)}>З шаблону</button>
         <span className="agent-catalog-pill-sep" aria-hidden="true" />
-        <button type="button" role="tab" aria-selected={view === 'current'} className={'ai-section-pill' + (view === 'current' ? ' active' : '')} onClick={() => setView('current')}>Поточні кампанії ({counts.current})</button>
+        <button type="button" role="tab" aria-selected={view === 'current'} className={'ai-section-pill' + (view === 'current' ? ' active' : '')} onClick={() => setView('current')}>Поточні операції ({counts.current})</button>
+        <button type="button" role="tab" aria-selected={view === 'calendar'} className={'ai-section-pill' + (view === 'calendar' ? ' active' : '')} onClick={() => setView('calendar')}>Календар</button>
         <button type="button" role="tab" aria-selected={view === 'archive'} className={'ai-section-pill' + (view === 'archive' ? ' active' : '')} onClick={() => setView('archive')}>Архів ({counts.archive})</button>
       </div>
 
-      {campaigns === null && <div className="ai-section-empty">Не вдалося завантажити кампанії. Потрібно застосувати міграцію <code>20261023000000_ag_campaigns.sql</code>.</div>}
-      {campaigns && !shown.length && (
-        <div className="ai-section-empty">{view === 'archive' ? 'В архіві поки порожньо.' : 'Кампаній ще немає. Натисніть «Створити кампанію», оберіть клієнта й канали, і команда агентів буде готова за кілька хвилин.'}</div>
+      {view === 'calendar' && campaigns && <CampaignCalendar campaigns={campaigns} projects={projects} onOpen={(id) => setOpenId(id)} />}
+      {fromTemplate && <FromTemplateDialog onClose={() => setFromTemplate(false)} notify={notify} onDone={(c) => { setFromTemplate(false); reload().then(() => setOpenId(c.id)); }} />}
+
+      {campaigns === null && <div className="ai-section-empty">Не вдалося завантажити операції. Потрібно застосувати міграцію <code>20261023000000_ag_campaigns.sql</code>.</div>}
+      {view !== 'calendar' && campaigns && !shown.length && (
+        <div className="ai-section-empty">{view === 'archive' ? 'В архіві поки порожньо.' : 'Операцій ще немає. Натисніть «Створити операцію», оберіть клієнта й канали, і команда агентів буде готова за кілька хвилин.'}</div>
       )}
       <div className="cmp-cards">
-        {shown.map((c) => {
+        {view !== 'calendar' && shown.map((c) => {
           const p = projectOf(c.project_id);
           const mine = agents.filter((a) => a.scope_id === String(c.id));
           const on = mine.filter((a) => a.enabled).length;
@@ -101,6 +108,7 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
 
       {wizard && (
         <CreateCampaignWizard
+          initialProjectId={startProjectId}
           onClose={() => { setWizard(false); reload(); }} notify={notify}
           onLaunched={(id, opts) => { setWizard(false); setNewRequest(Boolean(opts?.newRequest)); reload().then(() => setOpenId(id)); }}
         />

@@ -33,7 +33,7 @@ export function scheduleRows(agents = [], now = new Date()) {
     const next = a.schedule?.weekday ? nextScheduled('weekly', { weeklyDay: a.schedule.weekday, weeklyTime: a.schedule.time }, now) : null;
     const when = mode === 'paused' ? 'на паузі'
       : next ? `наступний запуск ${next.at.toISOString()}`
-        : trigger === 'initial' ? 'один раз, під час запуску кампанії'
+        : trigger === 'initial' ? 'один раз, під час запуску операції'
           : trigger === 'upstream' ? 'після агентів, від яких залежить' : 'без розкладу, лише вручну';
     return { id: a.id, role: a.role, name: a.name, trigger, mode, schedule: a.schedule || null, scheduleText: describeSchedule(a.schedule), nextAt: mode === 'paused' ? null : next?.at.toISOString() || null, when, lastRunAt: a.last_run_at || null, lastStatus: a.last_status || null };
   });
@@ -75,5 +75,5 @@ export const addInstruction = (list = [], item) => [...list, item].slice(-MAX_IN
 export const instructionsFor = (list = [], role) => list.filter((i) => !i.role || i.role === role);
 export const instructionBlock = (list = [], role) => {
   const mine = instructionsFor(list, role).slice(-10);
-  return mine.length ? { title: 'Вказівки менеджера для цієї кампанії (виконуйте їх, вони важливіші за загальні правила)', text: mine.map((i) => `- ${i.text}${i.role ? '' : ' (для всіх агентів)'}`).join('\n') } : null;
+  return mine.length ? { title: 'Вказівки менеджера для цієї операції (виконуйте їх, вони важливіші за загальні правила)', text: mine.map((i) => `- ${i.text}${i.role ? '' : ' (для всіх агентів)'}`).join('\n') } : null;
 };

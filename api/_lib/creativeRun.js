@@ -326,9 +326,9 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   const req = rid ? (await db.from('ag_creative_requests').select('*').eq('id', rid).maybeSingle()).data : null;
   if (rid && !req) throw new Error('Запит не знайдено (можливо, видалений).');
   const campaignId = task.campaign_id || req?.campaign_id;
-  if (!campaignId) throw new Error('Завдання без клієнта: запустіть його зі сторінки агента або кампанії.');
+  if (!campaignId) throw new Error('Завдання без клієнта: запустіть його зі сторінки агента або операції.');
   const campaign = (await db.from('ag_campaigns').select('*').eq('id', campaignId).maybeSingle()).data;
-  if (!campaign) throw new Error('Кампанію не знайдено (можливо, видалена).');
+  if (!campaign) throw new Error('Операцію не знайдено (можливо, видалена).');
   const project = (await db.from('projects').select('*').eq('id', campaign.project_id).maybeSingle()).data || {};
   const link = (await db.from('ag_agent_clients').select('*').eq('agent_id', agent.id).eq('campaign_id', campaignId).maybeSingle()).data;
   const cfg = agent.config || {};

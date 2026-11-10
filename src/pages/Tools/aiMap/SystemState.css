@@ -1,0 +1,52 @@
+/* «Стан системи» inside the AI Agents section (SystemState.jsx). Built on the shared .ai-section / .analytics-* / .spend-* foundation; only what is specific to this page lives here. */
+
+.sys-page .analytics-section { max-width: 1000px; }
+.sys-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sys-top .analytics-section-title { margin: 0; }
+.sys-lead { margin: 0 0 12px; }
+
+.sys-overall { display: flex; align-items: center; gap: 12px; margin: 12px 0; padding: 14px 18px; border-radius: 16px; background: rgba(53, 17, 63, 0.54); border: 1px solid rgba(235, 156, 239, 0.3); font: 700 1rem var(--font-body); color: #F9EDF9; }
+.sys-overall i, .sys-checks li i { flex: none; width: 12px; height: 12px; border-radius: 50%; background: #7c6a99; }
+.sys-overall.s-ok i, .sys-checks li.s-ok i { background: #4be07f; box-shadow: 0 0 8px #4be07f88; }
+.sys-overall.s-warn i, .sys-checks li.s-warn i { background: #ffb347; box-shadow: 0 0 8px #ffb34788; }
+.sys-overall.s-bad i, .sys-checks li.s-bad i { background: #ff5a6a; box-shadow: 0 0 8px #ff5a6a88; }
+.sys-overall.s-bad { border-color: #ff5a6a88; }
+
+.sys-checks { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sys-checks li { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: rgba(53, 17, 63, 0.4); border: 1px solid rgba(235, 156, 239, 0.2); font-family: var(--font-body); }
+.sys-checks li div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sys-checks li b { color: #F9EDF9; font-size: .88rem; }
+.sys-checks li span { color: #D5A9DC; font-size: .8rem; }
+.sys-checks li em { font-style: normal; font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #C193CA; }
+.sys-checks li.s-warn em { color: #ffb347; }
+.sys-checks li.s-bad em { color: #ff8a96; }
+.sys-ok { margin-top: 8px; }
+.sys-ok summary { cursor: pointer; padding: 8px 2px; font: 700 .84rem var(--font-body); color: #D5A9DC; }
+.sys-ok summary:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; border-radius: 8px; }
+.sys-bad { color: #ff9aa4; }
+
+.sys-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.sys-person { display: grid; grid-template-columns: 18px 1fr; align-items: center; column-gap: 10px; padding: 10px 14px; border-radius: 14px; background: rgba(53, 17, 63, 0.4); border: 1px solid rgba(235, 156, 239, 0.2); font-family: var(--font-body); font-size: .84rem; color: #F2DDF4; cursor: pointer; }
+.sys-person.on { border-color: #b07ce0; background: rgba(120, 60, 170, 0.35); }
+.sys-person small { grid-column: 2; color: #C193CA; font-size: .72rem; overflow: hidden; text-overflow: ellipsis; }
+.sys-person input { accent-color: #b07ce0; }
+.sys-person input:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; }
+.sys-person input:disabled + span { opacity: .75; }
+
+.sys-switch { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; font: 600 .9rem var(--font-body); color: #F9EDF9; cursor: pointer; }
+.sys-switch input { width: 18px; height: 18px; accent-color: #b07ce0; }
+.sys-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.sys-form label { display: flex; flex-direction: column; gap: 6px; font: 600 .78rem var(--font-body); color: #D5A9DC; }
+.sys-form input { padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(235, 156, 239, 0.3); background: rgba(23, 5, 28, 0.6); color: #F9EDF9; font: 500 .86rem var(--font-body); }
+.sys-form input:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; }
+.sys-sub { margin: 18px 0 8px; font: 700 .86rem var(--font-body); color: #F2DDF4; }
+.sys-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.sys-msg { margin: 10px 0 0; font: 500 .82rem var(--font-body); color: #9be8b4; }
+.sys-msg.bad { color: #ff9aa4; }
+.sys-sum { max-width: 520px; }
+.sys-denied td { color: #ffb7bf; }
+
+@media (max-width: 760px) {
+  .sys-checks li { grid-template-columns: 12px 1fr; }
+  .sys-checks li em { grid-column: 2; }
+}

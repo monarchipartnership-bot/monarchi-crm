@@ -77,7 +77,7 @@ export default function AgentSettings({ agent, notify, reload }) {
           <div className="smm-field smm-field--wide">
             <label htmlFor="ag-extra">Додаткова інструкція для цього клієнта</label>
             <textarea id="ag-extra" rows={4} value={f.config.extra || ''} onChange={(e) => setCfg('extra', e.target.value)} maxLength={2000} placeholder="Наприклад: не порівнювати з конкурентами за ціною; писати коротко; завжди називати кампанії за іменем." />
-            <span className="smm-hint">Додається до промту цього агента лише для цієї кампанії. Основний промт редагується у вкладці «Промти».</span>
+            <span className="smm-hint">Додається до промту цього агента лише для цієї операції. Основний промт редагується у вкладці «Промти».</span>
           </div>
           )}
         </div>

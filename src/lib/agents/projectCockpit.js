@@ -12,7 +12,7 @@ export const STAGES = [
   { key: 'quality', label: 'Контроль якості', role: 'creative_quality' },
   { key: 'you', label: 'Ви', role: null },
 ];
-const MODE_LABEL = { creative: 'Тільки креативи', full: 'Повна кампанія', strategy: 'Тільки стратегія', ads: 'Аналіз і оптимізація', report: 'Тільки звіт' };
+const MODE_LABEL = { creative: 'Тільки креативи', full: 'Повна операція', strategy: 'Тільки стратегія', ads: 'Аналіз і оптимізація', report: 'Тільки звіт' };
 export const REQUEST_STATUS_LABEL = { draft: 'Чернетка', running: 'Працює', review: 'На перегляд', approved: 'Затверджено', problem: 'Проблема' };
 const DB_STATUS = { done: 'approved' }; // the database says «done», the screens say «approved»
 const TASK_STATE = { queued: 'waiting', running: 'working', done: 'done', failed: 'failed' };
@@ -22,7 +22,7 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const round = (n) => Math.round(n * 10000) / 10000;
 const at = (v) => { const t = new Date(v).getTime(); return Number.isNaN(t) ? 0 : t; };
 
-export const modeLabelOf = (campaign) => MODE_LABEL[campaign?.config?.mode] || (campaign?.config?.mode ? campaign.config.mode : 'Повна кампанія');
+export const modeLabelOf = (campaign) => MODE_LABEL[campaign?.config?.mode] || (campaign?.config?.mode ? campaign.config.mode : 'Повна операція');
 
 // notes of the agents are numbered («1) …  2) …»): every point is one question to the person; a note without numbers is one point
 export function splitNotes(text) {
@@ -135,7 +135,7 @@ export function buildCockpit(raw) {
   live.slice(0, 4).forEach((r, i) => attention.push(...requestAttention(r, tasks, creatives, roleOf, library, { onlyReview: i > 0 })));
   // a campaign agent (not a request step) that failed: a task of the campaign without a request
   tasks.filter((t) => t.campaign_id === campaign.id && !t.request_id && t.status === 'failed').slice(0, 5).forEach((t) => {
-    attention.push({ id: `failed:${t.id}`, kind: 'failed_step', tone: 'problem', title: 'Агент кампанії зупинився', text: clip(t.error, 400) || 'Завдання завершилось помилкою.', requestId: null, taskId: t.id, actions: [{ key: 'retry_step', label: 'Повторити крок', primary: true }] });
+    attention.push({ id: `failed:${t.id}`, kind: 'failed_step', tone: 'problem', title: 'Агент операції зупинився', text: clip(t.error, 400) || 'Завдання завершилось помилкою.', requestId: null, taskId: t.id, actions: [{ key: 'retry_step', label: 'Повторити крок', primary: true }] });
   });
   attention.sort((a, b) => (a.tone === 'problem' ? 0 : 1) - (b.tone === 'problem' ? 0 : 1));
 

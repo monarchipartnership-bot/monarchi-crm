@@ -83,7 +83,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
 
   const def = creativeRoleDef(role);
   const cat = useMemo(() => catalogueOf(role), [role]);
-  const nameOf = useCallback((campaignId) => { const c = clients.find((x) => x.campaign_id === campaignId); return c ? (c.project?.name || c.campaign?.name || `Кампанія ${campaignId}`) : `Кампанія ${campaignId}`; }, [clients]);
+  const nameOf = useCallback((campaignId) => { const c = clients.find((x) => x.campaign_id === campaignId); return c ? (c.project?.name || c.campaign?.name || `Операція ${campaignId}`) : `Операція ${campaignId}`; }, [clients]);
   const load = useMemo(() => loadOf(data.tasks), [data.tasks]);
   // while the agent loads (or cannot be loaded) the window is still a window: it says so and can be closed
   if (!team) {
@@ -191,7 +191,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) 
           </section>
           <section className="dwa-card">
             <h3>Проєкти агента <small>{clients.length}</small></h3>
-            {!clients.length ? <p className="dwa-mut">До агента ще не підключено жодного клієнта. Клієнт підключається при створенні кампанії.</p> : (
+            {!clients.length ? <p className="dwa-mut">До агента ще не підключено жодного клієнта. Клієнт підключається при створенні операції.</p> : (
               <ul className="dwa-rows">
                 {clients.map((c) => {
                   const mine = data.tasks.filter((t) => t.campaign_id === c.campaign_id);
