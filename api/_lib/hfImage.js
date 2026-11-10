@@ -61,14 +61,36 @@ const detailOf = (json, status) => {
   return `Higgsfield: ${typeof d === 'string' ? d : d ? JSON.stringify(d) : `помилка ${status}`}`.slice(0, 300);
 };
 
+// A model billed by tokens has no fixed price: Higgsfield describes its rates («Per 1M tokens: text input $5 ... image input $8 ... image output $30. Quality
+// defaults to high. Final cost uses actual usage»). The price of one picture is then estimated from the size of the answer the model gives for the asked
+// quality and shape (the published sizes of GPT Image: a square, a tall and a wide picture), the words of the prompt and the reference pictures, plus a
+// margin, so the real charge is rarely above it. → USD, or NaN when the rates cannot be read.
+const OUT_TOKENS = { low: [272, 408, 400], medium: [1056, 1584, 1568], high: [4160, 6240, 6208] }; // [square, tall, wide]
+const REF_TOKENS = 2000; // one reference picture read by the model
+const MARGIN = 1.15;
+export function tokenEstimate(description, body = {}) {
+  const d = String(description || '');
+  const rate = (re) => { const m = re.exec(d); return m ? Number(m[1]) : NaN; };
+  const out = rate(/image output \$([\d.]+)/i), textIn = rate(/(?:^|[^a-z])text input \$([\d.]+)/i), imageIn = rate(/(?:^|[^a-z])image input \$([\d.]+)/i);
+  if (!Number.isFinite(out)) return NaN;
+  const q = ['low', 'medium', 'high'].includes(String(body.quality || '').toLowerCase()) ? String(body.quality).toLowerCase() : 'high';
+  const r = ratioValue(body.aspect_ratio || '1:1') || 1;
+  const shape = r < 0.9 ? 1 : r > 1.1 ? 2 : 0;
+  const refs = Object.entries(body).reduce((n, [k, v]) => (k === 'prompt' ? n : n + (Array.isArray(v) ? v.filter((x) => /^https:\/\//i.test(String(x))).length : typeof v === 'string' && /^https:\/\//i.test(v) ? 1 : 0)), 0); // the reference pictures, whatever the parameter is called
+  const usd = (OUT_TOKENS[q][shape] * out + Math.ceil(String(body.prompt || '').length / 3) * (Number.isFinite(textIn) ? textIn : 0) + refs * REF_TOKENS * (Number.isFinite(imageIn) ? imageIn : 0)) / 1e6;
+  return Math.round(usd * MARGIN * 10000) / 10000;
+}
+
 // → the price in USD of this request, before it is made. Throws a readable Error (a wrong model path or parameter shows here, without any spend).
 export async function estimate({ request, env = process.env, fetchFn = fetch }) {
   const res = await fetchFn(`${BASE}/estimate/${request.path}`, { method: 'POST', headers: headers(env), body: JSON.stringify(request.body) });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${detailOf(json, res.status)} (оцінка вартості; перевірте HF_IMAGE_MODEL і параметри моделі)`);
-  // the documented answer is { "usd": "0.094" }; an answer without it is shown as it came (it holds no secret), so the reason is seen at once
+  // the documented answer is { "usd": "0.094" }. A model billed by tokens (Marketing Studio / GPT Image) answers with a DESCRIPTION of its rates instead:
+  // the price is then worked out from those rates (tokenEstimate, an upper estimate). Any other answer is shown as it came (it holds no secret).
   const raw = json.usd ?? json.cost_usd ?? json.price_usd ?? json.estimate?.usd ?? json.cost?.usd;
-  const usd = raw == null || raw === '' ? NaN : Number(raw);
+  let usd = raw == null || raw === '' ? NaN : Number(raw);
+  if (!Number.isFinite(usd) && json.pricing_description) usd = tokenEstimate(json.pricing_description, request.body);
   if (!Number.isFinite(usd)) throw new Error(`Higgsfield не повернув вартість запиту (модель «${request.path}», відповідь: ${JSON.stringify(json).slice(0, 220)}).`);
   return usd;
 }

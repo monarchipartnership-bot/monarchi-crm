@@ -68,7 +68,7 @@ import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, mo
 import { ALL_INPUT_KEYS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS } from '../src/lib/agents/projectCreative.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
 import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
-import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit } from '../api/_lib/hfImage.js';
+import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { makerTokens, parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc, salvageCreatives } from '../api/_lib/creativeRun.js';
@@ -4476,6 +4476,22 @@ await ok('system state: only the agents whose booking ended long ago are restart
   assert.match(telegramTest(settings, 'spend', 'a<b>@x.com').text, /витрати[\s\S]*ab@x\.com/); // the name cannot break the message
   assert.equal(telegramTest({ tg_chat_id: '-1', attention_thread_id: null }).threadId, undefined);
   assert.throws(() => telegramTest({ tg_chat_id: ' ' }), /Чат Telegram не вказано/);
+});
+
+await ok('creatives: a model billed by tokens gives its rates, not a price; the estimate is worked out from them (shape, quality, prompt, references) with a margin', async () => {
+  const D = 'Per 1M tokens: text input $5, cached text input $1.25, text output $10; image input $8, cached image input $2, image output $30. Quality defaults to high. Final cost uses actual usage.';
+  const sq = tokenEstimate(D, { prompt: 'x'.repeat(300), aspect_ratio: '1:1' });
+  assert.equal(sq, Math.round(((4160 * 30 + 100 * 5) / 1e6) * 1.15 * 10000) / 10000); // 0.1441
+  assert.ok(tokenEstimate(D, { prompt: 'p', aspect_ratio: '9:16' }) > sq); // a tall picture is bigger
+  assert.ok(tokenEstimate(D, { prompt: 'p', aspect_ratio: '16:9' }) > sq);
+  assert.ok(tokenEstimate(D, { prompt: 'p', aspect_ratio: '1:1', quality: 'low' }) < 0.02);
+  const withRefs = tokenEstimate(D, { prompt: 'p', aspect_ratio: '1:1', image_urls: ['https://a/1.png', 'https://a/2.png'] });
+  assert.equal(Math.round((withRefs - tokenEstimate(D, { prompt: 'p', aspect_ratio: '1:1' })) * 10000), Math.round(2 * 2000 * 8 / 1e6 * 1.15 * 10000)); // two references read by the model
+  assert.ok(Number.isNaN(tokenEstimate('no rates here', {})));
+  const env = { HF_API_KEY_ID: 'id1', HF_API_KEY_SECRET: 'sec1' };
+  const net = async () => ({ ok: true, status: 200, json: async () => ({ type: 'description', pricing_description: D }) });
+  assert.equal(await imgEstimate({ request: { path: 'marketing-studio/image/sunburst', body: { prompt: 'x'.repeat(300), aspect_ratio: '1:1' } }, env, fetchFn: net }), sq);
+  await assert.rejects(() => imgEstimate({ request: { path: 'm', body: {} }, env, fetchFn: async () => ({ ok: true, status: 200, json: async () => ({ type: 'other' }) }) }), /не повернув вартість[\s\S]*other/);
 });
 
 console.log(`\n${passed} checks passed`);

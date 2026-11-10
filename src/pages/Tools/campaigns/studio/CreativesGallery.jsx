@@ -105,7 +105,7 @@ export default function CreativesGallery({ request, creatives, concepts = [], re
               </div>
               <div className="stu-gal-actions">
                 {canOverlay && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => overlay(c)}>{busy === `text:${c.id}` ? 'Накладаємо…' : c.final_url ? 'Накласти текст знову' : 'Накласти текст'}</button>}
-                {['review', 'rejected', 'failed', 'approved'].includes(c.status) && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => generate([c.id])}>{busy === `one:${c.id}` ? 'Рахуємо…' : c.status === 'failed' ? 'Спробувати знову' : 'Згенерувати знову'}</button>}
+                {['planned', 'review', 'rejected', 'failed', 'approved'].includes(c.status) && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => generate([c.id])}>{busy === `one:${c.id}` ? 'Рахуємо…' : c.status === 'planned' ? 'Згенерувати цю' : c.status === 'failed' ? 'Спробувати знову' : 'Згенерувати знову'}</button>}
                 {shown && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => download(c)}>{busy === `dl:${c.id}` ? 'Завантажуємо…' : 'Завантажити'}</button>}
                 {c.status === 'review' && <><button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy} onClick={() => decide(c, 'approved')}>Схвалити</button><button type="button" className="cmp-btn" disabled={!!busy} onClick={() => decide(c, 'rejected')}>Відхилити</button></>}
               </div>
