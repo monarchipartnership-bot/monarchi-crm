@@ -66,8 +66,10 @@ export async function estimate({ request, env = process.env, fetchFn = fetch }) 
   const res = await fetchFn(`${BASE}/estimate/${request.path}`, { method: 'POST', headers: headers(env), body: JSON.stringify(request.body) });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${detailOf(json, res.status)} (оцінка вартості; перевірте HF_IMAGE_MODEL і параметри моделі)`);
-  const usd = Number(json.usd);
-  if (!Number.isFinite(usd)) throw new Error('Higgsfield не повернув вартість запиту.');
+  // the documented answer is { "usd": "0.094" }; an answer without it is shown as it came (it holds no secret), so the reason is seen at once
+  const raw = json.usd ?? json.cost_usd ?? json.price_usd ?? json.estimate?.usd ?? json.cost?.usd;
+  const usd = raw == null || raw === '' ? NaN : Number(raw);
+  if (!Number.isFinite(usd)) throw new Error(`Higgsfield не повернув вартість запиту (модель «${request.path}», відповідь: ${JSON.stringify(json).slice(0, 220)}).`);
   return usd;
 }
 
