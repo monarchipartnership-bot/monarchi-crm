@@ -11,9 +11,10 @@ const SUB_ICONS = { overview: 'info', reports: 'doc', settings: 'gear', prompts:
 
 // The page of ONE campaign agent (overview, settings, prompts with versions, history of requests, tasks): the same page the SMM team uses, inside the
 // full-screen agent window (Hub style, left column of sections) over the campaign.
-export default function AgentWindow({ role, team, onClose, onChanged, setRole, kick }) {
+//   initialSub: the section to open on (the project card opens an agent straight on its settings)
+export default function AgentWindow({ role, team, onClose, onChanged, setRole, kick, initialSub = 'overview' }) {
   const [toast, setToast] = useState(null);
-  const [state, setState] = useState({ role, sub: 'overview' });
+  const [state, setState] = useState({ role, sub: initialSub });
   const timer = useRef(null);
   const sub = state.role === role ? state.sub : 'overview'; // another agent opened from the chain starts on its overview
   const notify = (text, isError = false) => {

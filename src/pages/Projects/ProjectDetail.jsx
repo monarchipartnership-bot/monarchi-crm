@@ -565,7 +565,7 @@ function ProjectDetailCard() {
       ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
-      {tab === 'creative' && <ProjectCreativeTab key={'creative-' + id} projectId={id} />}
+      {tab === 'creative' && <ProjectCreativeTab key={'creative-' + id} projectId={id} showDeliverables />}
       </div>
       {confirmDialog}
     </div>

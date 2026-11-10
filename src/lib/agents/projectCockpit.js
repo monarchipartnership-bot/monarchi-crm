@@ -3,6 +3,7 @@
 // design components take as props (see the contract in docs/design-decisions.md, decision 33). The database is read by lib/api/projectCockpit.js.
 
 import { fileNameOf } from '../creatives/download.js';
+import { directionLimit } from './creativeTeam.js';
 
 export const STAGES = [
   { key: 'strategy', label: 'Стратег', role: 'creative_strategy' },
@@ -15,6 +16,7 @@ export const STAGES = [
 const MODE_LABEL = { creative: 'Тільки креативи', full: 'Повна операція', strategy: 'Тільки стратегія', ads: 'Аналіз і оптимізація', report: 'Тільки звіт' };
 export const REQUEST_STATUS_LABEL = { draft: 'Чернетка', running: 'Працює', review: 'На перегляд', approved: 'Затверджено', problem: 'Проблема' };
 const DB_STATUS = { done: 'approved' }; // the database says «done», the screens say «approved»
+const STALE_REQUEST_DAYS = 14; // an open request nobody touched for this long is history
 const TASK_STATE = { queued: 'waiting', running: 'working', done: 'done', failed: 'failed' };
 
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -131,8 +133,10 @@ export function buildCockpit(raw) {
   const active = live[0] || mine[0] || null;
 
   const attention = [];
-  // the newest open request is the work; an older one is shown only while pictures wait in it for the decision (its old stops and questions are history)
-  live.slice(0, 4).forEach((r, i) => attention.push(...requestAttention(r, tasks, creatives, roleOf, library, { onlyReview: i > 0 })));
+  // cycles run side by side (the regular one and extra ones), so every open request that was touched lately says what it needs; an old one that was left
+  // behind is shown only while pictures wait in it for the decision (its old stops and questions are history)
+  const fresh = (raw.now ? new Date(raw.now).getTime() : Date.now()) - STALE_REQUEST_DAYS * 86400000;
+  live.slice(0, 6).forEach((r, i) => attention.push(...requestAttention(r, tasks, creatives, roleOf, library, { onlyReview: i > 0 && at(r.updated_at || r.created_at) < fresh })));
   // a campaign agent (not a request step) that failed: a task of the campaign without a request
   tasks.filter((t) => t.campaign_id === campaign.id && !t.request_id && t.status === 'failed').slice(0, 5).forEach((t) => {
     attention.push({ id: `failed:${t.id}`, kind: 'failed_step', tone: 'problem', title: 'Агент операції зупинився', text: clip(t.error, 400) || 'Завдання завершилось помилкою.', requestId: null, taskId: t.id, actions: [{ key: 'retry_step', label: 'Повторити крок', primary: true }] });
@@ -150,12 +154,22 @@ export function buildCockpit(raw) {
     requests: mine.filter((r) => r.status !== 'cancelled').map((r) => {
       const c = creatives.filter((x) => x.request_id === r.id);
       const status = DB_STATUS[r.status] || r.status;
+      const own = buildStages(r, tasks, roleOf);
+      const brief = r.brief || {};
       const items = c.slice().sort((a, b) => num(a.id) - num(b.id)).map((x) => {
         const url = x.final_url || x.asset_url || '';
-        const item = { id: x.id, url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400) };
+        const v = x.copy?.variants?.[0] || null;
+        const item = { id: x.id, url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
+          copy: v ? { headline: clip(v.headline, 200), text: clip(v.primary || v.text || v.body, 900), description: clip(v.description, 300), cta: clip(v.cta, 60) } : null };
         return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
       });
-      return { id: r.id, title: clip(r.title, 90), status, statusLabel: REQUEST_STATUS_LABEL[status] || status, items, updatedAt: r.updated_at || r.created_at, creatives: { total: c.length, review: c.filter((x) => x.status === 'review').length, approved: c.filter((x) => x.status === 'approved').length, failed: c.filter((x) => x.status === 'failed').length, producing: c.filter((x) => x.status === 'producing').length } };
+      const n = (s) => c.filter((x) => x.status === s).length;
+      return { id: r.id, title: clip(r.title, 90), status, statusLabel: REQUEST_STATUS_LABEL[status] || status, items, updatedAt: r.updated_at || r.created_at, createdAt: r.created_at || null,
+        // the cycle: regular (made by the schedule) or extra, what was asked, its own chain and its money (lib/agents/operationCycles.js)
+        kind: brief.kind === 'regular' ? 'regular' : 'extra', scheduledFor: brief.scheduled_for || null, regularId: brief.regular_id || null, goal: clip(brief.goal, 400), ratios: Array.isArray(brief.ratios) && brief.ratios.length ? brief.ratios : ['1:1'], directions: directionLimit(brief),
+        stages: own.stages, currentStageKey: own.currentStageKey, error: clip(r.error, 300),
+        cost: { model: round(tasks.filter((t) => t.request_id === r.id).reduce((s, t) => s + num(t.cost_usd), 0)), higgsfield: round(c.reduce((s, x) => s + num(x.cost_usd), 0)) },
+        creatives: { total: c.length, review: n('review'), approved: n('approved'), rejected: n('rejected'), failed: n('failed'), producing: n('producing'), planned: n('planned') } };
     }),
     spend: { model: modelCost, higgsfield, total: round(modelCost + higgsfield), currency: 'USD' },
     updatedAt: active?.updated_at || campaign.updated_at || campaign.created_at || null,

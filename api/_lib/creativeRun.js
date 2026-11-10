@@ -6,8 +6,8 @@
 // parsed and checked here, and the maker's prompts become the rows of ag_creatives. Everything the outside world provides is handed in
 // (ctx.read, ctx.campaignDeps), so tests run it with stand-ins.
 import { PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
-import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, directionLimit } from '../../src/lib/agents/creativeTeam.js';
-import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, PROFILE_FIELDS, inputState } from '../../src/lib/agents/projectCreative.js';
+import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, cycleAgentFields, directionLimit } from '../../src/lib/agents/creativeTeam.js';
+import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, PROFILE_FIELDS, ctaVariants, inputState } from '../../src/lib/agents/projectCreative.js';
 import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
 import { instructionBlock } from '../../src/lib/agents/campaignCycles.js';
 import { MEMORY_LIMITS, buildDossier, memoryBlock } from '../../src/lib/agents/clientMemory.js';
@@ -281,7 +281,7 @@ async function projectCreativeBlocks(db, projectId, now, { inputs = false } = {}
   const blocks = [];
   const rules = [
     row?.figma_url ? `Макет бренду в Figma: ${row.figma_url}` : '',
-    `Кнопка заклику до дії: ${CTA_MODES[row?.cta_mode || 'always']}${row?.cta_text ? `, текст кнопки «${row.cta_text}»` : ''}`,
+    `Кнопка заклику до дії на креативі: ${CTA_MODES[row?.cta_mode || 'always']}${ctaVariants(row?.cta_text).length ? `. Варіанти тексту кнопки від клієнта (для кожного креативу візьми той, що підходить йому за змістом): ${ctaVariants(row.cta_text).map((v) => `«${v}»`).join(', ')}` : ''}`,
     row?.restrictions ? `Обмеження клієнта: ${clip(row.restrictions, 2000)}` : '',
   ].filter(Boolean);
   blocks.push({ title: 'Правила клієнта для креативів (вкладка «Креативи» проєкту)', text: rules.join('\n') });
@@ -339,6 +339,9 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   const blocks = [projectBlock(project, campaign)];
   for (const f of def.clientFields || []) if (String(mine[f.key] || '').trim()) blocks.push({ title: `${f.label} (клієнт)`, text: clip(mine[f.key], 1500) });
   for (const f of def.fields || []) if (String(cfg[f.key] || '').trim()) blocks.push({ title: f.label, text: clip(cfg[f.key], 1800) });
+  // what the manager asked of THIS agent for THIS cycle (the form of the cycle): it counts above the general settings of the agent
+  const cycleSet = b.agent_settings?.[agent.role] || {};
+  for (const f of cycleAgentFields(agent.role)) if (f.type !== 'check' && f.key !== 'max_usd' && String(cycleSet[f.key] || '').trim()) blocks.push({ title: `${f.label} (для цього циклу: важливіше за загальні налаштування)`, text: clip(cycleSet[f.key], 1500) });
   const orders = instructionBlock(campaign.config?.instructions, agent.role); // what the manager asked of this campaign's agents
   if (orders) blocks.push(orders);
   if (req) blocks.push(requestBlock(req), materialsBlock(req.materials));
@@ -424,7 +427,8 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
 
   const user = blocks.map((x) => `### ${x.title}\n${x.text}`).join('\n\n') + (failed.length ? `\n\n### Вхідні дані, які не завантажились\n${failed.map((f) => '- ' + f).join('\n')}` : '');
   const system = composeCreativeSystem(agent.role, prompt.body, mine.extra, language);
-  const ask = (content) => rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: agent.role === 'creative_maker' ? Math.max(4200, makerTokens(brief?.concepts)) : json ? 4200 : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content }] } });
+  // more directions = a longer JSON answer: the room for it grows with the number of directions the request asks for
+  const ask = (content) => rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: agent.role === 'creative_maker' ? Math.max(4200, makerTokens(brief?.concepts)) : json ? Math.min(16000, Math.max(4200, 1500 + 1200 * directionLimit(b))) : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content }] } });
   let result;
   if (images.length) {
     const parts = [{ type: 'text', text: user }];
@@ -453,11 +457,11 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     return { output: { text, summary: `Текстів: ${parsed.texts.length}`, json: parsed, requestId: rid, campaignId }, summary: `Текстів: ${parsed.texts.length}` };
   }
   if (agent.role === 'creative_maker') {
-    const parsed = parseCreativeMaker(raw, brief.concepts, clip(cfg.style, 600));
+    const parsed = parseCreativeMaker(raw, brief.concepts, clip(cycleSet.style || cfg.style, 600));
     const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, req.materials); // a trial run saves nothing
     const text = rows.map((c) => `**${c.concept_key} · ${c.ratio}**\n${c.prompt}`).join('\n\n');
     // with «Генерувати одразу» on, the pictures go to Higgsfield at once (within the limit of the agent); otherwise the person starts it from the request window
-    const generation = !ctx.dryRun && cfg.auto_generate ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;
+    const generation = !ctx.dryRun && (cycleSet.auto_generate === true || cfg.auto_generate) ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;
     return { output: { text, summary: `Запитів до Higgsfield: ${rows.length}`, json: { creatives: parsed.creatives, notes: parsed.notes }, requestId: rid, campaignId, generation }, summary: `Запитів до Higgsfield: ${rows.length}` };
   }
   if (agent.role === 'creative_quality') {

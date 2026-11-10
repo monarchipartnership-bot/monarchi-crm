@@ -4,7 +4,7 @@ import './taskMarkers.css';
 // The carriers of the map: one small pill above the robot of the agent where a task is now (a running or queued task, a result that waits for the person's OK, a failed task),
 // from the real tables (lib/agents/mapTasks.js). HTML on top of the scene, placed every frame like the labels of the islands; far from the agent it is a dot with a number, close
 // it shows who and what. A click opens the campaign. The scene gives only what it knows: the camera, the root element and the agents with their place on the floor.
-const COLORS = { running: '#b25cff', queued: '#8fb4ff', review: '#ffb347', failed: '#ff5a6a' };
+const COLORS = { running: '#EB9CEF', queued: '#8fb4ff', review: '#FBBF24', failed: '#ff5a6a' };
 const NEAR = 22; // closer than this (metres from the camera) a carrier shows its text
 
 export function createTaskMarkers({ root, camera, getSize, agents, floor = 0.62, onOpen }) {

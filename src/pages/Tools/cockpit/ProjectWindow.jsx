@@ -32,7 +32,7 @@ function Node({ s, here, you }) {
   );
 }
 
-function StageLine({ stages = [], currentKey }) {
+export function StageLine({ stages = [], currentKey }) {
   // the stages with the same `parallel` mark that follow each other are drawn one over the other
   const groups = [];
   stages.forEach((s) => { const last = groups[groups.length - 1]; if (s.parallel && last && last.parallel === s.parallel) last.items.push(s); else groups.push({ parallel: s.parallel, items: [s] }); });
@@ -52,7 +52,7 @@ function StageLine({ stages = [], currentKey }) {
   );
 }
 
-function Spend({ spend }) {
+export function Spend({ spend }) {
   const s = spend || { model: 0, higgsfield: 0, total: 0 };
   const total = s.total || (s.model + s.higgsfield) || 0, m = total ? (s.model / total) * 100 : 0, h = total ? (s.higgsfield / total) * 100 : 0;
   return (
@@ -64,15 +64,12 @@ function Spend({ spend }) {
   );
 }
 
-export default function ProjectWindow({ cockpit, loading = false, onClose, onAction, onNewRequest, onStop, onOpenRequest }) {
-  const box = useRef(null);
-  const night = useAgentWindowNight();
-  useDialogA11y(box, onClose);
-  const c = cockpit;
+// The work of ONE operation: the stage line of its chain, the gallery of the chosen request, what waits for the person, the requests and the money.
+// Used inside the window of an operation (below) and inside the card of a project (ProjectCard.jsx, section «Операції»).
+export function OperationBody({ cockpit: c, loading = false, onAction, onOpenRequest }) {
   const att = c?.attention || [];
   const failed = att.filter((a) => a.kind === 'failed_step').length;
   const working = c?.stages?.find((s) => s.state === 'working');
-  const paused = c?.status === 'paused';
   const reqs = c?.requests || [];
   const [reqId, setReqId] = useState(null);
   useEffect(() => { if (c && (reqId == null || !reqs.some((r) => r.id === reqId))) setReqId(c.activeRequestId ?? reqs[0]?.id ?? null); }, [c?.id, c?.activeRequestId, reqs.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -81,24 +78,9 @@ export default function ProjectWindow({ cockpit, loading = false, onClose, onAct
   const galleryAct = (key, payload = {}) => onAction?.(key === 'approve_all' ? reviewItem : null, key, { campaignId: c.id, requestId: reqId, ...payload });
   const pick = (id) => { setReqId(id); onOpenRequest?.(id); };
   const galleryRef = useRef(null);
-  return createPortal(
-    <div className={'ckp ckp-overlay' + (night ? ' is-night' : '')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div ref={box} className="ckp-win" role="dialog" aria-modal="true" aria-label={c ? `Проєкт ${c.client}` : 'Проєкт'} tabIndex={-1}>
-        <header className="ckp-whd">
-          {c ? <Avatar name={c.client} size={48} /> : <span className="ckp-skel" style={{ width: 48, height: 48 }} />}
-          <div className="ckp-wt">
-            <h2>{c ? c.client : 'Проєкт'}{c && <span className={'ckp-chip ' + (paused ? '' : c.waiting ? 'is-warn' : 'is-work')}>{paused ? 'зупинено' : c.waiting ? 'чекає на вас' : 'працює'}</span>}</h2>
-            <p>{c ? `${c.modeLabel} · ${c.name}${c.updatedAt ? ' · оновлено ' + fmtAgo(c.updatedAt) : ''}` : loading ? 'Завантажуємо проєкт…' : 'Проєкт не знайдено'}</p>
-          </div>
-          {c && <button type="button" className="ckp-btn is-primary" onClick={() => onNewRequest?.(c)}><Ic n="plus" size={16} />Новий цикл (запит на креативи)</button>}
-          {c && <button type="button" className="ckp-btn" onClick={() => onStop?.(c)}><Ic n={paused ? 'play' : 'stop'} size={16} />{paused ? 'Відновити' : 'Зупинити'}</button>}
-          <button type="button" className="ckp-x ckp-x-lg" onClick={onClose} aria-label="Закрити вікно проєкту"><Ic n="close" size={17} /></button>
-        </header>
-        <div className="ckp-wbody">
-          {!c && loading && <div className="ckp-skel ckp-skel-wide" aria-hidden="true" />}
-          {!c && !loading && <p className="ckp-empty-line">Цей проєкт більше не активний або до нього немає доступу.</p>}
-          {c && (
-            <>
+  if (!c) return null;
+  return (
+    <>
               <StageLine stages={c.stages} currentKey={c.currentStageKey} />
               <div className="ckp-cols ckp-cols-g">
                 <section className="ckp-gzone" ref={galleryRef} aria-label={cur ? `Матеріали: ${cur.title}` : 'Матеріали'}>
@@ -140,8 +122,33 @@ export default function ProjectWindow({ cockpit, loading = false, onClose, onAct
                   </section>
                 </div>
               </div>
-            </>
-          )}
+    </>
+  );
+}
+
+export default function ProjectWindow({ cockpit, loading = false, onClose, onAction, onNewRequest, onStop, onOpenRequest }) {
+  const box = useRef(null);
+  const night = useAgentWindowNight();
+  useDialogA11y(box, onClose);
+  const c = cockpit;
+  const paused = c?.status === 'paused';
+  return createPortal(
+    <div className={'ckp ckp-overlay' + (night ? ' is-night' : '')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div ref={box} className="ckp-win" role="dialog" aria-modal="true" aria-label={c ? `Проєкт ${c.client}` : 'Проєкт'} tabIndex={-1}>
+        <header className="ckp-whd">
+          {c ? <Avatar name={c.client} size={48} /> : <span className="ckp-skel" style={{ width: 48, height: 48 }} />}
+          <div className="ckp-wt">
+            <h2>{c ? c.client : 'Проєкт'}{c && <span className={'ckp-chip ' + (paused ? '' : c.waiting ? 'is-warn' : 'is-work')}>{paused ? 'зупинено' : c.waiting ? 'чекає на вас' : 'працює'}</span>}</h2>
+            <p>{c ? `${c.modeLabel} · ${c.name}${c.updatedAt ? ' · оновлено ' + fmtAgo(c.updatedAt) : ''}` : loading ? 'Завантажуємо проєкт…' : 'Проєкт не знайдено'}</p>
+          </div>
+          {c && <button type="button" className="ckp-btn is-primary" onClick={() => onNewRequest?.(c)}><Ic n="plus" size={16} />Новий цикл (запит на креативи)</button>}
+          {c && <button type="button" className="ckp-btn" onClick={() => onStop?.(c)}><Ic n={paused ? 'play' : 'stop'} size={16} />{paused ? 'Відновити' : 'Зупинити'}</button>}
+          <button type="button" className="ckp-x ckp-x-lg" onClick={onClose} aria-label="Закрити вікно проєкту"><Ic n="close" size={17} /></button>
+        </header>
+        <div className="ckp-wbody">
+          {!c && loading && <div className="ckp-skel ckp-skel-wide" aria-hidden="true" />}
+          {!c && !loading && <p className="ckp-empty-line">Цей проєкт більше не активний або до нього немає доступу.</p>}
+          {c && <OperationBody cockpit={c} loading={loading} onAction={onAction} onOpenRequest={onOpenRequest} />}
         </div>
       </div>
     </div>,

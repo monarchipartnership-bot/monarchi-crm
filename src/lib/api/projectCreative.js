@@ -52,3 +52,21 @@ export async function deleteAsset(asset) {
   must(await supabase.from('project_creative_assets').delete().eq('id', asset.id).select());
   if (asset.path) await supabase.storage.from(BUCKET).remove([asset.path]).catch(() => {}); // the file may already be gone: the row is what matters
 }
+
+// «Визначити бренд із файлів»: the model looks at the uploaded files and names the colours, the kind of type and the style. → { text, colors, fonts, style, logo, notes, images }
+// Nothing is saved: the page puts the text into the field for the person to correct.
+export async function analyzeBrand(projectId) {
+  const { authedPost } = await import('../adAccounts');
+  return authedPost('/api/project-brand-analyze', { projectId });
+}
+
+// «Підтягнути кращі креативи з Meta»: the best ads of the last `days` days become files «Готовий креатив» of the library. → { added, already, noPicture, looked }
+export async function importMetaExamples(projectId, { days = 30, count = 6 } = {}) {
+  const { authedPost } = await import('../adAccounts');
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const end = new Date();
+  const start = new Date(end.getTime() - (days - 1) * 86400000);
+  const json = await authedPost('/api/report-creatives', { action: 'import_examples', projectId, start: iso(start), end: iso(end), count });
+  if (json.configError) throw new Error('На сервері не задано доступ до Meta (META_ACCESS_TOKEN).');
+  return json;
+}

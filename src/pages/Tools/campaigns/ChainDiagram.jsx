@@ -26,7 +26,7 @@ export function layout() {
   return { pos, width: PAD * 2 + STAGES.length * NODE_W + (STAGES.length - 1) * COL_GAP, height: HEAD + 6 + colH + 8, colH };
 }
 
-const STATE_DOT = { on: '#3FD98A', off: '#8D7A93', blocked: '#FF8A8A', paused: '#FFB547' };
+const STATE_DOT = { on: '#4BE07F', off: '#8D7A93', blocked: '#FF8A8A', paused: '#FBBF24' };
 
 export default function ChainDiagram({ active, states, selected, onSelect, compact = false }) {
   const uid = useId().replace(/:/g, '');
@@ -41,8 +41,8 @@ export default function ChainDiagram({ active, states, selected, onSelect, compa
   return (
     <svg className={'cmp-diagram' + (compact ? ' is-compact' : '')} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Схема звʼязків між агентами операції">
       <defs>
-        <marker id={`arrow-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#c76dff" /></marker>
-        <marker id={`arrow-dim-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#6b5a85" /></marker>
+        <marker id={`arrow-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#EB9CEF" /></marker>
+        <marker id={`arrow-dim-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9z" fill="#8a6a98" /></marker>
         <filter id={`glow-${uid}`} x="-30%" y="-40%" width="160%" height="180%"><feGaussianBlur stdDeviation="5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
       </defs>
 

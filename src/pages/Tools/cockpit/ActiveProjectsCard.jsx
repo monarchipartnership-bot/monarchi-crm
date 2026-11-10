@@ -9,7 +9,7 @@ function RingBadge({ value = 0 }) {
     <span className="apc-med" style={{ width: size, height: size }} aria-hidden="true">
       <svg className="apc-ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ck-track)" strokeWidth={w} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--apc-acc, #c76dff)" strokeWidth={w} strokeLinecap="round" strokeDasharray={`${C * v} ${C}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--apc-acc, #EB9CEF)" strokeWidth={w} strokeLinecap="round" strokeDasharray={`${C * v} ${C}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       </svg>
       <Ic n="folder" size={18} />
     </span>

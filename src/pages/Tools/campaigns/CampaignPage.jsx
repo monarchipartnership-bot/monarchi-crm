@@ -117,7 +117,7 @@ export default function CampaignPage({ campaign: initial, project, onBack, onCha
       <section className="cmp-live">
         <div className="cmp-live-head"><h3>Схема агентів операції</h3><span className="cmp-muted">Натисніть агента, щоб відкрити його промти, налаштування й історію.</span></div>
         <div className="cmp-scheme"><ChainDiagram active={active} states={states} onSelect={(role) => byRole.get(role) && setOpenRole(role)} selected={openRole} /></div>
-        <p className="cmp-legend cmp-legend--caps"><span><i style={{ background: '#3FD98A' }} />працює</span><span><i style={{ background: '#8D7A93' }} />вимкнено</span><span><i style={{ background: '#FF8A8A' }} />зупинено (залежить від вимкненого)</span><span><i style={{ background: '#FFB547' }} />операція на паузі</span></p>
+        <p className="cmp-legend cmp-legend--caps"><span><i style={{ background: '#4BE07F' }} />працює</span><span><i style={{ background: '#8D7A93' }} />вимкнено</span><span><i style={{ background: '#FF8A8A' }} />зупинено (залежить від вимкненого)</span><span><i style={{ background: '#FBBF24' }} />операція на паузі</span></p>
       </section>
       )}
 

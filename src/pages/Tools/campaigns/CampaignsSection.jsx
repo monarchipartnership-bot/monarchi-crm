@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { PLATFORMS } from '../../../lib/agents/campaignTeam';
 import { fmtDateTime } from '../../Smm/agentUi';
 import CampaignPage, { CAMPAIGN_STATUS } from './CampaignPage';
+import OperationCard from '../cockpit/OperationCard';
 import CreateCampaignWizard from './CreateCampaignWizard';
 import { CampaignCalendar, FromTemplateDialog } from './OperationTools';
 import '../../../styles/aiAgentsSection.css';
@@ -12,7 +13,8 @@ import '../../../styles/campaignsSection.css';
 
 // «Операції»: the teams of agents that work on the campaigns of the clients. Create a campaign (a window with the chain of agents),
 // the current campaigns, the archive.
-export default function CampaignsSection({ openCampaignId = null, openNewRequest = false, startProjectId = null }) {
+//   cockpit: useProjectCockpit() of the page (the cabinets of the operations)  onOpenProject(projectId, operationId): opens the card of the project
+export default function CampaignsSection({ openCampaignId = null, openNewRequest = false, startProjectId = null, cockpit = null, onOpenProject = null }) {
   const [campaigns, setCampaigns] = useState(null);
   const [projects, setProjects] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -47,7 +49,12 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
   const paused = (campaigns || []).filter((c) => c.status === 'paused').length;
   const withErrors = (campaigns || []).filter((c) => (failed[String(c.id)]?.failed || 0) > 0 && c.status !== 'archived').length;
 
-  if (open) {
+  // a launched operation: its card on the whole screen with the six sections (the same as inside the card of a project); the list stays under it
+  const card = open && cockpit && ['active', 'paused'].includes(open.status)
+    ? <OperationCard campaign={open} project={projectOf(open.project_id) || null} cockpit={cockpit} regularFirst={newRequest} onChanged={reload} onOpenProject={onOpenProject ? (pid, oid) => { setOpenId(null); setNewRequest(false); onOpenProject(pid, oid); } : null}
+        onClose={() => { setOpenId(null); setNewRequest(false); reload(); }} />
+    : null;
+  if (open && !card) {
     return (
       <div className="ai-section cmp-section" role="region" aria-label="Операція">
         {toast && <div className={'cmp-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
@@ -115,6 +122,7 @@ export default function CampaignsSection({ openCampaignId = null, openNewRequest
         })}
       </div>
 
+      {card}
       {wizard && (
         <CreateCampaignWizard
           initialProjectId={startProjectId}

@@ -3,6 +3,8 @@
     "api/project-agent-run.js": { "maxDuration": 300 },
     "api/project-profile-extract.js": { "maxDuration": 60 },
     "api/kb-search.js": { "maxDuration": 60 },
+    "api/project-brand-analyze.js": { "maxDuration": 90 },
+    "api/creative-form-fill.js": { "maxDuration": 60 },
     "api/agent-tick.js": { "maxDuration": 300 },
     "api/smm-generate.js": { "maxDuration": 300 },
     "api/smm-competitors-run.js": { "maxDuration": 300 },

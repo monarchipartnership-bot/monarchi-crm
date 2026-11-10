@@ -49,8 +49,8 @@ export default function QuarterDiagram({ lit }) {
   return (
     <svg className="cmp-diagram cmp-diagram--quarters" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Схема звʼязків між агентами за кварталами Клієнтського району">
       <defs>
-        <marker id={`qa-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1 9 5 1 9z" fill="#c76dff" /></marker>
-        <marker id={`qd-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1 9 5 1 9z" fill="#6b5a85" /></marker>
+        <marker id={`qa-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1 9 5 1 9z" fill="#EB9CEF" /></marker>
+        <marker id={`qd-${uid}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1 9 5 1 9z" fill="#8a6a98" /></marker>
       </defs>
       {QUARTERS.map((q, i) => (
         <g key={q.key} className={'cmp-colhead' + (quarterLit[i] ? ' is-lit' : '')}>

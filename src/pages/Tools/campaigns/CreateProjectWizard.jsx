@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { fetchClientsForCampaigns } from '../../../lib/api/campaigns';
 import { extractProfile, currentProfile, saveExtracted } from '../../../lib/api/projectProfile';
+import { NO_TABLE, ensureAiProject, fetchAiProjects } from '../../../lib/api/aiProjects';
 import { fetchProjectAccounts, fetchProjectCreative, saveInput, saveSettings, uploadAsset } from '../../../lib/api/projectCreative';
 import { PLATFORMS } from '../../../lib/agents/campaignTeam';
 import { FIELD_LABELS } from '../../../lib/agents/agentRequirements';
@@ -41,10 +42,17 @@ export default function CreateProjectWizard({ onClose, onDone, notify }) {
   const [saved, setSaved] = useState([]);
   useDialogA11y(box, () => { if (!busy) onClose(); });
 
-  useEffect(() => { fetchClientsForCampaigns().then(setClients).catch((e) => { setClients([]); setError(e.message || 'Не вдалося завантажити клієнтів.'); }); }, []);
+  // one project per client: a client whose project is ACTIVE in the section is not offered again (a finished or removed one can be started anew)
+  const [taken, setTaken] = useState(() => new Set());
+  useEffect(() => {
+    Promise.all([fetchClientsForCampaigns(), fetchAiProjects().catch(() => ({ aiProjects: [] }))])
+      .then(([list, ai]) => { setTaken(new Set(ai.aiProjects.filter((a) => a.status === 'active').map((a) => a.project_id))); setClients(list); })
+      .catch((e) => { setClients([]); setError(e.message || 'Не вдалося завантажити клієнтів.'); });
+  }, []);
   useEffect(() => () => { try { recRef.current?.stop(); } catch { /* already stopped */ } }, []);
 
-  const list = useMemo(() => (clients || []).filter((c) => c.accounts.length && `${c.name} ${c.client || ''}`.toLowerCase().includes(query.trim().toLowerCase())), [clients, query]);
+  const list = useMemo(() => (clients || []).filter((c) => c.accounts.length && !taken.has(c.id) && `${c.name} ${c.client || ''}`.toLowerCase().includes(query.trim().toLowerCase())), [clients, query, taken]);
+  const takenCount = useMemo(() => (clients || []).filter((c) => c.accounts.length && taken.has(c.id)).length, [clients, taken]);
   const conflicts = useMemo(() => (draft && existing && mode === 'quick' ? planWrites(extractedFromDraft(draft), existing).conflicts : []), [draft, existing, mode]);
   const summary = useMemo(() => (state ? wizardSummary({ extracted: { fields: {}, links: reading?.links || [], needsFiles: reading?.needsFiles || [], unplaced: reading?.unplaced || [] }, settings: state.settings, assets: state.assets, accounts: state.accounts }) : null), [state, reading]);
 
@@ -95,6 +103,7 @@ export default function CreateProjectWizard({ onClose, onDone, notify }) {
       const cur = (await fetchProjectCreative(project.id)).settings;
       await saveSettings(project.id, { ...cur, cta_mode: extracted.cta.mode, cta_text: extracted.cta.text }, email);
     }
+    await ensureAiProject(project.id, email).catch((e) => { if (e.message !== NO_TABLE) throw e; }); // from now on it is a project of the section (one per client)
     setSaved(r.saved);
     await reloadState();
     setStep(2);
@@ -138,7 +147,8 @@ export default function CreateProjectWizard({ onClose, onDone, notify }) {
               <p className="cmp-muted">Агенти читають цифри рекламного кабінету, тому проєкт має його мати.</p>
               <input className="cmp-input" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Пошук клієнта або проєкту" aria-label="Пошук клієнта" />
               {clients === null && <p className="cmp-muted">Завантаження…</p>}
-              {clients && !list.length && <p className="cmp-muted">Немає проєктів із привʼязаним рекламним кабінетом{query ? ' за цим пошуком' : ''}. Привʼяжіть кабінет у картці проєкту.</p>}
+              {clients && !list.length && <p className="cmp-muted">Немає проєктів із привʼязаним рекламним кабінетом{query ? ' за цим пошуком' : ''}, яких ще немає в AI Agents. Привʼяжіть кабінет у картці проєкту.</p>}
+              {clients && takenCount > 0 && <p className="cmp-muted">Уже в роботі в AI Agents і тому не показано: {takenCount}. У клієнта може бути один активний проєкт; завершений або видалений можна створити знову.</p>}
               <ul className="cmp-clients">
                 {list.map((c) => (
                   <li key={c.id}>

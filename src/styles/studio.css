@@ -210,3 +210,31 @@
 .qr-w2 { grid-column: 1 / -1; }
 .qr-shots { height: 36px; border-radius: 12px; border: 1.5px dashed #C193CA; background: transparent; color: #E8CBEC; font: 600 .78rem var(--font-body); cursor: pointer; padding: 0 12px; text-align: left; }
 @media (max-width: 760px) { .qr-exbody, .qr-askf, .qr-l, .qr-mat { grid-template-columns: minmax(0, 1fr); } .qr-row, .qr-row.is-edit { grid-template-columns: 26px minmax(0, 1fr) 30px; } .qr-row span, .qr-row em { display: none; } }
+
+/* the form of a cycle (RequestForm.jsx): sections, working dictation, the settings of the agents for this cycle */
+.qr-h { margin: 0; font: 800 .92rem var(--font-head); color: #F9EDF9; }
+.qr-wrap { flex-wrap: wrap; }
+.qr-prm0 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 26px; }
+.qr-total { margin: 0; font-size: .82rem; color: #C193CA; } .qr-total b { color: #F9EDF9; font-size: .9rem; }
+.qr-ctain { width: 220px; max-width: 100%; }
+.qr-mic.is-live { gap: 8px; }
+.qr-micbtn { width: 42px; height: 42px; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: #F9EDF9; background: rgba(235, 156, 239, .2); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .55); }
+.qr-micbtn svg { width: 20px; height: 20px; }
+.qr-micbtn.on { background: linear-gradient(135deg, #E0457B, #B02A5B); box-shadow: 0 0 0 5px rgba(224, 69, 123, .28); animation: qrPulse 1.2s ease-in-out infinite; }
+.qr-micbtn:focus-visible, .qr-miclang:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; }
+.qr-miclang { height: 32px; border: 0; border-radius: 999px; padding: 0 10px; background: rgba(12, 3, 16, .55); color: #F0C6F2; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .35); font: 600 .76rem var(--font-body); }
+.qr-micoff { font-size: .72rem; color: #C193CA; max-width: 200px; text-align: right; }
+.qr-live { margin: 6px 0 0; font-size: .84rem; color: #F5B04A; }
+.qr-liveerr { margin: 6px 0 0; font-size: .82rem; color: #FF8A8A; }
+.qr-ag { border-radius: 16px; background: rgba(12, 3, 16, .35); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .22); overflow: hidden; }
+.qr-ag.open .qr-chev { transform: rotate(180deg); }
+.qr-ag .qr-exbody { padding-top: 4px; }
+@keyframes qrPulse { 50% { box-shadow: 0 0 0 9px rgba(224, 69, 123, .1); } }
+@media (prefers-reduced-motion: reduce) { .qr-micbtn.on { animation: none; } }
+
+/* the analysis of the description: the button under the field and the note about what was filled */
+.qr-footrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-right: 150px; }
+.qr-ana { padding: 8px 16px; font-size: .84rem; }
+.qr-ansbox p { margin: 0; font-size: .86rem; line-height: 1.5; color: #F2DDF4; } .qr-ansbox p + p { margin-top: 6px; }
+.qr-src { margin-left: 6px; padding: 1px 8px; border-radius: 999px; font: 600 .68rem var(--font-body); font-style: normal; letter-spacing: .02em; text-transform: none; color: #F5B04A; background: rgba(245, 176, 74, .14); box-shadow: inset 0 0 0 1px rgba(245, 176, 74, .45); }
+@media (max-width: 760px) { .qr-footrow { padding-right: 0; } }

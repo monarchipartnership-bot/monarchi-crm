@@ -25,7 +25,7 @@ export function createAgentNames({ root, camera, getSize, agents, islands, boxes
   function refresh() { // the text and the lamp of every pill (after the states change)
     agents.forEach((a, i) => {
       const st = statusOf ? statusOf(a) : null;
-      els[i].innerHTML = `<i style="background:${st ? st.color : '#b25cff'}"></i><span>${esc(a.name)}</span>`;
+      els[i].innerHTML = `<i style="background:${st ? st.color : '#EB9CEF'}"></i><span>${esc(a.name)}</span>`;
       els[i].title = st ? `${a.name} · ${st.name}` : a.name;
     });
   }

@@ -28,7 +28,8 @@ export function periodStart(key, now = new Date()) {
 // campaigns: ag_campaigns rows; projects: [{ id, name }]; tasks: [{ campaign_id, cost_usd, created_at }]; spends: [{ campaign_id, usd, created_at }]
 // → { rows, total: { claude, higgsfield, total }, days: [{ date, claude, higgsfield }] (the last 30 Kyiv days, oldest first) }
 // A row: { id, name, project, status, claude, higgsfield, total (in the period), allTime (all the time: the cap is compared with it), cap, step, pct (0..1 or null), hot }
-export function buildCampaignSpend({ campaigns = [], projects = [], tasks = [], spends = [], period = 'month', now = new Date() } = {}) {
+//   keepAll: every operation is listed, even one that never spent (the card of a project shows all its operations)
+export function buildCampaignSpend({ campaigns = [], projects = [], tasks = [], spends = [], period = 'month', now = new Date(), keepAll = false } = {}) {
   const from = periodStart(period, now);
   const fromT = from ? from.getTime() : -Infinity;
   const slot = new Map();
@@ -57,7 +58,7 @@ export function buildCampaignSpend({ campaigns = [], projects = [], tasks = [], 
     const cap = c.spend_cap_usd != null && Number(c.spend_cap_usd) > 0 ? Number(c.spend_cap_usd) : null;
     const pct = cap ? Math.min(1, s.allTime / cap) : null;
     // a campaign that never spent and is not at work would only add noise to the list
-    if (!total && !s.allTime && !['active', 'paused'].includes(c.status)) return;
+    if (!keepAll && !total && !s.allTime && !['active', 'paused'].includes(c.status)) return;
     rows.push({ id: c.id, name: c.name || `Операція ${c.id}`, project: projectName(c.project_id), status: c.status, claude: s.claude, higgsfield: s.higgsfield, total, allTime: s.allTime, cap, step: c.notify_step_usd == null ? 2 : Number(c.notify_step_usd), pct, hot: pct != null && pct >= 0.9 });
     slot.delete(c.id);
   });

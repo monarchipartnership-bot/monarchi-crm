@@ -7,6 +7,8 @@ import { kickQueue, saveAgent } from '../../../lib/api/agents';
 import { changeCampaignPlatforms, createCampaign, fetchClientsForCampaigns, launchCampaign, loadCampaignTeam, setAgentsEnabled, updateCampaign } from '../../../lib/api/campaigns';
 import { dependents } from '../../../lib/agents/chain';
 import { CAMPAIGN_ROLES, PLATFORMS, PLATFORM_KEYS, roleDef, STAGES } from '../../../lib/agents/campaignTeam';
+import { conflictMessage, sameModeConflict } from '../../../lib/agents/operationCycles';
+import { supabase } from '../../../lib/supabaseClient';
 import { MODES, MODE_ORDER, litNodes, modeEstimate, modeHasDepartment, modeRoles, shortName } from '../../../lib/agents/campaignModes';
 import { CREATIVE_OPTIONAL, CREATIVE_REQUIRED, CREATIVE_ROLES, CREATIVE_STAGES, creativeAutofill } from '../../../lib/agents/creativeTeam';
 import { fetchDeptClientSetup, saveCreativeSetup } from '../../../lib/api/creatives';
@@ -38,7 +40,7 @@ function Field({ id, label, hint, children }) {
 // «Створити операцію»: 1) the client and the channels, with the chain of agents lighting up for the chosen channels,
 // 2) every agent set up for this client one after another, 3) the summary and the launch.
 // the accent of an agent: the colour of its channel, violet for the common ones (the medallions of the agent menu)
-const accentOfRole = (role) => { const d = roleDef(role); return !d || d.platforms.includes('*') ? '#c76dff' : PLATFORMS[d.platforms[0]]?.color || '#c76dff'; };
+const accentOfRole = (role) => { const d = roleDef(role); return !d || d.platforms.includes('*') ? '#EB9CEF' : PLATFORMS[d.platforms[0]]?.color || '#EB9CEF'; };
 
 export default function CreateCampaignWizard({ onClose, onLaunched, notify, initialProjectId = null }) {
   const { email } = useAuth();
@@ -60,6 +62,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
   const [seen, setSeen] = useState(new Set([0]));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [existing, setExisting] = useState([]); // the operations of the chosen project: one of a kind may work at a time
   useDialogA11y(box, () => { if (!busy) onClose(); });
 
   useEffect(() => { fetchClientsForCampaigns().then((list) => { setClients(list); const p = initialProjectId != null ? list.find((c) => c.id === initialProjectId && c.accounts.length) : null; if (p) choose(p); }).catch((e) => { setClients([]); setError(e.message || 'Не вдалося завантажити клієнтів.'); }); }, []);
@@ -67,11 +70,19 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
   const available = useMemo(() => new Set(project ? [...project.accounts.map((a) => a.platform).filter((p) => PLATFORMS[p]), 'tiktok'] : []), [project]);
   const choose = (p) => {
     setProject(p); setError('');
+    setExisting([]);
+    supabase.from('ag_campaigns').select('id, name, status, project_id, config').eq('project_id', p.id).then(({ data }) => {
+      const rows = data || [];
+      setExisting(rows);
+      setMode((m) => (sameModeConflict(rows, { projectId: p.id, mode: m }) ? MODE_ORDER.find((k) => !sameModeConflict(rows, { projectId: p.id, mode: k })) || m : m)); // the first kind that is still free
+    });
     const have = p.accounts.map((a) => a.platform).filter((x) => x === 'meta' || x === 'google');
     setPlatforms(have.length ? have : ['tiktok']);
   };
   const toggle = (k) => setPlatforms((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
   const modeDef = MODES[mode];
+  const clashOf = (k) => (project ? sameModeConflict(existing, { projectId: project.id, mode: k, exceptId: campaign?.id ?? null }) : null);
+  const clash = clashOf(mode);
   const roles = useMemo(() => modeRoles(mode, platforms), [mode, platforms]); // the agents of the campaign team this mode switches on
   const creativeOn = modeHasDepartment(mode, creative.enabled); // the department works in «Тільки креативи» and, when wanted, in «Повна операція»
   const lit = useMemo(() => litNodes(mode, platforms, { departmentWanted: creative.enabled, optional: creative.optional }), [mode, platforms, creative]);
@@ -81,6 +92,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
   // ---- step 1 -> 2: the campaign (a draft) and its team are created, the forms are filled from what is saved
   async function toAgents() {
     if (!project || !platforms.length) return;
+    if (clash) { setError(conflictMessage(clash)); return; }
     setBusy(true); setError('');
     try {
       let c = campaign;
@@ -199,7 +211,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
       } else {
         kickQueue().catch(() => {});
         notify?.('Операцію запущено: перші агенти вже працюють.');
-        onLaunched(campaign.id);
+        onLaunched(campaign.id, { newRequest: creativeOn }); // the regular cycle of the creatives is set up at once (the form opens)
       }
     } catch (e) { setError(e.message || 'Не вдалося запустити.'); setBusy(false); }
   }
@@ -267,9 +279,9 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                       <div className="cmp-modepick">
                         <div className="cmp-modelist" role="radiogroup" aria-label="Режим">
                           {MODE_ORDER.map((k) => (
-                            <button key={k} type="button" role="radio" aria-checked={mode === k} className={'cmp-moderow' + (mode === k ? ' is-on' : '')} onClick={() => setMode(k)}>
+                            <button key={k} type="button" role="radio" aria-checked={mode === k} aria-disabled={!!clashOf(k)} className={'cmp-moderow' + (mode === k ? ' is-on' : '') + (clashOf(k) ? ' is-taken' : '')} onClick={() => setMode(k)}>
                               <span className="cmp-modeicon cmp-modeicon--sm"><ModeIcon name={MODES[k].icon} /></span>
-                              <span><b>{MODES[k].title}</b><small>{MODES[k].sub}</small></span>
+                              <span><b>{MODES[k].title}</b><small>{clashOf(k) ? 'уже працює в цьому проєкті' : MODES[k].sub}</small></span>
                               <span className="cmp-radio" aria-hidden="true" />
                             </button>
                           ))}
@@ -280,6 +292,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                             <span><b>{modeDef.title}</b><small>{modeDef.sub}</small></span>
                           </div>
                           <p className="cmp-modecard-text">{modeDef.text}</p>
+                          {clash && <p className="cmp-strip cmp-strip--warn" role="alert"><b>Така операція вже працює.</b> {conflictMessage(clash)}</p>}
                           <span className="cmp-modechips">
                             <span className={'cmp-modechip ' + (modeDef.safe ? 'is-ok' : 'is-warn')}><i />Старт: {modeDef.start}</span>
                             <span className={'cmp-modechip ' + (modeDef.safe ? 'is-ok' : 'is-warn')}><i />Витрати: {modeDef.cost}</span>
@@ -357,7 +370,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
             <div className="cmp-step2">
               <nav className="cmp-agentnav" aria-label="Агенти операції">
                 <ol>
-                  {modeDef.brief && <li><button type="button" className={idx === 0 ? 'is-current' : seen.has(0) ? 'is-seen' : ''} style={{ '--c': '#c76dff' }} onClick={() => go(0)} disabled={busy}><i className="cow-n" aria-hidden="true">·</i><span>Загальне про операцію</span></button></li>}
+                  {modeDef.brief && <li><button type="button" className={idx === 0 ? 'is-current' : seen.has(0) ? 'is-seen' : ''} style={{ '--c': '#EB9CEF' }} onClick={() => go(0)} disabled={busy}><i className="cow-n" aria-hidden="true">·</i><span>Загальне про операцію</span></button></li>}
                   {ordered.map((a, i) => (
                     <li key={a.id}>
                       <button type="button" className={(idx === i + 1 ? 'is-current ' : seen.has(i + 1) ? 'is-seen ' : '') + (forms[a.id]?.enabled ? '' : 'is-off')} style={{ '--c': accentOfRole(a.role) }} onClick={() => go(i + 1)} disabled={busy}>
@@ -370,7 +383,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                     const n = ordered.length + j + 1;
                     return (
                       <li key={it.agent.id}>
-                        <button type="button" className={idx === n ? 'is-current' : seen.has(n) ? 'is-seen' : ''} style={{ '--c': '#c76dff' }} onClick={() => go(n)} disabled={busy}><i className="cow-n" aria-hidden="true">{n}</i><span>{it.agent.name}</span></button>
+                        <button type="button" className={idx === n ? 'is-current' : seen.has(n) ? 'is-seen' : ''} style={{ '--c': '#EB9CEF' }} onClick={() => go(n)} disabled={busy}><i className="cow-n" aria-hidden="true">{n}</i><span>{it.agent.name}</span></button>
                       </li>
                     );
                   })}
@@ -516,7 +529,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
         </div>
 
         <footer className="cmp-wiz-foot">
-          {step === 1 && (<><button type="button" className="cmp-btn" onClick={onClose}>Скасувати</button><button type="button" className="cmp-btn cmp-btn--primary" disabled={!project || !platforms.length || busy} onClick={toAgents}>{busy ? 'Створюємо…' : 'Підтвердити й налаштувати агентів'}</button></>)}
+          {step === 1 && (<><button type="button" className="cmp-btn" onClick={onClose}>Скасувати</button><button type="button" className="cmp-btn cmp-btn--primary" disabled={!project || !platforms.length || busy || !!clash} onClick={toAgents}>{busy ? 'Створюємо…' : 'Підтвердити й налаштувати агентів'}</button></>)}
           {step === 2 && (
             <>
               <button type="button" className="cmp-btn" onClick={() => (idx <= (modeDef.brief ? 0 : 1) ? setStep(1) : go(idx - 1))} disabled={busy}>Назад</button>

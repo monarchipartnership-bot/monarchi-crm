@@ -120,3 +120,30 @@ export async function pickCreative({ db, token, accounts, projectId, period, adI
 
 // The collector the agent's run is given: asks for the creatives of the Meta accounts of a project (null without a token, then the run simply has none).
 export const makeCreativesCollector = (db, token) => (token ? ({ projectId, accounts, period, count }) => collectCreatives({ db, token, accounts, projectId, period, count }) : null);
+
+// «Підтягнути кращі креативи з Meta» (owner, 2026-11-11): the best ads of the period become files of the client's library, kind «Готовий креатив», so the agents
+// can look at what already works. The picture is copied into our storage (a video gives its cover); an ad that is already in the library is not added twice
+// (its row carries the mark `meta-ad-<id>` in `path`). → { added: [rows], already, noPicture, looked }
+export const exampleMark = (adId) => `meta-ad-${adId}`;
+export async function importExamples({ db, token, accounts, projectId, period, count = 6, email = null, graphFn = graphGet, fetchFn = fetch }) {
+  const ranked = await rankedAds({ accounts, start: period.start, end: period.end, token, graphFn });
+  const out = { added: [], already: 0, noPicture: 0, looked: 0 };
+  if (!ranked.length) return out;
+  const pool = ranked.slice(0, count * 4);
+  const creatives = await creativesOf(pool.map((a) => a.adId), { token, graphFn });
+  const chosen = pickDistinct(pool, creatives, count);
+  out.looked = chosen.length;
+  const have = await db.from('project_creative_assets').select('path').eq('project_id', projectId).eq('kind', 'creative');
+  if (have.error) throw new Error(have.error.message);
+  const marks = new Set((have.data || []).map((r) => r.path));
+  for (const ad of chosen) {
+    if (marks.has(exampleMark(ad.adId))) { out.already += 1; continue; }
+    const url = await copyImage({ db, url: creativeImageUrl(creatives.get(ad.adId)), path: `project-examples/${projectId}/${ad.adId}`, fetchFn });
+    if (!url) { out.noPicture += 1; continue; }
+    const name = `Meta · ${captionOf(ad) || ad.adName || ad.adId}`.slice(0, 160);
+    const row = await db.from('project_creative_assets').insert({ project_id: projectId, kind: 'creative', name, url, path: exampleMark(ad.adId), created_by: email }).select().single();
+    if (row.error) throw new Error(row.error.message);
+    out.added.push(row.data);
+  }
+  return out;
+}

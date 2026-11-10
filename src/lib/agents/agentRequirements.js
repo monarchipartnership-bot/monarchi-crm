@@ -24,7 +24,7 @@ export const REQUIREMENTS = {
   creative_analyst: R(['cabinet'], []),
   // the team of a campaign
   business_research: R(['about'], ['offer']),
-  competitor_research: R(['competitors'], ['about']),
+  competitor_research: R(['competitor_sites'], ['about', 'competitor_notes']), // who to study: the sites of the competitors from the card of the project
   audience_research: R(['about'], ['offer', 'markets']),
   marketing_strategist: R(['about', 'goals'], ['offer', 'audience', 'competitors', 'budget', 'markets', 'seasonality']),
   meta_analyst: R(['cabinet_meta'], ['goals']),
@@ -52,6 +52,7 @@ export function filledFields({ settings = {}, assets = [], accounts = [] } = {})
   if (String(settings?.restrictions || '').trim()) have.add('restrictions');
   if (settings?.cta_mode === 'none' || String(settings?.cta_text || '').trim()) have.add('cta');
   if (String(settings?.figma_url || '').trim()) have.add('figma');
+  if (have.has('competitor_notes') || have.has('competitors')) have.add('competitor_sites'); // the competitors are named, with or without their addresses
   if (assets.length) have.add('materials');
   const platforms = new Set(accounts.map((a) => a.platform));
   if (platforms.has('meta')) { have.add('cabinet_meta'); have.add('cabinet'); }

@@ -2,15 +2,15 @@
 .agp { position: absolute; z-index: 30; left: 96px; top: 112px; bottom: 28px; width: min(360px, calc(100vw - 120px)); display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 22px; background: rgba(24, 12, 44, .92); border: 1.5px solid rgba(190, 120, 255, .45); box-shadow: 0 18px 50px rgba(10, 4, 24, .55); color: #fff; font-family: 'Onest', sans-serif; }
 .agp-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; }
 .agp-x { border: 0; background: rgba(255, 255, 255, .12); color: #fff; width: 28px; height: 28px; border-radius: 50%; font-size: 18px; line-height: 1; cursor: pointer; }
-.agp-q { border: 1.5px solid rgba(190, 120, 255, .35); background: rgba(255, 255, 255, .08); color: #fff; border-radius: 999px; padding: 8px 14px; font: 500 13px 'Onest', sans-serif; outline: none; }
-.agp-q:focus-visible, .agp-x:focus-visible, .agp-row:focus-visible { outline: 3px solid #d9a6ff; outline-offset: 2px; }
+.agp-q { border: 1.5px solid rgba(190, 120, 255, .35); background: rgba(235, 156, 239, .12); color: #fff; border-radius: 999px; padding: 8px 14px; font: 500 13px 'Onest', sans-serif; outline: none; }
+.agp-q:focus-visible, .agp-x:focus-visible, .agp-row:focus-visible { outline: 3px solid #F0C4F5; outline-offset: 2px; }
 .agp-list { overflow: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
-.agp-group h4 { margin: 0 0 4px; display: flex; justify-content: space-between; font: 700 12px 'Onest', sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #d9a6ff; }
+.agp-group h4 { margin: 0 0 4px; display: flex; justify-content: space-between; font: 700 12px 'Onest', sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #F0C4F5; }
 .agp-group h4 small { color: #a68ac4; font-weight: 600; }
 .agp-row { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: 12px; background: transparent; color: #fff; text-align: left; cursor: pointer; font: 500 13px 'Onest', sans-serif; }
 .agp-dot { width: 9px; height: 9px; border-radius: 50%; background: #7c6a99; }
-.agp-dot.s-working { background: #b25cff; box-shadow: 0 0 8px #b25cff; }
-.agp-dot.s-paused { background: #ffb347; }
+.agp-dot.s-working { background: #EB9CEF; box-shadow: 0 0 8px #EB9CEF; }
+.agp-dot.s-paused { background: #FBBF24; }
 .agp-dot.s-waiting { background: #4be07f; }
 .agp-dot.s-problem { background: #ff5a6a; box-shadow: 0 0 8px #ff5a6a; }
 .agp-st { font-size: 11px; color: #a68ac4; }

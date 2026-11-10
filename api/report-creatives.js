@@ -2,9 +2,10 @@
 //   POST { action: 'suggest',    projectId, start, end, count? }   → { items }        the best ads of the period with our copy of their pictures
 //   POST { action: 'candidates', projectId, start, end }           → { candidates }   the top ads to choose from (a preview, nothing is copied)
 //   POST { action: 'pick',       projectId, start, end, adId }     → { item }         the chosen ad as a report item, its picture copied
+//   POST { action: 'import_examples', projectId, start, end, count? } → { added, already, noPicture, looked }  the best ads become files «Готовий креатив» of the client's library
 // Meta only for now. A signed-in CRM user asks; the Meta token never leaves the server. Pictures are copied into our storage with the person's own session.
 import { createClient } from '@supabase/supabase-js';
-import { collectCreatives, creativeCandidates, pickCreative } from './_lib/metaCreatives.js';
+import { collectCreatives, creativeCandidates, importExamples, pickCreative } from './_lib/metaCreatives.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -32,6 +33,8 @@ export default async function handler(req, res) {
       res.status(200).json({ candidates: await creativeCandidates({ token: metaToken, accounts: accounts || [], period }) });
     } else if (action === 'pick' && adId) {
       res.status(200).json({ item: await pickCreative({ db: authed, token: metaToken, accounts: accounts || [], projectId: Number(projectId), period, adId: String(adId) }) });
+    } else if (action === 'import_examples') {
+      res.status(200).json(await importExamples({ db: authed, token: metaToken, accounts: accounts || [], projectId: Number(projectId), period, count: Math.min(Math.max(Number(count) || 6, 1), 12), email: user.user.email }));
     } else {
       res.status(400).json({ error: 'Невідома дія' });
     }

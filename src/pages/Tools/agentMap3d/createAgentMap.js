@@ -50,7 +50,7 @@ const CREAM = 0xe9d6c7, VIOLET = 0x8a4dff, DARK = 0x2b1f3f, NEON = 0xc76dff;
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.info.autoReset = false; renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(W(), H()); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 stage.appendChild(renderer.domElement);
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x140a2a); scene.fog = new THREE.FogExp2(0x140a2a, 0.0011);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x17051c); scene.fog = new THREE.FogExp2(0x17051c, 0.0011);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.6;
 const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.5, 4000);
 // the home view = the owner's own angle (2026-11-10: seen from the front-right, 48 degrees above the floor, the whole scene filling the screen); it is also the farthest the camera may go, and the camera is drawn towards it when it is moved away
@@ -73,7 +73,7 @@ scene.add(new THREE.HemisphereLight(0xd8c8ff, 0x20123d, 0.55));
 const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-20, 40, 25); scene.add(sun);
 
 // the backdrop (owner's picture, 2026-11-09): a violet horizon panorama (equirectangular, the glowing horizon line on the equator) round the whole scene; under the building a soft dark disc that fades into it + a faint violet glow, as if the neon lit the polished ground
-new THREE.TextureLoader().load(BASE + 'ai-world/map/background.webp', (tex) => { tex.mapping = THREE.EquirectangularReflectionMapping; tex.colorSpace = THREE.SRGBColorSpace; scene.background = tex; scene.backgroundIntensity = 0.9; scene.backgroundRotation.y = BG_ROT; });
+// 2026-11-11: the owner asked for one simple background across the whole AI Agents section, so the panorama is not loaded any more (scene.background stays the plain deep violet set above, same as the CSS background of the other tabs). To bring the panorama back: load ai-world/map/background.webp as an equirectangular texture into scene.background.
 const radial = (stops) => { const cv = document.createElement('canvas'); cv.width = cv.height = 512; const g = cv.getContext('2d'), gr = g.createRadialGradient(256, 256, 0, 256, 256, 256); stops.forEach(([o, c]) => gr.addColorStop(o, c)); g.fillStyle = gr; g.fillRect(0, 0, 512, 512); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t; };
 const ground = new THREE.Mesh(new THREE.CircleGeometry(2400, 96), new THREE.MeshBasicMaterial({ map: radial([[0, 'rgba(14,9,32,1)'], [0.05, 'rgba(18,12,42,1)'], [0.3, 'rgba(26,18,62,1)'], [0.75, 'rgba(60,42,128,1)'], [1, 'rgba(120,88,210,1)']]), depthWrite: false, fog: false })); ground.rotation.x = -Math.PI / 2; ground.position.y = GROUND_Y; ground.renderOrder = -2; scene.add(ground);
 const glowDisc = new THREE.Mesh(new THREE.CircleGeometry(95, 64), new THREE.MeshBasicMaterial({ map: radial([[0, 'rgba(150,90,255,0.22)'], [0.55, 'rgba(110,60,220,0.09)'], [1, 'rgba(90,40,200,0)']]), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); glowDisc.rotation.x = -Math.PI / 2; glowDisc.position.y = GROUND_Y + 0.03; glowDisc.renderOrder = -1; scene.add(glowDisc);
@@ -94,7 +94,7 @@ const screens = makeScreens(TEAMS);
 const POD_MAT = { Pod_Body: MAT.cream, Pod_Screen: screens.patch(basic(0xffffff, { side: THREE.DoubleSide })), Pod_Neon: MAT.neon, Pod_Tablet: MAT.glass, Pod_TabletScreen: basic(0xffffff, { map: tabletTex }), Pod_Plants: MAT.green, Pod_Pad: basic(VIOLET, { transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }) };
 POD_MAT.Pod_Cap = std(0xf1e8de, { roughness: 0.28 }); POD_MAT.Pod_Leaf = std(0xffffff, { vertexColors: true, roughness: 0.65, side: THREE.DoubleSide }); POD_MAT.Pod_Flower = std(0xffffff, { vertexColors: true, roughness: 0.55, side: THREE.DoubleSide }); POD_MAT.Pod_Soil = std(0x2a1d1a, { roughness: 1 }); POD_MAT.Pod_Status = basic(0xffffff);
 // the states of an agent and the light each one wears on the back of its desk (the owner's palette of the office robots: working = green, waiting for tasks = violet, standby = blue, not active = white); until the real states come from the CRM they are dealt out pseudo-randomly
-const STATUS = [{ k: 'working', name: 'Працює', col: new THREE.Color('#3FD98A'), pulse: 3.0 }, { k: 'waiting', name: 'Очікує завдань', col: new THREE.Color('#A45CFF'), pulse: 1.6 }, { k: 'standby', name: 'Резерв', col: new THREE.Color('#5BB8FF'), pulse: 0.7 }, { k: 'inactive', name: 'Не активний', col: new THREE.Color('#F2F2FA'), pulse: 0 }, { k: 'problem', name: 'Проблема', col: new THREE.Color('#FF5A6E'), pulse: 4.5 }];
+const STATUS = [{ k: 'working', name: 'Працює', col: new THREE.Color('#4BE07F'), pulse: 3.0 }, { k: 'waiting', name: 'Очікує завдань', col: new THREE.Color('#A45CFF'), pulse: 1.6 }, { k: 'standby', name: 'Резерв', col: new THREE.Color('#5BB8FF'), pulse: 0.7 }, { k: 'inactive', name: 'Не активний', col: new THREE.Color('#F2F2FA'), pulse: 0 }, { k: 'problem', name: 'Проблема', col: new THREE.Color('#FF5A6E'), pulse: 4.5 }];
 
 const ROBOT_MAT = { Robot_Cream: std(0xf4eee8, { roughness: 0.25 }), Robot_Violet: std(0x7a45e8, { roughness: 0.3 }), Robot_Face: basic(0xffffff, { map: faceTex }), Robot_Glow: basic(NEON) };
 
@@ -353,7 +353,7 @@ function updateDrones(dt) {
 }
 
 // ---------- HTML labels ----------
-const iconUrl = (name) => glyphTexture(name, { badge: false, color: '#efe6ff', size: 64 }).image.toDataURL();
+const iconUrl = (name) => glyphTexture(name, { badge: false, color: '#F6E9FA', size: 64 }).image.toDataURL();
 // the section box over a work zone (owner's pick 2026-11-10, "capsule"): a medallion whose ring shows the LOAD (share of the working agents among the built ones), the name, "N agents · X working" and one dot per agent in the colour of its state; no % figure
 const hexOf = (c) => '#' + new THREE.Color(c).getHexString();
 function capHtml(icon, name, color, list, withPips = true) {
@@ -387,7 +387,7 @@ function flyHome() { tween = { from: { t: controls.target.clone(), p: camera.pos
 let focused = null;
 function setFocused(isl) { if (isl === focused) return; focused = isl; if (opts.onFocusDept) opts.onFocusDept(isl ? isl.t.dept : null); }
 const homeBtn = document.createElement('button'); homeBtn.type = 'button'; homeBtn.title = 'Додому (H)'; homeBtn.setAttribute('aria-label', 'Додому'); homeBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>';
-Object.assign(homeBtn.style, { position: 'absolute', left: '20px', bottom: '24px', width: '44px', height: '44px', borderRadius: '14px', border: '1px solid rgba(190,150,255,0.4)', background: 'rgba(32,18,60,0.82)', color: '#efe6ff', display: 'grid', placeItems: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }); homeBtn.addEventListener('click', flyHome); homeBtn.className = 'am3-home'; root.appendChild(homeBtn);
+Object.assign(homeBtn.style, { position: 'absolute', left: '20px', bottom: '24px', width: '44px', height: '44px', borderRadius: '14px', border: '1px solid rgba(235,156,239,0.4)', background: 'rgba(52,16,52,0.82)', color: '#F6E9FA', display: 'grid', placeItems: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }); homeBtn.addEventListener('click', flyHome); homeBtn.className = 'am3-home'; root.appendChild(homeBtn);
 const panel = document.createElement('div'); panel.className = 'am3-panel'; panel.innerHTML = '<b></b><p></p><button type="button" class="am3-open">Відкрити агента</button>'; root.appendChild(panel);
 const pT = panel.querySelector('b'), pP = panel.querySelector('p'), pB = panel.querySelector('.am3-open'); let panelAgent = -1;
 pB.addEventListener('click', () => { const ag = agents[panelAgent]; if (ag && ag.key && opts.onOpenAgent) opts.onOpenAgent(ag.deptKey, ag.key); });

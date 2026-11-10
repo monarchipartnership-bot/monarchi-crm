@@ -44,10 +44,10 @@ function catalogueOf(role) {
 // The page of ONE agent of a department, as a full-screen window (Hub style, variant B: navigation in a left column). Sections: Огляд (what it does now,
 // tasks with progress, its place in the chain), Здоровʼя (status, load, last and next run, restart), Проєкти (its clients: mode, priority, stop/continue),
 // Налаштування (what it knows, prompts, trial run), Журнал. `night`: the dark plum look (the page is dark or it is night on the map).
-export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null }) {
+export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null, initialTab = 'overview' }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState(initialTab); // the project card opens the agent straight on its settings
   const [team, setTeam] = useState(null);
   const [clients, setClients] = useState([]);
   const [data, setData] = useState({ tasks: [], progress: {} });

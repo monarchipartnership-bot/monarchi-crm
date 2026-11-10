@@ -78,8 +78,9 @@ export const REQUEST_LANGUAGES = { uk: 'Українська', en: 'English' };
 // 'auto' = the agent decides (older requests).
 export const TEXT_MODES = { auto: 'Агент вирішує', yes: 'Напише агент', given: 'Задані менеджером', no: 'Без тексту' };
 export const MATERIAL_KINDS = { logo: 'Логотип', product: 'Фото продукту', style: 'Приклад стилю', competitor: 'Реклама конкурента', other: 'Інше' };
-export const MAX_CONCEPTS = 3; // the strategist makes at most three directions, the brief one concept per direction
-export const MAX_GIVEN_TEXTS = 8; // with given texts there is one direction (and creative) per text
+export const DEFAULT_CONCEPTS = 3; // how many directions when the request does not say
+export const MAX_CONCEPTS = 10; // the strategist makes at most ten directions (owner, 2026-11-11: raised from three), the brief one concept per direction
+export const MAX_GIVEN_TEXTS = 10; // with given texts there is one direction (and creative) per text
 export const MAX_MATERIALS = 16;
 export const IDEA_SOURCES = { competitors: 'Від конкурентів', own: 'Свої / від ШІ', mix: 'Мікс' };
 
@@ -87,7 +88,7 @@ export const IDEA_SOURCES = { competitors: 'Від конкурентів', own:
 export function directionLimit(brief = {}) {
   const given = Array.isArray(brief.given_texts) ? brief.given_texts.length : 0;
   if (brief.texts === 'given' && given) return Math.min(MAX_GIVEN_TEXTS, given);
-  return Math.min(MAX_CONCEPTS, Math.max(1, Number(brief.count) || MAX_CONCEPTS));
+  return Math.min(MAX_CONCEPTS, Math.max(1, Number(brief.count) || DEFAULT_CONCEPTS));
 }
 
 // The texts the manager pasted all together → [{ headline, subline, badge }]. Texts are numbered («1)» or «1.») or separated by an empty line; inside
@@ -101,6 +102,36 @@ export function parseGivenTexts(text) {
     const lines = b.split('\n').map((l) => l.trim()).filter(Boolean);
     return { headline: lines[0] || '', subline: lines[1] || '', badge: lines.slice(2).join(' ') };
   }).filter((t) => t.headline);
+}
+
+// The settings of the agents for ONE cycle (owner, 2026-11-11): the same fields the agent has in its own settings (department-wide) and in the link to the client,
+// asked again in the form of a cycle. What is filled is added to the prompt of that agent for this cycle only and counts above its general settings; an empty
+// field changes nothing. The checker has no settings. → [{ key, label, type, hint, rows? }]
+export const CYCLE_AGENT_ROLES = ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker'];
+export function cycleAgentFields(role) {
+  const def = creativeRoleDef(role);
+  const seen = new Set();
+  return def ? [...(def.clientFields || []), ...(def.fields || [])].filter((f) => !seen.has(f.key) && seen.add(f.key)) : [];
+}
+// input: { role: { key: value } } → the same, cleaned (texts clipped, the limit a positive number, a check only when on). Throws a message the person can read.
+export function cleanAgentSettings(input = {}) {
+  const out = {};
+  CYCLE_AGENT_ROLES.forEach((role) => {
+    const mine = {};
+    cycleAgentFields(role).forEach((f) => {
+      const v = input?.[role]?.[f.key];
+      if (f.type === 'check') { if (v === true) mine[f.key] = true; return; }
+      const text = String(v ?? '').replace(/\r\n/g, '\n').trim();
+      if (!text) return;
+      if (f.key === 'max_usd') {
+        const n = Number(text.replace(',', '.'));
+        if (!Number.isFinite(n) || n <= 0 || n > 1000) throw new Error('Ліміт витрат на цикл — сума в доларах, наприклад 2.5.');
+        mine[f.key] = String(Math.round(n * 100) / 100);
+      } else mine[f.key] = text.slice(0, 1500);
+    });
+    if (Object.keys(mine).length) out[role] = mine;
+  });
+  return out;
 }
 
 // A request as the form sends it, cleaned: only known keys, bounded sizes. Throws a message the person can read.
@@ -123,7 +154,7 @@ export function cleanRequest(input = {}) {
     competitors: clip(input.competitors, 2000),
     examples: clip(input.examples, 3000),
     ratios: ratios.length ? ratios : ['1:1'],
-    count: texts === 'given' && given.length ? Math.min(MAX_GIVEN_TEXTS, given.length) : Math.min(MAX_CONCEPTS, Math.max(1, Math.round(Number(input.count)) || MAX_CONCEPTS)),
+    count: texts === 'given' && given.length ? Math.min(MAX_GIVEN_TEXTS, given.length) : Math.min(MAX_CONCEPTS, Math.max(1, Math.round(Number(input.count)) || DEFAULT_CONCEPTS)),
     texts,
     given_texts: texts === 'given' ? given : [],
     idea_source: IDEA_SOURCES[input.idea_source] ? input.idea_source : 'mix',
@@ -131,14 +162,19 @@ export function cleanRequest(input = {}) {
     cta: input.cta !== false,
     cta_text: clip(input.cta_text, 40),
     language: REQUEST_LANGUAGES[input.language] ? input.language : 'uk',
+    kind: input.kind === 'regular' ? 'regular' : 'extra', // a cycle of the weekly schedule or a one-off one (lib/agents/operationCycles.js)
   };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(input.scheduled_for || ''))) brief.scheduled_for = input.scheduled_for;
+  if (/^r[a-z0-9]{1,20}$/.test(String(input.regular_id || ''))) brief.regular_id = input.regular_id; // which regular cycle made it
+  const agentSettings = cleanAgentSettings(input.agent_settings);
+  if (Object.keys(agentSettings).length) brief.agent_settings = agentSettings; // what the person asked of each agent for this cycle
   if (!brief.goal) throw new Error('Опишіть, що потрібно від креативів.');
   if (figma && !/^https?:\/\//i.test(figma)) throw new Error('Посилання на Figma має починатися з https://');
   if (texts === 'given' && !given.length) throw new Error('Додайте хоча б один текст або оберіть інший режим текстів.');
   const materials = (Array.isArray(input.materials) ? input.materials : []).slice(0, MAX_MATERIALS).map((m) => ({
     name: clip(m?.name, 160), url: clip(m?.url, 600), path: clip(m?.path, 400), kind: MATERIAL_KINDS[m?.kind] ? m.kind : 'other',
   })).filter((m) => m.name && m.url);
-  return { title: clip(input.title, 120) || clip(brief.goal, 60), brief, materials };
+  return { title: clip(input.title, 100) || clip(brief.goal, 60), brief, materials };
 }
 
 const must = (r) => { if (r.error) throw r.error; return r.data; };

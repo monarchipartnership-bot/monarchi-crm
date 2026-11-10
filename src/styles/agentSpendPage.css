@@ -63,7 +63,7 @@
    Map style (owner's pick 2026-11-10): big heading | ring counters | limit cards with a ring | grid chart | glass period ribbon | agent cards.
    Scoped under .spend-page so the other AI Agents pages that share .analytics-* keep their look.
    ===================================================================================================================================================== */
-.spend-page { --sp-line: rgba(190, 150, 255, .28); --sp-glass: rgba(32, 18, 60, .84); --sp-acc: #c76dff; --sp-warn: #FFB547; --sp-bad: #FF8A8A; }
+.spend-page { --sp-line: rgba(235, 156, 239, .28); --sp-glass: rgba(52, 16, 52, .84); --sp-acc: #EB9CEF; --sp-warn: #FBBF24; --sp-bad: #FF8A8A; }
 /* the heading: big, no icon */
 .spend-page .ai-section-icon { display: none; }
 .spend-page .ai-section-head { margin-bottom: 30px; }
@@ -72,8 +72,8 @@
 /* ring counters */
 .spend-page .analytics-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; max-width: 900px; margin-bottom: 34px; }
 .spend-page .analytics-stat { flex: none; min-width: 0; align-items: center; gap: 10px; padding: 0; border: 0; border-radius: 0; background: none; text-align: center; }
-.spend-page .analytics-stat-value { width: 96px; height: 96px; border-radius: 50%; display: grid; place-content: center; font-size: 1.05rem; background: var(--sp-glass); box-shadow: inset 0 0 0 1.5px var(--sp-acc), 0 0 16px rgba(199, 109, 255, .35); }
-.spend-page .analytics-stat.is-warn .analytics-stat-value { box-shadow: inset 0 0 0 1.5px var(--sp-warn), 0 0 16px rgba(255, 181, 71, .32); }
+.spend-page .analytics-stat-value { width: 96px; height: 96px; border-radius: 50%; display: grid; place-content: center; font-size: 1.05rem; background: var(--sp-glass); box-shadow: inset 0 0 0 1.5px var(--sp-acc), 0 0 16px rgba(181, 68, 181, .3); }
+.spend-page .analytics-stat.is-warn .analytics-stat-value { box-shadow: inset 0 0 0 1.5px var(--sp-warn), 0 0 16px rgba(251, 191, 36, .32); }
 .spend-page .analytics-stat.is-bad .analytics-stat-value { box-shadow: inset 0 0 0 1.5px var(--sp-bad), 0 0 16px rgba(255, 138, 138, .32); }
 .spend-page .analytics-stat-label { max-width: 150px; line-height: 1.3; }
 /* the ring of a figure */
@@ -85,21 +85,21 @@
 .spend-page .spend-limit { flex-direction: row; align-items: center; gap: 16px; padding: 14px 16px; border: 0; border-radius: 24px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
 .spend-page .spend-limit-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .spend-page .spend-limit-top { flex-wrap: wrap; align-items: baseline; }
-.spend-page .spend-limit-edit input { border: 0; border-radius: 999px; background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
-.spend-page .ai-section-btn { height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
-.spend-page .ai-section-btn-primary { background: linear-gradient(135deg, #8a4dff, #6a35d8); box-shadow: 0 0 12px rgba(138, 77, 255, .5); }
+.spend-page .spend-limit-edit input { border: 0; border-radius: 999px; background: rgba(235, 156, 239, .12); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
+.spend-page .ai-section-btn { height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: rgba(235, 156, 239, .12); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
+.spend-page .ai-section-btn-primary { background: linear-gradient(100deg, #B544B5, #661466); box-shadow: 0 0 12px rgba(181, 68, 181, .6); }
 /* the chart: a grid */
-.spend-page .spend-days { border: 0; border-radius: 22px; background: rgba(255, 255, 255, .05) repeating-linear-gradient(0deg, transparent 0 37px, rgba(190, 150, 255, .12) 37px 38px); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
+.spend-page .spend-days { border: 0; border-radius: 22px; background: rgba(255, 255, 255, .05) repeating-linear-gradient(0deg, transparent 0 37px, rgba(235, 156, 239, .12) 37px 38px); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
 .spend-page .spend-day-bar { border-radius: 4px 4px 0 0; background: linear-gradient(180deg, #d09cf5, #7a45e0); }
 /* the period switch: a glass ribbon with a light line under the active one */
 .spend-page .cs-periods { display: inline-flex; flex-wrap: nowrap; gap: 2px; padding: 4px; border-radius: 999px; background: var(--sp-glass); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
 .spend-page .cs-period { position: relative; height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: #F2DDF4; font-weight: 500; }
-.spend-page .cs-period.on { background: rgba(255, 255, 255, .08); color: #fff; font-weight: 600; }
+.spend-page .cs-period.on { background: rgba(235, 156, 239, .12); color: #fff; font-weight: 600; }
 .spend-page .cs-period.on::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--sp-acc), transparent); box-shadow: 0 0 10px var(--sp-acc); }
 /* tables that stay tables (money of the operations): glass */
 .spend-page .spend-table-wrap { border: 0; border-radius: 22px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
-.spend-page .spend-bar { height: 8px; border: 0; background: rgba(255, 255, 255, .08); }
-.spend-page .spend-bar-fill { background: linear-gradient(90deg, #8a4dff, #c76dff); box-shadow: 0 0 8px rgba(199, 109, 255, .6); }
+.spend-page .spend-bar { height: 8px; border: 0; background: rgba(235, 156, 239, .12); }
+.spend-page .spend-bar-fill { background: linear-gradient(90deg, #B544B5, #EB9CEF); box-shadow: 0 0 8px rgba(181, 68, 181, .3); }
 .spend-page .spend-bar-fill.hot { background: linear-gradient(90deg, #ff9a3d, #ffd04a); box-shadow: 0 0 8px rgba(255, 170, 60, .6); }
 .spend-page .ai-section-empty { border: 0; border-radius: 22px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1.5px var(--sp-line); }
 /* agent and project cards */
@@ -109,7 +109,7 @@
 .spend-page .spend-card-body b { color: #F9EDF9; font-size: .9rem; }
 .spend-page .spend-card-body span { color: #C9AAD1; font-size: .76rem; }
 .spend-page .spend-card-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
-.spend-page .spend-chip { font-style: normal; padding: 1px 9px; border-radius: 999px; font-size: .72rem; font-weight: 600; background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1.5px var(--sp-line); color: #F2DDF4; }
+.spend-page .spend-chip { font-style: normal; padding: 1px 9px; border-radius: 999px; font-size: .72rem; font-weight: 600; background: rgba(235, 156, 239, .12); box-shadow: inset 0 0 0 1.5px var(--sp-line); color: #F2DDF4; }
 .spend-page .spend-chip.is-bad { background: rgba(255, 138, 138, .14); color: var(--sp-bad); box-shadow: inset 0 0 0 1.5px rgba(255, 138, 138, .4); }
 /* problems: red capsule rows */
 .spend-page .spend-probs { display: flex; flex-direction: column; gap: 8px; max-width: 1000px; }

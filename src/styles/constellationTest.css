@@ -167,7 +167,7 @@
 /* ---------------- Hub style top bar (2026-10-24): brand with the emblem, section capsule, search / back pills, KPI cards ----------------
    Dark plum glass by default; on the 3D map by day the same pieces turn light glass (is-map-light), like the city under them. */
 .constellation-page.ai-immersive {
-  --tb-panel: rgba(32, 13, 54, .82); --tb-ink: #f6e9fa; --tb-sec: #d6aee0; --tb-line: rgba(235, 156, 239, .34); --tb-deep: #f0c4f5;
+  --tb-panel: rgba(52, 16, 52, .82); --tb-ink: #f6e9fa; --tb-sec: #d6aee0; --tb-line: rgba(235, 156, 239, .34); --tb-deep: #f0c4f5;
   --tb-shadow: 0 18px 44px rgba(0, 0, 0, .45); --tb-chip: rgba(235, 156, 239, .2); --tb-dot-bg: #3c1a58; --tb-dot-ring: #8a58aa;
 }
 .constellation-page.is-map-light {
@@ -210,7 +210,7 @@
 .constellation-gear { position: absolute; z-index: 40; top: 20px; right: calc(148px + clamp(150px, 14vw, 220px)); width: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .constellation-gear.ai-pill { height: 40px; background: var(--tb-panel); border: 0; color: var(--tb-sec); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 0 4px #ae40ae14; }
 .constellation-gear.active { color: var(--tb-deep); box-shadow: inset 0 0 0 1.5px var(--tb-deep), 0 0 0 4px #ae40ae14; }
-.constellation-gear:focus-visible { outline: 3px solid #d9a6ff; outline-offset: 2px; }
+.constellation-gear:focus-visible { outline: 3px solid #F0C4F5; outline-offset: 2px; }
 @media (max-width: 1180px) { .constellation-gear { top: 72px; right: 270px; } }
 .constellation-page.is-compact .constellation-gear { top: 14px; right: 136px; }
 
@@ -235,15 +235,15 @@
 
 
 /* ---------------- the section menu, glass ribbon (owner's pick 2026-11-10): one glass pill, every item = ring medallion + label, the active item has a light line under it ---------------- */
-.constellation-page .constellation-section-nav { height: 52px; padding: 4px; gap: 2px; background: var(--tb-panel); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 24px rgba(138, 77, 255, .25), var(--tb-shadow); }
+.constellation-page .constellation-section-nav { height: 52px; padding: 4px; gap: 2px; background: var(--tb-panel); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 24px rgba(181, 68, 181, .25), var(--tb-shadow); }
 .constellation-page .constellation-section-tab { gap: 9px; padding: 0 16px 0 7px; font-size: 14px; font-weight: 500; }
 .constellation-page .constellation-section-tab .cst-ico { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--tb-chip); box-shadow: inset 0 0 0 1.5px var(--tb-line); color: var(--tb-ink); }
 .constellation-page .constellation-section-tab .cst-ico svg { width: 19px; height: 19px; }
-.constellation-page .constellation-section-tab.active { background: rgba(255, 255, 255, .08); box-shadow: none; color: var(--tb-ink); font-weight: 600; }
+.constellation-page .constellation-section-tab.active { background: rgba(235, 156, 239, .12); box-shadow: none; color: var(--tb-ink); font-weight: 600; }
 .constellation-page.is-map-light .constellation-section-tab.active { background: rgba(102, 20, 102, .08); }
-.constellation-page .constellation-section-tab.active .cst-ico { box-shadow: inset 0 0 0 1.5px #c76dff, 0 0 12px rgba(199, 109, 255, .55); color: #fff; background: rgba(199, 109, 255, .22); }
+.constellation-page .constellation-section-tab.active .cst-ico { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 12px rgba(181, 68, 181, .3); color: #fff; background: rgba(181, 68, 181, .3); }
 .constellation-page.is-map-light .constellation-section-tab.active .cst-ico { color: #661466; box-shadow: inset 0 0 0 1.5px #b544b5, 0 0 10px rgba(181, 68, 181, .35); background: #f1dcf5; }
-.constellation-page .constellation-section-tab.active::after { content: ""; position: absolute; left: 16%; right: 16%; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, #c76dff, transparent); box-shadow: 0 0 10px #c76dff; }
+.constellation-page .constellation-section-tab.active::after { content: ""; position: absolute; left: 16%; right: 16%; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, #EB9CEF, transparent); box-shadow: 0 0 10px #EB9CEF; }
 .constellation-page.is-map-light .constellation-section-tab.active::after { background: linear-gradient(90deg, transparent, #b544b5, transparent); box-shadow: 0 0 8px #b544b5; }
 /* a narrow window: only the active item keeps its label */
 .constellation-page.is-compact .constellation-section-nav { height: 48px; }
@@ -254,11 +254,11 @@
 
 
 /* ---------------- the tools ribbon (owner's pick 2026-11-10): search icon that opens into a field | settings medallion | round «До Hub», one glass pill ---------------- */
-.constellation-page .constellation-tools { position: absolute; top: 16px; right: 20px; z-index: 40; display: flex; align-items: center; gap: 4px; height: 52px; padding: 6px; border-radius: 999px; background: var(--tb-panel); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 24px rgba(138, 77, 255, .25), var(--tb-shadow); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.constellation-page .constellation-tools { position: absolute; top: 16px; right: 20px; z-index: 40; display: flex; align-items: center; gap: 4px; height: 52px; padding: 6px; border-radius: 999px; background: var(--tb-panel); box-shadow: inset 0 0 0 1.5px var(--tb-line), 0 0 24px rgba(181, 68, 181, .25), var(--tb-shadow); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .constellation-page .cst-sep { flex: none; width: 1px; height: 22px; background: var(--tb-line); }
 .constellation-page .cst-tool { flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer; background: var(--tb-chip); color: var(--tb-ink); box-shadow: inset 0 0 0 1.5px var(--tb-line); }
-.constellation-page .cst-tool:focus-visible, .constellation-page .cst-hub:focus-visible { outline: 3px solid #d9a6ff; outline-offset: 2px; }
-.constellation-page .cst-gear.active { color: #fff; background: rgba(199, 109, 255, .22); box-shadow: inset 0 0 0 1.5px #c76dff, 0 0 12px rgba(199, 109, 255, .55); }
+.constellation-page .cst-tool:focus-visible, .constellation-page .cst-hub:focus-visible { outline: 3px solid #F0C4F5; outline-offset: 2px; }
+.constellation-page .cst-gear.active { color: #fff; background: rgba(181, 68, 181, .3); box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 12px rgba(181, 68, 181, .3); }
 .constellation-page .cst-hub { flex: none; width: 40px; height: 40px; border-radius: 50%; display: inline-grid; place-items: center; text-decoration: none; color: #fff; background: linear-gradient(135deg, #b544b5, #661466); box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
 .constellation-page .constellation-tools .agent-search { position: relative; top: auto; right: auto; width: auto; height: 40px; padding: 0; display: flex; align-items: center; background: none; border: 0; box-shadow: none; }
 .constellation-page .constellation-tools .agent-search-field { display: flex; align-items: center; gap: 9px; height: 40px; width: clamp(170px, 15vw, 230px); padding: 0 14px; border-radius: 999px; background: var(--tb-chip); box-shadow: inset 0 0 0 1.5px var(--tb-line); animation: cstSearchOpen .18s ease-out; }
@@ -270,5 +270,5 @@
 .constellation-page.is-compact .constellation-tools { top: 12px; right: 12px; }
 /* the lamp on the gear: amber = something to check, red = a problem (the planner, a key or stuck work) */
 .cst-gear { position: relative; overflow: visible; }
-.constellation-gear-lamp { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #2a1340; background: #ffb347; }
+.constellation-gear-lamp { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #2a1340; background: #FBBF24; }
 .constellation-gear-lamp.is-bad { background: #ff5a6a; box-shadow: 0 0 8px #ff5a6a; }

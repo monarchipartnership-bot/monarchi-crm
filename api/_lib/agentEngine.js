@@ -23,6 +23,8 @@ import { campaignRole } from './campaignRun.js';
 import { creativeRole } from './creativeRun.js';
 import { fanOutRequest, passOn, settleRequest, touchClientLink } from './creativeEngine.js';
 import { CAP_MESSAGE, cappedCampaigns, openCycle, syncCycles } from './campaignCycles.js';
+import { runRegularCycles } from './regularCycles.js';
+import { conflictMessage, modeOf, sameModeConflict } from '../../src/lib/agents/operationCycles.js';
 import { CREATIVE_TEAM } from '../../src/lib/agents/creativeTeam.js';
 import { CAMPAIGN_TEAM } from '../../src/lib/agents/campaignTeam.js';
 import { LANGUAGES, MAX_POSTS_PER_RUN, nextMonday, PLATFORM_KEYS } from './smmContent.js';
@@ -501,6 +503,7 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
   let all = await loadAll(ctx.db);
   if (!all.agents.length) return { ...stats, note: 'Команди ще не створено.' };
   stats.started = await scheduleDue(ctx, all);
+  try { stats.regular = await runRegularCycles(ctx); } catch (e) { console.warn('runRegularCycles failed:', e?.message || e); } // the weekly cycles of the operations (their requests then run in this pass)
   try { stats.assets = await pollAssets(ctx); } catch (e) { console.warn('pollAssets failed:', e?.message || e); }
   try { stats.creatives = await pollCreatives(ctx); } catch (e) { console.warn('pollCreatives failed:', e?.message || e); }
   for (let pass = 0; pass < 60 && Date.now() - began < maxMs; pass += 1) {
@@ -551,6 +554,12 @@ export async function launchCampaign(ctx, campaignId) {
   const campaign = must(await ctx.db.from('ag_campaigns').select('*').eq('id', campaignId).maybeSingle(), 'campaign');
   if (!campaign) throw new Error('Операцію не знайдено.');
   if (campaign.status === 'active') throw new Error('Операцію вже запущено.');
+  // one operation of a kind per project: a second «Тільки креативи» is not launched next to a working one (more work = more cycles in the first)
+  if (campaign.project_id != null) {
+    const others = must(await ctx.db.from('ag_campaigns').select('id, name, status, project_id, config').eq('project_id', campaign.project_id), 'campaigns') || [];
+    const clash = sameModeConflict(others, { projectId: campaign.project_id, mode: modeOf(campaign), exceptId: campaign.id });
+    if (clash) throw new Error(conflictMessage(clash));
+  }
   if ((await cappedCampaigns(ctx.db)).has(String(campaign.id))) throw new Error(CAP_MESSAGE);
   const now = iso(ctx.now());
   // «Тільки креативи»: the client is only connected to the creative department, which works on requests. The campaign becomes active (the department

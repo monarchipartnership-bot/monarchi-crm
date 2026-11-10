@@ -25,6 +25,9 @@ async function makerConfig(db) {
 export const limitOf = (cfg = {}) => (Number(cfg.max_usd) > 0 ? Number(cfg.max_usd) : DEFAULT_LIMIT_USD);
 
 const refsOf = (row) => (row.hf?.references || []).map((r) => r.url).filter(Boolean);
+// A picture the person returned is made again with their comment added to the prompt (the comments of the earlier rounds stay in it too).
+export const reworkNotes = (row) => [...(Array.isArray(row.hf?.rework) ? row.hf.rework.map((r) => r?.note) : []), row.status === 'rejected' ? row.note : null].map((n) => String(n || '').trim()).filter(Boolean).slice(-3);
+export const promptOf = (row) => { const notes = reworkNotes(row); return notes.length ? `${row.prompt}\n\nRevision requested by the manager (apply it, keep everything else): ${notes.join(' | ')}` : row.prompt; };
 
 // Sends the pictures of a request to Higgsfield. ids: only these creatives (any state but «producing»: this is how one is made again); without ids all
 // the «planned» and «failed» ones. → { ok, estimateUsd, count, submitted, skipped, failed, spent, limit } or { ok: false, configured: false, missing }.
@@ -32,17 +35,19 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
   const { db } = ctx;
   const hf = hfOf(ctx);
   if (!hf) return { ok: false, configured: false, missing: hfReal.missingConfig(), error: 'Higgsfield не налаштовано на сервері.' };
-  const req = must(await db.from('ag_creative_requests').select('id, status, campaign_id').eq('id', requestId).maybeSingle(), 'request');
+  const req = must(await db.from('ag_creative_requests').select('id, status, campaign_id, brief').eq('id', requestId).maybeSingle(), 'request');
   if (!req) throw new Error('Запит не знайдено.');
   if (!estimateOnly && (await cappedCampaigns(db)).has(String(req.campaign_id))) return { ok: false, capped: true, error: CAP_MESSAGE }; // the pictures cost real money: not over the cap
-  const limit = limitOf(await makerConfig(db));
+  // the cycle may carry its own limit (the form of the cycle, «Агент креативщик»); otherwise the limit of the agent
+  const cycleMax = Number(req.brief?.agent_settings?.creative_maker?.max_usd);
+  const limit = cycleMax > 0 ? cycleMax : limitOf(await makerConfig(db));
   const rows = must(await db.from('ag_creatives').select('*').eq('request_id', requestId).order('id', { ascending: true }), 'creatives') || [];
   const want = ids ? rows.filter((r) => ids.includes(r.id) && r.status !== 'producing') : rows.filter((r) => ['planned', 'failed'].includes(r.status));
   let spent = round(rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0)); // what this request already cost (a picture made again adds to its earlier price)
   const profile = hfReal.profileFromEnv();
   const out = { ok: true, estimateUsd: 0, count: 0, submitted: 0, skipped: [], failed: [], spent: 0, limit };
   for (const row of want) {
-    const request = hfReal.buildImageRequest({ prompt: row.prompt, negative_prompt: row.negative_prompt, ratio: row.ratio, references: refsOf(row) }, profile);
+    const request = hfReal.buildImageRequest({ prompt: promptOf(row), negative_prompt: row.negative_prompt, ratio: row.ratio, references: refsOf(row) }, profile);
     let usd;
     try { usd = await hf.estimate({ request }); } catch (e) {
       if (!estimateOnly) must(await db.from('ag_creatives').update({ status: 'failed', note: String(e.message || e).slice(0, 300), updated_at: iso(ctx.now?.() || new Date()) }).eq('id', row.id), 'creative');
@@ -60,7 +65,8 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
       const now = iso(ctx.now?.() || new Date());
       must(await db.from('ag_creatives').update({
         status: 'producing', cost_usd: round(Number(row.cost_usd || 0) + usd), generations: n, note: null, updated_at: now,
-        hf: { ...(row.hf || {}), model: request.path, job_id: job.jobId, status_url: job.statusUrl, estimate_usd: usd, charged_before: Number(row.cost_usd || 0), submitted_at: now, finished_at: null },
+        final_url: null, final_path: null, // the picture with the words over it belonged to the earlier version
+        hf: { ...(row.hf || {}), ...(row.status === 'rejected' && String(row.note || '').trim() ? { rework: [...(Array.isArray(row.hf?.rework) ? row.hf.rework : []), { note: String(row.note).trim().slice(0, 600), at: now }].slice(-5) } : {}), model: request.path, job_id: job.jobId, status_url: job.statusUrl, estimate_usd: usd, charged_before: Number(row.cost_usd || 0), submitted_at: now, finished_at: null },
       }).eq('id', row.id), 'creative');
       out.submitted += 1;
       await db.from('ag_creative_spend').insert({ creative_id: row.id, request_id: requestId, campaign_id: req.campaign_id, usd, kind: 'generation', model: request.path, job_id: job.jobId }); // the ledger of the agent page

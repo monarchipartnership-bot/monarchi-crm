@@ -1,7 +1,8 @@
 import { supabase } from '../supabaseClient';
 import { buildCockpit, isActiveCampaign, sortProjects, summaryOf } from '../agents/projectCockpit';
 import { kickQueue } from './agents';
-import { estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, setCreativeStatus } from './creatives';
+import { estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, setCreativeStatus, startRequest } from './creatives';
+import { reviewOutcome } from '../agents/operationCycles';
 import { uploadAsset } from './projectCreative';
 import { downloadOne, downloadZip } from '../creatives/download';
 
@@ -24,7 +25,7 @@ export async function fetchCockpits() {
     supabase.from('ag_creative_spend').select('campaign_id, usd').in('campaign_id', ids),
   ]);
   const reqs = must(requests) || [];
-  const creatives = reqs.length ? must(await supabase.from('ag_creatives').select('id, request_id, concept_key, concept_name, ratio, status, asset_url, final_url, cost_usd, note').in('request_id', reqs.map((r) => r.id))) || [] : [];
+  const creatives = reqs.length ? must(await supabase.from('ag_creatives').select('id, request_id, concept_key, concept_name, ratio, status, asset_url, final_url, cost_usd, note, copy').in('request_id', reqs.map((r) => r.id))) || [] : [];
   const projectOf = new Map((must(projects) || []).map((p) => [p.id, p]));
   const assetCount = {};
   (must(assets) || []).forEach((a) => { assetCount[a.project_id] = (assetCount[a.project_id] || 0) + 1; });
@@ -33,11 +34,25 @@ export async function fetchCockpits() {
   const taskRows = must(tasks) || [];
   const agentRows = must(agents) || [];
 
+  // the cabinet of every launched operation (the card of a project opens a paused one too); the list of the map keeps only the ones that are worked on
   const byId = {};
-  campaigns.filter((c) => isActiveCampaign(c, reqs)).forEach((c) => {
+  campaigns.filter((c) => c.status !== 'draft').forEach((c) => {
     byId[c.id] = buildCockpit({ campaign: c, project: projectOf.get(c.project_id) || {}, requests: reqs, tasks: taskRows, creatives, agents: agentRows, library: { assets: assetCount[c.project_id] || 0 }, spend: spendBy[c.id] || 0 });
   });
-  return { list: sortProjects(Object.values(byId).map(summaryOf)), byId };
+  const worked = new Set(campaigns.filter((c) => isActiveCampaign(c, reqs)).map((c) => c.id));
+  return { list: sortProjects(Object.values(byId).filter((c) => worked.has(c.id)).map(summaryOf)), byId };
+}
+
+// After the person decided on pictures the request follows them: every picture approved = the cycle is done; something returned or still waiting = it is on review again.
+async function settleReview(requestId) {
+  if (!requestId) return;
+  const rows = must(await supabase.from('ag_creatives').select('status').eq('request_id', requestId)) || [];
+  const want = reviewOutcome(rows);
+  if (!want) return;
+  const req = must(await supabase.from('ag_creative_requests').select('status').eq('id', requestId).maybeSingle());
+  if (!req || !['review', 'done'].includes(req.status) || req.status === want) return;
+  const now = new Date().toISOString();
+  must(await supabase.from('ag_creative_requests').update({ status: want, updated_at: now, ...(want === 'done' ? { finished_at: now } : {}) }).eq('id', requestId).select());
 }
 
 // What the person presses in a card (the names of the actions are the contract with the design components). Every function throws a readable Error.
@@ -57,18 +72,46 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     const n = await downloadZip(files, { project: cockpit?.client || cockpit?.name, zipName: name });
     return { downloaded: n };
   }
+  const rid = payload.requestId ?? item?.requestId ?? null;
+  // every approved picture of the operation (or of one cycle) in one archive: the cycles stay, so it can be downloaded again at any time
+  if (key === 'download_approved') {
+    const reqs = (cockpit?.requests || []).filter((r) => payload.requestId == null || r.id === payload.requestId);
+    const files = reqs.flatMap((r) => (r.items || []).filter((i) => i.status === 'approved' && i.url));
+    if (!files.length) throw new Error('Затверджених креативів ще немає.');
+    const n = await downloadZip(files, { project: cockpit?.client || cockpit?.name, zipName: `${cockpit?.client || cockpit?.name || 'creatives'}_zatverdzheni${payload.requestId != null ? `_cykl-${payload.requestId}` : ''}` });
+    return { downloaded: n };
+  }
+  // the returned pictures are made again with the manager's comment (the price is asked first, nothing is spent)
+  if (key === 'rework_estimate' || key === 'rework_confirm') {
+    const ids = payload.creativeIds || [];
+    if (!rid || !ids.length) throw new Error('Немає повернених креативів.');
+    const res = key === 'rework_estimate' ? await estimateGeneration(rid, ids) : await generateCreatives(rid, ids);
+    if (res?.configured === false) throw new Error('Higgsfield не налаштовано на сервері.');
+    if (res?.capped) throw new Error(res.error || 'Операція досягла ліміту витрат.');
+    if (key === 'rework_estimate') {
+      if (res?.failed?.length && !res.count) throw new Error(res.failed[0].error || 'Не вдалося оцінити вартість.');
+      return { rework: { usd: Number(res.estimateUsd || 0), count: Number(res.count || 0), limitUsd: Number(res.limit || 0), skipped: (res.skipped || []).length } };
+    }
+    if (res?.failed?.length && !res.submitted) throw new Error(res.failed[0].error || 'Не вдалося запустити генерацію.');
+    if (!res?.submitted) throw new Error('Нічого не запущено: картинки не вміщаються в ліміт витрат на один запит.');
+    kick();
+    return { submitted: res.submitted || 0 };
+  }
+  if (key === 'start_cycle') { if (!rid) throw new Error('Цикл не знайдено.'); await startRequest(rid); kick(); return {}; }
   if (key === 'approve_all') {
     const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);
     if (!ids.length) throw new Error('Немає креативів на перегляд.');
     for (const id of ids) await setCreativeStatus(id, 'approved');
+    await settleReview(rid);
     return {};
   }
-  if (key === 'approve_one') { await setCreativeStatus(payload.creativeId, 'approved'); return {}; }
+  if (key === 'approve_one') { await setCreativeStatus(payload.creativeId, 'approved'); await settleReview(rid); return {}; }
   if (key === 'return') {
     const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);
     const comment = String(payload.comment || '').trim();
     if (!comment) throw new Error('Напишіть коментар: що саме не так.');
     for (const id of ids) await setCreativeStatus(id, 'rejected', comment);
+    await settleReview(rid);
     return {};
   }
   if (key === 'retry_step') { await retryStudioTask(item.taskId); kick(); return {}; }

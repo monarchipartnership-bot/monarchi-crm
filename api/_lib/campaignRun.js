@@ -118,8 +118,10 @@ export async function campaignRole({ ctx, team: sub, agent, task, prompt, rec })
     if (!sites.length && !cc.brief) throw new Error('Немає з чого працювати: заповніть бриф операції або вкажіть адресу сайту клієнта в налаштуваннях агента.');
   }
   if (agent.role === 'competitor_research') {
-    const comps = String(cfg.competitors || '').trim();
-    if (!comps) throw new Error('Вкажіть конкурентів клієнта (назви й адреси сайтів) у налаштуваннях агента.');
+    // the competitors named for this operation and the ones kept in the card of the project («Про конкурентів»): both are read
+    const card = (await db.from('project_creative').select('inputs').eq('project_id', campaign.project_id).maybeSingle())?.data?.inputs || {};
+    const comps = [cfg.competitors, card.competitor_sites?.body, card.competitor_notes?.body].map((x) => String(x || '').trim()).filter(Boolean).join('\n');
+    if (!comps) throw new Error('Вкажіть конкурентів клієнта: у картці проєкту («Про конкурентів») або в налаштуваннях агента.');
     blocks.push({ title: 'Конкуренти, яких вказав менеджер', text: clip(comps, 2000) });
     blocks.push(...await siteBlocks(comps, { limit: 4, read: ctx.read || readSite }));
   }

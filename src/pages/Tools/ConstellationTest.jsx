@@ -29,7 +29,10 @@ import AgentSpend from '../AgentSpend/AgentSpend';
 import AgentInfoModal from '../../components/AgentWorkspace/AgentInfoModal';
 import useProjectCockpit from '../../lib/useProjectCockpit';
 import { updateCampaign } from '../../lib/api/campaigns';
-import { ActiveProjectsCard, ProjectsPage, ProjectWindow } from './cockpit';
+import { ActiveProjectsCard, ProjectsPage } from './cockpit';
+import ProjectCard from './cockpit/ProjectCard';
+import useAiProjects from '../../lib/useAiProjects';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import useAgentRunStates from './aiMap/useAgentRunStates';
 import AgentMap3D from './aiMap/AgentMap3D';
 import useMapTasks from './aiMap/useMapTasks';
@@ -96,7 +99,7 @@ const SECTIONS = [
 
 export default function ConstellationTest() {
   const [section, setSection] = useState('map');
-  const [cockpitId, setCockpitId] = useState(null); // the window of a project
+  const [card, setCard] = useState(null); // the card of a project on the whole screen: { projectId, operationId (open this operation at once) | null }
   const [cockpitCollapsed, setCockpitCollapsed] = useState(false);
   const [projectWizard, setProjectWizard] = useState(false); // «Створити проєкт»
   // the lamp on the gear: is the system alive (the clock, the keys, the queue)? Asked on entering the section and every 5 minutes; locally there is no server, so no lamp
@@ -110,6 +113,27 @@ export default function ConstellationTest() {
   }, []);
   const [campaignTarget, setCampaignTarget] = useState(null); // { id, newRequest }: «Операції» opens on this campaign
   const cockpit = useProjectCockpit({ enabled: true });
+  // the projects of the section (one per client) and what a person does with them on the page «Проєкти»
+  const aiProjects = useAiProjects(cockpit);
+  const [confirm, confirmDialog] = useConfirm();
+  const openOperationCard = (campaignId) => { const pid = cockpit.byId[campaignId]?.projectId; if (pid != null) setCard({ projectId: pid, operationId: campaignId }); };
+  const [projBusy, setProjBusy] = useState(null);
+  const [projNote, setProjNote] = useState(null); // { text, isError }
+  const sayProj = (text, isError = false) => { setProjNote({ text, isError }); setTimeout(() => setProjNote(null), isError ? 7000 : 4500); };
+  const opsText = (row) => { const n = row.operations.total - row.operations.archived; return n > 0 ? ` Його операції (${n}) зупиняться й перейдуть в архів розділу «Операції».` : ''; };
+  async function projectAction(row, kind) {
+    const ask = kind === 'finish' ? { title: `Завершити проєкт «${row.client}»?`, body: `Проєкт отримає позначку «Завершено» й перейде в архів.${opsText(row)} Уся зроблена робота й історія залишаються в картці проєкту в CRM.`, confirmLabel: 'Завершити' }
+      : kind === 'remove' ? { title: `Видалити проєкт «${row.client}» з AI Agents?`, body: `Проєкт зникне лише з розділу AI Agents.${opsText(row)} Картка проєкту в CRM, готові матеріали й історія роботи зберігаються. Проєкт можна створити знову.`, confirmLabel: 'Видалити з розділу' }
+        : null;
+    if (ask && !(await confirm(ask))) return false;
+    setProjBusy(row.id);
+    try {
+      if (kind === 'finish') { await aiProjects.finish(row.id); sayProj(`Проєкт «${row.client}» завершено: він в архіві.`); }
+      else if (kind === 'remove') { await aiProjects.remove(row.id); sayProj(`Проєкт «${row.client}» прибрано з AI Agents. Зроблена робота лишилась у картці CRM.`); }
+      else { await aiProjects.restore(row.id); sayProj(`Проєкт «${row.client}» повернуто в роботу.`); }
+      return true;
+    } catch (e) { sayProj(e.message || 'Не вдалося виконати.', true); return false; } finally { setProjBusy(null); }
+  }
   const [mapFocus, setMapFocus] = useState(null); // { key, n }: the camera of the map flies to this department (the search box asks for it)
   const [agentsOpen, setAgentsOpen] = useState(false); // the list of all agents (the «Агенти» button of the map's side menu)
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -318,9 +342,19 @@ export default function ConstellationTest() {
         </Link>
       </div>
 
-      {section === 'projects' && <ProjectsPage projects={cockpit.list} loading={cockpit.loading} onOpen={setCockpitId} onCreate={() => setProjectWizard(true)} />}
-      {projectWizard && <CreateProjectWizard onClose={() => setProjectWizard(false)} onDone={({ projectId, createOperation }) => { setProjectWizard(false); if (createOperation) { setCampaignTarget({ id: null, startProjectId: projectId }); setSection('campaigns'); } }} notify={() => {}} />}
-      {section === 'campaigns' && <CampaignsSection key={campaignTarget ? `c${campaignTarget.id ?? 'p' + campaignTarget.startProjectId}` : 'all'} openCampaignId={campaignTarget?.id ?? null} openNewRequest={!!campaignTarget?.newRequest} startProjectId={campaignTarget?.startProjectId ?? null} />}
+      {section === 'projects' && (
+        <ProjectsPage
+          rows={aiProjects.rows} loading={aiProjects.loading || cockpit.loading} ready={aiProjects.ready} busyId={projBusy}
+          onOpen={(row) => setCard({ projectId: row.id, operationId: null })}
+          onCreate={() => setProjectWizard(true)}
+          onFinish={(row) => projectAction(row, 'finish')} onRemove={(row) => projectAction(row, 'remove')} onRestore={(row) => projectAction(row, 'restore')}
+        />
+      )}
+      {projNote && <div className={'ckp-toast' + (projNote.isError ? ' is-error' : '')} role="status">{projNote.text}</div>}
+      {confirmDialog}
+      {projectWizard && <CreateProjectWizard onClose={() => setProjectWizard(false)} onDone={({ projectId, createOperation }) => { setProjectWizard(false); aiProjects.reload(); if (createOperation) { setCampaignTarget({ id: null, startProjectId: projectId }); setSection('campaigns'); } }} notify={() => {}} />}
+      {section === 'campaigns' && <CampaignsSection key={campaignTarget ? `c${campaignTarget.id ?? 'p' + campaignTarget.startProjectId}` : 'all'} openCampaignId={campaignTarget?.id ?? null} openNewRequest={!!campaignTarget?.newRequest} startProjectId={campaignTarget?.startProjectId ?? null} cockpit={cockpit}
+        onOpenProject={aiProjects.rows ? (projectId, operationId) => { if (aiProjects.rows.some((r) => r.id === projectId)) setCard({ projectId, operationId }); else sayProj('Цей проєкт не доданий у розділ «Проєкти».', true); } : null} />}
       {section === 'spend' && <AgentSpend onOpenCampaign={(id) => { setCampaignTarget({ id }); setSection('campaigns'); }} />}
       {section === 'system' && <SystemState />}
       {section === 'map' && (
@@ -335,13 +369,13 @@ export default function ConstellationTest() {
       <div className="ai-flow">
 
       {section === 'map' && (
-        <ActiveProjectsCard projects={cockpit.list} loading={cockpit.loading} collapsed={cockpitCollapsed} onToggle={() => setCockpitCollapsed((v) => !v)} onOpen={setCockpitId} onOpenAll={() => setSection('projects')} />
+        <ActiveProjectsCard projects={cockpit.list} loading={cockpit.loading} collapsed={cockpitCollapsed} onToggle={() => setCockpitCollapsed((v) => !v)} onOpen={openOperationCard} onOpenAll={() => setSection('projects')} />
       )}
       {section === 'map' && (
         <TaskFlowPanel
           tasks={mapTasks} selectedId={carId} onSelect={setCarId}
           onFocus={(agentKey) => { const a = allAgents.find((x) => x.key === agentKey); if (a) setMapFocus({ key: a.deptKey, n: Date.now() }); }}
-          onOpenOperation={(id) => setCockpitId(id)}
+          onOpenOperation={openOperationCard}
         />
       )}
       {section === 'map' && agentsOpen && (
@@ -355,16 +389,18 @@ export default function ConstellationTest() {
           opening it from the map itself. */}
       {coreOpen && <KnowledgeBase onClose={() => setCoreOpen(false)} />}
 
-      {cockpitId != null && (
-        <ProjectWindow
-          cockpit={cockpit.byId[cockpitId] || null} loading={cockpit.loading}
-          onClose={() => setCockpitId(null)}
-          onAction={(item, key, payload) => cockpit.run(item, key, payload)}
-          onNewRequest={() => { setCampaignTarget({ id: cockpitId, newRequest: true }); setCockpitId(null); setSection('campaigns'); }}
-          onOpenRequest={() => {}}
-          onStop={async () => { const c = cockpit.byId[cockpitId]; await updateCampaign(cockpitId, { status: c?.status === 'paused' ? 'active' : 'paused' }); await cockpit.reload(); }}
-        />
-      )}
+      {card && (() => {
+        const row = aiProjects.rows.find((r) => r.id === card.projectId);
+        if (!row) return null;
+        const after = (fn) => async (r) => { const ok = await fn(r); if (ok) setCard(null); return false; };
+        return (
+          <ProjectCard
+            key={`${card.projectId}:${card.operationId ?? ''}`} row={row} cockpit={cockpit} initialOperationId={card.operationId} ready={aiProjects.ready}
+            onClose={() => setCard(null)} onChanged={() => aiProjects.reload()}
+            onFinish={after((r) => projectAction(r, 'finish'))} onRemove={after((r) => projectAction(r, 'remove'))} onRestore={after((r) => projectAction(r, 'restore'))}
+          />
+        );
+      })()}
 
       {deptAgent && <DeptAgentWindow role={deptAgent.role} onClose={() => setDeptAgent(null)} onOpenLegacy={deptAgent.legacyTool ? () => { const tool = deptAgent.legacyTool; setDeptAgent(null); setAgentToolOpen(tool); setAgentToolPayload(null); } : null} />}
       {agentToolOpen && AGENT_TOOLS[agentToolOpen] && (() => {

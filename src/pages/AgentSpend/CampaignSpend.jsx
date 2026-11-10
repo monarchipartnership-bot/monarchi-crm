@@ -8,7 +8,9 @@ import { money } from '../../lib/aiUsageStats';
 const fmtDay = (d) => d.split('-').reverse().slice(0, 2).join('.');
 
 // «Гроші операцій» on the page «Витрати»: what every campaign cost (Claude + Higgsfield) in the chosen period, how close it is to its cap, and the cap itself can be changed here.
-export default function CampaignSpend({ onOpenCampaign }) {
+//   projectId: only the operations of this project (the section «Витрати» of the project card)
+//   campaignId: only this operation (the section «Витрати» of an operation)
+export default function CampaignSpend({ onOpenCampaign, projectId = null, campaignId = null }) {
   const [data, setData] = useState(null);
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState('');
@@ -26,9 +28,15 @@ export default function CampaignSpend({ onOpenCampaign }) {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const view = useMemo(() => (data ? buildCampaignSpend({ ...data, projects, period }) : null), [data, projects, period]);
+  // one project: its operations and only the money spent in them
+  const scoped = useMemo(() => {
+    if (!data || (projectId == null && campaignId == null)) return data;
+    const ids = new Set(data.campaigns.filter((c) => (campaignId != null ? c.id === campaignId : c.project_id === projectId)).map((c) => c.id));
+    return { campaigns: data.campaigns.filter((c) => ids.has(c.id)), tasks: data.tasks.filter((x) => ids.has(x.campaign_id)), spends: data.spends.filter((x) => ids.has(x.campaign_id)) };
+  }, [data, projectId, campaignId]);
+  const view = useMemo(() => (scoped ? buildCampaignSpend({ ...scoped, projects, period, keepAll: projectId != null || campaignId != null }) : null), [scoped, projects, period, projectId, campaignId]);
   const maxDay = view ? Math.max(0.0001, ...view.days.map((d) => d.claude + d.higgsfield)) : 1;
-  const months = useMemo(() => (data ? monthlySpend({ tasks: data.tasks, spends: data.spends }) : []), [data]);
+  const months = useMemo(() => (scoped ? monthlySpend({ tasks: scoped.tasks, spends: scoped.spends }) : []), [scoped]);
   const maxMonth = Math.max(0.0001, ...months.map((m) => m.total));
 
   async function save() {
@@ -39,7 +47,7 @@ export default function CampaignSpend({ onOpenCampaign }) {
   return (
     <div className="analytics-section">
       <div className="sys-top">
-        <h2 className="analytics-section-title">Гроші операцій</h2>
+        <h2 className="analytics-section-title">{campaignId != null ? 'Витрати операції' : projectId != null ? 'Витрати проєкту за операціями' : 'Гроші операцій'}</h2>
         <div className="cs-periods" role="tablist" aria-label="Період">
           {PERIODS.map((p) => <button key={p.key} type="button" role="tab" aria-selected={period === p.key} className={'cs-period' + (period === p.key ? ' on' : '')} onClick={() => setPeriod(p.key)}>{p.label}</button>)}
         </div>
