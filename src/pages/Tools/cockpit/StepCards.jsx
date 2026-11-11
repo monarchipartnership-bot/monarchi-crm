@@ -21,7 +21,7 @@ export default function StepCards({ stages = [], paused = false, onRevised }) {
   const speech = useSpeechInput({ lang: voiceLang, onText: (txt) => { if (txt) setRev((r) => (r ? { ...r, text: `${r.text}${r.text && !/\s$/.test(r.text) ? ' ' : ''}${txt}`.slice(0, 2000) } : r)); } });
   async function sendRevision(card) {
     setRev((r) => ({ ...r, busy: true, error: '' }));
-    try { await reviseStep(card.taskId, rev.text); setRev(null); onRevised?.(); } catch (e) { setRev((r) => ({ ...r, busy: false, error: e?.message || 'Не вдалося надіслати правку.' })); }
+    try { const r = await reviseStep(card.taskId, rev.text); setRev(null); onRevised?.(r); } catch (e) { setRev((r) => ({ ...r, busy: false, error: e?.message || 'Не вдалося надіслати правку.' })); }
   }
   async function toggle(card) {
     if (open[card.key]) { setOpen((o) => { const n = { ...o }; delete n[card.key]; return n; }); return; }

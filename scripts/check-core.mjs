@@ -4434,11 +4434,14 @@ await ok('correct a step with a comment: the same agent gets a new task with the
   assert.deepEqual([made.agent_id, made.status, made.request_id, made.brief.trigger, made.brief.revision.comment, made.brief.revision.of, made.brief.revision.by], [1, 'queued', 5, 'revision', 'Прибери напрям 2', 10, 'm@x.y']);
   assert.equal(tables.ag_creative_requests[0].status, 'running');
   assert.deepEqual([tables.ag_client_events[0].kind, tables.ag_client_events[0].project_id, tables.ag_client_events[0].subject], ['note', 7, 'Правка результату: Стратег']); // the memory of the client knows
-  await assert.rejects(() => reviseStep(ctx(tables), 10, 'ще раз'), /працює крок/); // its own new task is open now
+  await assert.rejects(() => reviseStep(ctx(tables), 10, 'ще раз'), /у черзі або в роботі/); // its own new task is open now
   await assert.rejects(() => reviseStep(ctx(base()), 10, 'ab'), /Опишіть/);
   await assert.rejects(() => reviseStep(ctx(base()), 11, 'щось не так'), /не виправляється/); // the checker is not corrected by a comment
   const paused = base(); paused.ag_campaigns[0].status = 'paused';
-  await assert.rejects(() => reviseStep(ctx(paused), 10, 'виправ'), /призупинено/);
+  const queued = await reviseStep(ctx(paused), 10, 'виправ'); // a paused operation takes the correction: the task waits in the queue
+  assert.deepEqual([queued.ok, queued.paused, paused.ag_tasks.find((x) => x.id === queued.taskId).status], [true, true, 'queued']);
+  const archived = base(); archived.ag_campaigns[0].status = 'archived';
+  await assert.rejects(() => reviseStep(ctx(archived), 10, 'виправ'), /в архіві/);
   const pics = base(); pics.ag_creatives.push({ id: 3, request_id: 5, status: 'review' });
   await assert.rejects(() => reviseStep(ctx(pics), 10, 'виправ'), /створила б дублі/);
   const notDone = base(); notDone.ag_tasks[0].status = 'queued';

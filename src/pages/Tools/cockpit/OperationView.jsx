@@ -175,7 +175,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
               {!view.inWork.length && (
                 <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Зараз нічого не в роботі</b><p>{view.counts.review ? `На вашу перевірку чекає креативів: ${view.counts.review}. ` : ''}{view.nextText}</p></div></div>
               )}
-              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} onRevised={() => { notify?.('Правку надіслано: агент переробляє крок.'); onChanged?.(); }} />)}
+              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} onRevised={(r) => { notify?.(r?.paused ? 'Правку прийнято. Крок виконається, коли ви відновите операцію.' : 'Правку надіслано: агент переробляє крок.'); onChanged?.(); }} />)}
             </div>
           )}
         </>
