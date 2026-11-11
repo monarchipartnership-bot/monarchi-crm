@@ -197,7 +197,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       )}
       {openCampaign && project && (
         <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst}
-          onClose={() => { setOpen(null); load(); }} onBackToProject={() => { setOpen(null); load(); }} onChanged={load} />
+          onClose={() => { setOpen(null); load(); }} onBackToProject={() => { setOpen(null); load(); }} onGoFill={(section) => { setOpen(null); onGoFill?.(section); }} onChanged={load} />
       )}
     </div>
   );

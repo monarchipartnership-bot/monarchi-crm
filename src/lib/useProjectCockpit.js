@@ -45,7 +45,8 @@ export default function useProjectCockpit({ enabled = true } = {}) {
           actions: [{ key: 'confirm_generation', label: `Підтвердити генерацію · $${est.usd.toFixed(2)}`, primary: true }, { key: 'estimate', label: 'Оцінити ще раз' }] };
       });
       const tone = attention.some((i) => i.tone === 'problem') ? 'problem' : attention.length ? 'attention' : 'ok';
-      out[c.id] = { ...c, attention, waiting: attention.length, tone };
+      const requests = c.requests.map((r) => (r.notes?.length ? { ...r, notes: r.notes.filter((n) => !dismissed.has(n.id)) } : r));
+      out[c.id] = { ...c, requests, attention, waiting: attention.length, tone };
     });
     const rank = { problem: 0, attention: 1, ok: 2 };
     const rows = state.list.map((s) => ({ ...s, waiting: out[s.id]?.waiting ?? s.waiting, tone: out[s.id]?.tone ?? s.tone })).sort((a, b) => rank[a.tone] - rank[b.tone]);

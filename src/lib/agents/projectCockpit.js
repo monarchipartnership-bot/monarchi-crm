@@ -4,6 +4,7 @@
 
 import { fileNameOf } from '../creatives/download.js';
 import { directionLimit } from './creativeTeam.js';
+import { mergeNotes } from './agentNotes.js';
 
 export const STAGES = [
   { key: 'strategy', label: 'Стратег', role: 'creative_strategy' },
@@ -26,11 +27,11 @@ const at = (v) => { const t = new Date(v).getTime(); return Number.isNaN(t) ? 0 
 
 export const modeLabelOf = (campaign) => MODE_LABEL[campaign?.config?.mode] || (campaign?.config?.mode ? campaign.config.mode : 'Повна операція');
 
-// notes of the agents are numbered («1) …  2) …»): every point is one question to the person; a note without numbers is one point
+// notes of the agents are numbered («1) …  2) …» or «1. …  2. …»): every point is one question to the person; a note without numbers is one point
 export function splitNotes(text) {
   const raw = String(text || '').trim();
   if (!raw) return [];
-  const parts = raw.split(/(?:^|\s)\d{1,2}\)\s+/).map((p) => p.trim()).filter(Boolean);
+  const parts = raw.split(/(?:^|\s)\d{1,2}[.)]\s+/).map((p) => p.trim()).filter(Boolean); // «1) …» and «1. …»
   return (parts.length ? parts : [raw]).map((p) => clip(p, 700));
 }
 
@@ -43,6 +44,18 @@ export function hashText(text) {
 }
 
 const lastBy = (rows, pick) => rows.filter(pick).sort((a, b) => at(b.created_at) - at(a.created_at) || num(b.id) - num(a.id))[0] || null;
+
+// What the agents of the steps that are done are unsure about (the newest note of each step), merged into short entries (lib/agents/agentNotes.js): information for the person, not
+// messages that wait for them. The theme «немає фото» is left out while the card tells it in its own message.
+export function stepNotes(request, tasks, roleOf, { hasAssets = true } = {}) {
+  const mine = tasks.filter((t) => t.request_id === request.id);
+  const steps = STAGES.filter((s) => ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker'].includes(s.role)).map((s) => {
+    const t = lastBy(mine, (x) => roleOf(x.agent_id) === s.role && x.status === 'done');
+    const notes = t?.notes ?? t?.output?.json?.notes;
+    return { label: s.label, points: splitNotes(typeof notes === 'string' ? notes : '') };
+  });
+  return mergeNotes(steps, request.id, { skipMaterials: !hasAssets });
+}
 
 // The chain of one request: the state of every step is the state of the newest task of its role.
 export function buildStages(request, tasks, roleOf) {
@@ -86,19 +99,6 @@ function requestAttention(request, tasks, creatives, roleOf, library, { onlyRevi
       creatives: review.map((c) => ({ id: c.id, url: c.final_url || c.asset_url || '', ratio: c.ratio, conceptName: c.concept_name || c.concept_key || '', status: c.status })),
       actions: [{ key: 'approve_all', label: 'Схвалити всі', primary: true }, { key: 'return', label: 'Повернути з коментарем' }] });
   }
-
-  // what the agents ask: the notes of the steps that are done (the newest note of each step), ONE card per step with its points, the same note of two steps once
-  const asked = new Set();
-  STAGES.filter((s) => !onlyReview && ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker'].includes(s.role)).forEach((s) => {
-    const t = lastBy(mine, (x) => roleOf(x.agent_id) === s.role && x.status === 'done');
-    const notes = t?.notes ?? t?.output?.json?.notes;
-    const points = splitNotes(typeof notes === 'string' ? notes : '');
-    if (!points.length) return;
-    const id = `question:${request.id}:${hashText(points.join('|'))}`;
-    if (asked.has(id)) return;
-    asked.add(id);
-    items.push({ id, kind: 'question', tone: 'attention', title: `Питання від кроку «${s.label}»`, text: points.length > 1 ? points.map((p, i) => `${i + 1}) ${p}`).join('\n') : points[0], requestId: request.id, actions: [{ key: 'dismiss', label: 'Зрозуміло' }] });
-  });
 
   // remarks of the quality control
   const qc = lastBy(mine, (x) => roleOf(x.agent_id) === 'creative_quality' && x.status === 'done');
@@ -168,7 +168,7 @@ export function buildCockpit(raw) {
       return { id: r.id, title: clip(r.title, 90), status, statusLabel: REQUEST_STATUS_LABEL[status] || status, items, updatedAt: r.updated_at || r.created_at, createdAt: r.created_at || null,
         // the cycle: regular (made by the schedule) or extra, what was asked, its own chain and its money (lib/agents/operationCycles.js)
         kind: brief.kind === 'regular' ? 'regular' : 'extra', scheduledFor: brief.scheduled_for || null, regularId: brief.regular_id || null, goal: clip(brief.goal, 400), ratios: Array.isArray(brief.ratios) && brief.ratios.length ? brief.ratios : ['1:1'], directions: directionLimit(brief),
-        stages: own.stages, currentStageKey: own.currentStageKey, error: clip(r.error, 300),
+        stages: own.stages, currentStageKey: own.currentStageKey, error: clip(r.error, 300), notes: ['draft', 'running', 'review', 'problem'].includes(r.status) ? stepNotes(r, tasks, roleOf, { hasAssets: !!((r.materials || []).length || library.assets) }) : [],
         cost: { model: round(tasks.filter((t) => t.request_id === r.id).reduce((s, t) => s + num(t.cost_usd), 0)), higgsfield: round(c.reduce((s, x) => s + num(x.cost_usd), 0)) },
         creatives: { total: c.length, review: n('review'), approved: n('approved'), rejected: n('rejected'), failed: n('failed'), producing: n('producing'), planned: n('planned') } };
     }),

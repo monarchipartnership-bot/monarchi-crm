@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { kickQueue } from '../../../lib/api/agents';
-import { fetchCampaignControl } from '../../../lib/api/campaignControl';
+import { addInstruction, fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
 import { MAX_REGULARS, SECTIONS, buildOperationView, cycleCosts, describeCycle } from '../../../lib/agents/operationCycles';
@@ -14,6 +14,7 @@ import RequestForm from '../campaigns/studio/RequestForm';
 import AgentsSettings from './AgentsSettings';
 import StepCards from './StepCards';
 import PicturesSetting from './PicturesSetting';
+import AgentNotes from './AgentNotes';
 import AttentionRow from './AttentionRow';
 import Gallery from './Gallery';
 import { StageLine } from './ProjectWindow';
@@ -29,7 +30,7 @@ const fmtWhen = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTim
 const countsLine = (c = {}) => [c.review ? `на перегляд: ${c.review}` : '', c.approved ? `затверджено: ${c.approved}` : '', c.rejected ? `повернено: ${c.rejected}` : '', c.producing ? `генерується: ${c.producing}` : ''].filter(Boolean).join(' · ') || 'рішень ще немає';
 
 // One cycle that is in work: what it makes, how far it is, the step of the chain, what comes after it.
-function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised }) {
+function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised, onDismissNote, onAnswerNote, onGoFill }) {
   const s = cycle.stage;
   const pct = Math.round((cycle.progress || 0) * 100);
   return (
@@ -55,6 +56,7 @@ function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised }) {
         {(s.blocked === 'failed' || s.blocked === 'estimate') && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('messages')}>{s.blocked === 'estimate' ? 'Підтвердити генерацію картинок' : 'Перейти до повідомлень'}<Ic n="arrow" size={15} /></button>}
         {s.blocked === 'review' && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('review', cycle.id)}>Перейти до перевірки<Ic n="arrow" size={15} /></button>}
       </div>
+      {cycle.status !== 'draft' && <AgentNotes notes={cycle.notes || []} onDismiss={onDismissNote} onAnswer={onAnswerNote} onGoFill={onGoFill} />}
       {cycle.status !== 'draft' && <StepCards stages={cycle.stages} paused={paused} onRevised={onRevised} />}
     </section>
   );
@@ -89,7 +91,7 @@ function Passes({ campaignId }) {
 //   «Готові матеріали»          the approved materials of the last cycle
 //   campaign: the ag_campaigns row  cockpit: the cabinet of the operation  run(item, key, payload): the action of the cabinet (useProjectCockpit)
 //   regularFirst: the operation was just created → the form of the regular cycle opens at once
-export default function OperationView({ campaign, cockpit: c, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false }) {
+export default function OperationView({ campaign, cockpit: c, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false, onGoFill = null }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
   const [section, setSection] = useState('now');
@@ -104,6 +106,12 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
   const costs = useMemo(() => cycleCosts(c), [c]);
   const stopped = ['paused', 'archived'].includes(campaign.status);
   const act = useCallback((item, key, payload = {}) => run(item, key, { campaignId: campaign.id, ...payload }), [run, campaign.id]);
+  // the answer of the manager to what the agents are unsure about: a manager's instruction for the operation (the agents read it in their next runs), the note is closed
+  const answerNote = useCallback(async (n, text) => {
+    await addInstruction(campaign.id, `${n.label}: ${String(text).trim()}`.slice(0, 1000));
+    await act({ id: n.id }, 'dismiss');
+    notify?.('Відповідь передано агентам: вони врахують її в наступних завданнях.');
+  }, [campaign.id, act, notify]);
   const [reviewTab, setReviewTab] = useState('now'); // now (the cycles that wait for the person) | archive (the checked ones)
   const go = (key, cycleId = null) => {
     setSection(key); setOpenCycle(cycleId); setRework(null);
@@ -176,7 +184,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
               {!view.inWork.length && (
                 <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Зараз нічого не в роботі</b><p>{view.counts.review ? `На вашу перевірку чекає креативів: ${view.counts.review}. ` : ''}{view.nextText}</p></div></div>
               )}
-              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} onRevised={(r) => { notify?.(r?.paused ? 'Правку прийнято. Крок виконається, коли ви відновите операцію.' : 'Правку надіслано: агент переробляє крок.'); onChanged?.(); }} />)}
+              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} onDismissNote={(n) => act({ id: n.id }, 'dismiss')} onAnswerNote={answerNote} onGoFill={onGoFill} onRevised={(r) => { notify?.(r?.paused ? 'Правку прийнято. Крок виконається, коли ви відновите операцію.' : 'Правку надіслано: агент переробляє крок.'); onChanged?.(); }} />)}
             </div>
           )}
         </>

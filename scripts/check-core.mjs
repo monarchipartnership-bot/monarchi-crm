@@ -43,6 +43,7 @@ import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
 import { reviseStep } from '../api/_lib/creativeEngine.js';
+import { mergeNotes, topicOf } from '../src/lib/agents/agentNotes.js';
 import { buildStepCards, durationText } from '../src/lib/agents/stageDetails.js';
 import { marketsText, parseMarkets } from '../src/lib/agents/markets.js';
 import { LANGUAGES, isValidLanguage, languageEnglish, languageLabel, languageOptions, overlaySafe } from '../src/lib/agents/languages.js';
@@ -2451,9 +2452,11 @@ await ok('project cabinet: the stage is the first step of the chain that is not 
   assert.equal(c.currentStageKey, 'you');
   assert.deepEqual(c.stages.filter((s) => s.parallel).map((s) => s.key), ['copy', 'maker']);
   const kinds = c.attention.map((i) => i.kind).sort();
-  assert.deepEqual(kinds, ['estimate', 'missing_assets', 'qc_remark', 'question', 'review']); // the same note of two steps is one question card
-  assert.equal(c.waiting, 5);
-  assert.match(c.attention.find((i) => i.kind === 'question').text, /^1\) Перекласти чи лишити оригінал\?\n2\) Не задано текст кнопки\.$/);
+  assert.deepEqual(kinds, ['estimate', 'missing_assets', 'qc_remark', 'review']); // the questions of the agents are not messages for the person any more: they are notes of the task
+  assert.equal(c.waiting, 4);
+  const notes = c.requests[0].notes; // the same note of two steps is one entry; the theme «фото» is left out while the card says «Немає фото товару» itself
+  assert.deepEqual(notes.map((n) => [n.topic, n.agents]).sort(), [['cta', ['Стратег', 'Копірайтер']], ['other', ['Стратег', 'Копірайтер']]]);
+  assert.equal(notes.find((n) => n.topic === 'other').text, 'Перекласти чи лишити оригінал?');
   assert.equal(c.tone, 'attention');
   const review = c.attention.find((i) => i.kind === 'review');
   assert.deepEqual(review.creatives.map((x) => x.id), [11]);
@@ -4497,6 +4500,24 @@ await ok('pictures of a creative task: generated at once unless the team switche
   assert.deepEqual(creativeAutoOf({ config: { creative: { autoGenerate: false, maxUsd: 5 } } }), { auto: false, maxUsd: 5 });
   assert.deepEqual(creativeAutoOf({ config: { creative: { autoGenerate: true, maxUsd: '2,5' } } }), { auto: true, maxUsd: null }); // a text that is not a number is no limit
   assert.deepEqual(creativeAutoOf({ config: { creative: { maxUsd: 4.5 } } }), { auto: true, maxUsd: 4.5 });
+});
+
+await ok('notes of the agents: the same theme of several agents is one entry with a way out (the card, an answer, unimportant)', () => {
+  const steps = [
+    { label: 'ТЗ', points: ['Підтвердити, чи дійсно текст кнопки CTA не потрібен навіть як напис на макеті.', 'Матеріалів клієнта (фото перук, лого, кольори) немає: концепти повністю згенеровані.'] },
+    { label: 'Копірайтер', points: ['Обидва концепти позначені як такі, що не потребують тексту (кнопка CTA без напису).', 'Нагадую: наявність фото продукту клієнта та згода на згенеровані сцени.'] },
+    { label: 'Креативщик', points: ['Уточнити, чи потрібен текст на кнопці CTA.', 'Перевірити, чи є хоч якісь фото перук клієнта для заміни.', 'ок'] },
+  ];
+  const merged = mergeNotes(steps, 7);
+  assert.deepEqual(merged.map((n) => [n.topic, n.agents]), [['cta', ['ТЗ', 'Копірайтер', 'Креативщик']], ['materials', ['ТЗ', 'Копірайтер', 'Креативщик']]]); // six lines became two; «ок» is too short to be a note
+  assert.equal(merged[0].text, 'Уточнити, чи потрібен текст на кнопці CTA.'); // the shortest wording
+  assert.deepEqual([merged[0].fill, merged[0].id, merged[1].id], ['business', 'note:7:cta', 'note:7:materials']);
+  assert.deepEqual(mergeNotes(steps, 7, { skipMaterials: true }).map((n) => n.topic), ['cta']);
+  const other = mergeNotes([{ label: 'A', points: ['Чи потрібна знижка у заголовку?'] }, { label: 'B', points: ['Чи потрібна знижка у заголовку?'] }, { label: 'C', points: ['Яка дата акції?'] }], 3);
+  assert.deepEqual(other.map((n) => [n.topic, n.fill, n.agents.length]), [['other', null, 2], ['other', null, 1]]); // other themes: the same wording is one, different ones stay apart
+  assert.notEqual(other[0].id, other[1].id);
+  assert.deepEqual([topicOf('Немає фото товару'), topicOf('Не задано текст кнопки'), topicOf('Яка дата?')], ['materials', 'cta', 'other']);
+  assert.deepEqual(mergeNotes([], 1), []);
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {

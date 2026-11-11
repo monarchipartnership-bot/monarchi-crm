@@ -29,3 +29,8 @@
 .sd-check { display: inline-flex; align-items: center; gap: 10px; font-size: .9rem; color: var(--ck-ink); cursor: pointer; }
 .sd-limit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .88rem; color: var(--ck-ink); }
 .sd-limit input { width: 90px; height: 34px; border: 1px solid var(--ck-ln); border-radius: 8px; padding: 0 10px; background: transparent; color: var(--ck-ink); font: inherit; } .sd-limit small { color: var(--ck-sec); }
+
+.sd-notes { margin-top: 14px; }
+.sd-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--ck-chip); color: var(--ck-ink); font-size: .7rem; }
+.sd-nitem { gap: 8px; } .sd-ntext { margin: 0; font-size: .86rem; line-height: 1.5; color: var(--ck-ink); }
+.sd-nacts { display: flex; gap: 8px; flex-wrap: wrap; }
