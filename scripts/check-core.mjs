@@ -100,7 +100,8 @@ import { buildCampaignSpend, monthlySpend, periodStart } from '../src/lib/agents
 import { DRAFT_KEYS, draftFrom, extractedFromDraft } from '../src/lib/agents/projectWizard.js';
 import { buildTaskPath, currentStep } from '../src/lib/agents/mapTasks.js';
 import { stuckAgents, telegramTest } from '../src/lib/agents/systemState.js';
-import { agentRows, buildProjectRows, cleanProjectTitle, filterSortProjects, groupOperations, operationsToStop, projectCounts, projectHeadline } from '../src/lib/agents/aiProjects.js';
+import { agentRows } from '../src/lib/agents/aiProjects.js';
+import { buildTeamProjectRows, filterSortTeamProjects, teamProjectCounts, teamsLink } from '../src/lib/agents/teamProjects.js';
 import { KB_SEARCH_MAX, buildKbSearchPrompt, kbPrivacyWarnings, parseKbSearch } from '../src/lib/kbSearch.js';
 import { buildCalendar, cleanTemplate, planApply, platformsFor, snapshotOperation } from '../src/lib/agents/campaignTemplates.js';
 import { counts as dlvCounts, decisionEvent, fileNameOf as dlvFileName, groupDeliverables, inputFromDeliverable, inputKeyOf } from '../src/lib/agents/deliverables.js';
@@ -4342,6 +4343,33 @@ await ok('schedule calendar: the time is a range, the coming runs of both modes,
   assert.equal(nov.filter((c) => c.date).length, 30); assert.equal(nov.findIndex((c) => c.date === '2026-11-01'), 6); // 1 November 2026 is a Sunday: six empty cells in front
 });
 
+await ok('projects of the AI section: only projects with launched teams, one row each with the states of its teams; filters, search, sorting; a click leads to the teams tab of the CRM card', () => {
+  const projects = [{ id: 1, name: 'Mellow', client: 'Mellow Diamond' }, { id: 2, name: 'Oxygen', client: 'Oxygen' }, { id: 3, name: 'Quiet', client: 'Quiet' }, { id: 4, name: 'Zeta', client: 'Zeta' }];
+  const campaigns = [
+    { id: 10, project_id: 1, status: 'active', config: { mode: 'creative' }, updated_at: '2026-11-10T10:00:00Z' },
+    { id: 11, project_id: 1, status: 'draft', config: { mode: 'ads' } }, // not launched
+    { id: 12, project_id: 1, status: 'active', config: { mode: 'full', team: 'oneoff', hidden: true } }, // the quiet operation of one-off tasks is not a team
+    { id: 13, project_id: 2, status: 'paused', config: { mode: 'ads' }, updated_at: '2026-11-11T10:00:00Z' },
+  ];
+  const agents = [{ project_id: 1, enabled: true, last_run_at: null }, { project_id: 3, enabled: false, last_run_at: null }, { project_id: 4, enabled: false, last_run_at: '2026-10-01T00:00:00Z' }]; // 3: never switched on
+  const accounts = [{ project_id: 1, platform: 'google' }, { project_id: 1, platform: 'meta' }];
+  const cockpits = { 10: { waiting: 2, tone: 'attention', updatedAt: '2026-11-11T09:00:00Z' } };
+  const rows = buildTeamProjectRows({ campaigns, agents, projects, accounts, cockpits });
+  assert.deepEqual(rows.map((r) => r.id).sort(), [1, 2, 4]); // 3 has only a never-launched report agent
+  const mellow = rows.find((r) => r.id === 1);
+  assert.deepEqual(mellow.teams.map((x) => [x.key, x.state]), [['creative', 'running'], ['reports', 'running']]);
+  assert.deepEqual([mellow.platforms, mellow.waiting, mellow.tone, mellow.running, mellow.client], [['meta', 'google'], 2, 'attention', 2, 'Mellow Diamond']);
+  assert.deepEqual(rows.find((r) => r.id === 2).teams, [{ key: 'analytics', title: 'Аналітика й оптимізація', state: 'paused' }]);
+  assert.equal(rows.find((r) => r.id === 4).running, 0); // a stopped report agent that worked before
+  assert.deepEqual(teamProjectCounts(rows), { all: 3, waiting: 1, working: 1, stopped: 2 });
+  const ids = (o) => filterSortTeamProjects(rows, o).map((r) => r.id);
+  assert.deepEqual(ids({}), [1, 2, 4]); // the one that waits for the person first
+  assert.deepEqual(ids({ filter: 'waiting' }), [1]); assert.deepEqual(ids({ filter: 'working' }), [1]);
+  assert.deepEqual(ids({ query: 'oxy' }), [2]); assert.deepEqual(ids({ sort: 'name' }), [1, 2, 4]);
+  assert.equal(teamsLink(7), '/projects/7?tab=teams');
+  assert.deepEqual(buildTeamProjectRows({}), []);
+});
+
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
   const reading = { fields: { about: 'Jewellery shop', tone: 'warm' }, restrictions: 'no discounts', cta: { mode: 'always', text: 'Shop now' }, figma: '', links: [{ url: 'https://x.com', about: 'site' }], needsFiles: ['logo'], unplaced: [] };
   const d = draftFrom(reading);
@@ -4525,75 +4553,6 @@ await ok('creatives: a model billed by tokens gives its rates, not a price; the 
   const net = async () => ({ ok: true, status: 200, json: async () => ({ type: 'description', pricing_description: D }) });
   assert.equal(await imgEstimate({ request: { path: 'marketing-studio/image/sunburst', body: { prompt: 'x'.repeat(300), aspect_ratio: '1:1' } }, env, fetchFn: net }), sq);
   await assert.rejects(() => imgEstimate({ request: { path: 'm', body: {} }, env, fetchFn: async () => ({ ok: true, status: 200, json: async () => ({ type: 'other' }) }) }), /не повернув вартість[\s\S]*other/);
-});
-
-await ok('AI projects: one row per client project with its cabinets, operations and what waits; tabs, search and sorting; a removed project is gone from the section', () => {
-  const aiProjects = [
-    { project_id: 1, status: 'active', created_at: '2026-11-01T10:00:00Z', updated_at: '2026-11-01T10:00:00Z' },
-    { project_id: 2, status: 'active', created_at: '2026-11-05T10:00:00Z', updated_at: '2026-11-05T10:00:00Z' },
-    { project_id: 3, status: 'done', created_at: '2026-10-01T10:00:00Z', updated_at: '2026-11-08T10:00:00Z', finished_at: '2026-11-08T10:00:00Z' },
-    { project_id: 4, status: 'removed', created_at: '2026-10-02T10:00:00Z', updated_at: '2026-11-09T10:00:00Z' },
-  ];
-  const projects = [{ id: 1, name: 'Mellowdiamond Instagram', client: 'Mellow' }, { id: 2, name: 'Alucons LTD', client: '' }, { id: 3, name: 'Oxygen', client: 'Oxygen' }, { id: 4, name: 'Gone', client: 'Gone' }];
-  const accounts = [{ project_id: 1, platform: 'google' }, { project_id: 1, platform: 'meta' }, { project_id: 2, platform: 'google' }];
-  const campaigns = [
-    { id: 10, project_id: 1, status: 'active', updated_at: '2026-11-09T10:00:00Z' }, { id: 11, project_id: 1, status: 'paused', updated_at: '2026-11-02T10:00:00Z' }, { id: 12, project_id: 1, status: 'archived' },
-    { id: 20, project_id: 3, status: 'archived' },
-  ];
-  const cockpits = { 10: { id: 10, projectId: 1, waiting: 2, tone: 'attention', progress: 0.5, modeLabel: 'Тільки креативи', updatedAt: '2026-11-10T08:00:00Z' }, 11: { id: 11, projectId: 1, waiting: 1, tone: 'problem', progress: 0.2, modeLabel: 'Повна операція', updatedAt: '2026-11-03T08:00:00Z' } };
-  const summaries = [{ id: 11, stageLabel: 'Стратег зупинився' }, { id: 10, stageLabel: 'Готово до перегляду' }];
-  const rows = buildProjectRows({ aiProjects, projects, accounts, campaigns, cockpits, summaries });
-  assert.deepEqual(rows.map((r) => r.id), [1, 2, 3]); // the removed one is not in the section at all
-  const m = rows[0];
-  assert.deepEqual([m.client, m.platforms, m.operations, m.waiting, m.tone, m.openCampaignId, m.stageLabel], ['Mellow', ['meta', 'google'], { total: 3, active: 1, paused: 1, archived: 1 }, 3, 'problem', 11, 'Стратег зупинився']);
-  assert.equal(m.updatedAt, '2026-11-10T08:00:00.000Z'); // the latest change of the project or anything in it
-  assert.equal(rows[1].client, 'Alucons LTD'); // no client name: the name of the project
-  assert.equal(rows[1].openCampaignId, null);
-  assert.deepEqual(projectCounts(rows), { active: 2, archive: 1, waiting: 1, working: 1 });
-  const ids = (o) => filterSortProjects(rows, o).map((r) => r.id);
-  assert.deepEqual(ids({}), [1, 2]); // the one that waits first
-  assert.deepEqual(ids({ tab: 'archive' }), [3]);
-  assert.deepEqual(ids({ filter: 'working' }), [2]);
-  assert.deepEqual(ids({ query: 'aluc' }), [2]);
-  assert.deepEqual(ids({ query: 'instagram' }), [1]); // the project's name is searched too
-  assert.deepEqual(ids({ sort: 'created_desc' }), [2, 1]);
-  assert.deepEqual(ids({ sort: 'created_asc' }), [1, 2]);
-  assert.deepEqual(ids({ sort: 'name' }), [2, 1]); // Alucons before Mellow
-  assert.deepEqual(ids({ sort: 'cabinet' }), [2, 1]); // google before meta+google
-  assert.deepEqual(ids({ sort: 'active' }), [1, 2]);
-  assert.deepEqual(ids({ sort: 'updated' }), [1, 2]);
-  assert.deepEqual(operationsToStop(campaigns, 1), [10, 11]); // the archived one is left alone
-  assert.deepEqual(buildProjectRows({}), []);
-});
-
-await ok('project card: the operations in three groups (in work, planned, finished; newest first), the headline of the project, the money of one project lists every operation', () => {
-  const campaigns = [
-    { id: 1, name: 'A', status: 'archived', updated_at: '2026-10-01T10:00:00Z', created_at: '2026-09-01T10:00:00Z', platforms: ['meta'], config: { mode: 'creative' } },
-    { id: 2, name: 'B', status: 'archived', updated_at: '2026-11-01T10:00:00Z', created_at: '2026-09-02T10:00:00Z', platforms: [], config: {} },
-    { id: 3, name: 'C', status: 'draft', created_at: '2026-11-05T10:00:00Z', platforms: ['google'], config: { mode: 'report' } },
-    { id: 4, name: 'D', status: 'paused', updated_at: '2026-11-09T10:00:00Z', created_at: '2026-11-01T10:00:00Z', platforms: ['meta'], config: { mode: 'full' } },
-    { id: 5, name: 'E', status: 'active', updated_at: '2026-11-02T10:00:00Z', created_at: '2026-11-02T10:00:00Z', platforms: ['meta', 'google'], config: { mode: 'creative' } },
-    { id: 6, name: 'F', status: 'active', updated_at: '2026-11-03T10:00:00Z', created_at: '2026-11-03T10:00:00Z', platforms: ['meta'], config: { mode: 'ads' } },
-  ];
-  const cockpits = { 5: { id: 5, progress: 0.6, waiting: 0, tone: 'ok', updatedAt: '2026-11-10T10:00:00Z' }, 6: { id: 6, progress: 0.2, waiting: 2, tone: 'attention', updatedAt: '2026-11-04T10:00:00Z' } };
-  const g = groupOperations(campaigns, cockpits, [{ id: 6, stageLabel: 'Готово до перегляду' }]);
-  assert.deepEqual(g.current.map((o) => o.id), [6, 5, 4]); // what waits first, then the working one, the paused one last
-  assert.deepEqual(g.planned.map((o) => o.id), [3]);
-  assert.deepEqual(g.finished.map((o) => o.id), [2, 1]); // newest first
-  assert.deepEqual([g.current[0].modeLabel, g.current[0].stageLabel, g.current[0].hasWork, g.current[2].hasWork, g.current[1].progress], ['Аналіз і оптимізація', 'Готово до перегляду', true, false, 0.6]);
-  assert.equal(g.planned[0].modeLabel, 'Тільки звіт');
-  assert.deepEqual(groupOperations([]), { current: [], planned: [], finished: [] });
-  assert.deepEqual(projectHeadline({ status: 'active', waiting: 2, tone: 'attention' }, campaigns), { label: 'чекає на вас', tone: 'is-warn', ops: 'операцій: 6, у роботі: 2, на паузі: 1' });
-  assert.equal(projectHeadline({ status: 'active', waiting: 1, tone: 'problem' }, campaigns).label, 'є проблема');
-  assert.equal(projectHeadline({ status: 'active', waiting: 0, tone: 'ok' }, campaigns).label, 'працює');
-  assert.equal(projectHeadline({ status: 'active' }, [campaigns[3]]).label, 'зупинено');
-  assert.equal(projectHeadline({ status: 'active' }, [campaigns[2]]).label, 'операції не запущені');
-  assert.deepEqual(projectHeadline({ status: 'active' }, []), { label: 'без операцій', tone: 'is-grey', ops: 'операцій ще немає' });
-  assert.equal(projectHeadline({ status: 'done' }, campaigns).label, 'Завершено');
-  // the money of one project: an operation that never spent is still listed
-  const one = buildCampaignSpend({ campaigns: [{ id: 3, name: 'C', status: 'draft', project_id: 1 }], tasks: [], spends: [], period: 'all', keepAll: true });
-  assert.deepEqual(one.rows.map((r) => [r.id, r.total]), [[3, 0]]);
-  assert.equal(buildCampaignSpend({ campaigns: [{ id: 3, name: 'C', status: 'draft' }], period: 'all' }).rows.length, 0); // the general page keeps hiding quiet drafts
 });
 
 await ok('project card, agents: the agents of the operation and of the linked department in one list, the working ones first, each with its mode and when it runs', () => {
@@ -4854,14 +4813,6 @@ await ok('operation cycles: a returned picture is made again with the manager\'s
   Object.assign(row, { status: 'rejected', note: 'Bigger logo' });
   assert.match(promptOf(row), /Make the background darker \| Bigger logo$/);
   assert.equal(promptOf({ prompt: 'P', status: 'review', note: 'ignored', hf: {} }), 'P');
-});
-
-await ok('ai projects: a person may give a project its own name (up to 100 characters); it is shown everywhere, the CRM name still finds it', async () => {
-  assert.deepEqual([cleanProjectTitle('  Mellow   US  '), cleanProjectTitle('   '), cleanProjectTitle(null), cleanProjectTitle('x'.repeat(140)).length], ['Mellow US', null, null, 100]);
-  const rows = buildProjectRows({ aiProjects: [{ project_id: 3, status: 'active', title: ' Перуки США ' }, { project_id: 4, status: 'active', title: null }], projects: [{ id: 3, name: 'Mellowdiamond Instagram', client: 'Mellow' }, { id: 4, name: 'Acme Shop', client: 'Acme' }] });
-  assert.deepEqual(rows.map((r) => [r.client, r.crmClient, r.title, r.name]), [['Перуки США', 'Mellow', 'Перуки США', 'Mellowdiamond Instagram'], ['Acme', 'Acme', '', 'Acme Shop']]);
-  assert.deepEqual(filterSortProjects(rows, { query: 'mellow' }).map((r) => r.id), [3]); // found by the CRM name too
-  assert.deepEqual(filterSortProjects(rows, { query: 'перуки' }).map((r) => r.id), [3]);
 });
 
 await ok('operation cycles: an operation may have several regular cycles, each with its own day; an old single one is read as the first', async () => {

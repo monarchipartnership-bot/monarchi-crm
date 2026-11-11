@@ -79,7 +79,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
     const on = (ctl?.agents || []).filter((a) => a.mode !== 'paused');
     const nextAt = on.map((a) => a.nextAt).filter(Boolean).sort()[0];
     const last = on.map((a) => a.lastRunAt).filter(Boolean).sort().pop();
-    return [ctl ? (t.state === 'paused' ? `агентів у команді: ${on.length}, команда на паузі` : `агентів працює: ${on.length || (t.key === 'creative' ? 'за запитом' : 0)}`) : 'завантажуємо агентів…', [last ? `останній запуск ${fmtDateTime(last)}` : 'ще не запускались', nextAt ? `найближчий ${fmtDateTime(nextAt)}` : ''].filter(Boolean).join(' · ')];
+    return [ctl ? (t.state === 'paused' ? (t.key === 'creative' ? 'команда на паузі: регулярні завдання не запускаються' : `агентів у команді: ${on.length}, команда на паузі`) : `агентів працює: ${on.length || (t.key === 'creative' ? 'за запитом' : 0)}`) : 'завантажуємо агентів…', [last ? `останній запуск ${fmtDateTime(last)}` : 'ще не запускались', nextAt ? `найближчий ${fmtDateTime(nextAt)}` : ''].filter(Boolean).join(' · ')];
   }
 
   return (
@@ -155,7 +155,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       )}
       {openCampaign && project && (
         <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst} extraFirst={!!open.extraFirst}
-          onClose={() => { setOpen(null); load(); }} onChanged={load} />
+          onClose={() => { setOpen(null); load(); }} onBackToProject={() => { setOpen(null); load(); }} onChanged={load} />
       )}
     </div>
   );

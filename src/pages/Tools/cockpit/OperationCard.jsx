@@ -20,7 +20,8 @@ const OP_STATUS = { active: ['працює', 'is-work'], paused: ['на пауз
 // the same six sections as inside the project card (OperationView), with its own head: the client, the operation, its state, stop / resume, the way to the project.
 //   campaign: the ag_campaigns row  project: { id, name, client }  cockpit: useProjectCockpit()  regularFirst: just created → the regular cycle form opens
 //   onOpenProject(projectId, operationId): opens the card of the project (not shown when the project is not in the section)
-export default function OperationCard({ campaign, project, cockpit, regularFirst = false, extraFirst = false, onClose, onChanged, onOpenProject }) {
+//   onBackToProject(): opened from the card of the project in the CRM: the first button of the head «До проєкту» brings the person back there
+export default function OperationCard({ campaign, project, cockpit, regularFirst = false, extraFirst = false, onClose, onChanged, onOpenProject, onBackToProject = null }) {
   const box = useRef(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
@@ -49,6 +50,7 @@ export default function OperationCard({ campaign, project, cockpit, regularFirst
     <div className="ckp ckp-overlay is-night ai-immersive pcd-overlay" data-ai-safe>
       <div ref={box} className="ckp-win pcd-win" role="dialog" aria-modal="true" aria-label={`Операція ${campaign.name}`} tabIndex={-1}>
         <header className="ckp-whd pcd-head">
+          {onBackToProject && <button type="button" className="ckp-btn pcd-back" onClick={onBackToProject}><Ic n="back" size={16} />До проєкту</button>}
           <Avatar name={client} size={48} />
           <div className="ckp-wt">
             <div className="pcd-optitle"><NameEdit as="h2" value={campaign.name} label="Назва операції" onSave={async (name) => { await updateCampaign(campaign.id, { name }); notify('Назву операції збережено.'); await changed(); }} /><span className="ckp-chip">{modeLabelOf(campaign)}</span><span className={'ckp-chip ' + tone}>{label}</span></div>
