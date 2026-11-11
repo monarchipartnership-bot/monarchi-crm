@@ -4998,8 +4998,11 @@ await ok('cycle form: the card fills the settings of the agents, the description
   const said = 'Мне нужно 17 кроликов. Мне нужно креативы с кроликами цветами помидорами и капустой';
   const bare = parseFill(JSON.stringify({ title: 'Кролики', product: 'кролики', count: 17, ratios: ['1:1'] }), said); // no quotes at all
   assert.deepEqual([bare.fields.count, bare.fields.ratios, bare.clamped], [undefined, undefined, null]);
-  const quoted = parseFill(JSON.stringify({ product: 'кролики', count: 17, count_quote: '17 кроликов', ratios: ['9:16'], ratios_quote: 'сториз' }), said);
-  assert.deepEqual([quoted.fields.count, quoted.clamped, quoted.quotes.count, quoted.fields.ratios], [10, 17, '17 кроликов', undefined]); // «сториз» is not in the text
+  const wrong = parseFill(JSON.stringify({ product: 'кролики', count: 17, count_quote: 'Мне нужно 17 кроликов', ratios: ['9:16'], ratios_quote: 'сториз' }), said);
+  assert.deepEqual([wrong.fields.count, wrong.clamped, wrong.fields.ratios], [undefined, null, undefined]); // the quote is in the text but «17 кроликов» does not count ideas; «сториз» is not in the text
+  const ideas = parseFill(JSON.stringify({ product: 'x', count: 12, count_quote: '12 ідей' }), 'Потрібно 12 ідей для осені');
+  assert.deepEqual([ideas.fields.count, ideas.clamped, ideas.quotes.count], [10, 12, '12 ідей']);
+  assert.equal(parseFill(JSON.stringify({ product: 'x', count: 3, count_quote: '6 креативів у двох форматах' }), 'Потрібно 6 креативів у двох форматах').fields.count, 3); // a total divided by the formats
   assert.equal(parseFill(JSON.stringify({ product: 'x', count: 5, count_quote: '5 ІДЕЙ' }), 'Потрібно 5  ідей для осені').fields.count, 5); // case and spaces do not matter
   assert.throws(() => parseFill('not json'), /Не вдалося прочитати/);
   assert.throws(() => parseFill('{"title":"","notes":"x"}'), /нічого не визначив/);

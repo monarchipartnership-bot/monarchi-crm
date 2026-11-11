@@ -73,6 +73,8 @@ const readJson = (raw) => { const s = String(raw || ''); const i = s.indexOf('{'
 
 // raw: the answer of the model → { fields: { title, …, ratios, count, cta … }, agent_settings: { role: { key } }, notes }. Only known keys, bounded sizes. Throws a readable Error.
 // description: the text the model was given; with it a number or a format the model cannot quote from the description is dropped (the model must not invent them)
+// the quote for the number of directions must name what is counted: ideas, directions, creatives (a number before any other noun, «17 кроликів», is not the number of ideas)
+const COUNTED = /ід[еє]|иде[йи]|напрям|направлен|креатив|концепц|варіант|вариант/i;
 const norm = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 export function parseFill(raw, description = null) {
   const j = readJson(raw);
@@ -84,7 +86,7 @@ export function parseFill(raw, description = null) {
   const quotes = {};
   let clamped = null; // the number the person named when it is above the maximum
   const count = Math.round(Number(j.count));
-  if (Number.isFinite(count) && count >= 1 && said(j.count_quote)) { fields.count = Math.min(MAX_CONCEPTS, count); if (count > MAX_CONCEPTS) clamped = count; if (clip(j.count_quote, 120)) quotes.count = clip(j.count_quote, 120); }
+  if (Number.isFinite(count) && count >= 1 && said(j.count_quote) && (description == null || COUNTED.test(String(j.count_quote)))) { fields.count = Math.min(MAX_CONCEPTS, count); if (count > MAX_CONCEPTS) clamped = count; if (clip(j.count_quote, 120)) quotes.count = clip(j.count_quote, 120); }
   const ratios = (Array.isArray(j.ratios) ? j.ratios : []).filter((r, i, a) => REQUEST_RATIOS.some((x) => x.key === r) && a.indexOf(r) === i);
   if (ratios.length && said(j.ratios_quote)) { fields.ratios = ratios; if (clip(j.ratios_quote, 120)) quotes.ratios = clip(j.ratios_quote, 120); }
   if (j.texts === 'yes' || j.texts === 'no') fields.texts = j.texts;
