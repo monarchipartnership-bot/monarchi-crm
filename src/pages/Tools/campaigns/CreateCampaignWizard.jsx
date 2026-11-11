@@ -418,7 +418,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                         {(deptItem.def.clientFields || []).map((fld) => (
                           <Field key={fld.key} id={'cmp-d-' + fld.key} label={fld.label} hint={fld.hint}>
                             <textarea id={'cmp-d-' + fld.key} className="cmp-input" rows={fld.rows || 3} value={deptForm.config[fld.key] || ''} onChange={(e) => setDeptCfg(fld.key, e.target.value)} maxLength={1500} />
-                            {deptForm.filled[fld.key] && <span className="cmp-dept-from">{deptForm.filled[fld.key] === 'project' ? 'Заповнено з вкладки «Креативи» проєкту (обмеження клієнта)' : 'Заповнено з цілей операції'}: перевірте й поправте</span>}
+                            {deptForm.filled[fld.key] && <span className="cmp-dept-from">{deptForm.filled[fld.key] === 'project' ? 'Заповнено з картки проєкту (обмеження клієнта)' : deptForm.filled[fld.key] === 'card' ? 'Заповнено з картки проєкту («Інформація по проєкту»)' : 'Заповнено з цілей операції'}: перевірте й поправте</span>}
                           </Field>
                         ))}
                         <p className="cmp-muted">Правила відділу, промти й режим роботи агента налаштовуються на його сторінці в AI Agents. Те, що не заповнене, лишається порожнім: нічого не вигадується.</p>

@@ -2331,10 +2331,14 @@ await ok('connecting a client to the department (wizard): the chosen roles are o
   // the autofill: the goals of the campaign and the restrictions kept in the project; nothing is invented
   const a = creativeAutofill({ project: tables.projects[0], goals: 'CPA under 12 dollars', projectCreative: { restrictions: 'No kids in the picture' } });
   assert.deepEqual(a.fields, { kpi: 'CPA under 12 dollars', limits: 'No kids in the picture', budget: '' });
-  assert.deepEqual(a.from, { kpi: 'campaign', limits: 'project' });
+  assert.deepEqual(a.from, { kpi: 'campaign', limits: 'project', budget: null });
+  // the goals and the budget written in the card of the project fill the fields too; the goals typed in the wizard come first
+  const c = creativeAutofill({ projectCreative: { restrictions: '', inputs: { goals: { body: 'ROAS from 3' }, budget: { body: '$2000 a month' } } } });
+  assert.deepEqual([c.fields, c.from], [{ kpi: 'ROAS from 3', limits: '', budget: '$2000 a month' }, { kpi: 'card', limits: null, budget: 'card' }]);
+  assert.equal(creativeAutofill({ goals: 'Typed now', projectCreative: { inputs: { goals: { body: 'ROAS from 3' } } } }).fields.kpi, 'Typed now');
   assert.deepEqual(a.facts, [['Сайт', 'https://acme.example'], ['Країна', 'Ukraine'], ['Тип бізнесу', 'E-commerce']]); // empty card fields are not listed
   const none = creativeAutofill({});
-  assert.deepEqual([none.fields, none.from, none.facts], [{ kpi: '', limits: '', budget: '' }, { kpi: null, limits: null }, []]);
+  assert.deepEqual([none.fields, none.from, none.facts], [{ kpi: '', limits: '', budget: '' }, { kpi: null, limits: null, budget: null }, []]);
 });
 
 await ok('Excel of a report: ONE sheet with the table, the texts at its right and the creatives under it; a month is the weeks one under another, then the summary', async () => {

@@ -25,7 +25,7 @@ export const CREATIVE_ROLES = [
     description: 'Раз на тиждень по кожному клієнту зв’язує креативи з результатами, шукає закономірності й віддає висновки Агенту креативний стратег.',
     fields: [], clientFields: [] },
   { role: 'creative_strategy', name: 'Агент креативний стратег', short: 'план по клієнту, до 3 напрямків', stage: 'plan', row: 0, trigger: 'request', entry: true,
-    description: 'Керівник відділу: з запиту менеджера, картки проєкту, досліджень і аналізу креативів складає план (до трьох напрямків) і ставить задачу Агенту по ТЗ.',
+    description: 'Керівник відділу: з запиту менеджера, картки проєкту, досліджень і аналізу креативів складає план (до десяти напрямків) і ставить задачу Агенту по ТЗ.',
     fields: [text('rules', 'Правила відділу креативів', 'Що ми завжди враховуємо в планах: підхід, пріоритети, що вважаємо успіхом.', 4)],
     clientFields: [text('kpi', 'Цілі й KPI клієнта', 'Наприклад: CPA до $12, ROAS від 3.', 3), text('limits', 'Обмеження клієнта', 'Що не можна показувати чи обіцяти.', 3), text('budget', 'Бюджет на креативи', 'Скільки можна витратити на цей цикл.', 2)] },
   { role: 'creative_brief', name: 'Агент по ТЗ', short: 'технічне завдання на креативи й тексти', stage: 'brief', row: 0, trigger: 'request',
@@ -269,8 +269,10 @@ export async function setCreativeRoles(db, campaign, roles, { email = null } = {
 // the goals typed in the first part of the step, the restrictions kept in the project's «Креативи» tab. The rest stays empty: nothing is invented.
 export function creativeAutofill({ project = {}, goals = '', projectCreative = null } = {}) {
   const clip = (v, n) => String(v ?? '').trim().slice(0, n);
-  const fields = { kpi: clip(goals, 400), limits: clip(projectCreative?.restrictions, 600), budget: '' };
-  const from = { kpi: fields.kpi ? 'campaign' : null, limits: fields.limits ? 'project' : null };
+  // what the person wrote in the card of the project («Інформація по проєкту») counts too: the goals and the budget of the client (owner, 2026-11-11)
+  const cardBody = (k) => clip(projectCreative?.inputs?.[k]?.body, 600);
+  const fields = { kpi: clip(goals, 400) || cardBody('goals'), limits: clip(projectCreative?.restrictions, 600), budget: cardBody('budget') };
+  const from = { kpi: clip(goals, 400) ? 'campaign' : fields.kpi ? 'card' : null, limits: fields.limits ? 'project' : null, budget: fields.budget ? 'card' : null };
   const facts = [['Сайт', project.website], ['Країна', project.country], ['Тип бізнесу', project.business_type], ['Менеджер', project.manager]].filter(([, v]) => String(v || '').trim()).map(([k, v]) => [k, clip(v, 80)]);
   return { fields, from, facts };
 }
