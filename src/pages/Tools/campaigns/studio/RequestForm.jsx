@@ -43,13 +43,13 @@ const ageOf = (item) => {
 // taken from the «Креативи» tab of the project, they are not fields here) and a closed «Додатково». Nothing opens over the window: pasting the texts,
 // adding a file and changing a value of the card are all inside it. An empty card asks only what we sell and for a logo or a photo, and keeps the answers.
 //   mode 'regular' (owner, 2026-11-11): the same form sets up the REGULAR cycle of the operation: the day and the time of the weekly run are asked too, ready
-//   texts and hand-picked files are not (every run takes the current card of the project), and onSave gets (values, startNow, { weekday, time } | { everyDays, time }).
-//   title: the heading of the window; schedule: { weekday | everyDays, time } of the regular task that is already saved.
+//   texts and hand-picked files are not (every run takes the current card of the project), and onSave gets (values, startNow, { weekdays, time } | { everyDays, time }).
+//   title: the heading of the window; schedule: { weekdays | weekday | everyDays, time } of the regular task that is already saved.
 //   allowKind: the person chooses in the form whether the cycle is one-off or regular («Створити додаткове завдання»)
 export default function RequestForm({ campaign, initial = null, onClose, onSave, mode = 'extra', title = 'Нове завдання: запит на креативи', schedule = null, canStartNow = true, allowKind = false }) {
   const [kind, setKind] = useState(mode); // extra | regular
   const regular = kind === 'regular';
-  const [sched, setSched] = useState(() => ({ kind: schedule?.everyDays ? 'every' : 'week', every: String(schedule?.everyDays || 3), weekday: String(schedule?.weekday || 1), time: schedule?.time || '09:00', startNow: !schedule && canStartNow })); // canStartNow false: the operation is paused, nothing can start
+  const [sched, setSched] = useState(() => ({ kind: schedule?.everyDays ? 'every' : 'week', every: String(schedule?.everyDays || 3), days: (schedule?.weekdays?.length ? schedule.weekdays : schedule?.weekday ? [schedule.weekday] : [1]).map(Number), time: schedule?.time || '09:00', startNow: !schedule && canStartNow })); // canStartNow false: the operation is paused, nothing can start
   const { email } = useAuth();
   const box = useRef(null);
   const shotInput = useRef(null);
@@ -173,7 +173,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
     setBusy(start ? 'start' : 'save');
     try {
       if (ask.text.trim()) await saveInput(campaign.project_id, 'business', ask.text.trim(), email).catch(() => {}); // what we sell goes to the card, so the next request does not ask again
-      await (regular ? onSave(req, start, sched.kind === 'every' ? { everyDays: Number(sched.every), time: sched.time.trim() } : { weekday: Number(sched.weekday), time: sched.time.trim() }) : onSave(req, start));
+      await (regular ? onSave(req, start, sched.kind === 'every' ? { everyDays: Number(sched.every), time: sched.time.trim() } : { weekdays: sched.days, time: sched.time.trim() }) : onSave(req, start));
     } catch (e) { setError(e.message || 'Не вдалося зберегти запит.'); setBusy(''); }
   }
 
@@ -209,7 +209,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
                 <select className="cmp-input ccx-select" value={sched.kind} onChange={(e) => setSched((s) => ({ ...s, kind: e.target.value }))} aria-label="Як часто"><option value="week">Щотижня</option><option value="every">Кожні N днів</option></select>
                 {sched.kind === 'every'
                   ? <><input className="cmp-input ccx-time" type="number" min="1" max="60" value={sched.every} onChange={(e) => setSched((s) => ({ ...s, every: e.target.value }))} aria-label="Кожні скільки днів" /><span className="qr-mut">дн.</span></>
-                  : <select className="cmp-input ccx-select" value={sched.weekday} onChange={(e) => setSched((s) => ({ ...s, weekday: e.target.value }))} aria-label="День тижня регулярного завдання">{WEEKDAYS.map((d, i) => <option key={d} value={String(i + 1)}>{d}</option>)}</select>}
+                  : <span className="qr-days" role="group" aria-label="Дні тижня">{WEEKDAYS.map((d, i) => <button key={d} type="button" aria-pressed={sched.days.includes(i + 1)} className={'cmp-btn' + (sched.days.includes(i + 1) ? ' cmp-btn--primary' : '')} onClick={() => setSched((s) => ({ ...s, days: s.days.includes(i + 1) ? s.days.filter((x) => x !== i + 1) : [...s.days, i + 1].sort((a, b) => a - b) }))}>{d.slice(0, 2)}</button>)}</span>}
                 <input className="cmp-input ccx-time" type="text" inputMode="numeric" value={sched.time} onChange={(e) => setSched((s) => ({ ...s, time: e.target.value }))} placeholder="09:00" aria-label="Час запуску (Київ)" />
                 <button type="button" className={'qr-sw' + (sched.startNow ? ' on' : '')} role="switch" aria-checked={sched.startNow} disabled={!canStartNow} title={canStartNow ? '' : 'Операція на паузі: перше завдання почнеться за розкладом після відновлення'} onClick={() => setSched((s) => ({ ...s, startNow: !s.startNow }))}><i /><span>{canStartNow ? 'Запустити перше завдання одразу' : 'Операція на паузі: запуск за розкладом після відновлення'}</span></button>
               </div>

@@ -388,7 +388,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
       {form && (
         <div className="cmp-section pcd-embed">
           <RequestForm key={form.regularId || form.mode} campaign={campaign} mode={form.mode} allowKind={!!form.allowKind} title="Разове завдання: запит на креативи" initial={editing ? { ...editing.brief, materials: [] } : null}
-            schedule={editing ? { weekday: editing.weekday, everyDays: editing.everyDays, time: editing.time } : null} canStartNow={!stopped} onClose={() => setForm(null)} onSave={saveForm} />
+            schedule={editing ? { weekdays: editing.weekdays, everyDays: editing.everyDays, time: editing.time } : null} canStartNow={!stopped} onClose={() => setForm(null)} onSave={saveForm} />
         </div>
       )}
       {confirmDialog}

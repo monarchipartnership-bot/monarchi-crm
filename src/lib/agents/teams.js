@@ -115,6 +115,7 @@ export function teamAgentPlan(teamKey, accounts = []) {
 
 // How many times a schedule starts an agent in 30 days.
 export function runsPerMonth(schedule) {
+  if (schedule?.weekdays?.length) return Math.round(4.3 * schedule.weekdays.length * 10) / 10;
   if (schedule?.weekday) return 4.3;
   if (Number(schedule?.everyDays) >= 1) return Math.round((30 / Number(schedule.everyDays)) * 10) / 10;
   return 0;

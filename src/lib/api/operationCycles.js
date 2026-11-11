@@ -32,7 +32,7 @@ export async function saveRegular(campaignId, input, email = null) {
 export async function setRegularEnabled(campaignId, id, enabled, email = null) {
   const r = rawRegulars(await readRow(campaignId)).find((x) => x.id === id);
   if (!r) throw new Error('Регулярне завдання не знайдено.');
-  return saveRegular(campaignId, { id, enabled, weekday: r.weekday, everyDays: r.everyDays, time: r.time, brief: r.brief }, email);
+  return saveRegular(campaignId, { id, enabled, weekdays: r.weekdays, weekday: r.weekday, everyDays: r.everyDays, startDate: r.startDate, time: r.time, brief: r.brief }, email);
 }
 
 // A regular cycle is removed (the cycles it already made stay).

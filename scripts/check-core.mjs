@@ -42,6 +42,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
+import { endTime, monthCells, previewRuns, weekdayOf, windowText } from '../src/lib/agents/scheduleCalendar.js';
 import { ONEOFF, describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
 import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
@@ -4303,7 +4304,42 @@ await ok('regular task every N days: cleaned, due once per N days counted from t
   assert.equal(kyivToday(new Date('2026-11-12T23:30:00Z')), '2026-11-13'); // after midnight in Kyiv
   // a weekly task still works as before
   const w = cleanRegular({ weekday: 1, time: '09:00', brief: { goal: 'x' } }, { now });
-  assert.deepEqual([w.weekday, w.everyDays], [1, null]);
+  assert.deepEqual([w.weekdays, w.everyDays], [[1], null]);
+  // several days a week: Monday, Wednesday, Friday at 09:00 Kyiv
+  const m = cleanRegular({ weekdays: [5, 1, 3, 3], time: '09:00', brief: { goal: 'x' } }, { now: new Date('2026-11-09T05:00:00Z') });
+  assert.deepEqual(m.weekdays, [1, 3, 5]);
+  assert.throws(() => cleanRegular({ weekdays: [], time: '09:00', brief: { goal: 'x' } }), /хоча б один день/);
+  assert.throws(() => cleanRegular({ weekdays: [9], time: '09:00', brief: { goal: 'x' } }), /День тижня/);
+  const mc = { id: 6, status: 'active', config: { regulars: [m] } };
+  const mr = regularsOf(mc)[0];
+  assert.equal(describeRegular(mr), 'щотижня: пн, ср, пт о 09:00');
+  const wed = new Date('2026-11-11T08:00:00Z'); // Wednesday 10:00 Kyiv
+  assert.deepEqual(regularDue({ campaign: mc, requests: [], now: wed }), { due: true, scheduledFor: '2026-11-11' }); // Wednesday's moment, the task was switched on Monday morning
+  assert.equal(regularDue({ campaign: mc, requests: [{ campaign_id: 6, brief: { scheduled_for: '2026-11-11', regular_id: m.id } }], now: wed }).reason, 'вже запущено');
+  assert.equal(nextOf(mr, wed).text, 'пʼятниця, 13.11 о 09:00');
+  assert.equal(describeRegular(regularsOf({ id: 7, config: { regulars: [{ id: 'r1', weekday: 2, time: '10:00', brief: { goal: 'x' } }] } })[0]), 'щотижня, вівторок о 10:00'); // an older task with one weekday
+  // «every N days» from a chosen first day: nothing before it, the first start at that day's time
+  const f = cleanRegular({ everyDays: 3, time: '09:00', startDate: '2026-11-16', brief: { goal: 'x' } }, { now: new Date('2026-11-12T08:00:00Z') });
+  assert.equal(f.startDate, '2026-11-16');
+  const fc = { id: 8, status: 'active', config: { regulars: [f] } };
+  const fr = regularsOf(fc)[0];
+  assert.equal(regularDue({ campaign: fc, requests: [], now: new Date('2026-11-15T10:00:00Z') }).due, false); // the day before
+  assert.deepEqual(regularDue({ campaign: fc, requests: [], now: new Date('2026-11-16T07:30:00Z') }), { due: true, scheduledFor: '2026-11-16' }); // 09:30 Kyiv on the first day
+  assert.equal(nextOf(fr, new Date('2026-11-12T08:00:00Z')).text, '16.11 о 09:00');
+  // a first day that has already passed means: from now
+  const g = cleanRegular({ everyDays: 3, time: '09:00', startDate: '2026-11-01', brief: { goal: 'x' } }, { now: new Date('2026-11-12T08:00:00Z') });
+  assert.equal(g.since, '2026-11-12T08:00:00.000Z');
+});
+
+await ok('schedule calendar: the time is a range, the coming runs of both modes, the grid of a month', () => {
+  assert.equal(endTime('09:00'), '09:30'); assert.equal(endTime('23:45'), '00:15'); assert.equal(windowText('9:05'), 'з 9:05 до 09:35'.replace('9:05 до', '9:05 до'));
+  assert.equal(weekdayOf('2026-11-12'), 4); // Thursday
+  assert.deepEqual(previewRuns({ mode: 'every', every: 3, start: '2026-11-16' }, '2026-11-12', 12), ['2026-11-16', '2026-11-19', '2026-11-22']);
+  assert.deepEqual(previewRuns({ mode: 'every', every: 3, start: '2026-11-01' }, '2026-11-12', 7), ['2026-11-12', '2026-11-15', '2026-11-18']); // a past first day means from today
+  assert.deepEqual(previewRuns({ mode: 'week', days: [1, 3, 5] }, '2026-11-12', 6), ['2026-11-13', '2026-11-16', '2026-11-18']);
+  assert.deepEqual(previewRuns({ mode: 'week', days: [] }, '2026-11-12'), []);
+  const nov = monthCells(2026, 10);
+  assert.equal(nov.filter((c) => c.date).length, 30); assert.equal(nov.findIndex((c) => c.date === '2026-11-01'), 6); // 1 November 2026 is a Sunday: six empty cells in front
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
@@ -4675,7 +4711,7 @@ await ok('client files: the best Meta ads come into the library as ready creativ
 await ok('operation cycles: the regular cycle is cleaned, is due once per its day, and one kind of operation works per project', async () => {
   const now = new Date('2026-10-22T08:00:00Z'); // Thursday 11:00 in Kyiv
   const reg = cleanRegular({ weekday: 4, time: '10:00', brief: { goal: 'Weekly banners for the sofa line', ratios: ['1:1', '4:5'], count: 2, texts: 'given', given_texts: [{ headline: 'x' }] } }, { by: 'a@x.com', now: new Date('2026-10-20T09:00:00Z') });
-  assert.deepEqual([reg.enabled, reg.weekday, reg.time, reg.brief.kind, reg.brief.texts, reg.brief.given_texts.length, reg.since], [true, 4, '10:00', 'regular', 'yes', 0, '2026-10-20T09:00:00.000Z']);
+  assert.deepEqual([reg.enabled, reg.weekdays[0], reg.time, reg.brief.kind, reg.brief.texts, reg.brief.given_texts.length, reg.since], [true, 4, '10:00', 'regular', 'yes', 0, '2026-10-20T09:00:00.000Z']);
   assert.throws(() => cleanRegular({ weekday: 9, time: '10:00', brief: { goal: 'x' } }), /День тижня/);
   assert.throws(() => cleanRegular({ weekday: 1, time: '10:00', brief: { goal: '' } }), /Опишіть/);
   // the same day and time keep the start of the schedule; a moved one counts from now; switched off = no start at all

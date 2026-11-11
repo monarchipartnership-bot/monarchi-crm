@@ -24,7 +24,9 @@ export function cleanSchedule(input) {
   return { weekday, time: `${String(Number(m[1])).padStart(2, '0')}:${m[2]}` };
 }
 
-export const describeSchedule = (s) => (s?.weekday ? `щотижня, ${WEEKDAYS[s.weekday - 1].toLowerCase()} о ${s.time || '09:00'}`
+const SHORT_DAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд'];
+export const describeSchedule = (s) => (Array.isArray(s?.weekdays) && s.weekdays.length > 1 ? `щотижня: ${[...s.weekdays].sort((a, b) => a - b).map((d) => SHORT_DAYS[d - 1]).join(', ')} о ${s.time || '09:00'}`
+  : Array.isArray(s?.weekdays) && s.weekdays.length === 1 ? `щотижня, ${WEEKDAYS[s.weekdays[0] - 1].toLowerCase()} о ${s.time || '09:00'}` : s?.weekday ? `щотижня, ${WEEKDAYS[s.weekday - 1].toLowerCase()} о ${s.time || '09:00'}`
   : Number(s?.everyDays) === 1 ? `щодня о ${s.time || '09:00'}` : Number(s?.everyDays) > 1 ? `кожні ${s.everyDays} дн. о ${s.time || '09:00'}` : '');
 
 // ---- the mode of an agent inside a campaign: auto (works and passes on), confirm (works, then waits for the person's OK), paused
