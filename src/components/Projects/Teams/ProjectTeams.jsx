@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import useProjectCockpit from '../../../lib/useProjectCockpit';
 import { fetchCampaignControl } from '../../../lib/api/campaignControl';
-import { fetchTeamsData, setTeamRunning } from '../../../lib/api/teams';
+import { deleteTeam, fetchTeamsData, setTeamRunning } from '../../../lib/api/teams';
+import { useConfirm } from '../../common/ConfirmDialog';
 import { teamsOf } from '../../../lib/agents/teams';
 import OperationCard from '../../../pages/Tools/cockpit/OperationCard';
 import { fmtDateTime } from '../../../pages/Smm/agentUi';
@@ -19,6 +20,7 @@ const WEEKDAYS = ['понеділок', 'вівторок', 'середа', 'ч�
 //   projectId  onGoFill(section): opens that section of «Інформація про проєкт»   onOpenReports(): opens the tab of the report agent
 export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
   const { email } = useAuth();
+  const [confirm, confirmDialog] = useConfirm();
   const cockpit = useProjectCockpit({ enabled: true });
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -48,6 +50,17 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
     try { await setTeamRunning(team, team.state !== 'running', email); say(team.state === 'running' ? `Команду «${team.def.title}» зупинено: агенти не запускаються, поки ви її не продовжите.` : `Команду «${team.def.title}» продовжено.`); await Promise.all([load(), cockpit.reload?.()]); } catch (e) { say(e?.message || 'Не вдалося змінити команду.', true); } finally { setBusy(''); }
   }
 
+  const GONE = {
+    creative: 'Будуть видалені всі цикли, запити й креативи цієї команди, а також її налаштування. Відновити їх не можна.',
+    analytics: 'Будуть видалені агенти команди, їхні звіти, плани дій і історія витрат. Відновити їх не можна.',
+    reports: 'Агента звітів буде відключено від проєкту: розклад і налаштування зникнуть. Звіти, які вже є в «Історії проєкту», залишаться.',
+  };
+  async function remove(team) {
+    if (!(await confirm({ title: `Видалити команду «${team.def.title}»?`, body: GONE[team.key], confirmLabel: 'Видалити команду' }))) return;
+    setBusy(team.key);
+    try { await deleteTeam(team, email); say(`Команду «${team.def.title}» видалено.`); await Promise.all([load(), cockpit.reload?.()]); } catch (e) { say(e?.message || 'Не вдалося видалити команду.', true); } finally { setBusy(''); }
+  }
+
   const runningTeams = view ? view.teams.filter((t) => t.state !== 'none') : [];
   const empty = view && !runningTeams.length && !view.legacy.length;
   const project = data?.project ? { id: data.project.id, name: data.project.name, client: data.project.client } : null;
@@ -69,13 +82,13 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
 
   return (
     <div className="pcr-wrap tm">
+      {confirmDialog}
       <section className="pcr-card" aria-label="Запуск AI команди">
         <div className="pcr-head">
           <div>
             <HubTitle icon="users">Запуск AI команди</HubTitle>
             <p className="pcr-sub">Команди, які працюють для цього клієнта. Усе, що вони читають, береться з розділу «Інформація про проєкт».</p>
           </div>
-          {!empty && view && <button type="button" className="btn btn-p" onClick={() => setWizard(true)}>+ Запустити команду</button>}
         </div>
         {note && <p className={'tm-note' + (note.bad ? ' is-bad' : '')} role="status">{note.text}</p>}
         {error && <p className="pcr-error" role="alert">{error}</p>}
@@ -96,12 +109,13 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
             return (
               <article key={t.key} className={'tm-team is-' + t.state}>
                 <div className="tm-team-main">
-                  <b>{t.def.title}</b><span className={'pcr-state ' + tone}>{label}</span>
+                  <div className="tm-team-title"><b>{t.def.title}</b><span className={'pcr-state ' + tone}>{label}</span></div>
                   <small>{line1}</small><small>{line2}</small>
                 </div>
                 <div className="tm-team-acts">
                   <button type="button" className="btn" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Відкрити команду'}</button>
                   <button type="button" className="btn" disabled={busy === t.key} onClick={() => toggle(t)}>{t.state === 'running' ? 'Зупинити' : 'Продовжити'}</button>
+                  <button type="button" className="btn" disabled={busy === t.key} onClick={() => remove(t)}>Видалити команду</button>
                 </div>
               </article>
             );
@@ -112,6 +126,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
               <div className="tm-team-acts"><button type="button" className="btn" onClick={() => setOpen({ campaignId: l.campaign.id, regularFirst: false })}>Відкрити</button></div>
             </article>
           ))}
+          {!empty && view && <div className="tm-add"><button type="button" className="btn btn-p" onClick={() => setWizard(true)}>+ Запустити команду</button></div>}
         </div>
       </section>
 

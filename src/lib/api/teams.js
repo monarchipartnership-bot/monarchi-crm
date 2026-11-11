@@ -3,7 +3,7 @@ import { createCampaign, deleteCampaign, launchCampaign, loadCampaignTeam, setAg
 import { kickQueue, saveAgent } from './agents';
 import { saveCreativeSetup } from './creatives';
 import { fetchProjectCreative } from './projectCreative';
-import { DEFAULT_AGENT_CONFIG, addAgentEvent, connectAgent, fetchAgent, updateAgent } from './projectAgents';
+import { DEFAULT_AGENT_CONFIG, addAgentEvent, connectAgent, disconnectAgent, fetchAgent, updateAgent } from './projectAgents';
 import { modeRoles } from '../agents/campaignModes';
 import { CREATIVE_OPTIONAL, CREATIVE_REQUIRED } from '../agents/creativeTeam';
 import { cleanSchedule } from '../agents/campaignCycles';
@@ -78,6 +78,17 @@ async function launchReports({ projectId, reports, email }) {
   await updateAgent(projectId, { enabled: true, enabled_since: nowIso() });
   await addAgentEvent({ projectId, kind: 'enabled', status: 'info', message: 'Команду «Звіти» запущено.', createdBy: email });
   return { reports: true };
+}
+
+// Deletes a team for good: the operation with its agents, tasks, cycles and requests (creative, analytics) or the connection of the report agent (reports).
+export async function deleteTeam(team, email = null) {
+  if (team.key === 'reports') {
+    const projectId = team.agent.project_id;
+    await addAgentEvent({ projectId, kind: 'disconnected', status: 'info', message: 'Команду «Звіти» видалено.', createdBy: email }).catch(() => {});
+    await disconnectAgent(projectId);
+    return;
+  }
+  await deleteCampaign(team.campaign.id);
 }
 
 // Stop or resume a team (its agents do not start until it is resumed; nothing is deleted).
