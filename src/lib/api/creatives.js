@@ -118,7 +118,7 @@ export { isCreativeRole, CREATIVE_ROLES, nowIso };
 
 // «Проаналізувати й заповнити» in the form of a cycle: the model reads the description (typed or dictated) and the card of the project and suggests the values of the
 // fields and of the settings of the agents. Nothing is saved. → { fields, agent_settings, notes }
-export async function fillCycleForm({ campaignId, text }) {
+export async function fillCycleForm({ campaignId = null, projectId = null, text }) {
   const { authedPost } = await import('../adAccounts');
-  return authedPost('/api/creative-form-fill', { campaignId, text });
+  return authedPost('/api/creative-form-fill', { campaignId, projectId, text });
 }

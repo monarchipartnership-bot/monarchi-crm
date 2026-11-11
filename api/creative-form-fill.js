@@ -18,13 +18,15 @@ export default async function handler(req, res) {
   if (authError || !userData?.user) { res.status(401).json({ error: 'Сесія недійсна' }); return; }
   if (!process.env.ANTHROPIC_API_KEY) { res.status(500).json({ error: 'ANTHROPIC_API_KEY не налаштовано на сервері' }); return; }
 
-  const campaignId = Number(req.body?.campaignId);
+  const num = (v) => (v == null || v === '' ? NaN : Number(v));
+  const campaignId = num(req.body?.campaignId);
+  const projectId = num(req.body?.projectId); // the launch of the creative team: the operation does not exist yet, the project does
   const text = String(req.body?.text || '').trim();
-  if (!Number.isFinite(campaignId)) { res.status(400).json({ error: 'Не вказано операцію.' }); return; }
+  if (!Number.isFinite(campaignId) && !Number.isFinite(projectId)) { res.status(400).json({ error: 'Не вказано операцію чи проєкт.' }); return; }
   if (text.length < MIN_FILL_CHARS) { res.status(400).json({ error: 'Опишіть завдання хоча б одним-двома реченнями: що потрібно й для чого.' }); return; }
   try {
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
-    const campaign = (await db.from('ag_campaigns').select('id, name, project_id, config').eq('id', campaignId).maybeSingle()).data;
+    const campaign = Number.isFinite(campaignId) ? (await db.from('ag_campaigns').select('id, name, project_id, config').eq('id', campaignId).maybeSingle()).data : { id: null, name: '', project_id: projectId, config: {} };
     if (!campaign) { res.status(404).json({ error: 'Операцію не знайдено.' }); return; }
     const [project, settings] = await Promise.all([
       campaign.project_id ? db.from('projects').select('name, client, website, business_type, notes').eq('id', campaign.project_id).maybeSingle().then((r) => r.data) : null,

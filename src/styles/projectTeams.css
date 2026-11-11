@@ -111,3 +111,11 @@
 .sc-now { margin-top: 2px; }
 .sc-out { background: #E8F7EE; color: #14532D; border-radius: 12px; padding: 10px 14px; font-size: .84rem; line-height: 1.5; } .sc-out p { margin: 0 0 4px; } .sc-out p:last-child { margin: 0; }
 .sc .sc-now { flex: 0 0 auto; } .sc .tm-time { width: 120px; }
+
+/* the description of the creative task: dictation, the counter and the button that fills the other fields */
+.vo-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vo-count { flex: 1 1 160px; color: var(--muted); font-size: .78rem; font-weight: 400; }
+.vo-lang { height: 34px; width: auto; }
+.vo-mic { display: inline-flex; align-items: center; gap: 6px; } .vo-mic.on { background: #FDECEC; border-color: #E8A5A5; color: #8A1C1C; }
+.vo-live { margin: 0; padding: 8px 12px; border-radius: 10px; background: #F6EEF8; color: #661466; font-size: .84rem; font-weight: 400; }
+.vo-err { margin: 0; color: #8A1C1C; font-size: .82rem; font-weight: 400; } .vo-ok { margin: 0; color: #14532D; font-size: .84rem; font-weight: 400; line-height: 1.5; }
