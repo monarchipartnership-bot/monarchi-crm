@@ -63,7 +63,7 @@ export function buildFillPrompt({ text = '', campaign = null, project = null, se
    "creative_brief":{"rules":"правила для картинок","avoid":"чого не показувати","formats":"формати й обмеження"},
    "creative_copywriter":{"tone":"тон і мови текстів"},
    "creative_maker":{"style":"стиль зображень: світло, кольори, настрій","max_usd":"ліміт витрат на картинки цього завдання в доларах, лише якщо менеджер назвав суму"}},
- "notes":"що в описі неясно й що менеджеру варто перевірити; інакше порожній рядок"}
+ "notes":["що в описі неясно й що менеджеру варто уточнити: до 4 коротких пунктів, до 12 слів кожен, без переказу того, що вже заповнено"] або []}
 count це кількість напрямів (ідей), а всього креативів стане count помножити на кількість форматів. Число перед предметом (на кшталт «17 кроликів») це не кількість ідей, доки менеджер не скаже «ідей», «напрямів» чи «креативів». Якщо менеджер назвав загальну кількість креативів і формати, поділи: «8 креативів 1:1» це count 8 і один формат; «6 креативів у двох форматах» це count 3. count і ratios став лише тоді, коли в описі є пряма цитата, її поверни в count_quote і ratios_quote; без цитати став null.`,
     user: `Картка проєкту:\n${card || '(порожня)'}\n\nОпис менеджера:\n${clip(text, 3000)}`,
   };
@@ -102,9 +102,10 @@ export function parseFill(raw, description = null) {
       if (v) (agent_settings[role] ||= {})[f.key] = v;
     });
   });
-  const notes = clip(j.notes, 600);
+  const questions = (Array.isArray(j.notes) ? j.notes : j.notes ? [j.notes] : []).map((x) => clip(x, 160)).filter(Boolean).slice(0, 4);
+  const notes = questions.join('; ');
   if (!Object.keys(fields).length && !Object.keys(agent_settings).length) throw new Error('Аналіз нічого не визначив: опишіть детальніше, для чого креативи й що в них має бути.');
-  return { fields, agent_settings, notes, quotes, clamped };
+  return { fields, agent_settings, notes, questions, quotes, clamped };
 }
 
 // ---- putting the result into the form. current: the values of the form now; touched: a Set of what the person wrote by hand ('title', … and 'role.key' of the agents).

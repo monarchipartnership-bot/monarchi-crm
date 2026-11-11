@@ -62,7 +62,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
   const today = useMemo(() => kyivToday(), []);
   // «Що потрібно від креативів»: typed or dictated; the button reads the description with the card and fills the other fields. What the person set by hand stays.
   const [voiceLang, setVoiceLang] = useState('uk');
-  const [an, setAn] = useState({ busy: false, error: '', filled: null, notes: '' });
+  const [an, setAn] = useState({ busy: false, error: '', rows: null, questions: [] });
   const touched = useRef(new Set());
   const draftKey = `tm-goal-draft-${data.project.id}`;
   const speech = useSpeechInput({ lang: voiceLang, onText: (txt) => { if (txt) setPlans((p) => (p.creative ? { ...p, creative: { ...p.creative, goal: `${p.creative.goal}${p.creative.goal && !/\s$/.test(p.creative.goal) ? ' ' : ''}${txt}`.slice(0, 3000) } } : p)); } });
@@ -93,7 +93,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
   useEffect(() => { if (plans.creative && plans.creative.goal === '') { try { const d = localStorage.getItem(draftKey); if (d) patchPlan('creative', { goal: d }); } catch { /* no storage */ } } }, [!!plans.creative]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (plans.creative) { try { if (plans.creative.goal) localStorage.setItem(draftKey, plans.creative.goal); else localStorage.removeItem(draftKey); } catch { /* no storage */ } } }, [plans.creative?.goal]); // eslint-disable-line react-hooks/exhaustive-deps
   const analyse = useCallback(async () => {
-    setAn({ busy: true, error: '', filled: null, notes: '' });
+    setAn({ busy: true, error: '', rows: null, questions: [] });
     try {
       const fill = await fillCycleForm({ projectId: data.project.id, text: plans.creative.goal });
       const fields = { ...fill.fields };
@@ -103,13 +103,13 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
       ['count', 'ratios', 'texts', 'language'].forEach((k) => { if (r.patch[k] != null) patch[k] = k === 'count' ? String(r.patch[k]) : r.patch[k]; });
       patchPlan('creative', patch);
       const q = fill.quotes || {};
-      const parts = [];
-      if (r.patch.count != null) parts.push(`кількість напрямів: ${r.patch.count}${q.count ? ` (з опису: «${q.count}»)` : ''}${fill.clamped ? `; ви назвали ${fill.clamped}, а за один запуск максимум ${MAX_CONCEPTS}` : ''}`);
-      if (r.patch.ratios) parts.push(`формати: ${r.patch.ratios.join(', ')}${q.ratios ? ` (з опису: «${q.ratios}»)` : ''}`);
-      if (r.patch.texts != null) parts.push('тексти на креативах');
-      if (r.patch.language != null) parts.push('мову текстів');
-      setAn({ busy: false, error: '', filled: parts, notes: `${fill.clamped ? `Більше ${MAX_CONCEPTS} ідей за запуск не буває: потрібно більше, запустіть ще одне разове завдання. ` : ''}${fill.notes || ''}`.trim() });
-    } catch (e) { setAn({ busy: false, error: e?.message || 'Не вдалося проаналізувати опис.', filled: null, notes: '' }); }
+      const rows = [];
+      if (r.patch.count != null) rows.push({ label: 'Напрямів за запуск', value: String(r.patch.count), quote: q.count, warn: fill.clamped ? `Ви назвали ${fill.clamped}, але за один запуск максимум ${MAX_CONCEPTS}: поставлено ${MAX_CONCEPTS}. Більше ідей замовляйте окремим разовим завданням.` : '' });
+      if (r.patch.ratios) rows.push({ label: 'Формати', value: r.patch.ratios.map((k) => REQUEST_RATIOS.find((x) => x.key === k)?.label || k).join(', '), quote: q.ratios });
+      if (r.patch.texts != null) rows.push({ label: 'Тексти на креативах', value: TEXT_MODES[r.patch.texts] || r.patch.texts });
+      if (r.patch.language != null) rows.push({ label: 'Мова текстів', value: REQUEST_LANGUAGES[r.patch.language] || r.patch.language });
+      setAn({ busy: false, error: '', rows, questions: fill.questions?.length ? fill.questions : fill.notes ? [fill.notes] : [] });
+    } catch (e) { setAn({ busy: false, error: e?.message || 'Не вдалося проаналізувати опис.', rows: null, questions: [] }); }
   }, [data.project.id, plans.creative]);
   const patchRow = (role, patch) => setPlans((p) => ({ ...p, analytics: { ...p.analytics, rows: p.analytics.rows.map((r) => (r.role === role ? { ...r, ...patch } : r)) } }));
 
@@ -286,7 +286,16 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                         <button type="button" className="btn btn-p" disabled={an.busy || plans.creative.goal.trim().length < MIN_FILL_CHARS} onClick={analyse} title={plans.creative.goal.trim().length < MIN_FILL_CHARS ? 'Спершу опишіть завдання хоча б одним-двома реченнями' : 'Агент розбере опис разом із карткою проєкту й заповнить напрями, формати, тексти й мову'}>{an.busy ? 'Аналізуємо…' : 'Заповнити поля з опису'}</button>
                       </div>
                       {an.error && <p className="vo-err" role="alert">{an.error}</p>}
-                      {an.filled && <p className="vo-ok" role="status">{an.filled.length ? `Заповнено: ${an.filled.join('; ')}. Перевірте нижче: усе можна змінити.` : 'З опису нічого додаткового не визначено: поля нижче лишились як були.'}{an.notes ? ` ${an.notes}` : ''}</p>}
+                      {an.rows && (
+                        <div className="vo-res" role="status">
+                          <p className="vo-res-h">Що визначено з опису</p>
+                          {an.rows.length
+                            ? <ul className="vo-rows">{an.rows.map((r) => <li key={r.label} className={r.warn ? 'is-warn' : ''}><b>{r.label}</b><span>{r.value}</span>{r.quote && <small>з опису: «{r.quote}»</small>}{r.warn && <em>{r.warn}</em>}</li>)}</ul>
+                            : <p className="vo-none">З опису нічого додаткового не визначено: поля нижче лишились як були.</p>}
+                          {an.questions.length > 0 && (<><p className="vo-res-h">Варто уточнити</p><ul className="vo-q">{an.questions.map((x, i) => <li key={i}>{x}</li>)}</ul></>)}
+                          <p className="vo-foot">Значення вже підставлено в поля нижче, їх можна змінити.</p>
+                        </div>
+                      )}
                     </div>
                     <label className="tm-fl"><span>Напрямів (ідей) за запуск</span>
                       <select className="tm-sel" value={plans.creative.count} onChange={(e) => patchByHand({ count: e.target.value })} aria-label="Напрямів за запуск">{Array.from({ length: MAX_CONCEPTS }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}</select></label>

@@ -119,3 +119,17 @@
 .vo-mic { display: inline-flex; align-items: center; gap: 6px; } .vo-mic.on { background: #FDECEC; border-color: #E8A5A5; color: #8A1C1C; }
 .vo-live { margin: 0; padding: 8px 12px; border-radius: 10px; background: #F6EEF8; color: #661466; font-size: .84rem; font-weight: 400; }
 .vo-err { margin: 0; color: #8A1C1C; font-size: .82rem; font-weight: 400; } .vo-ok { margin: 0; color: #14532D; font-size: .84rem; font-weight: 400; line-height: 1.5; }
+
+/* the result of the analysis of the description: what was determined (with the source), what to clarify */
+.vo-res { border: 1px solid #BFE6CB; background: #F4FBF6; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-weight: 400; }
+.vo-res-h { margin: 0; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #14532D; }
+.vo-rows, .vo-q { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vo-rows li { display: grid; grid-template-columns: minmax(130px, 190px) 1fr; gap: 2px 12px; align-items: baseline; font-size: .86rem; padding: 6px 0; border-top: 1px solid #DDEFE2; }
+.vo-rows li:first-child { border-top: 0; }
+.vo-rows b { font-weight: 600; color: var(--muted); } .vo-rows span { font-weight: 700; }
+.vo-rows small { grid-column: 2; color: var(--muted); font-size: .78rem; }
+.vo-rows li.is-warn { background: #FFFBEB; border-radius: 8px; padding: 8px 10px; border-top: 0; }
+.vo-rows em { grid-column: 2; font-style: normal; color: #78350F; font-size: .82rem; line-height: 1.45; }
+.vo-q li { position: relative; padding-left: 18px; font-size: .84rem; line-height: 1.45; color: #270827; } .vo-q li::before { content: '?'; position: absolute; left: 0; top: 0; width: 13px; height: 13px; border-radius: 50%; background: #F3E3F7; color: #661466; font-size: .68rem; font-weight: 700; display: grid; place-items: center; line-height: 13px; text-align: center; }
+.vo-foot, .vo-none { margin: 0; font-size: .78rem; color: var(--muted); }
+@media (max-width: 640px) { .vo-rows li { grid-template-columns: 1fr; } .vo-rows small, .vo-rows em { grid-column: 1; } }

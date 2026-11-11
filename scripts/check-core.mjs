@@ -4993,7 +4993,9 @@ await ok('cycle form: the card fills the settings of the agents, the description
   const fill = parseFill('Ось відповідь: ' + answer);
   assert.deepEqual(fill.fields, { title: 'Осінній розпродаж', product: 'Перуки з натурального волосся', count: 10, ratios: ['1:1', '9:16'], language: 'uk', cta: true }); // count cut to 10, a bad format and a bad kind dropped, «given» is never chosen by the analysis
   assert.deepEqual(fill.agent_settings, { creative_strategy: { kpi: 'CPA до $12' }, creative_maker: { style: 'Тепле світло', max_usd: '2.5' } }); // «generate at once» (money) is never filled
-  assert.equal(fill.notes, 'Не названо дату акції');
+  assert.equal(fill.notes, 'Не названо дату акції'); assert.deepEqual(fill.questions, ['Не названо дату акції']);
+  const asList = parseFill(JSON.stringify({ product: 'x', notes: ['Не вказано формати', ' ', 'Не названо дату', 'a', 'b', 'c'] }));
+  assert.deepEqual(asList.questions, ['Не вказано формати', 'Не названо дату', 'a', 'b']); // the questions are a short list: empty ones dropped, four at most
   // a number or a format the model cannot quote from the description is dropped; a number above the maximum is cut and reported
   const said = 'Мне нужно 17 кроликов. Мне нужно креативы с кроликами цветами помидорами и капустой';
   const bare = parseFill(JSON.stringify({ title: 'Кролики', product: 'кролики', count: 17, ratios: ['1:1'] }), said); // no quotes at all
