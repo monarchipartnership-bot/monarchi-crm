@@ -12,6 +12,8 @@ import { MODES, MODE_ORDER } from '../../../lib/agents/campaignModes';
 import { HubTitle } from '../hubIcons';
 import { STATUS_LABEL } from '../../../lib/projectConstants';
 import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
+import MarketsEditor, { marketsLanguageLine } from './MarketsEditor';
+import { updateProject } from '../../../lib/api/projects';
 import '../../../styles/projectCreative.css';
 
 const STATE_TEXT = { wait: 'Чекає даних', ok: 'Заповнено', old: 'Застарів' };
@@ -64,7 +66,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
       const [d, acc, proj] = await Promise.all([
         fetchProjectCreative(projectId),
         supabase.from('project_ad_accounts').select('platform, account_id, account_name').eq('project_id', projectId).then((r) => r.data || []).catch(() => []),
-        supabase.from('projects').select('name, client, manager, specialist, status, start_date, end_date, services, stop_reason, country, website, business_type, report_lang, contacts, timezone, notes').eq('id', projectId).maybeSingle().then((r) => r.data || null).catch(() => null),
+        supabase.from('projects').select('name, client, manager, specialist, status, start_date, end_date, services, stop_reason, country, website, business_type, report_lang, client_language, contacts, timezone, notes').eq('id', projectId).maybeSingle().then((r) => r.data || null).catch(() => null),
       ]);
       setAccounts(acc); setCrm(proj);
       setData(d);
@@ -151,6 +153,18 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
     } catch (e) { setError(e.message || 'Не вдалося зберегти.'); } finally { setBusy(''); }
   }
 
+  // «Ринки й мови»: the countries from a list go into the field, the language of the client is a field of the project (the same one as in its «Основне»)
+  async function saveMarkets({ text, language }) {
+    setError(''); setBusy('input:markets');
+    try {
+      const row = await saveInput(projectId, 'markets', text, email);
+      await updateProject(projectId, { client_language: language || null });
+      setData((d) => ({ ...d, settings: { ...d.settings, inputs: row.inputs } }));
+      setCrm((c) => ({ ...(c || {}), client_language: language || null }));
+      setEditing(null);
+    } catch (e) { setError(e.message || 'Не вдалося зберегти.'); } finally { setBusy(''); }
+  }
+
   const who = (f) => (f.agent ? `${f.agent}. Поки агент не заповнив, можна вручну.` : 'Заповнюється тут');
   const sites = parseLinks(data?.settings?.inputs?.competitor_sites?.body);
   async function addSite() {
@@ -183,7 +197,9 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
           {(need.required.length > 0 || need.recommended.length > 0) && <small className="pcr-need">{need.required.length ? `Потрібне для: ${need.required.join(', ')}` : `Бажане для: ${need.recommended.slice(0, 4).join(', ')}`}</small>}
         </div>
         <div className="pcr-input-body">
-          {open ? (
+          {open && f.key === 'markets' ? (
+            <MarketsEditor text={item?.body || ''} language={crm?.client_language || ''} busy={busy === 'input:markets'} onSave={saveMarkets} onCancel={() => setEditing(null)} />
+          ) : open ? (
             <>
               <AutoResizeTextarea className="pcr-input" value={editing.text} onChange={(v) => setEditing({ key: f.key, text: v })} placeholder={f.hint} maxLength={8000} autoFocus />
               <div className="pcr-row-actions">
@@ -194,6 +210,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
           ) : (
             <>
               <p className={'pcr-input-text' + (st.state === 'wait' ? ' is-empty' : '')}>{st.state === 'wait' ? f.hint : item.body}</p>
+              {f.key === 'markets' && <small className={'pcr-input-meta' + (crm?.client_language ? '' : ' pcr-lang-miss')}>{marketsLanguageLine(crm?.client_language)}</small>}
               {item && <small className="pcr-input-meta">{item.source === 'manual' ? `Введено вручну${item.by ? `, ${item.by}` : ''}` : `Агент: ${item.by || f.agent}`}{item.filled_at ? ` · ${fmtDate(item.filled_at)}` : ''}</small>}
             </>
           )}

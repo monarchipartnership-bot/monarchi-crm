@@ -115,3 +115,8 @@
 .pcr-inputs--in .pcr-input-side { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .pcr-group-head { flex-wrap: wrap; }
 .pcr-group-head > div:first-child { flex: 1 1 160px; }
+
+.pcr-wrap .mk { display: flex; flex-direction: column; gap: 14px; }
+.pcr-wrap .mk-block { display: flex; flex-direction: column; gap: 6px; } .pcr-wrap .mk-block > b { font-size: .86rem; }
+.pcr-wrap .mk-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.pcr-wrap .pcr-lang-miss { color: #8A1C1C; font-weight: 600; }

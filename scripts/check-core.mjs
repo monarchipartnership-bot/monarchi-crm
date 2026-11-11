@@ -44,6 +44,7 @@ import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
 import { reviseStep } from '../api/_lib/creativeEngine.js';
 import { buildStepCards, durationText } from '../src/lib/agents/stageDetails.js';
+import { marketsText, parseMarkets } from '../src/lib/agents/markets.js';
 import { LANGUAGES, isValidLanguage, languageEnglish, languageLabel, languageOptions, overlaySafe } from '../src/lib/agents/languages.js';
 import { creativeLockedText } from '../src/lib/agents/creativePrompts.js';
 import { endTime, monthCells, previewRuns, weekdayOf, windowText } from '../src/lib/agents/scheduleCalendar.js';
@@ -4446,6 +4447,17 @@ await ok('correct a step with a comment: the same agent gets a new task with the
   await assert.rejects(() => reviseStep(ctx(pics), 10, 'виправ'), /створила б дублі/);
   const notDone = base(); notDone.ag_tasks[0].status = 'queued';
   await assert.rejects(() => reviseStep(ctx(notDone), 10, 'виправ'), /завершений крок/);
+});
+
+await ok('markets of a project: the chosen countries become one short text and are read back; a name inside a longer name is not found twice', () => {
+  const countries = [{ code: 'DE', name: 'Німеччина' }, { code: 'AT', name: 'Австрія' }, { code: 'KR', name: 'Корея' }, { code: 'KP', name: 'Південна Корея' }, { code: 'US', name: 'Сполучені Штати Америки' }];
+  assert.equal(marketsText(['DE', 'AT'], countries), 'Країни реклами: Німеччина, Австрія.');
+  assert.equal(marketsText([], countries), ''); assert.equal(marketsText(['XX'], countries), '');
+  assert.deepEqual(parseMarkets('Країни реклами: Німеччина, Австрія.', countries).sort(), ['AT', 'DE']);
+  assert.deepEqual(parseMarkets('Реклама в південна корея', countries), ['KP']); // «Корея» is not found inside «Південна Корея»
+  assert.deepEqual(parseMarkets('США, English', countries), ['US']); // the short name of a country
+  assert.deepEqual(parseMarkets('English only', countries), []); // a free text that names no country of the list
+  assert.deepEqual(parseMarkets('', countries), []);
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
