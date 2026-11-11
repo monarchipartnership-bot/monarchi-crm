@@ -53,8 +53,8 @@ export function buildFillPrompt({ text = '', campaign = null, project = null, se
 {"title":"коротка назва завдання, до 60 символів",
  "product":"що продаємо або яка пропозиція, 1-2 речення",
  "audience":"","message":"головний меседж","tone":"","must":"що обовʼязково має бути","avoid":"чого не можна",
- "count":ціле від 1 до ${MAX_CONCEPTS} або null,
- "ratios":[формати з: ${ratios}] або null,
+ "count":ціле від 1 до ${MAX_CONCEPTS} або null, "count_quote":"точна цитата з опису, з якої взято count, або порожньо",
+ "ratios":[формати з: ${ratios}] або null, "ratios_quote":"точна цитата з опису про формати, або порожньо",
  "texts":"yes" (текст пише копірайтер) | "no" (без тексту на картинці) | null,
  "language":"uk" | "en" | null,
  "cta":true | false | null, "cta_text":"текст кнопки або порожньо",
@@ -64,7 +64,7 @@ export function buildFillPrompt({ text = '', campaign = null, project = null, se
    "creative_copywriter":{"tone":"тон і мови текстів"},
    "creative_maker":{"style":"стиль зображень: світло, кольори, настрій","max_usd":"ліміт витрат на картинки цього завдання в доларах, лише якщо менеджер назвав суму"}},
  "notes":"що в описі неясно й що менеджеру варто перевірити; інакше порожній рядок"}
-count це кількість напрямів (ідей), а всього креативів стане count помножити на кількість форматів. Якщо менеджер назвав загальну кількість креативів і формати, поділи: «10 креативів 1:1» це count 10 і один формат; «6 креативів у двох форматах» це count 3.`,
+count це кількість напрямів (ідей), а всього креативів стане count помножити на кількість форматів. Число перед предметом (на кшталт «17 кроликів») це не кількість ідей, доки менеджер не скаже «ідей», «напрямів» чи «креативів». Якщо менеджер назвав загальну кількість креативів і формати, поділи: «8 креативів 1:1» це count 8 і один формат; «6 креативів у двох форматах» це count 3. count і ratios став лише тоді, коли в описі є пряма цитата, її поверни в count_quote і ratios_quote; без цитати став null.`,
     user: `Картка проєкту:\n${card || '(порожня)'}\n\nОпис менеджера:\n${clip(text, 3000)}`,
   };
 }
@@ -72,16 +72,21 @@ count це кількість напрямів (ідей), а всього кр�
 const readJson = (raw) => { const s = String(raw || ''); const i = s.indexOf('{'), j = s.lastIndexOf('}'); if (i < 0 || j <= i) return null; try { return JSON.parse(s.slice(i, j + 1)); } catch { return null; } };
 
 // raw: the answer of the model → { fields: { title, …, ratios, count, cta … }, agent_settings: { role: { key } }, notes }. Only known keys, bounded sizes. Throws a readable Error.
-export function parseFill(raw) {
+// description: the text the model was given; with it a number or a format the model cannot quote from the description is dropped (the model must not invent them)
+const norm = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+export function parseFill(raw, description = null) {
   const j = readJson(raw);
   if (!j || typeof j !== 'object') throw new Error('Не вдалося прочитати відповідь аналізу. Спробуйте ще раз.');
   const fields = {};
   const text = (k, n) => { const v = clip(j[k], n); if (v) fields[k] = v; };
   text('title', 100); text('product', 1500); text('audience', 1500); text('message', 1500); text('tone', 800); text('must', 1500); text('avoid', 1500); text('cta_text', 40);
+  const said = (quote) => { const q = norm(quote); return description == null || (q.length >= 2 && norm(description).includes(q)); };
+  const quotes = {};
+  let clamped = null; // the number the person named when it is above the maximum
   const count = Math.round(Number(j.count));
-  if (Number.isFinite(count) && count >= 1) fields.count = Math.min(MAX_CONCEPTS, count);
+  if (Number.isFinite(count) && count >= 1 && said(j.count_quote)) { fields.count = Math.min(MAX_CONCEPTS, count); if (count > MAX_CONCEPTS) clamped = count; if (clip(j.count_quote, 120)) quotes.count = clip(j.count_quote, 120); }
   const ratios = (Array.isArray(j.ratios) ? j.ratios : []).filter((r, i, a) => REQUEST_RATIOS.some((x) => x.key === r) && a.indexOf(r) === i);
-  if (ratios.length) fields.ratios = ratios;
+  if (ratios.length && said(j.ratios_quote)) { fields.ratios = ratios; if (clip(j.ratios_quote, 120)) quotes.ratios = clip(j.ratios_quote, 120); }
   if (j.texts === 'yes' || j.texts === 'no') fields.texts = j.texts;
   if (REQUEST_LANGUAGES[j.language]) fields.language = j.language;
   if (typeof j.cta === 'boolean') fields.cta = j.cta;
@@ -97,7 +102,7 @@ export function parseFill(raw) {
   });
   const notes = clip(j.notes, 600);
   if (!Object.keys(fields).length && !Object.keys(agent_settings).length) throw new Error('Аналіз нічого не визначив: опишіть детальніше, для чого креативи й що в них має бути.');
-  return { fields, agent_settings, notes };
+  return { fields, agent_settings, notes, quotes, clamped };
 }
 
 // ---- putting the result into the form. current: the values of the form now; touched: a Set of what the person wrote by hand ('title', … and 'role.key' of the agents).

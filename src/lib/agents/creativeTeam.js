@@ -134,6 +134,15 @@ export function cleanAgentSettings(input = {}) {
   return out;
 }
 
+// A title from a long text: cut at a word, not in the middle of it
+export function shortTitle(text, n = 60) {
+  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (t.length <= n) return t;
+  const cut = t.slice(0, n);
+  const sp = cut.lastIndexOf(' ');
+  return `${(sp > n * 0.5 ? cut.slice(0, sp) : cut).replace(/[,;:\-–—\s]+$/, '')}…`;
+}
+
 // A request as the form sends it, cleaned: only known keys, bounded sizes. Throws a message the person can read.
 export function cleanRequest(input = {}) {
   const clip = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -174,7 +183,7 @@ export function cleanRequest(input = {}) {
   const materials = (Array.isArray(input.materials) ? input.materials : []).slice(0, MAX_MATERIALS).map((m) => ({
     name: clip(m?.name, 160), url: clip(m?.url, 600), path: clip(m?.path, 400), kind: MATERIAL_KINDS[m?.kind] ? m.kind : 'other',
   })).filter((m) => m.name && m.url);
-  return { title: clip(input.title, 100) || clip(brief.goal, 60), brief, materials };
+  return { title: clip(input.title, 100) || shortTitle(brief.goal, 60), brief, materials };
 }
 
 const must = (r) => { if (r.error) throw r.error; return r.data; };

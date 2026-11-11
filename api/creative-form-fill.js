@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       agentKey: 'creative-form-fill', actor: userData.user.email, projectId: campaign.project_id || null,
       params: { model: MODEL, max_tokens: 2000, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: user }] },
     });
-    res.status(200).json({ ...parseFill(result.text), costUsd: result.costUsd });
+    res.status(200).json({ ...parseFill(result.text, text), costUsd: result.costUsd });
   } catch (e) {
     if (e instanceof BudgetError) { res.status(429).json({ error: e.message }); return; }
     if (e instanceof ModelError) { res.status(502).json({ error: 'Помилка моделі: ' + e.message }); return; }

@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { runOneOff } from '../../../lib/api/oneoff';
 import { FIELD_LABELS, filledFields, missingFor } from '../../../lib/agents/agentRequirements';
-import { COST_PER_AGENT_RUN } from '../../../lib/agents/campaignModes';
 import { ONEOFF, whereToFill } from '../../../lib/agents/teams';
 
 // «Разове завдання» (owner, 2026-11-11): work that a person asks for any time, outside the teams that work by their schedules. Creatives and the report of a period go to the screens
@@ -53,7 +52,7 @@ export default function OneOffDialog({ data, view, email, onClose, onNewCreative
                     {stop.length > 0 && <small className="oo-warn">Спершу заповніть у картці: {stop.map((x) => FIELD_LABELS[x.key] || x.label).join(', ')}. <button type="button" className="oo-link" onClick={() => onGoFill(whereToFill(stop[0].key))}>Відкрити в картці</button></small>}
                     {r && <small className={r.ok ? 'oo-ok' : 'oo-warn'}>{r.text}{r.ok && <> <button type="button" className="oo-link" onClick={onOpenMaterials}>Відкрити «Готові матеріали»</button></>}</small>}
                   </div>
-                  <button type="button" className="btn" disabled={!!busy || stop.length > 0} onClick={() => run(item)}>{busy === item.role ? 'Виконується…' : `Запустити · ≈ $${(COST_PER_AGENT_RUN * 2).toFixed(2)}`}</button>
+                  <button type="button" className="btn" disabled={!!busy || stop.length > 0} onClick={() => run(item)}>{busy === item.role ? 'Виконується…' : 'Запустити · до $0.05'}</button>
                 </li>
               );
             })}

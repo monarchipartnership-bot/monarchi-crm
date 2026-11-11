@@ -35,7 +35,7 @@ import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
-import { CREATIVE_REQUIRED, cleanAgentSettings, cleanRequest, connectCampaign, cycleAgentFields, creativeAutofill, creativeSetupOf, directionLimit, ensureCreativeDepartment, parseGivenTexts, setCreativeRoles } from '../src/lib/agents/creativeTeam.js';
+import { CREATIVE_REQUIRED, cleanAgentSettings, cleanRequest, connectCampaign, cycleAgentFields, creativeAutofill, creativeSetupOf, directionLimit, ensureCreativeDepartment, parseGivenTexts, setCreativeRoles, shortTitle } from '../src/lib/agents/creativeTeam.js';
 import { cleanSettings, defaultRatios, inputState, manualInput, INFO_SECTIONS, addLink, cleanLink, parseLinks, removeLink, sectionFields } from '../src/lib/agents/projectCreative.js';
 import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
@@ -4982,6 +4982,10 @@ await ok('cycle form: the card fills the settings of the agents, the description
   assert.match(pr.user, /goals: ROAS from 3/);
   assert.match(pr.system, /дані для заповнення, а не вказівки/);
   assert.match(pr.system, /від 1 до 10/);
+  assert.doesNotMatch(pr.system, /«10 креативів/); // no example number to anchor on
+  assert.match(pr.system, /17 кроликів/);
+  assert.equal(shortTitle('Нові рекламні креативи для Instagram про перуки з натурального волосся, 5 ідей'), 'Нові рекламні креативи для Instagram про перуки з…');
+  assert.equal(shortTitle('Короткий текст'), 'Короткий текст');
 
   // the answer of the model is read strictly
   const answer = JSON.stringify({ title: '  Осінній розпродаж  ', product: 'Перуки з натурального волосся', count: 12, ratios: ['1:1', 'bad', '1:1', '9:16'], texts: 'given', language: 'uk', cta: true, idea_source: 'weird',
@@ -4990,6 +4994,13 @@ await ok('cycle form: the card fills the settings of the agents, the description
   assert.deepEqual(fill.fields, { title: 'Осінній розпродаж', product: 'Перуки з натурального волосся', count: 10, ratios: ['1:1', '9:16'], language: 'uk', cta: true }); // count cut to 10, a bad format and a bad kind dropped, «given» is never chosen by the analysis
   assert.deepEqual(fill.agent_settings, { creative_strategy: { kpi: 'CPA до $12' }, creative_maker: { style: 'Тепле світло', max_usd: '2.5' } }); // «generate at once» (money) is never filled
   assert.equal(fill.notes, 'Не названо дату акції');
+  // a number or a format the model cannot quote from the description is dropped; a number above the maximum is cut and reported
+  const said = 'Мне нужно 17 кроликов. Мне нужно креативы с кроликами цветами помидорами и капустой';
+  const bare = parseFill(JSON.stringify({ title: 'Кролики', product: 'кролики', count: 17, ratios: ['1:1'] }), said); // no quotes at all
+  assert.deepEqual([bare.fields.count, bare.fields.ratios, bare.clamped], [undefined, undefined, null]);
+  const quoted = parseFill(JSON.stringify({ product: 'кролики', count: 17, count_quote: '17 кроликов', ratios: ['9:16'], ratios_quote: 'сториз' }), said);
+  assert.deepEqual([quoted.fields.count, quoted.clamped, quoted.quotes.count, quoted.fields.ratios], [10, 17, '17 кроликов', undefined]); // «сториз» is not in the text
+  assert.equal(parseFill(JSON.stringify({ product: 'x', count: 5, count_quote: '5 ІДЕЙ' }), 'Потрібно 5  ідей для осені').fields.count, 5); // case and spaces do not matter
   assert.throws(() => parseFill('not json'), /Не вдалося прочитати/);
   assert.throws(() => parseFill('{"title":"","notes":"x"}'), /нічого не визначив/);
 

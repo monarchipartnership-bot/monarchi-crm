@@ -49,8 +49,8 @@ export default function ScheduleCalendar({ value, onChange, today }) {
       <div className="sc-out" role="status">
         {runs.length || value.startNow
           ? <>
-            <p>{value.startNow ? 'Перший запуск зараз. ' : ''}{runs.length ? <>Найближчі запуски: <b>{runs.slice(0, 4).map(dayMonthOf).join(', ')}</b>.</> : null}</p>
-            <p>Креативи будуть готові <b>{windowText(value.time)}</b>: вони не робляться миттєво (орієнтовно {WINDOW_MINUTES} хв).</p>
+            <p>{runs.length ? <>Найближчі запуски: <b>{runs.slice(0, 4).map(dayMonthOf).join(', ')}</b>.</> : null}</p>
+            <p>{value.startNow ? 'Перший запуск іде зараз і займає кілька хвилин. Далі креативи за розкладом' : 'Креативи'} будуть готові <b>{windowText(value.time)}</b>: вони не робляться миттєво (орієнтовно {WINDOW_MINUTES} хв).</p>
             <p>Це концепції й тексти. Картинки Higgsfield генеруються після вашого підтвердження ціни.</p>
           </>
           : <p>{value.mode === 'week' ? 'Оберіть хоча б один день тижня.' : 'Вкажіть, через скільки днів повторювати.'}</p>}

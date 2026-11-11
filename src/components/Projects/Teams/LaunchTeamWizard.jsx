@@ -102,7 +102,13 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
       const patch = {};
       ['count', 'ratios', 'texts', 'language'].forEach((k) => { if (r.patch[k] != null) patch[k] = k === 'count' ? String(r.patch[k]) : r.patch[k]; });
       patchPlan('creative', patch);
-      setAn({ busy: false, error: '', filled: r.filled.filter((x) => /напрям|формат|текст|мов/.test(x)), notes: fill.notes || '' });
+      const q = fill.quotes || {};
+      const parts = [];
+      if (r.patch.count != null) parts.push(`кількість напрямів: ${r.patch.count}${q.count ? ` (з опису: «${q.count}»)` : ''}${fill.clamped ? `; ви назвали ${fill.clamped}, а за один запуск максимум ${MAX_CONCEPTS}` : ''}`);
+      if (r.patch.ratios) parts.push(`формати: ${r.patch.ratios.join(', ')}${q.ratios ? ` (з опису: «${q.ratios}»)` : ''}`);
+      if (r.patch.texts != null) parts.push('тексти на креативах');
+      if (r.patch.language != null) parts.push('мову текстів');
+      setAn({ busy: false, error: '', filled: parts, notes: `${fill.clamped ? `Більше ${MAX_CONCEPTS} ідей за запуск не буває: потрібно більше, запустіть ще одне разове завдання. ` : ''}${fill.notes || ''}`.trim() });
     } catch (e) { setAn({ busy: false, error: e?.message || 'Не вдалося проаналізувати опис.', filled: null, notes: '' }); }
   }, [data.project.id, plans.creative]);
   const patchRow = (role, patch) => setPlans((p) => ({ ...p, analytics: { ...p.analytics, rows: p.analytics.rows.map((r) => (r.role === role ? { ...r, ...patch } : r)) } }));
@@ -339,7 +345,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                     <h3>{def.title}</h3>
                     <ul>
                       {k === 'analytics' && p.rows.filter((r) => r.enabled).map((r) => <li key={r.role}><b>{r.name}</b>: {r.runsAfter ? 'після агентів, від яких залежить' : describePlanSchedule(rowSchedule(r)) || 'лише вручну'}</li>)}
-                      {k === 'creative' && <><li><b>Завдання:</b> {p.goal.trim() || '—'}</li><li>Напрямів: {p.count} · формати: {p.ratios.join(', ') || '1:1'} · тексти: {TEXT_MODES[p.texts].toLowerCase()} · мова: {REQUEST_LANGUAGES[p.language]}</li><li>Запускається {describeSchedule(p.mode === 'every' ? { everyDays: Number(p.every), time: p.time } : { weekdays: p.days, time: p.time }) || 'за розкладом'}; перший запуск {p.startNow ? 'одразу' : `${p.mode === 'every' ? dayMonthOf(p.start) : 'за розкладом'} о ${p.time}`}; готово {windowText(p.time)}</li><li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}</li></>}
+                      {k === 'creative' && <><li><b>Завдання:</b> {p.goal.trim() || '—'}</li><li>Напрямів: {p.count} · формати: {p.ratios.join(', ') || '1:1'} · тексти: {TEXT_MODES[p.texts].toLowerCase()} · мова: {REQUEST_LANGUAGES[p.language]}</li><li>Запускається {describeSchedule(p.mode === 'every' ? { everyDays: Number(p.every), time: p.time } : { weekdays: p.days, time: p.time }) || 'за розкладом'}; перший запуск {p.startNow ? 'одразу, далі за розкладом' : `${p.mode === 'every' ? dayMonthOf(p.start) : 'за розкладом'} о ${p.time}`}; за розкладом готово {windowText(p.time)}</li><li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}</li></>}
                       {k === 'reports' && <>{p.weekly && <li>Тижневий звіт: {WEEKDAYS[p.weekday - 1]} о {p.time}</li>}{p.monthly && <li>Місячний звіт: {p.mday}-го числа о {p.mtime}</li>}{p.presentation && <li>Презентації для клієнта</li>}</>}
                     </ul>
                     <p className="tm-est">{k === 'creative' ? 'Вартість: ' : 'Орієнтовна вартість: '}{e.usd ? <b>≈ ${e.usd.toFixed(2)} на місяць</b> : null} {e.text}</p>
