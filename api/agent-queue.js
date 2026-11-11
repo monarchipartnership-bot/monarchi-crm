@@ -22,7 +22,7 @@ import { getModelClient } from './_lib/ai.js';
 import { generateCreatives, generatorState, pollCreatives } from './_lib/creativeMake.js';
 import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, passOnAny, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
 import { addInstruction, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from './_lib/campaignCycles.js';
-import { cancelRequest, startRequest } from './_lib/creativeEngine.js';
+import { cancelRequest, reviseStep, startRequest } from './_lib/creativeEngine.js';
 import { estimateInputs } from './_lib/estimateInputs.js';
 import { auditAfter, checkRights } from './_lib/agentAudit.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
@@ -83,6 +83,7 @@ export default async function handler(req, res) {
     else if (action === 'set_agent_mode') out = await setAgentMode(ctx, Number(body.agentId), String(body.mode || '')); // auto | confirm | paused
     else if (action === 'add_instruction') out = await addInstruction(ctx, Number(body.campaignId), { role: body.role || null, text: body.text });
     else if (action === 'remove_instruction') out = await removeInstruction(ctx, Number(body.campaignId), String(body.at || ''));
+    else if (action === 'revise_step') out = await reviseStep(ctx, Number(body.taskId), body.comment); // the person tells what to change in a step: the agent makes it again, the agents below follow
     else if (action === 'edit_output') out = await editOutput(ctx, Number(body.taskId), body.text); // the person corrects a result before the next agents read it
     else if (action === 'estimate_inputs') out = await estimateInputs(ctx, { ratio: typeof body.ratio === 'string' ? body.ratio : '4:5' }); // the price of one picture + the average cost of each agent run (nothing is spent)
     else if (action === 'site_speed') { // PageSpeed of the front page (10-30 s, so apart from the quick overview)

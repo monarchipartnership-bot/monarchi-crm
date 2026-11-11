@@ -58,7 +58,9 @@ export const CREATIVE_CONTRACTS = {
 
 export function creativeLockedText(role, language = null) {
   const parts = [...CREATIVE_RULES];
-  if (language) parts.push(`Write the texts for people in ${language} (JSON keys and the production prompts stay as specified).`);
+  // the language policy (owner, 2026-11-12): the client's language for what the client's audience reads, Ukrainian for the team
+  parts.push('Language policy: the team writes to you in Ukrainian, Russian or English; understand all three whatever language the request, the materials and the card of the client are in.');
+  if (language) parts.push(`Everything meant for the CLIENT's audience (headlines, primary texts, descriptions, calls to action and any words on a picture) is written in ${language}. Everything meant for the TEAM (the "summary", "notes", "why", comments, questions and any report) is written in Ukrainian. JSON keys and the production prompts stay as specified.`);
   parts.push(...(CREATIVE_CONTRACTS[role] || []));
   return parts.join('\n');
 }

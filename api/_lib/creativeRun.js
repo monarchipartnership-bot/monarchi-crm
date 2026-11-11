@@ -9,6 +9,7 @@ import { PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
 import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, cycleAgentFields, directionLimit } from '../../src/lib/agents/creativeTeam.js';
 import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, PROFILE_FIELDS, ctaVariants, inputState } from '../../src/lib/agents/projectCreative.js';
 import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
+import { isValidLanguage, languageEnglish, languageLabel, overlaySafe } from '../../src/lib/agents/languages.js';
 import { instructionBlock } from '../../src/lib/agents/campaignCycles.js';
 import { MEMORY_LIMITS, buildDossier, memoryBlock } from '../../src/lib/agents/clientMemory.js';
 import { fetchBlock, loadAccounts, siteBlocks, summaryOf } from './campaignRun.js';
@@ -59,6 +60,7 @@ const REF_ROLES = ['product', 'logo', 'style', 'person', 'other'];
 // the default for other languages until the model is tried on them), or nobody ('none'). Decided by the system from the request, not by an agent.
 export function textRender(brief = {}, needsText = true) {
   if (!needsText || brief.texts === 'no') return 'none';
+  if (!overlaySafe(brief.language)) return 'none'; // the words of a language that needs its own fonts or another layout are handed over apart from the picture
   return brief.language === 'en' ? 'model' : 'overlay';
 }
 export const COPY_LINES = (c) => [c.copy?.headline && `headline "${c.copy.headline}"`, c.copy?.subline && `subline "${c.copy.subline}"`, c.copy?.badge && `badge "${c.copy.badge}"`].filter(Boolean);
@@ -228,7 +230,7 @@ function requestBlock(req) {
       `Формати: ${ratios || '1:1'}`, b.texts === 'given' ? `Кількість напрямів: рівно ${directionLimit(b)}, по одному на кожен заданий текст` : `Кількість напрямів: до ${b.count || MAX_CONCEPTS}`,
       `Тексти до креативів: ${{ auto: 'агент вирішує', yes: 'потрібні, пише копірайтер', given: 'задані менеджером, використовувати дослівно', no: 'не потрібні' }[b.texts] || 'агент вирішує'}`,
       ...(b.texts === 'given' ? asList(b.given_texts).map((t, i) => `Заданий текст ${i + 1}: заголовок «${t.headline}»${t.subline ? `; підзаголовок «${t.subline}»` : ''}${t.badge ? `; плашка «${t.badge}»` : ''}`) : []),
-      `Мова текстів: ${REQUEST_LANGUAGES[b.language] || REQUEST_LANGUAGES.uk}`,
+      `Мова текстів для клієнта: ${languageLabel(b.language) || REQUEST_LANGUAGES[b.language] || REQUEST_LANGUAGES.uk}`,
       `Звідки брати ідеї: ${IDEA_SOURCES[b.idea_source] || IDEA_SOURCES.mix}`, b.figma ? `Макет у Figma: ${b.figma}` : '',
       b.cta === false ? 'Кнопка заклику до дії: не потрібна' : `Кнопка заклику до дії: так${b.cta_text ? `, текст кнопки «${b.cta_text}»` : ''}`,
     ].filter(Boolean).join('\n'),
@@ -333,8 +335,11 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   const link = (await db.from('ag_agent_clients').select('*').eq('agent_id', agent.id).eq('campaign_id', campaignId).maybeSingle()).data;
   const cfg = agent.config || {};
   const mine = link?.config || {};
+  // the language of the client is set in the card of the project: it is stamped on the request, so every step (and the system that puts the words on the pictures) reads the same one
+  const clientCode = isValidLanguage(project.client_language) ? project.client_language : (isValidLanguage(req?.brief?.language) ? req.brief.language : 'uk');
+  if (req && req.brief?.language !== clientCode) { req.brief = { ...(req.brief || {}), language: clientCode }; await db.from('ag_creative_requests').update({ brief: req.brief }).eq('id', req.id); }
   const b = req?.brief || {};
-  const language = LANGUAGE_NAMES[b.language] || 'Ukrainian';
+  const language = languageEnglish(clientCode) || LANGUAGE_NAMES[b.language] || 'Ukrainian';
   const read = ctx.read || readSite;
   const blocks = [projectBlock(project, campaign)];
   for (const f of def.clientFields || []) if (String(mine[f.key] || '').trim()) blocks.push({ title: `${f.label} (клієнт)`, text: clip(mine[f.key], 1500) });
@@ -418,6 +423,11 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
       }
       if (!brief) throw new Error('Немає технічного завдання для перевірки.');
     }
+  }
+  if (task.brief?.revision?.comment) { // «Виправити з коментарем»: the manager's remark on the previous result of this very step
+    blocks.push({ title: 'Правка менеджера до вашого попереднього результату: виправте саме це, решту лишіть як було', text: clip(task.brief.revision.comment, 2000) });
+    const prevRev = (await db.from('ag_tasks').select('output').eq('agent_id', agent.id).eq('request_id', rid).eq('status', 'done').order('id', { ascending: false }).limit(1)).data?.[0];
+    if (prevRev?.output?.text) blocks.push({ title: 'Ваша попередня версія (її й виправляєте)', text: clip(prevRev.output.text, 9000) });
   }
   if (task.brief?.feedback) {
     blocks.push({ title: `Зауваження перевірки якості (круг переробки ${task.brief.round || 1}): виправте саме їх, решту лишіть як було`, text: clip(asList(task.brief.feedback).map((f) => `- [${f.severity || ''}] ${f.concept ? `${f.concept}: ` : ''}${f.comment}`).join('\n'), 3000) });

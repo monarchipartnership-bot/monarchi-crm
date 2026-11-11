@@ -16,3 +16,9 @@
 .sd-note { margin: 0; font-size: .8rem; color: var(--ck-sec); } .sd-note.is-bad { color: var(--ck-bad); }
 .sd-more:focus-visible, .sd-input summary:focus-visible { outline: 2px solid var(--ck-deep); outline-offset: 2px; }
 @media (max-width: 640px) { .sd-rows > div { grid-template-columns: 1fr; gap: 0; } }
+
+.sd-acts { display: flex; gap: 16px; flex-wrap: wrap; }
+.sd-rev { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--ck-field); }
+.sd-rev label { font-size: .78rem; font-weight: 700; color: var(--ck-sec); }
+.sd-rev textarea { width: 100%; border: 1px solid var(--ck-ln); border-radius: 10px; padding: 8px 10px; background: transparent; color: var(--ck-ink); font: inherit; font-size: .86rem; resize: vertical; }
+.sd-revbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .sd-lang { height: 32px; border-radius: 8px; border: 1px solid var(--ck-ln); background: transparent; color: var(--ck-ink); font: inherit; font-size: .8rem; }

@@ -59,6 +59,35 @@ export async function startRequest(ctx, requestId) {
   return { started: 1, participants: participantsOf(dept, links).length };
 }
 
+// «Виправити з коментарем» (owner, 2026-11-12): the person tells in words what to change in the result of a step; the same agent makes it again from its previous version
+// and the comment, and the chain does the rest by itself: the agents below it work again because something above them delivered after their last task (a rework). Only
+// while no picture has been made: a rework after that would double the creatives. Costs one run of the agent and of every agent below it.
+export const REVISABLE_ROLES = ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker'];
+export async function reviseStep(ctx, taskId, comment) {
+  const { db } = ctx;
+  const note = String(comment || '').replace(/\r\n/g, '\n').trim();
+  if (note.length < 3) throw new Error('Опишіть, що виправити.');
+  if (note.length > 2000) throw new Error('Коментар завеликий (понад 2000 символів).');
+  const task = must(await db.from('ag_tasks').select('*').eq('id', taskId).maybeSingle(), 'task');
+  if (!task || task.status !== 'done' || !task.request_id) throw new Error('Виправити можна лише завершений крок завдання.');
+  const agent = must(await db.from('ag_agents').select('*').eq('id', task.agent_id).maybeSingle(), 'agent');
+  if (!agent || !REVISABLE_ROLES.includes(agent.role)) throw new Error('Цей крок не виправляється коментарем.');
+  const req = must(await db.from('ag_creative_requests').select('*').eq('id', task.request_id).maybeSingle(), 'request');
+  if (!req || req.status === 'cancelled') throw new Error('Завдання не знайдено або скасовано.');
+  const campaign = must(await db.from('ag_campaigns').select('*').eq('id', req.campaign_id).maybeSingle(), 'campaign');
+  if (!campaign || ['paused', 'archived'].includes(campaign.status)) throw new Error('Операцію призупинено або в архіві: продовжте її, і тоді виправляйте.');
+  if ((await cappedCampaigns(db)).has(String(req.campaign_id))) throw new Error(CAP_MESSAGE);
+  const made = (must(await db.from('ag_creatives').select('id, status').eq('request_id', req.id), 'creatives') || []).filter((c) => !['planned', 'failed'].includes(c.status));
+  if (made.length) throw new Error('Картинки цього завдання вже генерувалися або перевіряються: правка створила б дублі. Створіть нове завдання з потрібними змінами.');
+  const open = must(await db.from('ag_tasks').select('id').eq('request_id', req.id).in('status', ['queued', 'running']).limit(1), 'tasks') || [];
+  if (open.length) throw new Error('У завданні зараз працює крок: дочекайтесь його завершення, потім виправляйте.');
+  const created = await enqueue(db, agent, { campaignId: req.campaign_id, requestId: req.id, brief: { trigger: 'revision', requestId: req.id, revision: { comment: note, by: ctx.email || null, of: task.id } }, by: ctx.email || 'менеджер' });
+  const now = iso(ctx.now());
+  must(await db.from('ag_creative_requests').update({ status: 'running', error: null, finished_at: null, updated_at: now }).eq('id', req.id), 'request');
+  if (campaign.project_id) await db.from('ag_client_events').insert({ project_id: campaign.project_id, campaign_id: req.campaign_id, kind: 'note', subject: `Правка результату: ${agent.name}`, body: note.slice(0, 600), actor: ctx.email || null, meta: { task_id: task.id, request_id: req.id } });
+  return { ok: true, taskId: created.id };
+}
+
 // A task of the request finished: the agents below it may start. An agent starts when every participating agent above it has a done task of THIS
 // request and it has none of its own yet. A link in manual mode is not started by the chain (the person starts it); if something above failed,
 // the request waits until the task is retried.

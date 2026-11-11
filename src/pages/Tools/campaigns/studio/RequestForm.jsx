@@ -272,7 +272,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
             </div>
             <div className="qr-g qr-wrap">
               <span className="qr-lab">Мова текстів</span>
-              <Chips label="Мова текстів" value={f.language} options={Object.entries(REQUEST_LANGUAGES)} onPick={(k) => set({ language: k })} />
+              <span className="qr-mut">мова клієнта з картки проєкту</span>
               <button type="button" className={'qr-sw' + (f.cta ? ' on' : '')} role="switch" aria-checked={f.cta} onClick={() => set({ cta: !f.cta })}><i /><span>Кнопка заклику до дії</span></button>
               {f.cta && <input className="cmp-input qr-ctain" value={f.cta_text} onChange={(e) => set({ cta_text: e.target.value })} placeholder="Текст кнопки, наприклад: Shop now" aria-label="Текст кнопки" maxLength={40} />}
             </div>

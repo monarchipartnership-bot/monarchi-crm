@@ -11,6 +11,8 @@ export const STAGE_WORK = {
   quality: 'Перевіряє картинки й тексти на відповідність ТЗ та правилам клієнта.',
 };
 // who gets the result
+// the steps whose result the manager may correct with a comment (the agent makes it again, the agents below follow)
+export const REVISABLE_STAGES = ['strategy', 'brief', 'copy', 'maker'];
 export const STAGE_PASSES = { strategy: ['brief'], brief: ['copy', 'maker'], copy: ['quality'], maker: ['quality'], quality: ['you'] };
 // who it waits for
 const STAGE_NEEDS = { brief: ['strategy'], copy: ['brief'], maker: ['brief'], quality: ['copy', 'maker'] };
@@ -47,6 +49,7 @@ export function buildStepCards({ stages = [], paused = false } = {}) {
       key: s.key, label: s.label, state: s.state, stateLabel: STATE_LABEL[s.state] || s.state, tone: TONE[s.state] || 'grey',
       work: STAGE_WORK[s.key] || '', result: s.state === 'done' ? String(s.summary || '').trim() : '',
       passed: passes.length ? `${s.state === 'done' ? 'Передано' : 'Передасть'}: ${names(passes)}` : '', why,
+      canRevise: s.state === 'done' && REVISABLE_STAGES.includes(s.key) && s.taskId != null,
       startedAt: s.startedAt || null, finishedAt: s.finishedAt || null, duration: durationText(dur), costUsd: Number(s.costUsd) || 0, taskId: s.taskId ?? null, error: s.state === 'failed' ? s.note || '' : '',
     };
   });

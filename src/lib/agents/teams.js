@@ -33,6 +33,7 @@ export const ONEOFF = [
 // ---- which section of the card of the project a field is filled in (for the link «Відкрити в картці»)
 const SETTINGS_KEYS = ['restrictions', 'materials', 'cta', 'figma', 'brand', 'copy_rules', 'extra_info', 'examples'];
 export function whereToFill(key) {
+  if (key === 'client_language') return 'client';
   if (['cabinet', 'cabinet_meta', 'cabinet_google'].includes(key)) return 'main';
   if (['competitor_sites', 'competitor_notes', 'competitors'].includes(key)) return 'competitors';
   if (INFO_SECTIONS.client.includes(key)) return 'client';
@@ -71,6 +72,8 @@ export function teamReadiness(teamKey, ctx = {}) {
     const roles = CREATIVE_ROLES.map((r) => r.role).filter((r) => r !== 'creative_analyst');
     miss = missingFor(roles, have);
   }
+  // the language of the client decides what language the texts for the client are written in: the creative and the report teams do not launch without it
+  if ((teamKey === 'creative' || teamKey === 'reports') && !ctx.project?.client_language) miss.required = [{ key: 'client_language', label: 'Мова клієнта', agents: [teamKey === 'reports' ? 'Агент звітів' : 'Усі агенти креативів'] }, ...miss.required];
   const decorate = (x) => ({ ...x, where: whereToFill(x.key), inline: canFillInline(x.key), ai: AI_FILLABLE.has(x.key) });
   const required = miss.required.map(decorate);
   const recommended = miss.recommended.map(decorate);

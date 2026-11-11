@@ -428,3 +428,5 @@
 .project-detail-page.pw .prep-table--groups th.total, .project-detail-page.pw .prep-table--groups td.total { position: static; box-shadow: none; }
 
 .project-detail-page.pw .pd-header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+.project-detail-page.pw .ov-req { margin-left: 8px; font-size: .74rem; font-weight: 600; color: #8A1C1C; }

@@ -22,7 +22,7 @@ export async function fetchTeamsData(projectId) {
     fetchAgent(projectId).then((r) => r.agent || null),
     fetchProjectCreative(projectId).catch(() => ({ settings: {}, assets: [] })),
     supabase.from('project_ad_accounts').select('project_id, platform, account_id, account_name, account_status').eq('project_id', projectId).then(must),
-    supabase.from('projects').select('id, name, client, website, status').eq('id', projectId).maybeSingle().then(must),
+    supabase.from('projects').select('id, name, client, website, status, client_language').eq('id', projectId).maybeSingle().then(must),
   ]);
   return { campaigns: campaigns || [], agent, settings: creative.settings || {}, assets: creative.assets || [], accounts: accounts || [], project };
 }

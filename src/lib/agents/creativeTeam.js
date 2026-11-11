@@ -5,6 +5,7 @@
 //                                                           └─> maker ──────┴─> quality ──> the person approves
 // A request starts the strategist; every finished task starts the agents below it for the same client and request.
 import { CREATIVE_PROMPTS } from './creativePrompts.js';
+import { isValidLanguage } from './languages.js';
 
 export const CREATIVE_TEAM = 'creative';
 
@@ -170,7 +171,7 @@ export function cleanRequest(input = {}) {
     figma,
     cta: input.cta !== false,
     cta_text: clip(input.cta_text, 40),
-    language: REQUEST_LANGUAGES[input.language] ? input.language : 'uk',
+    language: isValidLanguage(input.language) ? input.language : 'uk', // the language of the client (the card of the project); the server stamps it before the agents work
     kind: input.kind === 'regular' ? 'regular' : 'extra', // a cycle of the weekly schedule or a one-off one (lib/agents/operationCycles.js)
   };
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(input.scheduled_for || ''))) brief.scheduled_for = input.scheduled_for;

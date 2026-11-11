@@ -42,7 +42,10 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
+import { reviseStep } from '../api/_lib/creativeEngine.js';
 import { buildStepCards, durationText } from '../src/lib/agents/stageDetails.js';
+import { LANGUAGES, isValidLanguage, languageEnglish, languageLabel, languageOptions, overlaySafe } from '../src/lib/agents/languages.js';
+import { creativeLockedText } from '../src/lib/agents/creativePrompts.js';
 import { endTime, monthCells, previewRuns, weekdayOf, windowText } from '../src/lib/agents/scheduleCalendar.js';
 import { ONEOFF, describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
 import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
@@ -4393,6 +4396,53 @@ await ok('blocks of the agents of a task: what each does, what it made and passe
   assert.deepEqual([failed[0].tone, failed[0].why, failed[0].error], ['bad', 'Немає даних', 'Немає даних']);
   assert.deepEqual([durationText(0), durationText(59.6), durationText(120)], ['', '60 с', '2 хв']);
   assert.deepEqual(buildStepCards({}), []);
+  assert.deepEqual(cards.map((c) => c.canRevise), [true, true, false, false, false]); // a done step of the chain may be corrected; a waiting one and the checker may not
+});
+
+await ok('language of the client: any language of the list, names for the prompts and the interface, which scripts the system may put over a picture', () => {
+  assert.equal(languageEnglish('de'), 'German'); assert.equal(languageEnglish('xx'), null); assert.equal(languageEnglish(''), null);
+  assert.deepEqual([isValidLanguage('pl'), isValidLanguage('zz'), isValidLanguage(null)], [true, false, false]);
+  assert.deepEqual([languageLabel('uk'), languageLabel('de'), languageLabel('xx')], ['Українська', 'Німецька (Deutsch)', '']);
+  assert.deepEqual(['en', 'uk', 'ru', 'pl', 'el', 'sr'].map(overlaySafe), [true, true, true, true, true, true]); // latin, cyrillic, greek letters
+  assert.deepEqual(['ar', 'he', 'zh', 'ja', 'ko', 'th', 'hi', 'ka'].map(overlaySafe), [false, false, false, false, false, false, false, false]); // own fonts or right-to-left
+  const opts = languageOptions();
+  assert.deepEqual(opts.slice(0, 3).map((o) => o.value), ['uk', 'en', 'ru']); // the team's languages first
+  assert.ok(opts.length >= 50 && new Set(opts.map((o) => o.value)).size === opts.length);
+  assert.ok(LANGUAGES.every((l) => l.en && l.uk && l.native && l.code));
+  // the creative agents get the policy: the client's language for the client's audience, Ukrainian for the team; without a language no client line
+  const rules = creativeLockedText('creative_copywriter', 'German');
+  assert.match(rules, /in German/); assert.match(rules, /for the TEAM[^.]*in Ukrainian/); assert.match(rules, /Ukrainian, Russian or English/);
+  assert.doesNotMatch(creativeLockedText('creative_copywriter', null), /in German|CLIENT's audience/);
+  // who puts the words on the picture: English by the model, other latin / cyrillic / greek languages over a clean picture, the other scripts: no words on the picture
+  assert.deepEqual(['en', 'de', 'uk', 'ar', 'zh'].map((l) => textRender({ language: l, texts: 'yes' })), ['model', 'overlay', 'overlay', 'none', 'none']);
+  // the request keeps any language of the list (an unknown one falls back to Ukrainian)
+  assert.deepEqual([cleanRequest({ goal: 'x', language: 'de' }).brief.language, cleanRequest({ goal: 'x', language: 'zz' }).brief.language], ['de', 'uk']);
+});
+
+await ok('correct a step with a comment: the same agent gets a new task with the comment, the request runs again; refused when the operation is paused, pictures exist, a step works or the step is not correctable', async () => {
+  const base = () => ({
+    ag_agents: [{ id: 1, role: 'creative_strategy', name: 'Стратег', team: 'creative' }, { id: 2, role: 'creative_quality', name: 'Контроль', team: 'creative' }],
+    ag_tasks: [{ id: 10, agent_id: 1, request_id: 5, campaign_id: 3, status: 'done', output: { text: 'План' } }, { id: 11, agent_id: 2, request_id: 5, campaign_id: 3, status: 'done', output: { text: 'ok' } }],
+    ag_creative_requests: [{ id: 5, campaign_id: 3, status: 'review', brief: { goal: 'x' } }], ag_campaigns: [{ id: 3, project_id: 7, status: 'active', spend_cap_usd: null }],
+    ag_creatives: [{ id: 1, request_id: 5, status: 'planned' }, { id: 2, request_id: 5, status: 'failed' }], ag_client_events: [], ag_campaign_spend: [],
+  });
+  const ctx = (tables) => ({ db: fakeDb(tables), email: 'm@x.y', now: () => new Date('2026-11-12T10:00:00Z') });
+  const tables = base();
+  const r = await reviseStep(ctx(tables), 10, '  Прибери напрям 2  ');
+  assert.equal(r.ok, true);
+  const made = tables.ag_tasks.find((x) => x.id === r.taskId);
+  assert.deepEqual([made.agent_id, made.status, made.request_id, made.brief.trigger, made.brief.revision.comment, made.brief.revision.of, made.brief.revision.by], [1, 'queued', 5, 'revision', 'Прибери напрям 2', 10, 'm@x.y']);
+  assert.equal(tables.ag_creative_requests[0].status, 'running');
+  assert.deepEqual([tables.ag_client_events[0].kind, tables.ag_client_events[0].project_id, tables.ag_client_events[0].subject], ['note', 7, 'Правка результату: Стратег']); // the memory of the client knows
+  await assert.rejects(() => reviseStep(ctx(tables), 10, 'ще раз'), /працює крок/); // its own new task is open now
+  await assert.rejects(() => reviseStep(ctx(base()), 10, 'ab'), /Опишіть/);
+  await assert.rejects(() => reviseStep(ctx(base()), 11, 'щось не так'), /не виправляється/); // the checker is not corrected by a comment
+  const paused = base(); paused.ag_campaigns[0].status = 'paused';
+  await assert.rejects(() => reviseStep(ctx(paused), 10, 'виправ'), /призупинено/);
+  const pics = base(); pics.ag_creatives.push({ id: 3, request_id: 5, status: 'review' });
+  await assert.rejects(() => reviseStep(ctx(pics), 10, 'виправ'), /створила б дублі/);
+  const notDone = base(); notDone.ag_tasks[0].status = 'queued';
+  await assert.rejects(() => reviseStep(ctx(notDone), 10, 'виправ'), /завершений крок/);
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
@@ -5032,8 +5082,8 @@ await ok('schedule: an agent may work every N days (cabinets every 3 days, compe
 
 await ok('AI teams of a project: the three teams, the check of what each one needs from the card, the running ones read from the operations, the price from the schedules', async () => {
   const both = [{ platform: 'meta', account_name: 'M' }, { platform: 'google', account_name: 'G' }];
-  const empty = { settings: {}, assets: [], accounts: [] };
-  // a team of reports needs only a cabinet: no offer, no competitors
+  const empty = { settings: {}, assets: [], accounts: [], project: { client_language: 'de' } };
+  // a team of reports needs only a cabinet (and the language of the client): no offer, no competitors
   const noCab = teamReadiness('reports', empty);
   assert.deepEqual([noCab.status, noCab.required.map((x) => [x.key, x.where, x.inline])], ['blocked', [['cabinet', 'main', false]]]);
   assert.deepEqual([teamReadiness('reports', { ...empty, accounts: both }).status, teamReadiness('reports', { ...empty, accounts: both }).required], ['ready', []]);
@@ -5043,6 +5093,12 @@ await ok('AI teams of a project: the three teams, the check of what each one nee
   assert.ok(cr.recommended.some((x) => x.key === 'restrictions' && !x.inline && x.where === 'business'));
   const crOk = teamReadiness('creative', { ...empty, settings: { inputs: { offer: { body: 'Wigs from natural hair' } } } });
   assert.deepEqual([crOk.ok, crOk.status], [true, 'warn']);
+  // the language of the client is required for the teams that write for the client (creatives, reports), not for the analytics (its results are for the team)
+  const noLang = { ...empty, project: {} };
+  assert.deepEqual(teamReadiness('creative', noLang).required.map((x) => [x.key, x.where, x.inline]), [['client_language', 'client', false], ['offer', 'business', true]]);
+  assert.equal(teamReadiness('reports', { ...noLang, accounts: both }).status, 'blocked');
+  assert.ok(teamReadiness('analytics', { ...noLang, accounts: both }).required.every((x) => x.key !== 'client_language'));
+  assert.equal(teamReadiness('creative', { ...noLang, project: { client_language: 'pl' }, settings: { inputs: { offer: { body: 'x' } } } }).ok, true);
   // analytics: no cabinet = one clear line; with the cabinets the goals of the client are required
   assert.deepEqual(teamReadiness('analytics', empty).required.map((x) => x.key), ['cabinet']);
   assert.deepEqual(teamReadiness('analytics', { ...empty, accounts: both }).required.map((x) => [x.key, x.inline]), [['goals', true]]);

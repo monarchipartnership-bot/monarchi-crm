@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { agentAction } from './agents';
+import { agentAction, kickQueue } from './agents';
 import { scheduleRows } from '../agents/campaignCycles';
 
 const must = ({ data, error }) => { if (error) throw error; return data; };
@@ -19,6 +19,8 @@ export const setAgentSchedule = (agentId, schedule) => agentAction('set_agent_sc
 export const setAgentMode = (agentId, mode) => agentAction('set_agent_mode', { agentId, mode });
 export const addInstruction = (campaignId, text, role = null) => agentAction('add_instruction', { campaignId, text, role });
 export const removeInstruction = (campaignId, at) => agentAction('remove_instruction', { campaignId, at });
+// «Виправити з коментарем»: the agent makes the step again from the comment; the agents below follow (the queue is kicked at once)
+export const reviseStep = async (taskId, comment) => { const r = await agentAction('revise_step', { taskId, comment }); kickQueue().catch(() => {}); return r; };
 export const editOutput = (taskId, text) => agentAction('edit_output', { taskId, text });
 export const passOnResult = (taskId) => agentAction('pass_on', { taskId });
 

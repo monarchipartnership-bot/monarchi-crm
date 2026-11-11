@@ -9,6 +9,7 @@ import { CREATIVE_OPTIONAL, DEFAULT_CONCEPTS, MAX_CONCEPTS, REQUEST_LANGUAGES, R
 import { MAX_EVERY_DAYS, WEEKDAYS, cleanSchedule, describeSchedule } from '../../../lib/agents/campaignCycles';
 import { cleanRegular, kyivToday } from '../../../lib/agents/operationCycles';
 import ScheduleCalendar from './ScheduleCalendar';
+import { languageLabel } from '../../../lib/agents/languages';
 import { dayMonthOf, windowText } from '../../../lib/agents/scheduleCalendar';
 import { TEAMS, estimateMonthly, teamAgentPlan, teamReadiness, teamsOf, describePlanSchedule } from '../../../lib/agents/teams';
 
@@ -80,7 +81,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
       order.forEach((k) => {
         if (next[k]) return;
         if (k === 'analytics') next[k] = { rows: teamAgentPlan('analytics', data.accounts).map((p) => ({ ...p, enabled: true, mode: p.schedule?.everyDays ? 'every' : p.schedule?.weekday ? 'week' : p.runsAfter ? 'chain' : 'manual', every: p.schedule?.everyDays || 3, weekday: p.schedule?.weekday || 1, time: p.schedule?.time || '09:00' })) };
-        if (k === 'creative') next[k] = { optional: new Set(CREATIVE_OPTIONAL), plan: teamAgentPlan('creative'), goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: 'uk', mode: 'every', every: '3', days: [1, 3, 5], time: '09:00', start: today, startNow: true };
+        if (k === 'creative') next[k] = { optional: new Set(CREATIVE_OPTIONAL), plan: teamAgentPlan('creative'), goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: data.project.client_language || 'uk', mode: 'every', every: '3', days: [1, 3, 5], time: '09:00', start: today, startNow: true };
         if (k === 'reports') next[k] = { weekly: true, weekday: 1, time: '09:00', monthly: true, mday: 1, mtime: '09:00', presentation: true };
       });
       return next;
@@ -100,14 +101,13 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
       if (fields.texts === 'given') delete fields.texts; // the launch has no ready texts: the copywriter writes them
       const r = applyFill({ current: { ...plans.creative, texts: plans.creative.texts }, fill: { ...fill, fields, agent_settings: {} }, touched: touched.current });
       const patch = {};
-      ['count', 'ratios', 'texts', 'language'].forEach((k) => { if (r.patch[k] != null) patch[k] = k === 'count' ? String(r.patch[k]) : r.patch[k]; });
+      ['count', 'ratios', 'texts'].forEach((k) => { if (r.patch[k] != null) patch[k] = k === 'count' ? String(r.patch[k]) : r.patch[k]; });
       patchPlan('creative', patch);
       const q = fill.quotes || {};
       const rows = [];
       if (r.patch.count != null) rows.push({ label: 'Напрямів за запуск', value: String(r.patch.count), quote: q.count, warn: fill.clamped ? `Ви назвали ${fill.clamped}, але за один запуск максимум ${MAX_CONCEPTS}: поставлено ${MAX_CONCEPTS}. Більше ідей замовляйте окремим разовим завданням.` : '' });
       if (r.patch.ratios) rows.push({ label: 'Формати', value: r.patch.ratios.map((k) => REQUEST_RATIOS.find((x) => x.key === k)?.label || k).join(', '), quote: q.ratios });
       if (r.patch.texts != null) rows.push({ label: 'Тексти на креативах', value: TEXT_MODES[r.patch.texts] || r.patch.texts });
-      if (r.patch.language != null) rows.push({ label: 'Мова текстів', value: REQUEST_LANGUAGES[r.patch.language] || r.patch.language });
       setAn({ busy: false, error: '', rows, questions: fill.questions?.length ? fill.questions : fill.notes ? [fill.notes] : [] });
     } catch (e) { setAn({ busy: false, error: e?.message || 'Не вдалося проаналізувати опис.', rows: null, questions: [] }); }
   }, [data.project.id, plans.creative]);
@@ -304,8 +304,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                     </fieldset>
                     <label className="tm-fl"><span>Тексти на креативах</span>
                       <select className="tm-sel" value={plans.creative.texts} onChange={(e) => patchByHand({ texts: e.target.value })} aria-label="Тексти на креативах">{['yes', 'no'].map((k) => <option key={k} value={k}>{TEXT_MODES[k]}</option>)}</select></label>
-                    <label className="tm-fl"><span>Мова текстів</span>
-                      <select className="tm-sel" value={plans.creative.language} onChange={(e) => patchByHand({ language: e.target.value })} aria-label="Мова текстів">{Object.entries(REQUEST_LANGUAGES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+                    <div className="tm-fl"><span>Мова текстів для клієнта</span><b className="tm-lang">{languageLabel(plans.creative.language)}</b><small className="tm-hint">Мова клієнта з картки проєкту. Для команди результати завжди українською.</small></div>
                     <div className="tm-fl tm-w2"><span>Коли запускати</span>
                       <ScheduleCalendar value={plans.creative} today={today} onChange={(patch) => patchPlan('creative', patch)} /></div>
                   </div>
@@ -354,7 +353,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                     <h3>{def.title}</h3>
                     <ul>
                       {k === 'analytics' && p.rows.filter((r) => r.enabled).map((r) => <li key={r.role}><b>{r.name}</b>: {r.runsAfter ? 'після агентів, від яких залежить' : describePlanSchedule(rowSchedule(r)) || 'лише вручну'}</li>)}
-                      {k === 'creative' && <><li><b>Завдання:</b> {p.goal.trim() || '—'}</li><li>Напрямів: {p.count} · формати: {p.ratios.join(', ') || '1:1'} · тексти: {TEXT_MODES[p.texts].toLowerCase()} · мова: {REQUEST_LANGUAGES[p.language]}</li><li>Запускається {describeSchedule(p.mode === 'every' ? { everyDays: Number(p.every), time: p.time } : { weekdays: p.days, time: p.time }) || 'за розкладом'}; перший запуск {p.startNow ? 'одразу, далі за розкладом' : `${p.mode === 'every' ? dayMonthOf(p.start) : 'за розкладом'} о ${p.time}`}; за розкладом готово {windowText(p.time)}</li><li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}</li></>}
+                      {k === 'creative' && <><li><b>Завдання:</b> {p.goal.trim() || '—'}</li><li>Напрямів: {p.count} · формати: {p.ratios.join(', ') || '1:1'} · тексти: {TEXT_MODES[p.texts].toLowerCase()} · мова клієнта: {languageLabel(p.language)}</li><li>Запускається {describeSchedule(p.mode === 'every' ? { everyDays: Number(p.every), time: p.time } : { weekdays: p.days, time: p.time }) || 'за розкладом'}; перший запуск {p.startNow ? 'одразу, далі за розкладом' : `${p.mode === 'every' ? dayMonthOf(p.start) : 'за розкладом'} о ${p.time}`}; за розкладом готово {windowText(p.time)}</li><li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}</li></>}
                       {k === 'reports' && <>{p.weekly && <li>Тижневий звіт: {WEEKDAYS[p.weekday - 1]} о {p.time}</li>}{p.monthly && <li>Місячний звіт: {p.mday}-го числа о {p.mtime}</li>}{p.presentation && <li>Презентації для клієнта</li>}</>}
                     </ul>
                     <p className="tm-est">{k === 'creative' ? 'Вартість: ' : 'Орієнтовна вартість: '}{e.usd ? <b>≈ ${e.usd.toFixed(2)} на місяць</b> : null} {e.text}</p>
