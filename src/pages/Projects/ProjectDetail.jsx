@@ -488,7 +488,10 @@ function ProjectDetailCard() {
             )}
           </div>
         </div>
-        <button type="button" className="pw-btn pd-back" onClick={() => navigate('/projects')}><ActionIcon name="back" size={18} /> Назад</button>
+        <div className="pd-header-actions">
+          <button type="button" className="pw-btn pd-back" onClick={() => navigate('/projects')}><ActionIcon name="back" size={18} /> Назад до проєктів</button>
+          <button type="button" className="pw-btn pw-btn--primary pd-back" onClick={() => navigate('/tools/constellation-test')}><ActionIcon name="generate" size={18} /> Відкрити AI розділ</button>
+        </div>
       </div>
 
       <div className="pw-tabs" role="tablist" aria-label="Розділи проєкту" onKeyDown={onTabKey}>
