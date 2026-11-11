@@ -13,6 +13,7 @@ import Deliverables from '../campaigns/Deliverables';
 import RequestForm from '../campaigns/studio/RequestForm';
 import AgentsSettings from './AgentsSettings';
 import StepCards from './StepCards';
+import PicturesSetting from './PicturesSetting';
 import AttentionRow from './AttentionRow';
 import Gallery from './Gallery';
 import { StageLine } from './ProjectWindow';
@@ -313,6 +314,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
 
       {section === 'settings' && (
         <>
+          {view.creative && <PicturesSetting campaign={campaign} notify={notify} onChanged={onChanged} />}
           {view.creative && (
             <section className="ckp-box opv-regular" aria-label="Регулярні завдання">
               <div className="ckp-sec-h">

@@ -35,7 +35,7 @@ import { collectSpeed, parseSpeed, speedFindings, speedKeyFromEnv } from '../api
 import { analyseLeads, applyExtras, checkUptime, leadSource, leadWindows, siteExtras } from '../api/_lib/siteExtras.js';
 import { ancestorsOf } from '../src/lib/agents/chain.js';
 import { ensureCampaignTeam, linksFor, participants } from '../src/lib/agents/campaignTeam.js';
-import { CREATIVE_REQUIRED, cleanAgentSettings, cleanRequest, connectCampaign, cycleAgentFields, creativeAutofill, creativeSetupOf, directionLimit, ensureCreativeDepartment, parseGivenTexts, setCreativeRoles, shortTitle } from '../src/lib/agents/creativeTeam.js';
+import { CREATIVE_REQUIRED, creativeAutoOf, cleanAgentSettings, cleanRequest, connectCampaign, cycleAgentFields, creativeAutofill, creativeSetupOf, directionLimit, ensureCreativeDepartment, parseGivenTexts, setCreativeRoles, shortTitle } from '../src/lib/agents/creativeTeam.js';
 import { cleanSettings, defaultRatios, inputState, manualInput, INFO_SECTIONS, addLink, cleanLink, parseLinks, removeLink, sectionFields } from '../src/lib/agents/projectCreative.js';
 import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
@@ -4489,6 +4489,14 @@ await ok('seasonal task: a regular task for a period; it ends by itself, the mai
   // an edit that does not mention the season keeps it
   const edited = cleanRegular({ id: season.id, enabled: true, everyDays: 3, time: '09:00', brief: { goal: 'Новорічний стиль, золото' } }, { prev: season });
   assert.deepEqual([edited.seasonal, edited.title, edited.endDate, edited.startDate, edited.replaces], [true, 'Новий рік', '2026-12-31', '2026-12-15', [mainId]]);
+});
+
+await ok('pictures of a creative task: generated at once unless the team switches it off, with a limit of the team; the person is asked only for what does not fit', () => {
+  assert.deepEqual(creativeAutoOf(null), { auto: true, maxUsd: null }); // a team that never chose: automatic, the limit of the maker
+  assert.deepEqual(creativeAutoOf({ config: { creative: { enabled: true, roles: [] } } }), { auto: true, maxUsd: null });
+  assert.deepEqual(creativeAutoOf({ config: { creative: { autoGenerate: false, maxUsd: 5 } } }), { auto: false, maxUsd: 5 });
+  assert.deepEqual(creativeAutoOf({ config: { creative: { autoGenerate: true, maxUsd: '2,5' } } }), { auto: true, maxUsd: null }); // a text that is not a number is no limit
+  assert.deepEqual(creativeAutoOf({ config: { creative: { maxUsd: 4.5 } } }), { auto: true, maxUsd: 4.5 });
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {

@@ -251,6 +251,15 @@ export async function connectCampaign(db, campaign, { email = null, only = null 
 export const CREATIVE_REQUIRED = ['creative_strategy', 'creative_brief', 'creative_maker'];
 export const CREATIVE_OPTIONAL = CREATIVE_ROLES.map((r) => r.role).filter((r) => !CREATIVE_REQUIRED.includes(r));
 
+// The pictures of a task (owner, 2026-11-12: «агенты делают задание вплоть до готового креатива, я утверждаю его, когда он готов»): they are generated at once, within a limit,
+// and the person is asked only when something does not fit the limit. campaign.config.creative = { …, autoGenerate (on unless it says false), maxUsd (one task; empty: the limit of the maker) }
+export const DEFAULT_PICTURES_LIMIT_USD = 3;
+export function creativeAutoOf(campaign) {
+  const c = campaign?.config?.creative;
+  const max = Number(c?.maxUsd);
+  return { auto: c?.autoGenerate !== false, maxUsd: max > 0 ? max : null };
+}
+
 // What the wizard decided for a campaign (campaign.config.creative = { enabled, roles }). A campaign that was never through the wizard step keeps the
 // old behaviour: the whole department.
 export function creativeSetupOf(campaign) {

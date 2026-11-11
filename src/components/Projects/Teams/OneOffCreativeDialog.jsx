@@ -80,7 +80,7 @@ export default function OneOffCreativeDialog({ data, campaign, email, seasonal =
               </div>
             )}
           </TaskBrief>
-          <p className="tm-hint">Вартість роботи агентів ≈ $0.15–0.3 за кожен запуск. Картинки Higgsfield генеруються лише після вашого підтвердження ціни.</p>
+          <p className="tm-hint">Вартість роботи агентів ≈ $0.15–0.3 за кожен запуск. Картинки Higgsfield (≈ $0.2 за штуку) генеруються автоматично в межах ліміту команди: ви перевіряєте готові креативи.</p>
         </div>
         <footer className="tm-foot">
           <button type="button" className="btn" disabled={busy} onClick={onClose}>Скасувати</button>

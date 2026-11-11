@@ -58,7 +58,7 @@ export async function launchTeam({ teamKey, project, accounts = [], existing = [
     await saveAgent(agent.id, { schedule: item.schedule ? cleanSchedule(item.schedule) : null }, email);
   }
   c = await updateCampaign(c.id, { config: { ...(c.config || {}), mode: def.mode, modeApplied: `${def.mode}:${[...platforms].sort().join()}`, agentsConfigured: true, language: 'uk', goals: String(goals || ''), team: teamKey }, spend_cap_usd: capUsd > 0 ? capUsd : null });
-  if (teamKey === 'creative') await saveCreativeSetup(c, { enabled: true, roles: [...CREATIVE_REQUIRED, ...CREATIVE_OPTIONAL.filter((r) => optional.includes(r))] }, email); // the client is linked to the chosen agents of the department
+  if (teamKey === 'creative') await saveCreativeSetup(c, { enabled: true, roles: [...CREATIVE_REQUIRED, ...CREATIVE_OPTIONAL.filter((r) => optional.includes(r))], autoGenerate: creativeTask?.autoGenerate, maxUsd: creativeTask?.maxUsd }, email); // the client is linked to the chosen agents of the department
   await launchCampaign(c.id);
   let startError = '';
   if (teamKey === 'creative' && creativeTask) {

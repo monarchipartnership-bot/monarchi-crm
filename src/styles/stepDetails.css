@@ -24,3 +24,8 @@
 .sd-revbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .sd-lang { height: 32px; border-radius: 8px; border: 1px solid var(--ck-ln); background: transparent; color: var(--ck-ink); font: inherit; font-size: .8rem; }
 
 .sd-hint { color: var(--ck-sec); font-size: .8rem; line-height: 1.4; max-width: 46ch; text-align: right; }
+
+.sd-pics { display: flex; flex-direction: column; gap: 10px; }
+.sd-check { display: inline-flex; align-items: center; gap: 10px; font-size: .9rem; color: var(--ck-ink); cursor: pointer; }
+.sd-limit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .88rem; color: var(--ck-ink); }
+.sd-limit input { width: 90px; height: 34px; border: 1px solid var(--ck-ln); border-radius: 8px; padding: 0 10px; background: transparent; color: var(--ck-ink); font: inherit; } .sd-limit small { color: var(--ck-sec); }

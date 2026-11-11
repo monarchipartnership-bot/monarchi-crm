@@ -121,7 +121,7 @@
 .pcd-tab em.is-warn { background: var(--ck-warn); color: #2a1a00; }
 .pcd-tab.is-on { background: rgba(235, 156, 239, .14); }
 .pcd-tab.is-on .pcd-tab-m { background: rgba(181, 68, 181, .3); box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 12px #EB9CEF; }
-.pcd-tab.is-on::after { content: ""; position: absolute; left: 14%; right: 14%; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, #EB9CEF, transparent); box-shadow: 0 0 10px #EB9CEF; }
+.pcd-tab.is-on::after { content: ""; position: absolute; left: 54px; right: 14px; bottom: 3px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 4px #EB9CEF); }
 .pcd-overlay .pcd-body { flex: 1; min-width: 0; padding: 8px 24px 28px; }
 /* the large card of the current operation */
 .pcd-hero { padding: 22px 24px; gap: 14px; }
@@ -157,7 +157,7 @@
 .opv-line { display: flex; gap: 22px; flex-wrap: wrap; border-bottom: 1px solid rgba(235, 156, 239, .2); }
 .opv-line button { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 2px; border: 0; background: none; color: var(--ck-sec); font-weight: 600; font-size: 13.5px; line-height: 1; font-family: inherit; cursor: pointer; }
 .opv-line button.is-on { color: #fff; }
-.opv-line button.is-on::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, #EB9CEF, transparent); box-shadow: 0 0 10px #EB9CEF; }
+.opv-line button.is-on::after { content: ""; position: absolute; left: -8px; right: -8px; bottom: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 4px #EB9CEF); }
 .opv-line button:focus-visible, .opv-arc:focus-visible { outline: 2px solid #F0C4F5; outline-offset: 2px; }
 .opv-line em { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; display: inline-grid; place-items: center; background: rgba(255, 255, 255, .14); color: #F6E9FA; font-style: normal; font-size: 11.5px; font-weight: 700; }
 .opv-line em.is-warn { background: var(--ck-warn); color: #2a1a00; } .opv-line em.is-bad { background: var(--ck-bad); color: #2a0a12; }
@@ -288,7 +288,7 @@
 .pcd-overlay .pcr-tabs { gap: 24px; margin: 0; border-bottom: 1px solid rgba(235, 156, 239, .2); }
 .pcd-overlay .pcr-tab { position: relative; min-height: 40px; padding: 0 2px; border: 0; border-radius: 0; background: none; color: var(--ck-sec); font-weight: 600; font-size: 13.5px; line-height: 1; font-family: inherit; }
 .pcd-overlay .pcr-tab.on { background: none; color: #fff; }
-.pcd-overlay .pcr-tab.on::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, #EB9CEF, transparent); box-shadow: 0 0 10px #EB9CEF; }
+.pcd-overlay .pcr-tab.on::after { content: ""; position: absolute; left: -8px; right: -8px; bottom: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 4px #EB9CEF); }
 .pcd-overlay .pcr-tab:focus-visible { outline: 2px solid #F0C4F5; outline-offset: 2px; }
 .pcd-overlay .pcr-tab em { background: var(--ck-warn); color: #2a1a00; } .pcd-overlay .pcr-tab em.is-plain, .pcd-overlay .pcr-tab.on em.is-plain { background: rgba(255, 255, 255, .14); color: #F6E9FA; }
 .pcd-overlay .pcr-tab.on em:not(.is-plain) { background: var(--ck-warn); color: #2a1a00; }

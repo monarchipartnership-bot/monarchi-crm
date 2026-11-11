@@ -6,7 +6,7 @@
 // parsed and checked here, and the maker's prompts become the rows of ag_creatives. Everything the outside world provides is handed in
 // (ctx.read, ctx.campaignDeps), so tests run it with stand-ins.
 import { PLATFORMS } from '../../src/lib/agents/campaignTeam.js';
-import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeRoleDef, cycleAgentFields, directionLimit } from '../../src/lib/agents/creativeTeam.js';
+import { IDEA_SOURCES, REQUEST_LANGUAGES, REQUEST_RATIOS, MATERIAL_KINDS, MAX_CONCEPTS, creativeAutoOf, creativeRoleDef, cycleAgentFields, directionLimit } from '../../src/lib/agents/creativeTeam.js';
 import { ASSET_KINDS, CTA_MODES, INPUT_FIELDS, PROFILE_FIELDS, ctaVariants, inputState } from '../../src/lib/agents/projectCreative.js';
 import { composeCreativeSystem } from '../../src/lib/agents/creativePrompts.js';
 import { isValidLanguage, languageEnglish, languageLabel, overlaySafe } from '../../src/lib/agents/languages.js';
@@ -470,8 +470,8 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     const parsed = parseCreativeMaker(raw, brief.concepts, clip(cycleSet.style || cfg.style, 600));
     const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, req.materials); // a trial run saves nothing
     const text = rows.map((c) => `**${c.concept_key} · ${c.ratio}**\n${c.prompt}`).join('\n\n');
-    // with «Генерувати одразу» on, the pictures go to Higgsfield at once (within the limit of the agent); otherwise the person starts it from the request window
-    const generation = !ctx.dryRun && (cycleSet.auto_generate === true || cfg.auto_generate) ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;
+    // the pictures go to Higgsfield at once, within the limit (the team's setting, on unless switched off; the agent's own «Генерувати одразу» counts too); what does not fit waits for the person
+    const generation = !ctx.dryRun && (cycleSet.auto_generate === true || cfg.auto_generate || creativeAutoOf(campaign).auto) ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;
     return { output: { text, summary: `Запитів до Higgsfield: ${rows.length}`, json: { creatives: parsed.creatives, notes: parsed.notes }, requestId: rid, campaignId, generation }, summary: `Запитів до Higgsfield: ${rows.length}` };
   }
   if (agent.role === 'creative_quality') {

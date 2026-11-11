@@ -28,9 +28,11 @@ export async function loadCreativeTeam(campaign, email) {
 }
 
 // The wizard (or the campaign page) decides which agents of the department work for this client: enabled false = none. → the updated campaign row.
-export async function saveCreativeSetup(campaign, { enabled = true, roles = [] }, email) {
+export async function saveCreativeSetup(campaign, { enabled = true, roles = [], autoGenerate, maxUsd }, email) {
   const chosen = enabled ? [...new Set(roles)].filter(isCreativeRole) : [];
-  const row = await updateCampaign(campaign.id, { config: { ...(campaign.config || {}), creative: { enabled: !!enabled, roles: chosen } } });
+  const prev = campaign.config?.creative || {}; // the pictures setting is kept when only the roles change
+  const creative = { ...prev, enabled: !!enabled, roles: chosen, ...(autoGenerate !== undefined ? { autoGenerate: !!autoGenerate } : {}), ...(maxUsd !== undefined ? { maxUsd: Number(maxUsd) > 0 ? Number(maxUsd) : null } : {}) };
+  const row = await updateCampaign(campaign.id, { config: { ...(campaign.config || {}), creative } });
   await setCreativeRoles(supabase, row, creativeSetupOf(row).roles, { email });
   return row;
 }

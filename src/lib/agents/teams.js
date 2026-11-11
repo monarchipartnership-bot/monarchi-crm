@@ -130,8 +130,8 @@ export function estimateMonthly(teamKey, plan = []) {
   if (teamKey === 'reports') return { usd: 1.2, text: 'тижневі й місячні звіти: приблизно 4 тижневих і 1 місячний на місяць' };
   if (teamKey === 'creative') {
     const runs = runsPerMonth(plan[0]?.schedule);
-    if (runs) return { usd: Math.round(runs * 0.3 * 100) / 100, runs: Math.round(runs), text: `приблизно ${Math.round(runs)} запусків на місяць за розкладом (≈ $0.3 за запуск агентів); картинки Higgsfield окремо, після підтвердження ціни` };
-    return { usd: 0, text: 'залежить від кількості запусків: кожен коштує за виклики агентів приблизно $0.5–1, картинки Higgsfield окремо, після підтвердження ціни' };
+    if (runs) return { usd: Math.round(runs * 0.3 * 100) / 100, runs: Math.round(runs), text: `приблизно ${Math.round(runs)} запусків на місяць за розкладом (≈ $0.3 за запуск агентів); картинки Higgsfield (≈ $0.2 за штуку) окремо, в межах ліміту на завдання` };
+    return { usd: 0, text: 'залежить від кількості запусків: кожен коштує за виклики агентів приблизно $0.5–1, картинки Higgsfield (≈ $0.2 за штуку) окремо, в межах ліміту на завдання' };
   }
   const own = plan.filter((p) => p.schedule && p.enabled !== false);
   const base = own.reduce((s, p) => s + runsPerMonth(p.schedule), 0);

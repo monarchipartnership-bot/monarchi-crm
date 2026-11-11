@@ -8,6 +8,7 @@
 // The generator is handed in (ctx.hfImage; the real one when its keys and model are set on the server), so tests run it with a stand-in.
 import * as hfReal from './hfImage.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
+import { creativeAutoOf } from '../../src/lib/agents/creativeTeam.js';
 
 export const DEFAULT_LIMIT_USD = 3;
 const STALE_MS = 40 * 60 * 1000; // a picture that is still «producing» after this long is given up
@@ -40,7 +41,8 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
   if (!estimateOnly && (await cappedCampaigns(db)).has(String(req.campaign_id))) return { ok: false, capped: true, error: CAP_MESSAGE }; // the pictures cost real money: not over the cap
   // the cycle may carry its own limit (the form of the cycle, «Агент креативщик»); otherwise the limit of the agent
   const cycleMax = Number(req.brief?.agent_settings?.creative_maker?.max_usd);
-  const limit = cycleMax > 0 ? cycleMax : limitOf(await makerConfig(db));
+  const teamMax = creativeAutoOf((await db.from('ag_campaigns').select('config').eq('id', req.campaign_id).maybeSingle()).data).maxUsd; // the limit of one task of the team
+  const limit = cycleMax > 0 ? cycleMax : teamMax || limitOf(await makerConfig(db));
   const rows = must(await db.from('ag_creatives').select('*').eq('request_id', requestId).order('id', { ascending: true }), 'creatives') || [];
   const want = ids ? rows.filter((r) => ids.includes(r.id) && r.status !== 'producing') : rows.filter((r) => ['planned', 'failed'].includes(r.status));
   let spent = round(rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0)); // what this request already cost (a picture made again adds to its earlier price)

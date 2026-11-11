@@ -243,8 +243,8 @@
 .constellation-page.is-map-light .constellation-section-tab.active { background: rgba(102, 20, 102, .08); }
 .constellation-page .constellation-section-tab.active .cst-ico { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 12px rgba(181, 68, 181, .3); color: #fff; background: rgba(181, 68, 181, .3); }
 .constellation-page.is-map-light .constellation-section-tab.active .cst-ico { color: #661466; box-shadow: inset 0 0 0 1.5px #b544b5, 0 0 10px rgba(181, 68, 181, .35); background: #f1dcf5; }
-.constellation-page .constellation-section-tab.active::after { content: ""; position: absolute; left: 16%; right: 16%; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, #EB9CEF, transparent); box-shadow: 0 0 10px #EB9CEF; }
-.constellation-page.is-map-light .constellation-section-tab.active::after { background: linear-gradient(90deg, transparent, #b544b5, transparent); box-shadow: 0 0 8px #b544b5; }
+.constellation-page .constellation-section-tab.active::after { content: ""; position: absolute; left: 56px; right: 18px; bottom: 3px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 4px #EB9CEF); }
+.constellation-page.is-map-light .constellation-section-tab.active::after { background: linear-gradient(90deg, transparent, #b544b5 25%, #b544b5 75%, transparent); filter: drop-shadow(0 0 4px #b544b5); box-shadow: none; }
 /* a narrow window: only the active item keeps its label */
 .constellation-page.is-compact .constellation-section-nav { height: 48px; }
 .constellation-page.is-compact .constellation-section-tab { padding: 0 7px; gap: 0; }
