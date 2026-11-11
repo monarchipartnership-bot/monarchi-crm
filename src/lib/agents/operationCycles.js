@@ -36,7 +36,11 @@ export const conflictMessage = (other) => `У цього проєкту вже �
 // (an older task keeps one `weekday`: it is read as weekdays [weekday])
 // An operation may have several of them (owner, 2026-11-11), each with its own day, time and parameters; an older operation keeps one in campaign.config.regular
 // and it is read as the cycle 'r1'. The operation gets its first regular cycle when it is created (the form opens at once).
-export const MAX_REGULARS = 5;
+export const MAX_REGULARS = 8; // the ones whose season is over do not count
+// A SEASONAL task (owner, 2026-11-12) is a regular task for a period: `seasonal`, `startDate` .. `endDate` (a Kyiv day each), and `replaces`: the ids of the main regular tasks that rest
+// while it lasts (the question «призупинити основне чи паралельно» is asked when it is made). Nothing is switched off and on: the rule is read at every run, so the main task
+// comes back by itself the day after `endDate`.
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // input: { id?, enabled, weekday, time, brief: the fields of the request form }; prev: what is saved for this id. Throws a message the person can read.
 export function cleanRegular(input = {}, { by = null, now = new Date(), prev = null } = {}) {
   const every = input.everyDays != null && input.everyDays !== '' && !input.weekday && !(Array.isArray(input.weekdays) && input.weekdays.length);
@@ -47,23 +51,31 @@ export function cleanRegular(input = {}, { by = null, now = new Date(), prev = n
   }
   const schedule = cleanSchedule(every ? { everyDays: input.everyDays, time: input.time } : { weekday: days[0], time: input.time });
   if (days) days.forEach((d) => cleanSchedule({ weekday: d, time: schedule.time })); // every day is checked
-  const startDate = every && /^\d{4}-\d{2}-\d{2}$/.test(String(input.startDate || '')) ? input.startDate : null;
+  // what an edit that does not mention these keeps as it was (the form of the regular task knows only the schedule and the brief)
+  const startDate = DATE.test(String(input.startDate || '')) ? input.startDate : input.startDate === undefined && prev ? prev.startDate || null : null;
+  const endDate = DATE.test(String(input.endDate || '')) ? input.endDate : input.endDate === undefined && prev ? prev.endDate || null : null;
+  const seasonal = input.seasonal === undefined ? !!prev?.seasonal : !!input.seasonal;
+  if (seasonal && !endDate) throw new Error('Вкажіть, до якої дати триває сезон.');
+  if (startDate && endDate && endDate < startDate) throw new Error('Кінець періоду раніше за його початок.');
+  const replaces = input.replaces === undefined ? (prev?.replaces || []) : [...new Set((Array.isArray(input.replaces) ? input.replaces : []).map(String).filter((x) => /^r[a-z0-9]{1,20}$/.test(x)))];
   const raw = { ...(input.brief || {}) };
   if (raw.texts === 'given') raw.texts = 'yes'; // the same ready texts every week make no sense: the copywriter writes new ones
-  const { title, brief } = cleanRequest({ ...raw, given_texts: [], materials: [], kind: 'regular', scheduled_for: '' });
+  const { title: derived, brief } = cleanRequest({ ...raw, given_texts: [], materials: [], kind: 'regular', scheduled_for: '' });
+  const own = input.title !== undefined ? String(input.title).replace(/\s+/g, ' ').trim().slice(0, 100) : '';
+  const title = own || (seasonal && prev?.title ? prev.title : derived);
   const enabled = input.enabled !== false;
   // the schedule counts from the moment it was switched on or moved: a run for a moment before that never starts
   const prevDays = prev ? (Array.isArray(prev.weekdays) && prev.weekdays.length ? prev.weekdays : prev.weekday ? [prev.weekday] : []).map(Number).join() : '';
-  const moved = !prev || !prev.enabled || prevDays !== (days || []).join() || Number(prev.everyDays || 0) !== Number(schedule.everyDays || 0) || prev.time !== schedule.time || (prev.startDate || null) !== startDate;
+  const moved = !prev || !prev.enabled || prevDays !== (days || []).join() || Number(prev.everyDays || 0) !== Number(schedule.everyDays || 0) || prev.time !== schedule.time || (prev.startDate || null) !== startDate || (prev.endDate || null) !== endDate;
   // «every N days» with a first day: the schedule starts at that day's time (a day that already passed means from now)
   const sinceAt = startDate ? new Date(Math.max(now.getTime(), kyivInstant(startDate, schedule.time).getTime() - 1)) : now;
   const id = prev?.id || (/^r[a-z0-9]{1,20}$/.test(String(input.id || '')) ? input.id : `r${now.getTime().toString(36)}`);
-  return { id, enabled, weekdays: days, weekday: null, everyDays: schedule.everyDays || null, startDate, time: schedule.time, title, brief, since: enabled ? (moved ? sinceAt.toISOString() : prev.since || now.toISOString()) : null, updated_by: by, updated_at: now.toISOString() };
+  return { id, enabled, weekdays: days, weekday: null, everyDays: schedule.everyDays || null, startDate, endDate, seasonal, replaces, time: schedule.time, title, brief, since: enabled ? (moved ? sinceAt.toISOString() : prev.since || now.toISOString()) : null, updated_by: by, updated_at: now.toISOString() };
 }
 
 const daysOf = (r) => (Array.isArray(r.weekdays) && r.weekdays.length ? r.weekdays : r.weekday ? [r.weekday] : []).map(Number).filter((d) => d >= 1 && d <= 7);
 const validRegular = (r) => !!r && typeof r === 'object' && (daysOf(r).length > 0 || Number(r.everyDays) >= 1) && !!String(r.brief?.goal || '').trim();
-const normRegular = (r, i) => ({ id: r.id || (i === 0 ? 'r1' : `r${i + 1}`), enabled: r.enabled !== false, weekdays: daysOf(r), weekday: daysOf(r)[0] || null, everyDays: Number(r.everyDays) || null, startDate: r.startDate || null, time: r.time || '09:00', title: r.title || clip(r.brief.goal, 60), brief: r.brief, since: r.since || null, updatedAt: r.updated_at || null });
+const normRegular = (r, i) => ({ id: r.id || (i === 0 ? 'r1' : `r${i + 1}`), enabled: r.enabled !== false, weekdays: daysOf(r), weekday: daysOf(r)[0] || null, everyDays: Number(r.everyDays) || null, startDate: r.startDate || null, endDate: r.endDate || null, seasonal: !!r.seasonal, replaces: Array.isArray(r.replaces) ? r.replaces : [], time: r.time || '09:00', title: r.title || clip(r.brief.goal, 60), brief: r.brief, since: r.since || null, updatedAt: r.updated_at || null });
 // the saved regular cycles of an operation, in the order they were made (raw rows: lib/api/operationCycles.js keeps the same rule)
 export const rawRegulars = (campaign) => { const cfg = campaign?.config || {}; return Array.isArray(cfg.regulars) ? cfg.regulars : cfg.regular ? [{ ...cfg.regular, id: cfg.regular.id || 'r1' }] : []; };
 export const regularsOf = (campaign) => rawRegulars(campaign).filter(validRegular).map(normRegular);
@@ -75,6 +87,14 @@ export const kyivToday = (now = new Date()) => lastInterval({ time: '00:00' }, n
 // the days a regular task has already been served: the days its requests were made for (the first run «now» counts as today)
 const servedDays = (requests, campaign, regular) => requests.filter((q) => q.campaign_id === campaign.id && (q.brief?.regular_id || 'r1') === regular.id && q.brief?.scheduled_for).map((q) => q.brief.scheduled_for).sort();
 
+// the seasonal task that makes this one rest now (its period holds today and it names this one in `replaces`), or null
+export function pausedBySeason(campaign, regular, now = new Date()) {
+  const today = kyivToday(now);
+  return regularsOf(campaign).find((o) => o.enabled && o.seasonal && o.id !== regular.id && o.replaces.includes(regular.id) && (!o.startDate || today >= o.startDate) && (!o.endDate || today <= o.endDate)) || null;
+}
+// the season is over (its last day has passed)
+export const seasonOver = (r, now = new Date()) => !!(r?.seasonal && r.endDate && kyivToday(now) > r.endDate);
+
 // Is this regular cycle due now? requests: the requests of the operation (at least the recent ones); regular: one of regularsOf (the first by default).
 // → { due, scheduledFor?: 'YYYY-MM-DD', reason }. The request made for a day and a cycle is the record that the day was served, so a run never repeats.
 export function regularDue({ campaign, regular = null, requests = [], now = new Date() }) {
@@ -82,6 +102,10 @@ export function regularDue({ campaign, regular = null, requests = [], now = new 
   if (!r) return { due: false, reason: 'не налаштовано' };
   if (!r.enabled) return { due: false, reason: 'вимкнено' };
   if (campaign.status !== 'active') return { due: false, reason: 'операція не працює' };
+  const today = kyivToday(now);
+  if (r.endDate && today > r.endDate) return { due: false, reason: 'сезон завершено' };
+  const rest = pausedBySeason(campaign, r, now);
+  if (rest) return { due: false, reason: `замінено сезонним «${rest.title}»` };
   if (r.everyDays) { // every N days: counted from the last served day
     const s = lastInterval({ time: r.time }, now);
     if (!r.since || s.at < new Date(r.since)) return { due: false, reason: 'запланований момент був до вмикання', scheduledFor: s.date };

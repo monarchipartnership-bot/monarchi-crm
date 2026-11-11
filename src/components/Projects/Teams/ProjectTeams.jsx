@@ -5,6 +5,9 @@ import { fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { deleteTeam, fetchTeamsData, setTeamRunning } from '../../../lib/api/teams';
 import { useConfirm } from '../../common/ConfirmDialog';
 import { teamsOf } from '../../../lib/agents/teams';
+import { describeRegular, kyivToday, pausedBySeason, regularsOf, seasonOver } from '../../../lib/agents/operationCycles';
+import { dayMonthOf } from '../../../lib/agents/scheduleCalendar';
+import { removeRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
 import OperationCard from '../../../pages/Tools/cockpit/OperationCard';
 import { fmtDateTime } from '../../../pages/Smm/agentUi';
 import { HubTitle } from '../hubIcons';
@@ -65,6 +68,18 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
     try { await deleteTeam(team, email); say(`Команду «${team.def.title}» видалено.`); await Promise.all([load(), cockpit.reload?.()]); } catch (e) { say(e?.message || 'Не вдалося видалити команду.', true); } finally { setBusy(''); }
   }
 
+  // the seasonal tasks of the creative team (a season that is over is not shown here) and what they do to the main regular task
+  const creativeCampaign = view?.teams.find((t) => t.key === 'creative')?.campaign || null;
+  const seasons = creativeCampaign ? regularsOf(creativeCampaign).filter((r) => r.seasonal && !seasonOver(r)) : [];
+  async function seasonAction(r, kind) {
+    if (kind === 'remove' && !(await confirm({ title: `Видалити сезонне завдання «${r.title}»?`, body: 'Воно більше не запускатиметься, а основне регулярне завдання повернеться до роботи. Уже зроблені за ним креативи лишаться.', confirmLabel: 'Видалити' }))) return;
+    setBusy('season:' + r.id);
+    try {
+      if (kind === 'remove') { await removeRegular(creativeCampaign.id, r.id); say(`Сезонне завдання «${r.title}» видалено.`); }
+      else { await setRegularEnabled(creativeCampaign.id, r.id, kind === 'resume', email); say(kind === 'resume' ? `Сезонне завдання «${r.title}» продовжено.` : `Сезонне завдання «${r.title}» зупинено.`); }
+      await Promise.all([load(), cockpit.reload?.()]);
+    } catch (e) { say(e?.message || 'Не вдалося виконати.', true); } finally { setBusy(''); }
+  }
   const runningTeams = view ? view.teams.filter((t) => t.state !== 'none') : [];
   const empty = view && !runningTeams.length && !view.legacy.length;
   const project = data?.project ? { id: data.project.id, name: data.project.name, client: data.project.client } : null;
@@ -78,6 +93,9 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       return [[w, m].filter(Boolean).join(' · ') || 'розклад не задано', t.agent?.last_run_at ? `останній запуск ${fmtDateTime(t.agent.last_run_at)}` : 'ще не запускалась'];
     }
     const ctl = control[t.campaign.id];
+    // the main regular task rests while a season replaces it: said on the card of the team
+    const rest = t.key === 'creative' ? regularsOf(t.campaign).filter((r) => r.enabled && !r.seasonal).map((r) => pausedBySeason(t.campaign, r)).filter(Boolean)[0] : null;
+    if (rest && t.state === 'running') return ['агентів працює: за запитом', `основне завдання на паузі до ${dayMonthOf(rest.endDate)}: сезонне «${rest.title}»`];
     const on = (ctl?.agents || []).filter((a) => a.mode !== 'paused');
     const nextAt = on.map((a) => a.nextAt).filter(Boolean).sort()[0];
     const last = on.map((a) => a.lastRunAt).filter(Boolean).sort().pop();
@@ -124,13 +142,31 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
               </article>
             );
           })}
+          {seasons.map((r) => {
+            const today = kyivToday();
+            const waiting = r.startDate && today < r.startDate;
+            const [label, tone] = !r.enabled ? ['зупинено', 'is-wait'] : waiting ? [`почнеться ${dayMonthOf(r.startDate)}`, 'is-wait'] : ['працює', 'is-ok'];
+            return (
+              <article key={'s' + r.id} className={'tm-team tm-season is-' + (r.enabled ? 'running' : 'paused')}>
+                <div className="tm-team-main">
+                  <div className="tm-team-title"><b>Сезонне: {r.title}</b><span className={'pcr-state ' + tone}>{label}</span></div>
+                  <small>{[r.startDate ? `${dayMonthOf(r.startDate)} – ${dayMonthOf(r.endDate)}` : `до ${dayMonthOf(r.endDate)}`, describeRegular(r)].filter(Boolean).join(' · ')}</small>
+                  <small>{r.replaces.length ? 'основне регулярне завдання на ці дати на паузі' : 'працює паралельно з основним'}</small>
+                </div>
+                <div className="tm-team-acts">
+                  <button type="button" className="btn" disabled={busy === 'season:' + r.id} onClick={() => seasonAction(r, r.enabled ? 'stop' : 'resume')}>{r.enabled ? 'Зупинити' : 'Продовжити'}</button>
+                  <button type="button" className="btn" disabled={busy === 'season:' + r.id} onClick={() => seasonAction(r, 'remove')}>Видалити</button>
+                </div>
+              </article>
+            );
+          })}
           {view?.legacy.map((l) => (
             <article key={'l' + l.campaign.id} className={'tm-team tm-legacy is-' + l.state}>
               <div className="tm-team-main"><b>{l.campaign.name}</b><span className="pcr-state is-wait">стара операція · {l.label}</span><small>Запущена за старою схемою: працює як працювала, відкрийте, щоб побачити роботу.</small></div>
               <div className="tm-team-acts"><button type="button" className="btn" onClick={() => setOpen({ campaignId: l.campaign.id, regularFirst: false })}>Відкрити</button></div>
             </article>
           ))}
-          {!empty && view && <div className="tm-add"><button type="button" className="btn" onClick={() => setOneoff(true)}>Разове завдання</button><button type="button" className="btn btn-p" onClick={() => setWizard(true)}>+ Запустити команду</button></div>}
+          {!empty && view && <div className="tm-add"><button type="button" className="btn" onClick={() => setOneoff(true)}>Додаткове завдання</button><button type="button" className="btn btn-p" onClick={() => setWizard(true)}>+ Запустити команду</button></div>}
         </div>
       </section>
 
@@ -146,12 +182,12 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       )}
       {oneoff && data && view && (
         <OneOffDialog data={data} view={view} email={email} onClose={() => setOneoff(false)}
-          onNewCreative={() => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setCreativeTask(c); }}
+          onNewCreative={({ seasonal }) => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setCreativeTask({ campaign: c, seasonal: !!seasonal }); }}
           onOpenReports={() => { setOneoff(false); onOpenReports?.(); }} onOpenMaterials={() => { setOneoff(false); onOpenMaterials?.(); }}
           onGoFill={(section) => { setOneoff(false); onGoFill?.(section); }} />
       )}
       {creativeTask && data && (
-        <OneOffCreativeDialog data={data} campaign={creativeTask} email={email} onClose={() => setCreativeTask(null)}
+        <OneOffCreativeDialog key={creativeTask.seasonal ? 's' : 'o'} data={data} campaign={creativeTask.campaign} seasonal={creativeTask.seasonal} email={email} onClose={() => setCreativeTask(null)}
           onCreated={(text) => { setCreativeTask(null); say(text); load(); cockpit.reload?.(); }} />
       )}
       {card && data && view?.teams.find((x) => x.key === card && x.campaign) && (

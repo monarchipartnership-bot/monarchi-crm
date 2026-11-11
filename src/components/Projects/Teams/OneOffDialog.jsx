@@ -4,9 +4,9 @@ import { runOneOff } from '../../../lib/api/oneoff';
 import { FIELD_LABELS, filledFields, missingFor } from '../../../lib/agents/agentRequirements';
 import { ONEOFF, whereToFill } from '../../../lib/agents/teams';
 
-// «Разове завдання» (owner, 2026-11-11): work that a person asks for any time, outside the teams that work by their schedules. Creatives and the report of a period go to the screens
+// «Додаткове завдання» (owner, 2026-11-11; renamed 2026-11-12, it holds the one-off and the seasonal ones): work that a person asks for any time, outside the teams that work by their schedules. Creatives and the report of a period go to the screens
 // that already do them; the research and the strategy run at once and the result lands in «Готові матеріали».
-//   data: fetchTeamsData result   view: teamsOf result   onNewCreative(): opens the form of a new creative task   onOpenReports(), onOpenMaterials(): switch the tab
+//   data: fetchTeamsData result   view: teamsOf result   onNewCreative({ seasonal }): opens the window of a new creative task   onOpenReports(), onOpenMaterials(): switch the tab
 //   onGoFill(section): opens that section of the card of the project
 export default function OneOffDialog({ data, view, email, onClose, onNewCreative, onOpenReports, onOpenMaterials, onGoFill }) {
   const box = useRef(null);
@@ -28,14 +28,18 @@ export default function OneOffDialog({ data, view, email, onClose, onNewCreative
   return (
     <div className="tm-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div ref={box} className="tm-win" role="dialog" aria-modal="true" aria-labelledby="oo-title" tabIndex={-1}>
-        <header className="tm-head"><h2 id="oo-title">Разове завдання</h2><button type="button" className="tm-x" onClick={onClose} disabled={!!busy} aria-label="Закрити">×</button></header>
+        <header className="tm-head"><h2 id="oo-title">Додаткове завдання</h2><button type="button" className="tm-x" onClick={onClose} disabled={!!busy} aria-label="Закрити">×</button></header>
         <div className="tm-body">
           <p className="tm-lead">Робота, яку можна замовити в будь-який момент, незалежно від команд, що працюють за розкладом. Результат з&apos;являється в «Історії проєкту» та «Готових матеріалах».</p>
 
           <ul className="oo-list">
             <li className="oo-row">
-              <div><b>Креативи</b><small>{creativeTeam?.state !== 'none' ? 'Опишіть задачу: агенти заплановують, напишуть і намалюють, ви перевірите результат.' : 'Спершу запустіть команду «Креативи»: вона підключає клієнта до відділу креативів.'}</small></div>
-              <button type="button" className="btn btn-p" disabled={creativeTeam?.state === 'none'} onClick={onNewCreative}>Створити завдання</button>
+              <div><b>Креативи · один раз</b><small>{creativeTeam?.state !== 'none' ? 'Окреме завдання: агенти заплановують, напишуть і намалюють, ви перевірите результат.' : 'Спершу запустіть команду «Креативи»: вона підключає клієнта до відділу креативів.'}</small></div>
+              <button type="button" className="btn btn-p" disabled={creativeTeam?.state === 'none'} onClick={() => onNewCreative({ seasonal: false })}>Створити завдання</button>
+            </li>
+            <li className="oo-row">
+              <div><b>Креативи · сезонне, на період</b><small>Наприклад, новорічні свята чи розпродаж: завдання з датами початку й кінця. Основне регулярне завдання на цей час можна призупинити або залишити паралельно.</small></div>
+              <button type="button" className="btn" disabled={creativeTeam?.state === 'none'} onClick={() => onNewCreative({ seasonal: true })}>Створити сезонне</button>
             </li>
             <li className="oo-row">
               <div><b>Звіт за період</b><small>Зібрати звіт за будь-який період у конструкторі звіту: поряд із тим, що агент робить щотижня й щомісяця.</small></div>

@@ -49,7 +49,7 @@ import { LANGUAGES, isValidLanguage, languageEnglish, languageLabel, languageOpt
 import { creativeLockedText } from '../src/lib/agents/creativePrompts.js';
 import { endTime, monthCells, previewRuns, weekdayOf, windowText } from '../src/lib/agents/scheduleCalendar.js';
 import { ONEOFF, describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
-import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
+import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, pausedBySeason, seasonOver, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
 import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
@@ -4344,6 +4344,9 @@ await ok('schedule calendar: the time is a range, the coming runs of both modes,
   assert.deepEqual(previewRuns({ mode: 'every', every: 3, start: '2026-11-01' }, '2026-11-12', 7), ['2026-11-12', '2026-11-15', '2026-11-18']); // a past first day means from today
   assert.deepEqual(previewRuns({ mode: 'week', days: [1, 3, 5] }, '2026-11-12', 6), ['2026-11-13', '2026-11-16', '2026-11-18']);
   assert.deepEqual(previewRuns({ mode: 'week', days: [] }, '2026-11-12'), []);
+  // a season: nothing after its last day, a later first day is where the days of the week begin
+  assert.deepEqual(previewRuns({ mode: 'every', every: 3, start: '2026-12-15', end: '2026-12-22' }, '2026-11-12', 120), ['2026-12-15', '2026-12-18', '2026-12-21']);
+  assert.deepEqual(previewRuns({ mode: 'week', days: [1, 4], start: '2026-12-14', end: '2026-12-20' }, '2026-11-12', 120), ['2026-12-14', '2026-12-17']);
   const nov = monthCells(2026, 10);
   assert.equal(nov.filter((c) => c.date).length, 30); assert.equal(nov.findIndex((c) => c.date === '2026-11-01'), 6); // 1 November 2026 is a Sunday: six empty cells in front
 });
@@ -4458,6 +4461,34 @@ await ok('markets of a project: the chosen countries become one short text and a
   assert.deepEqual(parseMarkets('США, English', countries), ['US']); // the short name of a country
   assert.deepEqual(parseMarkets('English only', countries), []); // a free text that names no country of the list
   assert.deepEqual(parseMarkets('', countries), []);
+});
+
+await ok('seasonal task: a regular task for a period; it ends by itself, the main task rests while it lasts and comes back the day after, nothing is switched on or off', () => {
+  const main = cleanRegular({ weekdays: [1], time: '09:00', brief: { goal: 'Основне' } }, { now: new Date('2026-12-01T08:00:00Z') });
+  const mainId = main.id;
+  const season = cleanRegular({ seasonal: true, title: '  Новий рік  ', everyDays: 3, time: '09:00', startDate: '2026-12-15', endDate: '2026-12-31', replaces: [mainId, 'bad id', mainId], brief: { goal: 'Новорічний стиль' } }, { now: new Date('2026-12-01T08:00:05Z') }); // another moment: the id comes from it
+  assert.deepEqual([season.seasonal, season.title, season.startDate, season.endDate, season.replaces], [true, 'Новий рік', '2026-12-15', '2026-12-31', [mainId]]);
+  assert.throws(() => cleanRegular({ seasonal: true, everyDays: 3, time: '09:00', brief: { goal: 'x' } }), /до якої дати/);
+  assert.throws(() => cleanRegular({ seasonal: true, everyDays: 3, startDate: '2026-12-20', endDate: '2026-12-10', time: '09:00', brief: { goal: 'x' } }), /раніше/);
+  const campaign = { id: 5, status: 'active', config: { regulars: [{ ...main, since: '2026-11-01T00:00:00Z' }, season] } };
+  const mr = regularsOf(campaign).find((r) => r.id === mainId);
+  const sr = regularsOf(campaign).find((r) => r.seasonal);
+  assert.equal(regularDue({ campaign, regular: mr, requests: [], now: new Date('2026-12-14T08:00:00Z') }).due, true); // Monday 14 Dec 10:00 Kyiv: before the season
+  assert.match(regularDue({ campaign, regular: mr, requests: [], now: new Date('2026-12-21T08:00:00Z') }).reason, /замінено сезонним «Новий рік»/); // Monday 21 Dec: the main rests
+  assert.equal(pausedBySeason(campaign, mr, new Date('2026-12-21T08:00:00Z')).id, sr.id);
+  assert.equal(pausedBySeason(campaign, mr, new Date('2027-01-04T08:00:00Z')), null); // after the season the main is back
+  assert.equal(regularDue({ campaign, regular: mr, requests: [], now: new Date('2027-01-04T08:00:00Z') }).due, true); // Monday 4 Jan 10:00 Kyiv
+  assert.equal(regularDue({ campaign, regular: sr, requests: [], now: new Date('2026-12-14T08:00:00Z') }).due, false); // the season has not begun
+  assert.equal(regularDue({ campaign, regular: sr, requests: [], now: new Date('2026-12-15T08:00:00Z') }).due, true); // the first day, 10:00 Kyiv
+  assert.match(regularDue({ campaign, regular: sr, requests: [], now: new Date('2027-01-02T08:00:00Z') }).reason, /сезон завершено/);
+  assert.deepEqual([seasonOver(sr, new Date('2026-12-31T20:00:00Z')), seasonOver(sr, new Date('2027-01-01T08:00:00Z')), seasonOver(mr)], [false, true, false]); // 31 Dec 22:00 Kyiv is still the season
+  // parallel: nothing is named in `replaces`, the main task keeps working
+  const par = cleanRegular({ seasonal: true, title: 'Хелловін', everyDays: 2, time: '09:00', startDate: '2026-12-15', endDate: '2026-12-31', brief: { goal: 'x' } }, { now: new Date('2026-12-01T08:00:09Z') });
+  const camp2 = { id: 6, status: 'active', config: { regulars: [{ ...main, since: '2026-11-01T00:00:00Z' }, par] } };
+  assert.equal(regularDue({ campaign: camp2, regular: regularsOf(camp2).find((r) => r.id === mainId), requests: [], now: new Date('2026-12-21T08:00:00Z') }).due, true);
+  // an edit that does not mention the season keeps it
+  const edited = cleanRegular({ id: season.id, enabled: true, everyDays: 3, time: '09:00', brief: { goal: 'Новорічний стиль, золото' } }, { prev: season });
+  assert.deepEqual([edited.seasonal, edited.title, edited.endDate, edited.startDate, edited.replaces], [true, 'Новий рік', '2026-12-31', '2026-12-15', [mainId]]);
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {

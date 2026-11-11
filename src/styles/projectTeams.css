@@ -136,3 +136,9 @@
 
 .tm-lang { font-size: .95rem; font-weight: 700; }
 .tm-sel.tm-text { width: 100%; height: 40px; }
+
+/* the seasonal tasks of the creative team and the question about the main one */
+.tm-team.tm-season { background: #F6EEF8; border-color: #E4C3EB; }
+.tm-stance { display: flex; flex-direction: column; gap: 8px; }
+.tm-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; font-weight: 400; }
+.tm-opt.on { border-color: #B544B5; background: #FBF0FC; } .tm-opt b { font-weight: 700; display: block; } .tm-opt small { color: var(--muted); font-size: .8rem; line-height: 1.45; }

@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { MAX_REGULARS, cleanRegular, kyivToday, rawRegulars, regularRequest } from '../agents/operationCycles';
+import { MAX_REGULARS, cleanRegular, kyivToday, rawRegulars, regularRequest, regularsOf, seasonOver } from '../agents/operationCycles';
 import { createRequest, startRequest } from './creatives';
 
 // The cycles of an operation (lib/agents/operationCycles.js): the regular ones are kept in the operation itself (config.regulars), an extra one is a request.
@@ -22,10 +22,18 @@ export async function saveRegular(campaignId, input, email = null) {
   const row = await readRow(campaignId);
   const list = rawRegulars(row);
   const prev = input.id ? list.find((r) => r.id === input.id) || null : null;
-  if (!prev && list.length >= MAX_REGULARS) throw new Error(`Регулярних завдань в операції може бути не більше ${MAX_REGULARS}.`);
+  const live = regularsOf({ config: { regulars: list } }).filter((r) => !seasonOver(r)).length; // a season that is over does not count
+  if (!prev && live >= MAX_REGULARS) throw new Error(`Регулярних завдань в операції може бути не більше ${MAX_REGULARS}.`);
   const regular = cleanRegular(input, { by: email, prev });
   const campaign = await writeRegulars(row, prev ? list.map((r) => (r.id === regular.id ? regular : r)) : [...list, regular]);
   return { campaign, regular };
+}
+
+// A seasonal task: a regular one for a period; `replaces` = the ids of the main tasks that rest while it lasts. → { campaign, regular }; startNow: the first run at once
+export async function createSeasonal(campaign, { title, brief, schedule, startDate, endDate, replaces = [], startNow = false }, email = null) {
+  const out = await saveRegular(campaign.id, { enabled: true, seasonal: true, title, ...schedule, startDate, endDate, replaces, brief }, email);
+  if (startNow) await runRegularNow(out.campaign, out.regular, email);
+  return out;
 }
 
 // A regular cycle is switched on or off without touching its parameters.

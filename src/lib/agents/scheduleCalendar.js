@@ -19,17 +19,19 @@ export function endTime(time, minutes = WINDOW_MINUTES) {
 // → «з 09:00 до 09:30»
 export const windowText = (time, minutes = WINDOW_MINUTES) => `з ${String(time || '09:00').slice(0, 5)} до ${endTime(time, minutes)}`;
 
-// The days the schedule starts a run, from today on. value: { mode: 'every' | 'week', every, days: [1..7], start: 'YYYY-MM-DD' }
+// The days the schedule starts a run, from today on. value: { mode: 'every' | 'week', every, days: [1..7], start: 'YYYY-MM-DD', end?: the last day of a season }
 export function previewRuns(value, today, horizon = 62) {
+  const last = value.end && value.end < addDays(today, horizon) ? value.end : addDays(today, horizon);
   const out = [];
   if (value.mode === 'every') {
     const n = Math.max(1, Math.round(Number(value.every)) || 1);
     let d = value.start && value.start >= today ? value.start : today;
-    for (let i = 0; i < 100 && d <= addDays(today, horizon); i += 1) { out.push(d); d = addDays(d, n); }
+    for (let i = 0; i < 100 && d <= last; i += 1) { out.push(d); d = addDays(d, n); }
     return out;
   }
   const days = new Set((value.days || []).map(Number));
-  for (let i = 0; i <= horizon; i += 1) { const d = addDays(today, i); if (days.has(weekdayOf(d))) out.push(d); }
+  const from = value.start && value.start > today ? value.start : today; // a season that begins later starts from its first day
+  for (let i = 0; i <= 400; i += 1) { const d = addDays(from, i); if (d > last) break; if (days.has(weekdayOf(d))) out.push(d); }
   return out;
 }
 
