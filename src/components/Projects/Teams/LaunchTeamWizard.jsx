@@ -223,7 +223,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
 
               {tab === 'creative' && (
                 <>
-                  <p className="tm-hint">Креативи працюють циклами: після запуску ви одразу опишете перший цикл (регулярний або разовий). Обовʼязкові агенти працюють завжди, решту можна вимкнути.</p>
+                  <p className="tm-hint">Креативи працюють завданнями: після запуску ви одразу опишете перше завдання (регулярний або разовий). Обовʼязкові агенти працюють завжди, решту можна вимкнути.</p>
                   <ul className="tm-agents">
                     {plans.creative.plan.map((a) => (
                       <li key={a.role} className={'tm-agent' + (a.optional && !plans.creative.optional.has(a.role) ? ' is-off' : '')}>
@@ -231,7 +231,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                           <input type="checkbox" checked={!a.optional || plans.creative.optional.has(a.role)} disabled={!a.optional} onChange={(e) => patchPlan('creative', { optional: (() => { const n = new Set(plans.creative.optional); if (e.target.checked) n.add(a.role); else n.delete(a.role); return n; })() })} aria-label={a.name} />
                           <span><b>{a.name}</b><small>{a.short}{a.required ? ' · обовʼязковий' : ''}</small></span>
                         </label>
-                        <span className="tm-when">{a.shared ? `за загальним розкладом відділу: ${describePlanSchedule(a.schedule)}` : 'працює за запитом на цикл'}</span>
+                        <span className="tm-when">{a.shared ? `за загальним розкладом відділу: ${describePlanSchedule(a.schedule)}` : 'працює за запитом на завдання'}</span>
                       </li>
                     ))}
                   </ul>
@@ -268,7 +268,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                     <h3>{def.title}</h3>
                     <ul>
                       {k === 'analytics' && p.rows.filter((r) => r.enabled).map((r) => <li key={r.role}><b>{r.name}</b>: {r.runsAfter ? 'після агентів, від яких залежить' : describePlanSchedule(rowSchedule(r)) || 'лише вручну'}</li>)}
-                      {k === 'creative' && <li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}. Перший цикл ви опишете одразу після запуску.</li>}
+                      {k === 'creative' && <li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}. Перше завдання ви опишете одразу після запуску.</li>}
                       {k === 'reports' && <>{p.weekly && <li>Тижневий звіт: {WEEKDAYS[p.weekday - 1]} о {p.time}</li>}{p.monthly && <li>Місячний звіт: {p.mday}-го числа о {p.mtime}</li>}{p.presentation && <li>Презентації для клієнта</li>}</>}
                     </ul>
                     <p className="tm-est">{k === 'creative' ? 'Вартість: ' : 'Орієнтовна вартість: '}{e.usd ? <b>≈ ${e.usd.toFixed(2)} на місяць</b> : null} {e.text}</p>

@@ -22,7 +22,7 @@ export async function saveRegular(campaignId, input, email = null) {
   const row = await readRow(campaignId);
   const list = rawRegulars(row);
   const prev = input.id ? list.find((r) => r.id === input.id) || null : null;
-  if (!prev && list.length >= MAX_REGULARS) throw new Error(`Регулярних циклів в операції може бути не більше ${MAX_REGULARS}.`);
+  if (!prev && list.length >= MAX_REGULARS) throw new Error(`Регулярних завдань в операції може бути не більше ${MAX_REGULARS}.`);
   const regular = cleanRegular(input, { by: email, prev });
   const campaign = await writeRegulars(row, prev ? list.map((r) => (r.id === regular.id ? regular : r)) : [...list, regular]);
   return { campaign, regular };
@@ -31,7 +31,7 @@ export async function saveRegular(campaignId, input, email = null) {
 // A regular cycle is switched on or off without touching its parameters.
 export async function setRegularEnabled(campaignId, id, enabled, email = null) {
   const r = rawRegulars(await readRow(campaignId)).find((x) => x.id === id);
-  if (!r) throw new Error('Регулярний цикл не знайдено.');
+  if (!r) throw new Error('Регулярне завдання не знайдено.');
   return saveRegular(campaignId, { id, enabled, weekday: r.weekday, time: r.time, brief: r.brief }, email);
 }
 

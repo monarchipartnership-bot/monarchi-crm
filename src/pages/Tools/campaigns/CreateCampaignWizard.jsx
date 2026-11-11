@@ -206,7 +206,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
     try {
       await launchCampaign(campaign.id);
       if (mode === 'creative') {
-        notify?.('Клієнта підключено до відділу креативів. Заповніть новий цикл (запит на креативи).');
+        notify?.('Клієнта підключено до відділу креативів. Заповніть нове завдання (запит на креативи).');
         onLaunched(campaign.id, { newRequest: true });
       } else {
         kickQueue().catch(() => {});
@@ -479,7 +479,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                 <b>Що буде далі</b>
                 <ol>
                   <li>Відкриється сторінка клієнта з блоком «Відділ креативів».</li>
-                  <li>Одразу відкриється форма «Новий цикл (запит на креативи)»: опишіть, що потрібно (канал, формати, настрій).</li>
+                  <li>Одразу відкриється форма «Нове завдання (запит на креативи)»: опишіть, що потрібно (канал, формати, настрій).</li>
                   <li>Стратег складе план, агент по ТЗ сформує завдання, копірайтер і креативщик підготують матеріали.</li>
                   <li>Готове перевірить контролер і віддасть вам на затвердження.</li>
                 </ol>
@@ -509,7 +509,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
                   <b>Що буде після запуску</b>
                   <ol>
                     {modeDef.flow.map((t) => <li key={t}>{t}</li>)}
-                    {creativeOn && mode !== 'creative' && <li>Відділ креативів чекає запитів: на сторінці операції, у блоці «Відділ креативів», натисніть «Новий цикл (запит на креативи)» і опишіть задачу.</li>}
+                    {creativeOn && mode !== 'creative' && <li>Відділ креативів чекає запитів: на сторінці операції, у блоці «Відділ креативів», натисніть «Нове завдання (запит на креативи)» і опишіть задачу.</li>}
                   </ol>
                 </div>
                 <ul className="cmp-agentlist">
@@ -538,7 +538,7 @@ export default function CreateCampaignWizard({ onClose, onLaunched, notify, init
               {idx < stepItems.length && <button type="button" className="cmp-btn" onClick={() => go('summary')} disabled={busy}>Пропустити решту</button>}
             </>
           )}
-          {step === 3 && (<><button type="button" className="cmp-btn" onClick={() => setStep(2)} disabled={busy}>Назад до налаштувань</button><button type="button" className="cmp-btn cmp-btn--primary cmp-btn--launch" onClick={launch} disabled={busy || (mode !== 'creative' && !enabledAgents.length)}>{busy ? (mode === 'creative' ? 'Створюємо…' : 'Запускаємо…') : mode === 'creative' ? 'Створити й відкрити новий цикл' : 'Запустити'}</button></>)}
+          {step === 3 && (<><button type="button" className="cmp-btn" onClick={() => setStep(2)} disabled={busy}>Назад до налаштувань</button><button type="button" className="cmp-btn cmp-btn--primary cmp-btn--launch" onClick={launch} disabled={busy || (mode !== 'creative' && !enabledAgents.length)}>{busy ? (mode === 'creative' ? 'Створюємо…' : 'Запускаємо…') : mode === 'creative' ? 'Створити й відкрити нове завдання' : 'Запустити'}</button></>)}
         </footer>
       </div>
     </div>,

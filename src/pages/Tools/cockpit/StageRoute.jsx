@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { iconPath } from './parts';
 
-// «Етапи циклу» as a route (owner's pick 2026-11-11, artifact 4bsktowXd2L1s4mrvwh5ZP; simplified the same day: «вся цепочка в таком виде»): the stops are the steps of
+// «Етапи завдання» as a route (owner's pick 2026-11-11, artifact 4bsktowXd2L1s4mrvwh5ZP; simplified the same day: «вся цепочка в таком виде»): the stops are the steps of
 // the chain of agents, the parallel steps branch and meet again. EVERY leg is the same: a violet dashed line with a small file travelling along it. A leg that leaves a
 // step that has not started (or waits, or failed) is dim and carries no file. The stop shows the state: green check (done), pink pulse (working), amber pulse (waits for
 // the person), red (failed). Everything moves with SMIL and stops (files stand in the middle of their legs) when the system asks for less motion.
@@ -66,7 +66,7 @@ export function StageRoute({ stages = [], currentKey = null }) {
   const label = stages.map((s) => `${s.label}: ${s.note || NOTE[s.state] || ''}`).join('; ');
   return (
     <div className="pcd-route">
-      <svg viewBox={`0 0 ${W} ${geo.H}`} role="img" aria-label={`Етапи циклу. ${label}`}>
+      <svg viewBox={`0 0 ${W} ${geo.H}`} role="img" aria-label={`Етапи завдання. ${label}`}>
         {geo.legs.map((l, i) => (
           <path key={'l' + i} d={l.d} fill="none" strokeWidth="3.5" strokeLinecap="round" strokeDasharray="2.5 10"
             stroke={l.live ? 'rgba(235, 156, 239, .9)' : 'rgba(235, 156, 239, .26)'}>
@@ -112,7 +112,7 @@ export function ProgressRing({ value = 0, tone = '' }) {
   const v = Math.max(0, Math.min(1, Number(value) || 0));
   const C = 2 * Math.PI * 38, col = tone === 'bad' ? '#FF8A8A' : tone === 'warn' ? '#FBBF24' : '#EB9CEF';
   return (
-    <div className="pcd-ring" role="progressbar" aria-label="Готовність циклу" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)}>
+    <div className="pcd-ring" role="progressbar" aria-label="Готовність завдання" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)}>
       <svg viewBox="0 0 92 92" aria-hidden="true">
         <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(235, 156, 239, .16)" strokeWidth="9" />
         <circle cx="46" cy="46" r="38" fill="none" stroke={col} strokeWidth="9" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - v)} style={{ filter: `drop-shadow(0 0 6px ${col})` }} />

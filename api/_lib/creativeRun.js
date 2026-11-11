@@ -341,7 +341,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   for (const f of def.fields || []) if (String(cfg[f.key] || '').trim()) blocks.push({ title: f.label, text: clip(cfg[f.key], 1800) });
   // what the manager asked of THIS agent for THIS cycle (the form of the cycle): it counts above the general settings of the agent
   const cycleSet = b.agent_settings?.[agent.role] || {};
-  for (const f of cycleAgentFields(agent.role)) if (f.type !== 'check' && f.key !== 'max_usd' && String(cycleSet[f.key] || '').trim()) blocks.push({ title: `${f.label} (для цього циклу: важливіше за загальні налаштування)`, text: clip(cycleSet[f.key], 1500) });
+  for (const f of cycleAgentFields(agent.role)) if (f.type !== 'check' && f.key !== 'max_usd' && String(cycleSet[f.key] || '').trim()) blocks.push({ title: `${f.label} (для цього завдання: важливіше за загальні налаштування)`, text: clip(cycleSet[f.key], 1500) });
   const orders = instructionBlock(campaign.config?.instructions, agent.role); // what the manager asked of this campaign's agents
   if (orders) blocks.push(orders);
   if (req) blocks.push(requestBlock(req), materialsBlock(req.materials));

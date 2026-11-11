@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   const campaignId = Number(req.body?.campaignId);
   const text = String(req.body?.text || '').trim();
   if (!Number.isFinite(campaignId)) { res.status(400).json({ error: 'Не вказано операцію.' }); return; }
-  if (text.length < MIN_FILL_CHARS) { res.status(400).json({ error: 'Опишіть цикл хоча б одним-двома реченнями: що потрібно й для чого.' }); return; }
+  if (text.length < MIN_FILL_CHARS) { res.status(400).json({ error: 'Опишіть завдання хоча б одним-двома реченнями: що потрібно й для чого.' }); return; }
   try {
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
     const campaign = (await db.from('ag_campaigns').select('id, name, project_id, config').eq('id', campaignId).maybeSingle()).data;

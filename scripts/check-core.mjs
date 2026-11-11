@@ -42,7 +42,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
-import { describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
+import { ONEOFF, describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
 import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
@@ -57,7 +57,7 @@ import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spen
 import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
 import { buildDossier, memoryBlock } from '../src/lib/agents/clientMemory.js';
 import { DEFAULT_FUNNEL_STAGES, funnelColumns, funnelModel, normalizeFunnel } from '../src/lib/reportFunnel.js';
-import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, cycleState, describeSchedule, instructionBlock, modeOfAgent, scheduleRows } from '../src/lib/agents/campaignCycles.js';
+import { addInstruction as pushInstruction, cleanInstruction, cleanSchedule, describeSchedule, instructionBlock, modeOfAgent, scheduleRows } from '../src/lib/agents/campaignCycles.js';
 import { digitsOf, metaErrorText, normalizeMetaAccount, planMetaSync, projectFromAccount } from '../src/lib/metaOnboarding.js';
 import { importAccount, runMetaSync, waitingAccounts } from '../api/_lib/metaOnboarding.js';
 import { planMetricChange } from '../src/lib/reportMetricOps.js';
@@ -68,7 +68,7 @@ import { safeHref } from '../src/lib/safeHref.js';
 import { daysText, monthNameIn, monthShortIn, normLang, trFor } from '../src/lib/clientLang.js';
 import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
 import { auditAfter, checkRights, loadRights } from '../api/_lib/agentAudit.js';
-import { addInstruction, cappedCampaigns, editOutput, openCycle, removeInstruction, setAgentMode, setAgentSchedule, syncCycles } from '../api/_lib/campaignCycles.js';
+import { addInstruction, cappedCampaigns, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from '../api/_lib/campaignCycles.js';
 import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, ASSET_GROUPS, ASSET_KINDS, INPUT_FIELDS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS, addCtaVariant, ctaVariants, removeCtaVariant } from '../src/lib/agents/projectCreative.js';
 import { BRAND_MAX_IMAGES, buildBrandPrompt, parseBrand, pickBrandImages } from '../src/lib/agents/brandAnalysis.js';
@@ -2719,7 +2719,7 @@ await ok('system state: the clock, the keys (only set / not set), the queue (stu
 });
 
 await ok('client memory: a short dossier of what the manager approved, returned (with the reason) and commented, newest first, kept short', () => {
-  assert.deepEqual(buildDossier([]), { text: '', counts: { approved: 0, returned: 0, comments: 0, notes: 0, cycles: 0 } });
+  assert.deepEqual(buildDossier([]), { text: '', counts: { approved: 0, returned: 0, comments: 0, notes: 0, tasks: 0 } });
   assert.equal(memoryBlock(buildDossier([])), null);
   const ev = [
     { kind: 'creative_approved', subject: 'Концепт A · 4:5', body: '', created_at: '2026-10-20T10:00:00Z' },
@@ -2729,7 +2729,7 @@ await ok('client memory: a short dossier of what the manager approved, returned 
     { kind: 'decision', subject: 'Не показувати ціни', body: 'за словами власника', created_at: '2026-10-23T10:00:00Z' },
   ];
   const d = buildDossier(ev);
-  assert.deepEqual(d.counts, { approved: 1, returned: 2, comments: 1, notes: 1, cycles: 0 });
+  assert.deepEqual(d.counts, { approved: 1, returned: 2, comments: 1, notes: 1, tasks: 0 });
   assert.ok(d.text.indexOf('2026-10-25 Концепт C') < d.text.indexOf('2026-10-21 Концепт B')); // newest first
   assert.match(d.text, /Концепт C · 9:16 \(причину не вказано\)/); assert.match(d.text, /мінімалізм/); assert.match(d.text, /Не показувати ціни/);
   assert.match(memoryBlock(d).title, /не вигадка/);
@@ -2738,7 +2738,7 @@ await ok('client memory: a short dossier of what the manager approved, returned 
   assert.ok(long.text.split('\n').filter((l) => l.startsWith('- ')).length <= 8);
 });
 
-await ok('campaign cycles: state from the tasks, schedule rows with the next run, a schedule is validated, instructions are cleaned and handed to the right agents', () => {
+await ok('campaign control: schedule rows with the next run, a schedule is validated, instructions are cleaned and handed to the right agents', () => {
   assert.deepEqual(cleanSchedule({ weekday: 1, time: '9:05' }), { weekday: 1, time: '09:05' }); assert.equal(cleanSchedule(null), null);
   assert.throws(() => cleanSchedule({ weekday: 8, time: '09:00' }), /День тижня/); assert.throws(() => cleanSchedule({ weekday: 2, time: '25:00' }), /Час/);
   assert.equal(describeSchedule({ weekday: 1, time: '09:00' }), 'щотижня, понеділок о 09:00'); assert.equal(describeSchedule(null), '');
@@ -2753,16 +2753,6 @@ await ok('campaign cycles: state from the tasks, schedule rows with the next run
   assert.deepEqual(rows.map((r) => r.role), ['business_research', 'meta_analyst', 'google_analyst', 'meta_optimizer']);
   assert.equal(rows[1].nextAt, '2026-11-09T07:00:00.000Z'); // 09:00 Kyiv in winter time
   assert.match(rows[0].when, /один раз/); assert.match(rows[3].when, /після агентів/); assert.equal(rows[2].nextAt, null); assert.equal(rows[2].when, 'на паузі');
-  // the state of a cycle
-  const cyc = { status: 'running', progress: 0 };
-  const t = (agent_id, status, output = null) => ({ agent_id, status, output });
-  assert.deepEqual(cycleState({ cycle: cyc, tasks: [t(1, 'done'), t(2, 'running')], expectedAgents: 3 }), { status: 'running', progress: 0.33, done: 1, open: 1, failed: 0, waiting: 0 });
-  assert.equal(cycleState({ cycle: cyc, tasks: [t(1, 'done'), t(2, 'done'), t(3, 'done')], expectedAgents: 3 }).status, 'done');
-  assert.equal(cycleState({ cycle: cyc, tasks: [t(1, 'done'), t(2, 'failed')], expectedAgents: 3 }).status, 'problem');
-  assert.equal(cycleState({ cycle: cyc, tasks: [t(1, 'done', { awaiting_pass: true })], expectedAgents: 1 }).status, 'review'); // waits for the person's OK
-  assert.equal(cycleState({ cycle: cyc, tasks: [], expectedAgents: 3 }).status, 'running');
-  assert.deepEqual(cycleState({ cycle: cyc, tasks: [], request: { status: 'review' } }), { status: 'review', progress: 1, done: 0, open: 0, failed: 0, waiting: 0 }); // a cycle of a request follows the request
-  assert.equal(cycleState({ cycle: { status: 'cancelled' }, tasks: [t(1, 'running')] }).status, 'cancelled');
   // instructions
   assert.throws(() => cleanInstruction({ text: ' ' }), /Напишіть/);
   const a = cleanInstruction({ text: '  Не  згадуй ціни ' }, 'm@x.y', new Date('2026-11-02T10:00:00Z'));
@@ -2772,9 +2762,9 @@ await ok('campaign cycles: state from the tasks, schedule rows with the next run
   assert.match(instructionBlock([a, b], 'meta_analyst').text, /ціни[\s\S]*лід-форми/); assert.doesNotMatch(instructionBlock([a, b], 'google_analyst').text, /лід-форми/); assert.equal(instructionBlock([b], 'google_analyst'), null);
 });
 
-await ok('campaign control: cycles open once per pass and follow their tasks; schedule, mode, instructions and edits are written; a changed schedule never runs late', async () => {
+await ok('campaign control: schedule, mode, instructions and edits are written; a changed schedule never runs late', async () => {
   const tables = {
-    ag_cycles: [], ag_campaigns: [{ id: 5, project_id: 10, config: {} }], ag_creative_requests: [{ id: 70, status: 'running' }],
+    ag_campaigns: [{ id: 5, project_id: 10, config: {} }], ag_creative_requests: [{ id: 70, status: 'running' }],
     ag_agents: [
       { id: 1, team: 'campaign', scope_id: '5', role: 'meta_analyst', name: 'Аналітик Meta Ads', enabled: true, config: { trigger: 'schedule' }, schedule: { weekday: 1, time: '09:00' }, enabled_since: '2026-10-01T00:00:00Z', attempts: 2, last_scheduled: '2026-10-26' },
       { id: 2, team: 'campaign', scope_id: '5', role: 'meta_optimizer', name: 'Оптимізатор', enabled: false, config: { trigger: 'upstream' }, schedule: null },
@@ -2784,29 +2774,6 @@ await ok('campaign control: cycles open once per pass and follow their tasks; sc
   };
   const T0 = new Date('2026-11-02T07:00:00Z');
   const ctx = (now) => ({ db: fakeDb(tables), email: 'm@x.y', now: () => now });
-  // opening
-  const c1 = await openCycle(ctx(T0), 5);
-  assert.deepEqual([c1.number, c1.status], [1, 'running']);
-  assert.equal((await openCycle(ctx(new Date(T0.getTime() + 3600000)), 5)).id, c1.id); // the same pass: the same cycle
-  const r1 = await openCycle(ctx(T0), 5, { requestId: 70 });
-  assert.deepEqual([r1.number, r1.request_id], [2, 70]); assert.equal((await openCycle(ctx(T0), 5, { requestId: 70 })).id, r1.id); // one cycle per request
-  // the pass did not finish for days: it is closed as a problem and a new one begins
-  const c3 = await openCycle(ctx(new Date('2026-11-08T07:00:00Z')), 5);
-  assert.equal(tables.ag_cycles.find((c) => c.id === c1.id).status, 'problem'); assert.equal(c3.number, 3);
-  // following the tasks
-  tables.ag_tasks.push({ agent_id: 1, status: 'done', created_at: '2026-11-08T07:01:00Z', output: {} });
-  tables.ag_agents[1].enabled = true;
-  const s1 = await syncCycles(ctx(new Date('2026-11-08T08:00:00Z')));
-  assert.ok(s1.changed >= 1);
-  assert.deepEqual([tables.ag_cycles.find((c) => c.id === c3.id).status, tables.ag_cycles.find((c) => c.id === c3.id).progress], ['running', 0.5]); // one of two enabled agents delivered
-  tables.ag_tasks.push({ agent_id: 2, status: 'done', created_at: '2026-11-08T07:30:00Z', output: {} });
-  await syncCycles(ctx(new Date('2026-11-08T09:00:00Z')));
-  const done = tables.ag_cycles.find((c) => c.id === c3.id);
-  assert.deepEqual([done.status, done.progress], ['done', 1]); assert.ok(done.finished_at);
-  assert.equal(tables.ag_cycles.find((c) => c.id === r1.id).status, 'running'); // the request is still running
-  tables.ag_creative_requests[0].status = 'review';
-  await syncCycles(ctx(T0));
-  assert.deepEqual([tables.ag_cycles.find((c) => c.id === r1.id).status, tables.ag_cycles.find((c) => c.id === r1.id).progress], ['review', 1]);
   // the schedule: a new day, and the agent does not run for a moment before the change
   const sch = await setAgentSchedule(ctx(T0), 1, { weekday: 3, time: '10:30' });
   assert.deepEqual(sch.schedule, { weekday: 3, time: '10:30' });
@@ -4292,33 +4259,30 @@ await ok('spend by campaign: Claude + Higgsfield per campaign and period (Kyiv d
   assert.equal(periodStart('month', now).toISOString(), '2026-10-31T22:00:00.000Z'); // 1 November 00:00 in Kyiv (UTC+2)
 });
 
-await ok('map cars: an open cycle is ONE car at the agent of its most important open task, with the cycle number and progress; work outside any cycle stays per agent', () => {
-  const agents = [{ id: 1, role: 'studio_copywriter', team: 'campaign' }, { id: 2, role: 'creative_strategy', team: 'creative' }, { id: 3, role: 'meta_analyst', team: 'campaign' }];
+await ok('map carriers: open work is one carrier per agent, operation and kind; the agents of an own-team operation belong to it by their scope', () => {
+  const agents = [{ id: 1, role: 'studio_copywriter', team: 'campaign', scope_id: '7' }, { id: 2, role: 'creative_strategy', team: 'creative' }, { id: 3, role: 'meta_analyst', team: 'campaign', scope_id: '7' }];
   const campaigns = [{ id: 7, name: 'Mellow creatives', project_id: 1 }];
   const projects = [{ id: 1, name: 'Mellow' }];
   const tasks = [
     { id: 1, agent_id: 1, status: 'running', campaign_id: 7, request_id: 70, created_at: '2026-11-10T10:00:00Z' },
     { id: 2, agent_id: 2, status: 'queued', campaign_id: 7, request_id: 70, created_at: '2026-11-10T10:01:00Z' },
-    { id: 3, agent_id: 3, status: 'running', campaign_id: 7, request_id: null, created_at: '2026-11-10T09:00:00Z' }, // a scheduled pass of the same campaign
-    { id: 4, agent_id: 3, status: 'queued', campaign_id: 7, request_id: null, created_at: '2026-10-01T09:00:00Z' }, // older than the pass: not in the cycle
+    { id: 3, agent_id: 3, status: 'running', campaign_id: null, request_id: null, created_at: '2026-11-10T09:00:00Z' }, // the task of an agent of the operation's own team: no campaign_id
+    { id: 4, agent_id: 3, status: 'queued', campaign_id: 7, request_id: null, created_at: '2026-10-01T09:00:00Z' },
   ];
-  const cycles = [
-    { id: 5, campaign_id: 7, number: 2, status: 'running', progress: '0.4', request_id: 70, started_at: '2026-11-10T09:59:00Z' },
-    { id: 6, campaign_id: 7, number: 3, status: 'running', progress: 0, request_id: null, started_at: '2026-11-10T08:00:00Z' },
-    { id: 8, campaign_id: 7, number: 1, status: 'done', progress: 1, request_id: null, started_at: '2026-10-01T08:00:00Z' }, // finished: no car
-  ];
-  const list = buildMapTasks({ tasks, agents, campaigns, projects, cycles });
-  const cars = list.filter((c) => c.cycleId);
-  assert.equal(cars.length, 2);
-  const a = cars.find((c) => c.cycleId === 5);
-  assert.deepEqual([a.agentKey, a.kind, a.count, a.cycleNumber], ['performance-copywriter', 'running', 2, 2]); // the running task wins over the queued one
-  assert.equal(carrierLabel(a), 'Mellow · цикл 2 · 40% · у роботі');
-  const b = cars.find((c) => c.cycleId === 6);
-  assert.deepEqual([b.agentKey, b.count], ['meta-ads-analyst', 1]);
-  const rest = list.filter((c) => !c.cycleId);
-  assert.equal(rest.length, 1); // the old queued task belongs to no open cycle
-  assert.equal(rest[0].kind, 'queued');
-  assert.equal(buildMapTasks({ tasks, agents, campaigns, projects }).filter((c) => c.cycleId).length, 0); // no cycles given: as before
+  const list = buildMapTasks({ tasks, agents, campaigns, projects });
+  assert.equal(list.length, 4); // running and queued of the analyst are different kinds: two carriers
+  const run = list.find((c) => c.agentKey === 'meta-ads-analyst' && c.kind === 'running');
+  assert.equal(run.campaignId, 7); assert.equal(run.project, 'Mellow'); // taken from the scope of the agent
+  assert.equal(carrierLabel(run), 'Mellow · у роботі');
+  assert.equal(list.find((c) => c.requestId === 70 && c.kind === 'running').agentKey, 'performance-copywriter');
+});
+
+await ok('one-off tasks: the quiet operation of a project (draft, never launched) is not a team, and every one-off role has a requirement entry', () => {
+  const quiet = { id: 20, status: 'draft', config: { mode: 'full', team: 'oneoff', hidden: true } };
+  const v = teamsOf({ campaigns: [quiet], agent: null });
+  assert.equal(v.running, 0); assert.equal(v.legacy.length, 0); assert.ok(v.teams.every((x) => x.state === 'none'));
+  assert.deepEqual(ONEOFF.map((x) => x.role), ['competitor_research', 'audience_research', 'business_research', 'marketing_strategist']);
+  assert.ok(ONEOFF.every((x) => Array.isArray(missingFor([x.role], new Set()).required)));
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
@@ -4370,10 +4334,10 @@ await ok('ready materials: grouped by kind newest first, filtered by decision; a
   assert.equal(decisionEvent(list[0], 'rejected', 'x', null).kind, 'decision');
 });
 
-await ok('client memory: the dossier tells the results of the last cycles too', () => {
+await ok('client memory: the dossier tells the results of the last tasks too', () => {
   const d = buildDossier([{ kind: 'cycle', subject: 'Цикл 2 · Mellow', body: 'Цикл завершено. Виконано кроків: 7, витрати: $1.2', created_at: '2026-11-10T10:00:00Z' }, { kind: 'note', subject: 'N', body: 'b', created_at: '2026-11-09T10:00:00Z' }]);
-  assert.match(d.text, /Підсумки останніх циклів[\s\S]*Цикл 2 · Mellow: Цикл завершено/);
-  assert.equal(d.counts.cycles, 1);
+  assert.match(d.text, /Підсумки останніх завдань[\s\S]*Цикл 2 · Mellow: Цикл завершено/);
+  assert.equal(d.counts.tasks, 1);
 });
 
 await ok('operation templates: a snapshot keeps the setup and drops the client data; apply maps agents by role, drops channels without a cabinet; the calendar puts every schedule on its weekday', () => {
@@ -4751,7 +4715,7 @@ await ok('operation cycles: the six sections come from the cabinet: what is in w
 
   const view = buildOperationView({ campaign, cockpit, now: new Date('2026-10-22T08:00:00Z') });
   // in work: the regular cycle whose chain runs, and the cycle whose pictures are only planned (with a failed step)
-  assert.deepEqual(view.inWork.map((c) => [c.id, c.kindLabel]), [[2, 'Регулярний цикл'], [3, 'Одноразовий цикл']]);
+  assert.deepEqual(view.inWork.map((c) => [c.id, c.kindLabel]), [[2, 'Регулярне завдання'], [3, 'Разове завдання']]);
   assert.equal(view.inWork[0].text, 'Створення до 6 креативів (3 напрями × 1:1, 4:5) за регулярним завданням «Weekly banners»');
   assert.deepEqual([view.inWork[0].progress, view.inWork[0].stage.now, view.inWork[0].stage.next, view.inWork[0].stage.blocked], [0.12, 'Працює: ТЗ', 'Копірайтер і Креативщик', null]);
   assert.deepEqual([view.inWork[1].stage.blocked, view.inWork[1].stage.now], ['failed', 'Крок «Креативщик» зупинився']);
@@ -4773,7 +4737,7 @@ await ok('operation cycles: the six sections come from the cabinet: what is in w
   assert.match(cycleStage({ status: 'review', stages: [], creatives: { total: 4, producing: 2, review: 2 } }).now, /готово 2 з 4/);
   assert.equal(cycleStage({ status: 'review', stages: [], creatives: { total: 2, review: 2 } }).blocked, 'review');
   assert.equal(cycleProgress({ status: 'review', stages: [{ key: 'a', state: 'done' }, { key: 'you', state: 'working' }], creatives: { total: 4, review: 2, producing: 2 } }), 0.8);
-  assert.deepEqual(cycleCosts(cockpit).find((r) => r.id === 1), { id: 1, title: 'Old cycle', kindLabel: 'Одноразовий цикл', model: 0, higgsfield: 0.6, total: 0.6, pictures: 3 });
+  assert.deepEqual(cycleCosts(cockpit).find((r) => r.id === 1), { id: 1, title: 'Old cycle', kindLabel: 'Разове завдання', model: 0, higgsfield: 0.6, total: 0.6, pictures: 3 });
 });
 
 await ok('operation cycles: the schedule starts the regular cycle once for its day, with the current files of the client; a second operation of the same kind is not launched', async () => {
@@ -4872,8 +4836,8 @@ await ok('operation cycles: an operation may have several regular cycles, each w
   assert.deepEqual(regularsOf(legacy).map((r) => [r.id, r.title]), [['r1', 'Old weekly']]);
   assert.equal(regularDue({ campaign: legacy, requests: [{ campaign_id: 2, brief: { scheduled_for: '2026-10-22' } }], now }).reason, 'вже запущено');
   assert.deepEqual(rawRegulars(legacy).map((r) => r.id), ['r1']);
-  assert.equal(buildOperationView({ campaign: { ...campaign, status: 'paused' }, cockpit: null }).nextText, 'Операція на паузі: регулярні цикли не запускаються, поки ви її не відновите.');
-  assert.equal(buildOperationView({ campaign: { ...campaign, config: { mode: 'creative', regulars: [{ ...a, enabled: false }] } }, cockpit: null }).nextText, 'Усі регулярні цикли вимкнено.');
+  assert.equal(buildOperationView({ campaign: { ...campaign, status: 'paused' }, cockpit: null }).nextText, 'Операція на паузі: регулярні завдання не запускаються, поки ви її не відновите.');
+  assert.equal(buildOperationView({ campaign: { ...campaign, config: { mode: 'creative', regulars: [{ ...a, enabled: false }] } }, cockpit: null }).nextText, 'Усі регулярні завдання вимкнено.');
 
   // the server starts every cycle that is due, once
   const { tables, db, ctx } = creativeWorld();
@@ -4902,8 +4866,8 @@ await ok('cycle form: the name of the cycle and the settings of the agents for O
   assert.deepEqual([clean.creative_strategy, clean.creative_maker], [{ kpi: 'CPA under $12' }, { style: 'Warm light', max_usd: '2.5', auto_generate: true }]);
   assert.equal(clean.creative_copywriter.tone.length, 1500);
   assert.deepEqual(cleanAgentSettings({ creative_maker: { auto_generate: false, style: '   ' } }), {}); // an unchecked box and an empty field change nothing
-  assert.throws(() => cleanAgentSettings({ creative_maker: { max_usd: 'a lot' } }), /Ліміт витрат на цикл/);
-  assert.throws(() => cleanAgentSettings({ creative_maker: { max_usd: '-3' } }), /Ліміт витрат на цикл/);
+  assert.throws(() => cleanAgentSettings({ creative_maker: { max_usd: 'a lot' } }), /Ліміт витрат на завдання/);
+  assert.throws(() => cleanAgentSettings({ creative_maker: { max_usd: '-3' } }), /Ліміт витрат на завдання/);
   const req = cleanRequest({ title: '  Autumn sale   ', goal: 'Banners', agent_settings: { creative_brief: { rules: 'Big product, no clutter' } } });
   assert.deepEqual([req.title, req.brief.agent_settings], ['Autumn sale', { creative_brief: { rules: 'Big product, no clutter' } }]);
   assert.equal(cleanRequest({ title: 'x'.repeat(150), goal: 'g' }).title.length, 100);
@@ -4922,7 +4886,7 @@ await ok('cycle form: the name of the cycle and the settings of the agents for O
   await processQueue(w.ctx);
   const seen = (key) => JSON.stringify(w.model.contents[key] || '');
   assert.match(seen('creative-creative_strategy'), /CPA UNDER TWELVE DOLLARS/);
-  assert.match(seen('creative-creative_strategy'), /для цього циклу: важливіше за загальні налаштування/);
+  assert.match(seen('creative-creative_strategy'), /для цього завдання: важливіше за загальні налаштування/);
   assert.doesNotMatch(seen('creative-creative_strategy'), /BIG PRODUCT NO CLUTTER/); // the brief writer's setting is not shown to the strategist
   assert.match(seen('creative-creative_brief'), /BIG PRODUCT NO CLUTTER/);
 });
@@ -4980,7 +4944,7 @@ await ok('cycle form: the card fills the settings of the agents, the description
   assert.deepEqual(applied.agent_settings, { creative_strategy: { kpi: 'Hand-written KPI' }, creative_maker: { style: 'Тепле світло', max_usd: '2.5' } });
   assert.equal(applied.skipped, 2); // the product and the KPI that the person wrote
   assert.ok(applied.sources.includes('f.title') && applied.sources.includes('a.creative_maker.style') && !applied.sources.includes('f.product'));
-  assert.deepEqual(applied.filled, ['назву циклу', 'кількість напрямів: 10', 'формати: 1:1, 9:16', 'мову текстів', 'кнопку заклику до дії', 'налаштування агентів: 2']);
+  assert.deepEqual(applied.filled, ['назву завдання', 'кількість напрямів: 10', 'формати: 1:1, 9:16', 'мову текстів', 'кнопку заклику до дії', 'налаштування агентів: 2']);
   // ready texts: the number of directions is the number of texts, the analysis leaves it
   assert.equal(applyFill({ current: { ...current, texts: 'given' }, fill, touched: new Set() }).patch.count, undefined);
 });

@@ -4,7 +4,7 @@
 // last agent has delivered the request goes to the person (status «review»). Standalone on purpose (no import of agentEngine): the engine calls
 // into this file.
 import { ancestorsOf } from '../../src/lib/agents/chain.js';
-import { CAP_MESSAGE, cappedCampaigns, openCycle } from './campaignCycles.js';
+import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { CREATIVE_TEAM, REQUEST_ENTRY_ROLE, isCreativeRole, requestRoles } from '../../src/lib/agents/creativeTeam.js';
 
 export const MAX_REWORK_ROUNDS = 2; // the quality checker may send the work back twice; the third time it goes to the person as it is
@@ -55,7 +55,6 @@ export async function startRequest(ctx, requestId) {
   if (!link || !link.enabled || link.mode === 'paused') throw new Error('Для цього клієнта Агент креативний стратег вимкнений або на паузі (вкладка «Проєкти» на його сторінці).');
   const now = iso(ctx.now());
   must(await db.from('ag_creative_requests').update({ status: 'running', error: null, started_at: now, finished_at: null, updated_at: now }).eq('id', requestId), 'request');
-  try { await openCycle(ctx, req.campaign_id, { requestId }); } catch (e) { console.warn('openCycle failed:', e?.message || e); } // a request is one cycle of its campaign
   await enqueue(db, entry, { campaignId: req.campaign_id, requestId, brief: { trigger: 'request', manual: true, requestId }, by: ctx.email || 'запит' });
   return { started: 1, participants: participantsOf(dept, links).length };
 }

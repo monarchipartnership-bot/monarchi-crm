@@ -41,7 +41,7 @@ function OpRow({ op, onOpen }) {
       <span className="pcd-opc-type"><i>Тип</i>{op.modeLabel}</span>
       {op.cycles.length > 0
         ? <span className="pcd-opc-cycles">{op.cycles.map((c) => <span key={c.id} title={c.title}>{c.kindLabel} №{c.id}</span>)}</span>
-        : ['active', 'paused'].includes(op.status) ? <span className="pcd-opc-cycles is-none"><span>Зараз немає циклів у роботі</span></span> : null}
+        : ['active', 'paused'].includes(op.status) ? <span className="pcd-opc-cycles is-none"><span>Зараз немає завдань у роботі</span></span> : null}
       {op.cycles.length > 0 && <span className="pcd-op-prog"><Progress value={op.cycleProgress} /><em>{Math.round((op.cycleProgress || 0) * 100)}%</em></span>}
       {op.waiting > 0 && <span className="pcd-opc-chips"><WaitChip tone={op.tone} waiting={op.waiting} /></span>}
       <span className="pcd-opc-foot"><span className="pcd-op-date">{op.status === 'archived' ? `завершено ${fmtDay(op.updatedAt) || '—'}` : `оновлено ${fmtAgo(op.updatedAt) || '—'}`}</span><Ic n="arrow" size={15} /></span>
@@ -208,19 +208,19 @@ export default function ProjectCard({ row, cockpit, initialOperationId = null, r
                 {groups.current.length > 1 && <p className="ckp-empty-line">Ще в роботі: {groups.current.slice(1).map((o) => o.name).join(', ')}. Усі операції — у розділі «Операції».</p>}
               </section>
               {current && (
-                <section className="pcd-sect" aria-label="Поточний цикл">
-                  <div className="ckp-sec-h"><h3>Поточний цикл</h3>{focus && <span className="ckp-chip">№{focus.id} · {focus.kindLabel}</span>}</div>
+                <section className="pcd-sect" aria-label="Поточне завдання">
+                  <div className="ckp-sec-h"><h3>Поточне завдання</h3>{focus && <span className="ckp-chip">№{focus.id} · {focus.kindLabel}</span>}</div>
                   <div className="pcd-duo">
-                    <div className={'pcd-pan' + (focusTone ? ' is-' + focusTone : '')}><small>Що зараз у роботі</small><b>{!focus ? 'Нічого не в роботі' : !focus.stage && waitingCycles.length > 1 ? `На перевірці циклів: ${waitingCycles.length} (№${waitingCycles.map((r) => r.id).join(', №')})` : focusNow.now}</b></div>
+                    <div className={'pcd-pan' + (focusTone ? ' is-' + focusTone : '')}><small>Що зараз у роботі</small><b>{!focus ? 'Нічого не в роботі' : !focus.stage && waitingCycles.length > 1 ? `На перевірці завдань: ${waitingCycles.length} (№${waitingCycles.map((r) => r.id).join(', №')})` : focusNow.now}</b></div>
                     {focus && <span className="pcd-duo-arw" aria-hidden="true"><Ic n="arrow" size={26} /></span>}
-                    <div className="pcd-pan"><small>Що буде далі</small><b>{focus ? focusNow.next || '—' : curView?.next ? `Регулярний цикл: ${curView.next.text}` : '—'}</b>{focus && curView?.next && <em>Наступний регулярний запуск: {curView.next.text}</em>}</div>
+                    <div className="pcd-pan"><small>Що буде далі</small><b>{focus ? focusNow.next || '—' : curView?.next ? `Регулярне завдання: ${curView.next.text}` : '—'}</b>{focus && curView?.next && <em>Наступний регулярний запуск: {curView.next.text}</em>}</div>
                     {focus && <ProgressRing value={focusNow.progress} tone={focusTone} />}
                   </div>
                 </section>
               )}
               {focus && (
-                <section className="pcd-sect" aria-label="Етапи циклу">
-                  <div className="ckp-sec-h"><h3>Етапи циклу</h3></div>
+                <section className="pcd-sect" aria-label="Етапи завдання">
+                  <div className="ckp-sec-h"><h3>Етапи завдання</h3></div>
                   <StageRoute stages={focus.stages} currentKey={focus.currentStageKey} />
                 </section>
               )}

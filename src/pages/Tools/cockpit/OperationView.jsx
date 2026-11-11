@@ -22,7 +22,7 @@ import './ProjectCard.css';
 
 const REQ_CHIP = { draft: 'is-grey', running: 'is-work', review: 'is-warn', problem: 'is-bad', approved: 'is-ok' };
 const STATE_CHIP = { review: 'is-warn', rework: 'is-back', checked: 'is-ok' };
-const PASS_STATUS = { queued: 'у черзі', running: 'працює', review: 'чекає вас', done: 'готово', problem: 'проблема', cancelled: 'скасовано' };
+const PASS_STATUS = { ok: 'успішно', failed: 'помилка', running: 'працює' };
 const fmtWhen = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')} о ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 const countsLine = (c = {}) => [c.review ? `на перегляд: ${c.review}` : '', c.approved ? `затверджено: ${c.approved}` : '', c.rejected ? `повернено: ${c.rejected}` : '', c.producing ? `генерується: ${c.producing}` : ''].filter(Boolean).join(' · ') || 'рішень ще немає';
 
@@ -31,9 +31,9 @@ function CycleCard({ cycle, busy, onStart, onGo }) {
   const s = cycle.stage;
   const pct = Math.round((cycle.progress || 0) * 100);
   return (
-    <section className={'ckp-box opv-cycle' + (s.blocked === 'failed' ? ' is-bad' : s.blocked === 'estimate' || s.blocked === 'review' ? ' is-warn' : '')} aria-label={`Цикл ${cycle.id}`}>
+    <section className={'ckp-box opv-cycle' + (s.blocked === 'failed' ? ' is-bad' : s.blocked === 'estimate' || s.blocked === 'review' ? ' is-warn' : '')} aria-label={`Завдання ${cycle.id}`}>
       <div className="ckp-sec-h">
-        <h3>Цикл №{cycle.id}</h3>
+        <h3>Завдання №{cycle.id}</h3>
         <span className={'ckp-chip ' + (cycle.kind === 'regular' ? 'is-work' : '')}>{cycle.kindLabel}</span>
         <span className={'ckp-chip ' + (REQ_CHIP[cycle.status] || '')}>{cycle.statusLabel}</span>
         <span className="opv-date">оновлено {fmtAgo(cycle.updatedAt) || '—'}</span>
@@ -48,7 +48,7 @@ function CycleCard({ cycle, busy, onStart, onGo }) {
       {cycle.error && cycle.status === 'problem' && <p className="ckp-err" role="status">{cycle.error}</p>}
       <div className="ckp-acts">
         {(cycle.status === 'draft' || (cycle.status === 'problem' && !cycle.stages.some((x) => x.state === 'failed'))) && (
-          <button type="button" className="ckp-btn is-primary" disabled={!!busy} onClick={() => onStart(cycle)}>{busy === 'start' + cycle.id ? <Spinner /> : <Ic n="play" size={15} />}{cycle.status === 'draft' ? 'Запустити цикл' : 'Запустити ще раз'}</button>
+          <button type="button" className="ckp-btn is-primary" disabled={!!busy} onClick={() => onStart(cycle)}>{busy === 'start' + cycle.id ? <Spinner /> : <Ic n="play" size={15} />}{cycle.status === 'draft' ? 'Запустити завдання' : 'Запустити ще раз'}</button>
         )}
         {(s.blocked === 'failed' || s.blocked === 'estimate') && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('messages')}>Перейти до повідомлень<Ic n="arrow" size={15} /></button>}
         {s.blocked === 'review' && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('review', cycle.id)}>Перейти до перевірки<Ic n="arrow" size={15} /></button>}
@@ -57,21 +57,20 @@ function CycleCard({ cycle, busy, onStart, onGo }) {
   );
 }
 
-// An operation without the creative department works by the weekly passes of its own agents: the last pass and when the agents run next.
+// An operation without the creative department works by the schedules of its own agents: when each one worked last and when the agents run next.
 function Passes({ campaignId }) {
   const [ctl, setCtl] = useState(null);
-  useEffect(() => { let off = false; fetchCampaignControl(campaignId).then((d) => { if (!off) setCtl(d); }).catch(() => { if (!off) setCtl({ cycles: [], agents: [] }); }); return () => { off = true; }; }, [campaignId]);
+  useEffect(() => { let off = false; fetchCampaignControl(campaignId).then((d) => { if (!off) setCtl(d); }).catch(() => { if (!off) setCtl({ agents: [] }); }); return () => { off = true; }; }, [campaignId]);
   if (!ctl) return <div className="ckp-skel ckp-skel-wide" aria-hidden="true" />;
-  const open = ctl.cycles.find((c) => ['queued', 'running', 'review', 'problem'].includes(c.status)) || null;
-  const last = open || ctl.cycles[0] || null;
-  const next = ctl.agents.filter((a) => a.nextAt).sort((a, b) => String(a.nextAt).localeCompare(String(b.nextAt)))[0] || null;
+  const working = ctl.agents.filter((a) => a.mode !== 'paused' && (a.schedule || a.lastRunAt));
+  const last = working.filter((a) => a.lastRunAt).sort((x, y) => String(y.lastRunAt).localeCompare(String(x.lastRunAt)))[0] || null;
+  const next = working.filter((a) => a.nextAt).sort((x, y) => String(x.nextAt).localeCompare(String(y.nextAt)))[0] || null;
   return (
-    <section className="ckp-box opv-cycle" aria-label="Прохід агентів операції">
-      <div className="ckp-sec-h"><h3>{last ? `Цикл №${last.number}` : 'Циклів ще не було'}</h3><span className="ckp-chip is-work">Регулярний цикл</span>{last && <span className="ckp-chip">{PASS_STATUS[last.status] || last.status}</span>}</div>
-      <p className="opv-what">{last ? 'Прохід агентів операції: кожен агент працює за своїм розкладом і передає результат наступному.' : 'Перший цикл зʼявиться, коли агенти операції почнуть роботу.'}</p>
-      {last && <div className="opv-prog"><Progress value={Number(last.progress) || 0} /><em>{Math.round((Number(last.progress) || 0) * 100)}%</em></div>}
+    <section className="ckp-box opv-cycle" aria-label="Робота агентів операції">
+      <div className="ckp-sec-h"><h3>Агенти за розкладом</h3>{last && <span className="ckp-chip">{PASS_STATUS[last.lastStatus] || last.lastStatus || '—'}</span>}</div>
+      <p className="opv-what">{last ? 'Кожен агент працює за своїм розкладом і передає результат наступному.' : 'Агенти ще не запускались: перший запуск буде за їхнім розкладом.'}</p>
       <dl className="opv-steps">
-        {last && <div><dt>Початок</dt><dd>{fmtWhen(last.started_at || last.created_at)}{last.finished_at ? ` · завершено ${fmtWhen(last.finished_at)}` : ''}</dd></div>}
+        {last && <div><dt>Останній запуск</dt><dd>{last.name}: {fmtWhen(last.lastRunAt)}</dd></div>}
         <div><dt>Наступний запуск</dt><dd>{next ? `${next.name}: ${fmtWhen(next.nextAt)}` : 'за розкладом агентів немає запланованих запусків'}</dd></div>
       </dl>
     </section>
@@ -87,12 +86,12 @@ function Passes({ campaignId }) {
 //   «Готові матеріали»          the approved materials of the last cycle
 //   campaign: the ag_campaigns row  cockpit: the cabinet of the operation  run(item, key, payload): the action of the cabinet (useProjectCockpit)
 //   regularFirst: the operation was just created → the form of the regular cycle opens at once
-export default function OperationView({ campaign, cockpit: c, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false }) {
+export default function OperationView({ campaign, cockpit: c, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false, extraFirst = false }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
   const [section, setSection] = useState('now');
   // the form of a cycle: { mode: 'extra', allowKind } (a new one, the kind is chosen in the form) | { mode: 'regular', regularId? } (a regular one: new or edited)
-  const [form, setForm] = useState(regularFirst ? { mode: 'regular' } : null);
+  const [form, setForm] = useState(regularFirst ? { mode: 'regular' } : extraFirst ? { mode: 'extra', allowKind: false } : null);
   const [openCycle, setOpenCycle] = useState(null);
   const [busy, setBusy] = useState('');
   const [rework, setRework] = useState(null); // { requestId, usd, count, skipped }
@@ -112,29 +111,29 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
     setBusy(id);
     try { await fn(); if (okText) notify?.(okText); await onChanged?.(); } catch (e) { notify?.(e?.message || 'Не вдалося виконати дію.', true); } finally { setBusy(''); }
   }
-  const startCycle = (cycle) => guard('start' + cycle.id, () => act(null, 'start_cycle', { requestId: cycle.id }), 'Цикл запущено: агенти працюють.');
+  const startCycle = (cycle) => guard('start' + cycle.id, () => act(null, 'start_cycle', { requestId: cycle.id }), 'Завдання запущено: агенти працюють.');
 
   // the form: a regular cycle is kept in the operation (the form sends its day and time), a one-off one becomes a request and starts
   async function saveForm(values, start, schedule) {
     if (schedule) {
       const { campaign: saved, regular } = await saveRegular(campaign.id, { id: form.regularId, enabled: true, weekday: schedule.weekday, time: schedule.time, brief: values }, email);
       if (start) { await runRegularNow(saved, regular, email); kickQueue().catch(() => {}); }
-      notify?.(start ? 'Регулярний цикл збережено, перший цикл запущено.' : 'Регулярний цикл збережено.');
+      notify?.(start ? 'Регулярне завдання збережено, перше завдання запущено.' : 'Регулярне завдання збережено.');
     } else {
       await createExtraCycle(campaign.id, values, email, start);
       if (start) kickQueue().catch(() => {});
-      notify?.(start ? 'Цикл запущено: агенти працюють.' : 'Цикл збережено як чернетку.');
+      notify?.(start ? 'Завдання запущено: агенти працюють.' : 'Завдання збережено як чернетку.');
     }
     setForm(null); setSection('now');
     await onChanged?.();
   }
   const editing = form?.regularId ? view.regulars.find((r) => r.id === form.regularId) || null : null;
   async function dropRegular(r) {
-    if (!(await confirm({ title: 'Видалити регулярний цикл?', body: `«${r.title}» більше не запускатиметься сам. Цикли, які він уже зробив, залишаються.`, confirmLabel: 'Видалити', danger: true }))) return;
-    await guard('rm' + r.id, () => removeRegular(campaign.id, r.id), 'Регулярний цикл видалено.');
+    if (!(await confirm({ title: 'Видалити регулярне завдання?', body: `«${r.title}» більше не запускатиметься сам. Завдання, які він уже зробив, залишаються.`, confirmLabel: 'Видалити', danger: true }))) return;
+    await guard('rm' + r.id, () => removeRegular(campaign.id, r.id), 'Регулярне завдання видалено.');
   }
 
-  // «Потребує перевірки»: the cycle that waits for the person is open at once; the checked cycles are kept in the tab «Архів циклів»
+  // «Потребує перевірки»: the cycle that waits for the person is open at once; the checked cycles are kept in the tab «Архів завдань»
   const pending = view.review.filter((r) => r.pending);
   const archived = view.review.filter((r) => !r.pending);
   const cycle = reviewTab === 'now' ? pending.find((r) => r.id === openCycle) || pending[0] || null : archived.find((r) => r.id === openCycle) || null;
@@ -164,8 +163,8 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
         <>
           {view.creative && (
             <div className="opv-nowhead">
-              <span>{view.inWork.length ? `Циклів у роботі: ${view.inWork.length}` : 'Зараз немає циклів у роботі'}</span>
-              <button type="button" className="ckp-btn is-primary" onClick={() => setForm({ mode: 'extra', allowKind: true })}><Ic n="plus" size={16} />Створити додатковий цикл</button>
+              <span>{view.inWork.length ? `Завдань у роботі: ${view.inWork.length}` : 'Зараз немає завдань у роботі'}</span>
+              <button type="button" className="ckp-btn is-primary" onClick={() => setForm({ mode: 'extra', allowKind: true })}><Ic n="plus" size={16} />Створити додаткове завдання</button>
             </div>
           )}
           {!view.creative && <Passes campaignId={campaign.id} />}
@@ -182,17 +181,17 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
 
       {section === 'review' && view.creative && (
         <>
-          <div className="ckp-ribbon opv-subtabs" role="tablist" aria-label="Цикли на перевірку">
-            <button type="button" role="tab" aria-selected={reviewTab === 'now'} className={reviewTab === 'now' ? 'is-on' : ''} onClick={() => { setReviewTab('now'); setOpenCycle(null); setRework(null); }}>{pending.length > 1 ? 'Актуальні цикли' : 'Актуальний цикл'}<em className={pending.length ? 'is-warn' : ''}>{pending.length}</em></button>
-            <button type="button" role="tab" aria-selected={reviewTab === 'archive'} className={reviewTab === 'archive' ? 'is-on' : ''} onClick={() => { setReviewTab('archive'); setOpenCycle(null); setRework(null); }}>Архів циклів<em>{archived.length}</em></button>
+          <div className="ckp-ribbon opv-subtabs" role="tablist" aria-label="Завдання на перевірку">
+            <button type="button" role="tab" aria-selected={reviewTab === 'now'} className={reviewTab === 'now' ? 'is-on' : ''} onClick={() => { setReviewTab('now'); setOpenCycle(null); setRework(null); }}>{pending.length > 1 ? 'Актуальні завдання' : 'Актуальне завдання'}<em className={pending.length ? 'is-warn' : ''}>{pending.length}</em></button>
+            <button type="button" role="tab" aria-selected={reviewTab === 'archive'} className={reviewTab === 'archive' ? 'is-on' : ''} onClick={() => { setReviewTab('archive'); setOpenCycle(null); setRework(null); }}>Архів завдань<em>{archived.length}</em></button>
           </div>
 
           {reviewTab === 'now' && !cycle && (
-            <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Немає циклів на перевірку</b><p>{archived.length ? 'Усі готові креативи перевірено: цикли лежать в архіві, їх можна відкрити й завантажити будь-коли.' : 'Готових креативів ще немає. Цикл зʼявиться тут, щойно агенти зроблять перші картинки.'}</p></div>{archived.length > 0 && <button type="button" className="ckp-btn" style={{ marginLeft: 'auto' }} onClick={() => setReviewTab('archive')}>Архів циклів<Ic n="arrow" size={15} /></button>}</div>
+            <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Немає завдань на перевірку</b><p>{archived.length ? 'Усі готові креативи перевірено: завдання лежать в архіві, їх можна відкрити й завантажити будь-коли.' : 'Готових креативів ще немає. Завдання зʼявиться тут, щойно агенти зроблять перші картинки.'}</p></div>{archived.length > 0 && <button type="button" className="ckp-btn" style={{ marginLeft: 'auto' }} onClick={() => setReviewTab('archive')}>Архів завдань<Ic n="arrow" size={15} /></button>}</div>
           )}
           {/* the cycles that wait for the person: one card per cycle says everything once (its kind, what it is, how many wait); with several, a click switches */}
           {reviewTab === 'now' && pending.length > 0 && (
-            <div className="opv-rvs" role={pending.length > 1 ? 'tablist' : undefined} aria-label="Актуальні цикли">
+            <div className="opv-rvs" role={pending.length > 1 ? 'tablist' : undefined} aria-label="Актуальні завдання">
               {pending.map((r) => {
                 const on = cycle?.id === r.id;
                 const body = (
@@ -212,16 +211,16 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
           {reviewTab === 'archive' && !cycle && (
             <>
               <div className="ckp-sec-h">
-                <h3>Архів циклів</h3><span className="ckp-chip">{archived.length}</span>
-                <button type="button" className="ckp-btn" style={{ marginLeft: 'auto' }} disabled={!view.archive.count || !!busy} onClick={() => download()}>{busy === 'dlall' ? <Spinner /> : <Ic n="download" size={15} />}Завантажити затверджені з усіх циклів ({view.archive.count})</button>
+                <h3>Архів завдань</h3><span className="ckp-chip">{archived.length}</span>
+                <button type="button" className="ckp-btn" style={{ marginLeft: 'auto' }} disabled={!view.archive.count || !!busy} onClick={() => download()}>{busy === 'dlall' ? <Spinner /> : <Ic n="download" size={15} />}Завантажити затверджені з усіх завдань ({view.archive.count})</button>
               </div>
-              {!archived.length && <p className="ckp-empty-line">Архів порожній. Цикл переходить сюди, коли ви ухвалили рішення щодо всіх його креативів; його можна відкрити й завантажити будь-коли.</p>}
+              {!archived.length && <p className="ckp-empty-line">Архів порожній. Завдання переходить сюди, коли ви ухвалили рішення щодо всіх його креативів; його можна відкрити й завантажити будь-коли.</p>}
               <div className="opv-arcs">
                 {archived.map((r) => (
                   <button key={r.id} type="button" className="opv-arc" onClick={() => { setOpenCycle(r.id); setRework(null); }}>
                     <span className="opv-arc-pic" style={r.items.find((i) => i.url) ? { backgroundImage: `url(${r.items.find((i) => i.url).url})` } : undefined} aria-hidden="true" />
                     <span className="opv-arc-tx">
-                      <b>Цикл №{r.id} · {r.title}</b>
+                      <b>Завдання №{r.id} · {r.title}</b>
                       <small>{[r.kindLabel, countsLine(r.creatives)].join(' · ')}</small>
                       <span className="opv-arc-foot"><span className={'ckp-chip ' + STATE_CHIP[r.state]}>{r.stateLabel}</span><span className="pcd-op-date">{fmtDay(r.updatedAt) || '—'}</span></span>
                     </span>
@@ -235,7 +234,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
             <>
               {reviewTab === 'archive' ? (
                 <div className="pcd-opbar">
-                  <button type="button" className="ckp-btn" onClick={() => { setOpenCycle(null); setRework(null); }}><Ic n="back" size={15} />Архів циклів</button>
+                  <button type="button" className="ckp-btn" onClick={() => { setOpenCycle(null); setRework(null); }}><Ic n="back" size={15} />Архів завдань</button>
                   <b>{cycle.kindLabel} · №{cycle.id} · {cycle.title}</b>
                   <span className={'ckp-chip ' + STATE_CHIP[cycle.state]}>{cycle.stateLabel}</span>
                   <span className="pcd-opbar-sp" />
@@ -258,7 +257,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
                   </div>
                 </div>
               )}
-              <section className="ckp-gzone" aria-label={`Креативи циклу ${cycle.id}`}>
+              <section className="ckp-gzone" aria-label={`Креативи завдання ${cycle.id}`}>
                 <Gallery key={cycle.id} minimal items={cycle.items} onAct={(key, payload = {}) => act(null, key, { requestId: cycle.id, ...payload })} loadingHint={loading} />
               </section>
             </>
@@ -284,16 +283,16 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
       {section === 'spend' && (
         <>
           {view.creative && (
-            <section className="ckp-box" aria-label="Витрати за циклами">
-              <div className="ckp-sec-h"><h3>Витрати за циклами</h3><span className="ckp-chip">{fmtUsd(c?.spend?.total)} за весь час</span></div>
-              {!costs.length && <p className="ckp-empty-line">Циклів ще не було.</p>}
+            <section className="ckp-box" aria-label="Витрати за завданнями">
+              <div className="ckp-sec-h"><h3>Витрати за завданнями</h3><span className="ckp-chip">{fmtUsd(c?.spend?.total)} за весь час</span></div>
+              {!costs.length && <p className="ckp-empty-line">Завдань ще не було.</p>}
               {costs.length > 0 && (
                 <div className="opv-sp">
                   {costs.map((r) => {
                     const sum = (r.model || 0) + (r.higgsfield || 0);
                     return (
-                      <article key={r.id} className="opv-spc" aria-label={`Цикл ${r.id}`}>
-                        <b>Цикл №{r.id} · {r.title}</b>
+                      <article key={r.id} className="opv-spc" aria-label={`Завдання ${r.id}`}>
+                        <b>Завдання №{r.id} · {r.title}</b>
                         <small>{r.kindLabel} · картинок: {r.pictures}</small>
                         <span className="opv-spc-big">{fmtUsd(r.total)}</span>
                         <span className="opv-spc-bar" aria-hidden="true"><i style={{ width: sum ? `${((r.model || 0) / sum) * 100}%` : '0%', background: '#EB9CEF' }} /><i style={{ width: sum ? `${((r.higgsfield || 0) / sum) * 100}%` : '0%', background: '#7C8CF8' }} /></span>
@@ -303,7 +302,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
                   })}
                 </div>
               )}
-              <p className="ckp-empty-line">Claude за циклом рахується за останні 30 днів; повна сума операції — у блоці нижче.</p>
+              <p className="ckp-empty-line">Claude за завданням рахується за останні 30 днів; повна сума операції — у блоці нижче.</p>
             </section>
           )}
           <div className="pcd-embed pcd-spend"><CampaignSpend campaignId={campaign.id} /></div>
@@ -313,13 +312,13 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
       {section === 'settings' && (
         <>
           {view.creative && (
-            <section className="ckp-box opv-regular" aria-label="Регулярні цикли">
+            <section className="ckp-box opv-regular" aria-label="Регулярні завдання">
               <div className="ckp-sec-h">
-                <h3>Регулярні цикли</h3><span className="ckp-chip">{view.regulars.length}</span>
-                <button type="button" className="ckp-btn is-primary" style={{ marginLeft: 'auto' }} disabled={view.regulars.length >= MAX_REGULARS} onClick={() => setForm({ mode: 'regular' })}><Ic n="plus" size={15} />Додати регулярний цикл</button>
+                <h3>Регулярні завдання</h3><span className="ckp-chip">{view.regulars.length}</span>
+                <button type="button" className="ckp-btn is-primary" style={{ marginLeft: 'auto' }} disabled={view.regulars.length >= MAX_REGULARS} onClick={() => setForm({ mode: 'regular' })}><Ic n="plus" size={15} />Додати регулярне завдання</button>
               </div>
-              <p className="opv-what">Регулярний цикл запускається сам щотижня у свій день і час, з однаковими параметрами. Їх може бути кілька. Зміни діють з наступного запуску.</p>
-              {!view.regulars.length && <p className="ckp-empty-line">Регулярних циклів немає: операція працює лише коли ви створюєте цикл вручну.</p>}
+              <p className="opv-what">Регулярне завдання запускається щотижня у свій день і час, з однаковими параметрами. Їх може бути кілька. Зміни діють з наступного запуску.</p>
+              {!view.regulars.length && <p className="ckp-empty-line">Регулярних завдань немає: операція працює лише коли ви створюєте завдання вручну.</p>}
               <div className="opv-regs">
                 {view.regulars.map((r) => (
                   <article key={r.id} className={'opv-reg' + (r.enabled ? '' : ' is-off')} aria-label={r.title}>
@@ -327,12 +326,12 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
                     <dl className="opv-list">
                       <div><dt>Що потрібно</dt><dd>{r.brief.goal}</dd></div>
                       <div><dt>Наступний запуск</dt><dd>{r.enabled ? (r.next ? `${r.next.text} (Київ)${stopped ? ': але операція на паузі' : ''}` : '—') : 'вимкнено'}</dd></div>
-                      <div><dt>Формати і напрями</dt><dd>{r.brief.ratios.join(', ')} · напрямів: {directionLimit(r.brief)} (креативів за цикл: до {directionLimit(r.brief) * r.brief.ratios.length})</dd></div>
+                      <div><dt>Формати і напрями</dt><dd>{r.brief.ratios.join(', ')} · напрямів: {directionLimit(r.brief)} (креативів на одне завдання: до {directionLimit(r.brief) * r.brief.ratios.length})</dd></div>
                       <div><dt>Тексти</dt><dd>{r.brief.texts === 'no' ? 'без тексту на картинці' : 'пише агент копірайтер'} · мова: {r.brief.language === 'en' ? 'English' : 'українська'}</dd></div>
                     </dl>
                     <div className="ckp-acts">
                       <button type="button" className="ckp-btn" onClick={() => setForm({ mode: 'regular', regularId: r.id })}><Ic n="pen" size={15} />Змінити</button>
-                      <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => guard('reg' + r.id, () => setRegularEnabled(campaign.id, r.id, !r.enabled, email), r.enabled ? 'Регулярний цикл вимкнено.' : 'Регулярний цикл увімкнено.')}><Ic n={r.enabled ? 'stop' : 'play'} size={15} />{r.enabled ? 'Вимкнути' : 'Увімкнути'}</button>
+                      <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => guard('reg' + r.id, () => setRegularEnabled(campaign.id, r.id, !r.enabled, email), r.enabled ? 'Регулярне завдання вимкнено.' : 'Регулярне завдання увімкнено.')}><Ic n={r.enabled ? 'stop' : 'play'} size={15} />{r.enabled ? 'Вимкнути' : 'Увімкнути'}</button>
                       <button type="button" className="ckp-btn is-danger" disabled={!!busy} onClick={() => dropRegular(r)}>Видалити</button>
                     </div>
                   </article>
@@ -350,20 +349,20 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
       )}
 
       {section === 'ready' && view.creative && (
-        <section className="ckp-box" aria-label="Готові матеріали останнього циклу">
+        <section className="ckp-box" aria-label="Готові матеріали останнього завдання">
           <div className="ckp-sec-h">
-            <h3>Готові матеріали останнього циклу</h3>
-            {view.ready && <span className="ckp-chip">Цикл №{view.ready.cycle.id} · {view.ready.cycle.kindLabel}</span>}
+            <h3>Готові матеріали останнього завдання</h3>
+            {view.ready && <span className="ckp-chip">Завдання №{view.ready.cycle.id} · {view.ready.cycle.kindLabel}</span>}
             {view.ready && <button type="button" className="ckp-btn is-primary" style={{ marginLeft: 'auto' }} disabled={!view.ready.items.length || !!busy} onClick={() => download(view.ready.cycle.id)}>{busy === 'dl' + view.ready.cycle.id ? <Spinner /> : <Ic n="download" size={15} />}Завантажити (ZIP)</button>}
           </div>
-          {!view.ready && <p className="ckp-empty-line">Готових матеріалів ще немає: вони зʼявляться після першого циклу.</p>}
+          {!view.ready && <p className="ckp-empty-line">Готових матеріалів ще немає: вони зʼявляться після першого завдання.</p>}
           {view.ready && (
             <>
               <p className="opv-what">{view.ready.cycle.title}</p>
               {(view.ready.pending > 0 || view.ready.returned > 0) && (
                 <p className="ckp-empty-line">{[view.ready.pending ? `ще на перевірці: ${view.ready.pending}` : '', view.ready.returned ? `повернено на доопрацювання: ${view.ready.returned}` : ''].filter(Boolean).join(' · ')}. <button type="button" className="ckp-more" onClick={() => go('review', view.ready.cycle.id)}>Перейти до перевірки</button></p>
               )}
-              {!view.ready.items.length && <p className="ckp-empty-line">У цьому циклі ще нічого не затверджено.</p>}
+              {!view.ready.items.length && <p className="ckp-empty-line">У цьому завданні ще нічого не затверджено.</p>}
               <div className="opv-ready">
                 {view.ready.items.map((i) => (
                   <article key={i.id} className="opv-mat">
@@ -388,7 +387,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
 
       {form && (
         <div className="cmp-section pcd-embed">
-          <RequestForm key={form.regularId || form.mode} campaign={campaign} mode={form.mode} allowKind={!!form.allowKind} title="Одноразовий цикл: запит на креативи" initial={editing ? { ...editing.brief, materials: [] } : null}
+          <RequestForm key={form.regularId || form.mode} campaign={campaign} mode={form.mode} allowKind={!!form.allowKind} title="Разове завдання: запит на креативи" initial={editing ? { ...editing.brief, materials: [] } : null}
             schedule={editing ? { weekday: editing.weekday, time: editing.time } : null} canStartNow={!stopped} onClose={() => setForm(null)} onSave={saveForm} />
         </div>
       )}

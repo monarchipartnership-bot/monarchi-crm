@@ -20,7 +20,7 @@ const OP_STATUS = { active: ['працює', 'is-work'], paused: ['на пауз
 // the same six sections as inside the project card (OperationView), with its own head: the client, the operation, its state, stop / resume, the way to the project.
 //   campaign: the ag_campaigns row  project: { id, name, client }  cockpit: useProjectCockpit()  regularFirst: just created → the regular cycle form opens
 //   onOpenProject(projectId, operationId): opens the card of the project (not shown when the project is not in the section)
-export default function OperationCard({ campaign, project, cockpit, regularFirst = false, onClose, onChanged, onOpenProject }) {
+export default function OperationCard({ campaign, project, cockpit, regularFirst = false, extraFirst = false, onClose, onChanged, onOpenProject }) {
   const box = useRef(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
@@ -62,7 +62,7 @@ export default function OperationCard({ campaign, project, cockpit, regularFirst
         </header>
         <div className="ckp-wbody pcd-body">
           <OperationView key={campaign.id} campaign={campaign} cockpit={cockpit.byId[campaign.id] || null} project={project} loading={cockpit.loading} run={cockpit.run} notify={notify}
-            onChanged={changed} onBack={() => { onClose?.(); }} regularFirst={regularFirst} />
+            onChanged={changed} onBack={() => { onClose?.(); }} regularFirst={regularFirst} extraFirst={extraFirst} />
         </div>
       </div>
       {toast && <div className={'ckp-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}

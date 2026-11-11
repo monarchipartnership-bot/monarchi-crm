@@ -602,7 +602,7 @@ function ProjectDetailCard() {
         </div>
       ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
-      {tab === 'teams' && <ProjectTeams key={'teams-' + id} projectId={id} onGoFill={(section) => { setTab('overview'); setInfo(section); }} onOpenReports={() => setTab('agent')} />}
+      {tab === 'teams' && <ProjectTeams key={'teams-' + id} projectId={id} onGoFill={(section) => { setTab('overview'); setInfo(section); }} onOpenReports={() => setTab('agent')} onOpenMaterials={() => setTab('creative')} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
       {tab === 'creative' && <ProjectCreativeTab key={'creative-' + id} projectId={id} section="materials" showDeliverables embedded />}
       </div>

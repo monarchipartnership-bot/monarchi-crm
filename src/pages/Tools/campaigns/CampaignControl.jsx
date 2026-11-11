@@ -4,7 +4,6 @@ import { addInstruction, fetchCampaignControl, removeInstruction, saveCampaignMo
 import { AGENT_MODES, MAX_INSTRUCTION_CHARS, WEEKDAYS, describeSchedule } from '../../../lib/agents/campaignCycles';
 import { fmtDateTime } from '../../Smm/agentUi';
 
-const CYCLE_STATUS = { queued: 'у черзі', running: 'працює', review: 'чекає вас', done: 'готово', problem: 'проблема', cancelled: 'скасовано' };
 // the dark pages of the section use the native select in the dark input style (as the campaign wizard does)
 const Pick = ({ value, onChange, options, ariaLabel }) => (
   <select className="cmp-input ccx-select" value={value} onChange={(e) => onChange(e.target.value)} aria-label={ariaLabel}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
@@ -13,7 +12,7 @@ const WEEK_OPTIONS = [{ value: '', label: 'Без розкладу' }, ...WEEKDA
 const timeOk = (t) => /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(t).trim());
 
 // «Керування операцією»: what a manager decides while the campaign works — when each agent works, whether it waits for their OK or is paused, the instructions
-// every agent reads, the money cap and the cycles so far (spec 2026-11-02, §3, §5, §9). Every change goes through the server, which checks the rights and writes the journal.
+// every agent reads, the money cap (spec 2026-11-02, §3, §5, §9). Every change goes through the server, which checks the rights and writes the journal.
 export default function CampaignControl({ campaign, notify }) {
   const [confirm, confirmDialog] = useConfirm();
   const [ctl, setCtl] = useState(null);
@@ -112,14 +111,6 @@ export default function CampaignControl({ campaign, notify }) {
       </div>
       <p className="cmp-muted">Досягнувши ліміту, операція не запускає нових платних кроків і надсилає сповіщення. Порожнє поле — без ліміту; крок 0 вимикає сповіщення про кожні витрачені N доларів.</p>
 
-      <h4 className="ccx-sub">Цикли</h4>
-      {!ctl.cycles.length && <p className="cmp-muted">Циклів ще не було: перший зʼявиться при запуску операції або запиту на креативи.</p>}
-      {ctl.cycles.length > 0 && (
-        <table className="ccx-cycles">
-          <thead><tr><th>№</th><th>Стан</th><th>Готовність</th><th>Початок</th><th>Кінець</th></tr></thead>
-          <tbody>{ctl.cycles.slice(0, 8).map((c) => <tr key={c.id}><td>{c.number}</td><td>{CYCLE_STATUS[c.status] || c.status}</td><td>{Math.round((Number(c.progress) || 0) * 100)}%</td><td>{fmtDateTime(c.started_at || c.created_at)}</td><td>{c.finished_at ? fmtDateTime(c.finished_at) : '—'}</td></tr>)}</tbody>
-        </table>
-      )}
       {confirmDialog}
     </section>
   );

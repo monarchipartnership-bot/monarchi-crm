@@ -45,8 +45,8 @@ const ageOf = (item) => {
 //   mode 'regular' (owner, 2026-11-11): the same form sets up the REGULAR cycle of the operation: the day and the time of the weekly run are asked too, ready
 //   texts and hand-picked files are not (every run takes the current card of the project), and onSave gets (values, startNow, { weekday, time }).
 //   title: the heading of the window; schedule: { weekday, time } of the regular cycle that is already saved.
-//   allowKind: the person chooses in the form whether the cycle is one-off or regular («Створити додатковий цикл»)
-export default function RequestForm({ campaign, initial = null, onClose, onSave, mode = 'extra', title = 'Новий цикл: запит на креативи', schedule = null, canStartNow = true, allowKind = false }) {
+//   allowKind: the person chooses in the form whether the cycle is one-off or regular («Створити додаткове завдання»)
+export default function RequestForm({ campaign, initial = null, onClose, onSave, mode = 'extra', title = 'Нове завдання: запит на креативи', schedule = null, canStartNow = true, allowKind = false }) {
   const [kind, setKind] = useState(mode); // extra | regular
   const regular = kind === 'regular';
   const [sched, setSched] = useState(() => ({ weekday: String(schedule?.weekday || 1), time: schedule?.time || '09:00', startNow: !schedule && canStartNow })); // canStartNow false: the operation is paused, nothing can start
@@ -185,7 +185,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
     <div className="cmp-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div ref={box} className="cmp-wizard stu-form qr" role="dialog" aria-modal="true" aria-labelledby="stu-form-title" tabIndex={-1}>
         <header className="cmp-wiz-head">
-          <div><span className="cmp-kicker">Креативна студія · {campaign.name}</span><h2 id="stu-form-title">{regular ? 'Регулярний цикл: що робити щотижня' : allowKind ? 'Створити додатковий цикл' : title}</h2></div>
+          <div><span className="cmp-kicker">Креативна студія · {campaign.name}</span><h2 id="stu-form-title">{regular ? 'Регулярне завдання: що робити щотижня' : allowKind ? 'Створити додаткове завдання' : title}</h2></div>
           <button type="button" className="cmp-x" onClick={onClose} disabled={!!busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
         </header>
         <div className="cmp-wiz-body qr-body">
@@ -194,21 +194,21 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
           {/* 1. the name and the kind of the cycle */}
           <div className="qr-card">
             <h4 className="qr-h">Основне</h4>
-            <label htmlFor="stu-name" className="qr-lab">Назва циклу {srcBadge('f.title')}</label>
+            <label htmlFor="stu-name" className="qr-lab">Назва завдання {srcBadge('f.title')}</label>
             <input id="stu-name" className="cmp-input" value={f.title} maxLength={100} onChange={(e) => set({ title: e.target.value })} placeholder="Наприклад: Осінній розпродаж, нова колекція (порожньо: назвемо за описом)" autoFocus={!initial} />
             {allowKind && (
               <div className="qr-g qr-wrap">
-                <span className="qr-lab">Тип циклу</span>
-                <Chips label="Тип циклу" value={kind} options={[['extra', 'Одноразовий'], ['regular', 'Регулярний (щотижня)']]} onPick={setKind} />
+                <span className="qr-lab">Тип завдання</span>
+                <Chips label="Тип завдання" value={kind} options={[['extra', 'Одноразовий'], ['regular', 'Регулярний (щотижня)']]} onPick={setKind} />
               </div>
             )}
-            {allowKind && <p className="qr-mut">{regular ? 'Запускатиметься сам щотижня у вибраний день і час, з однаковими параметрами.' : 'Запускається один раз, зараз. Параметри діють лише для цього циклу.'}</p>}
+            {allowKind && <p className="qr-mut">{regular ? 'Запускатиметься сам щотижня у вибраний день і час, з однаковими параметрами.' : 'Запускається один раз, зараз. Параметри діють лише для цього завдання.'}</p>}
             {regular && (
               <div className="qr-g qr-wrap">
                 <span className="qr-lab">Запускати щотижня</span>
-                <select className="cmp-input ccx-select" value={sched.weekday} onChange={(e) => setSched((s) => ({ ...s, weekday: e.target.value }))} aria-label="День тижня регулярного циклу">{WEEKDAYS.map((d, i) => <option key={d} value={String(i + 1)}>{d}</option>)}</select>
+                <select className="cmp-input ccx-select" value={sched.weekday} onChange={(e) => setSched((s) => ({ ...s, weekday: e.target.value }))} aria-label="День тижня регулярного завдання">{WEEKDAYS.map((d, i) => <option key={d} value={String(i + 1)}>{d}</option>)}</select>
                 <input className="cmp-input ccx-time" type="text" inputMode="numeric" value={sched.time} onChange={(e) => setSched((s) => ({ ...s, time: e.target.value }))} placeholder="09:00" aria-label="Час запуску (Київ)" />
-                <button type="button" className={'qr-sw' + (sched.startNow ? ' on' : '')} role="switch" aria-checked={sched.startNow} disabled={!canStartNow} title={canStartNow ? '' : 'Операція на паузі: перший цикл почнеться за розкладом після відновлення'} onClick={() => setSched((s) => ({ ...s, startNow: !s.startNow }))}><i /><span>{canStartNow ? 'Запустити перший цикл одразу' : 'Операція на паузі: запуск за розкладом після відновлення'}</span></button>
+                <button type="button" className={'qr-sw' + (sched.startNow ? ' on' : '')} role="switch" aria-checked={sched.startNow} disabled={!canStartNow} title={canStartNow ? '' : 'Операція на паузі: перше завдання почнеться за розкладом після відновлення'} onClick={() => setSched((s) => ({ ...s, startNow: !s.startNow }))}><i /><span>{canStartNow ? 'Запустити перше завдання одразу' : 'Операція на паузі: запуск за розкладом після відновлення'}</span></button>
               </div>
             )}
           </div>
@@ -221,7 +221,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
             {speech.error && <p className="qr-liveerr" role="alert">{speech.error}</p>}
             <div className="qr-foot qr-footrow">
               <span>{f.goal.length} / 3000</span>
-              <button type="button" className="cmp-btn cmp-btn--primary qr-ana" disabled={an.busy || f.goal.trim().length < MIN_FILL_CHARS} onClick={analyse} title={f.goal.trim().length < MIN_FILL_CHARS ? 'Спершу опишіть цикл хоча б одним-двома реченнями' : 'Агент розбере опис разом із карткою проєкту й заповнить поля'}>{an.busy ? 'Аналізуємо…' : '✦ Проаналізувати й заповнити поля'}</button>
+              <button type="button" className="cmp-btn cmp-btn--primary qr-ana" disabled={an.busy || f.goal.trim().length < MIN_FILL_CHARS} onClick={analyse} title={f.goal.trim().length < MIN_FILL_CHARS ? 'Спершу опишіть завдання хоча б одним-двома реченнями' : 'Агент розбере опис разом із карткою проєкту й заповнить поля'}>{an.busy ? 'Аналізуємо…' : '✦ Проаналізувати й заповнити поля'}</button>
             </div>
             <div className="qr-mic is-live">
               {speech.supported ? (
@@ -262,7 +262,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
               </div>
             </div>
             <p className="qr-total"><b>Разом: {total} {total === 1 ? 'креатив' : total > 1 && total < 5 ? 'креативи' : 'креативів'}</b> <span>({given ? f.given_texts.length || 0 : f.count} {(given ? f.given_texts.length : f.count) === 1 ? 'напрям' : 'напрями'} × {f.ratios.length || 1} {f.ratios.length === 1 ? 'формат' : 'формати'}). Кожен напрям робиться в кожному вибраному форматі.</span></p>
-            {total > 12 && <p className="qr-mut">Багато креативів: генерація картинок платна. Ціну покажемо до запуску, а стелю витрат цього циклу можна задати нижче, в налаштуваннях агента «Креативщик».</p>}
+            {total > 12 && <p className="qr-mut">Багато креативів: генерація картинок платна. Ціну покажемо до запуску, а стелю витрат цього завдання можна задати нижче, в налаштуваннях агента «Креативщик».</p>}
             <div className="qr-g qr-wrap">
               <span className="qr-lab">Тексти на креативах</span>
               <Chips label="Тексти на креативах" value={given ? 'given' : f.texts === 'no' ? 'no' : 'yes'} options={[['yes', 'Напише агент копірайтер'], ['no', 'Без тексту на картинці'], ...(regular ? [] : [['given', 'Мої готові тексти']])]} onPick={(k) => (k === 'given' ? setGiven(true) : set({ texts: k }))} />
@@ -376,8 +376,8 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
 
           {/* 4. what each agent is asked for THIS cycle only */}
           <div className="qr-card qr-agents">
-            <h4 className="qr-h">Налаштування агентів для цього циклу</h4>
-            <p className="qr-mut">Поля підставляються з картки проєкту й з вашого опису (кнопка «Проаналізувати й заповнити» вище), їх можна виправити. Агент врахує це лише в цьому циклі й вважатиме важливішим за свої загальні налаштування. Порожнє поле нічого не змінює.</p>
+            <h4 className="qr-h">Налаштування агентів для цього завдання</h4>
+            <p className="qr-mut">Поля підставляються з картки проєкту й з вашого опису (кнопка «Проаналізувати й заповнити» вище), їх можна виправити. Агент врахує це лише в цьому завданні й вважатиме важливішим за свої загальні налаштування. Порожнє поле нічого не змінює.</p>
             {CYCLE_AGENT_ROLES.map((role) => {
               const def = creativeRoleDef(role);
               const fields = cycleAgentFields(role);
@@ -399,7 +399,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
                         </div>
                       ) : (
                         <label key={fd.key} className={'qr-fl' + (fd.type === 'textarea' ? ' qr-w2' : '')}>
-                          <span className="qr-lab">{fd.key === 'max_usd' ? 'Ліміт витрат Higgsfield на цей цикл, $' : fd.label} {srcBadge(`a.${role}.${fd.key}`)}</span>
+                          <span className="qr-lab">{fd.key === 'max_usd' ? 'Ліміт витрат Higgsfield на це завдання, $' : fd.label} {srcBadge(`a.${role}.${fd.key}`)}</span>
                           {fd.type === 'textarea'
                             ? <textarea className="cmp-input" rows={3} value={mine[fd.key] || ''} onChange={(e) => setAgent(role, fd.key, e.target.value)} maxLength={1500} />
                             : <input className="cmp-input" inputMode={fd.key === 'max_usd' ? 'decimal' : undefined} value={mine[fd.key] || ''} onChange={(e) => setAgent(role, fd.key, e.target.value)} maxLength={fd.key === 'max_usd' ? 8 : 300} placeholder={fd.key === 'max_usd' ? 'порожньо: ліміт агента' : ''} />}
@@ -437,10 +437,10 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
           </div>
         </div>
         <footer className="cmp-wiz-foot">
-          <span className="cmp-foot-note">{regular ? 'Агенти запускатимуться самі за розкладом. Картинки генеруються лише після вашого підтвердження вартості; готове йде на ваше затвердження.' : !canStartNow ? 'Операція на паузі: цикл можна лише зберегти як чернетку, запустити його можна після відновлення операції.' : 'Нічого не публікується й не завантажується в рекламні кабінети: результат іде на ваше затвердження.'}</span>
+          <span className="cmp-foot-note">{regular ? 'Агенти запускатимуться самі за розкладом. Картинки генеруються лише після вашого підтвердження вартості; готове йде на ваше затвердження.' : !canStartNow ? 'Операція на паузі: завдання можна лише зберегти як чернетку, запустити його можна після відновлення операції.' : 'Нічого не публікується й не завантажується в рекламні кабінети: результат іде на ваше затвердження.'}</span>
           {!regular && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => submit(false)}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти чернетку'}</button>}
           {regular
-            ? <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy} onClick={() => submit(sched.startNow)}>{busy ? 'Зберігаємо…' : sched.startNow ? 'Зберегти й запустити перший цикл' : 'Зберегти регулярний цикл'}</button>
+            ? <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy} onClick={() => submit(sched.startNow)}>{busy ? 'Зберігаємо…' : sched.startNow ? 'Зберегти й запустити перше завдання' : 'Зберегти регулярне завдання'}</button>
             : <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy || !canStartNow} title={canStartNow ? '' : 'Операція на паузі'} onClick={() => submit(true)}>{busy === 'start' ? 'Запускаємо…' : 'Створити й запустити'}</button>}
         </footer>
       </div>

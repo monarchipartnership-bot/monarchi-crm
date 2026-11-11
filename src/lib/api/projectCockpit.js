@@ -97,7 +97,7 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     kick();
     return { submitted: res.submitted || 0 };
   }
-  if (key === 'start_cycle') { if (!rid) throw new Error('Цикл не знайдено.'); await startRequest(rid); kick(); return {}; }
+  if (key === 'start_cycle') { if (!rid) throw new Error('Завдання не знайдено.'); await startRequest(rid); kick(); return {}; }
   if (key === 'approve_all') {
     const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);
     if (!ids.length) throw new Error('Немає креативів на перегляд.');

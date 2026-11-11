@@ -3,12 +3,11 @@ import { supabase } from '../../../lib/supabaseClient';
 import { KIND_LABEL, PATH_STATE_LABEL, buildTaskPath, carrierLabel, currentStep } from '../../../lib/agents/mapTasks';
 import './TaskFlowPanel.css';
 
-// The tasks of one car, for its path: a cycle of a request → the tasks of the request; a scheduled cycle → the tasks of the operation since the cycle began;
-// open work outside a cycle → the tasks of the operation of the last two weeks.
+// The tasks of one carrier, for its path: a creative request → the tasks of the request; other open work → the tasks of the operation of the last two weeks.
 async function fetchPath(car) {
   let q = supabase.from('ag_tasks').select('agent_id, status, output, created_at').order('created_at', { ascending: true }).limit(300);
   if (car.requestId) q = q.eq('request_id', car.requestId);
-  else if (car.campaignId != null) q = q.eq('campaign_id', car.campaignId).gte('created_at', car.cycleId && car.since ? car.since : new Date(Date.now() - 14 * 86400000).toISOString());
+  else if (car.campaignId != null) q = q.eq('campaign_id', car.campaignId).gte('created_at', new Date(Date.now() - 14 * 86400000).toISOString());
   else return null; // an agent without an operation: there is no chain to show
   const [tasks, agents] = await Promise.all([q, supabase.from('ag_agents').select('id, role, name')]);
   if (tasks.error || agents.error) throw tasks.error || agents.error;
@@ -22,7 +21,7 @@ export default function TaskFlowPanel({ tasks = [], selectedId = null, onSelect,
   const [open, setOpen] = useState(false);
   const [path, setPath] = useState(undefined); // undefined = loading, null = no chain
   const car = useMemo(() => tasks.find((t) => t.id === selectedId) || null, [tasks, selectedId]);
-  const carKey = car ? `${car.id}:${car.kind}:${car.count}:${car.progress ?? ''}` : '';
+  const carKey = car ? `${car.id}:${car.kind}:${car.count}` : '';
 
   useEffect(() => { if (selectedId) setOpen(true); }, [selectedId]); // a click on a car on the map opens the panel
   useEffect(() => {
@@ -63,7 +62,7 @@ export default function TaskFlowPanel({ tasks = [], selectedId = null, onSelect,
       )}
       {car && (
         <div className="tfp-path">
-          <div className="tfp-path-head"><b>{car.project || car.campaign || 'Завдання'}</b>{car.cycleNumber ? <span>цикл {car.cycleNumber} · {Math.round((car.progress || 0) * 100)}%</span> : null}</div>
+          <div className="tfp-path-head"><b>{car.project || car.campaign || 'Завдання'}</b></div>
           {path === undefined && <p className="tfp-empty">Завантажую шлях…</p>}
           {path === null && <p className="tfp-empty">Це завдання агента без операції: ланцюжка немає.</p>}
           {path && !path.length && <p className="tfp-empty">Кроків ще немає.</p>}

@@ -7,28 +7,27 @@ import { buildMapTasks } from '../../../lib/agents/mapTasks';
 const REFRESH_MS = 30 * 1000;
 
 export default function useMapTasks(registryKeys = []) {
-  const [raw, setRaw] = useState({ tasks: [], agents: [], campaigns: [], projects: [], cycles: [] });
+  const [raw, setRaw] = useState({ tasks: [], agents: [], campaigns: [], projects: [] });
   useEffect(() => {
     let alive = true;
     async function load() {
       try {
-        const [open, review, agents, cyc] = await Promise.all([
+        const [open, review, agents] = await Promise.all([
           supabase.from('ag_tasks').select('id, agent_id, status, campaign_id, request_id, created_at, started_at, output').in('status', ['queued', 'running', 'failed']).order('created_at', { ascending: false }).limit(500),
           supabase.from('ag_tasks').select('id, agent_id, status, campaign_id, request_id, created_at, started_at, output').eq('status', 'done').eq('output->>awaiting_pass', 'true').limit(200),
-          supabase.from('ag_agents').select('id, role, team'),
-          supabase.from('ag_cycles').select('id, campaign_id, number, status, progress, request_id, started_at').in('status', ['queued', 'running', 'review', 'problem']).order('id', { ascending: false }).limit(100),
+          supabase.from('ag_agents').select('id, role, team, scope_id'),
         ]);
         if (open.error || review.error || agents.error) throw open.error || review.error || agents.error;
-        const cycles = cyc.error ? [] : cyc.data || []; // no cycles (older database): the carriers are per agent as before
         const tasks = [...(open.data || []), ...(review.data || [])];
-        const ids = [...new Set([...tasks, ...cycles].map((t) => t.campaign_id).filter((x) => x != null))];
+        const byAgent = new Map((agents.data || []).map((a) => [a.id, a]));
+        const ids = [...new Set(tasks.map((t) => t.campaign_id ?? (byAgent.get(t.agent_id)?.team === 'campaign' ? Number(byAgent.get(t.agent_id).scope_id) || null : null)).filter((x) => x != null))];
         const campaigns = ids.length ? (await supabase.from('ag_campaigns').select('id, name, project_id').in('id', ids)).data || [] : [];
         const pids = [...new Set(campaigns.map((c) => c.project_id).filter((x) => x != null))];
         const projects = pids.length ? (await supabase.from('projects').select('id, name').in('id', pids)).data || [] : [];
-        if (alive) setRaw({ tasks, agents: agents.data || [], campaigns, projects, cycles });
+        if (alive) setRaw({ tasks, agents: agents.data || [], campaigns, projects });
       } catch (e) {
         console.warn('map tasks not available', e?.message || e);
-        if (alive) setRaw({ tasks: [], agents: [], campaigns: [], projects: [], cycles: [] });
+        if (alive) setRaw({ tasks: [], agents: [], campaigns: [], projects: [] });
       }
     }
     load();

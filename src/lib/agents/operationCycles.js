@@ -1,7 +1,7 @@
 // The cycles of an operation (owner, 2026-11-11). An operation is a standing assignment for one client; a CYCLE is one pass of it:
 //   regular  the operation keeps weekly schedules with the parameters of the work (campaign.config.regulars, several may be); the server creates a request
 //            from them on the day and starts it (api/_lib/regularCycles.js)
-//   extra    a one-off request with its own parameters that a person starts next to the regular ones («Створити додатковий цикл»)
+//   extra    a one-off request with its own parameters that a person starts next to the regular ones («Створити додаткове завдання»)
 // A cycle of the creative department is a row of ag_creative_requests (brief.kind = 'regular' | 'extra', brief.scheduled_for = the Kyiv day of the run).
 // The card of an operation shows six sections; this file turns the cabinet of the operation (projectCockpit.js) into what each of them shows.
 // Pure code: the page, the server and the tests use it.
@@ -9,7 +9,7 @@ import { lastScheduled, nextScheduled } from '../agentSchedule.js';
 import { WEEKDAYS, cleanSchedule } from './campaignCycles.js';
 import { MAX_MATERIALS, cleanRequest, directionLimit } from './creativeTeam.js';
 
-export const CYCLE_KIND = { regular: 'Регулярний цикл', extra: 'Одноразовий цикл' };
+export const CYCLE_KIND = { regular: 'Регулярне завдання', extra: 'Разове завдання' };
 export const REGULAR_LATE_HOURS = 36; // a regular run that could not start within this time waits for the next week (an operation that was paused does not fire at once)
 export const SECTIONS = [['now', 'Зараз в роботі'], ['review', 'Потребує перевірки'], ['messages', 'Повідомлення від агентів'], ['spend', 'Витрати'], ['settings', 'Налаштування'], ['ready', 'Готові матеріали']];
 
@@ -30,7 +30,7 @@ export const hasCreativeCycles = (campaign) => modeOf(campaign) === 'creative' |
 export function sameModeConflict(campaigns = [], { projectId, mode, exceptId = null } = {}) {
   return campaigns.find((c) => c.project_id === projectId && c.id !== exceptId && ['active', 'paused'].includes(c.status) && modeOf(c) === mode) || null;
 }
-export const conflictMessage = (other) => `У цього проєкту вже працює операція «${MODE_TITLE[modeOf(other)] || modeOf(other)}» («${other.name || `Операція ${other.id}`}»). Дві однакові операції одночасно не запускаються: додайте цикл у наявну або завершіть її.`;
+export const conflictMessage = (other) => `У цього проєкту вже працює операція «${MODE_TITLE[modeOf(other)] || modeOf(other)}» («${other.name || `Операція ${other.id}`}»). Дві однакові операції одночасно не запускаються: додайте завдання у наявну або завершіть її.`;
 
 // ---- the regular cycles: campaign.config.regulars = [{ id, enabled, weekday 1..7, time 'HH:MM', title, brief, since, updated_by, updated_at }]
 // An operation may have several of them (owner, 2026-11-11), each with its own day, time and parameters; an older operation keeps one in campaign.config.regular
@@ -77,7 +77,7 @@ export const dueRegulars = ({ campaign, requests = [], now = new Date() }) => re
 // The row of ag_creative_requests the schedule creates. assets: the files of the project card (taken fresh at every run); regular: which cycle (the first by default).
 export function regularRequest(campaign, scheduledFor, assets = [], regular = null) {
   const r = regular || regularOf(campaign);
-  if (!r) throw new Error('Регулярний цикл не налаштовано.');
+  if (!r) throw new Error('Регулярне завдання не налаштовано.');
   const materials = assets.filter((a) => a?.url && a?.name).slice(0, MAX_MATERIALS).map((a) => ({ name: String(a.name).slice(0, 160), url: a.url, path: a.path || '', kind: ['logo', 'product', 'style'].includes(a.kind) ? a.kind : 'other' }));
   return { campaign_id: campaign.id, title: `${clip(r.title || clip(r.brief?.goal, 60), 100)} · ${dayMonth(scheduledFor)}`, brief: { ...r.brief, kind: 'regular', regular_id: r.id, scheduled_for: scheduledFor }, materials, status: 'draft', created_by: 'розклад' };
 }
@@ -125,7 +125,7 @@ const joinLabels = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')}
 export function cycleStage(cycle = {}) {
   const stages = (cycle.stages || []).filter((s) => s.key !== 'you');
   const c = cycle.creatives || {};
-  if (cycle.status === 'draft') return { now: 'Чернетка: цикл збережено, але не запущено', next: 'Після запуску почне працювати стратег', blocked: 'draft' };
+  if (cycle.status === 'draft') return { now: 'Чернетка: завдання збережено, але не запущено', next: 'Після запуску почне працювати стратег', blocked: 'draft' };
   const failed = stages.find((s) => s.state === 'failed');
   if (failed) return { now: `Крок «${failed.label}» зупинився`, next: 'Повторіть крок у розділі «Повідомлення від агентів»', blocked: 'failed' };
   const live = stages.filter((s) => ['working', 'waiting'].includes(s.state));
@@ -139,7 +139,7 @@ export function cycleStage(cycle = {}) {
   if (c.producing > 0) return { now: `Генеруються картинки: готово ${madeOf(c)} з ${c.total}`, next: 'Ваш перегляд у розділі «Потребує перевірки»', blocked: null };
   if ((c.planned || 0) + (c.failed || 0) > 0) return { now: `Чекає вашого підтвердження генерації: ${c.planned + (c.failed || 0)} ${plural(c.planned + (c.failed || 0), 'картинка', 'картинки', 'картинок')}`, next: 'Після підтвердження картинки згенеруються й підуть на ваш перегляд', blocked: 'estimate' };
   if (madeOf(c) > 0 || cycle.status === 'review') return { now: 'Готово: чекає вашого перегляду', next: 'Схваліть або поверніть у розділі «Потребує перевірки»', blocked: 'review' };
-  if (cycle.status === 'problem') return { now: 'Цикл зупинився з помилкою', next: 'Подивіться розділ «Повідомлення від агентів»', blocked: 'failed' };
+  if (cycle.status === 'problem') return { now: 'Завдання зупинився з помилкою', next: 'Подивіться розділ «Повідомлення від агентів»', blocked: 'failed' };
   const idle = stages.find((s) => s.state !== 'done');
   return { now: idle ? `Чекає на крок «${idle.label}»` : 'Агенти завершили роботу', next: idle ? '' : 'Ваш перегляд', blocked: null };
 }
@@ -186,9 +186,9 @@ export function buildOperationView({ campaign, cockpit = null, now = new Date() 
   const regular = regulars[0] || null;
   const next = nextRegular(campaign, now);
   const creative = hasCreativeCycles(campaign);
-  const nextText = !creative ? '' : !regulars.length ? 'Регулярних циклів не налаштовано: операція працює лише за одноразовими циклами.'
-    : !regulars.some((r) => r.enabled) ? 'Усі регулярні цикли вимкнено.'
-      : paused ? 'Операція на паузі: регулярні цикли не запускаються, поки ви її не відновите.'
+  const nextText = !creative ? '' : !regulars.length ? 'Регулярних завдань не налаштовано: операція працює лише за одноразовими завданнями.'
+    : !regulars.some((r) => r.enabled) ? 'Усі регулярні завдання вимкнено.'
+      : paused ? 'Операція на паузі: регулярні завдання не запускаються, поки ви її не відновите.'
         : next ? `Наступний регулярний запуск: ${next.text}.` : '';
   return {
     creative, inWork, review, messages, ready, regular, regulars,

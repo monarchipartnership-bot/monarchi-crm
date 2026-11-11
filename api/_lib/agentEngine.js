@@ -22,7 +22,7 @@ import { pollCreatives } from './creativeMake.js';
 import { campaignRole } from './campaignRun.js';
 import { creativeRole } from './creativeRun.js';
 import { fanOutRequest, passOn, settleRequest, touchClientLink } from './creativeEngine.js';
-import { CAP_MESSAGE, cappedCampaigns, openCycle, syncCycles } from './campaignCycles.js';
+import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { runRegularCycles } from './regularCycles.js';
 import { conflictMessage, modeOf, sameModeConflict } from '../../src/lib/agents/operationCycles.js';
 import { CREATIVE_TEAM } from '../../src/lib/agents/creativeTeam.js';
@@ -488,7 +488,6 @@ async function scheduleDue(ctx, all) {
     if (open.length) continue;
     const same = a.last_scheduled === verdict.scheduledFor;
     must(await ctx.db.from('ag_agents').update({ last_scheduled: verdict.scheduledFor, attempts: same ? (a.attempts || 0) + 1 : 1, last_attempt_at: iso(ctx.now()) }).eq('id', a.id), 'agent');
-    if (a.team === CAMPAIGN_TEAM) { try { await openCycle(ctx, Number(a.scope_id)); } catch (e) { console.warn('openCycle failed:', e?.message || e); } }
     await enqueue(ctx.db, { agent: a, type: typeOf(a), brief: { scheduled: true, scheduledFor: verdict.scheduledFor }, by: 'розклад' });
     started.push(a.role);
   }
@@ -526,7 +525,6 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
   const states = chainStates(all.agents, all.links);
   stats.left = rest.filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).length;
   stats.waiting = rest.length - stats.left;
-  try { stats.cycles = await syncCycles(ctx); } catch (e) { console.warn('syncCycles failed:', e?.message || e); }
   return stats;
 }
 
@@ -572,7 +570,6 @@ export async function launchCampaign(ctx, campaignId) {
   if (!mine.length) throw new Error('Увімкніть хоча б одного агента.');
   must(await ctx.db.from('ag_campaigns').update({ status: 'active', launched_at: now, updated_at: now }).eq('id', campaign.id), 'campaign');
   must(await ctx.db.from('ag_agents').update({ enabled_since: now, attempts: 0 }).eq('team', CAMPAIGN_TEAM).eq('scope_id', String(campaign.id)).eq('enabled', true), 'agents');
-  try { await openCycle(ctx, campaign.id); } catch (e) { console.warn('openCycle failed:', e?.message || e); }
   let started = 0;
   for (const a of mine) {
     if (['initial', 'schedule'].includes(a.config?.trigger)) { await enqueue(ctx.db, { agent: a, type: 'report', brief: { launch: true }, by: ctx.email }); started += 1; }

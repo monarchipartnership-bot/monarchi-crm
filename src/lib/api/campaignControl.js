@@ -4,15 +4,14 @@ import { scheduleRows } from '../agents/campaignCycles';
 
 const must = ({ data, error }) => { if (error) throw error; return data; };
 
-// What the card of a campaign shows about its work: the cycles (newest first), when each agent works next and in which mode, and the manager's instructions.
+// What the card of an operation shows about its work: when each agent works next and in which mode, and the manager's instructions.
 export async function fetchCampaignControl(campaignId) {
-  const [cycles, agents, campaign] = await Promise.all([
-    supabase.from('ag_cycles').select('*').eq('campaign_id', campaignId).order('number', { ascending: false }).limit(30),
+  const [agents, campaign] = await Promise.all([
     supabase.from('ag_agents').select('id, role, name, sort, enabled, config, schedule, last_run_at, last_status, last_scheduled, enabled_since').eq('team', 'campaign').eq('scope_id', String(campaignId)).order('sort'),
     supabase.from('ag_campaigns').select('id, config, spend_cap_usd, notify_step_usd').eq('id', campaignId).maybeSingle(),
   ]);
   const c = must(campaign);
-  return { cycles: must(cycles) || [], agents: scheduleRows(must(agents) || []), instructions: c?.config?.instructions || [], spendCapUsd: c?.spend_cap_usd ?? null, notifyStepUsd: c?.notify_step_usd ?? 2 };
+  return { agents: scheduleRows(must(agents) || []), instructions: c?.config?.instructions || [], spendCapUsd: c?.spend_cap_usd ?? null, notifyStepUsd: c?.notify_step_usd ?? 2 };
 }
 
 // The manager's control. weekday 1..7 + time 'HH:MM' (Kyiv), or null to take the agent off the schedule; mode: 'auto' | 'confirm' | 'paused'.

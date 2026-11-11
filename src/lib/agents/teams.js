@@ -13,7 +13,7 @@ import { CAMPAIGN_ROLES } from './campaignTeam.js';
 import { describeSchedule } from './campaignCycles.js';
 
 export const TEAMS = [
-  { key: 'creative', title: 'Креативи', mode: 'creative', text: 'Готує креативи й тексти до них: ви описуєте задачу, агенти планують, пишуть і малюють, а ви перевіряєте результат. Працює циклами: разовими й регулярними.' },
+  { key: 'creative', title: 'Креативи', mode: 'creative', text: 'Готує креативи й тексти до них: ви описуєте задачу, агенти планують, пишуть і малюють, а ви перевіряєте результат. Працює завданнями: разовими й регулярними.' },
   { key: 'analytics', title: 'Аналітика й оптимізація', mode: 'ads', text: 'Читає рекламні кабінети за розкладом, пояснює, що змінилось, і пропонує дії. У кабінетах нічого не змінюється без вашого рішення.' },
   { key: 'reports', title: 'Звіти', mode: null, text: 'Щотижня й щомісяця збирає звіт клієнту за кабінетами: показники, найкращі креативи й ваші тексти. Готове чекає на ваше затвердження.' },
 ];
@@ -21,6 +21,14 @@ export const teamDef = (key) => TEAMS.find((t) => t.key === key) || null;
 
 // the legacy operations of other modes are not a team: they stay visible, so nothing that works is lost
 export const LEGACY_MODES = { full: 'Повна операція', strategy: 'Тільки стратегія', report: 'Тільки звіт' };
+
+// One-off tasks of a project that run at once from the research agents (the creatives and the report of a period go to their own screens): see lib/api/oneoff.js
+export const ONEOFF = [
+  { key: 'competitors', role: 'competitor_research', title: 'Аналіз конкурентів', text: 'Хто конкуренти клієнта, як вони себе позиціонують і де є шанс виграти. Береться з сайтів конкурентів у картці проєкту.' },
+  { key: 'audience', role: 'audience_research', title: 'Дослідження аудиторії', text: 'Хто купує, чому й що їх зупиняє. Береться з картки клієнта та його сайту.' },
+  { key: 'business', role: 'business_research', title: 'Дослідження бізнесу', text: 'Що саме продає клієнт, чим сильний і що важливо знати рекламі.' },
+  { key: 'strategy', role: 'marketing_strategist', title: 'Маркетингова стратегія', text: 'Зводить усе, що відомо про клієнта, у стратегію реклами. Краще запускати після досліджень вище.' },
+];
 
 // ---- which section of the card of the project a field is filled in (for the link «Відкрити в картці»)
 const SETTINGS_KEYS = ['restrictions', 'materials', 'cta', 'figma', 'brand', 'copy_rules', 'extra_info', 'examples'];
@@ -116,7 +124,7 @@ export function runsPerMonth(schedule) {
 // plan: teamAgentPlan with the schedules chosen. An agent that runs after another one (no schedule of its own) works as often as the agents it waits for.
 export function estimateMonthly(teamKey, plan = []) {
   if (teamKey === 'reports') return { usd: 1.2, text: 'тижневі й місячні звіти: приблизно 4 тижневих і 1 місячний на місяць' };
-  if (teamKey === 'creative') return { usd: 0, text: 'залежить від кількості циклів: кожен коштує за виклики агентів приблизно $0.5–1, картинки Higgsfield окремо, після підтвердження ціни' };
+  if (teamKey === 'creative') return { usd: 0, text: 'залежить від кількості завдань: кожен коштує за виклики агентів приблизно $0.5–1, картинки Higgsfield окремо, після підтвердження ціни' };
   const own = plan.filter((p) => p.schedule && p.enabled !== false);
   const base = own.reduce((s, p) => s + runsPerMonth(p.schedule), 0);
   const chained = plan.filter((p) => !p.schedule && p.runsAfter && p.enabled !== false);

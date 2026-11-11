@@ -1,10 +1,8 @@
-// Cycles and schedule of a campaign (spec 2026-11-02, §3 and §5): a campaign is a standing assignment, a CYCLE is one pass of it (a one-off campaign has one cycle per request,
-// a repeating one a cycle every week). The person must see when each agent works next, be able to change it, pause an agent, ask it to wait for their OK, and give
-// instructions. Pure code: the server and the page both use it.
+// Schedule and control of an operation (spec 2026-11-02, §3 and §5): an operation is a standing assignment whose agents work by their own schedules. The person must see when
+// each agent works next, be able to change it, pause an agent, ask it to wait for their OK, and give instructions. Pure code: the server and the page both use it.
 import { nextInterval, nextScheduled } from '../agentSchedule.js';
 
 export const WEEKDAYS = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', 'Пʼятниця', 'Субота', 'Неділя'];
-export const STALE_CYCLE_DAYS = 3; // a cycle still «running» after this long did not finish: a new pass starts a new one
 export const MAX_INSTRUCTIONS = 20;
 export const MAX_INSTRUCTION_CHARS = 1000;
 
@@ -47,31 +45,6 @@ export function scheduleRows(agents = [], now = new Date()) {
           : trigger === 'upstream' ? 'після агентів, від яких залежить' : 'без розкладу, лише вручну';
     return { id: a.id, role: a.role, name: a.name, trigger, mode, schedule: a.schedule || null, scheduleText: describeSchedule(a.schedule), nextAt: mode === 'paused' ? null : next?.at.toISOString() || null, when, lastRunAt: a.last_run_at || null, lastStatus: a.last_status || null };
   });
-}
-
-// ---- the state of a cycle, from the tasks the campaign's agents did during it
-// cycle: { status, started_at, request?: { status } }; tasks: [{ agent_id, status, output }] created since the cycle began; expectedAgents: how many agents are meant to work in it.
-// → { status, progress 0..1, done, open, failed, waiting }
-export function cycleState({ cycle, tasks = [], expectedAgents = 0, request = null }) {
-  if (['cancelled'].includes(cycle.status)) return { status: 'cancelled', progress: Number(cycle.progress) || 0, done: 0, open: 0, failed: 0, waiting: 0 };
-  const live = tasks.filter((t) => t.status !== 'cancelled');
-  const doneAgents = new Set(live.filter((t) => t.status === 'done').map((t) => t.agent_id));
-  const open = live.filter((t) => ['queued', 'running'].includes(t.status)).length;
-  const failed = live.filter((t) => t.status === 'failed').length;
-  const waiting = live.filter((t) => t.status === 'done' && t.output?.awaiting_pass).length;
-  const total = Math.max(expectedAgents, new Set(live.map((t) => t.agent_id)).size);
-  let progress = total ? Math.min(1, doneAgents.size / total) : 0;
-  let status;
-  if (request) { // a cycle of a creative request follows the request
-    status = { draft: 'queued', running: 'running', review: 'review', done: 'done', problem: 'problem', cancelled: 'cancelled' }[request.status] || 'running';
-    if (status === 'review' || status === 'done') progress = 1;
-  } else if (failed && !open) status = 'problem';
-  else if (open || (total && doneAgents.size < total && !failed && live.length === 0)) status = 'running';
-  else if (waiting) status = 'review';
-  else if (total && doneAgents.size < total) status = 'running';
-  else status = live.length ? 'done' : 'running';
-  if (status === 'done') progress = 1;
-  return { status, progress: Math.round(progress * 100) / 100, done: doneAgents.size, open, failed, waiting };
 }
 
 // ---- the instructions of the manager for a campaign (config.instructions: [{ role|null, text, by, at }])

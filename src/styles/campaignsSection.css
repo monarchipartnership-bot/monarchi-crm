@@ -296,9 +296,6 @@ textarea.cmp-input { resize: vertical; }
 .ccx-money { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
 .ccx-money label { display: flex; flex-direction: column; gap: 6px; font: 600 .8rem var(--font-body); color: #D5A9DC; }
 .ccx-money .cmp-input { width: 150px; }
-.ccx-cycles { border-collapse: collapse; font: .8rem var(--font-body); color: #F2DDF4; min-width: 460px; }
-.ccx-cycles th { text-align: left; padding: 8px 14px; font-size: .64rem; letter-spacing: .07em; text-transform: uppercase; color: #C193CA; border-bottom: 1px solid rgba(235, 156, 239, .2); }
-.ccx-cycles td { padding: 8px 14px; border-bottom: 1px solid rgba(235, 156, 239, .1); }
 @media (max-width: 900px) { .ccx-agent { grid-template-columns: 1fr; } }
 .ccx-select { width: auto; min-width: 170px; padding: 8px 12px; }
 .ccx-role .ccx-select { width: 100%; }

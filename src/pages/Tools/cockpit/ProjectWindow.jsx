@@ -102,7 +102,7 @@ export function OperationBody({ cockpit: c, loading = false, onAction, onOpenReq
                   </section>
                   <section className="ckp-box" aria-label="Запити проєкту">
                     <div className="ckp-sec-h"><h3>Готова робота</h3>{cur && <span className="ckp-lab" style={{ marginLeft: 'auto' }}>у галереї №{cur.id}</span>}</div>
-                    {reqs.length === 0 && <p className="ckp-empty-line">Запитів ще немає. Натисніть «Новий цикл (запит на креативи)».</p>}
+                    {reqs.length === 0 && <p className="ckp-empty-line">Запитів ще немає. Натисніть «Нове завдання (запит на креативи)».</p>}
                     <div className="ckp-tbl">
                       {reqs.map((r) => {
                         const hist = isHistory(r);
@@ -141,7 +141,7 @@ export default function ProjectWindow({ cockpit, loading = false, onClose, onAct
             <h2>{c ? c.client : 'Проєкт'}{c && <span className={'ckp-chip ' + (paused ? '' : c.waiting ? 'is-warn' : 'is-work')}>{paused ? 'зупинено' : c.waiting ? 'чекає на вас' : 'працює'}</span>}</h2>
             <p>{c ? `${c.modeLabel} · ${c.name}${c.updatedAt ? ' · оновлено ' + fmtAgo(c.updatedAt) : ''}` : loading ? 'Завантажуємо проєкт…' : 'Проєкт не знайдено'}</p>
           </div>
-          {c && <button type="button" className="ckp-btn is-primary" onClick={() => onNewRequest?.(c)}><Ic n="plus" size={16} />Новий цикл (запит на креативи)</button>}
+          {c && <button type="button" className="ckp-btn is-primary" onClick={() => onNewRequest?.(c)}><Ic n="plus" size={16} />Нове завдання (запит на креативи)</button>}
           {c && <button type="button" className="ckp-btn" onClick={() => onStop?.(c)}><Ic n={paused ? 'play' : 'stop'} size={16} />{paused ? 'Відновити' : 'Зупинити'}</button>}
           <button type="button" className="ckp-x ckp-x-lg" onClick={onClose} aria-label="Закрити вікно проєкту"><Ic n="close" size={17} /></button>
         </header>
