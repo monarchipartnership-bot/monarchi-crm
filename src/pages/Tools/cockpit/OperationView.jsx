@@ -88,12 +88,12 @@ function Passes({ campaignId }) {
 //   «Готові матеріали»          the approved materials of the last cycle
 //   campaign: the ag_campaigns row  cockpit: the cabinet of the operation  run(item, key, payload): the action of the cabinet (useProjectCockpit)
 //   regularFirst: the operation was just created → the form of the regular cycle opens at once
-export default function OperationView({ campaign, cockpit: c, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false, extraFirst = false }) {
+export default function OperationView({ campaign, cockpit: c, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
   const [section, setSection] = useState('now');
   // the form of a cycle: { mode: 'extra', allowKind } (a new one, the kind is chosen in the form) | { mode: 'regular', regularId? } (a regular one: new or edited)
-  const [form, setForm] = useState(regularFirst ? { mode: 'regular' } : extraFirst ? { mode: 'extra', allowKind: false } : null);
+  const [form, setForm] = useState(regularFirst ? { mode: 'regular' } : null);
   const [openCycle, setOpenCycle] = useState(null);
   const [busy, setBusy] = useState('');
   const [rework, setRework] = useState(null); // { requestId, usd, count, skipped }

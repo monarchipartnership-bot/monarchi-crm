@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useSpeechInput, { SPEECH_LANGS } from '../../../lib/useSpeechInput';
-import { fillCycleForm } from '../../../lib/api/creatives';
-import { MIN_FILL_CHARS, applyFill } from '../../../lib/agents/cycleFormFill';
+import { useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { saveInput } from '../../../lib/api/projectCreative';
 import { launchTeam } from '../../../lib/api/teams';
-import { CREATIVE_OPTIONAL, DEFAULT_CONCEPTS, MAX_CONCEPTS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES, creativeRoleDef } from '../../../lib/agents/creativeTeam';
+import { CREATIVE_OPTIONAL, DEFAULT_CONCEPTS, TEXT_MODES, creativeRoleDef } from '../../../lib/agents/creativeTeam';
 import { MAX_EVERY_DAYS, WEEKDAYS, cleanSchedule, describeSchedule } from '../../../lib/agents/campaignCycles';
 import { cleanRegular, kyivToday } from '../../../lib/agents/operationCycles';
 import ScheduleCalendar from './ScheduleCalendar';
+import TaskBrief, { clearTaskDraft } from './TaskBrief';
 import { languageLabel } from '../../../lib/agents/languages';
 import { dayMonthOf, windowText } from '../../../lib/agents/scheduleCalendar';
 import { TEAMS, estimateMonthly, teamAgentPlan, teamReadiness, teamsOf, describePlanSchedule } from '../../../lib/agents/teams';
@@ -61,12 +59,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
   const [error, setError] = useState('');
   const [tab, setTab] = useState(null); // the team shown in the step of the settings
   const today = useMemo(() => kyivToday(), []);
-  // «Що потрібно від креативів»: typed or dictated; the button reads the description with the card and fills the other fields. What the person set by hand stays.
-  const [voiceLang, setVoiceLang] = useState('uk');
-  const [an, setAn] = useState({ busy: false, error: '', rows: null, questions: [] });
-  const touched = useRef(new Set());
-  const draftKey = `tm-goal-draft-${data.project.id}`;
-  const speech = useSpeechInput({ lang: voiceLang, onText: (txt) => { if (txt) setPlans((p) => (p.creative ? { ...p, creative: { ...p.creative, goal: `${p.creative.goal}${p.creative.goal && !/\s$/.test(p.creative.goal) ? ' ' : ''}${txt}`.slice(0, 3000) } } : p)); } });
+  const draftKey = `tm-goal-draft-${data.project.id}`; // the draft of the description of the creative task (kept by TaskBrief)
   useDialogA11y(box, () => { if (!launching) onClose(); });
 
   const view = useMemo(() => teamsOf({ campaigns: data.campaigns, agent: data.agent }), [data]);
@@ -89,28 +82,6 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
     setTab((t) => (order.includes(t) ? t : order[0]));
   }
   const patchPlan = (k, patch) => setPlans((p) => ({ ...p, [k]: { ...p[k], ...patch } }));
-  const patchByHand = (patch) => { Object.keys(patch).forEach((key) => touched.current.add(key)); patchPlan('creative', patch); }; // a field the person changed is not overwritten by the analysis
-  // the draft of the description is kept in this browser, so a closed window does not lose a dictated text; it goes when the team is launched
-  useEffect(() => { if (plans.creative && plans.creative.goal === '') { try { const d = localStorage.getItem(draftKey); if (d) patchPlan('creative', { goal: d }); } catch { /* no storage */ } } }, [!!plans.creative]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (plans.creative) { try { if (plans.creative.goal) localStorage.setItem(draftKey, plans.creative.goal); else localStorage.removeItem(draftKey); } catch { /* no storage */ } } }, [plans.creative?.goal]); // eslint-disable-line react-hooks/exhaustive-deps
-  const analyse = useCallback(async () => {
-    setAn({ busy: true, error: '', rows: null, questions: [] });
-    try {
-      const fill = await fillCycleForm({ projectId: data.project.id, text: plans.creative.goal });
-      const fields = { ...fill.fields };
-      if (fields.texts === 'given') delete fields.texts; // the launch has no ready texts: the copywriter writes them
-      const r = applyFill({ current: { ...plans.creative, texts: plans.creative.texts }, fill: { ...fill, fields, agent_settings: {} }, touched: touched.current });
-      const patch = {};
-      ['count', 'ratios', 'texts'].forEach((k) => { if (r.patch[k] != null) patch[k] = k === 'count' ? String(r.patch[k]) : r.patch[k]; });
-      patchPlan('creative', patch);
-      const q = fill.quotes || {};
-      const rows = [];
-      if (r.patch.count != null) rows.push({ label: 'Напрямів за запуск', value: String(r.patch.count), quote: q.count, warn: fill.clamped ? `Ви назвали ${fill.clamped}, але за один запуск максимум ${MAX_CONCEPTS}: поставлено ${MAX_CONCEPTS}. Більше ідей замовляйте окремим разовим завданням.` : '' });
-      if (r.patch.ratios) rows.push({ label: 'Формати', value: r.patch.ratios.map((k) => REQUEST_RATIOS.find((x) => x.key === k)?.label || k).join(', '), quote: q.ratios });
-      if (r.patch.texts != null) rows.push({ label: 'Тексти на креативах', value: TEXT_MODES[r.patch.texts] || r.patch.texts });
-      setAn({ busy: false, error: '', rows, questions: fill.questions?.length ? fill.questions : fill.notes ? [fill.notes] : [] });
-    } catch (e) { setAn({ busy: false, error: e?.message || 'Не вдалося проаналізувати опис.', rows: null, questions: [] }); }
-  }, [data.project.id, plans.creative]);
   const patchRow = (role, patch) => setPlans((p) => ({ ...p, analytics: { ...p.analytics, rows: p.analytics.rows.map((r) => (r.role === role ? { ...r, ...patch } : r)) } }));
 
   // what is checked when the person goes on from the step of the settings
@@ -165,7 +136,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
         });
         done.push({ key: k, title, campaignId: res.campaignId || null, startError: res.startError || '' });
       }
-      try { localStorage.removeItem(draftKey); } catch { /* no storage */ }
+      clearTaskDraft(draftKey);
       await onLaunched(done);
     } catch (e) {
       setError(`${done.length ? `Уже запущено: ${done.map((d) => d.title).join(', ')}. ` : ''}${e?.message || 'Не вдалося запустити команду.'}`);
@@ -268,46 +239,10 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
               {tab === 'creative' && (
                 <>
                   <p className="tm-hint">Запуск команди й є регулярне завдання: агенти працюють за розкладом із цими параметрами. Усе про клієнта вони беруть із картки проєкту. Змінити можна будь-коли, а окреме разове завдання створюється кнопкою «Разове завдання».</p>
-                  <div className="tm-task">
-                    <div className="tm-fl tm-w2"><label htmlFor="tm-goal">Що потрібно від креативів</label>
-                      <textarea id="tm-goal" className="tm-area" rows={4} maxLength={3000} value={plans.creative.goal} onChange={(e) => patchPlan('creative', { goal: e.target.value })} placeholder="Напишіть або надиктуйте своїми словами: для чого креативи, що важливо, скільки ідей" />
-                      {speech.listening && <p className="vo-live" role="status">Слухаю… {speech.interim}</p>}
-                      {speech.error && <p className="vo-err" role="alert">{speech.error}</p>}
-                      <div className="vo-bar">
-                        <span className="vo-count">{plans.creative.goal.length} / 3000{plans.creative.goal ? ' · чернетка збережена в цьому браузері' : ''}</span>
-                        {speech.supported
-                          ? (<>
-                            <select className="tm-sel vo-lang" value={voiceLang} onChange={(e) => setVoiceLang(e.target.value)} disabled={speech.listening} aria-label="Мова, якою ви говорите">{SPEECH_LANGS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}</select>
-                            <button type="button" className={'btn vo-mic' + (speech.listening ? ' on' : '')} onClick={speech.toggle} aria-pressed={speech.listening} aria-label={speech.listening ? 'Зупинити запис' : 'Надиктувати голосом'} title={speech.listening ? 'Зупинити запис' : 'Надиктувати голосом'}>
-                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>{speech.listening ? 'Зупинити' : 'Голос'}
-                            </button>
-                          </>)
-                          : <span className="vo-count" title="Цей браузер не вміє розпізнавати мову. Відкрийте CRM у Chrome, Edge або Safari.">голос: потрібен Chrome, Edge або Safari</span>}
-                        <button type="button" className="btn btn-p" disabled={an.busy || plans.creative.goal.trim().length < MIN_FILL_CHARS} onClick={analyse} title={plans.creative.goal.trim().length < MIN_FILL_CHARS ? 'Спершу опишіть завдання хоча б одним-двома реченнями' : 'Агент розбере опис разом із карткою проєкту й заповнить напрями, формати, тексти й мову'}>{an.busy ? 'Аналізуємо…' : 'Заповнити поля з опису'}</button>
-                      </div>
-                      {an.error && <p className="vo-err" role="alert">{an.error}</p>}
-                      {an.rows && (
-                        <div className="vo-res" role="status">
-                          <p className="vo-res-h">Що визначено з опису</p>
-                          {an.rows.length
-                            ? <ul className="vo-rows">{an.rows.map((r) => <li key={r.label} className={r.warn ? 'is-warn' : ''}><b>{r.label}</b><span>{r.value}</span>{r.quote && <small>з опису: «{r.quote}»</small>}{r.warn && <em>{r.warn}</em>}</li>)}</ul>
-                            : <p className="vo-none">З опису нічого додаткового не визначено: поля нижче лишились як були.</p>}
-                          {an.questions.length > 0 && (<><p className="vo-res-h">Варто уточнити</p><ul className="vo-q">{an.questions.map((x, i) => <li key={i}>{x}</li>)}</ul></>)}
-                          <p className="vo-foot">Значення вже підставлено в поля нижче, їх можна змінити.</p>
-                        </div>
-                      )}
-                    </div>
-                    <label className="tm-fl"><span>Напрямів (ідей) за запуск</span>
-                      <select className="tm-sel" value={plans.creative.count} onChange={(e) => patchByHand({ count: e.target.value })} aria-label="Напрямів за запуск">{Array.from({ length: MAX_CONCEPTS }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}</select></label>
-                    <fieldset className="tm-fl tm-fs"><legend>Формати</legend>
-                      {REQUEST_RATIOS.map((r) => <label key={r.key} className="tm-chk"><input type="checkbox" checked={plans.creative.ratios.includes(r.key)} onChange={(e) => patchByHand({ ratios: e.target.checked ? [...plans.creative.ratios, r.key] : plans.creative.ratios.filter((x) => x !== r.key) })} />{r.label}</label>)}
-                    </fieldset>
-                    <label className="tm-fl"><span>Тексти на креативах</span>
-                      <select className="tm-sel" value={plans.creative.texts} onChange={(e) => patchByHand({ texts: e.target.value })} aria-label="Тексти на креативах">{['yes', 'no'].map((k) => <option key={k} value={k}>{TEXT_MODES[k]}</option>)}</select></label>
-                    <div className="tm-fl"><span>Мова текстів для клієнта</span><b className="tm-lang">{languageLabel(plans.creative.language)}</b><small className="tm-hint">Мова клієнта з картки проєкту. Для команди результати завжди українською.</small></div>
+                  <TaskBrief value={plans.creative} onChange={(patch) => patchPlan('creative', patch)} projectId={data.project.id} draftKey={draftKey}>
                     <div className="tm-fl tm-w2"><span>Коли запускати</span>
                       <ScheduleCalendar value={plans.creative} today={today} onChange={(patch) => patchPlan('creative', patch)} /></div>
-                  </div>
+                  </TaskBrief>
                   <p className="tm-hint">Агенти відділу: обовʼязкові працюють завжди, решту можна вимкнути.</p>
                   <ul className="tm-agents">
                     {plans.creative.plan.map((a) => (

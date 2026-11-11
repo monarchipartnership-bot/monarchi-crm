@@ -11,6 +11,7 @@ import { HubTitle } from '../hubIcons';
 import LaunchTeamWizard from './LaunchTeamWizard';
 import TeamCard from './TeamCard';
 import OneOffDialog from './OneOffDialog';
+import OneOffCreativeDialog from './OneOffCreativeDialog';
 import '../../../styles/projectTeams.css';
 
 const STATE = { running: ['працює', 'is-ok'], paused: ['зупинено', 'is-wait'] };
@@ -28,6 +29,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
   const [wizard, setWizard] = useState(false);
   const [open, setOpen] = useState(null); // { campaignId, regularFirst }: the operation card (cycles of creatives, legacy operations)
   const [oneoff, setOneoff] = useState(false); // the dialog of a one-off task
+  const [creativeTask, setCreativeTask] = useState(null); // the window of a one-off task of creatives: the campaign of the creative team
   const [card, setCard] = useState(null); // the key of the team whose card (agents, schedules, money) is open
   const [control, setControl] = useState({}); // campaign id -> the agents with their last and next runs
   const [busy, setBusy] = useState('');
@@ -144,9 +146,13 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       )}
       {oneoff && data && view && (
         <OneOffDialog data={data} view={view} email={email} onClose={() => setOneoff(false)}
-          onNewCreative={() => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setOpen({ campaignId: c.id, regularFirst: false, extraFirst: true }); }}
+          onNewCreative={() => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setCreativeTask(c); }}
           onOpenReports={() => { setOneoff(false); onOpenReports?.(); }} onOpenMaterials={() => { setOneoff(false); onOpenMaterials?.(); }}
           onGoFill={(section) => { setOneoff(false); onGoFill?.(section); }} />
+      )}
+      {creativeTask && data && (
+        <OneOffCreativeDialog data={data} campaign={creativeTask} email={email} onClose={() => setCreativeTask(null)}
+          onCreated={(text) => { setCreativeTask(null); say(text); load(); cockpit.reload?.(); }} />
       )}
       {card && data && view?.teams.find((x) => x.key === card && x.campaign) && (
         <TeamCard key={card} team={view.teams.find((x) => x.key === card)} data={data}
@@ -154,7 +160,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
           onGoFill={(section) => { setCard(null); onGoFill?.(section); }} say={say} />
       )}
       {openCampaign && project && (
-        <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst} extraFirst={!!open.extraFirst}
+        <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst}
           onClose={() => { setOpen(null); load(); }} onBackToProject={() => { setOpen(null); load(); }} onChanged={load} />
       )}
     </div>
