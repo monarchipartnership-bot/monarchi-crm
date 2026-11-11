@@ -8,6 +8,7 @@ import OperationCard from '../../../pages/Tools/cockpit/OperationCard';
 import { fmtDateTime } from '../../../pages/Smm/agentUi';
 import { HubTitle } from '../hubIcons';
 import LaunchTeamWizard from './LaunchTeamWizard';
+import TeamCard from './TeamCard';
 import '../../../styles/projectTeams.css';
 
 const STATE = { running: ['працює', 'is-ok'], paused: ['зупинено', 'is-wait'] };
@@ -22,7 +23,8 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [wizard, setWizard] = useState(false);
-  const [open, setOpen] = useState(null); // { campaignId, regularFirst }
+  const [open, setOpen] = useState(null); // { campaignId, regularFirst }: the operation card (cycles of creatives, legacy operations)
+  const [card, setCard] = useState(null); // the key of the team whose card (agents, schedules, money) is open
   const [control, setControl] = useState({}); // campaign id -> the agents with their last and next runs
   const [busy, setBusy] = useState('');
   const [note, setNote] = useState(null);
@@ -98,7 +100,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
                   <small>{line1}</small><small>{line2}</small>
                 </div>
                 <div className="tm-team-acts">
-                  <button type="button" className="btn" onClick={() => (t.key === 'reports' ? onOpenReports?.() : setOpen({ campaignId: t.campaign.id, regularFirst: false }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Відкрити команду'}</button>
+                  <button type="button" className="btn" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Відкрити команду'}</button>
                   <button type="button" className="btn" disabled={busy === t.key} onClick={() => toggle(t)}>{t.state === 'running' ? 'Зупинити' : 'Продовжити'}</button>
                 </div>
               </article>
@@ -123,6 +125,11 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports }) {
             const c = launched.find((x) => x.campaignId && x.key === 'creative');
             if (c) setOpen({ campaignId: c.campaignId, regularFirst: true }); // the creatives work by cycles: the form of the regular cycle opens at once
           }} />
+      )}
+      {card && data && view?.teams.find((x) => x.key === card && x.campaign) && (
+        <TeamCard key={card} team={view.teams.find((x) => x.key === card)} data={data}
+          onClose={() => { setCard(null); load(); }} onChanged={() => { load(); cockpit.reload?.(); }}
+          onGoFill={(section) => { setCard(null); onGoFill?.(section); }} say={say} />
       )}
       {openCampaign && project && (
         <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst}
