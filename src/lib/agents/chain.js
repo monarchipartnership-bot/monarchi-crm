@@ -66,14 +66,17 @@ export function ancestorsOf(agentId, links) {
 // → { due, scheduledFor: 'YYYY-MM-DD', reason }. Missing a cron tick only delays a run, never loses it. A failed run is tried
 // again after an hour, three tries in all. When an agent is switched on, the page sets last_scheduled to the current moment, so
 // the first run is the NEXT scheduled one and not a late one for a moment that passed before it was on.
-import { lastScheduled } from '../agentSchedule.js';
+import { daysBetween, lastInterval, lastScheduled } from '../agentSchedule.js';
 
 const MAX_TRIES = 3;
 const RETRY_AFTER_MIN = 60;
 
+// agent.schedule may also be { everyDays: N, time } (owner, 2026-11-11: «кабінети кожні 3 дні, конкуренти раз на 2 тижні»): the days are counted from the last served day.
 export function agentDue({ agent, now = new Date() }) {
-  if (!agent.schedule || !agent.schedule.weekday) return { due: false, reason: 'без розкладу' };
-  const sched = lastScheduled('weekly', { weeklyDay: agent.schedule.weekday, weeklyTime: agent.schedule.time }, now);
+  const every = Number(agent.schedule?.everyDays);
+  if (!agent.schedule || (!agent.schedule.weekday && !(every >= 1))) return { due: false, reason: 'без розкладу' };
+  const sched = agent.schedule.weekday ? lastScheduled('weekly', { weeklyDay: agent.schedule.weekday, weeklyTime: agent.schedule.time }, now) : lastInterval({ time: agent.schedule.time }, now);
+  if (!agent.schedule.weekday && agent.last_scheduled && sched.date !== agent.last_scheduled && daysBetween(agent.last_scheduled, sched.date) < every) return { due: false, reason: 'ще не час за розкладом', scheduledFor: sched.date };
   if (agent.enabled_since && sched.at < new Date(agent.enabled_since)) return { due: false, reason: 'запланований момент був до вмикання агента' };
   if (agent.last_scheduled === sched.date) {
     if (agent.last_status === 'ok') return { due: false, reason: 'вже виконано', scheduledFor: sched.date };

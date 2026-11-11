@@ -17,6 +17,7 @@ import { runSmmWeekly, smmDue } from '../api/_lib/smmRun.js';
 import { auditSite, crawlSite, parsePage } from '../api/_lib/seoAudit.js';
 import { buildPlanPrompts, parsePlan } from '../api/_lib/seoPlan.js';
 import { agentDue, chainStates, dependents } from '../src/lib/agents/chain.js';
+import { nextInterval } from '../src/lib/agentSchedule.js';
 import { composeSystem } from '../src/lib/agents/locked.js';
 import { ensureSmmTeam } from '../src/lib/agents/smmTeam.js';
 import { decideQc, feedbackFor, parseCopy, parseQc, parseStrategy, parseVisual, scheduleStrategy } from '../api/_lib/agentContent.js';
@@ -41,6 +42,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
+import { describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
 import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
@@ -4981,6 +4983,83 @@ await ok('cycle form: the card fills the settings of the agents, the description
   assert.deepEqual(applied.filled, ['назву циклу', 'кількість напрямів: 10', 'формати: 1:1, 9:16', 'мову текстів', 'кнопку заклику до дії', 'налаштування агентів: 2']);
   // ready texts: the number of directions is the number of texts, the analysis leaves it
   assert.equal(applyFill({ current: { ...current, texts: 'given' }, fill, touched: new Set() }).patch.count, undefined);
+});
+
+await ok('schedule: an agent may work every N days (cabinets every 3 days, competitors every 14), counted from the last served day', async () => {
+  // validation and words
+  assert.deepEqual(cleanSchedule({ everyDays: '3', time: '9:00' }), { everyDays: 3, time: '09:00' });
+  assert.deepEqual(cleanSchedule({ weekday: 2, time: '10:00' }), { weekday: 2, time: '10:00' }); // a weekly one is as before
+  assert.throws(() => cleanSchedule({ everyDays: 0 }), /від 1 до 60/);
+  assert.throws(() => cleanSchedule({ everyDays: 61 }), /від 1 до 60/);
+  assert.throws(() => cleanSchedule({ everyDays: 2.5 }), /від 1 до 60/);
+  assert.throws(() => cleanSchedule({ everyDays: 3, time: '25:00' }), /ГГ:ХХ/);
+  assert.deepEqual([describeSchedule({ everyDays: 3, time: '09:00' }), describeSchedule({ everyDays: 1, time: '08:30' }), describeSchedule({ weekday: 1, time: '09:00' })], ['кожні 3 дн. о 09:00', 'щодня о 08:30', 'щотижня, понеділок о 09:00']);
+  // due: the first start after switching on, then not before N days pass from the last served day
+  const agent = { schedule: { everyDays: 3, time: '09:00' }, enabled_since: '2026-10-19T07:00:00Z', last_scheduled: null, attempts: 0 }; // switched on Mon 10:00 Kyiv, after the 09:00 start of that day
+  assert.deepEqual(agentDue({ agent, now: new Date('2026-10-19T08:00:00Z') }), { due: false, reason: 'запланований момент був до вмикання агента' }); // 11:00 Kyiv: the 09:00 of the same day was before switching on
+  assert.deepEqual(agentDue({ agent, now: new Date('2026-10-20T07:00:00Z') }), { due: true, scheduledFor: '2026-10-20' }); // the next morning the first start comes
+  const served = { ...agent, last_scheduled: '2026-10-20', last_status: 'ok' };
+  assert.equal(agentDue({ agent: served, now: new Date('2026-10-20T10:00:00Z') }).due, false); // the same day: done
+  assert.equal(agentDue({ agent: served, now: new Date('2026-10-22T10:00:00Z') }).reason, 'ще не час за розкладом'); // two days later: still waiting
+  assert.deepEqual(agentDue({ agent: served, now: new Date('2026-10-23T07:00:00Z') }), { due: true, scheduledFor: '2026-10-23' }); // the third day after: due again
+  assert.equal(agentDue({ agent: served, now: new Date('2026-10-23T05:00:00Z') }).due, false); // 08:00 Kyiv: before the time of the day, the start of the 22nd is not due yet
+  // a failed run is tried again the same day (an hour later), like a weekly one
+  const failed = { ...agent, last_scheduled: '2026-10-20', last_status: 'problem', attempts: 1, last_attempt_at: '2026-10-20T06:30:00Z' };
+  assert.equal(agentDue({ agent: failed, now: new Date('2026-10-20T07:00:00Z') }).reason, 'чекаємо перед повтором');
+  assert.equal(agentDue({ agent: failed, now: new Date('2026-10-20T08:00:00Z') }).due, true);
+  assert.equal(agentDue({ agent: { ...agent, schedule: { time: '09:00' } }, now: new Date('2026-10-20T07:00:00Z') }).reason, 'без розкладу');
+  // the next start shown to the person
+  const now = new Date('2026-10-21T08:00:00Z'); // Wed 11:00 Kyiv
+  assert.equal(nextInterval({ everyDays: 3, time: '09:00' }, { last: '2026-10-20' }, now).date, '2026-10-23');
+  assert.equal(nextInterval({ everyDays: 3, time: '09:00' }, { last: '2026-10-10' }, now).at.getTime(), now.getTime()); // overdue: now
+  assert.equal(nextInterval({ everyDays: 14, time: '09:00' }, { last: null, since: '2026-10-21T07:30:00Z' }, now).date, '2026-10-22'); // switched on (10:30 Kyiv) after the time of the day: tomorrow
+  const rows = scheduleRows([{ id: 1, role: 'meta_analyst', name: 'A', sort: 1, enabled: true, config: {}, schedule: { everyDays: 3, time: '09:00' }, last_scheduled: '2026-10-20', enabled_since: null }], now);
+  assert.deepEqual([rows[0].scheduleText, rows[0].nextAt.slice(0, 10)], ['кожні 3 дн. о 09:00', '2026-10-23']);
+});
+
+await ok('AI teams of a project: the three teams, the check of what each one needs from the card, the running ones read from the operations, the price from the schedules', async () => {
+  const both = [{ platform: 'meta', account_name: 'M' }, { platform: 'google', account_name: 'G' }];
+  const empty = { settings: {}, assets: [], accounts: [] };
+  // a team of reports needs only a cabinet: no offer, no competitors
+  const noCab = teamReadiness('reports', empty);
+  assert.deepEqual([noCab.status, noCab.required.map((x) => [x.key, x.where, x.inline])], ['blocked', [['cabinet', 'main', false]]]);
+  assert.deepEqual([teamReadiness('reports', { ...empty, accounts: both }).status, teamReadiness('reports', { ...empty, accounts: both }).required], ['ready', []]);
+  // creatives need the offer (a text field of the card: it can be written right in the check); the rest of the card is only recommended
+  const cr = teamReadiness('creative', empty);
+  assert.deepEqual(cr.required.map((x) => [x.key, x.where, x.inline]), [['offer', 'business', true]]);
+  assert.ok(cr.recommended.some((x) => x.key === 'restrictions' && !x.inline && x.where === 'business'));
+  const crOk = teamReadiness('creative', { ...empty, settings: { inputs: { offer: { body: 'Wigs from natural hair' } } } });
+  assert.deepEqual([crOk.ok, crOk.status], [true, 'warn']);
+  // analytics: no cabinet = one clear line; with the cabinets the goals of the client are required
+  assert.deepEqual(teamReadiness('analytics', empty).required.map((x) => x.key), ['cabinet']);
+  assert.deepEqual(teamReadiness('analytics', { ...empty, accounts: both }).required.map((x) => [x.key, x.inline]), [['goals', true]]);
+  assert.equal(teamReadiness('analytics', { ...empty, accounts: both, settings: { inputs: { goals: { body: 'ROAS 3' } } } }).ok, true);
+  assert.equal(whereToFill('tone'), 'client'); assert.equal(whereToFill('competitor_notes'), 'competitors'); assert.equal(whereToFill('cta'), 'business');
+
+  // the teams as they run
+  const view = teamsOf({ campaigns: [
+    { id: 1, status: 'active', config: { mode: 'creative' } }, { id: 2, status: 'paused', config: { mode: 'ads' } },
+    { id: 3, status: 'active', config: { mode: 'full' } }, { id: 4, status: 'archived', config: { mode: 'report' } }, { id: 5, status: 'draft', config: { mode: 'creative' } },
+  ], agent: { project_id: 9, enabled: true } });
+  assert.deepEqual(view.teams.map((x) => [x.key, x.state]), [['creative', 'running'], ['analytics', 'paused'], ['reports', 'running']]);
+  assert.deepEqual(view.legacy.map((x) => [x.campaign.id, x.label, x.state]), [[3, 'Повна операція', 'running']]); // an old operation stays visible, an archived or a draft one is not a team
+  assert.equal(view.running, 3);
+  const none = teamsOf({ campaigns: [], agent: null });
+  assert.deepEqual([none.running, none.teams.every((x) => x.state === 'none')], [0, true]);
+  assert.equal(teamsOf({ campaigns: [], agent: { enabled: false } }).teams[2].state, 'paused'); // the agent is connected but switched off
+
+  // the agents of a team with the schedules they start with, and the price
+  const plan = teamAgentPlan('analytics', both);
+  assert.deepEqual(plan.map((x) => [x.role, x.schedule?.everyDays ?? null, x.runsAfter]), [['meta_analyst', 3, false], ['google_analyst', 3, false], ['tracking_integrity', 3, false], ['meta_optimizer', null, true], ['google_optimizer', null, true]]);
+  assert.deepEqual(teamAgentPlan('analytics', [{ platform: 'meta' }]).map((x) => x.role), ['meta_analyst', 'tracking_integrity', 'meta_optimizer']);
+  const dept = teamAgentPlan('creative');
+  assert.deepEqual([dept.length, dept.find((x) => x.role === 'creative_analyst').shared, dept.filter((x) => x.required).map((x) => x.role)], [6, true, ['creative_strategy', 'creative_brief', 'creative_maker']]);
+  assert.deepEqual([runsPerMonth({ weekday: 1 }), runsPerMonth({ everyDays: 3 }), runsPerMonth({ everyDays: 14 }), runsPerMonth(null)], [4.3, 10, 2.1, 0]);
+  const est = estimateMonthly('analytics', plan);
+  assert.deepEqual([est.runs, est.usd], [50, 3.5]); // three analysts every 3 days (30 runs) and two optimizers that follow them (20)
+  assert.equal(estimateMonthly('analytics', plan.map((x) => (x.role === 'tracking_integrity' ? { ...x, enabled: false } : x))).runs, 40);
+  assert.ok(estimateMonthly('creative').usd === 0 && /окремо/.test(estimateMonthly('creative').text));
+  assert.match(describePlanSchedule(null), /за ланцюжком/);
 });
 
 console.log(`\n${passed} checks passed`);

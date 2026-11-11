@@ -27,7 +27,7 @@ import '../../../styles/campaignsSection.css';
 import './cockpit.css';
 import './ProjectCard.css';
 
-const TABS = [['overview', 'Загальна інформація', 'home'], ['operations', 'Операції', 'strategy'], ['agents', 'Налаштування агентів', 'bot'], ['spend', 'Витрати', 'wallet'], ['info', 'Інформація по проєкту', 'info']];
+const TABS = [['overview', 'Загальна інформація', 'home'], ['operations', 'Операції', 'strategy'], ['agents', 'Налаштування агентів', 'bot'], ['spend', 'Витрати', 'wallet'], ['info', 'Готовність до роботи', 'info']];
 const OP_STATUS = { active: ['працює', 'is-work'], paused: ['на паузі', ''], draft: ['не запущена', 'is-grey'], archived: ['завершена', 'is-ok'] };
 
 // an operation of the project, as a card with a colour bar of its state (red: a step failed, amber: waits for you, ok: finished, violet: works, grey: the rest)
@@ -293,7 +293,11 @@ export default function ProjectCard({ row, cockpit, initialOperationId = null, r
 
           {campaigns && tab === 'info' && (
             <div className="pcd-sheet" data-dd="plum">
-              <ProjectCreativeTab key={'pcd-' + row.id} projectId={row.id} crmLink />
+              <div className="pcd-infolink">
+                <p>Усю інформацію про проєкт заповнюють і змінюють лише в картці проєкту: ті самі дані читають агенти. Тут видно, чого їм ще бракує.</p>
+                <a className="btn btn-p" href={`/projects/${row.id}`} target="_blank" rel="noreferrer noopener">Відкрити «Інформація про проєкт» ↗</a>
+              </div>
+              <ProjectCreativeTab key={'pcd-' + row.id} projectId={row.id} section="ready" crmLink embedded />
             </div>
           )}
         </div>

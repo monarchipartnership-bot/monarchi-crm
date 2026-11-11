@@ -1,16 +1,24 @@
 // Cycles and schedule of a campaign (spec 2026-11-02, §3 and §5): a campaign is a standing assignment, a CYCLE is one pass of it (a one-off campaign has one cycle per request,
 // a repeating one a cycle every week). The person must see when each agent works next, be able to change it, pause an agent, ask it to wait for their OK, and give
 // instructions. Pure code: the server and the page both use it.
-import { nextScheduled } from '../agentSchedule.js';
+import { nextInterval, nextScheduled } from '../agentSchedule.js';
 
 export const WEEKDAYS = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', 'Пʼятниця', 'Субота', 'Неділя'];
 export const STALE_CYCLE_DAYS = 3; // a cycle still «running» after this long did not finish: a new pass starts a new one
 export const MAX_INSTRUCTIONS = 20;
 export const MAX_INSTRUCTION_CHARS = 1000;
 
-// ---- the schedule of one agent: { weekday 1..7, time 'HH:MM' } or null
+export const MAX_EVERY_DAYS = 60;
+// ---- the schedule of one agent: { weekday 1..7, time 'HH:MM' } (weekly) or { everyDays 1..60, time } (every N days) or null
 export function cleanSchedule(input) {
   if (input == null || input === false) return null;
+  if (input.everyDays != null && input.everyDays !== '' && !input.weekday) {
+    const n = Number(input.everyDays);
+    if (!Number.isInteger(n) || n < 1 || n > MAX_EVERY_DAYS) throw new Error(`Періодичність — від 1 до ${MAX_EVERY_DAYS} днів.`);
+    const t = /^(\d{1,2}):(\d{2})$/.exec(String(input.time || '09:00').trim());
+    if (!t || Number(t[1]) > 23 || Number(t[2]) > 59) throw new Error('Час має бути у форматі ГГ:ХХ, наприклад 09:00.');
+    return { everyDays: n, time: `${String(Number(t[1])).padStart(2, '0')}:${t[2]}` };
+  }
   const weekday = Number(input.weekday);
   if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) throw new Error('День тижня має бути від 1 (понеділок) до 7 (неділя).');
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(input.time || '09:00').trim());
@@ -18,7 +26,8 @@ export function cleanSchedule(input) {
   return { weekday, time: `${String(Number(m[1])).padStart(2, '0')}:${m[2]}` };
 }
 
-export const describeSchedule = (s) => (s?.weekday ? `щотижня, ${WEEKDAYS[s.weekday - 1].toLowerCase()} о ${s.time || '09:00'}` : '');
+export const describeSchedule = (s) => (s?.weekday ? `щотижня, ${WEEKDAYS[s.weekday - 1].toLowerCase()} о ${s.time || '09:00'}`
+  : Number(s?.everyDays) === 1 ? `щодня о ${s.time || '09:00'}` : Number(s?.everyDays) > 1 ? `кожні ${s.everyDays} дн. о ${s.time || '09:00'}` : '');
 
 // ---- the mode of an agent inside a campaign: auto (works and passes on), confirm (works, then waits for the person's OK), paused
 export const AGENT_MODES = [{ key: 'auto', label: 'Сам' }, { key: 'confirm', label: 'З моїм підтвердженням' }, { key: 'paused', label: 'Пауза' }];
@@ -30,7 +39,8 @@ export function scheduleRows(agents = [], now = new Date()) {
   return [...agents].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0)).map((a) => {
     const trigger = a.config?.trigger || 'upstream';
     const mode = modeOfAgent(a);
-    const next = a.schedule?.weekday ? nextScheduled('weekly', { weeklyDay: a.schedule.weekday, weeklyTime: a.schedule.time }, now) : null;
+    const next = a.schedule?.weekday ? nextScheduled('weekly', { weeklyDay: a.schedule.weekday, weeklyTime: a.schedule.time }, now)
+      : Number(a.schedule?.everyDays) >= 1 ? nextInterval({ everyDays: a.schedule.everyDays, time: a.schedule.time }, { last: a.last_scheduled || null, since: a.enabled_since || null }, now) : null;
     const when = mode === 'paused' ? 'на паузі'
       : next ? `наступний запуск ${next.at.toISOString()}`
         : trigger === 'initial' ? 'один раз, під час запуску операції'

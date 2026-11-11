@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { addInstruction, fetchCampaignControl, removeInstruction, saveCampaignMoney, setAgentMode, setAgentSchedule } from '../../../lib/api/campaignControl';
-import { AGENT_MODES, MAX_INSTRUCTION_CHARS, WEEKDAYS } from '../../../lib/agents/campaignCycles';
+import { AGENT_MODES, MAX_INSTRUCTION_CHARS, WEEKDAYS, describeSchedule } from '../../../lib/agents/campaignCycles';
 import { fmtDateTime } from '../../Smm/agentUi';
 
 const CYCLE_STATUS = { queued: 'у черзі', running: 'працює', review: 'чекає вас', done: 'готово', problem: 'проблема', cancelled: 'скасовано' };
@@ -72,11 +72,13 @@ export default function CampaignControl({ campaign, notify }) {
                   <button key={m.key} type="button" aria-pressed={a.mode === m.key} className={'cmp-btn' + (a.mode === m.key ? ' cmp-btn--primary' : '')} disabled={!!busy || a.mode === m.key} onClick={() => run(`mode${a.id}`, () => setAgentMode(a.id, m.key), `Режим «${m.label}»: ${a.name}.`)}>{m.label}</button>
                 ))}
               </div>
+              {a.schedule?.everyDays ? <p className="cmp-muted">Розклад: {describeSchedule(a.schedule)}. Змінюється в картці команди в картці проєкту.</p> : (
               <div className="ccx-sched">
                 <Pick value={drafts[a.id]?.weekday ?? ''} onChange={(v) => setDrafts((d) => ({ ...d, [a.id]: { ...d[a.id], weekday: v } }))} options={WEEK_OPTIONS} ariaLabel={`День запуску: ${a.name}`} />
                 {drafts[a.id]?.weekday && <input className="cmp-input ccx-time" type="text" inputMode="numeric" value={drafts[a.id].time} onChange={(e) => setDrafts((d) => ({ ...d, [a.id]: { ...d[a.id], time: e.target.value } }))} placeholder="09:00" aria-label={`Час запуску: ${a.name}`} />}
                 <button type="button" className="cmp-btn" disabled={!changed(a) || !!busy} onClick={() => saveSchedule(a)}>Зберегти розклад</button>
               </div>
+              )}
             </div>
           ))}
         </div>

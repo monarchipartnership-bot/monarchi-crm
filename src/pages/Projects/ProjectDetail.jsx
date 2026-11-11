@@ -22,6 +22,7 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
 import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
 import ProjectCreativeTab from '../../components/Projects/Creative/ProjectCreativeTab';
+import ProjectTeams from '../../components/Projects/Teams/ProjectTeams';
 import { fetchAgent } from '../../lib/api/projectAgents';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
@@ -37,16 +38,32 @@ import '../../styles/ddHub.css';
 import '../../styles/projectHub.css'; // Hub style, last so it wins over the older workspace styles
 
 const TABS = [
-  { key: 'overview', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src },
+  { key: 'overview', label: 'Інформація про проєкт', icon: PAGE_ICONS['page.projects'].src },
+  { key: 'teams', label: 'Запуск AI команди', icon: PAGE_ICONS['page.ai-agents'].src },
   { key: 'builder', label: 'Конструктор звіту', icon: null, line: <path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z" /> },
   { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'Агент звітів', icon: PAGE_ICONS['page.ai-agents'].src },
-  { key: 'creative', label: 'AI-креативи', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
+  { key: 'creative', label: 'Готові матеріали', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
 ];
 
+// «Звітність» (owner, 2026-11-11): the four report tabs are one tab of the card with four sections inside. Their keys and addresses stay (?tab=builder, compose, work, decks),
+// so every link that was sent before still opens the same page.
+const REPORT_TABS = [['builder', 'Конструктор звіту'], ['compose', 'Формування звіту'], ['work', 'Робота над звітами'], ['decks', 'Історія проекту']];
+const REPORT_KEYS = REPORT_TABS.map(([k]) => k);
+const STRIP = [
+  TABS.find((x) => x.key === 'overview'),
+  TABS.find((x) => x.key === 'teams'),
+  { key: 'reports', label: 'Звітність', icon: PAGE_ICONS['page.weekly-report'].src },
+  TABS.find((x) => x.key === 'agent'),
+  TABS.find((x) => x.key === 'creative'),
+];
 const STATUSES = ['active', 'paused', 'completed'];
+// «Інформація про проєкт» (owner, 2026-11-11): everything known about the client lives in this one card, for people and for the agents. The sections:
+// «Основне» is the former «Огляд»; the others come from the data the agents read (lib/agents/projectCreative.js).
+const INFO_SECTIONS = [['main', 'Основне'], ['client', 'Про клієнта'], ['business', 'Про бізнес'], ['competitors', 'Про конкурентів'], ['ready', 'Готовність до агентів']];
+const infoOf = (params) => (INFO_SECTIONS.some(([k]) => k === params.get('info')) ? params.get('info') : 'main');
 // «Формування звіту» holds three ways to look at a period; the old tabs (and the links the agent sends) still open them.
 const COMPOSE_MODES = [
   ['period', 'Показники за період', 'Будь-які дати: швидка вибірка цифр', 'range'],
@@ -102,6 +119,8 @@ function ProjectDetailCard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTabState] = useState(() => parseTab(searchParams).tab);
   const [mode, setModeState] = useState(() => parseTab(searchParams).mode);
+  const [info, setInfoState] = useState(() => infoOf(searchParams)); // the section of «Інформація про проєкт»; it stays in the address, so a link can open it
+  const setInfo = (next) => { setInfoState(next); setSearchParams(next === 'main' ? {} : { info: next }, { replace: true }); };
   const setTab = (next) => {
     setTabState(next);
     // the chosen ad platform of the report tabs stays when moving between them
@@ -114,11 +133,17 @@ function ProjectDetailCard() {
     setSearchParams({ tab: 'compose', mode: next, ...(platform ? { platform } : {}) }, { replace: true });
   };
   const paneKey = tab === 'compose' ? `compose:${mode}` : tab;
+  const isReport = REPORT_KEYS.includes(tab);
+  const activeStrip = isReport ? 'reports' : tab;
+  const lastReport = useRef('compose'); // the section of «Звітність» that was open last: the tab comes back to it
+  if (isReport) lastReport.current = tab;
+  const openStrip = (key) => setTab(key === 'reports' ? lastReport.current : key);
   // The address can be changed from outside (a link in the history, a note on a report page): the card follows it.
   useEffect(() => {
     const p = parseTab(searchParams);
     if (p.tab !== tab) setTabState(p.tab);
     if (p.tab === 'compose' && p.mode !== mode) setModeState(p.mode);
+    if (p.tab === 'overview') setInfoState(infoOf(searchParams));
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
   const [deleting, setDeleting] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
@@ -133,8 +158,8 @@ function ProjectDetailCard() {
 
   // Arrow keys / Home / End move between the folder tabs (the focused one is the selected one).
   function onTabKey(e) {
-    const keys = TABS.map((t) => t.key);
-    const i = keys.indexOf(tab);
+    const keys = STRIP.map((t) => t.key);
+    const i = keys.indexOf(activeStrip);
     let next = null;
     if (e.key === 'ArrowRight') next = keys[(i + 1) % keys.length];
     else if (e.key === 'ArrowLeft') next = keys[(i - 1 + keys.length) % keys.length];
@@ -142,7 +167,7 @@ function ProjectDetailCard() {
     else if (e.key === 'End') next = keys[keys.length - 1];
     if (!next) return;
     e.preventDefault();
-    setTab(next);
+    openStrip(next);
     tabRefs.current[next]?.focus();
   }
 
@@ -467,24 +492,37 @@ function ProjectDetailCard() {
       </div>
 
       <div className="pw-tabs" role="tablist" aria-label="Розділи проєкту" onKeyDown={onTabKey}>
-        {TABS.map((t) => (
+        {STRIP.map((t) => (
           <button
             key={t.key} id={'pw-tab-' + t.key} ref={(n) => { tabRefs.current[t.key] = n; }}
-            type="button" role="tab" aria-selected={tab === t.key} aria-controls="pw-panel" tabIndex={tab === t.key ? 0 : -1}
-            className={'pw-tab' + (tab === t.key ? ' on' : '')} onClick={() => setTab(t.key)}
+            type="button" role="tab" aria-selected={activeStrip === t.key} aria-controls="pw-panel" tabIndex={activeStrip === t.key ? 0 : -1}
+            className={'pw-tab' + (activeStrip === t.key ? ' on' : '')} onClick={() => openStrip(t.key)}
           >
             <span className="hub-ring">
               {t.icon
                 ? <span className="hub-tile"><img src={t.icon} alt="" aria-hidden="true" draggable="false" /></span>
                 : <span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true">{t.line}</svg></span>}
             </span>
-            <span>{t.label}</span>{t.key === 'work' && workCount > 0 && <span className="pw-tab-n" aria-label={`${workCount} у роботі`}>{workCount}</span>}
+            <span>{t.label}</span>{t.key === 'reports' && workCount > 0 && <span className="pw-tab-n" aria-label={`${workCount} у роботі`}>{workCount}</span>}
           </button>
         ))}
       </div>
 
-      <div className="pw-workspace" id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + tab}>
+      <div className="pw-workspace" id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
+      {isReport && (
+        <div className="pcr-tabs pw-sub" role="tablist" aria-label="Розділи звітності">
+          {REPORT_TABS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={'pcr-tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{k === 'work' && workCount > 0 ? <em>{workCount}</em> : null}</button>)}
+        </div>
+      )}
       {tab === 'overview' && (
+        <div className="pcr-wrap pw-info">
+          <div className="pcr-tabs" role="tablist" aria-label="Розділи інформації про проєкт">
+            {INFO_SECTIONS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={info === k} className={'pcr-tab' + (info === k ? ' on' : '')} onClick={() => setInfo(k)}>{label}</button>)}
+          </div>
+          {info !== 'main' && <ProjectCreativeTab key={'info-' + id + '-' + info} projectId={id} section={info} embedded />}
+        </div>
+      )}
+      {tab === 'overview' && info === 'main' && (
         <div className="pw-ov">
           <aside className="pw-ov-side">
             <section className="report-section pw-card pw-about">
@@ -564,8 +602,9 @@ function ProjectDetailCard() {
         </div>
       ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
+      {tab === 'teams' && <ProjectTeams key={'teams-' + id} projectId={id} onGoFill={(section) => { setTab('overview'); setInfo(section); }} onOpenReports={() => setTab('agent')} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
-      {tab === 'creative' && <ProjectCreativeTab key={'creative-' + id} projectId={id} showDeliverables />}
+      {tab === 'creative' && <ProjectCreativeTab key={'creative-' + id} projectId={id} section="materials" showDeliverables embedded />}
       </div>
       {confirmDialog}
     </div>

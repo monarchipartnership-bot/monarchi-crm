@@ -25,7 +25,7 @@ export function kyivInstant(date, time) {
   return new Date(`${date}T${t}:00${kyivOffset(new Date(`${date}T12:00:00Z`))}`);
 }
 
-const addDays = (date, n) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+export const addDays = (date, n) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const weekdayOf = (date) => ((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
 
 // The most recent scheduled moment that is not in the future: { date, at: Date } for the report type.
@@ -90,4 +90,29 @@ export function isDue({ periodType, schedType = periodType, agent, runs, now = n
   const lastFail = failed.map((r) => new Date(r.finished_at || r.started_at).getTime()).sort((a, b) => b - a)[0];
   if (lastFail && now.getTime() - lastFail < RETRY_AFTER_MIN * 60000) return { due: false, reason: 'чекаємо перед повтором', scheduledFor: sched.date };
   return { due: true, scheduledFor: sched.date, periodStart };
+}
+
+// The days between two 'YYYY-MM-DD' dates (b - a).
+export const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
+
+// The latest start of a schedule «every N days at HH:MM» that is not in the future: { date, at }. Which of these starts is really due depends on the last served day
+// (lib/agents/chain.js, agentDue), because the days are counted from it.
+export function lastInterval({ time = '09:00' } = {}, now = new Date()) {
+  const k = kyivParts(now);
+  const date = k.minutes >= minutesOf(time) ? k.date : addDays(k.date, -1);
+  return { date, at: kyivInstant(date, time) };
+}
+
+// When an agent with «every N days at HH:MM» starts next. last: the last served day ('YYYY-MM-DD') or null; since: when the agent was switched on (ISO) or null.
+// → { date, at: Date } (a start that is already overdue is given as «now»: it starts at the next pass of the clock).
+export function nextInterval({ everyDays, time = '09:00' }, { last = null, since = null } = {}, now = new Date()) {
+  const k = kyivParts(now);
+  let date;
+  if (last) date = addDays(last, Number(everyDays) || 1);
+  else {
+    const from = since ? kyivParts(new Date(since)) : k; // the first start after switching on
+    date = from.minutes >= minutesOf(time) ? addDays(from.date, 1) : from.date;
+  }
+  const at = kyivInstant(date, time);
+  return at.getTime() <= now.getTime() ? { date: k.date, at: now } : { date, at };
 }

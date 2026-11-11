@@ -8,7 +8,7 @@ const must = ({ data, error }) => { if (error) throw error; return data; };
 export async function fetchCampaignControl(campaignId) {
   const [cycles, agents, campaign] = await Promise.all([
     supabase.from('ag_cycles').select('*').eq('campaign_id', campaignId).order('number', { ascending: false }).limit(30),
-    supabase.from('ag_agents').select('id, role, name, sort, enabled, config, schedule, last_run_at, last_status').eq('team', 'campaign').eq('scope_id', String(campaignId)).order('sort'),
+    supabase.from('ag_agents').select('id, role, name, sort, enabled, config, schedule, last_run_at, last_status, last_scheduled, enabled_since').eq('team', 'campaign').eq('scope_id', String(campaignId)).order('sort'),
     supabase.from('ag_campaigns').select('id, config, spend_cap_usd, notify_step_usd').eq('id', campaignId).maybeSingle(),
   ]);
   const c = must(campaign);

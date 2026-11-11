@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { authedPost } from '../adAccounts';
-import { nextScheduled } from '../agentSchedule';
+import { nextInterval, nextScheduled } from '../agentSchedule';
 import { ensureSmmTeam } from '../agents/smmTeam';
 
 // The agent framework (migration 20261020000000_agent_framework.sql): the agents of a team, the links between them, their prompt
@@ -92,7 +92,8 @@ export async function kickQueue(onProgress) {
   return null;
 }
 
-export const nextRunOf = (agent) => (agent.schedule?.weekday ? nextScheduled('weekly', { weeklyDay: agent.schedule.weekday, weeklyTime: agent.schedule.time }) : null);
+export const nextRunOf = (agent) => (agent.schedule?.weekday ? nextScheduled('weekly', { weeklyDay: agent.schedule.weekday, weeklyTime: agent.schedule.time })
+  : Number(agent.schedule?.everyDays) >= 1 ? nextInterval({ everyDays: agent.schedule.everyDays, time: agent.schedule.time }, { last: agent.last_scheduled || null, since: agent.enabled_since || null }) : null);
 
 // What the server has connected (for the visual agent's page).
 export const fetchServerStatus = () => agentAction('status');

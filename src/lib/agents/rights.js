@@ -81,7 +81,7 @@ export function auditEntry(action, body = {}, out = {}) {
     case 'edit_output': summary = 'Відредагував результат агента вручну'; meta.taskId = body.taskId; break;
     case 'approve_plan': summary = 'Затвердив план тижня'; meta.planId = body.planId; break;
     case 'reject_plan': summary = `Відхилив план тижня${body.reason ? `: ${clip(body.reason, 160)}` : ''}`; meta.planId = body.planId; break;
-    case 'set_agent_schedule': summary = body.schedule?.weekday ? `Змінив розклад агента: день ${body.schedule.weekday}, ${body.schedule.time || '09:00'}` : 'Зняв агента з розкладу'; meta.agentId = body.agentId; break;
+    case 'set_agent_schedule': summary = body.schedule?.weekday ? `Змінив розклад агента: день ${body.schedule.weekday}, ${body.schedule.time || '09:00'}` : body.schedule?.everyDays ? `Змінив розклад агента: кожні ${body.schedule.everyDays} дн., ${body.schedule.time || '09:00'}` : 'Зняв агента з розкладу'; meta.agentId = body.agentId; break;
     case 'set_agent_mode': summary = `Режим агента: ${{ auto: 'сам', confirm: 'з підтвердженням', paused: 'пауза' }[body.mode] || body.mode}`; meta.agentId = body.agentId; break;
     case 'add_instruction': summary = `Додав вказівку: ${clip(body.text, 200)}`; meta.role = body.role || null; break;
     case 'remove_instruction': summary = 'Видалив вказівку'; break;

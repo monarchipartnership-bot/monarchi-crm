@@ -14,7 +14,7 @@ export function snapshotOperation({ campaign, agents = [], withInstructions = tr
     platforms: [...(campaign?.platforms || [])],
     language: cfg.language || 'uk',
     creative: { enabled: !!cfg.creative?.enabled, roles: [...(cfg.creative?.roles || [])] },
-    agents: agents.map((a) => ({ role: a.role, enabled: !!a.enabled, config: { ...(a.config || {}) }, schedule: a.schedule?.weekday ? { weekday: a.schedule.weekday, time: a.schedule.time || '09:00' } : null })),
+    agents: agents.map((a) => ({ role: a.role, enabled: !!a.enabled, config: { ...(a.config || {}) }, schedule: a.schedule?.weekday ? { weekday: a.schedule.weekday, time: a.schedule.time || '09:00' } : Number(a.schedule?.everyDays) >= 1 ? { everyDays: Number(a.schedule.everyDays), time: a.schedule.time || '09:00' } : null })),
     instructions: withInstructions ? (cfg.instructions || []).map((i) => ({ role: i.role || null, text: clip(i.text, 1000) })).filter((i) => i.text) : [],
     spendCapUsd: campaign?.spend_cap_usd == null ? null : Number(campaign.spend_cap_usd),
     notifyStepUsd: campaign?.notify_step_usd == null ? 2 : Number(campaign.notify_step_usd),
@@ -27,7 +27,7 @@ export function cleanTemplate(p) {
   return {
     v: TEMPLATE_VERSION, mode: String(p.mode || 'full'), platforms: p.platforms.filter((x) => typeof x === 'string'), language: ['uk', 'ru', 'en'].includes(p.language) ? p.language : 'uk',
     creative: { enabled: !!p.creative?.enabled, roles: Array.isArray(p.creative?.roles) ? p.creative.roles.filter((x) => typeof x === 'string') : [] },
-    agents: (Array.isArray(p.agents) ? p.agents : []).filter((a) => a && typeof a.role === 'string').map((a) => ({ role: a.role, enabled: !!a.enabled, config: a.config && typeof a.config === 'object' ? a.config : {}, schedule: a.schedule?.weekday ? { weekday: Number(a.schedule.weekday), time: String(a.schedule.time || '09:00') } : null })),
+    agents: (Array.isArray(p.agents) ? p.agents : []).filter((a) => a && typeof a.role === 'string').map((a) => ({ role: a.role, enabled: !!a.enabled, config: a.config && typeof a.config === 'object' ? a.config : {}, schedule: a.schedule?.weekday ? { weekday: Number(a.schedule.weekday), time: String(a.schedule.time || '09:00') } : Number(a.schedule?.everyDays) >= 1 ? { everyDays: Number(a.schedule.everyDays), time: String(a.schedule.time || '09:00') } : null })),
     instructions: (Array.isArray(p.instructions) ? p.instructions : []).map((i) => ({ role: i?.role || null, text: clip(i?.text, 1000) })).filter((i) => i.text),
     spendCapUsd: p.spendCapUsd == null || !(Number(p.spendCapUsd) > 0) ? null : Number(p.spendCapUsd), notifyStepUsd: Number.isFinite(Number(p.notifyStepUsd)) && Number(p.notifyStepUsd) >= 0 ? Number(p.notifyStepUsd) : 2,
   };

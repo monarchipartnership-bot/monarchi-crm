@@ -36,7 +36,9 @@ function crmFacts(p) {
 }
 
 //   showDeliverables: one more section «Готові матеріали» (the CRM card keeps the work of the agents there)   crmLink: a link to the CRM card of the project
-export default function ProjectCreativeTab({ projectId, showDeliverables = false, crmLink = false }) {
+//   section: show only this section ('ready' | 'client' | 'business' | 'competitors' | 'materials') without the strip of tabs: the card of the project in the Hub
+//   (owner, 2026-11-11: ALL the information about a project lives in that card) gives it its own navigation   embedded: the facts of the CRM «Основне» are not repeated
+export default function ProjectCreativeTab({ projectId, showDeliverables = false, crmLink = false, section = null, embedded = false }) {
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
   const fileInputs = useRef({}); // one hidden file input per kind of file
@@ -51,7 +53,8 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState(null); // { key, text } of the field being filled by hand
   const [accounts, setAccounts] = useState([]);
-  const [tab, setTab] = useState('ready');
+  const [tabState, setTab] = useState('ready');
+  const tab = section || tabState;
   const [crm, setCrm] = useState(null); // the row of the CRM project: what its «Огляд» holds
   const [link, setLink] = useState('');
 
@@ -209,9 +212,9 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
   const missing = MODE_ORDER.filter((m) => ready[m].required.length).length;
   return (
     <div className="pcr-wrap">
-      <div className="pcr-tabs" role="tablist" aria-label="Розділи інформації">
+      {!section && <div className="pcr-tabs" role="tablist" aria-label="Розділи інформації">
         {tabs.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={'pcr-tab' + (tab === k ? ' on' : '')} onClick={() => { setTab(k); setEditing(null); setError(''); setNotice(''); }}>{label}{k === 'ready' && missing > 0 ? <em>{missing}</em> : null}{k === 'competitors' && sites.length > 0 ? <em className="is-plain">{sites.length}</em> : null}</button>)}
-      </div>
+      </div>}
       {error && <p className="pcr-error" role="alert">{error}</p>}
 
       {tab === 'ready' && (
@@ -220,7 +223,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
         <div className="pcr-head">
           <div>
             <HubTitle icon="users">Готовність до операцій</HubTitle>
-            <p className="pcr-sub">Чого агентам ще не вистачає, щоб операція кожного типу працювала як слід. Обовʼязкове без якого агент не зробить нічого корисного, бажане покращує результат.</p>
+            <p className="pcr-sub">Чого агентам ще не вистачає, щоб операція кожного типу працювала як слід. Обовʼязкове без якого агент не зробить нічого корисного, бажане покращує результат.{crmLink ? ' Заповнюється все в картці проєкту, у розділі «Інформація про проєкт».' : ''}</p>
           </div>
         </div>
         <ul className="pcr-ready">
@@ -246,7 +249,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
 
       {tab === 'client' && (
         <>
-          <section className="pcr-card" aria-label="З картки проєкту в CRM">
+          {!embedded && <section className="pcr-card" aria-label="З картки проєкту в CRM">
             <div className="pcr-head">
               <div>
                 <HubTitle icon="users">З картки проєкту в CRM</HubTitle>
@@ -261,7 +264,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
                 <dl>{rows.map(([label, value]) => <div key={label || 'note'}>{label && <dt>{label}</dt>}<dd>{label === 'Сайт' ? <a href={/^https?:/i.test(value) ? value : `https://${value}`} target="_blank" rel="noreferrer noopener">{value}</a> : String(value)}</dd></div>)}</dl>
               </div>
             ))}
-          </section>
+          </section>}
 
           <section className="pcr-card" aria-label="Про клієнта">
             <div className="pcr-head">
@@ -282,12 +285,12 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
             <div className="pcr-head">
               <div>
                 <HubTitle icon="file">Сайт і рекламні кабінети</HubTitle>
-                <p className="pcr-sub">Сайт клієнта й кабінети, з яких агенти читають цифри. Підключаються в картці проєкту в CRM.</p>
+                <p className="pcr-sub">Сайт клієнта й кабінети, з яких агенти читають цифри. {embedded ? 'Змінюються в розділі «Основне» цієї картки.' : 'Підключаються в картці проєкту в CRM.'}</p>
               </div>
             </div>
             <div className="pcr-facts">
               <dl>
-                <div><dt>Сайт</dt><dd>{crm?.website ? <a href={/^https?:/i.test(crm.website) ? crm.website : `https://${crm.website}`} target="_blank" rel="noreferrer noopener">{crm.website}</a> : <span className="pcr-none">не вказано в картці CRM</span>}</dd></div>
+                <div><dt>Сайт</dt><dd>{crm?.website ? <a href={/^https?:/i.test(crm.website) ? crm.website : `https://${crm.website}`} target="_blank" rel="noreferrer noopener">{crm.website}</a> : <span className="pcr-none">{embedded ? 'не вказано в розділі «Основне»' : 'не вказано в картці CRM'}</span>}</dd></div>
                 {['meta', 'google'].map((pf) => {
                   const mine = accounts.filter((a) => a.platform === pf);
                   return <div key={pf}><dt>Кабінет {PLATFORM_NAME[pf]}</dt><dd>{mine.length ? mine.map((a) => `${a.account_name || 'без назви'} (${a.account_id})`).join('; ') : <span className="pcr-none">не підключено</span>}</dd></div>;
