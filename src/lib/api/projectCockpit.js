@@ -19,7 +19,7 @@ export async function fetchCockpits() {
   const [requests, projects, tasks, agents, assets, spend] = await Promise.all([
     supabase.from('ag_creative_requests').select('*').in('campaign_id', ids).order('created_at', { ascending: false }).limit(300),
     supabase.from('projects').select('id, name, client').in('id', [...new Set(campaigns.map((c) => c.project_id).filter(Boolean))]),
-    supabase.from('ag_tasks').select('id, agent_id, request_id, campaign_id, status, error, cost_usd, created_at, finished_at, notes:output->json->>notes, issues:output->json->issues').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1500),
+    supabase.from('ag_tasks').select('id, agent_id, request_id, campaign_id, status, error, cost_usd, created_at, started_at, finished_at, summary:output->>summary, notes:output->json->>notes, issues:output->json->issues').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1500),
     supabase.from('ag_agents').select('id, role').eq('team', 'creative'),
     supabase.from('project_creative_assets').select('project_id'),
     supabase.from('ag_creative_spend').select('campaign_id, usd').in('campaign_id', ids),
@@ -41,6 +41,20 @@ export async function fetchCockpits() {
   });
   const worked = new Set(campaigns.filter((c) => isActiveCampaign(c, reqs)).map((c) => c.id));
   return { list: sortProjects(Object.values(byId).filter((c) => worked.has(c.id)).map(summaryOf)), byId };
+}
+
+// One step of the chain opened in full (read when the person asks, so the cabinet stays light): the whole text it produced, what it was given, and how the runs went.
+// → { text, error, runs: [{ model, durationMs, inputTokens, outputTokens, costUsd, createdAt, status, error, input }] }
+export async function fetchStepDetail(taskId) {
+  const [task, runs] = await Promise.all([
+    supabase.from('ag_tasks').select('id, error, output').eq('id', taskId).maybeSingle(),
+    supabase.from('ag_runs').select('model, duration_ms, input_tokens, output_tokens, cost_usd, created_at, status, error, user_prompt').eq('task_id', taskId).order('id', { ascending: false }).limit(3),
+  ]);
+  const t = must(task);
+  return {
+    text: String(t?.output?.text || '').trim(), error: t?.error || '',
+    runs: (must(runs) || []).map((r) => ({ model: r.model || '', durationMs: r.duration_ms || 0, inputTokens: r.input_tokens || 0, outputTokens: r.output_tokens || 0, costUsd: Number(r.cost_usd) || 0, createdAt: r.created_at, status: r.status, error: r.error || '', input: String(r.user_prompt || '') })),
+  };
 }
 
 // After the person decided on pictures the request follows them: every picture approved = the cycle is done; something returned or still waiting = it is on review again.

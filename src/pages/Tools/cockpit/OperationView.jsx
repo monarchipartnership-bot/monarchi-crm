@@ -12,6 +12,7 @@ import CampaignPage from '../campaigns/CampaignPage';
 import Deliverables from '../campaigns/Deliverables';
 import RequestForm from '../campaigns/studio/RequestForm';
 import AgentsSettings from './AgentsSettings';
+import StepCards from './StepCards';
 import AttentionRow from './AttentionRow';
 import Gallery from './Gallery';
 import { StageLine } from './ProjectWindow';
@@ -27,7 +28,7 @@ const fmtWhen = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTim
 const countsLine = (c = {}) => [c.review ? `на перегляд: ${c.review}` : '', c.approved ? `затверджено: ${c.approved}` : '', c.rejected ? `повернено: ${c.rejected}` : '', c.producing ? `генерується: ${c.producing}` : ''].filter(Boolean).join(' · ') || 'рішень ще немає';
 
 // One cycle that is in work: what it makes, how far it is, the step of the chain, what comes after it.
-function CycleCard({ cycle, busy, onStart, onGo }) {
+function CycleCard({ cycle, busy, onStart, onGo, paused = false }) {
   const s = cycle.stage;
   const pct = Math.round((cycle.progress || 0) * 100);
   return (
@@ -46,6 +47,7 @@ function CycleCard({ cycle, busy, onStart, onGo }) {
         {s.next && <div><dt>Далі</dt><dd>{s.next}</dd></div>}
       </dl>
       {cycle.error && cycle.status === 'problem' && <p className="ckp-err" role="status">{cycle.error}</p>}
+      {cycle.status !== 'draft' && <StepCards stages={cycle.stages} paused={paused} />}
       <div className="ckp-acts">
         {(cycle.status === 'draft' || (cycle.status === 'problem' && !cycle.stages.some((x) => x.state === 'failed'))) && (
           <button type="button" className="ckp-btn is-primary" disabled={!!busy} onClick={() => onStart(cycle)}>{busy === 'start' + cycle.id ? <Spinner /> : <Ic n="play" size={15} />}{cycle.status === 'draft' ? 'Запустити завдання' : 'Запустити ще раз'}</button>
@@ -173,7 +175,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
               {!view.inWork.length && (
                 <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Зараз нічого не в роботі</b><p>{view.counts.review ? `На вашу перевірку чекає креативів: ${view.counts.review}. ` : ''}{view.nextText}</p></div></div>
               )}
-              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} />)}
+              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} />)}
             </div>
           )}
         </>

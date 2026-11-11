@@ -54,7 +54,8 @@ export function buildStages(request, tasks, roleOf) {
     }
     const t = lastBy(mine, (x) => roleOf(x.agent_id) === s.role);
     const state = t ? TASK_STATE[t.status] || 'idle' : 'idle';
-    const out = { key: s.key, label: s.label, state, note: t?.status === 'failed' ? clip(t.error, 160) : '' };
+    // the details of the step for the blocks under the scheme (lib/agents/stageDetails.js): its task, when it worked, what it cost, what it said about its own result
+    const out = { key: s.key, label: s.label, state, note: t?.status === 'failed' ? clip(t.error, 160) : '', taskId: t?.id ?? null, startedAt: t?.started_at || null, finishedAt: t?.finished_at || null, costUsd: num(t?.cost_usd), summary: clip(t?.summary, 1200) };
     if (s.parallel) out.parallel = s.parallel;
     return out;
   });

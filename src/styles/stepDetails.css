@@ -1,0 +1,18 @@
+/* The blocks of the agents under the scheme of a task (AI Agents section, dark plum look; own prefix sd-). */
+.sd { margin-top: 14px; }
+.sd-title { margin: 0 0 8px; font-size: .78rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ck-sec); }
+.sd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sd-card { border: 1px solid var(--ck-ln); border-radius: 12px; padding: 11px 14px; background: var(--ck-card); display: flex; flex-direction: column; gap: 6px; }
+.sd-card.is-work { border-color: color-mix(in srgb, var(--ck-warn) 55%, transparent); } .sd-card.is-bad { border-color: color-mix(in srgb, var(--ck-bad) 60%, transparent); }
+.sd-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .sd-head b { font-size: .95rem; color: var(--ck-ink); } .sd-head small { margin-left: auto; color: var(--ck-sec); font-size: .76rem; }
+.sd-rows { margin: 0; display: grid; gap: 6px; }
+.sd-rows > div { display: grid; grid-template-columns: 92px 1fr; gap: 10px; font-size: .84rem; line-height: 1.5; }
+.sd-rows dt { color: var(--ck-sec); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding-top: 2px; } .sd-rows dd { margin: 0; color: var(--ck-ink); }
+.sd-more { align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: .8rem; color: var(--ck-deep); text-decoration: underline; cursor: pointer; }
+.sd-detail { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; } .sd-detail h5 { margin: 6px 0 0; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ck-sec); }
+.sd-pre { margin: 0; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: .8rem; line-height: 1.55; padding: 10px 12px; border-radius: 10px; background: var(--ck-field); color: var(--ck-ink); }
+.sd-input summary { cursor: pointer; font-size: .8rem; color: var(--ck-sec); }
+.sd-log { list-style: none; margin: 0; padding: 0; font-size: .78rem; color: var(--ck-sec); display: flex; flex-direction: column; gap: 3px; }
+.sd-note { margin: 0; font-size: .8rem; color: var(--ck-sec); } .sd-note.is-bad { color: var(--ck-bad); }
+.sd-more:focus-visible, .sd-input summary:focus-visible { outline: 2px solid var(--ck-deep); outline-offset: 2px; }
+@media (max-width: 640px) { .sd-rows > div { grid-template-columns: 1fr; gap: 0; } }

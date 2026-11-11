@@ -42,6 +42,7 @@ import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js'
 import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
+import { buildStepCards, durationText } from '../src/lib/agents/stageDetails.js';
 import { endTime, monthCells, previewRuns, weekdayOf, windowText } from '../src/lib/agents/scheduleCalendar.js';
 import { ONEOFF, describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
 import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
@@ -4368,6 +4369,30 @@ await ok('projects of the AI section: only projects with launched teams, one row
   assert.deepEqual(ids({ query: 'oxy' }), [2]); assert.deepEqual(ids({ sort: 'name' }), [1, 2, 4]);
   assert.equal(teamsLink(7), '/projects/7?tab=teams');
   assert.deepEqual(buildTeamProjectRows({}), []);
+});
+
+await ok('blocks of the agents of a task: what each does, what it made and passed on, why it waits (paused, waiting for a result), how long and how much', () => {
+  const stages = [
+    { key: 'strategy', label: 'Стратег', state: 'done', taskId: 1, startedAt: '2026-11-11T21:21:42Z', finishedAt: '2026-11-11T21:22:08Z', costUsd: 0.026, summary: ' Три напрями ' },
+    { key: 'brief', label: 'ТЗ', state: 'done', taskId: 2, startedAt: '2026-11-11T21:22:12Z', finishedAt: '2026-11-11T21:23:15Z', costUsd: 0.027, summary: '6 ТЗ' },
+    { key: 'copy', label: 'Копірайтер', state: 'waiting', parallel: 'make' },
+    { key: 'maker', label: 'Креативщик', state: 'idle', parallel: 'make' },
+    { key: 'quality', label: 'Контроль якості', state: 'idle' },
+    { key: 'you', label: 'Ви', state: 'idle' },
+  ];
+  const cards = buildStepCards({ stages, paused: true });
+  assert.deepEqual(cards.map((c) => c.key), ['strategy', 'brief', 'copy', 'maker', 'quality']); // «Ви» is not a card
+  assert.deepEqual([cards[0].stateLabel, cards[0].tone, cards[0].result, cards[0].duration, cards[0].passed], ['готово', 'ok', 'Три напрями', '26 с', 'Передано: ТЗ']);
+  assert.equal(cards[1].duration, '1 хв 3 с'); assert.equal(cards[1].passed, 'Передано: Копірайтер і Креативщик');
+  assert.match(cards[2].why, /Команда на паузі/); assert.equal(cards[2].result, '');
+  const running = buildStepCards({ stages, paused: false });
+  assert.equal(running[2].why, 'У черзі: запуститься найближчим часом.'); // its input is ready
+  assert.equal(running[4].why, 'Чекає на результат: Копірайтер і Креативщик.');
+  assert.equal(running[4].passed, 'Передасть: вам на перевірку');
+  const failed = buildStepCards({ stages: [{ key: 'strategy', label: 'Стратег', state: 'failed', note: 'Немає даних', taskId: 5 }] });
+  assert.deepEqual([failed[0].tone, failed[0].why, failed[0].error], ['bad', 'Немає даних', 'Немає даних']);
+  assert.deepEqual([durationText(0), durationText(59.6), durationText(120)], ['', '60 с', '2 хв']);
+  assert.deepEqual(buildStepCards({}), []);
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
