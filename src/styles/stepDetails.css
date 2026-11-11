@@ -22,3 +22,5 @@
 .sd-rev label { font-size: .78rem; font-weight: 700; color: var(--ck-sec); }
 .sd-rev textarea { width: 100%; border: 1px solid var(--ck-ln); border-radius: 10px; padding: 8px 10px; background: transparent; color: var(--ck-ink); font: inherit; font-size: .86rem; resize: vertical; }
 .sd-revbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .sd-lang { height: 32px; border-radius: 8px; border: 1px solid var(--ck-ln); background: transparent; color: var(--ck-ink); font: inherit; font-size: .8rem; }
+
+.sd-hint { color: var(--ck-sec); font-size: .8rem; line-height: 1.4; max-width: 46ch; text-align: right; }

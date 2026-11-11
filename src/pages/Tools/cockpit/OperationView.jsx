@@ -36,7 +36,7 @@ function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised }) {
       <div className="ckp-sec-h">
         <h3>Завдання №{cycle.id}</h3>
         <span className={'ckp-chip ' + (cycle.kind === 'regular' ? 'is-work' : '')}>{cycle.kindLabel}</span>
-        <span className={'ckp-chip ' + (REQ_CHIP[cycle.status] || '')}>{cycle.statusLabel}</span>
+        <span className={'ckp-chip ' + (REQ_CHIP[cycle.status] || '')}>{s.blocked === 'estimate' ? 'Чекає підтвердження ціни' : cycle.statusLabel}</span>
         <span className="opv-date">оновлено {fmtAgo(cycle.updatedAt) || '—'}</span>
       </div>
       <p className="opv-what">{cycle.text}</p>
@@ -47,14 +47,14 @@ function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised }) {
         {s.next && <div><dt>Далі</dt><dd>{s.next}</dd></div>}
       </dl>
       {cycle.error && cycle.status === 'problem' && <p className="ckp-err" role="status">{cycle.error}</p>}
-      {cycle.status !== 'draft' && <StepCards stages={cycle.stages} paused={paused} onRevised={onRevised} />}
       <div className="ckp-acts">
         {(cycle.status === 'draft' || (cycle.status === 'problem' && !cycle.stages.some((x) => x.state === 'failed'))) && (
           <button type="button" className="ckp-btn is-primary" disabled={!!busy} onClick={() => onStart(cycle)}>{busy === 'start' + cycle.id ? <Spinner /> : <Ic n="play" size={15} />}{cycle.status === 'draft' ? 'Запустити завдання' : 'Запустити ще раз'}</button>
         )}
-        {(s.blocked === 'failed' || s.blocked === 'estimate') && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('messages')}>Перейти до повідомлень<Ic n="arrow" size={15} /></button>}
+        {(s.blocked === 'failed' || s.blocked === 'estimate') && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('messages')}>{s.blocked === 'estimate' ? 'Підтвердити генерацію картинок' : 'Перейти до повідомлень'}<Ic n="arrow" size={15} /></button>}
         {s.blocked === 'review' && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('review', cycle.id)}>Перейти до перевірки<Ic n="arrow" size={15} /></button>}
       </div>
+      {cycle.status !== 'draft' && <StepCards stages={cycle.stages} paused={paused} onRevised={onRevised} />}
     </section>
   );
 }
@@ -166,7 +166,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
           {view.creative && (
             <div className="opv-nowhead">
               <span>{view.inWork.length ? `Завдань у роботі: ${view.inWork.length}` : 'Зараз немає завдань у роботі'}</span>
-              <button type="button" className="ckp-btn is-primary" onClick={() => setForm({ mode: 'extra', allowKind: true })}><Ic n="plus" size={16} />Створити додаткове завдання</button>
+              <small className="sd-hint">Додаткові завдання створюються кнопкою «Додаткове завдання» в картці проєкту (вкладка «Запуск AI команди»).</small>
             </div>
           )}
           {!view.creative && <Passes campaignId={campaign.id} />}
@@ -189,7 +189,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
           </div>
 
           {reviewTab === 'now' && !cycle && (
-            <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Немає завдань на перевірку</b><p>{archived.length ? 'Усі готові креативи перевірено: завдання лежать в архіві, їх можна відкрити й завантажити будь-коли.' : 'Готових креативів ще немає. Завдання зʼявиться тут, щойно агенти зроблять перші картинки.'}</p></div>{archived.length > 0 && <button type="button" className="ckp-btn" style={{ marginLeft: 'auto' }} onClick={() => setReviewTab('archive')}>Архів завдань<Ic n="arrow" size={15} /></button>}</div>
+            <div className="ckp-calm"><IconBadge n={view.messages.some((m) => m.kind === 'estimate') ? 'clock' : 'check'} tone={view.messages.some((m) => m.kind === 'estimate') ? 'amber' : 'green'} /><div><b>{view.messages.some((m) => m.kind === 'estimate') ? 'Картинок на перевірку ще немає: чекаємо вашого підтвердження' : 'Немає завдань на перевірку'}</b><p>{view.messages.some((m) => m.kind === 'estimate') ? `Агенти підготували запити на картинки, але генерація почнеться лише після того, як ви підтвердите ціну. Це робиться в розділі «Повідомлення від агентів»: ${view.messages.find((m) => m.kind === 'estimate').title.toLowerCase()}.` : archived.length ? 'Усі готові креативи перевірено: завдання лежать в архіві, їх можна відкрити й завантажити будь-коли.' : 'Готових креативів ще немає. Завдання зʼявиться тут, щойно агенти зроблять перші картинки.'}</p>{view.messages.some((m) => m.kind === 'estimate') && <button type="button" className="ckp-btn is-primary" onClick={() => go('messages')}>Підтвердити генерацію картинок<Ic n="arrow" size={15} /></button>}</div>{archived.length > 0 && <button type="button" className="ckp-btn" style={{ marginLeft: 'auto' }} onClick={() => setReviewTab('archive')}>Архів завдань<Ic n="arrow" size={15} /></button>}</div>
           )}
           {/* the cycles that wait for the person: one card per cycle says everything once (its kind, what it is, how many wait); with several, a click switches */}
           {reviewTab === 'now' && pending.length > 0 && (
