@@ -116,7 +116,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
   // the form: a regular cycle is kept in the operation (the form sends its day and time), a one-off one becomes a request and starts
   async function saveForm(values, start, schedule) {
     if (schedule) {
-      const { campaign: saved, regular } = await saveRegular(campaign.id, { id: form.regularId, enabled: true, weekday: schedule.weekday, time: schedule.time, brief: values }, email);
+      const { campaign: saved, regular } = await saveRegular(campaign.id, { id: form.regularId, enabled: true, ...schedule, brief: values }, email);
       if (start) { await runRegularNow(saved, regular, email); kickQueue().catch(() => {}); }
       notify?.(start ? 'Регулярне завдання збережено, перше завдання запущено.' : 'Регулярне завдання збережено.');
     } else {
@@ -388,7 +388,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
       {form && (
         <div className="cmp-section pcd-embed">
           <RequestForm key={form.regularId || form.mode} campaign={campaign} mode={form.mode} allowKind={!!form.allowKind} title="Разове завдання: запит на креативи" initial={editing ? { ...editing.brief, materials: [] } : null}
-            schedule={editing ? { weekday: editing.weekday, time: editing.time } : null} canStartNow={!stopped} onClose={() => setForm(null)} onSave={saveForm} />
+            schedule={editing ? { weekday: editing.weekday, everyDays: editing.everyDays, time: editing.time } : null} canStartNow={!stopped} onClose={() => setForm(null)} onSave={saveForm} />
         </div>
       )}
       {confirmDialog}

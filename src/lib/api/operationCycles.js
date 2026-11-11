@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { MAX_REGULARS, cleanRegular, rawRegulars, regularRequest } from '../agents/operationCycles';
+import { MAX_REGULARS, cleanRegular, kyivToday, rawRegulars, regularRequest } from '../agents/operationCycles';
 import { createRequest, startRequest } from './creatives';
 
 // The cycles of an operation (lib/agents/operationCycles.js): the regular ones are kept in the operation itself (config.regulars), an extra one is a request.
@@ -32,7 +32,7 @@ export async function saveRegular(campaignId, input, email = null) {
 export async function setRegularEnabled(campaignId, id, enabled, email = null) {
   const r = rawRegulars(await readRow(campaignId)).find((x) => x.id === id);
   if (!r) throw new Error('Регулярне завдання не знайдено.');
-  return saveRegular(campaignId, { id, enabled, weekday: r.weekday, time: r.time, brief: r.brief }, email);
+  return saveRegular(campaignId, { id, enabled, weekday: r.weekday, everyDays: r.everyDays, time: r.time, brief: r.brief }, email);
 }
 
 // A regular cycle is removed (the cycles it already made stay).
@@ -44,9 +44,11 @@ export async function removeRegular(campaignId, id) {
 // The first pass of a regular cycle right now, without waiting for its day (the scheduled one still comes on its day).
 export async function runRegularNow(campaign, regular, email = null) {
   const assets = campaign.project_id ? must(await supabase.from('project_creative_assets').select('kind, name, url, path').eq('project_id', campaign.project_id).order('id', { ascending: true })) || [] : [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = kyivToday();
   const draft = regularRequest(campaign, today, assets, regular);
-  const { scheduled_for: _day, ...brief } = draft.brief; // not the scheduled run: the day of the schedule stays free
+  // a weekly task: not the scheduled run, the day of the schedule stays free; «every N days»: the first run counts as served today, so the next one comes N days later
+  const { scheduled_for: _day, ...rest } = draft.brief;
+  const brief = regular.everyDays ? draft.brief : rest;
   const row = must(await supabase.from('ag_creative_requests').insert({ ...draft, brief, created_by: email || null }).select().single());
   await startRequest(row.id);
   return row;

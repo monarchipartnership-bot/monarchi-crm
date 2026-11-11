@@ -138,9 +138,8 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
           onClose={() => setWizard(false)}
           onLaunched={async (launched) => {
             setWizard(false); await Promise.all([load(), cockpit.reload?.()]);
-            say(`Запущено: ${launched.map((x) => x.title).join(', ')}.`);
-            const c = launched.find((x) => x.campaignId && x.key === 'creative');
-            if (c) setOpen({ campaignId: c.campaignId, regularFirst: true }); // the creatives work by cycles: the form of the regular cycle opens at once
+            const bad = launched.find((x) => x.startError);
+            say(`Запущено: ${launched.map((x) => x.title).join(', ')}.${bad ? ` Перший запуск креативів не стартував: ${bad.startError} Він піде за розкладом.` : ''}`, !!bad);
           }} />
       )}
       {oneoff && data && view && (

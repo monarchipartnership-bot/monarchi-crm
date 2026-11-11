@@ -43,7 +43,7 @@ import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
 import { ONEOFF, describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
-import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
+import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
 import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
@@ -4283,6 +4283,27 @@ await ok('one-off tasks: the quiet operation of a project (draft, never launched
   assert.equal(v.running, 0); assert.equal(v.legacy.length, 0); assert.ok(v.teams.every((x) => x.state === 'none'));
   assert.deepEqual(ONEOFF.map((x) => x.role), ['competitor_research', 'audience_research', 'business_research', 'marketing_strategist']);
   assert.ok(ONEOFF.every((x) => Array.isArray(missingFor([x.role], new Set()).required)));
+});
+
+await ok('regular task every N days: cleaned, due once per N days counted from the last served day (the first run today counts), the next start follows it', () => {
+  const now = new Date('2026-11-12T08:00:00Z'); // 10:00 in Kyiv
+  const r = cleanRegular({ everyDays: 3, time: '9:00', brief: { goal: 'Нові креативи' } }, { by: 'm', now: new Date('2026-11-10T08:00:00Z') });
+  assert.deepEqual([r.weekday, r.everyDays, r.time], [null, 3, '09:00']);
+  assert.throws(() => cleanRegular({ everyDays: 99, time: '09:00', brief: { goal: 'x' } }), /від 1 до/);
+  const campaign = { id: 5, status: 'active', config: { regulars: [r] } };
+  const reg = regularsOf(campaign)[0];
+  assert.equal(describeRegular(reg), 'кожні 3 дн. о 09:00');
+  const req = (day) => ({ campaign_id: 5, brief: { scheduled_for: day, regular_id: r.id } });
+  assert.deepEqual(regularDue({ campaign, requests: [], now }), { due: true, scheduledFor: '2026-11-12' }); // never served
+  assert.equal(regularDue({ campaign, requests: [req('2026-11-12')], now }).reason, 'вже запущено');
+  assert.equal(regularDue({ campaign, requests: [req('2026-11-11')], now }).due, false); // only 1 day after the last run
+  assert.equal(regularDue({ campaign, requests: [req('2026-11-09')], now }).due, true); // 3 days after
+  assert.equal(regularDue({ campaign: { ...campaign, status: 'paused' }, requests: [], now }).due, false);
+  assert.equal(nextOf(reg, now, '2026-11-12').text, '15.11 о 09:00');
+  assert.equal(kyivToday(new Date('2026-11-12T23:30:00Z')), '2026-11-13'); // after midnight in Kyiv
+  // a weekly task still works as before
+  const w = cleanRegular({ weekday: 1, time: '09:00', brief: { goal: 'x' } }, { now });
+  assert.deepEqual([w.weekday, w.everyDays], [1, null]);
 });
 
 await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {

@@ -2,14 +2,18 @@ import { useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { saveInput } from '../../../lib/api/projectCreative';
 import { launchTeam } from '../../../lib/api/teams';
-import { CREATIVE_OPTIONAL, creativeRoleDef } from '../../../lib/agents/creativeTeam';
-import { MAX_EVERY_DAYS, WEEKDAYS, cleanSchedule } from '../../../lib/agents/campaignCycles';
+import { CREATIVE_OPTIONAL, DEFAULT_CONCEPTS, MAX_CONCEPTS, REQUEST_LANGUAGES, REQUEST_RATIOS, TEXT_MODES, creativeRoleDef } from '../../../lib/agents/creativeTeam';
+import { MAX_EVERY_DAYS, WEEKDAYS, cleanSchedule, describeSchedule } from '../../../lib/agents/campaignCycles';
+import { cleanRegular } from '../../../lib/agents/operationCycles';
 import { TEAMS, estimateMonthly, teamAgentPlan, teamReadiness, teamsOf, describePlanSchedule } from '../../../lib/agents/teams';
 
 const STEPS = ['Команди', 'Перевірка', 'Налаштування', 'Запуск'];
 const PLATFORM = { meta: 'Meta', google: 'Google', tiktok: 'TikTok' };
 const STATUS_TEXT = { ready: ['Усе готово', 'is-ok'], warn: ['Можна запускати, є бажане', 'is-wait'], blocked: ['Треба дозаповнити', 'is-old'] };
 const clip = (v, n) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+// the regular task of the creative team (launching the team IS making it): its schedule and its brief from the fields of the step of the settings
+const taskSchedule = (p) => (p.kind === 'every' ? { everyDays: Number(p.every), time: String(p.time).trim() } : { weekday: Number(p.weekday), time: String(p.time).trim() });
+const taskBrief = (p) => ({ goal: p.goal, count: Number(p.count), ratios: p.ratios, texts: p.texts, language: p.language });
 const rowSchedule = (r) => (r.mode === 'every' ? { everyDays: Number(r.every), time: r.time } : r.mode === 'week' ? { weekday: Number(r.weekday), time: r.time } : null);
 
 // One missing field of the card in the window of the check: written right here (it goes to the card of the project, the only place where it lives) or opened in the card.
@@ -64,7 +68,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
       order.forEach((k) => {
         if (next[k]) return;
         if (k === 'analytics') next[k] = { rows: teamAgentPlan('analytics', data.accounts).map((p) => ({ ...p, enabled: true, mode: p.schedule?.everyDays ? 'every' : p.schedule?.weekday ? 'week' : p.runsAfter ? 'chain' : 'manual', every: p.schedule?.everyDays || 3, weekday: p.schedule?.weekday || 1, time: p.schedule?.time || '09:00' })) };
-        if (k === 'creative') next[k] = { optional: new Set(CREATIVE_OPTIONAL), plan: teamAgentPlan('creative') };
+        if (k === 'creative') next[k] = { optional: new Set(CREATIVE_OPTIONAL), plan: teamAgentPlan('creative'), goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: 'uk', kind: 'every', every: '3', weekday: '1', time: '09:00', startNow: true };
         if (k === 'reports') next[k] = { weekly: true, weekday: 1, time: '09:00', monthly: true, mday: 1, mtime: '09:00', presentation: true };
       });
       return next;
@@ -78,6 +82,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
   function validate() {
     for (const k of order) {
       if (k === 'analytics') for (const r of plans[k].rows.filter((x) => x.enabled && ['every', 'week'].includes(x.mode))) { try { cleanSchedule(rowSchedule(r)); } catch (e) { return `${r.name}: ${e.message}`; } }
+      if (k === 'creative') { try { cleanRegular({ ...taskSchedule(plans[k]), brief: taskBrief(plans[k]) }, {}); } catch (e) { return `Креативи: ${e.message}`; } }
       if (k === 'reports') {
         const p = plans[k];
         if (!p.weekly && !p.monthly) return 'Звіти: оберіть хоча б один звіт, тижневий або місячний.';
@@ -90,7 +95,9 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
   const estimates = order.map((k) => {
     const p = plans[k];
     if (!p) return { key: k, usd: 0, text: '' };
-    const e = k === 'analytics' ? estimateMonthly('analytics', p.rows.map((r) => ({ ...r, schedule: rowSchedule(r) }))) : estimateMonthly(k);
+    let sch = null;
+    if (k === 'creative') { try { sch = cleanSchedule(taskSchedule(p)); } catch { sch = null; } }
+    const e = k === 'analytics' ? estimateMonthly('analytics', p.rows.map((r) => ({ ...r, schedule: rowSchedule(r) }))) : k === 'creative' ? estimateMonthly('creative', [{ schedule: sch }]) : estimateMonthly(k);
     return { key: k, ...e };
   });
   const total = Math.round(estimates.reduce((s, e) => s + (e.usd || 0), 0) * 100) / 100;
@@ -117,10 +124,11 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
           teamKey: k, project: data.project, accounts: data.accounts, existing: data.campaigns, goals: goal, email,
           plan: k === 'analytics' ? p.rows.map((r) => ({ role: r.role, enabled: r.enabled, schedule: rowSchedule(r) })) : [],
           optional: k === 'creative' ? [...p.optional] : [],
+          creativeTask: k === 'creative' ? { brief: taskBrief(p), schedule: taskSchedule(p), startNow: p.startNow } : null,
           capUsd: k !== 'reports' && Number(String(cap).replace(',', '.')) > 0 ? Number(String(cap).replace(',', '.')) : null,
           reports: k === 'reports' ? { weekly: p.weekly ? { weekday: Number(p.weekday), time: p.time.trim() } : null, monthly: p.monthly ? { day: Number(p.mday), time: p.mtime.trim() } : null, tasks: { presentation: p.presentation } } : null,
         });
-        done.push({ key: k, title, campaignId: res.campaignId || null });
+        done.push({ key: k, title, campaignId: res.campaignId || null, startError: res.startError || '' });
       }
       await onLaunched(done);
     } catch (e) {
@@ -223,7 +231,30 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
 
               {tab === 'creative' && (
                 <>
-                  <p className="tm-hint">Креативи працюють завданнями: після запуску ви одразу опишете перше завдання (регулярний або разовий). Обовʼязкові агенти працюють завжди, решту можна вимкнути.</p>
+                  <p className="tm-hint">Запуск команди й є регулярне завдання: агенти працюють за розкладом із цими параметрами. Усе про клієнта вони беруть із картки проєкту. Змінити можна будь-коли, а окреме разове завдання створюється кнопкою «Разове завдання».</p>
+                  <div className="tm-task">
+                    <label className="tm-fl tm-w2"><span>Що потрібно від креативів</span>
+                      <textarea className="tm-area" rows={3} value={plans.creative.goal} onChange={(e) => patchPlan('creative', { goal: e.target.value })} placeholder="Наприклад: нові рекламні креативи для Instagram, акцент на преміальності й ціні" aria-label="Що потрібно від креативів" /></label>
+                    <label className="tm-fl"><span>Напрямів (ідей) за запуск</span>
+                      <select className="tm-sel" value={plans.creative.count} onChange={(e) => patchPlan('creative', { count: e.target.value })} aria-label="Напрямів за запуск">{Array.from({ length: MAX_CONCEPTS }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}</select></label>
+                    <fieldset className="tm-fl tm-fs"><legend>Формати</legend>
+                      {REQUEST_RATIOS.map((r) => <label key={r.key} className="tm-chk"><input type="checkbox" checked={plans.creative.ratios.includes(r.key)} onChange={(e) => patchPlan('creative', { ratios: e.target.checked ? [...plans.creative.ratios, r.key] : plans.creative.ratios.filter((x) => x !== r.key) })} />{r.label}</label>)}
+                    </fieldset>
+                    <label className="tm-fl"><span>Тексти на креативах</span>
+                      <select className="tm-sel" value={plans.creative.texts} onChange={(e) => patchPlan('creative', { texts: e.target.value })} aria-label="Тексти на креативах">{['yes', 'no'].map((k) => <option key={k} value={k}>{TEXT_MODES[k]}</option>)}</select></label>
+                    <label className="tm-fl"><span>Мова текстів</span>
+                      <select className="tm-sel" value={plans.creative.language} onChange={(e) => patchPlan('creative', { language: e.target.value })} aria-label="Мова текстів">{Object.entries(REQUEST_LANGUAGES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+                    <div className="tm-fl tm-w2"><span>Як часто запускати</span>
+                      <span className="tm-sched">
+                        <select className="tm-sel" value={plans.creative.kind} onChange={(e) => patchPlan('creative', { kind: e.target.value })} aria-label="Як часто запускати"><option value="every">Кожні N днів</option><option value="week">Щотижня</option></select>
+                        {plans.creative.kind === 'every'
+                          ? <><input className="tm-num" type="number" min="1" max={MAX_EVERY_DAYS} value={plans.creative.every} onChange={(e) => patchPlan('creative', { every: e.target.value })} aria-label="Кожні скільки днів" /><span>дн.</span></>
+                          : <select className="tm-sel" value={plans.creative.weekday} onChange={(e) => patchPlan('creative', { weekday: e.target.value })} aria-label="День тижня">{WEEKDAYS.map((d, i) => <option key={d} value={String(i + 1)}>{d}</option>)}</select>}
+                        <input className="tm-time" type="text" inputMode="numeric" value={plans.creative.time} onChange={(e) => patchPlan('creative', { time: e.target.value })} placeholder="09:00" aria-label="Час (Київ)" />
+                      </span></div>
+                    <label className="tm-agent-on tm-w2"><input type="checkbox" checked={plans.creative.startNow} onChange={(e) => patchPlan('creative', { startNow: e.target.checked })} /><span><b>Запустити перший раз одразу</b><small>Інакше перший запуск буде за розкладом. Картинки Higgsfield генеруються лише після вашого підтвердження ціни.</small></span></label>
+                  </div>
+                  <p className="tm-hint">Агенти відділу: обовʼязкові працюють завжди, решту можна вимкнути.</p>
                   <ul className="tm-agents">
                     {plans.creative.plan.map((a) => (
                       <li key={a.role} className={'tm-agent' + (a.optional && !plans.creative.optional.has(a.role) ? ' is-off' : '')}>
@@ -268,7 +299,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                     <h3>{def.title}</h3>
                     <ul>
                       {k === 'analytics' && p.rows.filter((r) => r.enabled).map((r) => <li key={r.role}><b>{r.name}</b>: {r.runsAfter ? 'після агентів, від яких залежить' : describePlanSchedule(rowSchedule(r)) || 'лише вручну'}</li>)}
-                      {k === 'creative' && <li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}. Перше завдання ви опишете одразу після запуску.</li>}
+                      {k === 'creative' && <><li><b>Завдання:</b> {p.goal.trim() || '—'}</li><li>Напрямів: {p.count} · формати: {p.ratios.join(', ') || '1:1'} · тексти: {TEXT_MODES[p.texts].toLowerCase()} · мова: {REQUEST_LANGUAGES[p.language]}</li><li>Запускається {describeSchedule(taskSchedule(p)) || 'за розкладом'}; перший запуск {p.startNow ? 'одразу' : 'за розкладом'}</li><li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}</li></>}
                       {k === 'reports' && <>{p.weekly && <li>Тижневий звіт: {WEEKDAYS[p.weekday - 1]} о {p.time}</li>}{p.monthly && <li>Місячний звіт: {p.mday}-го числа о {p.mtime}</li>}{p.presentation && <li>Презентації для клієнта</li>}</>}
                     </ul>
                     <p className="tm-est">{k === 'creative' ? 'Вартість: ' : 'Орієнтовна вартість: '}{e.usd ? <b>≈ ${e.usd.toFixed(2)} на місяць</b> : null} {e.text}</p>

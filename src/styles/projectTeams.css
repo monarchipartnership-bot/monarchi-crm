@@ -86,3 +86,9 @@
 .oo-row > div { display: flex; flex-direction: column; gap: 3px; flex: 1 1 320px; min-width: 0; } .oo-row small { color: var(--muted); font-size: .82rem; line-height: 1.45; }
 .oo-warn { color: #8A1C1C !important; } .oo-ok { color: #14532D !important; }
 .oo-link { border: 0; background: none; padding: 0; font: inherit; color: #661466; text-decoration: underline; cursor: pointer; }
+
+/* the regular task of the creative team in the step of the settings */
+.tm-task { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; }
+.tm-fl { display: flex; flex-direction: column; gap: 6px; font-size: .86rem; font-weight: 600; min-width: 0; } .tm-w2 { grid-column: 1 / -1; }
+.tm-fs { border: 0; padding: 0; margin: 0; } .tm-fs legend { padding: 0; margin-bottom: 6px; font-size: .86rem; font-weight: 600; }
+.tm-chk { display: inline-flex; align-items: center; gap: 6px; margin: 0 14px 4px 0; font-weight: 400; }

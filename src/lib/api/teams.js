@@ -7,6 +7,8 @@ import { DEFAULT_AGENT_CONFIG, addAgentEvent, connectAgent, disconnectAgent, fet
 import { modeRoles } from '../agents/campaignModes';
 import { CREATIVE_OPTIONAL, CREATIVE_REQUIRED } from '../agents/creativeTeam';
 import { cleanSchedule } from '../agents/campaignCycles';
+import { cleanRegular } from '../agents/operationCycles';
+import { runRegularNow, saveRegular } from './operationCycles';
 import { teamDef, teamsOf } from '../agents/teams';
 
 // The AI teams of a project (lib/agents/teams.js): the reading of everything the section «Запуск AI команди» shows, the launch of a team and its stop and resume.
@@ -29,13 +31,15 @@ const channels = (accounts) => ['meta', 'google'].filter((p) => accounts.some((a
 
 // Launches a team. teamKey: 'creative' | 'analytics' | 'reports'.
 //   plan: [{ role, enabled, schedule }] the agents of a team of a campaign with the schedules chosen (analytics)   optional: the optional agents of the creative department that are wanted
+//   creativeTask: { brief: { goal, count, ratios, texts, language }, schedule: { weekday | everyDays, time }, startNow } the regular task of the creative team: launching the team IS making it
 //   capUsd: the monthly limit of the money of the operation (or null)   reports: { weekly: { weekday, time } | null, monthly: { day, time } | null, tasks }
 // → { campaignId } or { reports: true }. The agents start at once where their schedule says so (the cron and the queue do the work).
-export async function launchTeam({ teamKey, project, accounts = [], existing = [], plan = [], optional = [], capUsd = null, goals = '', reports = null, email = null }) {
+export async function launchTeam({ teamKey, project, accounts = [], existing = [], plan = [], optional = [], creativeTask = null, capUsd = null, goals = '', reports = null, email = null }) {
   const def = teamDef(teamKey);
   if (!def) throw new Error('Невідома команда.');
   if (teamKey === 'reports') return launchReports({ projectId: project.id, reports, email });
   if (teamsOf({ campaigns: existing }).teams.find((t) => t.key === teamKey)?.state !== 'none') throw new Error(`Команда «${def.title}» у цього проєкту вже працює.`);
+  if (teamKey === 'creative' && creativeTask) cleanRegular({ ...creativeTask.schedule, brief: creativeTask.brief }, { by: email }); // a task that cannot be saved is refused BEFORE anything is made
   const have = channels(accounts);
   const platforms = have.length ? have : ['tiktok'];
   let c = await createCampaign({ project, platforms, name: `${project.name} · ${def.title}`, email });
@@ -56,8 +60,14 @@ export async function launchTeam({ teamKey, project, accounts = [], existing = [
   c = await updateCampaign(c.id, { config: { ...(c.config || {}), mode: def.mode, modeApplied: `${def.mode}:${[...platforms].sort().join()}`, agentsConfigured: true, language: 'uk', goals: String(goals || ''), team: teamKey }, spend_cap_usd: capUsd > 0 ? capUsd : null });
   if (teamKey === 'creative') await saveCreativeSetup(c, { enabled: true, roles: [...CREATIVE_REQUIRED, ...CREATIVE_OPTIONAL.filter((r) => optional.includes(r))] }, email); // the client is linked to the chosen agents of the department
   await launchCampaign(c.id);
+  let startError = '';
+  if (teamKey === 'creative' && creativeTask) {
+    const { campaign: saved, regular } = await saveRegular(c.id, { enabled: true, ...creativeTask.schedule, brief: creativeTask.brief }, email);
+    // the team stays launched even if the first run cannot start: the person is told why and the schedule goes on
+    if (creativeTask.startNow) { try { await runRegularNow(saved, regular, email); } catch (e) { startError = e?.message || 'Перший запуск не вдалося почати.'; } }
+  }
   kickQueue().catch(() => {});
-  return { campaignId: c.id };
+  return { campaignId: c.id, startError };
   } catch (e) {
     await deleteCampaign(c.id).catch(() => {});
     throw e;

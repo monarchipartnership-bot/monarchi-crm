@@ -17,7 +17,7 @@ export async function runRegularCycles(ctx) {
   const campaigns = (must(await db.from('ag_campaigns').select('*').eq('status', 'active'), 'campaigns') || []).filter((c) => regularsOf(c).some((r) => r.enabled));
   if (!campaigns.length) return out;
   const now = nowOf(ctx);
-  const since = new Date(now.getTime() - 9 * 86400000).toISOString();
+  const since = new Date(now.getTime() - 70 * 86400000).toISOString(); // a task «every N days» looks at its last served day, up to 60 days back
   const recent = must(await db.from('ag_creative_requests').select('id, campaign_id, brief, created_at').in('campaign_id', campaigns.map((c) => c.id)).gte('created_at', since), 'requests') || [];
   const capped = await cappedCampaigns(db).catch(() => new Set());
   for (const campaign of campaigns) {

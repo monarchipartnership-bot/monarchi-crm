@@ -5,8 +5,8 @@
 // A cycle of the creative department is a row of ag_creative_requests (brief.kind = 'regular' | 'extra', brief.scheduled_for = the Kyiv day of the run).
 // The card of an operation shows six sections; this file turns the cabinet of the operation (projectCockpit.js) into what each of them shows.
 // Pure code: the page, the server and the tests use it.
-import { lastScheduled, nextScheduled } from '../agentSchedule.js';
-import { WEEKDAYS, cleanSchedule } from './campaignCycles.js';
+import { daysBetween, lastInterval, lastScheduled, nextInterval, nextScheduled } from '../agentSchedule.js';
+import { WEEKDAYS, cleanSchedule, describeSchedule } from './campaignCycles.js';
 import { MAX_MATERIALS, cleanRequest, directionLimit } from './creativeTeam.js';
 
 export const CYCLE_KIND = { regular: 'Регулярне завдання', extra: 'Разове завдання' };
@@ -32,31 +32,36 @@ export function sameModeConflict(campaigns = [], { projectId, mode, exceptId = n
 }
 export const conflictMessage = (other) => `У цього проєкту вже працює операція «${MODE_TITLE[modeOf(other)] || modeOf(other)}» («${other.name || `Операція ${other.id}`}»). Дві однакові операції одночасно не запускаються: додайте завдання у наявну або завершіть її.`;
 
-// ---- the regular cycles: campaign.config.regulars = [{ id, enabled, weekday 1..7, time 'HH:MM', title, brief, since, updated_by, updated_at }]
+// ---- the regular tasks: campaign.config.regulars = [{ id, enabled, weekday 1..7 OR everyDays 1..60, time 'HH:MM', title, brief, since, updated_by, updated_at }]
 // An operation may have several of them (owner, 2026-11-11), each with its own day, time and parameters; an older operation keeps one in campaign.config.regular
 // and it is read as the cycle 'r1'. The operation gets its first regular cycle when it is created (the form opens at once).
 export const MAX_REGULARS = 5;
 // input: { id?, enabled, weekday, time, brief: the fields of the request form }; prev: what is saved for this id. Throws a message the person can read.
 export function cleanRegular(input = {}, { by = null, now = new Date(), prev = null } = {}) {
-  const schedule = cleanSchedule({ weekday: input.weekday, time: input.time });
+  const every = input.everyDays != null && input.everyDays !== '' && !input.weekday;
+  const schedule = cleanSchedule(every ? { everyDays: input.everyDays, time: input.time } : { weekday: input.weekday, time: input.time });
   const raw = { ...(input.brief || {}) };
   if (raw.texts === 'given') raw.texts = 'yes'; // the same ready texts every week make no sense: the copywriter writes new ones
   const { title, brief } = cleanRequest({ ...raw, given_texts: [], materials: [], kind: 'regular', scheduled_for: '' });
   const enabled = input.enabled !== false;
   // the schedule counts from the moment it was switched on or moved: a run for a moment before that never starts
-  const moved = !prev || !prev.enabled || Number(prev.weekday) !== schedule.weekday || prev.time !== schedule.time;
+  const moved = !prev || !prev.enabled || Number(prev.weekday || 0) !== Number(schedule.weekday || 0) || Number(prev.everyDays || 0) !== Number(schedule.everyDays || 0) || prev.time !== schedule.time;
   const id = prev?.id || (/^r[a-z0-9]{1,20}$/.test(String(input.id || '')) ? input.id : `r${now.getTime().toString(36)}`);
-  return { id, enabled, weekday: schedule.weekday, time: schedule.time, title, brief, since: enabled ? (moved ? now.toISOString() : prev.since || now.toISOString()) : null, updated_by: by, updated_at: now.toISOString() };
+  return { id, enabled, weekday: schedule.weekday || null, everyDays: schedule.everyDays || null, time: schedule.time, title, brief, since: enabled ? (moved ? now.toISOString() : prev.since || now.toISOString()) : null, updated_by: by, updated_at: now.toISOString() };
 }
 
-const validRegular = (r) => !!r && typeof r === 'object' && Number(r.weekday) >= 1 && Number(r.weekday) <= 7 && !!String(r.brief?.goal || '').trim();
-const normRegular = (r, i) => ({ id: r.id || (i === 0 ? 'r1' : `r${i + 1}`), enabled: r.enabled !== false, weekday: Number(r.weekday), time: r.time || '09:00', title: r.title || clip(r.brief.goal, 60), brief: r.brief, since: r.since || null, updatedAt: r.updated_at || null });
+const validRegular = (r) => !!r && typeof r === 'object' && ((Number(r.weekday) >= 1 && Number(r.weekday) <= 7) || Number(r.everyDays) >= 1) && !!String(r.brief?.goal || '').trim();
+const normRegular = (r, i) => ({ id: r.id || (i === 0 ? 'r1' : `r${i + 1}`), enabled: r.enabled !== false, weekday: Number(r.weekday) || null, everyDays: Number(r.everyDays) || null, time: r.time || '09:00', title: r.title || clip(r.brief.goal, 60), brief: r.brief, since: r.since || null, updatedAt: r.updated_at || null });
 // the saved regular cycles of an operation, in the order they were made (raw rows: lib/api/operationCycles.js keeps the same rule)
 export const rawRegulars = (campaign) => { const cfg = campaign?.config || {}; return Array.isArray(cfg.regulars) ? cfg.regulars : cfg.regular ? [{ ...cfg.regular, id: cfg.regular.id || 'r1' }] : []; };
 export const regularsOf = (campaign) => rawRegulars(campaign).filter(validRegular).map(normRegular);
 export const regularOf = (campaign) => regularsOf(campaign)[0] || null;
 
-export const describeRegular = (r) => (r ? `щотижня, ${WEEKDAYS[r.weekday - 1].toLowerCase()} о ${r.time}` : '');
+export const describeRegular = (r) => (r ? describeSchedule(r.everyDays ? { everyDays: r.everyDays, time: r.time } : { weekday: r.weekday, time: r.time }) : '');
+// the Kyiv day of today as 'YYYY-MM-DD'
+export const kyivToday = (now = new Date()) => lastInterval({ time: '00:00' }, now).date;
+// the days a regular task has already been served: the days its requests were made for (the first run «now» counts as today)
+const servedDays = (requests, campaign, regular) => requests.filter((q) => q.campaign_id === campaign.id && (q.brief?.regular_id || 'r1') === regular.id && q.brief?.scheduled_for).map((q) => q.brief.scheduled_for).sort();
 
 // Is this regular cycle due now? requests: the requests of the operation (at least the recent ones); regular: one of regularsOf (the first by default).
 // → { due, scheduledFor?: 'YYYY-MM-DD', reason }. The request made for a day and a cycle is the record that the day was served, so a run never repeats.
@@ -65,6 +70,15 @@ export function regularDue({ campaign, regular = null, requests = [], now = new 
   if (!r) return { due: false, reason: 'не налаштовано' };
   if (!r.enabled) return { due: false, reason: 'вимкнено' };
   if (campaign.status !== 'active') return { due: false, reason: 'операція не працює' };
+  if (r.everyDays) { // every N days: counted from the last served day
+    const s = lastInterval({ time: r.time }, now);
+    if (!r.since || s.at < new Date(r.since)) return { due: false, reason: 'запланований момент був до вмикання', scheduledFor: s.date };
+    const served = servedDays(requests, campaign, r);
+    if (served.includes(s.date)) return { due: false, reason: 'вже запущено', scheduledFor: s.date };
+    if (served.length && daysBetween(served[served.length - 1], s.date) < r.everyDays) return { due: false, reason: 'ще не час за розкладом', scheduledFor: s.date };
+    if (now.getTime() - s.at.getTime() > REGULAR_LATE_HOURS * 3600000) return { due: false, reason: 'запізно: чекаємо наступного запуску', scheduledFor: s.date };
+    return { due: true, scheduledFor: s.date };
+  }
   const sched = lastScheduled('weekly', { weeklyDay: r.weekday, weeklyTime: r.time }, now);
   if (!r.since || sched.at < new Date(r.since)) return { due: false, reason: 'запланований момент був до вмикання', scheduledFor: sched.date };
   if (requests.some((q) => q.campaign_id === campaign.id && q.brief?.scheduled_for === sched.date && (q.brief?.regular_id || 'r1') === r.id)) return { due: false, reason: 'вже запущено', scheduledFor: sched.date };
@@ -82,15 +96,16 @@ export function regularRequest(campaign, scheduledFor, assets = [], regular = nu
   return { campaign_id: campaign.id, title: `${clip(r.title || clip(r.brief?.goal, 60), 100)} · ${dayMonth(scheduledFor)}`, brief: { ...r.brief, kind: 'regular', regular_id: r.id, scheduled_for: scheduledFor }, materials, status: 'draft', created_by: 'розклад' };
 }
 
-// When this regular cycle starts next. → { at: Date, text } | null
-export function nextOf(r, now = new Date()) {
+// When this regular task starts next. last: the last day it was served (for «every N days»). → { at: Date, text } | null
+export function nextOf(r, now = new Date(), last = null) {
   if (!r || !r.enabled) return null;
+  if (r.everyDays) { const n = nextInterval({ everyDays: r.everyDays, time: r.time }, { last, since: r.since || null }, now); return { at: n.at, text: `${dayMonth(n.date)} о ${r.time}` }; }
   const next = nextScheduled('weekly', { weeklyDay: r.weekday, weeklyTime: r.time }, now);
   return next ? { at: next.at, text: `${WEEKDAYS[r.weekday - 1].toLowerCase()}, ${dayMonth(next.date)} о ${r.time}` } : null;
 }
 // The nearest start of any regular cycle of the operation. → { at, text, regular } | null
-export function nextRegular(campaign, now = new Date()) {
-  const list = regularsOf(campaign).map((r) => { const n = nextOf(r, now); return n ? { ...n, regular: r } : null; }).filter(Boolean);
+export function nextRegular(campaign, now = new Date(), lastOf = () => null) {
+  const list = regularsOf(campaign).map((r) => { const n = nextOf(r, now, lastOf(r)); return n ? { ...n, regular: r } : null; }).filter(Boolean);
   return list.sort((a, b) => a.at - b.at)[0] || null;
 }
 
@@ -182,9 +197,10 @@ export function buildOperationView({ campaign, cockpit = null, now = new Date() 
   // the ready materials: the newest cycle that has made pictures
   const last = cycles.filter(hasMaterials).sort((a, b) => at(b.createdAt || b.updatedAt) - at(a.createdAt || a.updatedAt))[0] || null;
   const ready = last ? { cycle: { id: last.id, title: last.title, kind: last.kind, kindLabel: CYCLE_KIND[last.kind], updatedAt: last.updatedAt }, items: (last.items || []).filter((i) => i.status === 'approved' && i.url), pending: last.creatives?.review || 0, returned: last.creatives?.rejected || 0 } : null;
-  const regulars = regularsOf(campaign).map((r) => { const n = nextOf(r, now); return { ...r, whenText: describeRegular(r), next: n ? { at: n.at.toISOString(), text: n.text } : null }; });
+  const lastOf = (r) => cycles.filter((c) => (c.regularId || 'r1') === r.id && c.scheduledFor).map((c) => c.scheduledFor).sort().pop() || null;
+  const regulars = regularsOf(campaign).map((r) => { const n = nextOf(r, now, lastOf(r)); return { ...r, whenText: describeRegular(r), next: n ? { at: n.at.toISOString(), text: n.text } : null }; });
   const regular = regulars[0] || null;
-  const next = nextRegular(campaign, now);
+  const next = nextRegular(campaign, now, lastOf);
   const creative = hasCreativeCycles(campaign);
   const nextText = !creative ? '' : !regulars.length ? 'Регулярних завдань не налаштовано: операція працює лише за одноразовими завданнями.'
     : !regulars.some((r) => r.enabled) ? 'Усі регулярні завдання вимкнено.'
