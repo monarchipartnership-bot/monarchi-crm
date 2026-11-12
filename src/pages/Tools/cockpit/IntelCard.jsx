@@ -27,7 +27,7 @@ export default function IntelCard({ intel, steps = [], busy = false, onRefresh }
         {intel?.updatedAt && !working && <span className="opv-date">оновлено {fmtAgo(intel.updatedAt) || '—'}{intel.costUsd ? ` · ${fmtUsd(intel.costUsd)}` : ''}</span>}
       </div>
       {!intel && <p className="sd-note">Агент-розвідник ще не вивчав цього клієнта. Він читає сайт (товари, ціни, тон, фото) і найкращі реклами з кабінету Meta, щоб креативи й тексти відповідали справжнім товарам. Запускається разом із командою або кнопкою нижче.</p>}
-      {working && <p className="sd-note" role="status">Агент вивчає сайт і кабінет клієнта: кроки видно нижче. Перше завдання почнеться, коли профіль буде готовий.</p>}
+      {working && <p className="sd-note" role="status">Агент вивчає сайт і кабінет клієнта: кроки видно нижче.{intel?.status === 'running' ? ' Перше завдання почнеться, коли профіль буде готовий.' : ' Поточний профіль діє, поки не буде готовий новий.'}</p>}
       {intel?.status === 'failed' && <p className="sd-note is-bad">Не вдалося вивчити клієнта{intel.gaps?.length ? `: ${intel.gaps[0]}` : ''} Агенти працюватимуть за карткою проєкту.</p>}
       {has && (
         <>
