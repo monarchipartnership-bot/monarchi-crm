@@ -47,7 +47,7 @@ export function buildRuns({ cockpits = [], deliverables = [] } = {}) {
       const kind = runKindOf(r, c.regulars || []);
       const st = creativeRunState(r);
       runs.push({
-        id: `c:${c.id}:${r.id}`, source: 'creative', campaignId: c.id, requestId: r.id, title: r.title || r.goal || `Завдання №${r.id}`, kind, kindLabel: RUN_KIND[kind], team: 'Креативи',
+        id: `c:${c.id}:${r.id}`, source: 'creative', campaignId: c.id, requestId: r.id, title: r.title || r.goal || `Завдання №${r.id}`, kind, kindLabel: RUN_KIND[kind], team: c.teamTitle || 'Креативи',
         date: r.createdAt || r.updatedAt || null, state: st.state, stateText: st.text, counts: r.creatives || {}, items: r.items || [], stages: r.stages || [], goal: r.goal || '',
         cost: (r.cost?.model || 0) + (r.cost?.higgsfield || 0), steps: r.steps || [],
       });

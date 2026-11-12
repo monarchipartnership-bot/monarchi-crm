@@ -68,3 +68,25 @@ export async function createExtraCycle(campaignId, values, email = null, start =
   if (start) await startRequest(row.id);
   return row;
 }
+
+// Names (owner, 2026-11-12): the team and its tasks get names the person chooses. A regular task keeps its name in the operation, so the next runs carry it; a one-off task is a request.
+export async function renameRegular(campaignId, id, title) {
+  const row = await readRow(campaignId);
+  const name = String(title ?? '').replace(/\s+/g, ' ').trim().slice(0, 100);
+  if (!name) throw new Error('Назва не може бути порожньою.');
+  const list = rawRegulars(row);
+  if (!list.some((r) => r.id === id)) throw new Error('Регулярне завдання не знайдено.');
+  return writeRegulars(row, list.map((r) => (r.id === id ? { ...r, title: name } : r)));
+}
+export async function renameRequest(requestId, title) {
+  const name = String(title ?? '').replace(/\s+/g, ' ').trim().slice(0, 100);
+  if (!name) throw new Error('Назва не може бути порожньою.');
+  return must(await supabase.from('ag_creative_requests').update({ title: name, updated_at: new Date().toISOString() }).eq('id', requestId).select().single());
+}
+// The name of the team itself (empty = the type again: «Креативи»).
+export async function renameTeam(campaignId, title) {
+  const row = await readRow(campaignId);
+  const name = String(title ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const { title: _old, ...rest } = row.config || {};
+  return must(await supabase.from('ag_campaigns').update({ config: name ? { ...rest, title: name } : rest, updated_at: new Date().toISOString() }).eq('id', row.id).select().single());
+}
