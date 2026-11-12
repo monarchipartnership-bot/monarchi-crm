@@ -10,7 +10,7 @@ const clip = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 // concept: the concept of the technical brief; creative: the ag_creatives row. → { zone, headline, subline, badge, cta } or null when there is nothing to put (no text wanted)
 export function overlayFields(concept, creative) {
-  if (!concept || concept.text_render !== 'overlay' || concept.needs_text === false) return null;
+  if (!concept || !['overlay', 'model'].includes(concept.text_render) || concept.needs_text === false) return null; // a brief made before the rule «the system puts the words» says «model»: the same text, put by the system
   const variant = Array.isArray(creative?.copy?.variants) ? creative.copy.variants[0] : null;
   const own = concept.copy || {};
   const headline = clip(own.headline || variant?.headline, 90);

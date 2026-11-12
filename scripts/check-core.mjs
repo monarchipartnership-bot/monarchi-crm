@@ -5459,6 +5459,7 @@ await ok('words on a creative (3.1): the text comes from the brief and the copyw
   assert.deepEqual(overlayFields(concept, creative), { zone: 'top', headline: 'Edges This Real? Yes, Really.', subline: '', badge: '', cta: 'Shop Now' }); // the headline of the copywriter, the button of its first variant
   assert.deepEqual(overlayFields({ ...concept, copy: { headline: 'Given by the manager', subline: 'Line 2', badge: '-20%' }, cta: { show: false } }, creative), { zone: 'top', headline: 'Given by the manager', subline: 'Line 2', badge: '-20%', cta: '' }); // given texts win, a concept without a button has none
   assert.equal(overlayFields({ ...concept, text_render: 'none' }, creative), null); // no text wanted
+  assert.equal(overlayFields({ ...concept, text_render: 'model' }, creative).headline, 'Edges This Real? Yes, Really.'); // an older brief (the model was to draw the words): the system puts them
   assert.equal(overlayFields({ ...concept, layout: { text_zone: 'nowhere' } }, creative).zone, 'top'); // an unknown zone is the top
   assert.equal(overlayFields(concept, {}).headline, ''); // the copy is not ready: the caller waits
 
