@@ -22,6 +22,7 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
 import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
 import ProjectCreativeTab from '../../components/Projects/Creative/ProjectCreativeTab';
+import AiResults from '../../components/Projects/Results/AiResults';
 import ProjectTeams from '../../components/Projects/Teams/ProjectTeams';
 import { fetchAgent } from '../../lib/api/projectAgents';
 import '../../styles/reportPage.css';
@@ -47,7 +48,7 @@ const TABS = [
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'Агент звітів', icon: PAGE_ICONS['page.ai-agents'].src },
-  { key: 'creative', label: 'Готові матеріали', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
+  { key: 'creative', label: 'Результати AI команди', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
 ];
 
 // «Звітність» (owner, 2026-11-11): the four report tabs are one tab of the card with four sections inside. Their keys and addresses stay (?tab=builder, compose, work, decks),
@@ -617,7 +618,7 @@ function ProjectDetailCard() {
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
       {tab === 'teams' && <ProjectTeams key={'teams-' + id} projectId={id} onGoFill={(section) => { setTab('overview'); setInfo(section); }} onOpenReports={() => setTab('agent')} onOpenMaterials={() => setTab('creative')} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
-      {tab === 'creative' && <ProjectCreativeTab key={'creative-' + id} projectId={id} section="materials" showDeliverables embedded />}
+      {tab === 'creative' && <AiResults key={'results-' + id} projectId={id} />}
       </div>
       {confirmDialog}
     </div>

@@ -22,7 +22,7 @@ function download(d) {
 // A returned material asks for a reason: it goes to the memory of the client. An approved strategy or research becomes a field of the project card.
 //   light: the look of the project card of the CRM (Hub style: white card, .btn / .btn-p); otherwise the dark look of the AI Agents section
 //   head: the header of the block (the project card passes its own title)
-export default function Deliverables({ projectId = null, campaignId = null, notify, light = false, head = null }) {
+export default function Deliverables({ projectId = null, campaignId = null, notify, light = false, head = null, only = null, onChanged = null }) {
   const { email } = useAuth();
   const [list, setList] = useState(null);
   const [rights, setRights] = useState({ approvers: [], isOps: false });
@@ -43,7 +43,7 @@ export default function Deliverables({ projectId = null, campaignId = null, noti
   }, [projectId, campaignId, email]);
   useEffect(() => { load().catch((e) => { setList([]); notify?.(e.message || 'Не вдалося завантажити матеріали.', true); }); }, [load, notify]);
 
-  const groups = useMemo(() => groupDeliverables(list || [], { status: filter }), [list, filter]);
+  const groups = useMemo(() => groupDeliverables(only != null ? (list || []).filter((d) => (Array.isArray(only) ? only.includes(d.id) : d.id === only)) : (list || []), { status: only != null ? '' : filter }), [list, filter, only]);
   const c = useMemo(() => counts(list || []), [list]);
   const allowed = canDo({ action: 'pass_on', email, approvers: rights.approvers, isOps: rights.isOps });
   const mayEdit = canDo({ action: 'edit_output', email, approvers: rights.approvers, isOps: rights.isOps });
@@ -54,7 +54,7 @@ export default function Deliverables({ projectId = null, campaignId = null, noti
     try {
       const r = await decideDeliverable(d, status, { email, reason });
       notify?.(status === 'approved' ? (r.wroteField ? 'Схвалено: дані додано в картку проєкту.' : 'Схвалено.') : 'Повернуто: причину збережено в памʼяті клієнта.');
-      setAsking(null); await load();
+      setAsking(null); await load(); onChanged?.();
     } catch (e) { notify?.(e.message || 'Не вдалося зберегти рішення.', true); } finally { setBusy(0); }
   }
   // the manager corrects the text of an agent's result: the server keeps the original and writes a note to the memory of the client
@@ -67,14 +67,14 @@ export default function Deliverables({ projectId = null, campaignId = null, noti
 
   return (
     <section className={(light ? 'pcr-card dlv dlv-light' : 'cmp-live dlv')}>
-      {head || <div className="cmp-live-head"><h3>Готові матеріали</h3><span className="cmp-muted">Усе, що зробили агенти: схваліть, поверніть із причиною, виправте текст або завантажте.</span></div>}
+      {only == null && (head || <div className="cmp-live-head"><h3>Готові матеріали</h3><span className="cmp-muted">Усе, що зробили агенти: схваліть, поверніть із причиною, виправте текст або завантажте.</span></div>)}
       {list === null && <p className={MUTED}>Завантаження…</p>}
       {list && !list.length && <p className={MUTED}>Матеріалів ще немає. Вони зʼявляться, коли агенти завершать роботу (креативи, стратегія, звіти, аналізи).</p>}
       {list && list.length > 0 && (
         <>
-          <div className="dlv-filters" role="group" aria-label="Фільтр матеріалів">
+          {only == null && <div className="dlv-filters" role="group" aria-label="Фільтр матеріалів">
             {FILTERS.map(([k, label]) => <button key={k} type="button" aria-pressed={filter === k} className={filter === k ? BP : B} onClick={() => setFilter(k)}>{label} {k ? c[k] : c.all}</button>)}
-          </div>
+          </div>}
           {!groups.length && <p className={MUTED}>У цьому фільтрі матеріалів немає.</p>}
           {groups.map((g) => (
             <div className="dlv-group" key={g.kind}>

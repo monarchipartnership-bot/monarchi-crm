@@ -6,6 +6,7 @@ import { fileNameOf } from '../creatives/download.js';
 import { directionLimit } from './creativeTeam.js';
 import { mergeNotes } from './agentNotes.js';
 import { intelSummaryLine } from './clientIntel.js';
+import { regularsOf } from './operationCycles.js';
 
 export const STAGES = [
   { key: 'strategy', label: 'Стратег', role: 'creative_strategy' },
@@ -225,6 +226,7 @@ export function buildCockpit(raw) {
         creatives: { total: c.length, review: n('review'), approved: n('approved'), rejected: n('rejected'), failed: n('failed'), producing: n('producing'), planned: n('planned') } };
     }),
     spend: { model: modelCost, higgsfield, total: round(modelCost + higgsfield), currency: 'USD' },
+    regulars: regularsOf(campaign).map((r) => ({ id: r.id, seasonal: !!r.seasonal, title: r.title || '' })), // the regular tasks of the operation: the marks of the runs («Результати AI команди»)
     scoutSteps: stepsOfRequest({ id: -1, campaign_id: campaign.id }, raw.steps || [], tasks, roleOf), // the live lines of the scout (it works for the client, not for one task)
     intel: intelView(raw.intel, tasks.filter((t) => t.campaign_id === campaign.id && roleOf(t.agent_id) === SCOUT.role), raw.now),
     updatedAt: active?.updated_at || campaign.updated_at || campaign.created_at || null,

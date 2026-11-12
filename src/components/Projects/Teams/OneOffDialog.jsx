@@ -5,7 +5,7 @@ import { FIELD_LABELS, filledFields, missingFor } from '../../../lib/agents/agen
 import { ONEOFF, whereToFill } from '../../../lib/agents/teams';
 
 // «Додаткове завдання» (owner, 2026-11-11; renamed 2026-11-12, it holds the one-off and the seasonal ones): work that a person asks for any time, outside the teams that work by their schedules. Creatives and the report of a period go to the screens
-// that already do them; the research and the strategy run at once and the result lands in «Готові матеріали».
+// that already do them; the research and the strategy run at once and the result lands in «Результати AI команди».
 //   data: fetchTeamsData result   view: teamsOf result   onNewCreative({ seasonal }): opens the window of a new creative task   onOpenReports(), onOpenMaterials(): switch the tab
 //   onGoFill(section): opens that section of the card of the project
 export default function OneOffDialog({ data, view, email, onClose, onNewCreative, onOpenReports, onOpenMaterials, onGoFill }) {
@@ -21,7 +21,7 @@ export default function OneOffDialog({ data, view, email, onClose, onNewCreative
     try {
       const out = await runOneOff({ project: { id: data.project.id, name: data.project.name }, accounts: data.accounts, role: item.role, email });
       if (out?.status === 'failed') setDone((d) => ({ ...d, [item.role]: { ok: false, text: out.error || 'Агент не зміг виконати завдання.' } }));
-      else setDone((d) => ({ ...d, [item.role]: { ok: true, text: 'Готово. Результат у «Готові матеріали» проєкту: він чекає вашого перегляду.' } }));
+      else setDone((d) => ({ ...d, [item.role]: { ok: true, text: 'Готово. Результат у вкладці «Результати AI команди»: він чекає вашого перегляду.' } }));
     } catch (e) { setDone((d) => ({ ...d, [item.role]: { ok: false, text: e?.message || 'Не вдалося виконати.' } })); } finally { setBusy(''); }
   }
 
@@ -54,7 +54,7 @@ export default function OneOffDialog({ data, view, email, onClose, onNewCreative
                   <div>
                     <b>{item.title}</b><small>{item.text}</small>
                     {stop.length > 0 && <small className="oo-warn">Спершу заповніть у картці: {stop.map((x) => FIELD_LABELS[x.key] || x.label).join(', ')}. <button type="button" className="oo-link" onClick={() => onGoFill(whereToFill(stop[0].key))}>Відкрити в картці</button></small>}
-                    {r && <small className={r.ok ? 'oo-ok' : 'oo-warn'}>{r.text}{r.ok && <> <button type="button" className="oo-link" onClick={onOpenMaterials}>Відкрити «Готові матеріали»</button></>}</small>}
+                    {r && <small className={r.ok ? 'oo-ok' : 'oo-warn'}>{r.text}{r.ok && <> <button type="button" className="oo-link" onClick={onOpenMaterials}>Відкрити «Результати AI команди»</button></>}</small>}
                   </div>
                   <button type="button" className="btn" disabled={!!busy || stop.length > 0} onClick={() => run(item)}>{busy === item.role ? 'Виконується…' : 'Запустити · до $0.05'}</button>
                 </li>

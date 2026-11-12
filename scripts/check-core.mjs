@@ -84,6 +84,7 @@ import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUAR
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
+import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
 import { startIntel, releaseWaitingRequests } from '../api/_lib/creativeEngine.js';
 import { readShop } from '../api/_lib/creativeScout.js';
@@ -5391,6 +5392,41 @@ await ok('project cabinet: the scout is the first step of the scheme while it wo
   // the photos of the site count as materials: «Немає фото товару» does not come
   const noPhoto = (i) => buildCockpit({ ...base, tasks: [st(21, 1, 'done')], intel: i }).attention.some((x) => x.kind === 'missing_assets');
   assert.deepEqual([noPhoto(null), noPhoto(intel)], [true, false]);
+});
+
+await ok('«Результати AI команди»: runs with the marks regular / seasonal / one-off, the state, the order (what waits for the person first, then the newest) and the groups of the creatives', () => {
+  const regulars = [{ id: 'r1', seasonal: false }, { id: 'r2', seasonal: true }];
+  const req = (id, over = {}) => ({ id, title: `Task ${id}`, status: 'review', kind: 'extra', createdAt: `2026-11-1${id}T10:00:00Z`, creatives: {}, items: [], stages: [], cost: { model: 0.1, higgsfield: 0.4 }, ...over });
+  assert.deepEqual([runKindOf(req(1), regulars), runKindOf(req(1, { kind: 'regular', regularId: 'r1' }), regulars), runKindOf(req(1, { kind: 'regular', regularId: 'r2' }), regulars), runKindOf(req(1, { kind: 'regular' }), regulars)], ['oneoff', 'regular', 'seasonal', 'regular']);
+  const st = (over) => creativeRunState(req(1, over));
+  assert.deepEqual(st({ creatives: { review: 2, total: 2 } }), { state: 'wait', text: 'Чекають рішення: 2' });
+  assert.equal(st({ status: 'running', creatives: { total: 0 } }).state, 'work'); // the agents are still at it, no pictures yet
+  assert.equal(st({ creatives: { producing: 1, total: 1 } }).state, 'work');
+  assert.deepEqual(st({ creatives: { planned: 2, total: 2 } }), { state: 'wait', text: 'Чекає підтвердження генерації: 2' }); // the person confirms the money
+  assert.deepEqual(st({ creatives: { approved: 2, total: 2 } }), { state: 'ok', text: 'Усе перевірено' });
+  assert.deepEqual(st({ creatives: { rejected: 1, total: 1 } }), { state: 'ok', text: 'Повернуто: 1' });
+  assert.equal(st({ status: 'problem', creatives: { total: 0 } }).state, 'stopped');
+  const items = (n, status) => Array.from({ length: n }, (_, i) => ({ id: `${status}${i}`, status, url: 'u' }));
+  const cockpits = [{ id: 4, regulars, requests: [
+    req(1, { creatives: { approved: 2, total: 2 }, items: items(2, 'approved') }),
+    req(2, { kind: 'regular', regularId: 'r2', creatives: { review: 3, total: 3 }, items: items(3, 'review') }),
+    req(3, { kind: 'regular', regularId: 'r1', creatives: { review: 1, total: 1 }, items: items(1, 'review'), createdAt: '2026-11-20T10:00:00Z' }),
+    req(4, { status: 'running', creatives: { total: 0 }, createdAt: '2026-11-30T10:00:00Z' }),
+  ] }];
+  const deliverables = [{ id: 7, kind: 'strategy', status: 'draft', title: 'Strategy', created_at: '2026-11-25T10:00:00Z', meta: { role: 'marketing_strategist' } }, { id: 8, kind: 'creative', status: 'draft', title: 'A picture' }, { id: 9, kind: 'report', status: 'draft', title: 'Report' }, { id: 10, kind: 'analysis', status: 'approved', title: 'Old research', created_at: '2026-10-01T10:00:00Z', meta: { role: 'competitor_research' } },
+    { id: 11, kind: 'analysis', status: 'draft', title: 'Meta analyst', created_at: '2026-11-18T10:00:00Z', meta: { role: 'meta_analyst' } }, { id: 12, kind: 'analysis', status: 'approved', title: 'Meta optimizer', created_at: '2026-11-18T10:20:00Z', meta: { role: 'meta_optimizer' } }, { id: 13, kind: 'analysis', status: 'approved', title: 'Meta analyst', created_at: '2026-11-04T10:00:00Z', meta: { role: 'meta_analyst' } }];
+  const runs = buildRuns({ cockpits, deliverables });
+  // the creative pictures and the reports have their own places: only the strategy and the analysis join the runs
+  assert.deepEqual(runs.map((r) => r.id), ['d:7', 'c:4:3', 'd:11', 'c:4:2', 'c:4:4', 'c:4:1', 'd:13', 'd:10']); // waiting first (the newest of them first), then the rest by date; the two analysts of one pass are ONE run, the pass of 4 Nov another
+  assert.deepEqual(runs.map((r) => r.kind), ['oneoff', 'regular', 'regular', 'seasonal', 'oneoff', 'oneoff', 'regular', 'oneoff']);
+  assert.deepEqual([runs[0].team, runs[1].team, runs[0].stateText, runs[2].stateText, runs[2].deliverableIds], ['Аналітика', 'Креативи', 'Чекає рішення', 'Чекають рішення: 1', [11, 12]]);
+  assert.deepEqual(runCounts(runs), { all: 8, wait: 4, ok: 3, work: 1 });
+  assert.deepEqual(filterRuns(runs, 'work').map((r) => r.id), ['c:4:4']);
+  assert.deepEqual(RUN_FILTERS.map(([k]) => k), ['all', 'wait', 'ok', 'work']);
+  // the groups of a run: to approve / approved / returned, the pictures being made or failed apart
+  const g = groupItems([...items(2, 'review'), ...items(1, 'approved'), ...items(1, 'rejected'), ...items(1, 'producing'), ...items(1, 'failed')]);
+  assert.deepEqual(g.map((x) => [x.key, x.items.length]), [['review', 2], ['approved', 1], ['rejected', 1], ['other', 2]]);
+  assert.deepEqual(groupItems(items(1, 'review')).map((x) => x.key), ['review', 'approved', 'rejected']);
 });
 
 console.log(`\n${passed} checks passed`);
