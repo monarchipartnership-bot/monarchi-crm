@@ -161,7 +161,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
                   <div className="tmx-row">
                     <div className="tmx-main">
                       <div className="tmx-t"><TeamRing name={t.key} size={32} /><b>{t.def.title}</b><span className={'pcr-state ' + tone}>{label}</span></div>
-                      <small>{line1} · {line2}</small>
+                      {t.key !== 'creative' && <small>{line1} · {line2}</small>}
                     </div>
                     <div className="tmx-btns">
                       <button type="button" className="btn btn-p" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Відкрити команду'}</button>
