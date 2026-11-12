@@ -14,13 +14,15 @@ import { HubTitle } from '../hubIcons';
 import LaunchTeamWizard from './LaunchTeamWizard';
 import TeamCard from './TeamCard';
 import TeamTasks from './TeamTasks';
+import TeamPrep from './TeamPrep';
+import { teamPhase } from '../../../lib/agents/teamTasks';
 import { RoundBtn, TeamRing } from './teamsUi';
 import OneOffDialog from './OneOffDialog';
 import OneOffCreativeDialog from './OneOffCreativeDialog';
 import '../../../styles/projectTeams.css';
 import '../../../styles/projectTeamsPlum.css';
 
-const STATE = { running: ['працює', 'is-ok'], paused: ['зупинено', 'is-wait'] };
+const STATE = { running: ['працює', 'is-ok'], paused: ['зупинено', 'is-wait'], preparing: ['підготовка', 'is-wait'] };
 const WEEKDAYS = ['понеділок', 'вівторок', 'середа', 'четвер', 'пʼятниця', 'субота', 'неділя'];
 
 // «Запуск AI команди» of the card of the project (owner, 2026-11-11): the teams that work for the client (creatives, analytics, reports), the launch of a new one
@@ -153,7 +155,8 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
           <div className="tmx-list">
             {runningTeams.map((t) => {
               const [line1, line2] = summary(t);
-              const [label, tone] = STATE[t.state];
+              const phase = teamPhase(t, t.campaign ? cockpit.byId?.[t.campaign.id] : null); // a launched team prepares before it works
+              const [label, tone] = STATE[phase.phase] || STATE[t.state];
               const run = t.state === 'running';
               const chain = chainOf(t);
               return (
@@ -174,6 +177,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
                       {chain.map((a, i) => <span key={a.id} className="tmx-chain-i"><span className={'tmx-a' + (a.on ? '' : ' is-off')}><i />{a.name}</span>{i < chain.length - 1 && <span className="tmx-ln" aria-hidden="true" />}</span>)}
                     </div>
                   )}
+                  {t.key === 'creative' && <TeamPrep phase={phase} />}
                   {t.key === 'creative' && t.campaign && (
                     <TeamTasks campaign={t.campaign} cockpit={cockpit.byId?.[t.campaign.id]} busy={busy} say={say} onSeasonAction={seasonAction}
                       onOpen={() => setOpen({ campaignId: t.campaign.id, regularFirst: false })} onNewRegular={() => setOpen({ campaignId: t.campaign.id, regularFirst: true })}

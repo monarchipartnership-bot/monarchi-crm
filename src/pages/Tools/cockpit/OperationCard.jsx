@@ -45,7 +45,8 @@ export default function OperationCard({ campaign, project, cockpit, regularFirst
     try { await updateCampaign(campaign.id, { status: campaign.status === 'paused' ? 'active' : 'paused' }); if (campaign.status === 'paused') kickQueue().catch(() => {}); notify(campaign.status === 'paused' ? 'Операцію відновлено.' : 'Операцію зупинено.'); await changed(); } catch (e) { notify(e.message || 'Не вдалося змінити операцію.', true); } finally { setBusy(false); }
   }
   const client = project?.client || project?.name || campaign.name;
-  const [label, tone] = OP_STATUS[campaign.status] || [campaign.status, ''];
+  const preparing = campaign.status === 'active' && cockpit.byId?.[campaign.id]?.intel?.status === 'running'; // the scout is studying the client: the team prepares before it works
+  const [label, tone] = preparing ? ['підготовка', 'is-warn'] : (OP_STATUS[campaign.status] || [campaign.status, '']);
   return createPortal(
     <div className="ckp ckp-overlay is-night ai-immersive pcd-overlay" data-ai-safe>
       <div ref={box} className="ckp-win pcd-win" role="dialog" aria-modal="true" aria-label={`Операція ${campaign.name}`} tabIndex={-1}>

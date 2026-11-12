@@ -30,3 +30,22 @@ export function teamTasksOf({ campaign, cockpit = null, now = new Date() } = {})
   });
   return out;
 }
+
+// The phase of a team (owner, 2026-11-12, step 3.1b): a launched team is not «працює» at once. First it PREPARES: the scout studies the site, the materials and the past ads (later also the
+// style of the project and the tuning of the creator and the copywriter), and only then it works. A team that was launched before the scout existed (no profile at all) is not held back.
+//   team: the entry of teamsOf (key, state)   cockpit: the cabinet of its operation (or null)
+// → { phase: 'preparing' | 'running' | 'paused' | 'none', label, steps: [{ key, label, state, live }], text }
+export const PHASE_LABEL = { preparing: 'підготовка', running: 'працює', paused: 'зупинено' };
+export function teamPhase(team, cockpit = null) {
+  const state = team?.state || 'none';
+  if (state !== 'running') return { phase: state, label: PHASE_LABEL[state] || '', steps: [], text: '' };
+  if (team.key === 'creative' && cockpit?.intel?.status === 'running') {
+    const last = (cockpit.scoutSteps || [])[0];
+    return {
+      phase: 'preparing', label: PHASE_LABEL.preparing,
+      steps: [{ key: 'scout', label: 'Розвідка клієнта', state: 'working', live: last?.text || 'Починає вивчати сайт і кабінет' }],
+      text: 'Команда готується до роботи: вивчає сайт, матеріали й попередні реклами клієнта. Перші завдання почнуться, коли підготовка завершиться.',
+    };
+  }
+  return { phase: 'running', label: PHASE_LABEL.running, steps: [], text: '' };
+}

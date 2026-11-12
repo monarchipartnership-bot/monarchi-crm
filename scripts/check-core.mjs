@@ -84,7 +84,7 @@ import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUAR
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
-import { TASK_KIND, teamTasksOf } from '../src/lib/agents/teamTasks.js';
+import { TASK_KIND, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
 import { overlayFields, applyText, applyTextForRequest } from '../api/_lib/creativeText.js';
@@ -5504,6 +5504,20 @@ await ok('words on a creative (3.1): the text comes from the brief and the copyw
   assert.deepEqual(await applyText(ctx, 2), { ok: false, reason: 'no-text' });
   tables.ag_creatives[0].copy = null; tables.ag_creatives[0].final_url = null;
   assert.deepEqual(await applyText(ctx, 1), { ok: false, reason: 'no-headline' }); // no copy yet: it is done when the copy arrives
+});
+
+await ok('team phase (3.1b): a launched creative team prepares while the scout studies the client, then it works; a team without a profile, paused or another kind is not held back', () => {
+  const live = { key: 'creative', state: 'running' };
+  const steps = [{ id: 9, text: 'Вивчаю сторінку 3 з 8: /shop/rings', state: 'running' }];
+  const p = teamPhase(live, { intel: { status: 'running' }, scoutSteps: steps });
+  assert.deepEqual([p.phase, p.label, p.steps.length, p.steps[0].live], ['preparing', 'підготовка', 1, 'Вивчаю сторінку 3 з 8: /shop/rings']);
+  assert.match(p.text, /Перші завдання почнуться, коли підготовка завершиться/);
+  assert.equal(teamPhase(live, { intel: { status: 'running' }, scoutSteps: [] }).steps[0].live, 'Починає вивчати сайт і кабінет'); // no line yet
+  assert.equal(teamPhase(live, { intel: { status: 'ready' } }).phase, 'running'); // the profile is made
+  assert.equal(teamPhase(live, { intel: { status: 'refreshing' } }).phase, 'running'); // a refresh of an existing profile does not hold the work
+  assert.equal(teamPhase(live, { intel: { status: 'failed' } }).phase, 'running'); // a scout that failed does not hold it either
+  assert.equal(teamPhase(live, null).phase, 'running'); // a team from before the scout (no profile at all)
+  assert.deepEqual([teamPhase({ key: 'creative', state: 'paused' }, { intel: { status: 'running' } }).phase, teamPhase({ key: 'analytics', state: 'running' }, { intel: { status: 'running' } }).phase, teamPhase({ key: 'reports', state: 'none' }).phase], ['paused', 'running', 'none']);
 });
 
 console.log(`\n${passed} checks passed`);
