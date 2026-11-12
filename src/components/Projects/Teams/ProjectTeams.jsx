@@ -7,14 +7,13 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { TEAMS, teamRoles, teamsOf } from '../../../lib/agents/teams';
 import { describeRegular, kyivToday, pausedBySeason, regularsOf, seasonOver } from '../../../lib/agents/operationCycles';
 import { dayMonthOf } from '../../../lib/agents/scheduleCalendar';
-import { removeRegular, renameTeam, setRegularEnabled } from '../../../lib/api/operationCycles';
+import { removeRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
 import OperationCard from '../../../pages/Tools/cockpit/OperationCard';
 import { fmtDateTime } from '../../../pages/Smm/agentUi';
 import { HubTitle } from '../hubIcons';
 import LaunchTeamWizard from './LaunchTeamWizard';
 import TeamCard from './TeamCard';
 import TeamTasks from './TeamTasks';
-import InlineName from './InlineName';
 import { RoundBtn, TeamRing } from './teamsUi';
 import OneOffDialog from './OneOffDialog';
 import OneOffCreativeDialog from './OneOffCreativeDialog';
@@ -82,11 +81,6 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       else { await setRegularEnabled(creativeCampaign.id, r.id, kind === 'resume', email); say(kind === 'resume' ? `Сезонне завдання «${r.title}» продовжено.` : `Сезонне завдання «${r.title}» зупинено.`); }
       await Promise.all([load(), cockpit.reload?.()]);
     } catch (e) { say(e?.message || 'Не вдалося виконати.', true); } finally { setBusy(''); }
-  }
-  async function nameTeam(team, name) {
-    await renameTeam(team.campaign.id, name);
-    say(name ? `Команду названо «${name}».` : 'Назву команди скинуто.');
-    await Promise.all([load(), cockpit.reload?.()]);
   }
   const runningTeams = view ? view.teams.filter((t) => t.state !== 'none') : [];
   const empty = view && !runningTeams.length && !view.legacy.length;
@@ -166,7 +160,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
                 <article key={t.key} className={'tmx-team is-' + t.state}>
                   <div className="tmx-row">
                     <div className="tmx-main">
-                      <div className="tmx-t"><TeamRing name={t.key} size={32} />{t.campaign ? <><InlineName as="h3" className="tt-name" value={t.campaign.config?.title || ''} fallback={t.def.title} label="Назва команди" onSave={(n) => nameTeam(t, n)} />{t.campaign.config?.title && <span className="tt-type">{t.def.title}</span>}</> : <b>{t.def.title}</b>}<span className={'pcr-state ' + tone}>{label}</span></div>
+                      <div className="tmx-t"><TeamRing name={t.key} size={32} /><b>{t.def.title}</b><span className={'pcr-state ' + tone}>{label}</span></div>
                       <small>{line1} · {line2}</small>
                     </div>
                     <div className="tmx-btns">

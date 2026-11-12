@@ -84,7 +84,7 @@ import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUAR
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
-import { TASK_KIND, cleanName, teamNameOf, teamTasksOf } from '../src/lib/agents/teamTasks.js';
+import { TASK_KIND, teamTasksOf } from '../src/lib/agents/teamTasks.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
 import { startIntel, releaseWaitingRequests } from '../api/_lib/creativeEngine.js';
@@ -5430,9 +5430,7 @@ await ok('«Результати AI команди»: runs with the marks regula
   assert.deepEqual(groupItems(items(1, 'review')).map((x) => x.key), ['review', 'approved', 'rejected']);
 });
 
-await ok('team names and tasks: the team has a name of its own (else its type), the tasks are listed with names and marks: main regular, additional regular, seasonal, one-off', () => {
-  const def = { title: 'Креативи' };
-  assert.deepEqual([teamNameOf({ config: {} }, def), teamNameOf({ config: { title: '  Креативи   для сусликів ' } }, def), cleanName('x'.repeat(90)).length], ['Креативи', 'Креативи для сусликів', 60]);
+await ok('team tasks: the tasks of a team are listed with names and marks: main regular, additional regular, seasonal, one-off', () => {
   const brief = { goal: 'Fresh creatives', count: 2, ratios: ['1:1'], texts: 'yes', language: 'en' };
   const reg = (id, title, extra = {}) => ({ id, enabled: true, weekdays: [1, 4], time: '09:00', title, brief, since: '2026-11-01T00:00:00Z', ...extra });
   const campaign = { id: 4, status: 'active', config: { mode: 'creative', regulars: [reg('r1', 'Суслики: щотижня'), reg('r2', 'Хом’ячки: бестселери', { weekdays: [3] }), reg('r3', 'Зимові суслики', { seasonal: true, startDate: '2026-12-01', endDate: '2026-12-31', replaces: ['r1'] }), reg('r4', 'Осінь', { seasonal: true, startDate: '2026-09-01', endDate: '2026-10-01' })] } };

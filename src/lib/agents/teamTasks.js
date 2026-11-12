@@ -4,11 +4,6 @@ import { buildOperationView, isInWork, kyivToday, pausedBySeason, regularsOf, se
 import { creativeRunState } from './aiResults.js';
 
 export const TASK_KIND = { main: 'Регулярне · основне', extra: 'Регулярне · додаткове', seasonal: 'Сезонне', oneoff: 'Разове' };
-export const MAX_NAME = 60;
-
-// The name of a team: the one the person gave, else the type («Креативи»).
-export const teamNameOf = (campaign, def = null) => String(campaign?.config?.title || '').replace(/\s+/g, ' ').trim().slice(0, MAX_NAME) || def?.title || '';
-export const cleanName = (v) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_NAME);
 
 const dayMonth = (d) => (d ? `${String(d).slice(8, 10)}.${String(d).slice(5, 7)}` : '');
 

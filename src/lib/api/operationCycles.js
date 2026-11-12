@@ -83,10 +83,3 @@ export async function renameRequest(requestId, title) {
   if (!name) throw new Error('Назва не може бути порожньою.');
   return must(await supabase.from('ag_creative_requests').update({ title: name, updated_at: new Date().toISOString() }).eq('id', requestId).select().single());
 }
-// The name of the team itself (empty = the type again: «Креативи»).
-export async function renameTeam(campaignId, title) {
-  const row = await readRow(campaignId);
-  const name = String(title ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  const { title: _old, ...rest } = row.config || {};
-  return must(await supabase.from('ag_campaigns').update({ config: name ? { ...rest, title: name } : rest, updated_at: new Date().toISOString() }).eq('id', row.id).select().single());
-}
