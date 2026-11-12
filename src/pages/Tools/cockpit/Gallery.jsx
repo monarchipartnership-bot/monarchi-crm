@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Ic, Spinner } from './parts';
+import ReturnDialog from './ReturnDialog';
+import TextEditDialog from './TextEditDialog';
 
 // The gallery of the materials of one request (the main zone of the project window, decision 34). Everything happens in place: a click on a thumbnail
 // opens it larger in the same zone (no lightbox over the window), with its note, a comment field and the actions.
-//   items: [{ id, url, downloadUrl, ratio, conceptName, status, kind, fileName, note }]
+//   items: [{ id, url, rawUrl, downloadUrl, ratio, conceptName, status, kind, fileName, note }]
+//   textEdit (step 3.1e): { autoStyle, taskStyle } turns on «Редагувати текст» (the words of a ready creative without a new picture) and the choice in «Повернути»: the picture or only the words
 //   onAct(key, payload): Promise  (approve_one, approve_all, return, download_one, download_all)
 const STATUS = { review: ['is-warn', 'на перегляд'], approved: ['is-ok', 'затверджено'], rejected: ['is-back', 'повернено'], failed: ['is-bad', 'впав'], producing: ['is-work', 'генерується'], planned: ['', 'заплановано'] };
 const FALLBACK = ['linear-gradient(150deg,#B544B5,#661466)', 'linear-gradient(150deg,#F5B04A,#B5651D)', 'linear-gradient(150deg,#7C8CF8,#3B3FA8)', 'linear-gradient(150deg,#E46AA8,#8E1D63)', 'linear-gradient(150deg,#4AD488,#12803F)'];
@@ -49,13 +52,13 @@ function FullView({ item, count, onClose, onGo }) {
 }
 
 //   minimal: no bar of filters and bulk buttons above the pictures (the caller shows its own head)
-export default function Gallery({ items = [], onAct, loadingHint = false, minimal = false }) {
+export default function Gallery({ items = [], onAct, loadingHint = false, minimal = false, textEdit = null }) {
   const [filter, setFilter] = useState('all');
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
-  const [comment, setComment] = useState('');
-  const [retId, setRetId] = useState(null); // the thumbnail whose comment field is open
+  const [returning, setReturning] = useState(null); // the creative the dialog «Повернути» is open for
+  const [editing, setEditing] = useState(null); // the creative whose words are being edited
   const [full, setFull] = useState(false); // the opened creative on the whole screen
   const pred = FILTERS.find((f) => f[0] === filter)[2];
   const shown = useMemo(() => items.filter(pred), [items, filter]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,7 +67,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
   const idx = shown.findIndex((i) => i.id === openId);
   const open = idx >= 0 ? shown[idx] : null;
   useEffect(() => { if (openId != null && idx < 0) { setOpenId(null); setFull(false); } }, [openId, idx]);
-  useEffect(() => { setComment(''); setErr(''); setRetId(null); }, [openId]);
+  useEffect(() => { setErr(''); }, [openId]);
 
   async function act(key, payload, id = key) {
     setErr(''); setBusy(id);
@@ -72,11 +75,8 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
   }
   const approve = (i) => act('approve_one', { creativeId: i.id }, 'ap' + i.id);
   const download = (i) => act('download_one', { creativeId: i.id }, 'dl' + i.id);
-  function giveBack(i) {
-    if (retId !== i.id && open?.id !== i.id) { setRetId(i.id); setComment(''); return; }
-    if (!comment.trim()) { setErr('Напишіть, що змінити, і натисніть ще раз.'); return; }
-    return act('return', { creativeIds: [i.id], comment: comment.trim() }, 'rt' + i.id).then(() => { setRetId(null); setComment(''); });
-  }
+  const giveBack = (i) => setReturning(i); // the dialog asks what is wrong: the picture or only the words
+  const canEditText = (i) => !!textEdit && !!i.rawUrl && i.kind !== 'video' && ['review', 'approved'].includes(i.status);
   const go = (d) => { if (!shown.length) return; setOpenId(shown[(idx + d + shown.length) % shown.length].id); };
 
   const tools = minimal ? null : (
@@ -111,15 +111,10 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
             <div className="ckp-gmeta"><span className="ckp-chip">{open.ratio || '4:5'}</span><span className="ckp-chip">{open.kind === 'video' ? 'відео' : 'зображення'}</span>{open.fileName && <span className="ckp-chip is-grey">{open.fileName}</span>}</div>
             <h3>{open.conceptName}</h3>
             {open.note && <p>{open.note}</p>}
-            {canReturn(open) && (
-              <>
-                <label className="ckp-lab" htmlFor="ckp-gcomment">Коментар, якщо повертаєте</label>
-                <input id="ckp-gcomment" className="ckp-field" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Що змінити…" maxLength={600} />
-              </>
-            )}
             <div className="ckp-acts">
               {canApprove(open) && <button type="button" className="ckp-btn is-ok" disabled={!!busy} onClick={() => approve(open)}>{busy === 'ap' + open.id ? <Spinner /> : <Ic n="check" size={15} />}Схвалити</button>}
-              {canReturn(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => giveBack(open)}>{busy === 'rt' + open.id && <Spinner />}Повернути з коментарем</button>}
+              {canReturn(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => giveBack(open)}>{busy === 'rt' + open.id && <Spinner />}Повернути</button>}
+              {canEditText(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => setEditing(open)}><Ic n="pen" size={15} />Редагувати текст</button>}
               {canDownload(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => download(open)}>{busy === 'dl' + open.id ? <Spinner /> : <Ic n="download" size={15} />}Завантажити</button>}
             </div>
             <div className="ckp-acts">
@@ -130,6 +125,9 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
           </div>
         </div>
         {full && open.url && <FullView item={open} count={shown.length} onClose={() => setFull(false)} onGo={go} />}
+      {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} onClose={() => setReturning(null)}
+        onRedo={(comment) => act('return', { creativeIds: [returning.id], comment }, 'rt' + returning.id)} onText={() => { setEditing(returning); setReturning(null); }} />}
+      {editing && textEdit && <TextEditDialog item={editing} autoStyle={textEdit.autoStyle} taskStyle={textEdit.taskStyle} onClose={() => setEditing(null)} onSave={(edit) => onAct?.('edit_text', { creativeId: editing.id, edit })} />}
       </div>
     );
   }
@@ -143,12 +141,10 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
             <button type="button" className="ckp-gopen" onClick={() => setOpenId(i.id)} aria-label={`Розгорнути: ${i.conceptName}`}><Picture item={i} index={k} /></button>
             <div className="gx-ov">
               <div className="ckp-gname">{i.conceptName}<small>{i.ratio || '4:5'} · {i.kind === 'video' ? 'відео' : 'зображення'}</small></div>
-              {retId === i.id && (
-                <input className="ckp-field" autoFocus value={comment} onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') giveBack(i); if (e.key === 'Escape') setRetId(null); }} placeholder="Що змінити…" aria-label={`Коментар: ${i.conceptName}`} maxLength={600} />
-              )}
               <div className="ckp-gacts">
                 <button type="button" className="ckp-gb is-ok" disabled={!canApprove(i) || !!busy} onClick={() => approve(i)} aria-label={`Схвалити: ${i.conceptName}`}>{busy === 'ap' + i.id ? <Spinner /> : <Ic n="check" size={14} />}</button>
-                <button type="button" className="ckp-gb ckp-gap" disabled={!canReturn(i) || !!busy} onClick={() => giveBack(i)}>{retId === i.id ? 'Повернути ↵' : 'Повернути'}</button>
+                <button type="button" className="ckp-gb ckp-gap" disabled={!canReturn(i) || !!busy} onClick={() => giveBack(i)}>Повернути</button>
+                <button type="button" className="ckp-gb" disabled={!canEditText(i) || !!busy} onClick={() => setEditing(i)} aria-label={`Редагувати текст: ${i.conceptName}`}>Текст</button>
                 <button type="button" className="ckp-gb" disabled={!canDownload(i) || !!busy} onClick={() => download(i)} aria-label={`Завантажити: ${i.conceptName}`}>{busy === 'dl' + i.id ? <Spinner /> : <Ic n="download" size={14} />}</button>
               </div>
             </div>
@@ -157,6 +153,9 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
         {!shown.length && <p className="ckp-empty-line">У цьому фільтрі матеріалів немає.</p>}
       </div>
       {err && <p className="ckp-err" role="alert">{err}</p>}
+      {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} onClose={() => setReturning(null)}
+        onRedo={(comment) => act('return', { creativeIds: [returning.id], comment }, 'rt' + returning.id)} onText={() => { setEditing(returning); setReturning(null); }} />}
+      {editing && textEdit && <TextEditDialog item={editing} autoStyle={textEdit.autoStyle} taskStyle={textEdit.taskStyle} onClose={() => setEditing(null)} onSave={(edit) => onAct?.('edit_text', { creativeId: editing.id, edit })} />}
     </div>
   );
 }

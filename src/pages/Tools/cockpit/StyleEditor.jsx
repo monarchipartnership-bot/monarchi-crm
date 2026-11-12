@@ -6,9 +6,9 @@ import { DEFAULT_MARGIN, cleanManual, cleanStyle, composerOptions, draftFromStyl
 import { Spinner } from './parts';
 import '../../../styles/styleEditor.css';
 
-const ZONES = [['auto', 'за картинкою'], ['top', 'зверху'], ['center', 'по центру'], ['bottom', 'знизу'], ['left', 'зліва'], ['right', 'справа']];
-const PLATES = [['auto', 'за картинкою'], ['on', 'є'], ['off', 'немає']];
-const INKS = [['auto', 'за картинкою'], ['light', 'світлий'], ['dark', 'темний']];
+export const ZONES = [['auto', 'за картинкою'], ['top', 'зверху'], ['center', 'по центру'], ['bottom', 'знизу'], ['left', 'зліва'], ['right', 'справа']];
+export const PLATES = [['auto', 'за картинкою'], ['on', 'є'], ['off', 'немає']];
+export const INKS = [['auto', 'за картинкою'], ['light', 'світлий'], ['dark', 'темний']];
 const FONT = "'Onest', 'Inter', 'Segoe UI', Arial, sans-serif";
 const PREVIEW_W = 560;
 
@@ -23,7 +23,7 @@ function loadPicture(url) {
 }
 
 // The live preview: the picture with the words over it, drawn by the SAME code as the server uses (paintText), so what is seen here is what the finished creative gets.
-function Preview({ sample, text }) {
+export function Preview({ sample, text, zone = 'left' }) {
   const ref = useRef(null);
   const [err, setErr] = useState('');
   const cache = useRef(new Map());
@@ -42,12 +42,13 @@ function Preview({ sample, text }) {
         const cv = ref.current; cv.width = W; cv.height = H;
         const ctx = cv.getContext('2d');
         ctx.drawImage(img, 0, 0, W, H);
-        paintText(ctx, { W, H, zone: 'left', headline: sample.headline || 'Заголовок вашої акції', cta: sample.cta || 'Купити зараз', font: FONT, style: opts });
+        const exact = !!sample.exact; // the editor of the words of a creative shows exactly the words it is given, the editor of the style shows sample words
+        paintText(ctx, { W, H, zone, headline: exact ? sample.headline || '' : sample.headline || 'Заголовок вашої акції', subline: sample.subline || '', badge: sample.badge || '', cta: exact ? sample.cta || '' : sample.cta || 'Купити зараз', font: FONT, style: opts });
       } catch (e) { if (!dead) setErr(e?.message || 'Не вдалося намалювати превʼю.'); }
     };
     const id = setTimeout(draw, 60);
     return () => { dead = true; clearTimeout(id); };
-  }, [sample, opts]);
+  }, [sample, opts, zone]);
   return (
     <div className="se-pv">
       <canvas ref={ref} role="img" aria-label="Превʼю: картинка з текстом за обраним оформленням" />
@@ -56,7 +57,7 @@ function Preview({ sample, text }) {
   );
 }
 
-function Chips({ label, value, options, onPick }) {
+export function Chips({ label, value, options, onPick }) {
   return (
     <div className="se-row" role="group" aria-label={label}>
       <span className="se-lab">{label}</span>
@@ -76,7 +77,7 @@ function Field({ label, value, placeholder, onChange }) {
   );
 }
 
-function Slider({ label, value, auto, min, max, step, unit = '%', autoLabel = 'за замовчуванням', onChange, onAuto, fallback }) {
+export function Slider({ label, value, auto, min, max, step, unit = '%', autoLabel = 'за замовчуванням', onChange, onAuto, fallback }) {
   const shown = auto ? fallback : value;
   return (
     <div className="se-row">

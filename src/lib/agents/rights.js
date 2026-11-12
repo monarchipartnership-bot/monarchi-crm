@@ -19,6 +19,7 @@ export const ACTION_RULES = {
   reject_plan: { level: 'result', label: 'Відхилення плану' },
   cancel_task: { level: 'logged', label: 'Скасування кроку' },
   overlay_creative: { level: 'logged', label: 'Текст на креативі' },
+  edit_creative_text: { level: 'logged', label: 'Правка тексту на готовому креативі' },
   cancel_request: { level: 'logged', label: 'Зупинка запиту' },
   set_agent_schedule: { level: 'logged', label: 'Зміна розкладу агента' },
   set_agent_mode: { level: 'logged', label: 'Зміна режиму агента' },

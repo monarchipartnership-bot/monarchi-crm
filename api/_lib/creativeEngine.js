@@ -261,10 +261,10 @@ async function attachCopy(db, rid, dept, tasks) {
   const out = writer ? tasks.filter((t) => t.agent_id === writer.id && t.status === 'done').sort((a, b) => b.id - a.id)[0]?.output : null;
   const texts = out?.json?.texts;
   if (!Array.isArray(texts) || !texts.length) return;
-  const rows = must(await db.from('ag_creatives').select('id, concept_key').eq('request_id', rid), 'creatives') || [];
+  const rows = must(await db.from('ag_creatives').select('id, concept_key, copy').eq('request_id', rid), 'creatives') || [];
   for (const r of rows) {
     const mine = texts.filter((t) => t.concept === r.concept_key);
-    if (mine.length) must(await db.from('ag_creatives').update({ copy: { variants: mine }, updated_at: iso(new Date()) }).eq('id', r.id), 'creative');
+    if (mine.length) must(await db.from('ag_creatives').update({ copy: { ...(r.copy?.edit ? { edit: r.copy.edit } : {}), variants: mine }, updated_at: iso(new Date()) }).eq('id', r.id), 'creative'); // the edit of a person stays
   }
 }
 

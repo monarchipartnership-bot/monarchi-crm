@@ -25,7 +25,7 @@ import { generateCreatives, generatorState, pollCreatives } from './_lib/creativ
 import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, passOnAny, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
 import { addInstruction, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from './_lib/campaignCycles.js';
 import { cancelRequest, reviseStep, startIntel, startRequest } from './_lib/creativeEngine.js';
-import { applyText } from './_lib/creativeText.js';
+import { applyText, saveTextEdit, textInfo } from './_lib/creativeText.js';
 import { estimateInputs } from './_lib/estimateInputs.js';
 import { auditAfter, checkRights } from './_lib/agentAudit.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
@@ -79,6 +79,8 @@ export default async function handler(req, res) {
     else if (action === 'start_request') out = await startRequest(ctx, Number(body.requestId)); // the page then calls `process` until the queue is empty
     else if (action === 'start_intel') out = await startIntel(ctx, Number(body.campaignId), { force: body.force === true }); // the scout studies the site and the cabinet of the client (the page then calls `process`)
     else if (action === 'overlay_creative') out = await applyText(ctx, Number(body.creativeId), { force: true }); // the words over the picture again (free)
+    else if (action === 'creative_text_info') out = await textInfo(ctx, Number(body.creativeId)); // the words that are on a creative now (the editor of the words)
+    else if (action === 'edit_creative_text') out = await saveTextEdit(ctx, Number(body.creativeId), body.edit ?? null); // a person changed the words of a ready creative: put on the same picture again (free)
     else if (action === 'cancel_request') out = await cancelRequest(ctx, Number(body.requestId));
     else if (action === 'restart_agent') { out = await restartAgent(ctx, Number(body.agentId)); if (out.requeued) out.queue = await processQueue(ctx, { maxMs: 60000 }); }
     else if (action === 'dry_run') out = await dryRun(ctx, Number(body.agentId), { campaignId: body.campaignId, requestId: body.requestId, promptBody: body.promptBody });

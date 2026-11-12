@@ -68,6 +68,12 @@ export function cleanManual(raw) {
   return out;
 }
 
+// The manual style of a task with the edit of ONE creative over it: every field the edit sets wins. → { text, image, copy }
+export function mergeManual(base, over) {
+  const a = cleanManual(base); const b = cleanManual(over);
+  return { text: { ...a.text, ...b.text }, image: { ...a.image, ...b.image }, copy: { ...a.copy, ...b.copy } };
+}
+
 export const isEmptyManual = (m) => !m || (!Object.keys(m.text || {}).length && !Object.keys(m.image || {}).length && !Object.keys(m.copy || {}).length);
 
 // auto (the scout) + manual (the person) → the style that counts, with the source of every field: { text: { zone: { value, source } ... }, ..., value: the plain style }

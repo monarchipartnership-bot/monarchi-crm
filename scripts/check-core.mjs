@@ -88,8 +88,9 @@ import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agen
 import { allTasks, calendarRuns, groupByProject, matchesFilter, parseTaskKey, requestsOfTask, scopeCockpit, tasksOfOperation } from '../src/lib/agents/taskScope.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
-import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, effectiveStyle, manualFromDraft, styleBlock, styleRows, styleSamplesOf } from '../src/lib/agents/projectStyle.js';
-import { overlayFields, applyText, applyTextForRequest } from '../api/_lib/creativeText.js';
+import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, effectiveStyle, manualFromDraft, mergeManual, styleBlock, styleRows, styleSamplesOf } from '../src/lib/agents/projectStyle.js';
+import { overlayFields, applyText, applyTextForRequest, saveTextEdit, textInfo } from '../api/_lib/creativeText.js';
+import { cleanTextEdit } from '../src/lib/creatives/textEdit.js';
 import { composeTextServer } from '../api/_lib/composeServer.js';
 import { busyOf, calmSpan } from '../src/lib/creatives/composeText.js';
 import { startIntel, releaseWaitingRequests } from '../api/_lib/creativeEngine.js';
@@ -5496,6 +5497,44 @@ await ok('task cards (3.0b): every task has its own runs, notes and money; the l
   assert.deepEqual(every.map((r) => r.date), ['2026-11-13', '2026-11-16', '2026-11-19']); // from the next run, every 3 days, up to the last day of the season
   const groups = groupByProject(list);
   assert.deepEqual(groups.map((g) => g.projectName), ['Mellow', 'Joia']); // the project with the tasks that wait for the person comes first
+});
+
+await ok('text edit (3.1e): a person changes the words of a ready creative; the picture stays, the words are put again; the edit wins and survives a new text of the copywriter', async () => {
+  // the cleaning: only known fields, bounded; an empty button is «no button»; the style is only the words on the picture
+  assert.deepEqual(cleanTextEdit({ headline: '  New   headline ', cta: '', junk: 1, style: { text: { zone: 'TOP', margin: 9, color: 'weird' } } }), { headline: 'New headline', cta: '', style: { text: { zone: 'top', margin: 9 } } });
+  assert.equal(cleanTextEdit({}), null); assert.equal(cleanTextEdit(null), null); assert.equal(cleanTextEdit({ style: { text: { zone: 'nonsense' } } }), null);
+  assert.equal(cleanTextEdit({ headline: 'x'.repeat(300) }).headline.length, 90);
+  // what is put on the picture: the edit over the brief and the copywriter; a field not in the edit stays as it was
+  const concept = { key: 'c1', text_render: 'overlay', needs_text: true, layout: { text_zone: 'bottom' }, cta: { show: true, text: '' }, copy: { headline: '', subline: 'Line 2', badge: '' } };
+  const creative = { copy: { variants: [{ headline: 'Agent headline', cta: 'Shop Now' }] } };
+  assert.deepEqual(overlayFields(concept, { copy: { ...creative.copy, edit: { headline: 'Mine' } } }), { zone: 'bottom', headline: 'Mine', subline: 'Line 2', badge: '', cta: 'Shop Now' });
+  assert.equal(overlayFields(concept, { copy: { ...creative.copy, edit: { cta: '' } } }).cta, ''); // the button taken off
+  assert.equal(overlayFields({ ...concept, text_render: 'none' }, creative), null); // no text wanted and nothing edited
+  assert.equal(overlayFields({ ...concept, text_render: 'none' }, { copy: { edit: { headline: 'Added by a person' } } }).headline, 'Added by a person'); // a person may add words where the brief wanted none
+  assert.deepEqual(mergeManual({ text: { zone: 'top', plate: 'on' }, copy: { tone: 'warm' } }, { text: { zone: 'bottom' } }), { text: { zone: 'bottom', plate: 'on' }, image: {}, copy: { tone: 'warm' } });
+  // the whole step with a database
+  const { createCanvas } = await import('@napi-rs/canvas');
+  const c0 = createCanvas(800, 1000); const g = c0.getContext('2d'); g.fillStyle = '#F4F0EA'; g.fillRect(0, 0, 800, 1000);
+  const png = c0.toBuffer('image/png');
+  const tables = { ag_creatives: [{ id: 1, request_id: 5, concept_key: 'c1', status: 'review', asset_url: 'https://s/raw.png', final_url: 'https://s/old.png', copy: creative.copy }, { id: 2, request_id: 5, concept_key: 'c1', status: 'review', asset_url: '', final_url: null, copy: creative.copy }],
+    ag_tasks: [{ id: 1, request_id: 5, status: 'done', output: { json: { concepts: [concept] } } }], ag_creative_requests: [{ id: 5, campaign_id: 1, brief: { style: { text: { plate: 'on' } } } }], ag_campaigns: [{ id: 1, project_id: 9 }], ag_project_intel: [{ project_id: 9, profile: {} }] };
+  const db = fakeDb(tables);
+  const stored = [];
+  db.storage = { from: () => ({ upload: async (path) => { stored.push(path); return { error: null }; }, getPublicUrl: (path) => ({ data: { publicUrl: `https://s/${path}` } }) }) };
+  const ctx = { db, fetchImage: async () => ({ ok: true, arrayBuffer: async () => png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) }) };
+  const info = await textInfo(ctx, 1);
+  assert.deepEqual([info.ok, info.hasPicture, info.fields.headline, info.fields.subline, info.edit], [true, true, 'Agent headline', 'Line 2', null]); // what the editor starts from
+  const done = await saveTextEdit(ctx, 1, { headline: 'My own headline', style: { text: { zone: 'top' } } });
+  assert.equal(done.ok, true);
+  assert.deepEqual(tables.ag_creatives[0].copy.edit, { headline: 'My own headline', style: { text: { zone: 'top' } } });
+  assert.equal(tables.ag_creatives[0].copy.variants[0].headline, 'Agent headline'); // the words of the agents are untouched
+  assert.match(tables.ag_creatives[0].final_url, /requests\/5\/final-1-\d+\.png$/); assert.equal(stored.length, 1); // a new picture with the words: the raw one is the same
+  assert.deepEqual((await textInfo(ctx, 1)).fields.headline, 'My own headline'); // the editor shows the edit next time
+  assert.deepEqual(await saveTextEdit(ctx, 2, { headline: 'x' }), { ok: false, reason: 'no-picture' }); // no picture: nothing to put words on
+  assert.deepEqual(await saveTextEdit(ctx, 1, { junk: 1 }), { ok: false, reason: 'empty-edit' });
+  // back to what the agents made
+  const back = await saveTextEdit(ctx, 1, null);
+  assert.equal(back.ok, true); assert.equal('edit' in tables.ag_creatives[0].copy, false); assert.equal(stored.length, 2);
 });
 
 await ok('words on a creative (3.1): the text comes from the brief and the copywriter, the system puts it on the clean picture, in a real font, on the server', async () => {

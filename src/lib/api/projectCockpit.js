@@ -126,6 +126,11 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     return {};
   }
   if (key === 'overlay') { await agentAction('overlay_creative', { creativeId: payload.creativeId }); return {}; } // the headline and the button over the picture, made again
+  if (key === 'edit_text') { // the words of a ready creative changed by a person: put on the same picture again (free); edit null = back to what the agents made
+    const r = await agentAction('edit_creative_text', { creativeId: payload.creativeId, edit: payload.edit ?? null });
+    if (r?.ok === false) throw new Error({ 'no-picture': 'У креатива немає картинки, на яку можна накласти текст.', 'empty-edit': 'Нічого змінювати.', 'no-creative': 'Креатив не знайдено.' }[r.reason] || 'Не вдалося накласти текст.');
+    return {};
+  }
   if (key === 'approve_one') { await setCreativeStatus(payload.creativeId, 'approved'); await settleReview(rid); return {}; }
   if (key === 'return') {
     const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);
