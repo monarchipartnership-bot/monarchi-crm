@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { MAX_REGULARS, cleanRegular, kyivToday, rawRegulars, regularRequest, regularsOf, seasonOver } from '../agents/operationCycles';
+import { cleanRequest } from '../agents/creativeTeam';
 import { createRequest, startRequest } from './creatives';
 
 // The cycles of an operation (lib/agents/operationCycles.js): the regular ones are kept in the operation itself (config.regulars), an extra one is a request.
@@ -67,6 +68,13 @@ export async function createExtraCycle(campaignId, values, email = null, start =
   const row = await createRequest(campaignId, { ...values, kind: 'extra' }, email);
   if (start) await startRequest(row.id);
   return row;
+}
+
+// The settings of a one-off task (step 3.0b: every task has its own settings, the agents' ones included): the request keeps its brief, the next start («Запустити ще раз») reads the new one.
+// values: the same fields as the form of a new task. → the request row
+export async function updateExtraCycle(requestId, values) {
+  const clean = cleanRequest({ ...values, kind: 'extra' });
+  return must(await supabase.from('ag_creative_requests').update({ title: clean.title, brief: clean.brief, materials: clean.materials, updated_at: new Date().toISOString() }).eq('id', requestId).select().single());
 }
 
 // Names (owner, 2026-11-12): the team and its tasks get names the person chooses. A regular task keeps its name in the operation, so the next runs carry it; a one-off task is a request.

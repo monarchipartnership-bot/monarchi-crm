@@ -5,7 +5,9 @@ import { saveStyleManual } from '../../../lib/api/projectCockpit';
 import { styleSamplesOf } from '../../../lib/agents/projectStyle';
 import { addInstruction, fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
-import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
+import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled, updateExtraCycle } from '../../../lib/api/operationCycles';
+import { startRequest } from '../../../lib/api/creatives';
+import { scopeCockpit } from '../../../lib/agents/taskScope';
 import { MAX_REGULARS, SECTIONS, buildOperationView, cycleCosts, describeCycle } from '../../../lib/agents/operationCycles';
 import { directionLimit } from '../../../lib/agents/creativeTeam';
 import CampaignSpend from '../../AgentSpend/CampaignSpend';
@@ -27,6 +29,9 @@ import { fmtAgo, fmtDay, fmtUsd, plural } from './format';
 import '../../../styles/studio.css';
 import './ProjectCard.css';
 
+// the sections of the card of ONE task and of the card of the team (step 3.0b); the card of a whole operation (SECTIONS) is kept for the old operations
+const TASK_SECTIONS = [['review', 'Результати'], ['now', 'Хід роботи'], ['settings', 'Налаштування'], ['spend', 'Витрати']];
+const TEAM_SECTIONS = [['client', 'Про клієнта'], ['settings', 'Налаштування команди'], ['spend', 'Витрати']];
 const REQ_CHIP = { draft: 'is-grey', running: 'is-work', review: 'is-warn', problem: 'is-bad', approved: 'is-ok' };
 const STATE_CHIP = { review: 'is-warn', rework: 'is-back', checked: 'is-ok' };
 const PASS_STATUS = { ok: 'успішно', failed: 'помилка', running: 'працює' };
@@ -96,10 +101,12 @@ function Passes({ campaignId }) {
 //   «Готові матеріали»          the approved materials of the last cycle
 //   campaign: the ag_campaigns row  cockpit: the cabinet of the operation  run(item, key, payload): the action of the cabinet (useProjectCockpit)
 //   regularFirst: the operation was just created → the form of the regular cycle opens at once
-export default function OperationView({ campaign, cockpit: c, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false, onGoFill = null }) {
+//   task: one task of the operation (taskScope.js): the card shows only its runs, notes and money, and its own settings (the agents' ones too)   teamOnly: the card of the team: the client, the limit, the money
+export default function OperationView({ campaign, cockpit: cAll, project, loading = false, run, notify, onChanged, onBack, onOpenAgents, regularFirst = false, onGoFill = null, task = null, teamOnly = false }) {
+  const c = useMemo(() => (task ? scopeCockpit(cAll, task) : cAll), [cAll, task]);
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
-  const [section, setSection] = useState('now');
+  const [section, setSection] = useState(task ? 'review' : teamOnly ? 'client' : 'now');
   // the form of a cycle: { mode: 'extra', allowKind } (a new one, the kind is chosen in the form) | { mode: 'regular', regularId? } (a regular one: new or edited)
   const [form, setForm] = useState(regularFirst ? { mode: 'regular' } : null);
   const [openCycle, setOpenCycle] = useState(null);
@@ -153,10 +160,27 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
     setForm(null); setSection('now');
     await onChanged?.();
   }
+  // the settings of the card of a task (step 3.0b): the regular task is saved in the operation (its title and its on/off state stay), a one-off task in its request
+  const taskReg = task?.regularId ? view.regulars.find((r) => r.id === task.regularId) || null : null;
+  const taskReq = task?.requestId != null ? (cAll?.requests || []).find((r) => r.id === task.requestId) || null : null;
+  async function saveTaskForm(values, start, schedule) {
+    if (taskReg) {
+      const { campaign: saved, regular } = await saveRegular(campaign.id, { id: taskReg.id, enabled: taskReg.enabled, title: taskReg.title, ...schedule, brief: values }, email);
+      if (start) { await runRegularNow(saved, regular, email); kickQueue().catch(() => {}); }
+      notify?.(start ? 'Налаштування збережено, завдання запущено.' : 'Налаштування завдання збережено: вони діють з наступних запусків.');
+    } else if (taskReq) {
+      await updateExtraCycle(taskReq.id, values);
+      if (start) { await startRequest(taskReq.id); kickQueue().catch(() => {}); }
+      notify?.(start ? 'Налаштування збережено, завдання запущено ще раз.' : 'Налаштування завдання збережено.');
+    }
+    setSection(start ? 'now' : 'settings');
+    await onChanged?.();
+  }
   const editing = form?.regularId ? view.regulars.find((r) => r.id === form.regularId) || null : null;
   async function dropRegular(r) {
-    if (!(await confirm({ title: 'Видалити регулярне завдання?', body: `«${r.title}» більше не запускатиметься сам. Завдання, які він уже зробив, залишаються.`, confirmLabel: 'Видалити', danger: true }))) return;
+    if (!(await confirm({ title: 'Видалити регулярне завдання?', body: `«${r.title}» більше не запускатиметься сам. Завдання, які він уже зробив, залишаються.`, confirmLabel: 'Видалити', danger: true }))) return false;
     await guard('rm' + r.id, () => removeRegular(campaign.id, r.id), 'Регулярне завдання видалено.');
+    return true;
   }
 
   // «Потребує перевірки»: the cycle that waits for the person is open at once; the checked cycles are kept in the tab «Архів завдань»
@@ -174,11 +198,12 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
   }
   const download = (requestId = null) => guard('dl' + (requestId ?? 'all'), async () => { const r = await act(null, 'download_approved', requestId != null ? { requestId } : {}); notify?.(`Завантажено файлів: ${r.downloaded}.`); });
 
-  const badge = { now: view.counts.now, review: view.counts.review, messages: view.counts.messages };
+  const sections = task ? TASK_SECTIONS : teamOnly ? TEAM_SECTIONS : SECTIONS;
+  const badge = { now: view.counts.now + (task ? view.counts.messages : 0), review: view.counts.review, messages: view.counts.messages };
   return (
     <div className="opv">
       <nav className="opv-line" role="tablist" aria-label="Розділи операції">
-        {SECTIONS.map(([k, label]) => (
+        {sections.map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'is-on' : ''} onClick={() => go(k)}>
             {label}{badge[k] > 0 ? <em className={k === 'now' ? '' : k === 'messages' && view.counts.problems ? 'is-bad' : 'is-warn'}>{badge[k]}</em> : null}
           </button>
@@ -187,20 +212,26 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
 
       {section === 'now' && (
         <>
-          {view.creative && (
+          {task && view.messages.length > 0 && (
+            <section className="ckp-box" aria-label="Повідомлення від агентів">
+              <div className="ckp-sec-h"><h3>Повідомлення від агентів</h3><span className="ckp-chip is-warn"><Ic n="clock" size={13} />{view.messages.length}</span></div>
+              <div className="ckp-alist">{view.messages.map((a) => <AttentionRow key={a.id} item={a} onAction={act} />)}</div>
+            </section>
+          )}
+          {view.creative && !task && (
             <div className="opv-nowhead">
               <span>{view.inWork.length ? `Завдань у роботі: ${view.inWork.length}` : 'Зараз немає завдань у роботі'}</span>
               <small className="sd-hint">Додаткові завдання створюються кнопкою «Додаткове завдання» в картці проєкту (вкладка «Запуск AI команди»).</small>
             </div>
           )}
-          {view.creative && c && (
+          {view.creative && c && !task && (
             <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} samples={styleSamples} onSaveStyle={saveStyle} />
           )}
           {!view.creative && <Passes campaignId={campaign.id} />}
           {view.creative && (
             <div className="opv-cycles">
               {!view.inWork.length && (
-                <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Зараз нічого не в роботі</b><p>{view.counts.review ? `На вашу перевірку чекає креативів: ${view.counts.review}. ` : ''}{view.nextText}</p></div></div>
+                <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Зараз нічого не в роботі</b><p>{view.counts.review ? `На вашу перевірку чекає креативів: ${view.counts.review}. ` : ''}{task ? task.line : view.nextText}</p></div></div>
               )}
               {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} onDismissNote={(n) => act({ id: n.id }, 'dismiss')} onAnswerNote={answerNote} onGoFill={onGoFill} onRevised={(r) => { notify?.(r?.paused ? 'Правку прийнято. Крок виконається, коли ви відновите операцію.' : 'Правку надіслано: агент переробляє крок.'); onChanged?.(); }} />)}
             </div>
@@ -311,9 +342,9 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
 
       {section === 'spend' && (
         <>
-          {view.creative && (
+          {view.creative && !teamOnly && (
             <section className="ckp-box" aria-label="Витрати за завданнями">
-              <div className="ckp-sec-h"><h3>Витрати за завданнями</h3><span className="ckp-chip">{fmtUsd(c?.spend?.total)} за весь час</span></div>
+              <div className="ckp-sec-h"><h3>{task ? 'Витрати цього завдання' : 'Витрати за завданнями'}</h3><span className="ckp-chip">{fmtUsd(c?.spend?.total)} за весь час</span></div>
               {!costs.length && <p className="ckp-empty-line">Завдань ще не було.</p>}
               {costs.length > 0 && (
                 <div className="opv-sp">
@@ -334,11 +365,43 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
               <p className="ckp-empty-line">Claude за завданням рахується за останні 30 днів; повна сума операції — у блоці нижче.</p>
             </section>
           )}
-          <div className="pcd-embed pcd-spend"><CampaignSpend campaignId={campaign.id} /></div>
+          {!task && <div className="pcd-embed pcd-spend"><CampaignSpend campaignId={campaign.id} /></div>}
         </>
       )}
 
-      {section === 'settings' && (
+      {section === 'client' && teamOnly && view.creative && c && (
+        <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} samples={styleSamples} onSaveStyle={saveStyle} />
+      )}
+
+      {section === 'settings' && teamOnly && (
+        <>
+          {view.creative && <PicturesSetting campaign={campaign} notify={notify} onChanged={onChanged} />}
+          {campaign.status !== 'draft' && <div className="cmp-section pcd-embed"><CampaignControl campaign={campaign} notify={notify} /></div>}
+        </>
+      )}
+
+      {section === 'settings' && task && (
+        <>
+          <section className="ckp-box opv-regular" aria-label="Налаштування завдання">
+            <div className="ckp-sec-h"><h3>Налаштування завдання</h3><span className="ckp-chip">{task.kindLabel}</span></div>
+            <p className="opv-what">{task.regularId ? 'Усе тут діє лише для цього завдання: в інших завдань клієнта свої налаштування, зокрема й у кожного агента. Зміни застосуються до наступних запусків.' : 'Усе тут діє лише для цього завдання, зокрема й налаштування кожного агента. Зміни застосуються, коли ви запустите завдання ще раз.'}</p>
+            {taskReg && (
+              <div className="ckp-acts">
+                <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => guard('reg' + taskReg.id, () => setRegularEnabled(campaign.id, taskReg.id, !taskReg.enabled, email), taskReg.enabled ? 'Регулярне завдання вимкнено.' : 'Регулярне завдання увімкнено.')}><Ic n={taskReg.enabled ? 'stop' : 'play'} size={15} />{taskReg.enabled ? 'Вимкнути' : 'Увімкнути'}</button>
+                <button type="button" className="ckp-btn is-danger" disabled={!!busy} onClick={async () => { if (await dropRegular(taskReg)) onBack?.(); }}>Видалити завдання</button>
+              </div>
+            )}
+          </section>
+          {(taskReg || taskReq) && (
+            <div className="cmp-section pcd-embed">
+              <RequestForm key={task.key} campaign={campaign} mode={taskReg ? 'regular' : 'extra'} title="Налаштування завдання" initial={taskReg ? { ...taskReg.brief, materials: [] } : { ...taskReq.brief, title: taskReq.title, materials: [] }}
+                schedule={taskReg ? { weekdays: taskReg.weekdays, everyDays: taskReg.everyDays, time: taskReg.time } : null} canStartNow={!stopped} onClose={() => setSection('review')} onSave={saveTaskForm} />
+            </div>
+          )}
+        </>
+      )}
+
+      {section === 'settings' && !task && !teamOnly && (
         <>
           {view.creative && <PicturesSetting campaign={campaign} notify={notify} onChanged={onChanged} />}
           {view.creative && (

@@ -167,7 +167,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
                       {t.key !== 'creative' && <small>{line1} · {line2}</small>}
                     </div>
                     <div className="tmx-btns">
-                      <button type="button" className="btn btn-p" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Відкрити команду'}</button>
+                      <button type="button" className="btn btn-p" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false, teamOnly: true }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Налаштування команди'}</button>
                       <RoundBtn icon={run ? 'pause' : 'play'} label={run ? 'Зупинити' : 'Продовжити'} disabled={busy === t.key} onClick={() => toggle(t)} />
                       <RoundBtn icon="trash" label="Видалити команду" disabled={busy === t.key} onClick={() => remove(t)} />
                     </div>
@@ -180,7 +180,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
                   {t.key === 'creative' && <TeamPrep phase={phase} />}
                   {t.key === 'creative' && t.campaign && (
                     <TeamTasks campaign={t.campaign} cockpit={cockpit.byId?.[t.campaign.id]} busy={busy} say={say} onSeasonAction={seasonAction}
-                      onOpen={() => setOpen({ campaignId: t.campaign.id, regularFirst: false })} onNewRegular={() => setOpen({ campaignId: t.campaign.id, regularFirst: true })}
+                      onOpen={(task) => setOpen({ campaignId: t.campaign.id, regularFirst: false, taskKey: task.key })} onNewRegular={() => setOpen({ campaignId: t.campaign.id, regularFirst: true })}
                       onNewSeasonal={() => setCreativeTask({ campaign: t.campaign, seasonal: true })} onNewOneoff={() => setCreativeTask({ campaign: t.campaign, seasonal: false })}
                       onChanged={() => Promise.all([load(), cockpit.reload?.()])} />
                   )}
@@ -229,7 +229,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
           onGoFill={(section) => { setCard(null); onGoFill?.(section); }} say={say} />
       )}
       {openCampaign && project && (
-        <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst}
+        <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst} taskKey={open.taskKey || null} teamOnly={!!open.teamOnly}
           onClose={() => { setOpen(null); load(); }} onBackToProject={() => { setOpen(null); load(); }} onGoFill={(section) => { setOpen(null); onGoFill?.(section); }} onChanged={load} />
       )}
       </div>

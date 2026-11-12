@@ -85,6 +85,7 @@ import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingC
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
+import { allTasks, groupByProject, matchesFilter, parseTaskKey, requestsOfTask, scopeCockpit, tasksOfOperation } from '../src/lib/agents/taskScope.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
 import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, effectiveStyle, manualFromDraft, styleBlock, styleRows, styleSamplesOf } from '../src/lib/agents/projectStyle.js';
@@ -5455,6 +5456,38 @@ await ok('team tasks: the tasks of a team are listed with names and marks: main 
   const stopped = teamTasksOf({ campaign: { ...campaign, config: { ...campaign.config, regulars: [reg('r1', 'Суслики', { enabled: false })] } }, cockpit: null, now });
   assert.deepEqual(stopped.map((t) => [t.kind, t.state, t.stateText]), [['main', 'paused', 'зупинено']]);
   assert.deepEqual(teamTasksOf({ campaign: { id: 1, config: {} }, cockpit: null, now }), []);
+});
+
+await ok('task cards (3.0b): every task has its own runs, notes and money; the list of all tasks, by project, with filters', () => {
+  const brief = { goal: 'Fresh creatives', count: 2, ratios: ['1:1'], texts: 'yes', language: 'en' };
+  const reg = (id, title, extra = {}) => ({ id, enabled: true, weekdays: [1, 4], time: '09:00', title, brief, since: '2026-11-01T00:00:00Z', ...extra });
+  const campaign = { id: 4, project_id: 7, name: 'Mellow · Креативи', status: 'active', config: { mode: 'creative', regulars: [reg('r1', 'Постійні'), reg('r2', 'Хом’ячки', { weekdays: [3] }), reg('r3', 'Старий сезон', { seasonal: true, startDate: '2026-09-01', endDate: '2026-10-01' })] } };
+  const now = new Date('2026-11-12T10:00:00Z');
+  const req = (id, over = {}) => ({ id, title: `Task ${id}`, status: 'running', kind: 'extra', creatives: { total: 0 }, items: [], stages: [], cost: { model: 0.1, higgsfield: 0.2 }, createdAt: '2026-11-12T09:00:00Z', updatedAt: '2026-11-12T09:30:00Z', ...over });
+  const cockpit = { requests: [req(10, { status: 'review', creatives: { review: 2, total: 2 } }), req(11, { status: 'approved', creatives: { approved: 1, total: 1 }, updatedAt: '2026-11-10T09:00:00Z' }), req(12, { kind: 'regular', regularId: 'r1', creatives: { review: 1, total: 1 } }), req(13, { kind: 'regular', regularId: 'r1', creatives: { approved: 2, total: 2 }, updatedAt: '2026-11-09T09:00:00Z' }), req(14, { kind: 'regular', regularId: 'r2', creatives: { approved: 1, total: 1 } })],
+    attention: [{ id: 'a', kind: 'estimate', requestId: 10 }, { id: 'b', kind: 'failed', requestId: 14 }, { id: 'c', kind: 'failed_step', requestId: null }] };
+  assert.deepEqual([parseTaskKey('reg:r1'), parseTaskKey('one:5'), parseTaskKey('x')], [{ kind: 'regular', regularId: 'r1' }, { kind: 'oneoff', requestId: 5 }, null]);
+  // a regular task owns its runs, a one-off task its single request
+  assert.deepEqual(requestsOfTask(cockpit, { key: 'reg:r1' }).map((r) => r.id), [12, 13]);
+  assert.deepEqual(requestsOfTask(cockpit, { key: 'one:10' }).map((r) => r.id), [10]);
+  const scoped = scopeCockpit(cockpit, { key: 'reg:r2' });
+  assert.deepEqual([scoped.requests.map((r) => r.id), scoped.attention.map((a) => a.id)], [[14], ['b']]); // the notes of other tasks and of the whole operation are not in it
+  assert.equal(scopeCockpit(null, { key: 'reg:r1' }), null);
+  // every task of the operation with its state and its own numbers
+  const tasks = tasksOfOperation({ campaign, cockpit, now });
+  const by = Object.fromEntries(tasks.map((x) => [x.key, x]));
+  assert.deepEqual([by['reg:r1'].kind, by['reg:r1'].state, by['reg:r1'].review, by['reg:r1'].approved, by['reg:r1'].runs, by['reg:r1'].costUsd], ['main', 'wait', 1, 2, 2, 0.6]);
+  assert.deepEqual([by['reg:r2'].kind, by['reg:r2'].state, by['reg:r3'].kind, by['reg:r3'].state, by['reg:r3'].stateText], ['extra', 'work', 'seasonal', 'done', 'сезон завершено']);
+  assert.deepEqual([by['one:10'].state, by['one:10'].review, by['one:11'].state, by['one:11'].stateText], ['wait', 2, 'done', 'завершено']);
+  assert.deepEqual(tasksOfOperation({ campaign: { ...campaign, config: { mode: 'ads' } }, cockpit, now }), []); // an operation without creatives has no creative tasks
+  // the section «Задачі»: everything with the project name, what waits for the person first; the filters; the groups of the list
+  const list = allTasks({ campaigns: [campaign, { ...campaign, id: 5, project_id: 8, name: 'Joia', status: 'paused', config: { mode: 'creative', regulars: [reg('r1', 'Joia main')] } }, { ...campaign, id: 6, status: 'archived' }], cockpits: { 4: cockpit }, projects: [{ id: 7, name: 'Mellow', client: 'Mellow' }, { id: 8, name: 'Joia' }], now });
+  assert.deepEqual(list.slice(0, 2).map((x) => x.state), ['wait', 'wait']); // waiting for the person first
+  assert.equal(list[0].projectName, 'Mellow'); assert.ok(!list.some((x) => x.campaignId === 6)); // an archived operation has no tasks in the list
+  assert.deepEqual([list.filter((x) => matchesFilter(x, 'wait')).length, list.filter((x) => matchesFilter(x, 'archive')).map((x) => x.key).sort()], [2, ['one:11', 'reg:r3']]);
+  assert.ok(list.filter((x) => matchesFilter(x, 'all')).every((x) => x.state !== 'done')); // «Усі» keeps the archive apart
+  const groups = groupByProject(list);
+  assert.deepEqual(groups.map((g) => g.projectName), ['Mellow', 'Joia']); // the project with the tasks that wait for the person comes first
 });
 
 await ok('words on a creative (3.1): the text comes from the brief and the copywriter, the system puts it on the clean picture, in a real font, on the server', async () => {

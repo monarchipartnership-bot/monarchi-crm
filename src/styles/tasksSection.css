@@ -1,0 +1,24 @@
+/* AI Agents → «Задачі» (step 3.0b): rows of the tasks, grouped by project (variant A of the mockup). Built on the plum foundation of campaignsSection.css. */
+.ts-section .ts-group { margin-bottom: 18px; padding: 14px 18px 6px; background: rgba(53, 17, 63, .54); border: 1px solid rgba(235, 156, 239, .3); border-radius: 18px; }
+.ts-gh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 6px; color: #F9EDF9; }
+.ts-gh b { font-family: var(--font-head); font-size: 1.02rem; font-weight: 800; }
+.ts-gh-acts { margin-left: auto; display: inline-flex; gap: 14px; }
+.ts-link { border: 0; background: none; padding: 0; font: inherit; font-size: .78rem; font-weight: 700; color: #EB9CEF; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.ts-link:focus-visible, .ts-open:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; }
+.ts-list { list-style: none; margin: 0; padding: 0; }
+.ts-row { display: grid; grid-template-columns: minmax(0, 1.7fr) 130px 140px 90px 96px; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid rgba(235, 156, 239, .2); color: #F9EDF9; }
+.ts-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ts-main b { font-size: .94rem; font-weight: 700; overflow-wrap: anywhere; }
+.ts-main small { font-size: .76rem; color: #C193CA; line-height: 1.4; }
+.ts-n { font-size: .78rem; color: #C9AAD1; }
+.ts-pill { justify-self: start; font-size: .68rem; font-weight: 800; letter-spacing: .03em; padding: 4px 10px; border-radius: 999px; background: rgba(190, 170, 200, .18); color: #D8C4DD; white-space: nowrap; }
+.ts-pill.is-work { background: rgba(95, 224, 161, .18); color: #7CF0B8; }
+.ts-pill.is-wait { background: rgba(242, 185, 75, .2); color: #F6CD76; }
+.ts-pill.is-bad { background: rgba(255, 138, 138, .18); color: #FF9C9C; }
+.ts-pill.is-paused { background: rgba(190, 170, 200, .18); color: #D8C4DD; }
+.ts-pill.is-done { background: rgba(140, 120, 150, .2); color: #B9A5BF; }
+.ts-open { justify-self: end; }
+@media (max-width: 760px) {
+  .ts-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ts-row .ts-pill { grid-column: 1; } .ts-row .ts-n { grid-column: 1; } .ts-open { grid-column: 2; grid-row: 1; }
+}

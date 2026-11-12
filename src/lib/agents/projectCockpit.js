@@ -221,7 +221,7 @@ export function buildCockpit(raw) {
         return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
       });
       const n = (s) => c.filter((x) => x.status === s).length;
-      return { id: r.id, title: clip(r.title, 90), status, statusLabel: REQUEST_STATUS_LABEL[status] || status, items, updatedAt: r.updated_at || r.created_at, createdAt: r.created_at || null,
+      return { id: r.id, title: clip(r.title, 90), brief, status, statusLabel: REQUEST_STATUS_LABEL[status] || status, items, updatedAt: r.updated_at || r.created_at, createdAt: r.created_at || null,
         // the cycle: regular (made by the schedule) or extra, what was asked, its own chain and its money (lib/agents/operationCycles.js)
         kind: brief.kind === 'regular' ? 'regular' : 'extra', scheduledFor: brief.scheduled_for || null, regularId: brief.regular_id || null, goal: clip(brief.goal, 400), ratios: Array.isArray(brief.ratios) && brief.ratios.length ? brief.ratios : ['1:1'], directions: directionLimit(brief),
         stages: own.stages, steps: stepsOfRequest(r, raw.steps || [], tasks, roleOf), currentStageKey: own.currentStageKey, error: clip(r.error, 300), notes: ['draft', 'running', 'review', 'problem'].includes(r.status) ? stepNotes(r, tasks, roleOf, { hasAssets: !!((r.materials || []).length || library.assets || library.sitePhotos) }) : [],

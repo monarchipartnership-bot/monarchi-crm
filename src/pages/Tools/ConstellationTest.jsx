@@ -39,7 +39,7 @@ import AgentsPanel from './aiMap/AgentsPanel';
 import SystemState from './aiMap/SystemState';
 import { fetchSystemState } from '../../lib/api/systemState';
 import TaskFlowPanel from './aiMap/TaskFlowPanel';
-import CampaignsSection from './campaigns/CampaignsSection';
+import TasksSection from './tasks/TasksSection';
 import DeptAgentWindow from './agents/DeptAgentWindow';
 import '../../styles/constellationTest.css';
 
@@ -90,7 +90,7 @@ const SECTION_ICONS = {
 const SECTIONS = [
   { key: 'map', label: 'Мапа' }, // the 3D map of the team (aiMap/AgentMap3D.jsx, scene in agentMap3d/)
   { key: 'projects', label: 'Проєкти' },
-  { key: 'campaigns', label: 'Операції' },
+  { key: 'campaigns', label: 'Задачі' }, // was «Операції» (owner, 2026-11-12, step 3.0b): the tasks of the teams with a card of their own
   { key: 'spend', label: 'Витрати' },
   { key: 'knowledge', label: 'Інформаційна база' },
 ];
@@ -323,8 +323,7 @@ export default function ConstellationTest() {
       </div>
 
       {section === 'projects' && <ProjectsPage rows={teamProjects.rows} loading={teamProjects.loading || cockpit.loading} onOpen={(row) => openProject(row.id)} />}
-      {section === 'campaigns' && <CampaignsSection key={campaignTarget ? `c${campaignTarget.id ?? 'p' + campaignTarget.startProjectId}` : 'all'} openCampaignId={campaignTarget?.id ?? null} openNewRequest={!!campaignTarget?.newRequest} startProjectId={campaignTarget?.startProjectId ?? null} cockpit={cockpit}
-        onOpenProject={(projectId) => openProject(projectId)} />}
+      {section === 'campaigns' && <TasksSection key={campaignTarget ? `c${campaignTarget.id}` : 'all'} openCampaignId={campaignTarget?.id ?? null} cockpit={cockpit} onOpenProject={(projectId) => openProject(projectId)} />}
       {section === 'spend' && <AgentSpend onOpenCampaign={(id) => { setCampaignTarget({ id }); setSection('campaigns'); }} />}
       {section === 'system' && <SystemState />}
       {section === 'map' && (
