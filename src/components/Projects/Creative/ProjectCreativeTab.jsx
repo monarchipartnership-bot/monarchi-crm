@@ -14,6 +14,8 @@ import { STATUS_LABEL } from '../../../lib/projectConstants';
 import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
 import MarketsEditor, { marketsLanguageLine } from './MarketsEditor';
 import { updateProject } from '../../../lib/api/projects';
+import { languagePatch } from '../../../lib/clientLang';
+import { languageLabel } from '../../../lib/agents/languages';
 import '../../../styles/projectCreative.css';
 
 const STATE_TEXT = { wait: 'Чекає даних', ok: 'Заповнено', old: 'Застарів' };
@@ -31,7 +33,7 @@ function crmFacts(p) {
   const period = [day(p.start_date), day(p.end_date)].filter(Boolean).join(' – ');
   const groups = [
     ['Основне', [['Менеджер', p.manager], ['Спеціаліст', p.specialist], ['Статус', STATUS_LABEL[p.status] || p.status], ['Період', period], ['Послуги', (p.services || []).join(', ')], ['Причина зупинки', p.stop_reason]]],
-    ['Клієнт', [['Клієнт', p.client], ['Країна', p.country], ['Сайт', p.website], ['Тип бізнесу', p.business_type], ['Мова звітів', LANG_NAME[p.report_lang] || p.report_lang], ['Контакти', p.contacts], ['Часовий пояс', p.timezone]]],
+    ['Клієнт', [['Клієнт', p.client], ['Країна', p.country], ['Сайт', p.website], ['Тип бізнесу', p.business_type], ['Мова клієнта й звітів', languageLabel(p.client_language) || LANG_NAME[p.report_lang] || p.report_lang], ['Контакти', p.contacts], ['Часовий пояс', p.timezone]]],
     ['Особливості роботи з клієнтом', [['', p.notes]]],
   ];
   return groups.map(([title, rows]) => [title, rows.filter(([, v]) => String(v ?? '').trim())]).filter(([, rows]) => rows.length);
@@ -158,7 +160,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
     setError(''); setBusy('input:markets');
     try {
       const row = await saveInput(projectId, 'markets', text, email);
-      await updateProject(projectId, { client_language: language || null });
+      await updateProject(projectId, languagePatch(language));
       setData((d) => ({ ...d, settings: { ...d.settings, inputs: row.inputs } }));
       setCrm((c) => ({ ...(c || {}), client_language: language || null }));
       setEditing(null);

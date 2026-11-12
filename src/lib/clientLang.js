@@ -2,6 +2,9 @@
 // follows the project's («Мова звітів» in the project card). Pure code (no React): the screens read it through ClientReport/langContext.jsx.
 export const LANGS = ['en', 'uk'];
 export const normLang = (l) => (l === 'uk' ? 'uk' : 'en');
+// The language of the client is the only language field of a project (owner, 2026-11-12): the reports follow it. A report exists in English and Ukrainian only, so every other
+// language reads English; the column report_lang stays (the shared report page reads it in the database) and is written together with the client language, never on its own.
+export const languagePatch = (code) => (code ? { client_language: code, report_lang: normLang(code) } : { client_language: null });
 export const LANG_NAME = { en: 'English', uk: 'Українська' };
 export const localeOf = (lang) => (normLang(lang) === 'uk' ? 'uk-UA' : 'en-US');
 

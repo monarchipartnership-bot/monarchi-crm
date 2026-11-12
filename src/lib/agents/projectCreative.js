@@ -16,7 +16,7 @@ export const INPUT_KEYS = INPUT_FIELDS.map((f) => f.key);
 // What the manager tells about the client here (the section «AI-агенти» of the project card): nobody else delivers it. Stored in the same `inputs` as the data of
 // the agents (key -> { body, source: 'manual', by, filled_at }), so the age of a value is known too. Which agent needs which field: lib/agents/agentRequirements.js.
 export const PROFILE_FIELDS = [
-  { key: 'about', label: 'Опис бізнесу', hint: 'Чим займається клієнт, що продає, де працює, коротка історія й сайт.' },
+  { key: 'about', label: 'Опис бізнесу', hint: 'Чим займається клієнт, що продає, де працює, коротка історія. Сайт вносити не треба: агенти беруть його з поля «Сайт» в «Основне».' },
   { key: 'offer', label: 'Оффер і відмінності', hint: 'Головна пропозиція, чим клієнт відрізняється від конкурентів, акції й умови (лише те, що точно є).' },
   { key: 'tone', label: 'Тон і стиль бренду', hint: 'Як бренд говорить: тепло чи стримано, на «ви» чи на «ти», слова, яких уникати.' },
   { key: 'brand', label: 'Бренд: кольори й шрифти', hint: 'Основні кольори (коди), шрифти, правила використання логотипу.' },
