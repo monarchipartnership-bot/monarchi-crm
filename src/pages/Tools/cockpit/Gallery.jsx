@@ -125,7 +125,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
           </div>
         </div>
         {full && open.url && <FullView item={open} count={shown.length} onClose={() => setFull(false)} onGo={go} />}
-      {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} onClose={() => setReturning(null)}
+      {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} textOption={!!textEdit} onClose={() => setReturning(null)}
         onRedo={(comment) => act('return', { creativeIds: [returning.id], comment }, 'rt' + returning.id)} onText={() => { setEditing(returning); setReturning(null); }} />}
       {editing && textEdit && <TextEditDialog item={editing} autoStyle={textEdit.autoStyle} taskStyle={textEdit.taskStyle} onClose={() => setEditing(null)} onSave={(edit) => onAct?.('edit_text', { creativeId: editing.id, edit })} />}
       </div>
@@ -153,7 +153,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
         {!shown.length && <p className="ckp-empty-line">У цьому фільтрі матеріалів немає.</p>}
       </div>
       {err && <p className="ckp-err" role="alert">{err}</p>}
-      {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} onClose={() => setReturning(null)}
+      {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} textOption={!!textEdit} onClose={() => setReturning(null)}
         onRedo={(comment) => act('return', { creativeIds: [returning.id], comment }, 'rt' + returning.id)} onText={() => { setEditing(returning); setReturning(null); }} />}
       {editing && textEdit && <TextEditDialog item={editing} autoStyle={textEdit.autoStyle} taskStyle={textEdit.taskStyle} onClose={() => setEditing(null)} onSave={(edit) => onAct?.('edit_text', { creativeId: editing.id, edit })} />}
     </div>

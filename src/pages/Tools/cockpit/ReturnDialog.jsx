@@ -7,7 +7,8 @@ import '../../../styles/textEdit.css';
 // «Повернути креатив» (owner's pick A, step 3.1e): the person first says WHAT is wrong: the picture (it is made again in Higgsfield with their comment, about $0.2) or only the words (the editor of the
 // words opens, the picture stays, free).
 //   item: { id, conceptName }   canEditText: the creative has a picture the words can be changed on   onRedo(comment): Promise   onText()   onClose()
-export default function ReturnDialog({ item, canEditText = true, onRedo, onText, onClose }) {
+//   textOption: false = this screen has no editor of the words: the dialog only asks the comment for a new picture
+export default function ReturnDialog({ item, canEditText = true, textOption = true, onRedo, onText, onClose }) {
   const box = useRef(null);
   const [mode, setMode] = useState('redo');
   const [comment, setComment] = useState('');
@@ -30,7 +31,7 @@ export default function ReturnDialog({ item, canEditText = true, onRedo, onText,
     <div className="ckp ckp-overlay is-night ai-immersive ted-ov" data-ai-safe onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div ref={box} className="ted-win ted-ret" role="dialog" aria-modal="true" aria-label={`Повернути креатив ${item.conceptName}`} tabIndex={-1}>
         <header className="ted-head"><div><h2>Повернути «{item.conceptName}»</h2><small>Що саме не так?</small></div></header>
-        <div className="ted-opts" role="radiogroup" aria-label="Що змінити">
+        {textOption && <div className="ted-opts" role="radiogroup" aria-label="Що змінити">
           <label className={'ted-opt' + (mode === 'redo' ? ' is-on' : '')}>
             <input type="radio" name="ret-mode" checked={mode === 'redo'} onChange={() => setMode('redo')} />
             <span><b>Переробити картинку</b><small>Нова генерація в Higgsfield з вашим коментарем, ≈ $0.2. Текст накладеться заново.</small></span>
@@ -39,7 +40,7 @@ export default function ReturnDialog({ item, canEditText = true, onRedo, onText,
             <input type="radio" name="ret-mode" checked={mode === 'text'} disabled={!canEditText} onChange={() => setMode('text')} />
             <span><b>Змінити лише текст</b><small>{canEditText ? 'Відкриється редактор тексту. Картинка та сама, $0.' : 'Для цього креатива редактор тексту недоступний: немає чистої картинки.'}</small></span>
           </label>
-        </div>
+        </div>}
         {mode === 'redo' && (
           <label className="se-row ted-f">
             <span className="se-lab">Коментар для агентів</span>

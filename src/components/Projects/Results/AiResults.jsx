@@ -5,6 +5,8 @@ import { fetchDeliverables } from '../../../lib/api/deliverables';
 import { RUN_FILTERS, buildRuns, dateTimeText, filterRuns, groupItems, runCounts } from '../../../lib/agents/aiResults';
 import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
 import StepCards from '../../../pages/Tools/cockpit/StepCards';
+import ReturnDialog from '../../../pages/Tools/cockpit/ReturnDialog';
+import TextEditDialog from '../../../pages/Tools/cockpit/TextEditDialog';
 import { fmtUsd } from '../../../pages/Tools/cockpit/format';
 import '../../../pages/Tools/cockpit/cockpit.css';
 import './aiResults.css';
@@ -15,18 +17,15 @@ const canApprove = (i) => i.status === 'review' || i.status === 'rejected';
 const canReturn = (i) => i.status === 'review' || i.status === 'approved';
 const canDownload = (i) => ['review', 'approved', 'rejected'].includes(i.status) && (i.downloadUrl || i.url);
 
-// One creative of a run: the picture (a click opens it large), the name, the texts of the copywriter and the three buttons. «Повернути» asks what to change first.
-function ResultCard({ item, onOpen, onAct, busy }) {
-  const [asking, setAsking] = useState(false);
-  const [comment, setComment] = useState('');
+// One creative of a run: the picture (a click opens it large), the name, the texts of the copywriter and the buttons. «Повернути» asks what is wrong (the picture is made again, or only the words are changed);
+// «Редагувати текст» changes the words of a ready creative on the same picture (free).
+//   styleCtx: { autoStyle, taskStyle } of the run (the editor of the words needs them)
+function ResultCard({ item, onOpen, onAct, busy, styleCtx }) {
+  const [returning, setReturning] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [err, setErr] = useState('');
   const st = ITEM_STATUS[item.status] || ['', item.status];
-  async function giveBack() {
-    if (!asking) { setAsking(true); return; }
-    if (!comment.trim()) { setErr('Напишіть, що змінити.'); return; }
-    setErr('');
-    try { await onAct('return', { creativeIds: [item.id], comment: comment.trim() }); setAsking(false); setComment(''); } catch (e) { setErr(e?.message || 'Не вдалося повернути.'); }
-  }
+  const canEditText = !!styleCtx && !!item.rawUrl && item.kind !== 'video' && ['review', 'approved'].includes(item.status);
   async function simple(key) { setErr(''); try { await onAct(key, { creativeId: item.id }); } catch (e) { setErr(e?.message || 'Не вдалося виконати дію.'); } }
   return (
     <li className="ar-card" data-st={item.status}>
@@ -39,18 +38,15 @@ function ResultCard({ item, onOpen, onAct, busy }) {
         {item.copy?.headline && <p className="ar-copy"><strong>{item.copy.headline}</strong>{item.copy.text ? ` ${item.copy.text}` : ''}</p>}
         {item.note && <p className="ar-note">{item.note}</p>}
       </div>
-      {asking && (
-        <div className="ar-ask">
-          <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Що змінити…" maxLength={600} aria-label={`Що змінити в «${item.conceptName}»`} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') giveBack(); if (e.key === 'Escape') setAsking(false); }} />
-        </div>
-      )}
       <div className="ar-acts">
         {canApprove(item) && <button type="button" className="btn btn-p" disabled={!!busy} onClick={() => simple('approve_one')}>Схвалити</button>}
-        {canReturn(item) && <button type="button" className="btn" disabled={!!busy} onClick={giveBack}>{asking ? 'Повернути ↵' : 'Повернути'}</button>}
-        {item.url && ['review', 'approved'].includes(item.status) && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('overlay')}>{item.hasText ? 'Текст знову' : 'Накласти текст'}</button>}
+        {canReturn(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => setReturning(true)}>Повернути</button>}
+        {canEditText && <button type="button" className="btn" disabled={!!busy} onClick={() => setEditing(true)}>Редагувати текст</button>}
         {canDownload(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('download_one')} aria-label={`Завантажити: ${item.conceptName}`}>Завантажити</button>}
       </div>
       {err && <p className="ar-err" role="alert">{err}</p>}
+      {returning && <ReturnDialog item={item} canEditText={canEditText} onClose={() => setReturning(false)} onRedo={(comment) => onAct('return', { creativeIds: [item.id], comment })} onText={() => { setReturning(false); setEditing(true); }} />}
+      {editing && styleCtx && <TextEditDialog item={item} autoStyle={styleCtx.autoStyle} taskStyle={styleCtx.taskStyle} onClose={() => setEditing(false)} onSave={(edit) => onAct('edit_text', { creativeId: item.id, edit })} />}
     </li>
   );
 }
@@ -78,7 +74,7 @@ function Lightbox({ items, index, onClose, onGo }) {
 }
 
 // The card of a run of the creative team: the creatives in groups (to approve / approved / returned), the texts and the steps of the agents.
-function CreativeRun({ run, onBack, onAct }) {
+function CreativeRun({ run, onBack, onAct, styleCtx }) {
   const groups = useMemo(() => groupItems(run.items), [run.items]);
   const [light, setLight] = useState(null); // { items, index }
   const [busy, setBusy] = useState('');
@@ -104,7 +100,7 @@ function CreativeRun({ run, onBack, onAct }) {
           </div>
           {!g.items.length ? <p className="ar-empty">Нічого не чекає вашого рішення.</p> : (
             <ul className="ar-grid">
-              {g.items.map((i, k) => <ResultCard key={i.id} item={i} busy={busy} onOpen={() => setLight({ items: g.items.filter((x) => x.url), index: Math.max(0, g.items.filter((x) => x.url).findIndex((x) => x.id === i.id)) })} onAct={act} />)}
+              {g.items.map((i, k) => <ResultCard key={i.id} item={i} busy={busy} styleCtx={styleCtx} onOpen={() => setLight({ items: g.items.filter((x) => x.url), index: Math.max(0, g.items.filter((x) => x.url).findIndex((x) => x.id === i.id)) })} onAct={act} />)}
             </ul>
           )}
         </section>
@@ -136,6 +132,8 @@ export default function AiResults({ projectId }) {
   const counts = useMemo(() => runCounts(runs), [runs]);
   const open = runs.find((r) => r.id === openId) || null;
   useEffect(() => { if (openId && !open && !loading) setOpenId(null); }, [openId, open, loading]);
+  // the look of the words: the scout's decision for the client and the style of the task of this run (the editor of the words of a creative starts from both)
+  const styleOf = (r) => { const c = byId[r.campaignId]; if (!c?.intel) return null; return { autoStyle: c.intel.autoStyle, taskStyle: (c.requests || []).find((q) => q.id === r.requestId)?.brief?.style }; };
   const onAct = useCallback(async (r, key, payload = {}) => {
     setProblem('');
     try { return await runAction(null, key, { campaignId: r.campaignId, requestId: r.requestId, ...payload }); } catch (e) { setProblem(e?.message || 'Не вдалося виконати дію.'); throw e; }
@@ -178,7 +176,7 @@ export default function AiResults({ projectId }) {
           </ul>
         </>
       )}
-      {open && open.source === 'creative' && <CreativeRun run={open} onBack={() => setOpenId(null)} onAct={onAct} />}
+      {open && open.source === 'creative' && <CreativeRun run={open} onBack={() => setOpenId(null)} onAct={onAct} styleCtx={styleOf(open)} />}
       {open && open.source === 'deliverable' && (
         <div className="ar-run-card">
           <button type="button" className="ar-back" onClick={() => setOpenId(null)}>← Усі запуски</button>
