@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchCampaigns, fetchClientsForCampaigns } from '../../../lib/api/campaigns';
-import { TASK_FILTERS, allTasks, groupByProject, matchesFilter } from '../../../lib/agents/taskScope';
+import { TASK_FILTERS, allTasks, calendarRuns, groupByProject, matchesFilter } from '../../../lib/agents/taskScope';
 import { fmtUsd } from '../cockpit/format';
 import OperationCard from '../cockpit/OperationCard';
 import NewTaskDialog from './NewTaskDialog';
 import { hasCreativeCycles } from '../../../lib/agents/operationCycles';
-import { CampaignCalendar } from '../campaigns/OperationTools';
 import '../../../styles/aiAgentsSection.css';
 import '../../../styles/campaignsSection.css';
 import '../../../styles/tasksSection.css';
 
+const WD = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+const dayLabel = (d) => `${WD[new Date(`${d}T00:00:00Z`).getUTCDay()]} ${d.slice(8, 10)}.${d.slice(5, 7)}`;
 const STATE_CLS = { work: 'is-work', wait: 'is-wait', stopped: 'is-bad', paused: 'is-paused', soon: 'is-paused', done: 'is-done' };
 
 // «Задачі» (owner, 2026-11-12, step 3.0b): the tasks of all the creative teams in one list, instead of «Операції». A project is a group, a task is a row; a click opens the card of THAT task.
@@ -40,6 +41,8 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
   const counts = useMemo(() => Object.fromEntries(TASK_FILTERS.map(([k]) => [k, tasks.filter((t) => matchesFilter(t, k)).length])), [tasks]);
   const shown = useMemo(() => tasks.filter((t) => matchesFilter(t, filter)), [tasks, filter]);
   const groups = useMemo(() => groupByProject(shown), [shown]);
+  const runs = useMemo(() => (filter === 'calendar' ? calendarRuns(tasks) : []), [filter, tasks]);
+  const runDays = useMemo(() => { const m = new Map(); runs.forEach((r) => { if (!m.has(r.date)) m.set(r.date, []); m.get(r.date).push(r); }); return [...m.entries()]; }, [runs]);
   const names = useMemo(() => Object.fromEntries(projectRows.map((p) => [p.id, p.client || p.name])), [projectRows]);
   const creativeCampaigns = useMemo(() => (campaigns || []).filter((c) => ['active', 'paused'].includes(c.status) && hasCreativeCycles(c)), [campaigns]);
   const openCampaign = card ? (campaigns || []).find((c) => c.id === card.campaignId) || null : null;
@@ -74,7 +77,28 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
         </div>
       </div>
 
-      {filter === 'calendar' && campaigns && <CampaignCalendar campaigns={campaigns} projects={projects} onOpen={(id) => setCard({ campaignId: id, taskKey: null, teamOnly: true })} />}
+      {filter === 'calendar' && cockpitReady && (
+        <section className="ts-group" aria-label="Найближчі запуски">
+          <div className="ts-gh"><b>Найближчі запуски за розкладом</b><span className="ts-pill">30 днів</span></div>
+          {!runDays.length && <p className="ts-empty">Запусків за розкладом найближчі 30 днів немає: регулярних завдань або немає, або вони вимкнені.</p>}
+          <ul className="ts-list">
+            {runDays.map(([date, items]) => (
+              <li key={date} className="ts-day">
+                <span className="ts-date">{dayLabel(date)}</span>
+                <ul className="ts-runs">
+                  {items.map((r) => (
+                    <li key={r.task.campaignId + r.task.key} className="ts-run">
+                      <b>{r.time}</b>
+                      <span className="ts-run-t">{r.task.title}<small>{r.task.projectName} · {r.task.kindLabel}{r.held ? ' · команда на паузі' : ''}</small></span>
+                      <button type="button" className="ts-link" onClick={() => openTask(r.task)}>Відкрити</button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {filter !== 'calendar' && !cockpitReady && <div className="ai-section-empty">Завантаження задач…</div>}
       {filter !== 'calendar' && cockpitReady && !groups.length && (
         <div className="ai-section-empty">{filter === 'archive' ? 'В архіві поки порожньо.' : filter === 'all' ? 'Задач ще немає. Додайте їх у картці проєкту, у вкладці «Запуск AI команди».' : 'За цим фільтром задач немає.'}</div>

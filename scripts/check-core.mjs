@@ -85,7 +85,7 @@ import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingC
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
-import { allTasks, groupByProject, matchesFilter, parseTaskKey, requestsOfTask, scopeCockpit, tasksOfOperation } from '../src/lib/agents/taskScope.js';
+import { allTasks, calendarRuns, groupByProject, matchesFilter, parseTaskKey, requestsOfTask, scopeCockpit, tasksOfOperation } from '../src/lib/agents/taskScope.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
 import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, effectiveStyle, manualFromDraft, styleBlock, styleRows, styleSamplesOf } from '../src/lib/agents/projectStyle.js';
@@ -5486,6 +5486,14 @@ await ok('task cards (3.0b): every task has its own runs, notes and money; the l
   assert.equal(list[0].projectName, 'Mellow'); assert.ok(!list.some((x) => x.campaignId === 6)); // an archived operation has no tasks in the list
   assert.deepEqual([list.filter((x) => matchesFilter(x, 'wait')).length, list.filter((x) => matchesFilter(x, 'archive')).map((x) => x.key).sort()], [2, ['one:11', 'reg:r3']]);
   assert.ok(list.filter((x) => matchesFilter(x, 'all')).every((x) => x.state !== 'done')); // «Усі» keeps the archive apart
+  // the calendar of the runs: every N days from the next run, the days of the week; a switched-off or finished task has none, a team on pause is marked
+  const runs = calendarRuns(list, '2026-11-12', 14);
+  assert.deepEqual(runs.filter((r) => r.task.key === 'reg:r1' && r.task.campaignId === 4).map((r) => r.date), ['2026-11-12', '2026-11-16', '2026-11-19', '2026-11-23', '2026-11-26']); // Monday and Thursday (weekdays 1, 4) from today
+  assert.ok(runs.every((r) => r.task.key !== 'reg:r3')); // the season is over
+  assert.ok(runs.filter((r) => r.task.campaignId === 5).every((r) => r.held) && runs.filter((r) => r.task.campaignId === 4).every((r) => !r.held));
+  assert.deepEqual(calendarRuns([{ regularId: 'x', enabled: false, state: 'paused', schedule: { everyDays: 2, time: '09:00' }, title: 'Off' }], '2026-11-12', 10), []);
+  const every = calendarRuns([{ regularId: 'e', enabled: true, state: 'work', campaignStatus: 'active', title: 'Every', schedule: { everyDays: 3, time: '10:00', nextAt: '2026-11-13T07:00:00Z', endDate: '2026-11-20' } }], '2026-11-12', 30);
+  assert.deepEqual(every.map((r) => r.date), ['2026-11-13', '2026-11-16', '2026-11-19']); // from the next run, every 3 days, up to the last day of the season
   const groups = groupByProject(list);
   assert.deepEqual(groups.map((g) => g.projectName), ['Mellow', 'Joia']); // the project with the tasks that wait for the person comes first
 });

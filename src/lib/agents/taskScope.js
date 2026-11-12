@@ -4,6 +4,7 @@
 import { regularsOf, kyivToday, pausedBySeason, seasonOver, buildOperationView, hasCreativeCycles } from './operationCycles.js';
 import { creativeRunState } from './aiResults.js';
 import { TASK_KIND } from './teamTasks.js';
+import { previewRuns } from './scheduleCalendar.js';
 
 const dayMonth = (d) => (d ? `${String(d).slice(8, 10)}.${String(d).slice(5, 7)}` : '');
 const at = (v) => { const t = new Date(v).getTime(); return Number.isNaN(t) ? 0 : t; };
@@ -55,6 +56,7 @@ export function tasksOfOperation({ campaign, cockpit = null, now = new Date() } 
     const period = seasonal ? `${r.startDate ? `${dayMonth(r.startDate)} – ` : 'до '}${dayMonth(r.endDate)}` : '';
     const line = [period, r.whenText, r.enabled && state !== 'paused' && !over && r.next?.text ? `наступний запуск ${r.next.text}` : ''].filter(Boolean).join(' · ');
     out.push({ key: `reg:${r.id}`, campaignId: campaign.id, projectId: campaign.project_id ?? null, kind, kindLabel: TASK_KIND[kind], title: r.title || 'Без назви', line, state, stateText, regularId: r.id, enabled: r.enabled,
+      schedule: { everyDays: r.everyDays || null, weekdays: r.weekdays || [], time: r.time || '09:00', nextAt: r.next?.at || null, endDate: r.endDate || null, startDate: r.startDate || null },
       review, approved: sum(runs, (x) => x.creatives?.approved || 0), costUsd: Math.round(sum(runs, (x) => (x.cost?.model || 0) + (x.cost?.higgsfield || 0)) * 100) / 100, runs: runs.length, lastAt: runs.map((x) => x.updatedAt || x.createdAt).filter(Boolean).sort().pop() || null });
   });
   (cockpit?.requests || []).filter((r) => r.kind !== 'regular').forEach((r) => {
@@ -88,4 +90,26 @@ export function groupByProject(tasks = []) {
   const map = new Map();
   tasks.forEach((t) => { if (!map.has(t.projectId)) map.set(t.projectId, { projectId: t.projectId, projectName: t.projectName, campaignStatus: t.campaignStatus, tasks: [] }); map.get(t.projectId).tasks.push(t); });
   return [...map.values()].sort((a, b) => Math.min(...a.tasks.map((t) => ORDER[t.state] ?? 5)) - Math.min(...b.tasks.map((t) => ORDER[t.state] ?? 5)) || String(a.projectName).localeCompare(String(b.projectName)));
+}
+
+const kyivDate = (iso) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Kyiv' }).format(new Date(iso));
+const addDay = (d, n) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+// The runs the regular and seasonal tasks make by their schedules in the next `horizon` days. tasks: allTasks(); a task that is switched off or over is not in it; a task of a team that is on
+// pause is shown with `held: true` (it does not start until the team is continued). → [{ date, time, task }] by date and time
+export function calendarRuns(tasks = [], today = kyivDate(new Date().toISOString()), horizon = 30) {
+  const last = addDay(today, horizon);
+  const out = [];
+  tasks.filter((t) => t.regularId && t.schedule && t.enabled !== false && t.state !== 'done' && t.state !== 'paused').forEach((t) => {
+    const s = t.schedule;
+    let dates = [];
+    if (s.everyDays) {
+      let d = s.startDate && s.startDate > today ? s.startDate : s.nextAt ? kyivDate(s.nextAt) : today;
+      if (d < today) d = today;
+      for (let i = 0; i < 100 && d <= last; i += 1) { dates.push(d); d = addDay(d, s.everyDays); }
+    } else if (s.weekdays?.length) {
+      dates = previewRuns({ mode: 'week', days: s.weekdays, start: s.startDate || null, end: s.endDate || null }, today, horizon);
+    }
+    dates.filter((d) => !s.endDate || d <= s.endDate).forEach((date) => out.push({ date, time: s.time, task: t, held: t.campaignStatus === 'paused' }));
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || a.task.title.localeCompare(b.task.title));
 }

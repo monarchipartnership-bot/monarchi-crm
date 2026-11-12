@@ -24,3 +24,12 @@
 }
 /* the windows of a new task sit above the top bar of the section (they are carried to the body) */
 .ts-dialogs .tm-overlay { z-index: 1600; }
+/* the calendar of the runs by the schedules */
+.ts-empty { margin: 4px 0 12px; font-size: .82rem; color: #C9AAD1; }
+.ts-day { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid rgba(235, 156, 239, .2); color: #F9EDF9; }
+.ts-date { font-weight: 800; font-size: .86rem; color: #EB9CEF; padding-top: 2px; }
+.ts-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ts-run { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: .88rem; }
+.ts-run b { font-variant-numeric: tabular-nums; color: #F9EDF9; }
+.ts-run-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.ts-run-t small { font-size: .74rem; color: #C193CA; }
