@@ -34,6 +34,7 @@ import '@fontsource/onest/700.css';
 import '../../styles/projectWorkspace.css';
 import Select from '../../components/common/Select';
 import { languageOptions } from '../../lib/agents/languages';
+import { languagePatch } from '../../lib/clientLang';
 import DatePicker from '../../components/common/DatePicker';
 import '../../styles/ddHub.css';
 import '../../styles/projectHub.css'; // Hub style, last so it wins over the older workspace styles
@@ -86,7 +87,7 @@ function parseTab(params) {
 // The Overview fields in reading order. Empty ones are hidden while viewing.
 const FIELD_GROUPS = [
   { title: 'Основне', hint: 'Хто веде проєкт і в якому він стані', items: ['manager', 'specialist', 'status', 'period', 'services', 'stop_reason'] },
-  { title: 'Клієнт', hint: 'Хто клієнт і де він працює', items: ['client', 'country', 'client_language', 'website', 'business_type', 'report_lang', 'contacts', 'timezone'] },
+  { title: 'Клієнт', hint: 'Хто клієнт і де він працює', items: ['client', 'country', 'client_language', 'website', 'business_type', 'contacts', 'timezone'] },
   { title: 'Комунікація та оплата', hint: 'Початок співпраці, оплата, робочий простір', items: ['comm_start_date', 'payment_channel', 'cost', 'worksection_link'] },
 ];
 
@@ -367,8 +368,8 @@ function ProjectDetailCard() {
         return (
           <div className="ov-field-box" key={key}>
             <div className="ov-field-label"><FieldIcon name="country" />Мова клієнта{!project.client_language && <span className="ov-req"> обовʼязково для запуску команд</span>}</div>
-            <Select value={project.client_language || ''} onChange={(v) => commit({ client_language: v || null })} ariaLabel="Мова клієнта" options={[{ value: '', label: 'Не вказано' }, ...languageOptions()]} />
-            <div className="ov-field-hint">Усі тексти для клієнта (на креативах, у рекламі, у звітах) агенти пишуть цією мовою. Для команди результати завжди українською. Матеріали можна давати українською, російською чи англійською.</div>
+            <Select value={project.client_language || ''} onChange={(v) => commit(languagePatch(v))} ariaLabel="Мова клієнта" options={[{ value: '', label: 'Не вказано' }, ...languageOptions()]} />
+            <div className="ov-field-hint">Усі тексти для клієнта (на креативах, у рекламі) агенти пишуть цією мовою, звіти для клієнта (сторінка, Excel, презентація) теж: для української вони українські, для будь-якої іншої мови англійські. У кожному звіті мову можна змінити окремо. Для команди результати завжди українською. Матеріали можна давати українською, російською чи англійською.</div>
           </div>
         );
       case 'report_lang': {
