@@ -167,7 +167,7 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
   async function saveTaskForm(valuesIn, start, schedule) {
     const values = { ...valuesIn, style: (taskReg || taskReq)?.brief?.style }; // the form does not know the style of the task: it stays as it is
     if (taskReg) {
-      const { campaign: saved, regular } = await saveRegular(campaign.id, { id: taskReg.id, enabled: taskReg.enabled, title: taskReg.title, ...schedule, brief: values }, email);
+      const { campaign: saved, regular } = await saveRegular(campaign.id, { id: taskReg.id, enabled: taskReg.enabled, title: String(values.title || '').trim() || taskReg.title, ...schedule, brief: values }, email);
       if (start) { await runRegularNow(saved, regular, email); kickQueue().catch(() => {}); }
       notify?.(start ? 'Налаштування збережено, завдання запущено.' : 'Налаштування завдання збережено: вони діють з наступних запусків.');
     } else if (taskReq) {
@@ -396,8 +396,8 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
           )}
           {(taskReg || taskReq) && (
             <div className="cmp-section pcd-embed">
-              <RequestForm key={task.key} campaign={campaign} mode={taskReg ? 'regular' : 'extra'} title="Налаштування завдання" initial={taskReg ? { ...taskReg.brief, materials: [] } : { ...taskReq.brief, title: taskReq.title, materials: [] }}
-                schedule={taskReg ? { weekdays: taskReg.weekdays, everyDays: taskReg.everyDays, time: taskReg.time } : null} canStartNow={!stopped} onClose={() => setSection('review')} onSave={saveTaskForm} />
+              <RequestForm key={task.key} campaign={campaign} mode={taskReg ? 'regular' : 'extra'} title="Налаштування завдання" initial={taskReg ? { ...taskReg.brief, title: taskReg.title, materials: [] } : { ...taskReq.brief, title: taskReq.title, materials: [] }}
+                schedule={taskReg ? { weekdays: taskReg.weekdays, everyDays: taskReg.everyDays, time: taskReg.time } : null} canStartNow={!stopped} inline onClose={() => {}} onSave={saveTaskForm} />
             </div>
           )}
         </>

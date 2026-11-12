@@ -45,8 +45,9 @@ const ageOf = (item) => {
 //   mode 'regular' (owner, 2026-11-11): the same form sets up the REGULAR cycle of the operation: the day and the time of the weekly run are asked too, ready
 //   texts and hand-picked files are not (every run takes the current card of the project), and onSave gets (values, startNow, { weekdays, time } | { everyDays, time }).
 //   title: the heading of the window; schedule: { weekdays | weekday | everyDays, time } of the regular task that is already saved.
+//   inline (step 3.0b): the form sits IN THE PAGE (the settings of a task), not in a window: the same cards (the basics, the creatives, the card of the project, the agents one by one), a bar with the save button at the bottom
 //   allowKind: the person chooses in the form whether the cycle is one-off or regular («Створити додаткове завдання»)
-export default function RequestForm({ campaign, initial = null, onClose, onSave, mode = 'extra', title = 'Нове завдання: запит на креативи', schedule = null, canStartNow = true, allowKind = false }) {
+export default function RequestForm({ campaign, initial = null, onClose, onSave, mode = 'extra', title = 'Нове завдання: запит на креативи', schedule = null, canStartNow = true, allowKind = false, inline = false }) {
   const [kind, setKind] = useState(mode); // extra | regular
   const regular = kind === 'regular';
   const [sched, setSched] = useState(() => ({ kind: schedule?.everyDays ? 'every' : 'week', every: String(schedule?.everyDays || 3), days: (schedule?.weekdays?.length ? schedule.weekdays : schedule?.weekday ? [schedule.weekday] : [1]).map(Number), time: schedule?.time || '09:00', startNow: !schedule && canStartNow })); // canStartNow false: the operation is paused, nothing can start
@@ -72,7 +73,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
   const [src, setSrc] = useState({});
   const touched = useRef(new Set());
   const [an, setAn] = useState({ busy: false, error: '', filled: null, notes: '', skipped: 0 });
-  useDialogA11y(box, onClose);
+  useDialogA11y(box, onClose, { enabled: !inline });
   const set = (patch) => { Object.keys(patch).forEach((k) => touched.current.add(k)); setSrc((s) => dropSrc(s, Object.keys(patch).map((k) => `f.${k}`))); setF((x) => ({ ...x, ...patch })); };
   const fRef = useRef(null);
   // dictation: what is said is added to the end of the description (the field stays editable)
@@ -174,6 +175,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
     try {
       if (ask.text.trim()) await saveInput(campaign.project_id, 'business', ask.text.trim(), email).catch(() => {}); // what we sell goes to the card, so the next request does not ask again
       await (regular ? onSave(req, start, sched.kind === 'every' ? { everyDays: Number(sched.every), time: sched.time.trim() } : { weekdays: sched.days, time: sched.time.trim() }) : onSave(req, start));
+      if (inline) setBusy(''); // a form in the page stays: it can be saved again
     } catch (e) { setError(e.message || 'Не вдалося зберегти запит.'); setBusy(''); }
   }
 
@@ -182,13 +184,13 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
   const cardLine = [...cardRows.map((r) => r.k.toLowerCase()).filter((k) => k !== 'конкуренти'), library.assets.length ? `${materialsOn} з ${library.assets.length} матеріалів` : ''].filter(Boolean).join(', ');
 
   return (
-    <div className="cmp-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div ref={box} className="cmp-wizard stu-form qr" role="dialog" aria-modal="true" aria-labelledby="stu-form-title" tabIndex={-1}>
-        <header className="cmp-wiz-head">
-          <div><span className="cmp-kicker">Креативна студія · {campaign.name}</span><h2 id="stu-form-title">{regular ? 'Регулярне завдання: що робити щотижня' : allowKind ? 'Створити додаткове завдання' : title}</h2></div>
-          <button type="button" className="cmp-x" onClick={onClose} disabled={!!busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>
+    <div className={inline ? 'qr-page' : 'cmp-overlay'} role={inline ? undefined : 'presentation'} onMouseDown={inline ? undefined : (e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div ref={box} className={inline ? 'stu-form qr qr-inline' : 'cmp-wizard stu-form qr'} role={inline ? undefined : 'dialog'} aria-modal={inline ? undefined : 'true'} aria-labelledby="stu-form-title" tabIndex={-1}>
+        <header className={inline ? 'qr-ihead' : 'cmp-wiz-head'}>
+          <div>{!inline && <span className="cmp-kicker">Креативна студія · {campaign.name}</span>}<h2 id="stu-form-title">{inline ? 'Основні налаштування завдання' : regular ? 'Регулярне завдання: що робити щотижня' : allowKind ? 'Створити додаткове завдання' : title}</h2></div>
+          {!inline && <button type="button" className="cmp-x" onClick={onClose} disabled={!!busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>}
         </header>
-        <div className="cmp-wiz-body qr-body">
+        <div className={inline ? 'qr-body' : 'cmp-wiz-body qr-body'}>
           {error && <p className="cmp-error" role="alert">{error}</p>}
 
           {/* 1. the name and the kind of the cycle */}
@@ -211,7 +213,7 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
                   ? <><input className="cmp-input ccx-time" type="number" min="1" max="60" value={sched.every} onChange={(e) => setSched((s) => ({ ...s, every: e.target.value }))} aria-label="Кожні скільки днів" /><span className="qr-mut">дн.</span></>
                   : <span className="qr-days" role="group" aria-label="Дні тижня">{WEEKDAYS.map((d, i) => <button key={d} type="button" aria-pressed={sched.days.includes(i + 1)} className={'cmp-btn' + (sched.days.includes(i + 1) ? ' cmp-btn--primary' : '')} onClick={() => setSched((s) => ({ ...s, days: s.days.includes(i + 1) ? s.days.filter((x) => x !== i + 1) : [...s.days, i + 1].sort((a, b) => a - b) }))}>{d.slice(0, 2)}</button>)}</span>}
                 <input className="cmp-input ccx-time" type="text" inputMode="numeric" value={sched.time} onChange={(e) => setSched((s) => ({ ...s, time: e.target.value }))} placeholder="09:00" aria-label="Час запуску (Київ)" />
-                <button type="button" className={'qr-sw' + (sched.startNow ? ' on' : '')} role="switch" aria-checked={sched.startNow} disabled={!canStartNow} title={canStartNow ? '' : 'Операція на паузі: перше завдання почнеться за розкладом після відновлення'} onClick={() => setSched((s) => ({ ...s, startNow: !s.startNow }))}><i /><span>{canStartNow ? 'Запустити перше завдання одразу' : 'Операція на паузі: запуск за розкладом після відновлення'}</span></button>
+                {!inline && <button type="button" className={'qr-sw' + (sched.startNow ? ' on' : '')} role="switch" aria-checked={sched.startNow} disabled={!canStartNow} title={canStartNow ? '' : 'Операція на паузі: перше завдання почнеться за розкладом після відновлення'} onClick={() => setSched((s) => ({ ...s, startNow: !s.startNow }))}><i /><span>{canStartNow ? 'Запустити перше завдання одразу' : 'Операція на паузі: запуск за розкладом після відновлення'}</span></button>}
               </div>
             )}
           </div>
@@ -439,12 +441,12 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
             )}
           </div>
         </div>
-        <footer className="cmp-wiz-foot">
-          <span className="cmp-foot-note">{regular ? 'Агенти запускатимуться самі за розкладом. Картинки генеруються лише після вашого підтвердження вартості; готове йде на ваше затвердження.' : !canStartNow ? 'Операція на паузі: завдання можна лише зберегти як чернетку, запустити його можна після відновлення операції.' : 'Нічого не публікується й не завантажується в рекламні кабінети: результат іде на ваше затвердження.'}</span>
-          {!regular && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => submit(false)}>{busy === 'save' ? 'Зберігаємо…' : 'Зберегти чернетку'}</button>}
+        <footer className={inline ? 'qr-foot' : 'cmp-wiz-foot'}>
+          <span className="cmp-foot-note">{regular ? 'Агенти запускатимуться самі за розкладом. Картинки генеруються автоматично в межах ліміту; готове йде на ваше затвердження.' : !canStartNow ? 'Операція на паузі: завдання можна лише зберегти як чернетку, запустити його можна після відновлення операції.' : 'Нічого не публікується й не завантажується в рекламні кабінети: результат іде на ваше затвердження.'}</span>
+          {!regular && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => submit(false)}>{busy === 'save' ? 'Зберігаємо…' : inline ? 'Зберегти налаштування' : 'Зберегти чернетку'}</button>}
           {regular
-            ? <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy} onClick={() => submit(sched.startNow)}>{busy ? 'Зберігаємо…' : sched.startNow ? 'Зберегти й запустити перше завдання' : 'Зберегти регулярне завдання'}</button>
-            : <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy || !canStartNow} title={canStartNow ? '' : 'Операція на паузі'} onClick={() => submit(true)}>{busy === 'start' ? 'Запускаємо…' : 'Створити й запустити'}</button>}
+            ? <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy} onClick={() => submit(inline ? false : sched.startNow)}>{busy ? 'Зберігаємо…' : inline ? 'Зберегти налаштування' : sched.startNow ? 'Зберегти й запустити перше завдання' : 'Зберегти регулярне завдання'}</button>
+            : <button type="button" className="cmp-btn cmp-btn--primary" disabled={!!busy || !canStartNow} title={canStartNow ? '' : 'Операція на паузі'} onClick={() => submit(true)}>{busy === 'start' ? 'Запускаємо…' : inline ? 'Зберегти й запустити ще раз' : 'Створити й запустити'}</button>}
         </footer>
       </div>
     </div>

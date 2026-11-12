@@ -240,3 +240,11 @@
 @media (max-width: 760px) { .qr-footrow { padding-right: 0; } }
 
 .qr-days { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+/* the form of a task in the page (the tab «Налаштування» of the card of a task): the same cards, no window around them */
+.qr-page { min-width: 0; }
+.stu-form.qr.qr-inline { max-width: none; display: flex; flex-direction: column; gap: 12px; }
+.qr-ihead h2 { margin: 2px 0 0; font: 800 1.15rem var(--font-head); color: #F9EDF9; }
+.qr-ihead .cmp-kicker { display: block; }
+.qr-foot { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; margin-top: 4px; border-radius: 18px; background: rgba(32, 9, 42, .92); border: 1px solid rgba(235, 156, 239, .3); backdrop-filter: blur(8px); }
+.qr-foot .cmp-foot-note { margin-right: auto; font-size: .78rem; color: #C193CA; max-width: 52ch; }

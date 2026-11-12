@@ -8,11 +8,12 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
 // What every dialog of the project workspace needs: focus moves into it when it opens, Tab stays
 // inside, Escape asks to close, and focus goes back to what opened it. `box` is a ref to the dialog
 // element (give it tabIndex={-1}); `onClose` may change between renders without resetting anything.
-export default function useDialogA11y(box, onClose, { initialFocus } = {}) {
+export default function useDialogA11y(box, onClose, { initialFocus, enabled = true } = {}) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const opener = document.activeElement;
     const el = box.current;
     (initialFocus ? el?.querySelector(initialFocus) : null)?.focus?.();
@@ -33,5 +34,5 @@ export default function useDialogA11y(box, onClose, { initialFocus } = {}) {
       document.removeEventListener('keydown', onKey, true);
       if (opener && opener.isConnected) opener.focus?.();
     };
-  }, [box, initialFocus]);
+  }, [box, initialFocus, enabled]);
 }
