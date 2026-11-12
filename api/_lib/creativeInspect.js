@@ -23,11 +23,12 @@ export function parsePictureQc(text) {
 }
 
 // The note of a returned creative: what the manager reads first.
-export const qcNote = (qc) => clip(`Контроль якості: ${qc.summary || 'є зауваження'}${qc.issues?.length ? ` (${qc.issues.filter((i) => i.severity !== 'low').slice(0, 3).map((i) => i.comment).join('; ')})` : ''}`, 400);
+// the details are in the verdict of the creative (shown under it), the note carries the one sentence
+export const qcNote = (qc) => clip(`Контроль якості: ${qc.summary || 'є зауваження'}`, 400);
 
 const INSTRUCTION = `### Mode: inspect ONE FINISHED creative
 The LAST image is the finished creative (the words of the system may already be on it). The images before it are references of the client (logo, product photos). Check it against the concept and its words (below), the client's brand rules and restrictions (the sections above) and the references.
-Real problems only: a wrong or distorted product (not like the references), a broken or altered logo, or a logo that the rules require and is missing; malformed hands, faces or objects; garbled or misspelled lettering inside the picture; the words of the system unreadable or covering the product or the logo; colours, elements, claims, prices or offers that the client's restrictions forbid or the brief does not allow. Be strict about facts and defects, calm about taste. Never raise what a person must decide (client approval, brand taste).
+Real problems only: a wrong or distorted product (not like the references), a broken or altered logo, or a logo that the rules require and is missing; malformed hands, faces or objects; garbled or misspelled lettering inside the picture; the words of the system unreadable or covering the product or the logo; colours, elements, claims, prices or offers that the client's restrictions forbid or the brief does not allow. List ONLY real problems: never write an issue to say that something is fine. If everything is fine the list is empty. Be strict about facts and defects, calm about taste. Never raise what a person must decide (client approval, brand taste).
 Answer with ONE JSON object: {"verdict":"pass|fail","summary":"one sentence in Ukrainian","issues":[{"aspect":"brand|product|artifact|text|brief","severity":"high|medium|low","comment":"what is wrong and where, in Ukrainian"}]}. The verdict is fail if any issue is high or there are three or more medium issues.`;
 
 // The handler of the checker when it is asked to look at one finished picture (task.brief.trigger === 'inspect'). Everything the other agents read about the client is already in `blocks`.

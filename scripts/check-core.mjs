@@ -5509,7 +5509,7 @@ await ok('picture quality control (3.2): the checker looks at the FINISHED creat
   assert.equal(parsePictureQc('{"issues":[{"severity":"medium","comment":"a"},{"severity":"medium","comment":"b"},{"severity":"medium","comment":"c"}]}').verdict, 'fail'); // three medium ones
   assert.throws(() => parsePictureQc('not json'), /вердикт/);
   assert.deepEqual(parsePictureQc('{"issues":[{"aspect":"weird","severity":"urgent","comment":"x"},{"comment":""}]}').issues, [{ aspect: 'artifact', severity: 'low', comment: 'x' }]); // unknown values are made safe, empty ones dropped
-  assert.match(qcNote({ summary: 'Флакон не схожий', issues: [{ severity: 'high', comment: 'форма іншого флакона' }, { severity: 'low', comment: 'дрібниця' }] }), /^Контроль якості: Флакон не схожий \(форма іншого флакона\)$/);
+  assert.equal(qcNote({ summary: 'Флакон не схожий', issues: [{ severity: 'high', comment: 'форма іншого флакона' }] }), 'Контроль якості: Флакон не схожий'); // one sentence: the reasons are shown under the creative
   // the whole step with a database: a creative on review, the brief with its concept, the model's answer
   const concept = { key: 'c1', text_render: 'overlay', needs_text: true, layout: { text_zone: 'top' }, cta: { show: true, text: 'Shop' }, copy: { headline: 'Big idea', subline: '', badge: '' }, visual: 'A white bottle on a pink pedestal' };
   const mk = () => ({ ag_creatives: [{ id: 1, request_id: 5, concept_key: 'c1', concept_name: 'Idea', ratio: '4:5', status: 'review', asset_url: 'https://s/raw.png', final_url: 'https://s/final.png', copy: { variants: [{ headline: 'Big idea' }] }, qc: null, note: '' }],
