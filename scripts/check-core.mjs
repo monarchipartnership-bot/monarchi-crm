@@ -84,7 +84,7 @@ import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUAR
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
-import { TASK_KIND, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
+import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
 import { overlayFields, applyText, applyTextForRequest } from '../api/_lib/creativeText.js';
@@ -5513,6 +5513,12 @@ await ok('team phase (3.1b): a launched creative team prepares while the scout s
   assert.deepEqual([p.phase, p.label, p.steps.length, p.steps[0].live], ['preparing', 'підготовка', 1, 'Вивчаю сторінку 3 з 8: /shop/rings']);
   assert.match(p.text, /Перші завдання почнуться, коли підготовка завершиться/);
   assert.equal(teamPhase(live, { intel: { status: 'running' }, scoutSteps: [] }).steps[0].live, 'Починає вивчати сайт і кабінет'); // no line yet
+  // the loading bar: read from the live lines, grows with the steps, never reaches 100 before the profile is there
+  const L = (...texts) => texts.map((text) => ({ text }));
+  assert.deepEqual([prepProgress([]), prepProgress(L('Починаю розвідку клієнта: сайт, товари, реклама з кабінету')), prepProgress(L('Вивчаю сторінку 4 з 8: /catalog', 'Читаю сайт mellow.com: головна сторінка')), prepProgress(L('Вивчаю сторінку 8 з 8: /x'))], [3, 4, 30, 50]);
+  assert.ok(prepProgress(L('Аналізую побачене: сторінок 8', 'Знайдено реклам із картинками: 6', 'Прочитано сторінок: 8')) === 82 && prepProgress(L('Зберігаю фото товарів із сайту: 7')) === 94);
+  assert.ok(prepProgress(L('Готово: профіль клієнта збережено', 'Зберігаю фото товарів із сайту: 7')) <= 95); // 100 only when the preparation is over
+  assert.equal(p.progress, 25); // page 3 of 8
   assert.equal(teamPhase(live, { intel: { status: 'ready' } }).phase, 'running'); // the profile is made
   assert.equal(teamPhase(live, { intel: { status: 'refreshing' } }).phase, 'running'); // a refresh of an existing profile does not hold the work
   assert.equal(teamPhase(live, { intel: { status: 'failed' } }).phase, 'running'); // a scout that failed does not hold it either

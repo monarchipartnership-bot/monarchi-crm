@@ -31,3 +31,10 @@
 .tt-prep-steps i { width: 9px; height: 9px; border-radius: 50%; background: #FBBF24; align-self: center; box-shadow: 0 0 0 4px rgba(251, 191, 36, .25); }
 .tt-prep-steps li.is-done i { background: #4BE07F; box-shadow: none; }
 @media (prefers-reduced-motion: no-preference) { .tt-prep-steps li.is-working i { animation: tt-blink 1.6s ease-in-out infinite; } @keyframes tt-blink { 50% { opacity: .4; } } }
+
+/* the loading bar of the preparation: the share of the steps done, with a moving shine so it is clear that the work goes on */
+.tt-prep-bar { position: relative; height: 22px; border-radius: 12px; background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1px rgba(235, 156, 239, .28); overflow: hidden; }
+.tt-prep-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 12px; background: linear-gradient(90deg, #B544B5, #EB9CEF); transition: width .8s ease; overflow: hidden; }
+.tt-prep-bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .45) 50%, transparent 70%); transform: translateX(-100%); }
+.tt-prep-bar span { position: relative; z-index: 1; display: block; text-align: center; font-size: .76rem; font-weight: 700; line-height: 22px; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(27, 10, 44, .6); }
+@media (prefers-reduced-motion: no-preference) { .tt-prep-bar i::after { animation: tt-shine 1.8s ease-in-out infinite; } @keyframes tt-shine { to { transform: translateX(100%); } } }

@@ -34,7 +34,29 @@ export function teamTasksOf({ campaign, cockpit = null, now = new Date() } = {})
 // The phase of a team (owner, 2026-11-12, step 3.1b): a launched team is not «працює» at once. First it PREPARES: the scout studies the site, the materials and the past ads (later also the
 // style of the project and the tuning of the creator and the copywriter), and only then it works. A team that was launched before the scout existed (no profile at all) is not held back.
 //   team: the entry of teamsOf (key, state)   cockpit: the cabinet of its operation (or null)
-// → { phase: 'preparing' | 'running' | 'paused' | 'none', label, steps: [{ key, label, state, live }], text }
+// → { phase: 'preparing' | 'running' | 'paused' | 'none', label, steps: [{ key, label, state, live }], text, progress (preparing only, 0..100) }
+// How far the preparation is, 0..100, read from the live lines of the scout (the steps are known: the site, the shop pages, the ads of the cabinet, the look of it all, the photos); it never
+// shows 100 before the profile is really there. steps: [{ text }] newest first.
+export function prepProgress(steps = []) {
+  let best = 3;
+  for (const s of steps) {
+    const x = String(s?.text || '');
+    const pages = x.match(/сторінку (\d+) з (\d+)/);
+    let v = 0;
+    if (/Починаю розвідку/.test(x)) v = 4;
+    else if (/Читаю сайт/.test(x)) v = 8;
+    else if (pages) v = 10 + Math.round((Number(pages[1]) / Math.max(1, Number(pages[2]))) * 40);
+    else if (/Прочитано сторінок/.test(x)) v = 52;
+    else if (/Знайдено каталог/.test(x)) v = 56;
+    else if (/Дивлюся .* реклам/.test(x)) v = 60;
+    else if (/Знайдено реклам|немає реклам|Кабінет Meta не/.test(x)) v = 68;
+    else if (/Зберігаю зображення сайту/.test(x)) v = 72;
+    else if (/Аналізую побачене/.test(x)) v = 82;
+    else if (/Зберігаю фото товарів/.test(x)) v = 94;
+    best = Math.max(best, v);
+  }
+  return Math.min(95, best);
+}
 export const PHASE_LABEL = { preparing: 'підготовка', running: 'працює', paused: 'зупинено' };
 export function teamPhase(team, cockpit = null) {
   const state = team?.state || 'none';
@@ -43,6 +65,7 @@ export function teamPhase(team, cockpit = null) {
     const last = (cockpit.scoutSteps || [])[0];
     return {
       phase: 'preparing', label: PHASE_LABEL.preparing,
+      progress: prepProgress(cockpit.scoutSteps || []),
       steps: [{ key: 'scout', label: 'Розвідка клієнта', state: 'working', live: last?.text || 'Починає вивчати сайт і кабінет' }],
       text: 'Команда готується до роботи: вивчає сайт, матеріали й попередні реклами клієнта. Перші завдання почнуться, коли підготовка завершиться.',
     };
