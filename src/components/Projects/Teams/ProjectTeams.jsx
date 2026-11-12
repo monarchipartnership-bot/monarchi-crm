@@ -14,6 +14,7 @@ import { HubTitle } from '../hubIcons';
 import LaunchTeamWizard from './LaunchTeamWizard';
 import TeamCard from './TeamCard';
 import TeamTasks from './TeamTasks';
+import NewRegularTask from './NewRegularTask';
 import TeamPrep from './TeamPrep';
 import { teamPhase } from '../../../lib/agents/teamTasks';
 import { RoundBtn, TeamRing } from './teamsUi';
@@ -37,6 +38,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
   const [wizard, setWizard] = useState(false);
   const [open, setOpen] = useState(null); // { campaignId, regularFirst }: the operation card (cycles of creatives, legacy operations)
   const [oneoff, setOneoff] = useState(false); // the dialog of a one-off task
+  const [newRegular, setNewRegular] = useState(null); // the window of a new regular task: the campaign of the creative team
   const [creativeTask, setCreativeTask] = useState(null); // the window of a one-off task of creatives: the campaign of the creative team
   const [card, setCard] = useState(null); // the key of the team whose card (agents, schedules, money) is open
   const [control, setControl] = useState({}); // campaign id -> the agents with their last and next runs
@@ -180,7 +182,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
                   {t.key === 'creative' && <TeamPrep phase={phase} />}
                   {t.key === 'creative' && t.campaign && (
                     <TeamTasks campaign={t.campaign} cockpit={cockpit.byId?.[t.campaign.id]} busy={busy} say={say} onSeasonAction={seasonAction}
-                      onOpen={(task) => setOpen({ campaignId: t.campaign.id, regularFirst: false, taskKey: task.key })} onNewRegular={() => setOpen({ campaignId: t.campaign.id, regularFirst: true })}
+                      onOpen={(task) => setOpen({ campaignId: t.campaign.id, regularFirst: false, taskKey: task.key })} onNewRegular={() => setNewRegular(t.campaign)}
                       onNewSeasonal={() => setCreativeTask({ campaign: t.campaign, seasonal: true })} onNewOneoff={() => setCreativeTask({ campaign: t.campaign, seasonal: false })}
                       onChanged={() => Promise.all([load(), cockpit.reload?.()])} />
                   )}
@@ -215,9 +217,13 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       {oneoff && data && view && (
         <OneOffDialog data={data} view={view} email={email} onClose={() => setOneoff(false)}
           onNewCreative={({ seasonal }) => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setCreativeTask({ campaign: c, seasonal: !!seasonal }); }}
-          onNewRegular={() => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setOpen({ campaignId: c.id, regularFirst: true }); }}
+          onNewRegular={() => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setNewRegular(c); }}
           onOpenReports={() => { setOneoff(false); onOpenReports?.(); }} onOpenMaterials={() => { setOneoff(false); onOpenMaterials?.(); }}
           onGoFill={(section) => { setOneoff(false); onGoFill?.(section); }} />
+      )}
+      {newRegular && data && (
+        <NewRegularTask data={data} campaign={newRegular} email={email} onClose={() => setNewRegular(null)}
+          onCreated={(text) => { setNewRegular(null); say(text); load(); cockpit.reload?.(); }} />
       )}
       {creativeTask && data && (
         <OneOffCreativeDialog key={creativeTask.seasonal ? 's' : 'o'} data={data} campaign={creativeTask.campaign} seasonal={creativeTask.seasonal} email={email} onClose={() => setCreativeTask(null)}

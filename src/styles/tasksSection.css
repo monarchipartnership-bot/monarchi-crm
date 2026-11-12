@@ -22,3 +22,5 @@
   .ts-row { grid-template-columns: minmax(0, 1fr) auto; }
   .ts-row .ts-pill { grid-column: 1; } .ts-row .ts-n { grid-column: 1; } .ts-open { grid-column: 2; grid-row: 1; }
 }
+/* the windows of a new task sit above the top bar of the section (they are carried to the body) */
+.ts-dialogs .tm-overlay { z-index: 1600; }

@@ -3,6 +3,8 @@ import { fetchCampaigns, fetchClientsForCampaigns } from '../../../lib/api/campa
 import { TASK_FILTERS, allTasks, groupByProject, matchesFilter } from '../../../lib/agents/taskScope';
 import { fmtUsd } from '../cockpit/format';
 import OperationCard from '../cockpit/OperationCard';
+import NewTaskDialog from './NewTaskDialog';
+import { hasCreativeCycles } from '../../../lib/agents/operationCycles';
 import { CampaignCalendar } from '../campaigns/OperationTools';
 import '../../../styles/aiAgentsSection.css';
 import '../../../styles/campaignsSection.css';
@@ -17,6 +19,9 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
   const [campaigns, setCampaigns] = useState(null);
   const [projects, setProjects] = useState([]);
   const [filter, setFilter] = useState('all'); // all | wait | work | paused | archive | calendar
+  const [newTask, setNewTask] = useState(false);
+  const [toast, setToast] = useState(null);
+  const notify = useCallback((text, isError = false) => { setToast({ text, isError }); setTimeout(() => setToast(null), isError ? 7000 : 4500); }, []);
   const [card, setCard] = useState(openCampaignId != null ? { campaignId: openCampaignId, taskKey: null, teamOnly: true } : null); // { campaignId, taskKey?, teamOnly? }
 
   const reload = useCallback(async () => {
@@ -35,6 +40,8 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
   const counts = useMemo(() => Object.fromEntries(TASK_FILTERS.map(([k]) => [k, tasks.filter((t) => matchesFilter(t, k)).length])), [tasks]);
   const shown = useMemo(() => tasks.filter((t) => matchesFilter(t, filter)), [tasks, filter]);
   const groups = useMemo(() => groupByProject(shown), [shown]);
+  const names = useMemo(() => Object.fromEntries(projectRows.map((p) => [p.id, p.client || p.name])), [projectRows]);
+  const creativeCampaigns = useMemo(() => (campaigns || []).filter((c) => ['active', 'paused'].includes(c.status) && hasCreativeCycles(c)), [campaigns]);
   const openCampaign = card ? (campaigns || []).find((c) => c.id === card.campaignId) || null : null;
   const projectOf = (id) => projectRows.find((p) => p.id === id) || null;
   const cockpitReady = !!campaigns && !cockpit?.loading;
@@ -42,6 +49,7 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
   const openTask = (t) => setCard({ campaignId: t.campaignId, taskKey: t.key });
   return (
     <div className="ai-section cmp-section ts-section" role="region" aria-label="Задачі команд">
+      {toast && <div className={'cmp-toast' + (toast.isError ? ' is-error' : '')} role="status">{toast.text}</div>}
       <div className="ai-section-head cmp-head">
         <div className="cmp-head-tt">
           <div className="ai-section-kicker">Команди агентів</div>
@@ -56,6 +64,8 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
       </div>
 
       <div className="cmp-onebar" role="group" aria-label="Задачі">
+        <button type="button" className="cmp-ob-btn cmp-ob-main" onClick={() => setNewTask(true)}>Нова задача</button>
+        <span className="cmp-ob-sep" aria-hidden="true" />
         <div className="cmp-ob-views" role="tablist" aria-label="Фільтр задач">
           {TASK_FILTERS.map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{label}<em>{counts[k]}</em></button>
@@ -96,6 +106,7 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
         </section>
       ))}
 
+      {newTask && <NewTaskDialog campaigns={creativeCampaigns} names={names} onClose={() => setNewTask(false)} onCreated={(text) => { notify(text); reload(); cockpit?.reload?.(); }} />}
       {openCampaign && (
         <OperationCard key={`${openCampaign.id}:${card.taskKey || ''}`} campaign={openCampaign} project={projectOf(openCampaign.project_id)} cockpit={cockpit} taskKey={card.taskKey || null} teamOnly={!!card.teamOnly}
           onChanged={reload} onClose={() => { setCard(null); reload(); }}
