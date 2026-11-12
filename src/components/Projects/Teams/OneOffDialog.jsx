@@ -4,16 +4,30 @@ import { runOneOff } from '../../../lib/api/oneoff';
 import { FIELD_LABELS, filledFields, missingFor } from '../../../lib/agents/agentRequirements';
 import { ONEOFF, whereToFill } from '../../../lib/agents/teams';
 
-// «Додаткове завдання» (owner, 2026-11-11; renamed 2026-11-12, it holds the one-off and the seasonal ones): work that a person asks for any time, outside the teams that work by their schedules. Creatives and the report of a period go to the screens
-// that already do them; the research and the strategy run at once and the result lands in «Результати AI команди».
-//   data: fetchTeamsData result   view: teamsOf result   onNewCreative({ seasonal }): opens the window of a new creative task   onOpenReports(), onOpenMaterials(): switch the tab
-//   onGoFill(section): opens that section of the card of the project
-export default function OneOffDialog({ data, view, email, onClose, onNewCreative, onOpenReports, onOpenMaterials, onGoFill }) {
+// The kinds of a task (owner, 2026-11-12: «сначала выбирается тип задания, а потом направление команды»): the person first says WHAT KIND of task it is, then for which direction of the teams.
+const KINDS = [
+  { key: 'oneoff', title: 'Разове', text: 'Один раз, коли потрібно: агенти зроблять роботу й віддадуть результат.' },
+  { key: 'seasonal', title: 'Сезонне', text: 'На період із датами початку й кінця: новорічні свята, розпродаж. Основне регулярне завдання на цей час можна призупинити.' },
+  { key: 'regular', title: 'Регулярне', text: 'За розкладом: день і час задаєте ви, агенти працюють самі, поки завдання не зупинити.' },
+];
+const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.key, k.title]));
+const NOT_FOR = {
+  seasonal: 'Сезонні завдання бувають лише для креативів.',
+  regular: 'Для цього напрямку регулярної роботи окремим завданням немає: аналітика працює за розкладом своїх агентів у картці команди.',
+};
+
+// «Додаткове завдання»: work that a person asks for any time, next to the teams that work by their schedules. Step 1: the kind (one-off, seasonal, regular), step 2: the direction of the teams
+// (creatives, the report of a period, the research and the strategy). A direction that has no such kind is shown grey with the reason.
+//   data: fetchTeamsData result   view: teamsOf result   onNewCreative({ seasonal }): the window of a new creative task   onNewRegular(): a new regular creative task (its form)
+//   onOpenReports(), onOpenMaterials(): switch the tab   onGoFill(section): opens that section of the card of the project
+export default function OneOffDialog({ data, view, email, onClose, onNewCreative, onNewRegular, onOpenReports, onOpenMaterials, onGoFill }) {
   const box = useRef(null);
+  const [kind, setKind] = useState(null); // null = step 1
   const [busy, setBusy] = useState('');
   const [done, setDone] = useState({}); // role -> { ok, text }
   useDialogA11y(box, () => { if (!busy) onClose(); });
   const creativeTeam = view.teams.find((t) => t.key === 'creative');
+  const creativeOff = creativeTeam?.state === 'none';
   const have = useMemo(() => filledFields({ settings: data.settings, assets: data.assets, accounts: data.accounts }), [data]);
 
   async function run(item) {
@@ -30,37 +44,59 @@ export default function OneOffDialog({ data, view, email, onClose, onNewCreative
       <div ref={box} className="tm-win" role="dialog" aria-modal="true" aria-labelledby="oo-title" tabIndex={-1}>
         <header className="tm-head"><h2 id="oo-title">Додаткове завдання</h2><button type="button" className="tm-x" onClick={onClose} disabled={!!busy} aria-label="Закрити">×</button></header>
         <div className="tm-body">
-          <p className="tm-lead">Робота, яку можна замовити в будь-який момент, незалежно від команд, що працюють за розкладом. Результат з&apos;являється в «Історії проєкту» та «Готових матеріалах».</p>
-
-          <ul className="oo-list">
-            <li className="oo-row">
-              <div><b>Креативи · один раз</b><small>{creativeTeam?.state !== 'none' ? 'Окреме завдання: агенти заплановують, напишуть і намалюють, ви перевірите результат.' : 'Спершу запустіть команду «Креативи»: вона підключає клієнта до відділу креативів.'}</small></div>
-              <button type="button" className="btn btn-p" disabled={creativeTeam?.state === 'none'} onClick={() => onNewCreative({ seasonal: false })}>Створити завдання</button>
-            </li>
-            <li className="oo-row">
-              <div><b>Креативи · сезонне, на період</b><small>Наприклад, новорічні свята чи розпродаж: завдання з датами початку й кінця. Основне регулярне завдання на цей час можна призупинити або залишити паралельно.</small></div>
-              <button type="button" className="btn" disabled={creativeTeam?.state === 'none'} onClick={() => onNewCreative({ seasonal: true })}>Створити сезонне</button>
-            </li>
-            <li className="oo-row">
-              <div><b>Звіт за період</b><small>Зібрати звіт за будь-який період у конструкторі звіту: поряд із тим, що агент робить щотижня й щомісяця.</small></div>
-              <button type="button" className="btn" onClick={onOpenReports}>Відкрити конструктор</button>
-            </li>
-            {ONEOFF.map((item) => {
-              const miss = missingFor([item.role], have);
-              const stop = miss.required;
-              const r = done[item.role];
-              return (
-                <li key={item.key} className="oo-row">
+          {!kind ? (
+            <>
+              <p className="tm-lead">Крок 1 з 2. Який це тип завдання? Спершу оберіть тип, потім напрямок команди. Результат зʼявляється у вкладці «Результати AI команди».</p>
+              <ul className="oo-list">
+                {KINDS.map((k) => (
+                  <li key={k.key} className="oo-row">
+                    <div><b>{k.title}</b><small>{k.text}</small></div>
+                    <button type="button" className={'btn' + (k.key === 'oneoff' ? ' btn-p' : '')} onClick={() => setKind(k.key)}>Обрати</button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <>
+              <p className="tm-lead">
+                Крок 2 з 2. Тип: <b>{KIND_LABEL[kind]}</b>. Для якого напрямку команди це завдання?{' '}
+                <button type="button" className="oo-link" disabled={!!busy} onClick={() => setKind(null)}>← Змінити тип</button>
+              </p>
+              <ul className="oo-list">
+                <li className="oo-row">
                   <div>
-                    <b>{item.title}</b><small>{item.text}</small>
-                    {stop.length > 0 && <small className="oo-warn">Спершу заповніть у картці: {stop.map((x) => FIELD_LABELS[x.key] || x.label).join(', ')}. <button type="button" className="oo-link" onClick={() => onGoFill(whereToFill(stop[0].key))}>Відкрити в картці</button></small>}
-                    {r && <small className={r.ok ? 'oo-ok' : 'oo-warn'}>{r.text}{r.ok && <> <button type="button" className="oo-link" onClick={onOpenMaterials}>Відкрити «Результати AI команди»</button></>}</small>}
+                    <b>Креативи</b>
+                    <small>{creativeOff ? 'Команда «Креативи» ще не запущена: запустіть її, і тоді можна створювати завдання.' : kind === 'oneoff' ? 'Окреме завдання: агенти заплановують, напишуть і намалюють, ви перевірите результат.' : kind === 'seasonal' ? 'Завдання з датами початку й кінця. Основне регулярне завдання на цей час можна призупинити або залишити паралельно.' : 'Ще одне регулярне завдання команди: свої день, час, формат і назва. Працює поруч із основним.'}</small>
                   </div>
-                  <button type="button" className="btn" disabled={!!busy || stop.length > 0} onClick={() => run(item)}>{busy === item.role ? 'Виконується…' : 'Запустити · до $0.05'}</button>
+                  <button type="button" className={'btn' + (kind === 'oneoff' ? ' btn-p' : '')} disabled={creativeOff}
+                    onClick={() => (kind === 'regular' ? onNewRegular() : onNewCreative({ seasonal: kind === 'seasonal' }))}>{kind === 'oneoff' ? 'Створити завдання' : kind === 'seasonal' ? 'Створити сезонне' : 'Створити регулярне'}</button>
                 </li>
-              );
-            })}
-          </ul>
+                <li className={'oo-row' + (kind === 'seasonal' ? ' is-off' : '')}>
+                  <div>
+                    <b>{kind === 'regular' ? 'Звіти' : 'Звіт за період'}</b>
+                    <small>{kind === 'seasonal' ? NOT_FOR.seasonal : kind === 'regular' ? 'Тижневий і місячний звіти складає агент звітів за розкладом: день і час налаштовуються в його вкладці.' : 'Зібрати звіт за будь-який період у конструкторі звіту: поряд із тим, що агент робить щотижня й щомісяця.'}</small>
+                  </div>
+                  <button type="button" className="btn" disabled={kind === 'seasonal'} onClick={onOpenReports}>{kind === 'seasonal' ? 'Недоступно' : kind === 'regular' ? 'Налаштувати розклад' : 'Відкрити конструктор'}</button>
+                </li>
+                {ONEOFF.map((item) => {
+                  const miss = missingFor([item.role], have);
+                  const stop = kind === 'oneoff' ? miss.required : [];
+                  const r = done[item.role];
+                  const off = kind !== 'oneoff';
+                  return (
+                    <li key={item.key} className={'oo-row' + (off ? ' is-off' : '')}>
+                      <div>
+                        <b>{item.title}</b><small>{off ? NOT_FOR[kind] : item.text}</small>
+                        {stop.length > 0 && <small className="oo-warn">Спершу заповніть у картці: {stop.map((x) => FIELD_LABELS[x.key] || x.label).join(', ')}. <button type="button" className="oo-link" onClick={() => onGoFill(whereToFill(stop[0].key))}>Відкрити в картці</button></small>}
+                        {r && <small className={r.ok ? 'oo-ok' : 'oo-warn'}>{r.text}{r.ok && <> <button type="button" className="oo-link" onClick={onOpenMaterials}>Відкрити «Результати AI команди»</button></>}</small>}
+                      </div>
+                      <button type="button" className="btn" disabled={off || !!busy || stop.length > 0} onClick={() => run(item)}>{busy === item.role ? 'Виконується…' : off ? 'Недоступно' : 'Запустити · до $0.05'}</button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
           {busy && <p className="tm-hint" role="status">Агент працює: це може тривати до кількох хвилин. Вікно не закривайте.</p>}
         </div>
       </div>

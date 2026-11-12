@@ -142,3 +142,7 @@
 .tm-stance { display: flex; flex-direction: column; gap: 8px; }
 .tm-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; font-weight: 400; }
 .tm-opt.on { border-color: #B544B5; background: #FBF0FC; } .tm-opt b { font-weight: 700; display: block; } .tm-opt small { color: var(--muted); font-size: .8rem; line-height: 1.45; }
+
+/* a direction that has no such kind of task (owner, 2026-11-12): shown grey with the reason */
+.oo-row.is-off { opacity: .62; }
+.oo-row.is-off b { font-weight: 600; }

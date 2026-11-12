@@ -217,6 +217,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       {oneoff && data && view && (
         <OneOffDialog data={data} view={view} email={email} onClose={() => setOneoff(false)}
           onNewCreative={({ seasonal }) => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setCreativeTask({ campaign: c, seasonal: !!seasonal }); }}
+          onNewRegular={() => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setOpen({ campaignId: c.id, regularFirst: true }); }}
           onOpenReports={() => { setOneoff(false); onOpenReports?.(); }} onOpenMaterials={() => { setOneoff(false); onOpenMaterials?.(); }}
           onGoFill={(section) => { setOneoff(false); onGoFill?.(section); }} />
       )}
