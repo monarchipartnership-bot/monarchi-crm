@@ -94,9 +94,12 @@ function Slider({ label, value, auto, min, max, step, unit = '%', autoLabel = 'Ð
 //   autoStyle: the scout's decision (cleanStyle)   manual: what is saved for the task (cleanManual: { text, image, copy })
 //   samples: [{ id, url, label, headline, cta }]   onSave(manual) â†’ Promise (an empty object gives the decision back to the scout)
 export default function StyleEditor({ autoStyle, manual, samples = [], onSave }) {
-  const autoFull = useMemo(() => cleanStyle(autoStyle), [autoStyle]);
+  // the cabinet is read again every few seconds while a task works and hands over NEW objects with the same content: the draft of the person must not be reset by that, only by a real change
+  const autoKey = JSON.stringify(cleanStyle(autoStyle));
+  const savedKey = JSON.stringify(cleanManual(manual));
+  const autoFull = useMemo(() => JSON.parse(autoKey), [autoKey]);
   const auto = autoFull.text;
-  const saved = useMemo(() => cleanManual(manual), [manual]);
+  const saved = useMemo(() => JSON.parse(savedKey), [savedKey]);
   const start = useMemo(() => draftFromStyle(auto, saved.text), [auto, saved]);
   const [draft, setDraft] = useState(start);
   const startTones = useMemo(() => ({ tone: saved.image.tone || '', mood: saved.image.mood || '', copy: saved.copy.tone || '' }), [saved]);
