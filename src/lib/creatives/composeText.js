@@ -82,7 +82,7 @@ export function layoutText({ measure, W, H, zone, headline, subline, badge, cta,
 // ---------------------------------------------------------------------------------------------------------------- reading the picture (browser canvas or server canvas)
 const lum = (d, i) => (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
 export const BUSY = 0.12; // above this share of «something is here» the zone is busy (hair, a face, a product): the words go on a dark veil
-export const IN_THE_WAY = 0.02; // above this share even a small thing (a logo in a corner) is under the words: another place or a narrower stretch is tried
+export const IN_THE_WAY = 0.004; // above this share even a small thing (a logo in a corner) is under the words: another place or a narrower stretch is tried
 
 // How much of a rectangle is NOT the plain background: the share of the sampled pixels whose brightness differs from the median of the rectangle by more than a slow gradient or a
 // vignette can explain. A smooth wall gives ~0, a logo in a corner a few percent, hair or a face tens of percent. → 0..1
@@ -177,22 +177,28 @@ export function paintText(ctx, { W, H, zone: asked = 'left', headline = '', subl
   // a top or bottom zone narrows to the calm stretch when a logo or the subject is in the way.
   const maxW = (z) => calmWidth(ctx, W, H, z);
   const lay0 = (z, span = null, fit = 1) => layoutText({ measure, W, H, zone: z, headline, subline, badge, cta, maxW: maxW(z), span, fit });
-  const readRect = (l) => busyOf(ctx, l.rect.x, l.rect.y, l.rect.w, l.rect.h);
+  // the picture is read under the words AND a margin around them (5% of the width): the words never touch a logo or the subject
+  const mg = Math.round(W * 0.05);
+  const readRect = (l) => { const x = Math.max(0, l.rect.x - mg); const y = Math.max(0, l.rect.y - Math.round(mg * 0.6)); return busyOf(ctx, x, y, Math.min(W - x, l.rect.w + 2 * mg), Math.min(H - y, l.rect.h + Math.round(mg * 1.2))); };
   let zone = asked; let lay = lay0(zone); let score = 0; let busy = false;
   if (smart) {
     let best = null;
     for (const z of (asked === 'center' ? ['center'] : ['top', 'bottom', 'left', 'right'])) {
-      for (const fit of [1, 0.85, 0.72, 0.6]) { // smaller type when the calm place is small; the bigger the better
-        let l = lay0(z, null, fit);
-        let sc = readRect(l);
-        if (sc > IN_THE_WAY && (z === 'top' || z === 'bottom')) { // narrow to the calm stretch of the rows the words take and look again
-          const span = calmSpan(ctx, W, H, z, { y: l.rect.y, h: l.rect.h });
-          if (span) { const l2 = lay0(z, span, fit); const sc2 = readRect(l2); if (sc2 < sc) { l = l2; sc = sc2; } }
+      for (const fit of [1, 0.85, 0.72, 0.6, 0.5]) { // smaller type when the calm place is small; the bigger the better
+        const variants = [lay0(z, null, fit)];
+        if (z === 'top' || z === 'bottom') { // and the same words narrowed to the calm stretch of their rows (a logo in a corner, the subject)
+          const span = calmSpan(ctx, W, H, z, { y: variants[0].rect.y, h: variants[0].rect.h });
+          if (span) variants.push(lay0(z, { x: span.x + Math.round(mg * 0.5), w: Math.max(Math.round(W * 0.25), span.w - Math.round(mg * 1.5)) }, fit));
         }
-        const lines = (l.items.find((it) => it.kind === 'headline')?.lines.length) || 1;
-        const weighted = sc + Math.max(0, lines - 2) * 0.04 + (l.rect.w < W * 0.3 ? 0.03 : 0) + (z === asked ? 0 : 0.004) + (1 - fit) * 0.06; // a narrow column, a tall headline, small type: all worse than a wide calm place
-        if (!best || weighted < best.weighted) best = { z, l, sc, weighted };
-        if (sc <= IN_THE_WAY) break; // fits here: no need for a smaller type
+        let fitBest = null;
+        for (const l of variants) {
+          const sc = readRect(l);
+          const lines = (l.items.find((it) => it.kind === 'headline')?.lines.length) || 1;
+          const weighted = sc + Math.max(0, lines - 2) * 0.04 + (l.rect.w < W * 0.3 ? 0.03 : 0) + (z === asked ? 0 : 0.004) + (1 - fit) * 0.06; // a narrow column, a tall headline, small type: all worse than a wide calm place
+          if (!best || weighted < best.weighted) best = { z, l, sc, weighted };
+          if (!fitBest || sc < fitBest) fitBest = sc;
+        }
+        if (fitBest <= IN_THE_WAY) break; // fits here: no need for a smaller type
       }
     }
     zone = best.z; lay = best.l; score = best.sc; busy = score > BUSY;
