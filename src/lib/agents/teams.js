@@ -69,7 +69,7 @@ export function teamReadiness(teamKey, ctx = {}) {
     miss = have.has('cabinet') ? missingFor(teamRoles('analytics', accounts), have) : { required: [{ key: 'cabinet', label: FIELD_LABELS.cabinet, agents: ['Аналітики кабінетів'] }], recommended: [] };
   } else {
     // creatives: the agents of the chain that cannot work without a field (the department's analyst needs a cabinet but may be left out: it is optional)
-    const roles = CREATIVE_ROLES.map((r) => r.role).filter((r) => r !== 'creative_analyst');
+    const roles = CREATIVE_ROLES.map((r) => r.role).filter((r) => r !== 'creative_analyst' && r !== 'creative_scout');
     miss = missingFor(roles, have);
   }
   // the language of the client decides what language the texts for the client are written in: the creative and the report teams do not launch without it

@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { createCampaign, deleteCampaign, launchCampaign, loadCampaignTeam, setAgentsEnabled, updateCampaign } from './campaigns';
-import { kickQueue, saveAgent } from './agents';
+import { kickQueue, saveAgent, startIntel } from './agents';
 import { saveCreativeSetup } from './creatives';
 import { fetchProjectCreative } from './projectCreative';
 import { DEFAULT_AGENT_CONFIG, addAgentEvent, connectAgent, disconnectAgent, fetchAgent, updateAgent } from './projectAgents';
@@ -60,6 +60,8 @@ export async function launchTeam({ teamKey, project, accounts = [], existing = [
   c = await updateCampaign(c.id, { config: { ...(c.config || {}), mode: def.mode, modeApplied: `${def.mode}:${[...platforms].sort().join()}`, agentsConfigured: true, language: 'uk', goals: String(goals || ''), team: teamKey }, spend_cap_usd: capUsd > 0 ? capUsd : null });
   if (teamKey === 'creative') await saveCreativeSetup(c, { enabled: true, roles: [...CREATIVE_REQUIRED, ...CREATIVE_OPTIONAL.filter((r) => optional.includes(r))], autoGenerate: creativeTask?.autoGenerate, maxUsd: creativeTask?.maxUsd }, email); // the client is linked to the chosen agents of the department
   await launchCampaign(c.id);
+  // the scout studies the site and the cabinet of the client right after the launch (owner, 2026-11-12); the first task waits for the profile. Not a reason to undo a launch.
+  if (teamKey === 'creative') await startIntel(c.id).catch((e) => console.warn('startIntel failed:', e?.message || e));
   let startError = '';
   if (teamKey === 'creative' && creativeTask) {
     const { campaign: saved, regular } = await saveRegular(c.id, { enabled: true, ...creativeTask.schedule, brief: creativeTask.brief }, email);

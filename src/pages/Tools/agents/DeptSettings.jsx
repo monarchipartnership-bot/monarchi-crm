@@ -54,7 +54,7 @@ function PromptTest({ agent, clients, prompts, reload, notify }) {
   const [compare, setCompare] = useState(true);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
-  const needsRequest = agent.role !== 'creative_analyst';
+  const needsRequest = !['creative_analyst', 'creative_scout'].includes(agent.role);
   useEffect(() => { setBody(current?.body || ''); }, [current?.id, current?.current_version]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setRequestId('');

@@ -84,6 +84,9 @@ import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUAR
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
+import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
+import { startIntel, releaseWaitingRequests } from '../api/_lib/creativeEngine.js';
+import { readShop } from '../api/_lib/creativeScout.js';
 import { makerTokens, parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc, salvageCreatives } from '../api/_lib/creativeRun.js';
 import { fetchBlock, summaryOf } from '../api/_lib/campaignRun.js';
 import { buildRequest, check as hfCheck, submit as hfSubmit } from '../api/_lib/higgsfield.js';
@@ -1478,11 +1481,12 @@ function fakeDb(tables) {
   });
   return {
     from(name) {
-      const q = { mode: 'select', filters: [], patch: null, rows: null, limitN: null, order: null };
+      const q = { mode: 'select', filters: [], patch: null, rows: null, limitN: null, order: null, conflict: null };
       const run = () => {
         const rows = T(name);
         const pass = (r) => q.filters.every((f) => f(r));
         if (q.mode === 'insert') { const made = q.rows.map((r, i) => ({ id: rows.length + i + 1, ...r })); rows.push(...made); return { data: made, error: null }; }
+        if (q.mode === 'upsert') { const made = q.rows.map((r) => { const hit = rows.find((x) => x[q.conflict] === r[q.conflict]); if (hit) { Object.assign(hit, r); return hit; } const row = { id: rows.length + 1, ...r }; rows.push(row); return row; }); return { data: made, error: null }; }
         if (q.mode === 'update') { const hit = rows.filter(pass); hit.forEach((r) => Object.assign(r, q.patch)); return { data: hit, error: null }; }
         if (q.mode === 'delete') { const hit = rows.filter(pass); hit.forEach((r) => rows.splice(rows.indexOf(r), 1)); return { data: hit, error: null }; }
         let out = rows.filter(pass);
@@ -1496,6 +1500,7 @@ function fakeDb(tables) {
         select() { return api; },
         insert(r) { q.mode = 'insert'; q.rows = Array.isArray(r) ? r : [r]; return api; },
         update(p) { q.mode = 'update'; q.patch = p; return api; },
+        upsert(r, o) { q.mode = 'upsert'; q.rows = Array.isArray(r) ? r : [r]; q.conflict = o?.onConflict || 'id'; return api; },
         delete() { q.mode = 'delete'; return api; },
         eq(c, v) { q.filters.push((r) => r[c] === v); return api; },
         neq(c, v) { q.filters.push((r) => r[c] !== v); return api; },
@@ -1895,6 +1900,8 @@ const creativeWorld = () => {
     project_ad_accounts: [{ project_id: 5, platform: 'meta', account_id: '111' }],
     ag_campaigns: [{ id: 1, project_id: 5, name: 'Acme autumn', platforms: ['meta'], status: 'draft', config: { brief: 'Furniture store.' } }, { id: 2, project_id: 6, name: 'Beta spring', platforms: ['meta'], status: 'draft', config: {} }],
     ag_agents: [], ag_links: [], ag_prompts: [], ag_prompt_versions: [], ag_tasks: [], ag_runs: [], ag_agent_clients: [], ag_creative_requests: [], ag_creatives: [], ag_creative_spend: [], notifications: [],
+    ag_project_intel: [5, 6].map((id) => ({ project_id: id, status: 'ready', summary: 'Sofa store.', profile: { summary: 'Sofa store.' }, photos: [], updated_at: new Date().toISOString() })), // the scout has already studied the clients
+    ag_task_steps: [],
   };
   const db = fakeDb(tables);
   let failBrief = true;
@@ -2317,7 +2324,7 @@ await ok('quality loop: a «revise» verdict sends the work back to the agents i
 });
 
 await ok('connecting a client to the department (wizard): the chosen roles are on, the rest are switched off and kept, the required ones are always there, the autofill says where it comes from', async () => {
-  const all = ['creative_analyst', 'creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker', 'creative_quality'];
+  const all = ['creative_scout', 'creative_analyst', 'creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker', 'creative_quality'];
   assert.deepEqual(creativeSetupOf({ config: {} }), { configured: false, enabled: true, roles: all }); // a campaign that never saw the step: the whole department
   assert.deepEqual(creativeSetupOf({ config: { creative: { enabled: false } } }), { configured: true, enabled: false, roles: [] });
   const setup = creativeSetupOf({ config: { creative: { enabled: true, roles: ['creative_quality', 'bogus'] } } });
@@ -2326,17 +2333,17 @@ await ok('connecting a client to the department (wizard): the chosen roles are o
   const camp = tables.ag_campaigns[0];
   const roleOf = (rows) => rows.map((r) => tables.ag_agents.find((a) => a.id === r.agent_id).role).sort();
   let rows = await setCreativeRoles(db, camp, setup.roles, { email: 'a@x.com' });
-  assert.deepEqual([rows.length, roleOf(rows.filter((r) => r.enabled))], [4, [...CREATIVE_REQUIRED, 'creative_quality'].sort()]);
-  assert.equal(tables.ag_agents.length, 6); // the department itself is the same six, a client only gets links
+  assert.deepEqual([rows.length, roleOf(rows.filter((r) => r.enabled))], [5, [...CREATIVE_REQUIRED, 'creative_quality'].sort()]);
+  assert.equal(tables.ag_agents.length, 7); // the department itself is the same seven, a client only gets links
   // the person changes the mind: the copywriter in, the checker out: its row stays (settings and history), switched off
   rows = await setCreativeRoles(db, camp, [...CREATIVE_REQUIRED, 'creative_copywriter'], { email: 'a@x.com' });
-  assert.deepEqual([rows.length, roleOf(rows.filter((r) => r.enabled))], [5, [...CREATIVE_REQUIRED, 'creative_copywriter'].sort()]);
+  assert.deepEqual([rows.length, roleOf(rows.filter((r) => r.enabled))], [6, [...CREATIVE_REQUIRED, 'creative_copywriter'].sort()]);
   const off = rows.find((r) => !r.enabled);
   assert.equal(tables.ag_agents.find((a) => a.id === off.agent_id).role, 'creative_quality');
   rows = await setCreativeRoles(db, camp, setup.roles, { email: 'a@x.com' }); // and back: the same row is switched on again, no copy
-  assert.deepEqual([rows.length, rows.find((r) => r.id === off.id).enabled], [5, true]);
+  assert.deepEqual([rows.length, rows.find((r) => r.id === off.id).enabled], [6, true]);
   rows = await setCreativeRoles(db, camp, [], { email: 'a@x.com' }); // the department is not wanted for this client
-  assert.deepEqual([rows.length, rows.every((r) => !r.enabled)], [5, true]);
+  assert.deepEqual([rows.length, rows.every((r) => !r.enabled)], [6, true]);
   assert.equal(tables.ag_agent_clients.filter((r) => r.campaign_id === 2).length, 0); // another client is not touched
   // the autofill: the goals of the campaign and the restrictions kept in the project; nothing is invented
   const a = creativeAutofill({ project: tables.projects[0], goals: 'CPA under 12 dollars', projectCreative: { restrictions: 'No kids in the picture' } });
@@ -3238,17 +3245,17 @@ await ok('wizard modes: each of the five modes switches on only the agents of it
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {
   const { tables, db, model, ctx } = creativeWorld();
   const dept = await ensureCreativeDepartment(db, 'a@x.com');
-  assert.equal(dept.agents.length, 6);
+  assert.equal(dept.agents.length, 7);
   assert.equal(dept.links.length, 6);
-  assert.equal(tables.ag_prompts.length, 6);
+  assert.equal(tables.ag_prompts.length, 7);
   await ensureCreativeDepartment(db, 'a@x.com');
-  assert.deepEqual([tables.ag_agents.length, tables.ag_links.length, tables.ag_prompts.length], [6, 6, 6]); // idempotent
+  assert.deepEqual([tables.ag_agents.length, tables.ag_links.length, tables.ag_prompts.length], [7, 6, 7]); // idempotent
   assert.ok(tables.ag_agents.every((a) => a.team === 'creative' && a.scope_type === 'internal' && a.enabled));
   // two clients do NOT make twelve agents: they are linked to the same six
   const l1 = await connectCampaign(db, tables.ag_campaigns[0], { email: 'a@x.com' });
   const l2 = await connectCampaign(db, tables.ag_campaigns[1], { email: 'a@x.com' });
   await connectCampaign(db, tables.ag_campaigns[0], { email: 'a@x.com' });
-  assert.deepEqual([l1.length, l2.length, tables.ag_agent_clients.length, tables.ag_agents.length], [6, 6, 12, 6]);
+  assert.deepEqual([l1.length, l2.length, tables.ag_agent_clients.length, tables.ag_agents.length], [7, 7, 14, 7]);
   const A = (r) => tables.ag_agents.find((a) => a.role === r);
   A('creative_brief').config = { ...A('creative_brief').config, rules: 'Soft daylight, no stock-photo smiles.' };
   tables.ag_agent_clients.find((l) => l.campaign_id === 1 && l.agent_id === A('creative_strategy').id).config = { kpi: 'CPA under 12 dollars', extra: 'Never compare prices.' };
@@ -3286,7 +3293,8 @@ await ok('creative department: one agent per role with a queue of clients; a req
   assert.match(st.system_prompt, /Never compare prices/); // the client's instruction reaches the system prompt
   assert.match(st.user_prompt, /Дослідження бізнесу \(звіт від 2026-10-01: 21 дн\. тому, ЗАСТАРІВ\)[\s\S]*Sofa store for families/);
   assert.match(st.user_prompt, /Аналізу немає/);
-  assert.match(st.user_prompt, /We sell sofas/); // no business research that is fresh enough is no excuse: the site is read
+  assert.match(st.user_prompt, /Профіль клієнта від Розвідника[\s\S]*Summary: Sofa store\./); // what the scout learned reaches the strategist
+  assert.doesNotMatch(st.user_prompt, /We sell sofas/); // the scout has read the site: the strategist does not read it again
   // the limit of two directions held and they are ordered by priority; the brief got them
   const plan = tables.ag_tasks.find((t) => t.agent_id === A('creative_strategy').id).output;
   assert.deepEqual(plan.json.directions.map((d) => d.key), ['d1', 'd2']);
@@ -5197,13 +5205,192 @@ await ok('AI teams of a project: the three teams, the check of what each one nee
   assert.deepEqual(plan.map((x) => [x.role, x.schedule?.everyDays ?? null, x.runsAfter]), [['meta_analyst', 3, false], ['google_analyst', 3, false], ['tracking_integrity', 3, false], ['meta_optimizer', null, true], ['google_optimizer', null, true]]);
   assert.deepEqual(teamAgentPlan('analytics', [{ platform: 'meta' }]).map((x) => x.role), ['meta_analyst', 'tracking_integrity', 'meta_optimizer']);
   const dept = teamAgentPlan('creative');
-  assert.deepEqual([dept.length, dept.find((x) => x.role === 'creative_analyst').shared, dept.filter((x) => x.required).map((x) => x.role)], [6, true, ['creative_strategy', 'creative_brief', 'creative_maker']]);
+  assert.deepEqual([dept.length, dept.find((x) => x.role === 'creative_analyst').shared, dept.filter((x) => x.required).map((x) => x.role)], [7, true, ['creative_scout', 'creative_strategy', 'creative_brief', 'creative_maker']]);
   assert.deepEqual([runsPerMonth({ weekday: 1 }), runsPerMonth({ everyDays: 3 }), runsPerMonth({ everyDays: 14 }), runsPerMonth(null)], [4.3, 10, 2.1, 0]);
   const est = estimateMonthly('analytics', plan);
   assert.deepEqual([est.runs, est.usd], [50, 3.5]); // three analysts every 3 days (30 runs) and two optimizers that follow them (20)
   assert.equal(estimateMonthly('analytics', plan.map((x) => (x.role === 'tracking_integrity' ? { ...x, enabled: false } : x))).runs, 40);
   assert.ok(estimateMonthly('creative').usd === 0 && /окремо/.test(estimateMonthly('creative').text));
   assert.match(describePlanSchedule(null), /за ланцюжком/);
+});
+
+await ok('scout: the pages of a shop, the pictures, the profile of the client and its state', () => {
+  const links = [
+    { url: 'https://s.example/shop/rings', label: 'Rings' }, { url: 'https://s.example/product/luna-ring', label: 'Luna' }, { url: 'https://s.example/cart', label: 'Cart' },
+    { url: 'https://other.example/shop', label: 'Shop' }, { url: 'https://s.example/about', label: 'About us' }, { url: 'https://s.example/blog/news', label: 'Blog' },
+    { url: 'https://s.example/shop/rings#top', label: 'again' }, { url: 'https://s.example/shop/necklaces', label: 'Necklaces' }, { url: 'https://s.example/files/catalog.pdf', label: 'PDF' },
+  ];
+  const pages = pickShopPages(links, 'https://s.example/');
+  assert.deepEqual(pages.slice().sort(), ['https://s.example/about', 'https://s.example/product/luna-ring', 'https://s.example/shop/necklaces', 'https://s.example/shop/rings']); // not the cart, another host, a blog or a file, each address once
+  assert.ok(pages.indexOf('https://s.example/shop/rings') < pages.indexOf('https://s.example/product/luna-ring')); // a category goes before a single product
+  assert.equal(pickShopPages(links, 'https://s.example/', 2).length, 2);
+  const html = '<meta property="og:image" content="/img/hero.jpg"><img src="/i/logo.png" alt="Shop logo"><img src="/i/icon-cart.png" width="24"><img src="/i/a.svg"><img data-src="/p/ring.jpg" srcset="/p/ring-300.jpg 300w, /p/ring-900.jpg 900w" alt="Gold ring"><img src="/p/ring-900.jpg" alt="again"><img src="data:image/gif;base64,AAAA"><img src="/p/pixel-1x1.png">';
+  const im = imagesOf(html, 'https://s.example/shop/rings');
+  assert.deepEqual(im.map((x) => x.url), ['https://s.example/img/hero.jpg', 'https://s.example/i/logo.png', 'https://s.example/p/ring-900.jpg']); // the biggest of a srcset, no icons, svg, data, pixels or repeats
+  assert.deepEqual(im.map((x) => x.logo), [false, true, false]);
+  const photos = pickPhotos([{ url: 'https://s.example/', images: im }, { url: 'https://s.example/shop', images: [{ url: 'https://s.example/p/x.jpg', alt: 'x', logo: false }] }], 3);
+  assert.equal(photos[0].logo, true); // the logo goes first
+  assert.equal(photos.length, 3);
+  // the answer of the model → the profile: nothing beyond the limits, the picks refer to the numbered pictures only
+  const prof = parseIntel({ summary: 'A jeweller.', products: [{ name: 'Luna ring', category: 'Rings', price: '120 EUR' }, { name: '' }], categories: ['Rings'], ads: { worked: ['Close-up on white, ROAS 4.1'], seen: 99 }, photo_picks: [{ n: 2, use: 'product', label: 'Gold ring' }, { n: 2, use: 'product' }, { n: 9, use: 'product' }, { n: 1, use: 'skip' }, { n: 1, use: 'logo', label: 'Logo' }], gaps: ['No video'] }, { photos: [{ url: 'a.jpg' }, { url: 'b.jpg', page: 'p' }], ads: [{}, {}] });
+  assert.deepEqual([prof.products.length, prof.photos.map((p) => [p.url, p.use]), prof.ads.seen, prof.gaps], [1, [['b.jpg', 'product'], ['a.jpg', 'logo']], 2, ['No video']]);
+  // what the others read, and the state: fresh for 30 days, then stale; a run that never reported back is not «running» for ever
+  const now = new Date('2026-11-12T10:00:00Z');
+  const row = { status: 'ready', updated_at: '2026-11-10T10:00:00Z', profile: prof };
+  const block = intelBlock(row, now);
+  assert.match(block.title, /2 дн\. тому/);
+  assert.match(block.text, /Summary: A jeweller\.[\s\S]*Luna ring \(Rings\), 120 EUR[\s\S]*Close-up on white[\s\S]*Not learned[\s\S]*No video/);
+  assert.equal(intelBlock({ status: 'running' }, now), null);
+  assert.equal(intelSummaryLine(row), '1 товар, 1 категорія, 2 реклами з кабінету, 2 фото з сайту');
+  assert.deepEqual([intelState(null, now), intelState(row, now), intelState({ ...row, updated_at: '2026-09-01T00:00:00Z' }, now), intelState({ status: 'running', updated_at: '2026-11-12T09:55:00Z' }, now), intelState({ status: 'running', updated_at: '2026-11-12T08:00:00Z' }, now), intelState({ status: 'failed' }, now)], ['none', 'fresh', 'stale', 'running', 'failed', 'failed']);
+  assert.equal(INTEL_STALE_DAYS, 30);
+});
+
+await ok('scout: reads a shop with its own fetch (public addresses, robots.txt), follows the shop pages and collects the pictures', async () => {
+  const pagesByUrl = {
+    'https://s.example/robots.txt': { type: 'text/plain', body: 'User-agent: *\nDisallow: /private' },
+    'https://s.example/': { type: 'text/html', body: '<title>Shop</title><meta name="description" content="Rings"><img src="/hero.jpg" alt="Hero"><a href="/shop/rings">Rings</a><a href="/private/shop">Private shop</a><a href="/cart">Cart</a><p>Handmade rings and necklaces for every day.</p>' },
+    'https://s.example/shop/rings': { type: 'text/html', body: '<title>Rings</title><img src="/p/luna.jpg" alt="Luna ring"><p>Luna ring 120 EUR</p>' },
+  };
+  const fetchFn = async (url) => { const hit = pagesByUrl[String(url)]; if (!hit) return { ok: false, status: 404, headers: { get: () => '' }, url: String(url) }; return { ok: true, status: 200, url: String(url), headers: { get: (h) => (h.toLowerCase() === 'content-type' ? hit.type : '') }, body: null, text: async () => hit.body, arrayBuffer: async () => new TextEncoder().encode(hit.body).buffer }; };
+  const lookup = async () => [{ address: '93.184.216.34', family: 4 }];
+  const steps = [];
+  const r = await readShop('https://s.example', { fetchFn, lookup, onStep: async (t) => steps.push(t) });
+  assert.equal(r.blockedByRobots, false);
+  assert.deepEqual(r.pages.map((p) => [p.url, p.ok]).sort(), [['https://s.example/', true], ['https://s.example/private/shop', false], ['https://s.example/shop/rings', true]]); // the private path is named but not read
+  assert.equal(r.pages.find((p) => p.url.includes('private')).error, 'заборонено robots.txt');
+  assert.deepEqual(r.pages.flatMap((p) => p.images.map((i) => i.alt)), ['Hero', 'Luna ring']);
+  assert.equal(steps.length, 2);
+  assert.ok(steps.every((t) => /^Вивчаю сторінку \d з 3: \//.test(t)));
+  await assert.rejects(() => readShop('http://localhost/', { fetchFn, lookup }), /Внутрішні/);
+});
+
+// the department with a client that was NOT studied yet: the request waits for the scout, the scout's end releases it
+const scoutWorld = async ({ answer, fail = false, withSite = true } = {}) => {
+  const w = creativeWorld();
+  w.tables.ag_project_intel.length = 0;
+  if (!withSite) w.tables.projects[0].website = '';
+  await ensureCreativeDepartment(w.db, 'a@x.com');
+  await connectCampaign(w.db, w.tables.ag_campaigns[0], { email: 'a@x.com' });
+  const scoutAnswer = answer || JSON.stringify({ summary: 'A jeweller with a clean catalogue.', products: [{ name: 'Luna ring', category: 'Rings', price: '120 EUR' }], categories: ['Rings'], tone: 'warm', visual_style: 'white background, soft light', ads: { worked: ['Close-up on white, ROAS 4'], avoid: [], formats: ['static'] }, photo_picks: [{ n: 2, use: 'product', label: 'Luna ring on white' }], gaps: [] });
+  const inner = w.model;
+  const model = { calls: [], contents: {}, async callModel(args) {
+    if (args.agentKey === 'creative-creative_scout') { this.calls.push(args.agentKey); this.contents[args.agentKey] = args.params.messages[0].content; if (fail) throw new Error('model down'); return { text: scoutAnswer, usage: { input_tokens: 10, output_tokens: 5 }, costUsd: 0.2 }; }
+    return inner.callModel(args);
+  } };
+  const readShop2 = async () => ({ pages: [{ ok: true, url: 'https://acme.example/', title: 'Acme', text: 'Rings.', images: [{ url: 'https://acme.example/logo.png', alt: 'logo', logo: true }, { url: 'https://acme.example/luna.jpg', alt: 'Luna ring', logo: false }] }, { ok: true, url: 'https://acme.example/shop', title: 'Shop', text: 'Luna ring 120 EUR', images: [] }], blockedByRobots: false, shopPagesFound: 1 });
+  const ctx = { ...w.ctx, model, readShop: readShop2, metaToken: 'tok', collectAds: async () => [{ caption: 'Ad 1 · ROAS 4.00', imageUrl: 'https://store/ad1.jpg', metrics: { spend: 100, purchases: 9, roas: 4, ctr: 2 } }], copyImage: async ({ url }) => url.replace('https://acme.example', 'https://store/scout') };
+  return { ...w, ctx, model };
+};
+const stepsOfTask = (tables, role) => tables.ag_task_steps.filter((x) => x.role === role).map((x) => x.text);
+
+await ok('scout: studies the site and the cabinet, writes the profile and the live steps, keeps the product photos in our storage', async () => {
+  const { tables, ctx, model } = await scoutWorld();
+  const first = await startIntel(ctx, 1);
+  assert.equal(first.started, true);
+  assert.equal(tables.ag_project_intel[0].status, 'running');
+  assert.deepEqual((await startIntel(ctx, 1)).reason, 'active'); // one scout task per client at a time
+  await processQueue(ctx);
+  const row = tables.ag_project_intel[0];
+  assert.deepEqual([row.status, row.summary, row.profile.products.length, row.photos.map((p) => p.url)], ['ready', 'A jeweller with a clean catalogue.', 1, ['https://store/scout/luna.jpg']]);
+  assert.equal(row.cost_usd, 0.2);
+  const user = JSON.stringify(model.contents['creative-creative_scout']);
+  assert.match(user, /Luna ring 120 EUR/); // the text of the shop pages
+  assert.match(user, /Site picture 2: Luna ring/); // numbered pictures, so the model can point at one
+  assert.match(user, /Past ad 1: Ad 1/); // and the best past ad with its numbers
+  const steps = stepsOfTask(tables, 'creative_scout');
+  assert.match(steps[0], /Починаю розвідку/);
+  assert.ok(steps.some((t) => /Читаю сайт acme\.example/.test(t)) && steps.some((t) => /Прочитано сторінок: 2, знайдено зображень: 2/.test(t)));
+  assert.ok(steps.some((t) => /Знайдено реклам із картинками: 1/.test(t)) && steps.some((t) => /Зберігаю фото товарів із сайту: 1/.test(t)));
+  assert.match(steps[steps.length - 1], /Готово: профіль клієнта збережено/);
+  assert.equal(tables.ag_tasks[0].status, 'done');
+  assert.equal((await startIntel(ctx, 1)).reason, 'fresh'); // made once; not again until it is stale
+  assert.equal((await startIntel(ctx, 1, { force: true })).started, true); // the button «Оновити»
+});
+
+await ok('scout: a request that comes before the profile waits for it; when the scout delivers the strategist starts, and the maker may use the site photos', async () => {
+  const { tables, ctx } = await scoutWorld();
+  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'draft', title: 'T', brief: { goal: 'Autumn sale banners', count: 2, ratios: ['1:1'], texts: 'no', language: 'en' }, materials: [] });
+  const s = await startRequest(ctx, 1);
+  assert.deepEqual([s.started, s.waiting], [0, 'intel']);
+  const scout = tables.ag_agents.find((a) => a.role === 'creative_scout');
+  assert.deepEqual(tables.ag_tasks.map((t) => [t.agent_id, t.status, t.request_id ?? null]), [[scout.id, 'queued', null]]); // only the scout works; the strategist has nothing yet
+  assert.equal(tables.ag_creative_requests[0].status, 'running');
+  await processQueue(ctx);
+  const strat = tables.ag_agents.find((a) => a.role === 'creative_strategy');
+  const t = tables.ag_tasks.filter((x) => x.agent_id === strat.id && x.request_id === 1);
+  assert.equal(t.length, 1); // released once
+  assert.equal(t[0].status, 'done');
+  const run = tables.ag_runs.find((r) => r.agent_id === strat.id);
+  assert.match(run.user_prompt, /Профіль клієнта від Розвідника[\s\S]*A jeweller with a clean catalogue/);
+  assert.match(run.user_prompt, /Сайт: Luna ring on white \(1\)/); // the photo of the site is among the materials the agents may use, no approval needed
+  const briefer = tables.ag_agents.find((a) => a.role === 'creative_brief');
+  assert.match(tables.ag_runs.find((r) => r.agent_id === briefer.id).user_prompt, /Матеріали клієнта \(файли запиту\)[\s\S]*- Сайт: Luna ring on white \(1\) \(Фото продукту\)/); // the agents below list it with the manager's own files
+  assert.equal((await releaseWaitingRequests(ctx, 1)), 0); // nothing waits any more
+  const live = stepsOfTask(tables, 'creative_strategy');
+  assert.ok(live.some((x) => /Збираю дані/.test(x)) && live.some((x) => /Складаю план напрямків/.test(x)) && live.some((x) => /^Готово:/.test(x)));
+});
+
+await ok('scout: when it fails the request goes on without the profile (the strategist reads the site itself), and a closed site is not asked again at once', async () => {
+  const { tables, ctx } = await scoutWorld({ fail: true });
+  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'draft', title: 'T', brief: { goal: 'Autumn sale banners', count: 2, ratios: ['1:1'], texts: 'no', language: 'en' }, materials: [] });
+  await startRequest(ctx, 1);
+  await processQueue(ctx);
+  const scoutTask = tables.ag_tasks.find((t) => t.request_id == null);
+  assert.deepEqual([scoutTask.status, tables.ag_project_intel[0].status], ['failed', 'failed']);
+  assert.ok(stepsOfTask(tables, 'creative_scout').some((x) => /^Не вдалося: .*model down/.test(x)));
+  const strat = tables.ag_agents.find((a) => a.role === 'creative_strategy');
+  assert.equal(tables.ag_tasks.filter((x) => x.agent_id === strat.id && x.request_id === 1).length, 1); // released although the scout failed
+  assert.deepEqual((await startIntel(ctx, 1)).reason, 'recent-failure');
+});
+
+await ok('scout: no site and no cabinet = nothing to study: says so, the profile stays empty and nothing is invented', async () => {
+  const w = await scoutWorld({ withSite: false });
+  w.tables.project_ad_accounts.length = 0;
+  await startIntel(w.ctx, 1);
+  await processQueue(w.ctx);
+  assert.equal(w.tables.ag_project_intel[0].status, 'failed');
+  assert.deepEqual(w.model.calls, []); // no material: no model call
+  assert.ok(stepsOfTask(w.tables, 'creative_scout').some((x) => /Сайт у картці не вказано/.test(x)) && stepsOfTask(w.tables, 'creative_scout').some((x) => /нічого не знайшла/i.test(x)));
+});
+
+await ok('project cabinet: the scout is the first step of the scheme while it works or has made the profile, the live lines of the agents, the profile of the client; an older task without a scout looks as before', () => {
+  const agents = [[1, 'creative_strategy'], [2, 'creative_brief'], [7, 'creative_scout']].map(([id, role]) => ({ id, role }));
+  const campaign = { id: 4, project_id: 9, name: 'Mellow', status: 'active', config: { mode: 'creative' } };
+  const now = '2026-11-12T10:10:00Z';
+  const base = { campaign, project: { name: 'Mellow' }, agents, library: { assets: 0 }, spend: 0, now, requests: [{ id: 2, campaign_id: 4, status: 'running', title: 'Fall', materials: [], created_at: '2026-11-12T10:00:00Z' }] };
+  const scout = (status, extra = {}) => ({ id: 20, agent_id: 7, request_id: null, campaign_id: 4, status, created_at: '2026-11-12T10:00:00Z', cost_usd: 0.4, ...extra });
+  const step = (id, role, text, state, minAgo, extra = {}) => ({ id, task_id: 20, request_id: null, campaign_id: 4, role, text, state, created_at: new Date(new Date(now).getTime() - minAgo * 60000).toISOString(), ...extra });
+  const keys = (c) => c.requests[0].stages.map((x) => [x.key, x.state]);
+  // the request waits for the scout: the scout works, the others have nothing yet
+  const steps = [step(2, 'creative_scout', 'Вивчаю сторінку 3 з 8: /shop/rings', 'running', 1), step(1, 'creative_scout', 'Читаю сайт acme.example: головна сторінка', 'running', 3)];
+  let c = buildCockpit({ ...base, tasks: [scout('running')], steps, intel: { project_id: 9, status: 'running', summary: '', profile: {}, photos: [] } });
+  assert.deepEqual(keys(c).slice(0, 3), [['scout', 'working'], ['strategy', 'idle'], ['brief', 'idle']]);
+  assert.equal(c.requests[0].stages[0].live, 'Вивчаю сторінку 3 з 8: /shop/rings'); // the line of the node: what it does now
+  assert.deepEqual(c.requests[0].steps.map((x) => [x.label, x.text]), [['Розвідник', 'Вивчаю сторінку 3 з 8: /shop/rings'], ['Розвідник', 'Читаю сайт acme.example: головна сторінка']]); // newest first
+  assert.deepEqual([c.currentStageKey, c.intel.status, c.scoutSteps.length], ['scout', 'running', 2]);
+  // the profile is made: the step is done with what was found; the strategist works and shows its own line; an old line that nothing closed is not «live»
+  const intel = { project_id: 9, status: 'ready', summary: 'A jeweller.', updated_at: '2026-11-12T10:05:00Z', site_url: 'https://acme.example', cost_usd: 0.4, profile: { summary: 'A jeweller.', products: [{ name: 'Luna' }], categories: ['Rings'], ads: { worked: ['x'], seen: 3 }, gaps: [], photos: [{ url: 'u' }] }, photos: [{ url: 'https://store/a.jpg', label: 'Ring', use: 'product' }] };
+  const st = (id, agent_id, status) => ({ id, agent_id, request_id: 2, campaign_id: 4, status, created_at: '2026-11-12T10:06:00Z', cost_usd: 0.05 });
+  c = buildCockpit({ ...base, tasks: [scout('done'), st(21, 1, 'running')], intel, steps: [step(5, 'creative_strategy', 'Складаю план напрямків', 'running', 2, { task_id: 21, request_id: 2 }), step(4, 'creative_scout', 'Готово: профіль клієнта збережено', 'done', 4)] });
+  assert.deepEqual(keys(c).slice(0, 2), [['scout', 'done'], ['strategy', 'working']]);
+  assert.equal(c.requests[0].stages[0].note, '1 товар, 1 категорія, 3 реклами з кабінету, 1 фото з сайту');
+  assert.equal(c.requests[0].stages[1].live, 'Складаю план напрямків');
+  assert.deepEqual([c.intel.status, c.intel.products.length, c.intel.photos[0].url, c.intel.siteUrl], ['ready', 1, 'https://store/a.jpg', 'https://acme.example']);
+  const stale = buildCockpit({ ...base, now: '2026-11-12T11:00:00Z', tasks: [scout('done'), st(21, 1, 'running')], intel, steps: [step(5, 'creative_strategy', 'Складаю план напрямків', 'running', 2, { task_id: 21, request_id: 2 })] });
+  assert.equal(stale.requests[0].stages[1].live, undefined); // a line older than 15 minutes is not live any more, even for a step that works
+  assert.equal(buildCockpit({ ...base, now: '2026-11-12T11:00:00Z', tasks: [scout('done')], intel, steps: [step(5, 'creative_strategy', 'Складаю план напрямків', 'running', 2, { task_id: 21, request_id: 2 })] }).requests[0].stages.find((x) => x.key === 'strategy').live, undefined); // a stale line of an idle step is not live
+  // a refresh of a profile that exists: the scheme stays calm (the scout step is done), the card says it is refreshing
+  assert.equal(buildCockpit({ ...base, tasks: [scout('running')], intel }).intel.status, 'refreshing');
+  // a scout that failed does not stop the task: «без профілю»; an older task that never had a scout keeps its scheme
+  c = buildCockpit({ ...base, tasks: [scout('failed', { error: 'model down' }), st(21, 1, 'done')], intel: { project_id: 9, status: 'failed', summary: '' } });
+  assert.deepEqual([keys(c)[0], c.requests[0].stages[0].note, c.attention.some((i) => i.kind === 'failed_step')], [['scout', 'done'], 'без профілю: model down', false]);
+  c = buildCockpit({ ...base, tasks: [st(21, 1, 'done')], intel: null });
+  assert.deepEqual(c.requests[0].stages.map((x) => x.key), ['strategy', 'brief', 'copy', 'maker', 'quality', 'you']);
+  assert.equal(c.intel, null);
+  // the photos of the site count as materials: «Немає фото товару» does not come
+  const noPhoto = (i) => buildCockpit({ ...base, tasks: [st(21, 1, 'done')], intel: i }).attention.some((x) => x.kind === 'missing_assets');
+  assert.deepEqual([noPhoto(null), noPhoto(intel)], [true, false]);
 });
 
 console.log(`\n${passed} checks passed`);

@@ -6,6 +6,7 @@
 export const ACTION_RULES = {
   launch_campaign: { level: 'paid', label: 'Запуск операції' },
   start_request: { level: 'paid', label: 'Запуск запиту на креативи' },
+  start_intel: { level: 'paid', label: 'Розвідка клієнта (сайт і кабінет)' },
   generate_creatives: { level: 'paid', label: 'Генерація зображень у Higgsfield' },
   run_agent: { level: 'paid', label: 'Ручний запуск агента' },
   retry_task: { level: 'paid', label: 'Повтор кроку' },
@@ -69,6 +70,7 @@ export function auditEntry(action, body = {}, out = {}) {
       meta.requestId = body.requestId; meta.submitted = out.submitted ?? 0; meta.estimateUsd = out.estimateUsd ?? 0;
       break;
     case 'launch_campaign': summary = `Запустив операцію (агентів: ${out.agents ?? '—'}${out.creativeOnly ? ', лише креативи' : ''})`; break;
+    case 'start_intel': summary = body.force ? 'Оновив профіль клієнта (розвідка)' : 'Запустив розвідку клієнта'; break;
     case 'start_request': summary = 'Запустив запит на креативи'; meta.requestId = body.requestId; break;
     case 'cancel_request': summary = 'Зупинив запит на креативи'; meta.requestId = body.requestId; break;
     case 'run_agent': summary = 'Запустив агента вручну'; meta.agentId = body.agentId; break;

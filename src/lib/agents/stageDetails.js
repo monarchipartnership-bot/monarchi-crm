@@ -4,6 +4,7 @@
 
 // what each agent does, in plain words (the same for every task; what it made is in `result`)
 export const STAGE_WORK = {
+  scout: 'Вивчає сайт клієнта (товари, ціни, тон, фото) і найкращі реклами з кабінету, складає профіль клієнта, який читають усі агенти.',
   strategy: 'Складає напрями за описом завдання, карткою проєкту й памʼяттю про клієнта.',
   brief: 'Перетворює напрями на технічне завдання для картинок: композиція, світло, що показати.',
   copy: 'Пише тексти до кожного напряму.',
@@ -13,7 +14,7 @@ export const STAGE_WORK = {
 // who gets the result
 // the steps whose result the manager may correct with a comment (the agent makes it again, the agents below follow)
 export const REVISABLE_STAGES = ['strategy', 'brief', 'copy', 'maker'];
-export const STAGE_PASSES = { strategy: ['brief'], brief: ['copy', 'maker'], copy: ['quality'], maker: ['quality'], quality: ['you'] };
+export const STAGE_PASSES = { scout: ['strategy'], strategy: ['brief'], brief: ['copy', 'maker'], copy: ['quality'], maker: ['quality'], quality: ['you'] };
 // who it waits for
 const STAGE_NEEDS = { brief: ['strategy'], copy: ['brief'], maker: ['brief'], quality: ['copy', 'maker'] };
 const STATE_LABEL = { done: 'готово', working: 'працює', waiting: 'у черзі', failed: 'помилка', idle: 'ще не почав' };

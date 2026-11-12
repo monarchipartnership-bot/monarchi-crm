@@ -21,7 +21,8 @@ import * as higgsfield from './higgsfield.js';
 import { pollCreatives } from './creativeMake.js';
 import { campaignRole } from './campaignRun.js';
 import { creativeRole } from './creativeRun.js';
-import { fanOutRequest, passOn, settleRequest, touchClientLink } from './creativeEngine.js';
+import { fanOutRequest, passOn, scoutEnded, settleRequest, touchClientLink } from './creativeEngine.js';
+import { logStep } from './taskSteps.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { runRegularCycles } from './regularCycles.js';
 import { conflictMessage, modeOf, sameModeConflict } from '../../src/lib/agents/operationCycles.js';
@@ -416,7 +417,12 @@ export async function runTask(ctx, team, task) {
   const status = outcome.ok ? 'done' : 'failed';
   await db.from('ag_tasks').update({ status, output: outcome.ok ? outcome.output : null, error: outcome.ok ? null : String(outcome.error).slice(0, 600), cost_usd: rec.state.cost, finished_at: finished, lease_until: null, prompt_id: prompt.id, prompt_version: prompt.version }).eq('id', task.id);
   if (agent) await db.from('ag_agents').update({ last_run_at: finished, last_status: outcome.ok ? 'ok' : 'problem', last_message: String(outcome.ok ? outcome.summary : outcome.error).slice(0, 500) }).eq('id', agent.id);
-  if (agent?.team === CREATIVE_TEAM) { try { await touchClientLink(ctx, task, outcome.ok); } catch (e) { console.warn('touchClientLink failed:', e?.message || e); } }
+  if (agent?.team === CREATIVE_TEAM) {
+    try { await touchClientLink(ctx, task, outcome.ok); } catch (e) { console.warn('touchClientLink failed:', e?.message || e); }
+    // the live line of the card: how the step ended (the scout writes its own closing line)
+    if (agent.role !== 'creative_scout' || !outcome.ok) await logStep(ctx, { id: task.id, request_id: task.request_id, campaign_id: task.campaign_id, role: agent.role }, outcome.ok ? 'Готово: ' + String(outcome.summary || 'результат збережено').replace(/\s+/g, ' ').slice(0, 200) : 'Не вдалося: ' + String(outcome.error || '').slice(0, 200), outcome.ok ? 'done' : 'failed');
+    if (agent.role === 'creative_scout' && !outcome.ok) { try { await scoutEnded(ctx, task); } catch (e) { console.warn('scoutEnded failed:', e?.message || e); } }
+  }
   // a result that must wait for the person's OK before it goes on (confirm_before_pass of the client's link) does not start the next agents
   const gate = outcome.ok && (agent?.team === CREATIVE_TEAM || agent?.team === CAMPAIGN_TEAM) ? await confirmGate(ctx, task, agent, outcome) : false;
   if (outcome.ok && agent && !gate) { try { await fanOut(ctx, team, agent, task); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
@@ -626,5 +632,10 @@ export async function retryTask(ctx, taskId) {
 
 export async function cancelTask(ctx, taskId) {
   must(await ctx.db.from('ag_tasks').update({ status: 'cancelled', finished_at: iso(ctx.now()), lease_until: null }).eq('id', taskId).eq('status', 'queued'), 'task');
+  const t = (await ctx.db.from('ag_tasks').select('id, campaign_id, agent_id, status').eq('id', taskId).maybeSingle()).data;
+  if (t?.status === 'cancelled' && t.campaign_id) { // a withdrawn scout must not keep the requests waiting
+    const a = (await ctx.db.from('ag_agents').select('role').eq('id', t.agent_id).maybeSingle()).data;
+    if (a?.role === 'creative_scout') { try { await scoutEnded(ctx, t); } catch (e) { console.warn('scoutEnded failed:', e?.message || e); } }
+  }
   return { ok: true };
 }

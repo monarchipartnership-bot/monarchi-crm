@@ -97,6 +97,13 @@ export const nextRunOf = (agent) => (agent.schedule?.weekday ? nextScheduled('we
 
 // What the server has connected (for the visual agent's page).
 export const fetchServerStatus = () => agentAction('status');
+
+// «Розвідник» (owner, 2026-11-12): studies the site and the cabinet of the client and writes the profile the agents read. force: make it again («Оновити»). The queue is run afterwards.
+export async function startIntel(campaignId, { force = false } = {}) {
+  const r = await agentAction('start_intel', { campaignId, force });
+  if (r?.started) kickQueue().catch(() => {});
+  return r;
+}
 // The website analyst's main page: { status: { configured, auth, ga4, gsc, error, warnings, checkedAt }, analysis } (reads Google live, no model).
 export const fetchSiteOverview = () => agentAction('site_overview');
 // Google PageSpeed of the site (slow: 10-30 s): { speed: { configured, mobile, desktop, errors, error }, findings, seo }.

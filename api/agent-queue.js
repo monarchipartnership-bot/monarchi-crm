@@ -6,6 +6,7 @@
 //   POST { action: 'run_agent', agentId, brief? }    run one agent now (strategist, SEO, competitors), even if it is switched off
 //   POST { action: 'retry_task' | 'cancel_task', taskId }
 //   POST { action: 'launch_campaign', campaignId }   a campaign team goes live: its first agents get their first tasks
+//   POST { action: 'start_intel', campaignId, force? }  the scout studies the client's site and cabinet (made once, again on «Оновити» or after 30 days)
 //   POST { action: 'start_request', requestId }      a creative request starts its chain at the strategist; { action: 'cancel_request', requestId } stops it;
 //   POST { action: 'restart_agent', agentId }       puts back in the queue what hangs (running) and the failed tasks of the last 7 days
 //   POST { action: 'dry_run', agentId, campaignId, requestId?, promptBody? }  a trial run for one client with a prompt text: shown, saved nowhere
@@ -22,7 +23,7 @@ import { getModelClient } from './_lib/ai.js';
 import { generateCreatives, generatorState, pollCreatives } from './_lib/creativeMake.js';
 import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, passOnAny, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
 import { addInstruction, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from './_lib/campaignCycles.js';
-import { cancelRequest, reviseStep, startRequest } from './_lib/creativeEngine.js';
+import { cancelRequest, reviseStep, startIntel, startRequest } from './_lib/creativeEngine.js';
 import { estimateInputs } from './_lib/estimateInputs.js';
 import { auditAfter, checkRights } from './_lib/agentAudit.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
@@ -74,6 +75,7 @@ export default async function handler(req, res) {
     else if (action === 'redo_visual') out = await redoVisual(ctx, Number(body.postId), body.note);
     else if (action === 'launch_campaign') out = await launchCampaign(ctx, Number(body.campaignId)); // the page then calls `process` until the queue is empty
     else if (action === 'start_request') out = await startRequest(ctx, Number(body.requestId)); // the page then calls `process` until the queue is empty
+    else if (action === 'start_intel') out = await startIntel(ctx, Number(body.campaignId), { force: body.force === true }); // the scout studies the site and the cabinet of the client (the page then calls `process`)
     else if (action === 'cancel_request') out = await cancelRequest(ctx, Number(body.requestId));
     else if (action === 'restart_agent') { out = await restartAgent(ctx, Number(body.agentId)); if (out.requeued) out.queue = await processQueue(ctx, { maxMs: 60000 }); }
     else if (action === 'dry_run') out = await dryRun(ctx, Number(body.agentId), { campaignId: body.campaignId, requestId: body.requestId, promptBody: body.promptBody });

@@ -14,7 +14,7 @@ import './cockpit.css';
 //   cockpit: Cockpit | null  loading  onClose  onAction(item, actionKey, payload) → Promise  onNewRequest  onStop  onOpenRequest(requestId)
 // The actions on the materials come with item = null (approve_all: the review card, if there is one) and payload { campaignId, requestId, creativeId | creativeIds | comment | statuses }.
 // onOpenRequest(id) is also called when the manager switches the request in the list, so the page can load the materials of that request.
-const STAGE_ICON = { strategy: 'strategy', brief: 'doc', copy: 'pen', maker: 'img', quality: 'shield', you: 'user' };
+const STAGE_ICON = { scout: 'search', strategy: 'strategy', brief: 'doc', copy: 'pen', maker: 'img', quality: 'shield', you: 'user' };
 const STATE_NOTE = { done: 'готово', working: 'працює…', waiting: 'чекає', failed: 'впав крок', idle: '' };
 const REQ_CHIP = { draft: '', running: 'is-work', review: 'is-warn', problem: 'is-bad', approved: 'is-ok' };
 const isHistory = (r) => r.status === 'problem' && !(r.creatives?.total > 0); // an old failed request with nothing in it: calm grey, not red
@@ -27,7 +27,7 @@ function Node({ s, here, you }) {
       {here && <span className="ckp-here">Зараз тут</span>}
       <span className="ckp-m"><Ic n={STAGE_ICON[s.key] || 'doc'} size={20} /></span>
       <b>{s.label}</b>
-      <small>{s.note || STATE_NOTE[s.state] || ''}</small>
+      <small className={s.live ? 'is-live' : ''} title={s.live || undefined}>{s.live || s.note || STATE_NOTE[s.state] || ''}</small>
     </div>
   );
 }

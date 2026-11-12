@@ -16,13 +16,17 @@ export async function fetchCockpits() {
   if (!campaigns.length) return { list: [], byId: {} };
   const ids = campaigns.map((c) => c.id);
   const since = new Date(Date.now() - WINDOW_DAYS * 86400000).toISOString();
-  const [requests, projects, tasks, agents, assets, spend] = await Promise.all([
+  const projectIds = [...new Set(campaigns.map((c) => c.project_id).filter(Boolean))];
+  const [requests, projects, tasks, agents, assets, spend, stepRows, intelRows] = await Promise.all([
     supabase.from('ag_creative_requests').select('*').in('campaign_id', ids).order('created_at', { ascending: false }).limit(300),
     supabase.from('projects').select('id, name, client').in('id', [...new Set(campaigns.map((c) => c.project_id).filter(Boolean))]),
     supabase.from('ag_tasks').select('id, agent_id, request_id, campaign_id, status, error, cost_usd, created_at, started_at, finished_at, summary:output->>summary, notes:output->json->>notes, issues:output->json->issues').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1500),
     supabase.from('ag_agents').select('id, role').eq('team', 'creative'),
     supabase.from('project_creative_assets').select('project_id'),
     supabase.from('ag_creative_spend').select('campaign_id, usd').in('campaign_id', ids),
+    // the live steps of the agents (what each does right now) and the profile of the client made by the scout
+    supabase.from('ag_task_steps').select('id, task_id, request_id, campaign_id, role, text, state, created_at').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1200),
+    projectIds.length ? supabase.from('ag_project_intel').select('*').in('project_id', projectIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const reqs = must(requests) || [];
   const creatives = reqs.length ? must(await supabase.from('ag_creatives').select('id, request_id, concept_key, concept_name, ratio, status, asset_url, final_url, cost_usd, note, copy').in('request_id', reqs.map((r) => r.id))) || [] : [];
@@ -32,12 +36,14 @@ export async function fetchCockpits() {
   const spendBy = {};
   (must(spend) || []).forEach((s) => { spendBy[s.campaign_id] = (spendBy[s.campaign_id] || 0) + Number(s.usd || 0); });
   const taskRows = must(tasks) || [];
+  const steps = must(stepRows) || [];
+  const intelOf = new Map((must(intelRows) || []).map((r) => [r.project_id, r]));
   const agentRows = must(agents) || [];
 
   // the cabinet of every launched operation (the card of a project opens a paused one too); the list of the map keeps only the ones that are worked on
   const byId = {};
   campaigns.filter((c) => c.status !== 'draft').forEach((c) => {
-    byId[c.id] = buildCockpit({ campaign: c, project: projectOf.get(c.project_id) || {}, requests: reqs, tasks: taskRows, creatives, agents: agentRows, library: { assets: assetCount[c.project_id] || 0 }, spend: spendBy[c.id] || 0 });
+    byId[c.id] = buildCockpit({ campaign: c, project: projectOf.get(c.project_id) || {}, requests: reqs, tasks: taskRows, creatives, agents: agentRows, library: { assets: assetCount[c.project_id] || 0 }, spend: spendBy[c.id] || 0, steps: steps.filter((x) => x.campaign_id === c.id), intel: intelOf.get(c.project_id) || null });
   });
   const worked = new Set(campaigns.filter((c) => isActiveCampaign(c, reqs)).map((c) => c.id));
   return { list: sortProjects(Object.values(byId).filter((c) => worked.has(c.id)).map(summaryOf)), byId };

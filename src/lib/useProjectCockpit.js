@@ -4,6 +4,7 @@ import { fetchCockpits, pollProducing, runCockpitAction } from './api/projectCoc
 
 const DISMISS_KEY = 'cockpit-dismissed';
 const REFRESH_MS = 20000;
+const LIVE_MS = 6000; // while a task of the agents works, the cabinet is read often: the steps are shown as they come
 
 const readDismissed = () => { try { return new Set(JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]')); } catch { return new Set(); } };
 const saveDismissed = (set) => { try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...set].slice(-400))); } catch { /* the choice is only for this browser */ } };
@@ -17,11 +18,12 @@ export default function useProjectCockpit({ enabled = true } = {}) {
   const [dismissed, setDismissed] = useState(readDismissed);
   const [estimates, setEstimates] = useState({}); // request id -> { usd, count, limitUsd }
   const alive = useRef(true);
+  const live = useRef({}); // the cabinets as last read (the timer looks at them to choose how soon to read again)
 
   const reload = useCallback(async () => {
     try {
       const data = await fetchCockpits();
-      if (alive.current) setState({ ...data, loading: false, error: '' });
+      if (alive.current) { live.current = data.byId || {}; setState({ ...data, loading: false, error: '' }); }
       pollProducing(data.byId).catch(() => {});
     } catch (e) { if (alive.current) setState((s) => ({ ...s, loading: false, error: e?.message || 'Не вдалося завантажити проєкти.' })); }
   }, []);
@@ -29,9 +31,15 @@ export default function useProjectCockpit({ enabled = true } = {}) {
   useEffect(() => {
     alive.current = true;
     if (!enabled) return undefined;
-    reload();
-    const t = setInterval(reload, REFRESH_MS);
-    return () => { alive.current = false; clearInterval(t); };
+    let timer = null;
+    const tick = async () => {
+      await reload();
+      if (!alive.current) return;
+      const busy = Object.values(live.current).some((c) => (c.requests || []).some((r) => r.status === 'running') || c.intel?.status === 'running' || c.intel?.status === 'refreshing');
+      timer = setTimeout(tick, busy ? LIVE_MS : REFRESH_MS);
+    };
+    tick();
+    return () => { alive.current = false; clearTimeout(timer); };
   }, [enabled, reload]);
 
   // what the screens get: the cabinets without the dismissed points, with the estimate put into its card

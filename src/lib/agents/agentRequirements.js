@@ -22,6 +22,7 @@ export const REQUIREMENTS = {
   creative_maker: R([], ['materials', 'brand', 'restrictions']),
   creative_quality: R([], ['restrictions', 'offer', 'tone']),
   creative_analyst: R(['cabinet'], []),
+  creative_scout: R([], []), // it reads the site and the cabinet itself and says what it could not learn
   // the team of a campaign
   business_research: R(['about'], ['offer']),
   competitor_research: R(['competitor_sites'], ['about', 'competitor_notes']), // who to study: the sites of the competitors from the card of the project

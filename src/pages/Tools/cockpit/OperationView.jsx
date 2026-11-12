@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { kickQueue } from '../../../lib/api/agents';
+import { kickQueue, startIntel } from '../../../lib/api/agents';
 import { addInstruction, fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
@@ -13,6 +13,8 @@ import Deliverables from '../campaigns/Deliverables';
 import RequestForm from '../campaigns/studio/RequestForm';
 import AgentsSettings from './AgentsSettings';
 import StepCards from './StepCards';
+import LiveSteps from './LiveSteps';
+import IntelCard from './IntelCard';
 import PicturesSetting from './PicturesSetting';
 import AgentNotes from './AgentNotes';
 import AttentionRow from './AttentionRow';
@@ -44,6 +46,7 @@ function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised, onDi
       <p className="opv-what">{cycle.text}</p>
       <div className="opv-prog"><Progress value={cycle.progress} /><em>{pct}%</em></div>
       {cycle.status !== 'draft' && <StageLine stages={cycle.stages} currentKey={cycle.currentStageKey} />}
+      {cycle.status !== 'draft' && <LiveSteps steps={cycle.steps || []} working={cycle.status === 'running' && cycle.stages.some((x) => x.state === 'working')} />}
       <dl className="opv-steps">
         <div><dt>Зараз</dt><dd>{s.now}</dd></div>
         {s.next && <div><dt>Далі</dt><dd>{s.next}</dd></div>}
@@ -122,6 +125,13 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
     setBusy(id);
     try { await fn(); if (okText) notify?.(okText); await onChanged?.(); } catch (e) { notify?.(e?.message || 'Не вдалося виконати дію.', true); } finally { setBusy(''); }
   }
+  // «Розвідка клієнта»: the scout makes the profile again (about $0.3-0.6); the cabinet is read at once, so its steps show up
+  const refreshIntel = async () => {
+    const again = !!c?.intel && ['ready', 'partial'].includes(c.intel.status);
+    const yes = await confirm({ title: again ? 'Оновити профіль клієнта?' : 'Вивчити клієнта?', body: 'Агент-розвідник прочитає сайт і найкращі реклами з кабінету Meta. Це коштує приблизно $0.3–0.6 за виклик моделі й триває кілька хвилин.', confirmLabel: again ? 'Оновити' : 'Вивчити' });
+    if (!yes) return;
+    await guard('intel', async () => { const r = await startIntel(campaign.id, { force: again }); if (!r?.started && r?.reason === 'active') throw new Error('Розвідник уже працює: кроки видно нижче.'); }, 'Розвідка запущена: кроки видно в блоці «Кроки розвідника».');
+  };
   const startCycle = (cycle) => guard('start' + cycle.id, () => act(null, 'start_cycle', { requestId: cycle.id }), 'Завдання запущено: агенти працюють.');
 
   // the form: a regular cycle is kept in the operation (the form sends its day and time), a one-off one becomes a request and starts
@@ -177,6 +187,9 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
               <span>{view.inWork.length ? `Завдань у роботі: ${view.inWork.length}` : 'Зараз немає завдань у роботі'}</span>
               <small className="sd-hint">Додаткові завдання створюються кнопкою «Додаткове завдання» в картці проєкту (вкладка «Запуск AI команди»).</small>
             </div>
+          )}
+          {view.creative && c && (
+            <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} />
           )}
           {!view.creative && <Passes campaignId={campaign.id} />}
           {view.creative && (

@@ -17,6 +17,9 @@ import { readJson } from './agentContent.js';
 import { readSite } from './siteReader.js';
 import { figmaText, figmaToken, readFigma } from './figma.js';
 import { generateCreatives } from './creativeMake.js';
+import { scoutRun } from './creativeScout.js';
+import { intelBlock } from '../../src/lib/agents/clientIntel.js';
+import { stepsOf } from './taskSteps.js';
 
 const MODEL = 'claude-sonnet-5';
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -341,6 +344,17 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   const b = req?.brief || {};
   const language = languageEnglish(clientCode) || LANGUAGE_NAMES[b.language] || 'Ukrainian';
   const read = ctx.read || readSite;
+  // «Розвідник»: studies the site and the cabinet before the first creative; it has no request, no materials and no chain above it
+  if (agent.role === 'creative_scout') {
+    const accountRows = (await db.from('project_ad_accounts').select('platform, account_id').eq('project_id', campaign.project_id)).data || [];
+    return scoutRun({ ctx, agent, task, prompt, rec, campaign, project: { ...project, id: campaign.project_id }, accounts: accountRows });
+  }
+  // what the scout learned about the client (the site, the products, the past ads) is read by every agent below; its product photos are references for the maker (no approval needed)
+  const intelRow = campaign.project_id ? (await db.from('ag_project_intel').select('*').eq('project_id', campaign.project_id).maybeSingle()).data : null;
+  const intelMats = asList(intelRow?.photos).filter((p) => p?.url).slice(0, 6).map((p, i) => ({ name: `Сайт: ${clip(p.label || 'фото', 60)} (${i + 1})`, url: p.url, kind: p.use === 'logo' ? 'logo' : 'product' }));
+  const materials = [...asList(req?.materials), ...intelMats];
+  const step = stepsOf(ctx, { id: task.id, request_id: rid, campaign_id: campaignId, role: agent.role });
+  await step('Збираю дані: картку проєкту, профіль клієнта й результати агентів вище', 'running');
   const blocks = [projectBlock(project, campaign)];
   for (const f of def.clientFields || []) if (String(mine[f.key] || '').trim()) blocks.push({ title: `${f.label} (клієнт)`, text: clip(mine[f.key], 1500) });
   for (const f of def.fields || []) if (String(cfg[f.key] || '').trim()) blocks.push({ title: f.label, text: clip(cfg[f.key], 1800) });
@@ -349,9 +363,11 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   for (const f of cycleAgentFields(agent.role)) if (f.type !== 'check' && f.key !== 'max_usd' && String(cycleSet[f.key] || '').trim()) blocks.push({ title: `${f.label} (для цього завдання: важливіше за загальні налаштування)`, text: clip(cycleSet[f.key], 1500) });
   const orders = instructionBlock(campaign.config?.instructions, agent.role); // what the manager asked of this campaign's agents
   if (orders) blocks.push(orders);
-  if (req) blocks.push(requestBlock(req), materialsBlock(req.materials));
+  if (req) blocks.push(requestBlock(req), materialsBlock(materials));
   const own = await projectCreativeBlocks(db, campaign.project_id, now, { inputs: agent.role === 'creative_strategy' });
   if (agent.role !== 'creative_analyst') blocks.push(...own.blocks);
+  const intel = agent.role === 'creative_analyst' ? null : intelBlock(intelRow, now);
+  if (intel) blocks.push(intel);
   const failed = [];
   const accounts = await loadAccounts(db, campaign.project_id);
   const dept = sub;
@@ -385,11 +401,11 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     else blocks.push({ title: 'Аналіз ефективності креативів', text: 'Аналізу немає (новий клієнт або кабінет Meta не підключено): напрями спираються на дослідження й сайт.' });
     // research that is missing or outdated is no excuse to work blind: the strategist reads the site (and the named competitors) itself
     const fresh = (re) => blocks.some((x) => re.test(x.title) && /свіжий/.test(x.title));
-    if (!fresh(/^Дослідження бізнесу/)) blocks.push(...await siteBlocks(b.site || project.website, { limit: 2, read }));
+    if (!fresh(/^Дослідження бізнесу/) && !intel) blocks.push(...await siteBlocks(b.site || project.website, { limit: 2, read }));
     if (!fresh(/^(Дослідження конкурентів|Конкуренти)/) && String(b.competitors || '').trim()) blocks.push({ title: 'Конкуренти, яких вказав менеджер', text: clip(b.competitors, 2000) }, ...await siteBlocks(b.competitors, { limit: 3, read }));
     if (String(b.examples || '').trim()) blocks.push({ title: 'Приклади креативів конкурентів (описав або вставив менеджер)', text: clip(b.examples, 3000) });
     // the strategist LOOKS at the materials, the competitors' screenshots and the frames of the Figma file: the inventory is made from what it sees
-    const mats = asList(req?.materials);
+    const mats = materials;
     images = [
       ...mats.filter((m) => m.kind !== 'competitor').slice(0, 6).map((m) => ({ url: m.url, caption: `Матеріал клієнта: ${m.name} (${MATERIAL_KINDS[m.kind] || m.kind})` })),
       ...mats.filter((m) => m.kind === 'competitor').slice(0, 6).map((m) => ({ url: m.url, caption: `Реклама конкурента (скриншот): ${m.name}` })),
@@ -439,6 +455,14 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   const system = composeCreativeSystem(agent.role, prompt.body, mine.extra, language);
   // more directions = a longer JSON answer: the room for it grows with the number of directions the request asks for
   const ask = (content) => rec.callModel({ agentKey: `creative-${agent.role}`, params: { model: agent.model || MODEL, max_tokens: agent.role === 'creative_maker' ? Math.max(4200, makerTokens(brief?.concepts)) : json ? Math.min(16000, Math.max(4200, 1500 + 1200 * directionLimit(b))) : 2800, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content }] } });
+  const DOING = {
+    creative_strategy: 'Складаю план напрямків за запитом, карткою проєкту й профілем клієнта',
+    creative_brief: 'Пишу технічне завдання для креативщика й копірайтера за планом стратега',
+    creative_copywriter: 'Пишу тексти до креативів за технічним завданням',
+    creative_maker: 'Складаю запити для Higgsfield за технічним завданням: ' + (brief?.concepts?.length || 0) + ' концепцій',
+    creative_quality: 'Перевіряю тексти й запити перед менеджером',
+  };
+  await step(DOING[agent.role] || 'Працюю над завданням', 'running');
   let result;
   if (images.length) {
     const parts = [{ type: 'text', text: user }];
@@ -468,7 +492,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   }
   if (agent.role === 'creative_maker') {
     const parsed = parseCreativeMaker(raw, brief.concepts, clip(cycleSet.style || cfg.style, 600));
-    const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, req.materials); // a trial run saves nothing
+    const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, materials); // a trial run saves nothing
     const text = rows.map((c) => `**${c.concept_key} · ${c.ratio}**\n${c.prompt}`).join('\n\n');
     // the pictures go to Higgsfield at once, within the limit (the team's setting, on unless switched off; the agent's own «Генерувати одразу» counts too); what does not fit waits for the person
     const generation = !ctx.dryRun && (cycleSet.auto_generate === true || cfg.auto_generate || creativeAutoOf(campaign).auto) ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;

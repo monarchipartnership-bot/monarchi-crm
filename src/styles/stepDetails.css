@@ -34,3 +34,30 @@
 .sd-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--ck-chip); color: var(--ck-ink); font-size: .7rem; }
 .sd-nitem { gap: 8px; } .sd-ntext { margin: 0; font-size: .86rem; line-height: 1.5; color: var(--ck-ink); }
 .sd-nacts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* «Хід роботи» (live steps of the agents, variant A) and «Розвідка клієнта» */
+.sd-live { margin-top: 14px; }
+.sd-pulse { margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ck-deep) 22%, transparent); color: var(--ck-ink); font-size: .66rem; letter-spacing: .04em; text-transform: none; animation: sd-blink 1.6s ease-in-out infinite; }
+@keyframes sd-blink { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .sd-pulse { animation: none; } }
+.sd-feed { list-style: none; margin: 0 0 6px; padding: 4px 12px; border: 1px solid var(--ck-ln); border-radius: 12px; background: var(--ck-card); display: flex; flex-direction: column; }
+.sd-line { display: grid; grid-template-columns: 44px 10px auto 1fr; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--ck-ln); font-size: .84rem; line-height: 1.45; color: var(--ck-ink); }
+.sd-line:last-child { border-bottom: 0; }
+.sd-line time { color: var(--ck-sec); font-size: .74rem; font-variant-numeric: tabular-nums; }
+.sd-line em { font-style: normal; font-weight: 700; color: var(--ck-ink); }
+.sd-line span { color: var(--ck-sec); min-width: 0; overflow-wrap: anywhere; }
+.sd-line > :nth-child(3):last-child { grid-column: 3 / -1; }
+.sd-line:not(:has(em)) span { grid-column: 3 / -1; }
+.sd-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ck-ln); align-self: center; }
+.sd-line.is-run .sd-dot { background: var(--ck-deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ck-deep) 30%, transparent); }
+.sd-line.is-ok .sd-dot { background: var(--ck-ok); } .sd-line.is-bad .sd-dot { background: var(--ck-bad); } .sd-line.is-bad span { color: var(--ck-bad); }
+.ckp-node small.is-live { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; max-width: 170px; }
+.sd-intel { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.sd-intel-sum { margin: 0; font-size: .9rem; line-height: 1.55; color: var(--ck-ink); }
+.sd-photos { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.sd-photos button { border: 1px solid var(--ck-ln); border-radius: 10px; padding: 0; width: 64px; height: 64px; overflow: hidden; background: var(--ck-field); cursor: pointer; }
+.sd-photos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sd-photos button:focus-visible { outline: 2px solid var(--ck-deep); outline-offset: 2px; }
+.sd-photo-big { display: flex; flex-direction: column; gap: 6px; max-width: 360px; } .sd-photo-big img { width: 100%; border-radius: 12px; display: block; } .sd-photo-big div { display: flex; justify-content: space-between; gap: 10px; font-size: .8rem; color: var(--ck-sec); }
+.sd-profile { margin-top: 2px; }
+@media (max-width: 640px) { .sd-line { grid-template-columns: 40px 10px 1fr; } .sd-line em { grid-column: 3; } .sd-line span { grid-column: 3; } }

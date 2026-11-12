@@ -9,6 +9,7 @@
 import * as hfReal from './hfImage.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { creativeAutoOf } from '../../src/lib/agents/creativeTeam.js';
+import { logStep } from './taskSteps.js';
 
 export const DEFAULT_LIMIT_USD = 3;
 const STALE_MS = 40 * 60 * 1000; // a picture that is still «producing» after this long is given up
@@ -48,7 +49,10 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
   let spent = round(rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0)); // what this request already cost (a picture made again adds to its earlier price)
   const profile = hfReal.profileFromEnv();
   const out = { ok: true, estimateUsd: 0, count: 0, submitted: 0, skipped: [], failed: [], spent: 0, limit };
-  for (const row of want) {
+  const who = { request_id: requestId, campaign_id: req.campaign_id, role: 'creative_maker' };
+  const label = (row) => `«${row.concept_name || row.concept_key}», ${row.ratio}`;
+  const total = want.length;
+  for (const [i, row] of want.entries()) {
     const request = hfReal.buildImageRequest({ prompt: promptOf(row), negative_prompt: row.negative_prompt, ratio: row.ratio, references: refsOf(row) }, profile);
     let usd;
     try { usd = await hf.estimate({ request }); } catch (e) {
@@ -56,7 +60,7 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
       out.failed.push({ id: row.id, error: String(e.message || e) });
       continue;
     }
-    if (spent + usd > limit + 1e-9) { out.skipped.push(row.id); continue; }
+    if (spent + usd > limit + 1e-9) { out.skipped.push(row.id); if (!estimateOnly) await logStep(ctx, who, 'Картинка ' + (i + 1) + ' з ' + total + ' (' + label(row) + ') не вміщується в ліміт $' + limit + ': чекає підтвердження', 'info'); continue; }
     spent = round(spent + usd);
     out.estimateUsd = round(out.estimateUsd + usd);
     out.count += 1;
@@ -71,6 +75,7 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
         hf: { ...(row.hf || {}), ...(row.status === 'rejected' && String(row.note || '').trim() ? { rework: [...(Array.isArray(row.hf?.rework) ? row.hf.rework : []), { note: String(row.note).trim().slice(0, 600), at: now }].slice(-5) } : {}), model: request.path, job_id: job.jobId, status_url: job.statusUrl, estimate_usd: usd, charged_before: Number(row.cost_usd || 0), submitted_at: now, finished_at: null },
       }).eq('id', row.id), 'creative');
       out.submitted += 1;
+      await logStep(ctx, who, 'Higgsfield: картинка ' + (i + 1) + ' з ' + total + ' (' + label(row) + ') відправлена, очікую результат', 'running');
       await db.from('ag_creative_spend').insert({ creative_id: row.id, request_id: requestId, campaign_id: req.campaign_id, usd, kind: 'generation', model: request.path, job_id: job.jobId }); // the ledger of the agent page
     } catch (e) {
       spent = round(spent - usd);
@@ -78,6 +83,7 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
       out.count -= 1;
       must(await db.from('ag_creatives').update({ status: 'failed', note: String(e.message || e).slice(0, 300), updated_at: iso(ctx.now?.() || new Date()) }).eq('id', row.id), 'creative');
       out.failed.push({ id: row.id, error: String(e.message || e) });
+      await logStep(ctx, who, 'Higgsfield: картинка ' + (i + 1) + ' з ' + total + ' не відправилась: ' + String(e.message || e).slice(0, 120), 'failed');
     }
   }
   out.spent = spent;
@@ -109,6 +115,7 @@ export async function pollCreatives(ctx, { requestId = null } = {}) {
       const saved = await hf.persist({ db, url: r.url, requestId: row.request_id, creativeId: row.id });
       must(await db.from('ag_creatives').update({ status: 'review', asset_url: saved.url, asset_path: saved.path || null, hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id), 'creative');
       changed += 1;
+      await logStep(ctx, { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' }, 'Higgsfield: картинка «' + (row.concept_name || row.concept_key) + '», ' + row.ratio + ' готова', 'done');
     } else if (r.state === 'failed' || timedOut) {
       // the provider refused it (failed, moderated, canceled): it does not charge, so the price of this generation goes back. A picture that only
       // took too long may still be made and charged: its price stays.
@@ -116,6 +123,7 @@ export async function pollCreatives(ctx, { requestId = null } = {}) {
       must(await db.from('ag_creatives').update({ status: 'failed', cost_usd: refused ? Number(gen.charged_before || 0) : row.cost_usd, note: r.error || 'Higgsfield не відповів вчасно: картинку не отримано.', hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id), 'creative');
       if (refused && Number(gen.estimate_usd) > 0) await db.from('ag_creative_spend').insert({ creative_id: row.id, request_id: row.request_id, campaign_id: await campaignOf(row.request_id), usd: -Number(gen.estimate_usd), kind: 'refund', model: gen.model || null, job_id: gen.job_id || null });
       changed += 1;
+      await logStep(ctx, { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' }, 'Higgsfield: картинка «' + (row.concept_name || row.concept_key) + '», ' + row.ratio + ' не вийшла' + (r.error ? ': ' + String(r.error).slice(0, 100) : ' (не відповів вчасно)'), 'failed');
     }
   }
   return changed;

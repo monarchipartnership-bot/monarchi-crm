@@ -13,7 +13,7 @@ export default function DeptProjects({ agent, team, clients, tasks, reload, noti
     try { await fn(); if (okText) notify(okText); await reload(); } catch (e) { notify(e.message || 'Не вдалося виконати дію.', true); } finally { setBusy(null); }
   };
   const patch = (c, p, okText) => run(c.id, () => updateClientLink(c.id, p), okText);
-  const runsAlone = agent.role === 'creative_analyst'; // the others work on the requests of the client (started in the campaign), not on their own
+  const runsAlone = ['creative_analyst', 'creative_scout'].includes(agent.role); // the others work on the requests of the client (started in the campaign), not on their own
   const clientName = (c) => c.project?.name || c.campaign?.name || `Операція ${c.campaign_id}`;
 
   return (

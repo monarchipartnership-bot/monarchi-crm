@@ -5,7 +5,9 @@
 // into this file.
 import { ancestorsOf } from '../../src/lib/agents/chain.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
-import { CREATIVE_TEAM, REQUEST_ENTRY_ROLE, isCreativeRole, requestRoles } from '../../src/lib/agents/creativeTeam.js';
+import { CREATIVE_TEAM, REQUEST_ENTRY_ROLE, connectCampaign, isCreativeRole, requestRoles } from '../../src/lib/agents/creativeTeam.js';
+import { SCOUT_ROLE, intelState } from '../../src/lib/agents/clientIntel.js';
+import { scoutFailed } from './creativeScout.js';
 
 export const MAX_REWORK_ROUNDS = 2; // the quality checker may send the work back twice; the third time it goes to the person as it is
 
@@ -35,6 +37,64 @@ async function enqueue(db, agent, { campaignId, requestId, brief, by }) {
   return must(await db.from('ag_tasks').insert({ agent_id: agent.id, type: 'creative', status: 'queued', brief, created_by: by, request_id: requestId, campaign_id: campaignId }).select().single(), 'task');
 }
 
+// The scout of the client (owner, 2026-11-12): studies the site and the cabinet once and writes the profile that the agents read. It starts when the team is launched, when a request
+// finds no profile, when a profile is older than 30 days (then the work does not wait) and by the «Оновити» button (force). One scout task per client at a time.
+// → { started, reason? }
+export async function startIntel(ctx, campaignId, { force = false } = {}) {
+  const { db } = ctx;
+  const campaign = must(await db.from('ag_campaigns').select('*').eq('id', campaignId).maybeSingle(), 'campaign');
+  if (!campaign?.project_id) return { started: false, reason: 'no-project' };
+  if (['paused', 'archived'].includes(campaign.status)) return { started: false, reason: 'paused' };
+  await connectCampaign(db, campaign, { email: ctx.email, only: [SCOUT_ROLE] });
+  const dept = await loadDepartment(db);
+  const scout = dept.byRole.get(SCOUT_ROLE);
+  if (!scout || !scout.enabled) return { started: false, reason: 'off' };
+  const open = must(await db.from('ag_tasks').select('id').eq('agent_id', scout.id).eq('campaign_id', campaignId).in('status', ['queued', 'running']).limit(1), 'tasks') || [];
+  if (open.length) return { started: false, reason: 'active' };
+  const row = must(await db.from('ag_project_intel').select('status, summary, updated_at').eq('project_id', campaign.project_id).maybeSingle(), 'intel');
+  const state = intelState(row, ctx.now());
+  if (!force && state === 'fresh') return { started: false, reason: 'fresh' };
+  if (!force && state === 'failed' && Date.now() - new Date(row?.updated_at || 0).getTime() < 86400000) return { started: false, reason: 'recent-failure' }; // a closed site is not asked again and again
+  if (!row?.summary) must(await db.from('ag_project_intel').upsert({ project_id: campaign.project_id, status: 'running', task_id: null, updated_at: iso(ctx.now()) }, { onConflict: 'project_id' }), 'intel');
+  await enqueue(db, scout, { campaignId, requestId: null, brief: { trigger: 'intel', manual: true, force }, by: ctx.email || 'розвідка' });
+  return { started: true, state };
+}
+
+// A request that arrived before the profile of the client exists waits for the scout: the strategist reads the profile. → true when the request must wait.
+async function intelGate(ctx, campaign) {
+  const row = must(await ctx.db.from('ag_project_intel').select('status, summary, updated_at').eq('project_id', campaign.project_id).maybeSingle(), 'intel');
+  const state = intelState(row, ctx.now());
+  const r = await startIntel(ctx, campaign.id).catch((e) => { console.warn('startIntel failed:', e?.message || e); return { started: false, reason: 'error' }; });
+  return ['none', 'running'].includes(state) && (r.started || r.reason === 'active');
+}
+
+// The scout delivered (or failed for good): the requests that were waiting for it start their strategist now.
+export async function releaseWaitingRequests(ctx, campaignId) {
+  const { db } = ctx;
+  const reqs = must(await db.from('ag_creative_requests').select('id').eq('campaign_id', campaignId).eq('status', 'running'), 'requests') || [];
+  if (!reqs.length) return 0;
+  const dept = await loadDepartment(db);
+  const entry = dept.byRole.get(REQUEST_ENTRY_ROLE);
+  const links = await loadClientLinks(db, campaignId);
+  const link = entry ? links.get(entry.id) : null;
+  if (!entry || !entry.enabled || !link || !link.enabled || link.mode === 'paused') return 0;
+  let released = 0;
+  for (const r of reqs) {
+    const any = must(await db.from('ag_tasks').select('id').eq('request_id', r.id).limit(1), 'tasks') || [];
+    if (any.length) continue; // it already works
+    await enqueue(db, entry, { campaignId, requestId: r.id, brief: { trigger: 'request', manual: true, requestId: r.id, afterIntel: true }, by: 'розвідка' });
+    released += 1;
+  }
+  return released;
+}
+
+// The scout's task failed for good or was withdrawn: the profile is marked failed (when there never was one) and the waiting requests go on without it.
+export async function scoutEnded(ctx, task) {
+  const campaign = task?.campaign_id ? must(await ctx.db.from('ag_campaigns').select('project_id').eq('id', task.campaign_id).maybeSingle(), 'campaign') : null;
+  if (campaign?.project_id) await scoutFailed(ctx, campaign.project_id);
+  if (task?.campaign_id) await releaseWaitingRequests(ctx, task.campaign_id);
+}
+
 // The request is started by the person: the strategist of this client gets the first task (it runs even if the client's link is in manual mode:
 // the person asked). The campaign must not be paused or archived.
 export async function startRequest(ctx, requestId) {
@@ -55,6 +115,7 @@ export async function startRequest(ctx, requestId) {
   if (!link || !link.enabled || link.mode === 'paused') throw new Error('Для цього клієнта Агент креативний стратег вимкнений або на паузі (вкладка «Проєкти» на його сторінці).');
   const now = iso(ctx.now());
   must(await db.from('ag_creative_requests').update({ status: 'running', error: null, started_at: now, finished_at: null, updated_at: now }).eq('id', requestId), 'request');
+  if (campaign.project_id && await intelGate(ctx, campaign)) return { started: 0, waiting: 'intel', participants: participantsOf(dept, links).length }; // the strategist starts when the scout has delivered
   await enqueue(db, entry, { campaignId: req.campaign_id, requestId, brief: { trigger: 'request', manual: true, requestId }, by: ctx.email || 'запит' });
   return { started: 1, participants: participantsOf(dept, links).length };
 }
@@ -93,6 +154,7 @@ export async function reviseStep(ctx, taskId, comment) {
 // request and it has none of its own yet. A link in manual mode is not started by the chain (the person starts it); if something above failed,
 // the request waits until the task is retried.
 export async function fanOutRequest(ctx, team, agent, task) {
+  if (agent.role === SCOUT_ROLE) { await releaseWaitingRequests(ctx, task?.campaign_id); return; } // the scout has no chain: it releases the requests that waited for it
   const rid = task?.request_id;
   if (!rid) return;
   const { db } = ctx;

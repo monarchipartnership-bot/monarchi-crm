@@ -179,7 +179,7 @@ export default function DeptAgentWindow({ role, onClose, onOpenLegacy = null, in
                   const p = data.progress[t.request_id];
                   return (
                     <li key={t.id}>
-                      <span className="dwa-r-main"><b>{nameOf(t.campaign_id)}</b><span>{p?.title || (t.request_id ? `Запит ${t.request_id}` : agent.role === 'creative_analyst' ? 'тижневий аналіз' : 'завдання без запиту')}</span>{t.status === 'failed' && <span className="dwa-err">{t.error}</span>}</span>
+                      <span className="dwa-r-main"><b>{nameOf(t.campaign_id)}</b><span>{p?.title || (t.request_id ? `Запит ${t.request_id}` : agent.role === 'creative_analyst' ? 'тижневий аналіз' : agent.role === 'creative_scout' ? 'розвідка клієнта' : 'завдання без запиту')}</span>{t.status === 'failed' && <span className="dwa-err">{t.error}</span>}</span>
                       {p && <span className="dwa-mut" title={`${p.done} з ${p.total} кроків запиту`}>{p.done} з {p.total}</span>}
                       <span className={'dwa-chip ' + (t.status === 'failed' ? 'bad' : t.status === 'running' ? 'ok' : '')}><i />{TASK_STATUS[t.status]}</span>
                       {t.status === 'failed' && <button type="button" className="dwa-btn sm" disabled={busy} onClick={() => retry(t)}>Повторити</button>}

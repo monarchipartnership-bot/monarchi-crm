@@ -22,6 +22,9 @@ const text = (key, label, hint, rows = 4) => ({ key, label, type: 'textarea', ro
 // trigger: 'request' = works on the requests of the clients; 'schedule' = weekly, once per client.
 // fields: the department-wide settings of the agent (agent.config); clientFields: what is asked per client (ag_agent_clients.config).
 export const CREATIVE_ROLES = [
+  { role: 'creative_scout', name: 'Агент розвідник', short: 'сайт, товари й реклама клієнта', stage: 'data', row: 1, trigger: 'intel',
+    description: 'Перед першим креативом вивчає сайт клієнта (товари, ціни, тон, оформлення, фото) і найкращі реклами з кабінету Meta, складає профіль клієнта, який читають усі агенти відділу. Працює один раз при запуску команди, оновлюється кнопкою або раз на 30 днів.',
+    fields: [], clientFields: [] },
   { role: 'creative_analyst', name: 'Агент аналітик креативів', short: 'які креативи працюють', stage: 'data', row: 0, trigger: 'schedule', schedule: { weekday: 1, time: '09:15' },
     description: 'Раз на тиждень по кожному клієнту зв’язує креативи з результатами, шукає закономірності й віддає висновки Агенту креативний стратег.',
     fields: [], clientFields: [] },
@@ -246,9 +249,9 @@ export async function connectCampaign(db, campaign, { email = null, only = null 
 }
 
 // ---------------------------------------------------------------------------------------------------------------- connecting a client (campaign wizard)
-// The agents without which a request cannot be made: the strategist starts it, the brief writer turns the plan into a brief, the maker makes the
+// The agents without which a request cannot be made: the scout studies the client first, the strategist starts the request, the brief writer turns the plan into a brief, the maker makes the
 // pictures (see the required links). The others (the weekly analyst, the copywriter, the quality checker) can be left out for a client.
-export const CREATIVE_REQUIRED = ['creative_strategy', 'creative_brief', 'creative_maker'];
+export const CREATIVE_REQUIRED = ['creative_scout', 'creative_strategy', 'creative_brief', 'creative_maker'];
 export const CREATIVE_OPTIONAL = CREATIVE_ROLES.map((r) => r.role).filter((r) => !CREATIVE_REQUIRED.includes(r));
 
 // The pictures of a task (owner, 2026-11-12: «агенты делают задание вплоть до готового креатива, я утверждаю его, когда он готов»): they are generated at once, within a limit,
