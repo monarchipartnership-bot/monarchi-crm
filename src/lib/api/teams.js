@@ -39,7 +39,7 @@ export async function launchTeam({ teamKey, project, accounts = [], existing = [
   if (!def) throw new Error('Невідома команда.');
   if (teamKey === 'reports') return launchReports({ projectId: project.id, reports, email });
   if (teamsOf({ campaigns: existing }).teams.find((t) => t.key === teamKey)?.state !== 'none') throw new Error(`Команда «${def.title}» у цього проєкту вже працює.`);
-  if (teamKey === 'creative' && creativeTask) cleanRegular({ ...creativeTask.schedule, brief: creativeTask.brief }, { by: email }); // a task that cannot be saved is refused BEFORE anything is made
+  if (teamKey === 'creative' && creativeTask) cleanRegular({ ...creativeTask.schedule, ...(creativeTask.title ? { title: creativeTask.title } : {}), brief: creativeTask.brief }, { by: email }); // a task that cannot be saved is refused BEFORE anything is made
   const have = channels(accounts);
   const platforms = have.length ? have : ['tiktok'];
   let c = await createCampaign({ project, platforms, name: `${project.name} · ${def.title}`, email });
@@ -64,7 +64,7 @@ export async function launchTeam({ teamKey, project, accounts = [], existing = [
   if (teamKey === 'creative') await startIntel(c.id).catch((e) => console.warn('startIntel failed:', e?.message || e));
   let startError = '';
   if (teamKey === 'creative' && creativeTask) {
-    const { campaign: saved, regular } = await saveRegular(c.id, { enabled: true, ...creativeTask.schedule, brief: creativeTask.brief }, email);
+    const { campaign: saved, regular } = await saveRegular(c.id, { enabled: true, ...creativeTask.schedule, ...(creativeTask.title ? { title: creativeTask.title } : {}), brief: creativeTask.brief }, email);
     // the team stays launched even if the first run cannot start: the person is told why and the schedule goes on
     if (creativeTask.startNow) { try { await runRegularNow(saved, regular, email); } catch (e) { startError = e?.message || 'Перший запуск не вдалося почати.'; } }
   }

@@ -4515,7 +4515,7 @@ await ok('seasonal task: a regular task for a period; it ends by itself, the mai
 await ok('pictures of a creative task: generated at once unless the team switches it off, with a limit of the team; the person is asked only for what does not fit', () => {
   assert.deepEqual(creativeAutoOf(null), { auto: true, maxUsd: null }); // a team that never chose: automatic, the limit of the maker
   assert.deepEqual(creativeAutoOf({ config: { creative: { enabled: true, roles: [] } } }), { auto: true, maxUsd: null });
-  assert.deepEqual(creativeAutoOf({ config: { creative: { autoGenerate: false, maxUsd: 5 } } }), { auto: false, maxUsd: 5 });
+  assert.deepEqual(creativeAutoOf({ config: { creative: { autoGenerate: false, maxUsd: 5 } } }), { auto: true, maxUsd: 5 }); // the pictures are always made automatically (owner, 2026-11-12): only the limits hold the money
   assert.deepEqual(creativeAutoOf({ config: { creative: { autoGenerate: true, maxUsd: '2,5' } } }), { auto: true, maxUsd: null }); // a text that is not a number is no limit
   assert.deepEqual(creativeAutoOf({ config: { creative: { maxUsd: 4.5 } } }), { auto: true, maxUsd: 4.5 });
 });

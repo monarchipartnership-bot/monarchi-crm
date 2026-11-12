@@ -80,7 +80,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
       order.forEach((k) => {
         if (next[k]) return;
         if (k === 'analytics') next[k] = { rows: teamAgentPlan('analytics', data.accounts).map((p) => ({ ...p, enabled: true, mode: p.schedule?.everyDays ? 'every' : p.schedule?.weekday ? 'week' : p.runsAfter ? 'chain' : 'manual', every: p.schedule?.everyDays || 3, weekday: p.schedule?.weekday || 1, time: p.schedule?.time || '09:00' })) };
-        if (k === 'creative') next[k] = { optional: new Set(CREATIVE_OPTIONAL), plan: teamAgentPlan('creative'), goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: data.project.client_language || 'uk', mode: 'every', every: '3', days: [1, 3, 5], time: '09:00', start: today, startNow: true, auto: true, maxUsd: '3' };
+        if (k === 'creative') next[k] = { optional: new Set(CREATIVE_OPTIONAL), plan: teamAgentPlan('creative'), title: '', goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: data.project.client_language || 'uk', mode: 'every', every: '3', days: [1, 3, 5], time: '09:00', start: today, startNow: true, maxUsd: '3' };
         if (k === 'reports') next[k] = { weekly: true, weekday: 1, time: '09:00', monthly: true, mday: 1, mtime: '09:00', presentation: true };
       });
       return next;
@@ -136,7 +136,7 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
           teamKey: k, project: data.project, accounts: data.accounts, existing: data.campaigns, goals: goal, email,
           plan: k === 'analytics' ? p.rows.map((r) => ({ role: r.role, enabled: r.enabled, schedule: rowSchedule(r) })) : [],
           optional: k === 'creative' ? [...p.optional] : [],
-          creativeTask: k === 'creative' ? { brief: taskBrief(p), schedule: taskSchedule(p), startNow: p.startNow, autoGenerate: p.auto, maxUsd: p.auto ? Number(String(p.maxUsd).replace(',', '.')) || 3 : null } : null,
+          creativeTask: k === 'creative' ? { title: clip(p.title, 100), brief: { ...taskBrief(p), agent_settings: { creative_maker: { max_usd: String(Number(String(p.maxUsd).replace(',', '.')) || 3) } } }, schedule: taskSchedule(p), startNow: p.startNow, autoGenerate: true } : null, // the limit of the pictures is a setting of THIS task (the agent «креативщик»)
           capUsd: k !== 'reports' && Number(String(cap).replace(',', '.')) > 0 ? Number(String(cap).replace(',', '.')) : null,
           reports: k === 'reports' ? { weekly: p.weekly ? { weekday: Number(p.weekday), time: p.time.trim() } : null, monthly: p.monthly ? { day: Number(p.mday), time: p.mtime.trim() } : null, tasks: { presentation: p.presentation } } : null,
         });
@@ -254,12 +254,14 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
                 {tab === 'creative' && (
                   <>
                     <p className="tm-hint">Запуск команди й є регулярне завдання: агенти працюють за розкладом із цими параметрами. Усе про клієнта вони беруть із картки проєкту. Змінити можна будь-коли, а окреме разове завдання створюється кнопкою «Разове завдання».</p>
+                    <label className="tm-fl"><span>Назва завдання (необовʼязково)</span>
+                      <input className="tm-sel tm-text" type="text" maxLength={100} value={plans.creative.title} onChange={(e) => patchPlan('creative', { title: e.target.value })} placeholder="Наприклад: Постійні креативи" /></label>
                     <TaskBrief value={plans.creative} onChange={(patch) => patchPlan('creative', patch)} projectId={data.project.id} draftKey={draftKey}>
                       <div className="tm-fl tm-w2"><span>Коли запускати</span>
                         <ScheduleCalendar value={plans.creative} today={today} onChange={(patch) => patchPlan('creative', patch)} /></div>
                       <div className="tm-fl tm-w2"><span>Картинки</span>
-                        <label className="tm-agent-on"><input type="checkbox" checked={plans.creative.auto} onChange={(e) => patchPlan('creative', { auto: e.target.checked })} /><span><b>Генерувати картинки автоматично</b><small>Агенти доведуть завдання до готових креативів, а ви лише затверджуєте або повертаєте їх. Підтвердження просимо тільки тоді, коли вартість не вміщується в ліміт.</small></span></label>
-                        {plans.creative.auto && <label className="tm-cap">Ліміт на одне завдання, $<input className="tm-num" type="text" inputMode="decimal" value={plans.creative.maxUsd} onChange={(e) => patchPlan('creative', { maxUsd: e.target.value })} aria-label="Ліміт на картинки одного завдання, $" /><small>Картинка Higgsfield коштує приблизно $0.2: на $3 вийде близько 15 картинок.</small></label>}
+                        <p className="tm-hint">Картинки генеруються автоматично: агенти доведуть завдання до готових креативів, а ви лише затверджуєте або повертаєте їх. Витрати стримує ліміт: підтвердження просимо тільки тоді, коли вартість не вміщується в нього.</p>
+                        <label className="tm-cap">Ліміт на картинки цього завдання, $<input className="tm-num" type="text" inputMode="decimal" value={plans.creative.maxUsd} onChange={(e) => patchPlan('creative', { maxUsd: e.target.value })} aria-label="Ліміт на картинки одного завдання, $" /><small>Картинка Higgsfield коштує приблизно $0.2: на $3 вийде близько 15 картинок.</small></label>
                       </div>
                     </TaskBrief>
                     <p className="tm-hint">Агенти відділу: обовʼязкові працюють завжди, решту можна вимкнути.</p>

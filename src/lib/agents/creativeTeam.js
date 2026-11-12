@@ -263,7 +263,7 @@ export const DEFAULT_PICTURES_LIMIT_USD = 3;
 export function creativeAutoOf(campaign) {
   const c = campaign?.config?.creative;
   const max = Number(c?.maxUsd);
-  return { auto: c?.autoGenerate !== false, maxUsd: max > 0 ? max : null };
+  return { auto: true, maxUsd: max > 0 ? max : null }; // owner, 2026-11-12: the pictures are always made automatically, the spending is held by the limits (of the task and of the team)
 }
 
 // What the wizard decided for a campaign (campaign.config.creative = { enabled, roles }). A campaign that was never through the wizard step keeps the
