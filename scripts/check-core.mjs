@@ -3476,6 +3476,9 @@ await ok('creative department: the answers of the strategist, brief writer, copy
   assert.notEqual(brief.concepts[0].key, brief.concepts[1].key);
   assert.throws(() => parseCreativeBrief('not json', req), /не повернув/);
   assert.throws(() => parseCreativeBrief('{"concepts":[{"name":"no visual"}]}', req), /не повернув/);
+  // the copywriter writes «c1. Name» instead of the key: the text is still taken (live bug of 2026-11-12), c10 is not c1
+  const labelled = parseCreativeCopy(JSON.stringify({ texts: [{ concept: 'c1. Акція 3+1', headline: 'A' }, { concept: 'C2 — Other', headline: 'B' }, { concept: 'Other idea', headline: 'C' }, { concept: 'c10', headline: 'D' }] }), [{ key: 'c1', name: 'Акція 3+1' }, { key: 'c2', name: 'Other idea' }]);
+  assert.deepEqual(labelled.texts.map((t) => [t.concept, t.headline]), [['c1', 'A'], ['c2', 'B'], ['c2', 'C']]);
   const copy = parseCreativeCopy(JSON.stringify({ texts: [{ concept: 'c1', headline: 'H', primary_text: 'P' }, { concept: 'other', headline: 'H' }, { concept: 'c1' }] }), [{ key: 'c1' }]);
   assert.equal(copy.texts.length, 1);
   const prod = parseCreativeMaker('{"creatives":[{"concept":"c1","ratio":"1:1","prompt":"P1"}]}', [{ key: 'c1', name: 'N', ratios: ['1:1', '9:16'], visual: 'a sofa' }], 'warm light');

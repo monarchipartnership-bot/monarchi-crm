@@ -106,12 +106,25 @@ export function parseCreativeBrief(text, request = {}, directions = [], style = 
   return { summary: clip(j?.summary, 800), concepts, notes: clip(j?.notes, 800) };
 }
 
+// The copywriter sometimes writes the concept as «c1. Name» or «c1 — Name» instead of the plain key (live, Joiavegan-shop 2026-11-12: every text was dropped, «Текстів: 0»). The key is found at the start, or the name.
+function conceptKeyOf(raw, concepts) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  const exact = concepts.find((c) => c.key === s);
+  if (exact) return exact.key;
+  const low = s.toLowerCase();
+  const byKey = concepts.find((c) => low.startsWith(String(c.key).toLowerCase()) && !/[a-z0-9_]/i.test(low[String(c.key).length] || ' '));
+  if (byKey) return byKey.key;
+  const byName = concepts.find((c) => c.name && low.includes(String(c.name).toLowerCase()));
+  if (byName) return byName.key;
+  return '';
+}
+
 export function parseCreativeCopy(text, concepts = []) {
   const j = readJson(text);
-  const keys = new Set(concepts.map((c) => c.key));
   const texts = asList(j?.texts).map((t) => ({
-    concept: clip(t?.concept, 20), headline: clip(t?.headline, 90), primary_text: clip(t?.primary_text, 900), description: clip(t?.description, 160), cta: clip(t?.cta, 60),
-  })).filter((t) => keys.has(t.concept) && (t.headline || t.primary_text));
+    concept: conceptKeyOf(t?.concept, concepts), headline: clip(t?.headline, 90), primary_text: clip(t?.primary_text, 900), description: clip(t?.description, 160), cta: clip(t?.cta, 60),
+  })).filter((t) => t.concept && (t.headline || t.primary_text));
   return { texts, notes: clip(j?.notes, 800) };
 }
 
