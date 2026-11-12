@@ -43,7 +43,24 @@ export async function readShop(website, { onStep = async () => {}, fetchFn = fet
       pages.push({ url: r.url, title: p.title, description: p.description, text: p.text, images: imagesOf(b.text, r.url), ok: true });
     } catch (e) { pages.push({ url, ok: false, error: e.name === 'AbortError' ? 'час очікування вичерпано' : e.message, images: [] }); }
   }
-  return { pages, blockedByRobots: false, linksOnHome: homePage.links.length, shopPagesFound: urls.length };
+  const catalog = await readCatalog(home, { fetchFn, lookup, timeoutMs, robots });
+  return { pages, catalog, blockedByRobots: false, linksOnHome: homePage.links.length, shopPagesFound: urls.length };
+}
+
+// A Shopify shop publishes its catalogue at /products.json (public, no key): the real names, types, prices and pictures. Read only when robots.txt allows it; null for any other site.
+export async function readCatalog(home, { fetchFn = fetch, lookup, timeoutMs = 8000, robots = '', limit = 40 } = {}) {
+  if (!robotsAllows(robots, '/products.json')) return null;
+  try {
+    const r = await fetchOne(`${home.origin}/products.json?limit=${limit}`, { fetchFn, lookup, timeoutMs });
+    if (!r.res.ok) return null;
+    const body = await readBody(r.res);
+    const j = JSON.parse(body.text);
+    const list = Array.isArray(j?.products) ? j.products : [];
+    return list.slice(0, limit).map((x) => ({
+      title: clip(x.title, 120), type: clip(x.product_type, 60), price: clip(x.variants?.[0]?.price, 20), url: `${home.origin}/products/${clip(x.handle, 120)}`,
+      image: clip(x.images?.[0]?.src || x.image?.src, 600),
+    })).filter((x) => x.title);
+  } catch { return null; }
 }
 
 // The task of the scout. → { output, summary } like every handler of the department.
@@ -104,7 +121,20 @@ export async function scoutRun({ ctx, agent, task, prompt, rec, campaign, projec
 
   // ------------------------------------------------------------------------------------------------ nothing to look at
   const pages = shop.pages.filter((p) => p.ok);
-  let photos = pickPhotos(shop.pages, MAX_SITE_PHOTOS);
+  const catalog = Array.isArray(shop.catalog) ? shop.catalog : [];
+  if (catalog.length) { sources.catalog = catalog.length; await step('Знайдено каталог магазину: товарів ' + catalog.length, 'done'); }
+  // the pictures of the products of the catalogue come first (they show the goods), then the pictures of the pages
+  let photos = pickPhotos([{ url: site, images: catalog.filter((x) => x.image).slice(0, MAX_SITE_PHOTOS).map((x) => ({ url: x.image, alt: x.title, logo: false })) }, ...shop.pages], MAX_SITE_PHOTOS);
+  if (photos.length && !ctx.dryRun) {
+    await step('Зберігаю зображення сайту у власне сховище: ' + photos.length, 'running');
+    const copied = [];
+    for (let i = 0; i < photos.length; i += 1) {
+      const own = await (ctx.copyImage || copyImage)({ db, url: photos[i].url, path: 'scout/' + project.id + '/site-' + Date.now().toString(36) + '-' + (i + 1) });
+      if (own) copied.push({ ...photos[i], url: own, own: true });
+    }
+    photos = copied;
+    await step(photos.length ? 'Зображень збережено: ' + photos.length : 'Зображення сайту не вдалося зберегти', photos.length ? 'done' : 'info');
+  }
   if (!pages.length && !ads.length) {
     const profile = parseIntel({ gaps }, {});
     if (!ctx.dryRun && !before?.summary) await db.from('ag_project_intel').upsert({ project_id: project.id, status: 'failed', summary: '', profile, photos: [], sources, site_url: site || null, task_id: task.id, cost_usd: rec.state.cost, updated_at: new Date().toISOString() }, { onConflict: 'project_id' });
@@ -116,6 +146,7 @@ export async function scoutRun({ ctx, agent, task, prompt, rec, campaign, projec
   const card = [project.name && `Project: ${project.name}`, project.business_type && `Business type: ${project.business_type}`, project.country && `Country: ${project.country}`, project.notes && `Notes: ${clip(project.notes, 800)}`, project.additional_info && `More: ${clip(project.additional_info, 800)}`].filter(Boolean).join('\n');
   const text = [
     '### Project card', card || '(empty)',
+    catalog.length ? `### Catalogue of the shop (its public product list; prices as published, currency of the shop)\n${catalog.map((x) => `- ${x.title}${x.type ? ` | ${x.type}` : ''}${x.price ? ` | ${x.price}` : ''}`).join('\n')}` : '',
     ...pages.flatMap((p) => [`### Site page: ${p.title || p.url} (${p.url})`, clip(`${p.description ? `${p.description}\n` : ''}${p.text}`, 3200)]),
     ads.length ? `### Past ads of the client (the best by spend and results)\n${ads.map((a, i) => `${i + 1}. ${a.caption}; spend ${a.metrics?.spend ?? '?'}, purchases ${a.metrics?.purchases ?? '?'}, ROAS ${a.metrics?.roas ?? '?'}, CTR ${a.metrics?.ctr ?? '?'}`).join('\n')}` : '### Past ads of the client\nNone available.',
     gaps.length ? `### Already known gaps\n${gaps.map((g) => `- ${g}`).join('\n')}` : '',
@@ -152,7 +183,7 @@ export async function scoutRun({ ctx, agent, task, prompt, rec, campaign, projec
     await step(`Зберігаю фото товарів із сайту: ${parsed.photos.length}`, 'running');
     for (let i = 0; i < parsed.photos.length; i += 1) {
       const p = parsed.photos[i];
-      const own = ctx.dryRun ? p.url : await (ctx.copyImage || copyImage)({ db, url: p.url, path: `scout/${project.id}/site-${Date.now().toString(36)}-${i + 1}` });
+      const own = ctx.dryRun || p.own !== false ? p.url : await (ctx.copyImage || copyImage)({ db, url: p.url, path: `scout/${project.id}/site-${Date.now().toString(36)}-${i + 1}` });
       if (own) kept.push({ ...p, url: own });
     }
     parsed.photos = kept;
