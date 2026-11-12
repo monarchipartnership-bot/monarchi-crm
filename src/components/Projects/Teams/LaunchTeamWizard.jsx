@@ -6,12 +6,18 @@ import { CREATIVE_OPTIONAL, DEFAULT_CONCEPTS, TEXT_MODES, creativeRoleDef } from
 import { MAX_EVERY_DAYS, WEEKDAYS, cleanSchedule, describeSchedule } from '../../../lib/agents/campaignCycles';
 import { cleanRegular, kyivToday } from '../../../lib/agents/operationCycles';
 import ScheduleCalendar from './ScheduleCalendar';
+import { TeamRing } from './teamsUi';
+import Select from '../../common/Select';
+import '../../../styles/projectTeamsLaunch.css';
 import TaskBrief, { clearTaskDraft } from './TaskBrief';
 import { languageLabel } from '../../../lib/agents/languages';
 import { dayMonthOf, windowText } from '../../../lib/agents/scheduleCalendar';
 import { TEAMS, estimateMonthly, teamAgentPlan, teamReadiness, teamsOf, describePlanSchedule } from '../../../lib/agents/teams';
 
 const STEPS = ['Команди', 'Перевірка', 'Налаштування', 'Запуск'];
+const SCHED_MODES = [{ value: 'every', label: 'Кожні N днів' }, { value: 'week', label: 'Щотижня' }, { value: 'manual', label: 'Лише вручну' }];
+const WEEKDAY_OPTIONS = WEEKDAYS.map((d, i) => ({ value: String(i + 1), label: d }));
+const MONTH_DAY_OPTIONS = Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}-го числа` }));
 const PLATFORM = { meta: 'Meta', google: 'Google', tiktok: 'TikTok' };
 const STATUS_TEXT = { ready: ['Усе готово', 'is-ok'], warn: ['Можна запускати, є бажане', 'is-wait'], blocked: ['Треба дозаповнити', 'is-old'] };
 const clip = (v, n) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
@@ -146,173 +152,185 @@ export default function LaunchTeamWizard({ data, reload, email, onClose, onGoFil
   }
 
   const canNext = step === 1 ? picked.size > 0 : step === 2 ? blocked.length === 0 : true;
+  // the agents of a team for the tile of the first step (the first three and «+N»)
+  const agentNames = (k) => (k === 'reports' ? ['Агент звітів'] : teamAgentPlan(k, data.accounts).map((a) => a.name));
+  const sumChips = (k, p) => {
+    if (k === 'analytics') return p.rows.filter((r) => r.enabled).map((r) => `${r.name}: ${r.runsAfter ? 'після інших' : describePlanSchedule(rowSchedule(r)) || 'вручну'}`);
+    if (k === 'creative') return [describeSchedule(p.mode === 'every' ? { everyDays: Number(p.every), time: p.time } : { weekdays: p.days, time: p.time }) || 'за розкладом', `напрямів: ${p.count}`, `формати: ${p.ratios.join(', ') || '1:1'}`, `тексти: ${TEXT_MODES[p.texts].toLowerCase()}`, `мова клієнта: ${languageLabel(p.language)}`, `перший запуск ${p.startNow ? 'одразу' : `${p.mode === 'every' ? dayMonthOf(p.start) : 'за розкладом'} о ${p.time}`}`, `готово ${windowText(p.time)}`, `агентів: ${p.plan.filter((a) => !a.optional || p.optional.has(a.role)).length}`];
+    return [p.weekly && `тижневий: ${WEEKDAYS[p.weekday - 1]} о ${p.time}`, p.monthly && `місячний: ${p.mday}-го о ${p.mtime}`, p.presentation && 'презентації для клієнта'].filter(Boolean);
+  };
   return (
-    <div className="tm-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !launching) onClose(); }}>
-      <div ref={box} className="tm-win" role="dialog" aria-modal="true" aria-labelledby="tm-title" tabIndex={-1}>
-        <header className="tm-head">
-          <h2 id="tm-title">Запуск AI команди</h2>
-          <button type="button" className="tm-x" onClick={onClose} disabled={launching} aria-label="Закрити">×</button>
+    <div className="tml" data-dd="night" role="presentation">
+      <div ref={box} className="tml-win" role="dialog" aria-modal="true" aria-labelledby="tm-title" tabIndex={-1}>
+        <header className="tml-head">
+          <h2 id="tm-title"><TeamRing name="users" size={36} />Запуск AI команди</h2>
+          <button type="button" className="tml-x" onClick={onClose} disabled={launching} aria-label="Закрити">×</button>
         </header>
-        <ol className="tm-steps" aria-label="Кроки запуску">
-          {STEPS.map((label, i) => <li key={label} className={step === i + 1 ? 'on' : step > i + 1 ? 'done' : ''} aria-current={step === i + 1 ? 'step' : undefined}><b>{step > i + 1 ? '✓' : i + 1}</b>{label}</li>)}
+        <ol className="tml-rail" aria-label="Кроки запуску">
+          {STEPS.map((label, i) => <li key={label} className={step === i + 1 ? 'on' : step > i + 1 ? 'done' : ''} aria-current={step === i + 1 ? 'step' : undefined}><span className="tml-m">{step > i + 1 ? '✓' : i + 1}</span>{label}</li>)}
         </ol>
 
-        <div className="tm-body">
-          {error && <p className="pcr-error" role="alert">{error}</p>}
+        <div className="tml-body">
+          <div className="tml-in">
+            {error && <p className="pcr-error" role="alert">{error}</p>}
 
-          {step === 1 && (
-            <>
-              <p className="tm-lead">Оберіть команди, які мають працювати для цього клієнта. Можна одну, кілька або всі.</p>
-              <div className="tm-pick" role="group" aria-label="Команди">
-                {TEAMS.map((def) => {
-                  const st = view.teams.find((t) => t.key === def.key);
-                  const taken = st.state !== 'none';
-                  const on = picked.has(def.key);
+            {step === 1 && (
+              <>
+                <p className="tm-lead">Оберіть команди, які мають працювати для цього клієнта. Можна одну, кілька або всі.</p>
+                <div className="tml-tiles" role="group" aria-label="Команди">
+                  {TEAMS.map((def) => {
+                    const st = view.teams.find((t) => t.key === def.key);
+                    const taken = st.state !== 'none';
+                    const on = picked.has(def.key);
+                    const names = agentNames(def.key);
+                    return (
+                      <button key={def.key} type="button" className={'tml-tile' + (on ? ' on' : '') + (taken ? ' is-taken' : '')} disabled={taken} aria-pressed={on}
+                        onClick={() => setPicked((s) => { const n = new Set(s); if (n.has(def.key)) n.delete(def.key); else n.add(def.key); return n; })}>
+                        <span className="tml-tick" aria-hidden="true">{on ? '✓' : ''}</span>
+                        <TeamRing name={def.key} size={48} />
+                        <b>{def.title}</b>
+                        <small>{def.text.split('. ')[0].replace(/\.$/, '')}.</small>
+                        <span className="tml-mini">{names.slice(0, 3).map((n) => <span key={n}>{n}</span>)}{names.length > 3 && <span>+{names.length - 3}</span>}</span>
+                        {taken && <em>{st.state === 'running' ? 'вже працює' : 'вже запущена, зараз зупинена'}</em>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
+                <p className="tm-lead">Перевіряємо, чи заповнено все, що потрібно саме цим командам, і чи є доступи. Обовʼязкове треба заповнити, бажане можна пропустити.</p>
+                {order.map((k) => {
+                  const def = TEAMS.find((t) => t.key === k);
+                  const r = ready[k];
+                  const [text, tone] = STATUS_TEXT[r.status];
                   return (
-                    <button key={def.key} type="button" className={'tm-pickcard' + (on ? ' on' : '') + (taken ? ' is-taken' : '')} disabled={taken} aria-pressed={on}
-                      onClick={() => setPicked((s) => { const n = new Set(s); if (n.has(def.key)) n.delete(def.key); else n.add(def.key); return n; })}>
-                      <span className="tm-tick" aria-hidden="true">{on ? '✓' : ''}</span>
-                      <b>{def.title}</b>
-                      <small>{def.text}</small>
-                      {taken && <em>{st.state === 'running' ? 'вже працює' : 'вже запущена, зараз зупинена'}</em>}
-                    </button>
+                    <section key={k} className="tml-sec">
+                      <div className="tml-sec-h"><TeamRing name={k} size={32} /><h3>{def.title}</h3><span className={'pcr-state ' + tone}>{text}</span></div>
+                      <ul className="tm-access">
+                        {k !== 'creative' && <li className={data.accounts.length ? 'ok' : 'bad'}>Рекламні кабінети: {data.accounts.length ? data.accounts.map((a) => `${PLATFORM[a.platform] || a.platform}${a.account_name ? ` «${a.account_name}»` : ''}`).join(', ') + ' підключено' : 'жодного не підключено'}</li>}
+                        {k === 'creative' && <li className={data.project.website ? 'ok' : 'warn'}>Сайт клієнта: {data.project.website || 'не вказано'}</li>}
+                      </ul>
+                      {r.status === 'ready' && <p className="tm-ok">Усе, що потрібно цій команді, заповнено.</p>}
+                      <ul className="tm-miss-list">
+                        {r.required.map((x) => <Missing key={x.key} item={x} level="required" open={edit?.key === x.key} value={edit?.key === x.key ? edit.text : ''} saving={saving}
+                          onOpen={() => setEdit(edit?.key === x.key ? null : { key: x.key, text: '' })} onChange={(t) => setEdit({ key: x.key, text: t })} onSave={() => saveField(x)} onGo={onGoFill} />)}
+                        {r.recommended.map((x) => <Missing key={x.key} item={x} level="recommended" open={edit?.key === x.key} value={edit?.key === x.key ? edit.text : ''} saving={saving}
+                          onOpen={() => setEdit(edit?.key === x.key ? null : { key: x.key, text: '' })} onChange={(t) => setEdit({ key: x.key, text: t })} onSave={() => saveField(x)} onGo={onGoFill} />)}
+                      </ul>
+                    </section>
                   );
                 })}
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          {step === 2 && (
-            <>
-              <p className="tm-lead">Перевіряємо, чи заповнено все, що потрібно саме цим командам, і чи є доступи. Обовʼязкове треба заповнити, бажане можна пропустити.</p>
-              {order.map((k) => {
-                const def = TEAMS.find((t) => t.key === k);
-                const r = ready[k];
-                const [text, tone] = STATUS_TEXT[r.status];
-                return (
-                  <section key={k} className="tm-check">
-                    <div className="tm-check-h"><h3>{def.title}</h3><span className={'pcr-state ' + tone}>{text}</span></div>
-                    <ul className="tm-access">
-                      {k !== 'creative' && <li className={data.accounts.length ? 'ok' : 'bad'}>Рекламні кабінети: {data.accounts.length ? data.accounts.map((a) => `${PLATFORM[a.platform] || a.platform}${a.account_name ? ` «${a.account_name}»` : ''}`).join(', ') + ' підключено' : 'жодного не підключено'}</li>}
-                      {k === 'creative' && <li className={data.project.website ? 'ok' : 'warn'}>Сайт клієнта: {data.project.website || 'не вказано'}</li>}
-                    </ul>
-                    {r.status === 'ready' && <p className="tm-ok">Усе, що потрібно цій команді, заповнено.</p>}
-                    <ul className="tm-miss-list">
-                      {r.required.map((x) => <Missing key={x.key} item={x} level="required" open={edit?.key === x.key} value={edit?.key === x.key ? edit.text : ''} saving={saving}
-                        onOpen={() => setEdit(edit?.key === x.key ? null : { key: x.key, text: '' })} onChange={(t) => setEdit({ key: x.key, text: t })} onSave={() => saveField(x)} onGo={onGoFill} />)}
-                      {r.recommended.map((x) => <Missing key={x.key} item={x} level="recommended" open={edit?.key === x.key} value={edit?.key === x.key ? edit.text : ''} saving={saving}
-                        onOpen={() => setEdit(edit?.key === x.key ? null : { key: x.key, text: '' })} onChange={(t) => setEdit({ key: x.key, text: t })} onSave={() => saveField(x)} onGo={onGoFill} />)}
-                    </ul>
-                  </section>
-                );
-              })}
-            </>
-          )}
+            {step === 3 && tab && plans[tab] && (
+              <>
+                <p className="tm-lead">Розклад і режим роботи агентів. Усе можна змінити й після запуску.</p>
+                {order.length > 1 && <div className="tml-caps" role="tablist" aria-label="Команда">{order.map((k) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{TEAMS.find((t) => t.key === k).title}</button>)}</div>}
 
-          {step === 3 && tab && plans[tab] && (
-            <>
-              <p className="tm-lead">Розклад і режим роботи агентів. Усе можна змінити й після запуску.</p>
-              {order.length > 1 && <div className="pcr-tabs" role="tablist" aria-label="Команда">{order.map((k) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={'pcr-tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{TEAMS.find((t) => t.key === k).title}</button>)}</div>}
-
-              {tab === 'analytics' && (
-                <ul className="tm-agents">
-                  {plans.analytics.rows.map((r) => (
-                    <li key={r.role} className={'tm-agent' + (r.enabled ? '' : ' is-off')}>
-                      <label className="tm-agent-on"><input type="checkbox" checked={r.enabled} onChange={(e) => patchRow(r.role, { enabled: e.target.checked })} aria-label={`Увімкнути: ${r.name}`} /><span><b>{r.name}</b><small>{r.short}</small></span></label>
-                      {r.enabled && (r.runsAfter
-                        ? <span className="tm-when">працює після агентів, від яких залежить</span>
-                        : (
-                          <span className="tm-sched">
-                            <select className="tm-sel" value={r.mode} onChange={(e) => patchRow(r.role, { mode: e.target.value })} aria-label={`Як часто: ${r.name}`}>
-                              <option value="every">Кожні N днів</option><option value="week">Щотижня</option><option value="manual">Лише вручну</option>
-                            </select>
-                            {r.mode === 'every' && <><input className="tm-num" type="number" min="1" max={MAX_EVERY_DAYS} value={r.every} onChange={(e) => patchRow(r.role, { every: e.target.value })} aria-label={`Кожні скільки днів: ${r.name}`} /><span>дн.</span></>}
-                            {r.mode === 'week' && <select className="tm-sel" value={r.weekday} onChange={(e) => patchRow(r.role, { weekday: e.target.value })} aria-label={`День тижня: ${r.name}`}>{WEEKDAYS.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}</select>}
-                            {r.mode !== 'manual' && <input className="tm-time" type="text" inputMode="numeric" value={r.time} onChange={(e) => patchRow(r.role, { time: e.target.value })} placeholder="09:00" aria-label={`Час (Київ): ${r.name}`} />}
-                          </span>
-                        ))}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {tab === 'creative' && (
-                <>
-                  <p className="tm-hint">Запуск команди й є регулярне завдання: агенти працюють за розкладом із цими параметрами. Усе про клієнта вони беруть із картки проєкту. Змінити можна будь-коли, а окреме разове завдання створюється кнопкою «Разове завдання».</p>
-                  <TaskBrief value={plans.creative} onChange={(patch) => patchPlan('creative', patch)} projectId={data.project.id} draftKey={draftKey}>
-                    <div className="tm-fl tm-w2"><span>Коли запускати</span>
-                      <ScheduleCalendar value={plans.creative} today={today} onChange={(patch) => patchPlan('creative', patch)} /></div>
-                    <div className="tm-fl tm-w2"><span>Картинки</span>
-                      <label className="tm-agent-on"><input type="checkbox" checked={plans.creative.auto} onChange={(e) => patchPlan('creative', { auto: e.target.checked })} /><span><b>Генерувати картинки автоматично</b><small>Агенти доведуть завдання до готових креативів, а ви лише затверджуєте або повертаєте їх. Підтвердження просимо тільки тоді, коли вартість не вміщується в ліміт.</small></span></label>
-                      {plans.creative.auto && <label className="tm-cap">Ліміт на одне завдання, $<input className="tm-num" type="text" inputMode="decimal" value={plans.creative.maxUsd} onChange={(e) => patchPlan('creative', { maxUsd: e.target.value })} aria-label="Ліміт на картинки одного завдання, $" /><small>Картинка Higgsfield коштує приблизно $0.2: на $3 вийде близько 15 картинок.</small></label>}
-                    </div>
-                  </TaskBrief>
-                  <p className="tm-hint">Агенти відділу: обовʼязкові працюють завжди, решту можна вимкнути.</p>
+                {tab === 'analytics' && (
                   <ul className="tm-agents">
-                    {plans.creative.plan.map((a) => (
-                      <li key={a.role} className={'tm-agent' + (a.optional && !plans.creative.optional.has(a.role) ? ' is-off' : '')}>
-                        <label className="tm-agent-on">
-                          <input type="checkbox" checked={!a.optional || plans.creative.optional.has(a.role)} disabled={!a.optional} onChange={(e) => patchPlan('creative', { optional: (() => { const n = new Set(plans.creative.optional); if (e.target.checked) n.add(a.role); else n.delete(a.role); return n; })() })} aria-label={a.name} />
-                          <span><b>{a.name}</b><small>{a.short}{a.required ? ' · обовʼязковий' : ''}</small></span>
-                        </label>
-                        <span className="tm-when">{a.shared ? `за загальним розкладом відділу: ${describePlanSchedule(a.schedule)}` : 'працює за запитом на завдання'}</span>
+                    {plans.analytics.rows.map((r) => (
+                      <li key={r.role} className={'tm-agent' + (r.enabled ? '' : ' is-off')}>
+                        <label className="tm-agent-on"><input type="checkbox" checked={r.enabled} onChange={(e) => patchRow(r.role, { enabled: e.target.checked })} aria-label={`Увімкнути: ${r.name}`} /><span><b>{r.name}</b><small>{r.short}</small></span></label>
+                        {r.enabled && (r.runsAfter
+                          ? <span className="tm-when">працює після агентів, від яких залежить</span>
+                          : (
+                            <span className="tm-sched">
+                              <Select className="tm-ssel" value={r.mode} onChange={(v) => patchRow(r.role, { mode: v })} options={SCHED_MODES} ariaLabel={`Як часто: ${r.name}`} />
+                              {r.mode === 'every' && <><input className="tm-num" type="number" min="1" max={MAX_EVERY_DAYS} value={r.every} onChange={(e) => patchRow(r.role, { every: e.target.value })} aria-label={`Кожні скільки днів: ${r.name}`} /><span>дн.</span></>}
+                              {r.mode === 'week' && <Select className="tm-ssel" value={String(r.weekday)} onChange={(v) => patchRow(r.role, { weekday: v })} options={WEEKDAY_OPTIONS} ariaLabel={`День тижня: ${r.name}`} />}
+                              {r.mode !== 'manual' && <input className="tm-time" type="text" inputMode="numeric" value={r.time} onChange={(e) => patchRow(r.role, { time: e.target.value })} placeholder="09:00" aria-label={`Час (Київ): ${r.name}`} />}
+                            </span>
+                          ))}
                       </li>
                     ))}
                   </ul>
-                </>
-              )}
+                )}
 
-              {tab === 'reports' && (
-                <div className="tm-reports">
-                  <div className="tm-rep">
-                    <label className="tm-agent-on"><input type="checkbox" checked={plans.reports.weekly} onChange={(e) => patchPlan('reports', { weekly: e.target.checked })} /><span><b>Тижневий звіт</b><small>по кожній платформі й «Разом»</small></span></label>
-                    {plans.reports.weekly && <span className="tm-sched"><select className="tm-sel" value={plans.reports.weekday} onChange={(e) => patchPlan('reports', { weekday: e.target.value })} aria-label="День тижневого звіту">{WEEKDAYS.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}</select><input className="tm-time" type="text" inputMode="numeric" value={plans.reports.time} onChange={(e) => patchPlan('reports', { time: e.target.value })} aria-label="Час тижневого звіту" /></span>}
-                  </div>
-                  <div className="tm-rep">
-                    <label className="tm-agent-on"><input type="checkbox" checked={plans.reports.monthly} onChange={(e) => patchPlan('reports', { monthly: e.target.checked })} /><span><b>Місячний звіт</b><small>підсумок місяця з текстами тижневих</small></span></label>
-                    {plans.reports.monthly && <span className="tm-sched"><select className="tm-sel" value={plans.reports.mday} onChange={(e) => patchPlan('reports', { mday: e.target.value })} aria-label="День місячного звіту">{Array.from({ length: 28 }, (_, i) => <option key={i} value={i + 1}>{i + 1}-го числа</option>)}</select><input className="tm-time" type="text" inputMode="numeric" value={plans.reports.mtime} onChange={(e) => patchPlan('reports', { mtime: e.target.value })} aria-label="Час місячного звіту" /></span>}
-                  </div>
-                  <label className="tm-agent-on"><input type="checkbox" checked={plans.reports.presentation} onChange={(e) => patchPlan('reports', { presentation: e.target.checked })} /><span><b>Презентація для клієнта</b><small>зі збереженого звіту</small></span></label>
-                  <p className="tm-hint">Отримувачі, чат Telegram і затверджувачі звітів налаштовуються в команді після запуску.</p>
-                </div>
-              )}
-            </>
-          )}
-
-          {step === 4 && (
-            <>
-              <p className="tm-lead">Перевірте, що буде запущено.</p>
-              {goal && <p className="tm-goal"><b>Мета з картки проєкту:</b> {goal}</p>}
-              {order.map((k) => {
-                const def = TEAMS.find((t) => t.key === k);
-                const p = plans[k];
-                const e = estimates.find((x) => x.key === k);
-                return (
-                  <section key={k} className="tm-sum">
-                    <h3>{def.title}</h3>
-                    <ul>
-                      {k === 'analytics' && p.rows.filter((r) => r.enabled).map((r) => <li key={r.role}><b>{r.name}</b>: {r.runsAfter ? 'після агентів, від яких залежить' : describePlanSchedule(rowSchedule(r)) || 'лише вручну'}</li>)}
-                      {k === 'creative' && <><li><b>Завдання:</b> {p.goal.trim() || '—'}</li><li>Напрямів: {p.count} · формати: {p.ratios.join(', ') || '1:1'} · тексти: {TEXT_MODES[p.texts].toLowerCase()} · мова клієнта: {languageLabel(p.language)}</li><li>Запускається {describeSchedule(p.mode === 'every' ? { everyDays: Number(p.every), time: p.time } : { weekdays: p.days, time: p.time }) || 'за розкладом'}; перший запуск {p.startNow ? 'одразу, далі за розкладом' : `${p.mode === 'every' ? dayMonthOf(p.start) : 'за розкладом'} о ${p.time}`}; за розкладом готово {windowText(p.time)}</li><li>Агентів відділу: {p.plan.filter((a) => !a.optional || p.optional.has(a.role)).map((a) => creativeRoleDef(a.role)?.name || a.role).length}</li></>}
-                      {k === 'reports' && <>{p.weekly && <li>Тижневий звіт: {WEEKDAYS[p.weekday - 1]} о {p.time}</li>}{p.monthly && <li>Місячний звіт: {p.mday}-го числа о {p.mtime}</li>}{p.presentation && <li>Презентації для клієнта</li>}</>}
+                {tab === 'creative' && (
+                  <>
+                    <p className="tm-hint">Запуск команди й є регулярне завдання: агенти працюють за розкладом із цими параметрами. Усе про клієнта вони беруть із картки проєкту. Змінити можна будь-коли, а окреме разове завдання створюється кнопкою «Разове завдання».</p>
+                    <TaskBrief value={plans.creative} onChange={(patch) => patchPlan('creative', patch)} projectId={data.project.id} draftKey={draftKey}>
+                      <div className="tm-fl tm-w2"><span>Коли запускати</span>
+                        <ScheduleCalendar value={plans.creative} today={today} onChange={(patch) => patchPlan('creative', patch)} /></div>
+                      <div className="tm-fl tm-w2"><span>Картинки</span>
+                        <label className="tm-agent-on"><input type="checkbox" checked={plans.creative.auto} onChange={(e) => patchPlan('creative', { auto: e.target.checked })} /><span><b>Генерувати картинки автоматично</b><small>Агенти доведуть завдання до готових креативів, а ви лише затверджуєте або повертаєте їх. Підтвердження просимо тільки тоді, коли вартість не вміщується в ліміт.</small></span></label>
+                        {plans.creative.auto && <label className="tm-cap">Ліміт на одне завдання, $<input className="tm-num" type="text" inputMode="decimal" value={plans.creative.maxUsd} onChange={(e) => patchPlan('creative', { maxUsd: e.target.value })} aria-label="Ліміт на картинки одного завдання, $" /><small>Картинка Higgsfield коштує приблизно $0.2: на $3 вийде близько 15 картинок.</small></label>}
+                      </div>
+                    </TaskBrief>
+                    <p className="tm-hint">Агенти відділу: обовʼязкові працюють завжди, решту можна вимкнути.</p>
+                    <ul className="tm-agents">
+                      {plans.creative.plan.map((a) => (
+                        <li key={a.role} className={'tm-agent' + (a.optional && !plans.creative.optional.has(a.role) ? ' is-off' : '')}>
+                          <label className="tm-agent-on">
+                            <input type="checkbox" checked={!a.optional || plans.creative.optional.has(a.role)} disabled={!a.optional} onChange={(e) => patchPlan('creative', { optional: (() => { const n = new Set(plans.creative.optional); if (e.target.checked) n.add(a.role); else n.delete(a.role); return n; })() })} aria-label={a.name} />
+                            <span><b>{a.name}</b><small>{a.short}{a.required ? ' · обовʼязковий' : ''}</small></span>
+                          </label>
+                          <span className="tm-when">{a.shared ? `за загальним розкладом відділу: ${describePlanSchedule(a.schedule)}` : 'працює за запитом на завдання'}</span>
+                        </li>
+                      ))}
                     </ul>
-                    <p className="tm-est">{k === 'creative' ? 'Вартість: ' : 'Орієнтовна вартість: '}{e.usd ? <b>≈ ${e.usd.toFixed(2)} на місяць</b> : null} {e.text}</p>
-                  </section>
-                );
-              })}
-              {order.some((k) => k !== 'reports') && (
-                <label className="tm-cap">Ліміт витрат на місяць для команд операції, $
-                  <input className="tm-num" type="text" inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} aria-label="Ліміт витрат на місяць" />
-                  <small>Досягши ліміту, команда не запускає нових платних кроків і попереджає вас. Порожньо: без ліміту.</small>
-                </label>
-              )}
-              <p className="tm-hint">Оцінка враховує лише роботу агентів. Картинки Higgsfield рахуються окремо (≈ $0.2 за штуку): вони генеруються автоматично в межах ліміту на завдання й операції.{total ? ` Разом за агентів: ≈ $${total.toFixed(2)} на місяць.` : ''}</p>
-            </>
-          )}
+                  </>
+                )}
+
+                {tab === 'reports' && (
+                  <div className="tm-reports">
+                    <div className="tm-rep">
+                      <label className="tm-agent-on"><input type="checkbox" checked={plans.reports.weekly} onChange={(e) => patchPlan('reports', { weekly: e.target.checked })} /><span><b>Тижневий звіт</b><small>по кожній платформі й «Разом»</small></span></label>
+                      {plans.reports.weekly && <span className="tm-sched"><Select className="tm-ssel" value={String(plans.reports.weekday)} onChange={(v) => patchPlan('reports', { weekday: v })} options={WEEKDAY_OPTIONS} ariaLabel="День тижневого звіту" /><input className="tm-time" type="text" inputMode="numeric" value={plans.reports.time} onChange={(e) => patchPlan('reports', { time: e.target.value })} aria-label="Час тижневого звіту" /></span>}
+                    </div>
+                    <div className="tm-rep">
+                      <label className="tm-agent-on"><input type="checkbox" checked={plans.reports.monthly} onChange={(e) => patchPlan('reports', { monthly: e.target.checked })} /><span><b>Місячний звіт</b><small>підсумок місяця з текстами тижневих</small></span></label>
+                      {plans.reports.monthly && <span className="tm-sched"><Select className="tm-ssel" value={String(plans.reports.mday)} onChange={(v) => patchPlan('reports', { mday: v })} options={MONTH_DAY_OPTIONS} ariaLabel="День місячного звіту" /><input className="tm-time" type="text" inputMode="numeric" value={plans.reports.mtime} onChange={(e) => patchPlan('reports', { mtime: e.target.value })} aria-label="Час місячного звіту" /></span>}
+                    </div>
+                    <div className="tm-rep">
+                      <label className="tm-agent-on"><input type="checkbox" checked={plans.reports.presentation} onChange={(e) => patchPlan('reports', { presentation: e.target.checked })} /><span><b>Презентація для клієнта</b><small>зі збереженого звіту</small></span></label>
+                    </div>
+                    <p className="tm-hint">Отримувачі, чат Telegram і затверджувачі звітів налаштовуються в команді після запуску.</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {step === 4 && (
+              <>
+                <p className="tm-lead">Перевірте, що буде запущено.</p>
+                {goal && <p className="tm-goal"><b>Мета з картки проєкту:</b> {goal}</p>}
+                <div className="tml-sum">
+                  {order.map((k) => {
+                    const def = TEAMS.find((t) => t.key === k);
+                    const p = plans[k];
+                    const e = estimates.find((x) => x.key === k);
+                    return (
+                      <section key={k} className="tml-card">
+                        <div className="tml-card-h"><TeamRing name={k} size={34} /><b>{def.title}</b></div>
+                        {k === 'creative' && <small>{p.goal.trim() || '—'}</small>}
+                        <div className="tml-chips">{sumChips(k, p).map((c) => <span key={c}>{c}</span>)}</div>
+                        <p className="tml-cost">{e.usd ? <b>≈ ${e.usd.toFixed(2)} / міс</b> : null}<small>{e.text}</small></p>
+                      </section>
+                    );
+                  })}
+                  {total > 0 && <div className="tml-big"><span>Разом за агентів на місяць</span><b>≈ ${total.toFixed(2)}</b></div>}
+                </div>
+                {order.some((k) => k !== 'reports') && (
+                  <label className="tm-cap">Ліміт витрат на місяць для команд операції, $
+                    <input className="tm-num" type="text" inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} aria-label="Ліміт витрат на місяць" />
+                    <small>Досягши ліміту, команда не запускає нових платних кроків і попереджає вас. Порожньо: без ліміту.</small>
+                  </label>
+                )}
+                <p className="tm-hint">Оцінка враховує лише роботу агентів. Картинки Higgsfield рахуються окремо (≈ $0.2 за штуку): вони генеруються автоматично в межах ліміту на завдання й операції.</p>
+              </>
+            )}
+          </div>
         </div>
 
-        <footer className="tm-foot">
+        <footer className="tml-foot">
           {step > 1 ? <button type="button" className="btn" disabled={launching} onClick={() => go(step - 1)}>Назад</button> : <span />}
-          <span className="tm-foot-note">{step === 2 && blocked.length > 0 ? 'Заповніть обовʼязкові поля, щоб продовжити.' : ''}</span>
+          <span className="tml-mid">{step === 2 && blocked.length > 0 ? <span className="tml-warn">Заповніть обовʼязкові поля, щоб продовжити.</span> : <>Крок <b>{step}</b> з 4 · {STEPS[step - 1]}</>}</span>
           {step < 4 ? <button type="button" className="btn btn-p" disabled={!canNext} onClick={() => go(step + 1)}>Далі</button>
             : <button type="button" className="btn btn-p" disabled={launching} onClick={launch}>{launching ? 'Запускаємо…' : 'Запустити'}</button>}
         </footer>

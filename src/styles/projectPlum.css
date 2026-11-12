@@ -1,0 +1,185 @@
+/* The card of a project (/projects/:id) in the plum palette of the AI Agents section (owner's pick 2026-11-12, artifact 1hTVf7iYM6aJnNwW3N6k5X):
+   plum page + glass header | the menu of AI Agents (a capsule with round medallions and a soft light line under the active one) | «Інформація про проєкт» in plum:
+   sub-sections as text with a glowing line, the summary «ring + next step», soft blocks, the ad accounts on the left and the form on the right, the fields of the agents
+   as cards in two columns with a frame in the colour of the state, readiness as cards, files as tiles. The other tabs of the card keep their light Hub look on a light sheet.
+   Loaded after projectHub.css; everything is scoped to .is-plum (set in ProjectDetail.jsx) and, for the information section, to .pw-dark. */
+
+.main:has(.project-detail-page.pw.is-plum) {
+  background:
+    radial-gradient(ellipse 70% 50% at 14% 108%, rgba(181, 68, 181, .24), transparent 70%),
+    radial-gradient(ellipse 55% 40% at 94% -8%, rgba(235, 156, 239, .09), transparent 70%),
+    linear-gradient(180deg, #17051c 0%, #270827 100%);
+}
+.project-detail-page.pw.is-plum { --pl-ink: #F6E9FA; --pl-sec: #D6AEE0; --pl-ln: rgba(235, 156, 239, .3); --pl-chip: rgba(235, 156, 239, .14); --pl-soft: rgba(255, 255, 255, .06); --pl-card: rgba(52, 16, 52, .92); --pl-field: rgba(23, 5, 28, .6); --pl-acc: #EB9CEF; --pl-ok: #4BE07F; --pl-warn: #FBBF24; --pl-bad: #FF8A8A; --pl-disc: #2c0f2c; color: var(--pl-ink); }
+.project-detail-page.pw.is-plum :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid #F0C4F5; outline-offset: 3px; }
+
+/* ---- the header: a glass box ---- */
+.project-detail-page.pw.is-plum .pd-header.pw-head { background: rgba(255, 255, 255, .04); border: 0; box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-head .hub-ring::before { background: var(--pl-disc); }
+.project-detail-page.pw.is-plum input.pd-title-input:not([type=checkbox]):not([type=radio]) { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum input.pd-title-input:not([type=checkbox]):not([type=radio]):focus { background: var(--pl-field); box-shadow: inset 0 0 0 1.5px var(--pl-acc); }
+.project-detail-page.pw.is-plum .pw-head .pw-chip { background: var(--pl-chip); box-shadow: inset 0 0 0 1.5px var(--pl-ln); color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-head .pw-chip--platform { background: var(--pl-chip); box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-head .pw-chip--ok { background: rgba(75, 224, 127, .16); color: var(--pl-ok); box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-head .pw-chip--warn { background: rgba(251, 191, 36, .16); color: var(--pl-warn); box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-head .pw-chip--bad { background: rgba(255, 138, 138, .16); color: var(--pl-bad); box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-head .pw-chip--muted { background: var(--pl-chip); color: var(--pl-sec); box-shadow: none; }
+.project-detail-page.pw.is-plum .pd-header-actions .pw-btn { background: rgba(235, 156, 239, .12); color: var(--pl-ink); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pd-header-actions .pw-btn:hover:not(:disabled) { background: rgba(235, 156, 239, .12); color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pd-header-actions .pw-btn--primary, .project-detail-page.pw.is-plum .pd-header-actions .pw-btn--primary:hover:not(:disabled) { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+
+/* ---- the menu of the card = the menu of AI Agents ---- */
+.project-detail-page.pw.is-plum .pw-tabs { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 2px; width: max-content; max-width: 100%; margin: 6px auto 16px; padding: 4px; border-radius: 999px; background: var(--pl-card); box-shadow: inset 0 0 0 1.5px var(--pl-ln), 0 0 24px rgba(181, 68, 181, .25); }
+.project-detail-page.pw.is-plum .pw-tab { position: relative; gap: 10px; padding: 4px 16px 4px 4px; background: none; box-shadow: none; color: var(--pl-ink); font-size: 13.5px; font-weight: 700; }
+.project-detail-page.pw.is-plum .pw-tab-m { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .5); color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-tab-m svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.project-detail-page.pw.is-plum .pw-tab[aria-selected=true] { background: rgba(235, 156, 239, .1); color: var(--pl-ink); border: 0; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-tab[aria-selected=true] .pw-tab-m { background: rgba(181, 68, 181, .3); box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 12px rgba(235, 156, 239, .7); color: #fff; }
+.project-detail-page.pw.is-plum .pw-tab[aria-selected=true]::after { content: ""; position: absolute; left: 54px; right: 18px; bottom: 3px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 4px #EB9CEF); }
+.project-detail-page.pw.is-plum .pw-tab-n { background: #FBBF24; color: #3b2400; }
+
+/* ---- the other tabs of the card keep their light Hub look, on a light sheet ---- */
+.project-detail-page.pw.is-plum .pw-sheet { padding: 18px; border-radius: 28px; background: #FAF7FB; color: #270827; }
+
+/* ======== «Інформація про проєкт» (.pw-dark) ======== */
+.project-detail-page.pw.is-plum .pw-dark { color: var(--pl-ink); }
+/* the sub-sections: text with a glowing line */
+.project-detail-page.pw.is-plum .pw-dark .pcr-tabs.pw-isub { display: flex; flex-wrap: wrap; gap: 26px; margin: 0 0 14px; padding: 0; border: 0; border-bottom: 1.5px solid var(--pl-ln); border-radius: 0; background: none; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-dark .pw-isub .pcr-tab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 42px; min-height: 0; padding: 0 2px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--pl-sec); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.project-detail-page.pw.is-plum .pw-dark .pw-isub .pcr-tab.on { color: #fff; background: none; }
+.project-detail-page.pw.is-plum .pw-dark .pw-isub .pcr-tab.on::after { content: ""; position: absolute; left: -8px; right: -8px; bottom: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 4px #EB9CEF); }
+.pw-isub-n { padding: 2px 8px; border-radius: 99px; background: rgba(235, 156, 239, .16); color: var(--pl-ink); font-size: 11.5px; font-weight: 700; }
+.pw-isub-n.is-warn { background: var(--pl-warn); color: #2a1a00; }
+/* the summary: the ring + the next step */
+.project-detail-page.pw.is-plum .pw-sum { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin: 0 0 14px; padding: 18px 20px; border-radius: 28px; background: var(--pl-soft); }
+.pw-sum-ring { --p: 0; position: relative; flex: none; width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(#B544B5 calc(var(--p) * 1%), rgba(235, 156, 239, .16) 0); }
+.pw-sum-ring::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--pl-disc, #2c0f2c); }
+.pw-sum-ring b { position: relative; font-size: 20px; font-weight: 800; }
+.pw-sum-tx { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 2px; } .pw-sum-tx b { font-size: 16px; } .pw-sum-tx span { color: var(--pl-sec); font-size: 13px; }
+.project-detail-page.pw.is-plum .pw-sum .pw-btn { margin-left: auto; }
+
+/* soft blocks */
+.project-detail-page.pw.is-plum .pw-dark .report-section, .project-detail-page.pw.is-plum .pw-dark .pw-card, .project-detail-page.pw.is-plum .pw-dark .pcr-card { border: 0; border-radius: 28px; background: var(--pl-soft); box-shadow: none; color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-card { padding: 18px 20px; gap: 14px; }
+.project-detail-page.pw.is-plum .pw-dark .stitle, .project-detail-page.pw.is-plum .pw-dark .pw-card .ov-field-label { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .hub-ring::before { background: var(--pl-disc); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-head { padding-bottom: 0; border: 0; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-head .hub-title { color: var(--pl-ink); font-size: 17px; font-weight: 800; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-sub, .project-detail-page.pw.is-plum .pw-dark .pcr-hint, .project-detail-page.pw.is-plum .pw-dark .pacc-hint { color: var(--pl-sec); font-size: 13px; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-h4 { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-error, .project-detail-page.pw.is-plum .pw-dark .pacc-err { background: rgba(255, 138, 138, .13); color: #ffb3b3; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ok { color: var(--pl-ok); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-brandnote { background: rgba(75, 224, 127, .13); color: #8be8b9; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-empty, .project-detail-page.pw.is-plum .pw-dark .pcr-group-empty, .project-detail-page.pw.is-plum .pw-dark .pacc-empty { border-color: var(--pl-ln); color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-none { color: #8a6a98; }
+
+/* «Основне»: the ad accounts on the left, the form of the project on the right */
+.project-detail-page.pw.is-plum .pw-dark .pw-ov { grid-template-columns: minmax(0, 1fr) minmax(330px, 400px); }
+.project-detail-page.pw.is-plum .pw-dark .pw-ov-side { order: 2; }
+.project-detail-page.pw.is-plum .pw-dark .pw-about .ov-group { background: rgba(255, 255, 255, .04); }
+.project-detail-page.pw.is-plum .pw-dark .ov-group-title, .project-detail-page.pw.is-plum .pw-dark .pw-about .ov-group-title { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .ov-group-hint, .project-detail-page.pw.is-plum .pw-dark .ov-field-label, .project-detail-page.pw.is-plum .pw-dark .pacc-card-sub, .project-detail-page.pw.is-plum .pw-dark .ov-save-state { color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .ov-field-box { background: var(--pl-card); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .ov-field-box:has(input, .ui-select, .date-picker, .status-picker, .svc-picker, .client-picker, textarea) { background: none; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-dark .ov-field-value { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .ov-field-icon { background: rgba(235, 156, 239, .16); }
+.project-detail-page.pw.is-plum .pw-dark .ov-field-icon svg { stroke: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .ov-save-state { background: rgba(235, 156, 239, .14); }
+.project-detail-page.pw.is-plum .pw-dark .ov-save-state.saved { background: rgba(75, 224, 127, .16); color: var(--pl-ok); }
+.project-detail-page.pw.is-plum .pw-dark .ov-save-state.saving { background: rgba(251, 191, 36, .16); color: var(--pl-warn); }
+.project-detail-page.pw.is-plum .pw-dark .ov-save-state.error { background: rgba(255, 138, 138, .16); color: var(--pl-bad); }
+/* fields, pickers */
+.project-detail-page.pw.is-plum .pw-dark input:not([type=checkbox]):not([type=radio]):not(.pd-title-input):not(.pb-hex), .project-detail-page.pw.is-plum .pw-dark select, .project-detail-page.pw.is-plum .pw-dark textarea,
+.project-detail-page.pw.is-plum .pw-dark .ui-select-trigger, .project-detail-page.pw.is-plum .pw-dark .date-picker-trigger, .project-detail-page.pw.is-plum .pw-dark .time-picker-trigger { background: var(--pl-field); color: var(--pl-ink); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark input:not([type=checkbox]):not([type=radio]):not(.pd-title-input):not(.pb-hex):focus, .project-detail-page.pw.is-plum .pw-dark textarea:focus, .project-detail-page.pw.is-plum .pw-dark .ui-select-trigger:focus-visible { box-shadow: inset 0 0 0 1.5px var(--pl-acc); outline: none; }
+.project-detail-page.pw.is-plum .pw-dark input::placeholder, .project-detail-page.pw.is-plum .pw-dark textarea::placeholder, .project-detail-page.pw.is-plum .pw-dark .ui-select-placeholder, .project-detail-page.pw.is-plum .pw-dark .date-picker-placeholder { color: #8a6a98; }
+.project-detail-page.pw.is-plum .pw-dark .ui-select-chevron, .project-detail-page.pw.is-plum .pw-dark .date-picker-ic, .project-detail-page.pw.is-plum .pw-dark .time-picker-ic { background: rgba(235, 156, 239, .16); color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .status-picker { background: var(--pl-soft); }
+.project-detail-page.pw.is-plum .pw-dark .status-btn { color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .status-btn.on { background: var(--pl-card); color: var(--pl-ink); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .svc-opt span { background: var(--pl-card); color: var(--pl-sec); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .svc-opt input:checked + span { background: rgba(181, 68, 181, .3); color: #fff; box-shadow: inset 0 0 0 1.5px var(--pl-acc); }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-selected { background: rgba(181, 68, 181, .3); color: #fff; box-shadow: inset 0 0 0 1.5px var(--pl-acc); }
+/* buttons */
+.project-detail-page.pw.is-plum .pw-dark .pw-btn, .project-detail-page.pw.is-plum .pw-dark .btn, .project-detail-page.pw.is-plum .pw-dark .pw-btn:hover:not(:disabled), .project-detail-page.pw.is-plum .pw-dark .btn:hover:not(:disabled) { background: rgba(235, 156, 239, .12); color: var(--pl-ink); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pw-btn--primary, .project-detail-page.pw.is-plum .pw-dark .btn-p, .project-detail-page.pw.is-plum .pw-dark .pw-btn--primary:hover:not(:disabled), .project-detail-page.pw.is-plum .pw-dark .btn-p:hover:not(:disabled) { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.project-detail-page.pw.is-plum .pw-dark .pw-btn--danger-quiet, .project-detail-page.pw.is-plum .pw-dark .pw-btn--danger-quiet:hover:not(:disabled) { background: none; color: var(--pl-bad); box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-dark .pw-btn--selected, .project-detail-page.pw.is-plum .pw-dark .pw-btn--selected:hover:not(:disabled) { background: rgba(181, 68, 181, .3); color: #fff; box-shadow: inset 0 0 0 1.5px var(--pl-acc); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-link { background: var(--pl-chip); color: var(--pl-ink); } .project-detail-page.pw.is-plum .pw-dark .pacc-link--danger { background: rgba(255, 138, 138, .16); color: var(--pl-bad); }
+/* switches: the platform, the period */
+.project-detail-page.pw.is-plum .pw-dark :is(.pw-switch, .prep-seg, .pacc-tabs, .pacc-period, .proj-tabs) { background: var(--pl-soft); }
+.project-detail-page.pw.is-plum .pw-dark :is(.pw-switch .pw-btn, .prep-seg-tab, .pacc-tab, .pacc-period-btn, .proj-tab), .project-detail-page.pw.is-plum .pw-dark :is(.pw-switch .pw-btn, .prep-seg-tab, .pacc-tab, .pacc-period-btn, .proj-tab):hover:not(:disabled) { background: none; color: var(--pl-sec); box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-dark :is(.pw-switch .pw-btn--selected, .prep-seg-tab.on, .pacc-tab.on, .pacc-period-btn.on, .proj-tab.on), .project-detail-page.pw.is-plum .pw-dark :is(.pw-switch .pw-btn--selected, .prep-seg-tab.on, .pacc-tab.on, .pacc-period-btn.on, .proj-tab.on):hover:not(:disabled) { background: var(--pl-card); color: var(--pl-ink); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+/* the ad accounts */
+.project-detail-page.pw.is-plum .pw-dark .pacc-card, .project-detail-page.pw.is-plum .pw-dark .pacc-add-box { border: 0; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-found { background: rgba(255, 255, 255, .04); border-color: var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-platform-img { background: rgba(235, 156, 239, .16); box-shadow: 0 0 0 3.5px var(--pl-disc), 0 0 0 5.5px rgba(235, 156, 239, .5); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-card-name, .project-detail-page.pw.is-plum .pw-dark .pacc-metrics-title { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-facts > div { background: var(--pl-soft); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-facts span, .project-detail-page.pw.is-plum .pw-dark .pacc-metric span { color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-facts b, .project-detail-page.pw.is-plum .pw-dark .pacc-metric b { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-metric { background: var(--pl-card); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-metric > i { box-shadow: 0 0 0 2px var(--pl-disc), 0 0 0 3.5px rgba(235, 156, 239, .5); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-card-actions { border-top-color: rgba(235, 156, 239, .2); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-pill--ok { background: rgba(75, 224, 127, .16); color: var(--pl-ok); } .project-detail-page.pw.is-plum .pw-dark .pacc-pill--warn { background: rgba(251, 191, 36, .16); color: var(--pl-warn); }
+.project-detail-page.pw.is-plum .pw-dark .pacc-pill--bad { background: rgba(255, 138, 138, .16); color: var(--pl-bad); } .project-detail-page.pw.is-plum .pw-dark .pacc-pill--muted { background: var(--pl-chip); color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .prep-table { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .prep-table th { background: rgba(235, 156, 239, .12); color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .prep-table td { color: var(--pl-ink); border-color: rgba(235, 156, 239, .16); }
+.project-detail-page.pw.is-plum .pw-dark .prep-table tr.total td { background: rgba(235, 156, 239, .08); }
+
+/* ---- the fields of the agents: cards in two columns with a frame in the colour of the state ---- */
+.project-detail-page.pw.is-plum .pw-dark .pcr-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-input-row, .project-detail-page.pw.is-plum .pw-dark .pcr-input-row.is-agent { --c: var(--pl-ln); display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 0; border-radius: 26px; background: var(--pl-card); box-shadow: inset 0 0 0 1.5px var(--c); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-input-row.is-wait { --c: rgba(251, 191, 36, .75); } .project-detail-page.pw.is-plum .pw-dark .pcr-input-row.is-ok { --c: rgba(75, 224, 127, .75); } .project-detail-page.pw.is-plum .pw-dark .pcr-input-row.is-old { --c: rgba(255, 138, 138, .75); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-input-name b { color: var(--pl-ink); font-size: 14.5px; } .project-detail-page.pw.is-plum .pw-dark .pcr-input-name small, .project-detail-page.pw.is-plum .pw-dark .pcr-input-meta { color: var(--pl-sec); font-size: 12px; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-input-text { color: var(--pl-ink); font-size: 13.5px; } .project-detail-page.pw.is-plum .pw-dark .pcr-input-text.is-empty { color: var(--pl-sec); font-style: italic; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-input-side { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-agent-chip { background: rgba(199, 109, 255, .2); color: #F0D6F5; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-state { display: inline-flex; align-items: center; height: 26px; padding: 0 12px; background: var(--pl-chip); box-shadow: inset 0 0 0 1.5px var(--pl-ln); font-size: 12px; font-weight: 700; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-state.is-wait { color: var(--pl-warn); } .project-detail-page.pw.is-plum .pw-dark .pcr-state.is-ok { color: var(--pl-ok); } .project-detail-page.pw.is-plum .pw-dark .pcr-state.is-old { color: var(--pl-bad); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-inputs--in { display: flex; flex-direction: column; gap: 0; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-inputs--in .pcr-input-row { padding: 12px 0 0; border-top: 1px solid rgba(235, 156, 239, .2); border-radius: 0; background: none; box-shadow: none; }
+/* readiness: a card per kind of operation */
+.project-detail-page.pw.is-plum .pw-dark .pcr-ready { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ready-row, .project-detail-page.pw.is-plum .pw-dark .pcr-ready-row + .pcr-ready-row { --c: var(--pl-ok); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 16px 14px; border-top: 0; border-radius: 26px; background: var(--pl-card); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ready-row.is-bad { --c: var(--pl-bad); } .project-detail-page.pw.is-plum .pw-dark .pcr-ready-row.is-warn { --c: var(--pl-warn); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ready-row::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: var(--c); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ready-row .pcr-state { background: var(--pl-chip); color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ready-row .pcr-state::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 7px var(--c); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ready-text { font-size: 12.5px; color: var(--pl-sec); opacity: 1; }
+/* facts of the CRM card */
+.project-detail-page.pw.is-plum .pw-dark .pcr-facts h4 { color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-facts dl > div { background: rgba(255, 255, 255, .04); border: 0; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-facts dt { color: var(--pl-sec); } .project-detail-page.pw.is-plum .pw-dark .pcr-facts dd { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-facts a, .project-detail-page.pw.is-plum .pw-dark .pcr-links a { color: #F0C4F5; }
+/* client files: groups as panels, the files as tiles with a big preview */
+.project-detail-page.pw.is-plum .pw-dark .pcr-group { border: 0; border-radius: 24px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-group-head b { color: var(--pl-ink); } .project-detail-page.pw.is-plum .pw-dark .pcr-group-head small { color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-assets { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-assets li { padding: 0; gap: 0; border: 0; border-radius: 16px; overflow: hidden; background: var(--pl-field); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-assets img { aspect-ratio: 1; border-radius: 0; background: rgba(255, 255, 255, .1); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-assets b { padding: 6px 8px; color: var(--pl-ink); font-size: 11.5px; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-x { background: rgba(39, 8, 39, .7); color: #fff; box-shadow: none; }
+/* inputs of the creative tab, chips, links */
+.project-detail-page.pw.is-plum .pw-dark .pcr-field { border: 0; border-radius: 22px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-field > span, .project-detail-page.pw.is-plum .pw-dark .pcr-field small { color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-input { border: 0; border-radius: 14px; background: var(--pl-field); box-shadow: inset 0 0 0 1.5px var(--pl-ln); color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .pcr-chip { border: 0; background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px var(--pl-ln); color: var(--pl-ink); font-weight: 600; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-chip.on { background: rgba(181, 68, 181, .3); box-shadow: inset 0 0 0 1.5px var(--pl-acc); color: #fff; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-ctas li { background: rgba(181, 68, 181, .3); box-shadow: inset 0 0 0 1.5px var(--pl-acc); color: #fff; }
+.project-detail-page.pw.is-plum .pw-dark .pcr-links li { border: 0; border-radius: 999px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px var(--pl-ln); color: var(--pl-ink); }
+@media (max-width: 1000px) { .project-detail-page.pw.is-plum .pw-dark .pw-ov { grid-template-columns: minmax(0, 1fr); } .project-detail-page.pw.is-plum .pw-dark .pw-ov-side { order: 0; } .project-detail-page.pw.is-plum .pw-dark .pcr-inputs { grid-template-columns: minmax(0, 1fr); } }
+
+/* the list of the client picker (it opens under its field, not in the layer of the page) */
+.project-detail-page.pw.is-plum .pw-dark .client-picker-list { border: 0; background: rgba(30, 8, 36, .98); box-shadow: inset 0 0 0 1.5px var(--pl-ln), 0 16px 36px rgba(0, 0, 0, .5); }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-item { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-item:hover, .project-detail-page.pw.is-plum .pw-dark .client-picker-item.active { background: rgba(235, 156, 239, .12); }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-list { border-radius: 24px; padding: 8px; }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-item { border-radius: 999px; padding: 9px 14px; font-weight: 500; background: none; }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-item .hint { color: var(--pl-sec); }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-empty { color: var(--pl-sec); font-style: normal; }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-create { color: #EB9CEF; border-top: 1px solid rgba(235, 156, 239, .2); border-radius: 0 0 999px 999px; }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-selected { background: var(--pl-field); color: var(--pl-ink); box-shadow: inset 0 0 0 1.5px var(--pl-ln); border: 0; }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-change { color: #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-dark .client-picker-list * { scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .45) transparent; }

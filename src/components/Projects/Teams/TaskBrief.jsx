@@ -4,6 +4,7 @@ import { fillCycleForm } from '../../../lib/api/creatives';
 import { MIN_FILL_CHARS, applyFill } from '../../../lib/agents/cycleFormFill';
 import { MAX_CONCEPTS, REQUEST_RATIOS, TEXT_MODES } from '../../../lib/agents/creativeTeam';
 import { languageLabel } from '../../../lib/agents/languages';
+import Select from '../../common/Select';
 
 // The brief of a creative task in the windows of the card of a project (the launch of the team, a one-off task): the description typed or dictated, the button that reads it
 // with the card and fills the other fields, the directions, the formats, the texts and the language of the client (read only: it is set in the card). What the person set by
@@ -52,7 +53,7 @@ export default function TaskBrief({ value, onChange, projectId, draftKey, childr
           <span className="vo-count">{value.goal.length} / 3000{value.goal ? ' · чернетка збережена в цьому браузері' : ''}</span>
           {speech.supported
             ? (<>
-              <select className="tm-sel vo-lang" value={voiceLang} onChange={(e) => setVoiceLang(e.target.value)} disabled={speech.listening} aria-label="Мова, якою ви говорите">{SPEECH_LANGS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}</select>
+              <Select className="tm-ssel vo-lang" value={voiceLang} onChange={setVoiceLang} disabled={speech.listening} options={SPEECH_LANGS.map((l) => ({ value: l.key, label: l.label }))} ariaLabel="Мова, якою ви говорите" />
               <button type="button" className={'btn vo-mic' + (speech.listening ? ' on' : '')} onClick={speech.toggle} aria-pressed={speech.listening} aria-label={speech.listening ? 'Зупинити запис' : 'Надиктувати голосом'} title={speech.listening ? 'Зупинити запис' : 'Надиктувати голосом'}>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>{speech.listening ? 'Зупинити' : 'Голос'}
               </button>
@@ -73,12 +74,12 @@ export default function TaskBrief({ value, onChange, projectId, draftKey, childr
         )}
       </div>
       <label className="tm-fl"><span>Напрямів (ідей) за запуск</span>
-        <select className="tm-sel" value={value.count} onChange={(e) => byHand({ count: e.target.value })} aria-label="Напрямів за запуск">{Array.from({ length: MAX_CONCEPTS }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}</select></label>
+        <Select className="tm-ssel tm-text" value={String(value.count)} onChange={(v) => byHand({ count: v })} options={Array.from({ length: MAX_CONCEPTS }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))} ariaLabel="Напрямів за запуск" /></label>
       <fieldset className="tm-fl tm-fs"><legend>Формати</legend>
         {REQUEST_RATIOS.map((r) => <label key={r.key} className="tm-chk"><input type="checkbox" checked={value.ratios.includes(r.key)} onChange={(e) => byHand({ ratios: e.target.checked ? [...value.ratios, r.key] : value.ratios.filter((x) => x !== r.key) })} />{r.label}</label>)}
       </fieldset>
       <label className="tm-fl"><span>Тексти на креативах</span>
-        <select className="tm-sel" value={value.texts} onChange={(e) => byHand({ texts: e.target.value })} aria-label="Тексти на креативах">{['yes', 'no'].map((k) => <option key={k} value={k}>{TEXT_MODES[k]}</option>)}</select></label>
+        <Select className="tm-ssel tm-text" value={value.texts} onChange={(v) => byHand({ texts: v })} options={['yes', 'no'].map((k) => ({ value: k, label: TEXT_MODES[k] }))} ariaLabel="Тексти на креативах" /></label>
       <div className="tm-fl"><span>Мова текстів для клієнта</span><b className="tm-lang">{languageLabel(value.language)}</b><small className="tm-hint">Мова клієнта з картки проєкту. Для команди результати завжди українською.</small></div>
       {children}
     </div>

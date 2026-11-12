@@ -1,0 +1,316 @@
+/* GENERATED dark plum overrides for the tab «Звітність» (owner's picks 2026-11-12). Made by scratchpad/gen_dark.py from builderHub, composeHub, historyHub, workbenchHub, projectReports and projectHistory: every light colour is mapped to the plum palette; edit by hand below the marker «HAND-MADE». Scoped to .pw-rep. */
+/* ---- projectHub.css ---- */
+.project-detail-page.pw.is-plum .pw-rep .report-section, .project-detail-page.pw.is-plum .pw-rep .pw-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .hub-title small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-box-title { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .empty-hint { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-btn-on { background: rgba(235, 156, 239, .16); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.project-detail-page.pw.is-plum .pw-rep .pk-field label, .project-detail-page.pw.is-plum .pw-rep .picker label, .project-detail-page.pw.is-plum .pw-rep .pf > label { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .pw-notice, .project-detail-page.pw.is-plum .pw-rep .prep-internal-note { background: rgba(251, 191, 36, .16); }
+.project-detail-page.pw.is-plum .pw-rep .prep-internal-note { background: rgba(251, 191, 36, .16); }
+.project-detail-page.pw.is-plum .pw-rep .prep-src--agent { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.project-detail-page.pw.is-plum .pw-rep .prep-chipbtn, .project-detail-page.pw.is-plum .pw-rep .prep-chip { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-chipbtn.on, .project-detail-page.pw.is-plum .pw-rep .prep-chip.on { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-period-card { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-picker summary { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .cg-item, .project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .cg-item.on, .project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt.on { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .prep-capture-sub { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-subtitle { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-export-menu { box-shadow: 0 18px 44px rgba(0, 0, 0, .4); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table th { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table td { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table .total, .project-detail-page.pw.is-plum .pw-rep .prep-table td.total, .project-detail-page.pw.is-plum .pw-rep .prep-table th.total { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table tr.total td { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table tr.on td { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table td.best { color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table .muted { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table--wide th { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table--groups th.total { background: rgba(235, 156, 239, .16); }
+.project-detail-page.pw.is-plum .pw-rep .prep-delta--good { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .prep-delta--bad { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .prep-delta--neutral { background: rgba(235, 156, 239, .16); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-delta--none { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .arc-period { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-work-facts ul { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .arc-win { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); box-shadow: 0 24px 80px rgba(0, 0, 0, .5); }
+.project-detail-page.pw.is-plum .pw-rep .arc-head { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); }
+.project-detail-page.pw.is-plum .pw-rep .arc-title h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .arc-sub { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .arc-text { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-metric-list li { background: rgba(255, 255, 255, .06); }
+/* ---- projectReports.css ---- */
+.project-detail-page.pw.is-plum .pw-rep .prep-controls .pk-field input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-chipbtn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-check { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-period-line { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-capture { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-capture-title { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-capture-sub { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table th { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table td { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table .muted { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table .total { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table td.best { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table tr.on td { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-delta--good { color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .prep-delta--bad { color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .prep-delta--neutral, .project-detail-page.pw.is-plum .pw-rep .prep-delta--none { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-export-menu { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-export-menu button { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-src--agent { background: rgba(255, 255, 255, .06); color: #D6AEE0; border-color: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .prep-src--manual { background: rgba(255, 255, 255, .06); color: #D6AEE0; border-color: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .prep-check { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-group-count { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-campaigns { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-internal-note { border: 1px solid rgba(251, 191, 36, .16); background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .prep-picker { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-picker summary { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-picker-name { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-picker-meta { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-content { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-content-title { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-chip { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-chip.on { background: rgba(255, 255, 255, .06); border-color: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .prep-chipbtn.on { background: rgba(255, 255, 255, .06); border-color: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .prep-btn-on { background: rgba(255, 255, 255, .06); border-color: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt.on { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-dates input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .cg-strip-head h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .cg-empty { border: 1px dashed rgba(235, 156, 239, .3); background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .cg-card { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .cg-card.is-focus { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .cg-card.is-active:not(.is-focus) { border-color: rgba(235, 156, 239, .3); background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .cg-card-meta { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .cg-card-plats i { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .cg-danger { color: #FF8A8A; border-color: rgba(255, 138, 138, .35); }
+.project-detail-page.pw.is-plum .pw-rep .cg-confirm { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .cg-pick-count { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .cg-item { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .cg-item.on { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .cg-item-meta { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-seg { background: rgba(255, 255, 255, .06); border: 1px solid rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .prep-seg-tab { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .mc-group-toggle small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .mc-group-toggle:focus-visible { outline: 2px solid #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table--wide th { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table--wide th:first-child, .project-detail-page.pw.is-plum .pw-rep .prep-table--wide td.lbl { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table--wide th:first-child { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table--groups th.total { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-box-title { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-period-card { background: rgba(255, 255, 255, .06); border: 1px solid rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .arc-period { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .arc-win { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .arc-head { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .arc-title h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .arc-sub { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .arc-text { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .arc-text-title { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .arc-text-body { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .arc-win .prep-result-bar { background: rgba(255, 255, 255, .06); }
+/* ---- projectHistory.css ---- */
+.project-detail-page.pw.is-plum .pw-rep .ph-month { border: 1px solid var(--border, rgba(235, 156, 239, .3)); background: var(--card, rgba(255, 255, 255, .06)); }
+.project-detail-page.pw.is-plum .pw-rep .ph-month > header .ph-sum { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-month > header .ph-chev { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-rows li { border-top: 1px solid var(--border, rgba(235, 156, 239, .3)); }
+.project-detail-page.pw.is-plum .pw-rep .ph-rows .ph-dates { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-rows .ph-missing { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-note { color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--draft { background: rgba(235, 156, 239, .3); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--reviewed { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--final { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--todate { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--none { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-doc-title span { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-queue-row { border: 1px solid var(--border, rgba(235, 156, 239, .3)); background: var(--card, rgba(255, 255, 255, .06)); }
+.project-detail-page.pw.is-plum .pw-rep .ph-queue-row .ph-sub { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-count { background: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .crx-item { border: 1px solid var(--border, rgba(235, 156, 239, .3)); background: var(--card, rgba(255, 255, 255, .06)); }
+.project-detail-page.pw.is-plum .pw-rep .crx-img { background: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .crx-img--empty { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crx-img--empty small { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .crx-lb img { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .crx-cap small { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .ph-share { border: 1px solid var(--border, rgba(235, 156, 239, .3)); background: var(--card, rgba(255, 255, 255, .06)); }
+.project-detail-page.pw.is-plum .pw-rep .ph-share-url { border: 1px solid var(--border, rgba(235, 156, 239, .3)); background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .ph-share-meta { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .rte-head .ph-chev { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .rte-head .ph-sum { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .rte-block { border: 1px solid var(--border, rgba(235, 156, 239, .3)); }
+.project-detail-page.pw.is-plum .pw-rep .rte-checks input[type="number"] { border: 1px solid var(--border, rgba(235, 156, 239, .3)); }
+.project-detail-page.pw.is-plum .pw-rep .rte-prompt { color: var(--muted, #D6AEE0); }
+.project-detail-page.pw.is-plum .pw-rep .rte-prompt textarea { border: 1px solid var(--border, rgba(235, 156, 239, .3)); background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .bld-preview { border: 1px dashed var(--border, rgba(235, 156, 239, .3)); background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .bld-panel { border: 1px solid var(--border, rgba(235, 156, 239, .3)); background: var(--card, rgba(255, 255, 255, .06)); }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip--extra { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip-x { color: #4BE07F; background: rgba(75, 224, 127, .4); }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip-x:focus-visible { outline: 3px solid #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .bld-toggle { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px var(--border, rgba(235, 156, 239, .3)); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-toggle.on { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px #EB9CEF; color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-toggle:focus-visible { outline: 3px solid #EB9CEF; }
+/* ---- builderHub.css ---- */
+.project-detail-page.pw.is-plum .pw-rep .bld-md::before { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .bld-bar { box-shadow: 0 6px 18px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .bld-bar-title b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .bld-bar-title small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-state.saved { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .bld-state.dirty { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .bld .bld-save, .project-detail-page.pw.is-plum .pw-rep .bld .bld-save:hover:not(:disabled) { background: linear-gradient(135deg, #4BE07F, #4BE07F); }
+.project-detail-page.pw.is-plum .pw-rep .bld-panel { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .bld-panel-head { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .bld-panel-titles small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-sum { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-cv { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-opt { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .bld-ck { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .bld-opt.on { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.project-detail-page.pw.is-plum .pw-rep .bld-opt.on .bld-ck::after { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .bld-opt:has(input:focus-visible) { outline: 3px solid #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip--extra { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip-x { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip-label:focus-visible, .project-detail-page.pw.is-plum .pw-rep .bld-chip-mv:focus-visible { outline: 2px solid #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-chip--picked { background: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .bld-block { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .bld-ib { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .bld-ib--bad { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .bld-tgl { background: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .bld-tgl i { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .bld-tgl.on { background: linear-gradient(100deg, #4BE07F, #4BE07F); }
+.project-detail-page.pw.is-plum .pw-rep .bld-how { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crh .hubt .mt-name:focus-visible, .project-detail-page.pw.is-plum .pw-rep .prep-table .mt-name:focus-visible { outline: 2px solid #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crh .hubt .crh-picked .mt-name, .project-detail-page.pw.is-plum .pw-rep .prep-table .crh-picked .mt-name { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crh .hubt .mt-tool, .project-detail-page.pw.is-plum .pw-rep .prep-table .mt-tool { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crh .hubt .mt-tool:hover:not(:disabled), .project-detail-page.pw.is-plum .pw-rep .prep-table .mt-tool:hover:not(:disabled) { background: rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .crh .hubt .mt-tool:focus-visible, .project-detail-page.pw.is-plum .pw-rep .prep-table .mt-tool:focus-visible { outline: 2px solid #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crh .hubt .mt-tool.on, .project-detail-page.pw.is-plum .pw-rep .prep-table .mt-tool.on { background: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crh .hubt .mt-tool--bad, .project-detail-page.pw.is-plum .pw-rep .prep-table .mt-tool--bad { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table tr.mt-dragging td { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table tr.crh-picked td { background: rgba(255, 255, 255, .06); }
+/* ---- composeHub.css ---- */
+.project-detail-page.pw.is-plum .pw-rep .ch-tile { color: #F6E9FA; background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ch-tile:focus-visible { outline: 3px solid #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .ch-tt b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ch-tt small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-period { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ch-ph h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ch-pcard { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .ch-pcard small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-pcard b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ch-pd { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-chp { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-src { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-src.ag { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-save { box-shadow: 0 10px 28px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ch-pill { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-pill.warn { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .ch-pill.ok { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .ch-sbtns .btn.ch-ok, .project-detail-page.pw.is-plum .pw-rep .ch-sbtns .btn.ch-ok:hover:not(:disabled) { background: linear-gradient(135deg, #4BE07F, #4BE07F); }
+.project-detail-page.pw.is-plum .pw-rep .ch-lnk { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-shint { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-lbl { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-block { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ch-bh b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ch-bd { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-skel i { background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); }
+.project-detail-page.pw.is-plum .pw-rep .ch-empty { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ch-empty h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ch-empty p { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ch-err { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .ch-err .ch-ic { stroke: #FF8A8A; }
+/* ---- historyHub.css ---- */
+.project-detail-page.pw.is-plum .pw-rep .ph-share-title { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ph-share { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ph-share-url { background: rgba(255, 255, 255, .06); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.project-detail-page.pw.is-plum .pw-rep .ph-share-url:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.project-detail-page.pw.is-plum .pw-rep .ph-share-meta { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-month { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ph-month > header h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ph-month > header .ph-sum { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-month > header .ph-chev { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-rows .ph-name { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ph-rows .ph-dates { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-rows .ph-act .btn-p { background: linear-gradient(135deg, #4BE07F, #4BE07F); }
+.project-detail-page.pw.is-plum .pw-rep .ph-rows .ph-missing { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-note { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--draft { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--reviewed { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--final { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--todate { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--none { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-chip--rework { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .ph-tile { color: #F6E9FA; background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ph-tile:focus-visible { outline: 3px solid #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .ph-tn { color: #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .ph-tt b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ph-tt small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-clist li { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ph-ct b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ph-cs { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-plt { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-plt--meta { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.project-detail-page.pw.is-plum .pw-rep .ph-plt--google { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .ph-cact .btn.ph-cdel { color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .ph-cempty { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .ph-cempty h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .ph-cempty p { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .ph-clist .ph-crow:focus-visible { outline: 3px solid #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .ph-clist .ph-cgo { color: #EB9CEF; }
+/* ---- workbenchHub.css ---- */
+.project-detail-page.pw.is-plum .pw-rep .wbh { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-tile { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .wbh-tile:focus-visible, .project-detail-page.pw.is-plum .pw-rep .wbh-card:focus-visible { outline: 3px solid #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-n { color: #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-tile.warm .wbh-n { color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-tt b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-tt small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-hint { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-card { color: #F6E9FA; background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .wbh-plt { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-plt--meta { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-plt--google { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-period { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-src { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-src.ag { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-upd { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-note { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-note svg { color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-open { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-empty { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .wbh-empty p { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-chip { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-chip--reviewed, .project-detail-page.pw.is-plum .pw-rep .wbh-chip--rework { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-chip--reviewed { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-chip--final { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .wbe { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-bar { box-shadow: 0 6px 18px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .wbe-back { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-title b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-upd { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-actions .btn.wbe-del { color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-actions .btn.wbe-ok, .project-detail-page.pw.is-plum .pw-rep .wbe-actions .btn.wbe-ok:hover:not(:disabled) { background: linear-gradient(135deg, #4BE07F, #4BE07F); }
+.project-detail-page.pw.is-plum .pw-rep .wbe-note--warn { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-note--info { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-note--ok { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-block { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .wbe-mut { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-count { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-count.ok { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .rt-eye, .project-detail-page.pw.is-plum .pw-rep .wbe-eye { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .rt-eye.on, .project-detail-page.pw.is-plum .pw-rep .wbe-eye.on { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .rt-eye:focus-visible, .project-detail-page.pw.is-plum .pw-rep .wbe-eye:focus-visible { outline: 3px solid #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-text { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .wbe-text textarea { background: rgba(255, 255, 255, .06); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .wbe-text textarea:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-chip--custom { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-chip--live { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .wbh-card--live { border-color: rgba(75, 224, 127, .4); background: linear-gradient(rgba(75, 224, 127, .16), rgba(75, 224, 127, .16)); }
+.project-detail-page.pw.is-plum .pw-rep .wbh-note--live { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-lang { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .wbe-lang-b { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .wbe-lang-b.on { background: linear-gradient(135deg, #AE40AE, #D6AEE0); box-shadow: 0 3px 8px -2px rgba(0, 0, 0, .4); }
+.project-detail-page.pw.is-plum .pw-rep .wbe-lang-b:focus-visible { outline: 3px solid #EB9CEF; }

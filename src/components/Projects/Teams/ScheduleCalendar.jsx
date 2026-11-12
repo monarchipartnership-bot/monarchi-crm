@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import TimePicker from '../../common/TimePicker';
 import { MAX_EVERY_DAYS } from '../../../lib/agents/campaignCycles';
 import { MONTHS, SHORT_WEEKDAYS, WINDOW_MINUTES, dayMonthOf, monthCells, previewRuns, windowText } from '../../../lib/agents/scheduleCalendar';
 
@@ -23,7 +24,7 @@ export default function ScheduleCalendar({ value, onChange, today }) {
         {value.mode === 'every'
           ? <label>Кожні <input className="tm-num" type="number" min="1" max={MAX_EVERY_DAYS} value={value.every} onChange={(e) => onChange({ every: e.target.value })} aria-label="Кожні скільки днів" /> дн.</label>
           : <span className="sc-chips" role="group" aria-label="Дні тижня">{SHORT_WEEKDAYS.map((w, i) => <button key={w} type="button" aria-pressed={value.days.includes(i + 1)} className={'sc-chip' + (value.days.includes(i + 1) ? ' on' : '')} onClick={() => toggleDay(i + 1)}>{w}</button>)}</span>}
-        <label>Початок о <input className="tm-time" type="time" value={value.time} onChange={(e) => onChange({ time: e.target.value })} aria-label="Час початку (Київ)" /></label>
+        <label>Початок о <TimePicker className="tm-tpick" value={value.time} onChange={(v) => onChange({ time: v })} /></label>
       </div>
       {value.mode === 'every' && <p className="tm-hint">Перший день оберіть у календарі: від нього рахуються наступні запуски.</p>}
 

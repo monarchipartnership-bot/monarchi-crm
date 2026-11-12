@@ -39,6 +39,12 @@ import { languagePatch } from '../../lib/clientLang';
 import DatePicker from '../../components/common/DatePicker';
 import '../../styles/ddHub.css';
 import '../../styles/projectHub.css'; // Hub style, last so it wins over the older workspace styles
+import '../../styles/ddNight.css'; // the dark plum menus of the dropdowns and calendars (data-dd="night")
+import '../../styles/projectPlum.css';
+import '../../styles/reportsPlum.generated.css'; // the report styles recoloured to the plum palette (made by a script)
+import '../../styles/reportsPlum.css'; // the hand-made part: switch of the sections, mode tiles, striped table, glass bars; scoped to .is-plum
+import { fetchProjectCreative } from '../../lib/api/projectCreative';
+import { infoProgress } from '../../lib/agents/infoProgress';
 
 const TABS = [
   { key: 'overview', label: 'Інформація про проєкт', icon: PAGE_ICONS['page.projects'].src },
@@ -62,7 +68,31 @@ const STRIP = [
   TABS.find((x) => x.key === 'agent'),
   TABS.find((x) => x.key === 'creative'),
 ];
+// the line icons of the menu of the card (the menu is the one of the AI Agents section: a round medallion with a line icon)
+const STRIP_LINE = {
+  overview: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  teams: <><rect x="5" y="8" width="14" height="11" rx="4" /><path d="M12 8V4M9.5 13h.01M14.5 13h.01" /></>,
+  reports: <path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" />,
+  agent: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></>,
+  creative: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" />,
+};
 const STATUSES = ['active', 'paused', 'completed'];
+
+// The summary of «Інформація про проєкт»: how many fields are filled and the next step (the ring + a button to the section).
+function InfoSummary({ fill, onGo }) {
+  if (!fill) return null;
+  const { pct, done, total, next } = fill;
+  return (
+    <section className="pw-sum" aria-label="Заповненість інформації про проєкт">
+      <div className="pw-sum-ring" style={{ '--p': pct }} role="img" aria-label={`Заповнено ${pct}%`}><b>{pct}%</b></div>
+      <div className="pw-sum-tx">
+        <b>Інформацію про проєкт заповнено: {done} з {total} полів</b>
+        <span>{next ? `Далі: «${next.sectionName}» → ${next.label}. ${next.hint}` : 'Усе заповнено: агенти мають усе, що їм потрібно.'}</span>
+      </div>
+      {next && <button type="button" className="pw-btn pw-btn--primary pw-sum-go" onClick={() => onGo(next.section)}>Заповнити «{next.sectionName}»</button>}
+    </section>
+  );
+}
 // «Інформація про проєкт» (owner, 2026-11-11): everything known about the client lives in this one card, for people and for the agents. The sections:
 // «Основне» is the former «Огляд»; the others come from the data the agents read (lib/agents/projectCreative.js).
 const INFO_SECTIONS = [['main', 'Основне'], ['client', 'Про клієнта'], ['business', 'Про бізнес'], ['competitors', 'Про конкурентів'], ['ready', 'Готовність до агентів']];
@@ -175,6 +205,13 @@ function ProjectDetailCard() {
   }
 
   const [linkedAccounts, setLinkedAccounts] = useState([]);
+  const [fill, setFill] = useState(null); // how full «Інформація про проєкт» is: the counters of the sub-sections and the summary (refreshed when the section is opened)
+  useEffect(() => {
+    let off = false;
+    if (!id) return undefined;
+    fetchProjectCreative(id).then((d) => { if (!off) setFill(infoProgress({ settings: d.settings, assets: d.assets, accounts: linkedAccounts })); }).catch(() => { if (!off) setFill(null); });
+    return () => { off = true; };
+  }, [id, linkedAccounts, info, tab]);
   // The agent's state for the chip in the header (the tab itself loads everything it needs).
   const [agentChip, setAgentChip] = useState(null);
   // The project name in the header is a field that saves itself (like the deal title).
@@ -462,7 +499,7 @@ function ProjectDetailCard() {
   const infoDirty = infoValue !== (project.additional_info || '');
 
   return (
-    <div className="report-page project-detail-page pw" data-dd="hub">
+    <div className="report-page project-detail-page pw is-plum" data-dd="night">
       <div className="pd-header pw-head">
         <span className={'hub-ring hub-ring--lg st-' + project.status} style={{ '--p': periodShare(project) }}>
           <span className="hub-tile"><img src={PAGE_ICONS['page.projects'].src} alt="" draggable="false" /></span>
@@ -512,27 +549,33 @@ function ProjectDetailCard() {
             type="button" role="tab" aria-selected={activeStrip === t.key} aria-controls="pw-panel" tabIndex={activeStrip === t.key ? 0 : -1}
             className={'pw-tab' + (activeStrip === t.key ? ' on' : '')} onClick={() => openStrip(t.key)}
           >
-            <span className="hub-ring">
-              {t.icon
-                ? <span className="hub-tile"><img src={t.icon} alt="" aria-hidden="true" draggable="false" /></span>
-                : <span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24" aria-hidden="true">{t.line}</svg></span>}
-            </span>
+            <span className="pw-tab-m"><svg viewBox="0 0 24 24" aria-hidden="true">{STRIP_LINE[t.key]}</svg></span>
             <span>{t.label}</span>{t.key === 'reports' && workCount > 0 && <span className="pw-tab-n" aria-label={`${workCount} у роботі`}>{workCount}</span>}
           </button>
         ))}
       </div>
 
-      <div className="pw-workspace" id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
+      <div className={'pw-workspace ' + (tab === 'overview' ? 'pw-dark' : tab === 'teams' ? 'pw-flat' : isReport ? 'pw-dark pw-rep' : 'pw-sheet')} data-dd={tab === 'overview' || isReport ? 'night' : 'hub'} id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
       {isReport && (
-        <div className="pcr-tabs pw-sub" role="tablist" aria-label="Розділи звітності">
+        <div className="pcr-tabs pw-sub pw-isub" role="tablist" aria-label="Розділи звітності">
           {REPORT_TABS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={'pcr-tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{k === 'work' && workCount > 0 ? <em>{workCount}</em> : null}</button>)}
         </div>
       )}
       {tab === 'overview' && (
         <div className="pcr-wrap pw-info">
-          <div className="pcr-tabs" role="tablist" aria-label="Розділи інформації про проєкт">
-            {INFO_SECTIONS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={info === k} className={'pcr-tab' + (info === k ? ' on' : '')} onClick={() => setInfo(k)}>{label}</button>)}
+          <div className="pcr-tabs pw-isub" role="tablist" aria-label="Розділи інформації про проєкт">
+            {INFO_SECTIONS.map(([k, label]) => {
+              const sec = fill?.sections?.[k];
+              return (
+                <button key={k} type="button" role="tab" aria-selected={info === k} className={'pcr-tab' + (info === k ? ' on' : '')} onClick={() => setInfo(k)}>
+                  {label}
+                  {sec && k !== 'ready' && sec.total > 0 && <span className="pw-isub-n">{sec.done} з {sec.total}</span>}
+                  {sec && k === 'ready' && sec.missing > 0 && <span className="pw-isub-n is-warn">{sec.missing} бракує</span>}
+                </button>
+              );
+            })}
           </div>
+          <InfoSummary fill={fill} onGo={setInfo} />
           {info !== 'main' && <ProjectCreativeTab key={'info-' + id + '-' + info} projectId={id} section={info} embedded />}
         </div>
       )}

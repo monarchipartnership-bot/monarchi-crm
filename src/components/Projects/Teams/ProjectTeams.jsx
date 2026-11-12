@@ -4,18 +4,22 @@ import useProjectCockpit from '../../../lib/useProjectCockpit';
 import { fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { deleteTeam, fetchTeamsData, setTeamRunning } from '../../../lib/api/teams';
 import { useConfirm } from '../../common/ConfirmDialog';
-import { teamsOf } from '../../../lib/agents/teams';
+import { TEAMS, teamRoles, teamsOf } from '../../../lib/agents/teams';
 import { describeRegular, kyivToday, pausedBySeason, regularsOf, seasonOver } from '../../../lib/agents/operationCycles';
 import { dayMonthOf } from '../../../lib/agents/scheduleCalendar';
-import { removeRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
+import { removeRegular, renameTeam, setRegularEnabled } from '../../../lib/api/operationCycles';
 import OperationCard from '../../../pages/Tools/cockpit/OperationCard';
 import { fmtDateTime } from '../../../pages/Smm/agentUi';
 import { HubTitle } from '../hubIcons';
 import LaunchTeamWizard from './LaunchTeamWizard';
 import TeamCard from './TeamCard';
+import TeamTasks from './TeamTasks';
+import InlineName from './InlineName';
+import { RoundBtn, TeamRing } from './teamsUi';
 import OneOffDialog from './OneOffDialog';
 import OneOffCreativeDialog from './OneOffCreativeDialog';
 import '../../../styles/projectTeams.css';
+import '../../../styles/projectTeamsPlum.css';
 
 const STATE = { running: ['працює', 'is-ok'], paused: ['зупинено', 'is-wait'] };
 const WEEKDAYS = ['понеділок', 'вівторок', 'середа', 'четвер', 'пʼятниця', 'субота', 'неділя'];
@@ -70,7 +74,6 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
 
   // the seasonal tasks of the creative team (a season that is over is not shown here) and what they do to the main regular task
   const creativeCampaign = view?.teams.find((t) => t.key === 'creative')?.campaign || null;
-  const seasons = creativeCampaign ? regularsOf(creativeCampaign).filter((r) => r.seasonal && !seasonOver(r)) : [];
   async function seasonAction(r, kind) {
     if (kind === 'remove' && !(await confirm({ title: `Видалити сезонне завдання «${r.title}»?`, body: 'Воно більше не запускатиметься, а основне регулярне завдання повернеться до роботи. Уже зроблені за ним креативи лишаться.', confirmLabel: 'Видалити' }))) return;
     setBusy('season:' + r.id);
@@ -79,6 +82,11 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
       else { await setRegularEnabled(creativeCampaign.id, r.id, kind === 'resume', email); say(kind === 'resume' ? `Сезонне завдання «${r.title}» продовжено.` : `Сезонне завдання «${r.title}» зупинено.`); }
       await Promise.all([load(), cockpit.reload?.()]);
     } catch (e) { say(e?.message || 'Не вдалося виконати.', true); } finally { setBusy(''); }
+  }
+  async function nameTeam(team, name) {
+    await renameTeam(team.campaign.id, name);
+    say(name ? `Команду названо «${name}».` : 'Назву команди скинуто.');
+    await Promise.all([load(), cockpit.reload?.()]);
   }
   const runningTeams = view ? view.teams.filter((t) => t.state !== 'none') : [];
   const empty = view && !runningTeams.length && !view.legacy.length;
@@ -102,73 +110,99 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
     return [ctl ? (t.state === 'paused' ? (t.key === 'creative' ? 'команда на паузі: регулярні завдання не запускаються' : `агентів у команді: ${on.length}, команда на паузі`) : `агентів працює: ${on.length || (t.key === 'creative' ? 'за запитом' : 0)}`) : 'завантажуємо агентів…', [last ? `останній запуск ${fmtDateTime(last)}` : 'ще не запускались', nextAt ? `найближчий ${fmtDateTime(nextAt)}` : ''].filter(Boolean).join(' · ')];
   }
 
+  // the agents of a team as a chain of pills: green = works, grey = paused
+  const chainOf = (t) => {
+    if (t.key === 'reports') return [{ id: 'rep', name: 'Агент звітів', on: t.state === 'running' }];
+    const ctl = control[t.campaign.id];
+    if (!ctl) return [];
+    const roles = new Set(teamRoles(t.key, data?.accounts || []));
+    return ctl.agents.filter((a) => roles.has(a.role)).map((a) => ({ id: a.id, name: a.name, on: a.mode !== 'paused' && t.state === 'running' }));
+  };
+  const nextRuns = runningTeams.filter((t) => t.state === 'running' && t.campaign).flatMap((t) => (control[t.campaign.id]?.agents || []).filter((a) => a.mode !== 'paused').map((a) => a.nextAt)).filter(Boolean).sort();
+  const nRun = runningTeams.filter((t) => t.state === 'running').length;
+  const nPause = runningTeams.filter((t) => t.state === 'paused').length;
+  const newButtons = <div className="tmx-btns"><button type="button" className="btn" onClick={() => setOneoff(true)}>Додаткове завдання</button><button type="button" className="btn btn-p" onClick={() => setWizard(true)}>+ Запустити команду</button></div>;
+  const lead = 'Команди, які працюють для цього клієнта. Усе, що вони читають, береться з розділу «Інформація про проєкт».';
+
   return (
-    <div className="pcr-wrap tm">
-      {confirmDialog}
-      <section className="pcr-card" aria-label="Запуск AI команди">
-        <div className="pcr-head">
-          <div>
-            <HubTitle icon="users">Запуск AI команди</HubTitle>
-            <p className="pcr-sub">Команди, які працюють для цього клієнта. Усе, що вони читають, береться з розділу «Інформація про проєкт».</p>
+    <>
+      <div className="pcr-wrap tm tmx pw-dark" data-dd="night">
+        <section className={'tmx-box' + (empty ? ' is-open' : '')} aria-label="Запуск AI команди">
+          <div className="tmx-bh">
+            <div><HubTitle icon="users">Запуск AI команди</HubTitle><p className="tmx-lead">{lead}</p></div>
+            {view && newButtons}
           </div>
-        </div>
+          {view && !empty && (
+            <div className="tmx-sum">
+              <div><b className="is-ok">{nRun}</b><small>{nRun === 1 ? 'команда працює' : 'команди працюють'}</small></div>
+              <div><b className="is-wait">{nPause}</b><small>на паузі</small></div>
+              <div><b>{nextRuns[0] ? fmtDateTime(nextRuns[0]) : '—'}</b><small>найближчий запуск агентів</small></div>
+            </div>
+          )}
+        </section>
         {note && <p className={'tm-note' + (note.bad ? ' is-bad' : '')} role="status">{note.text}</p>}
         {error && <p className="pcr-error" role="alert">{error}</p>}
         {!view && !error && <div className="pcr-empty">Завантаження…</div>}
 
         {empty && (
-          <div className="tm-empty">
+          <section className="tmx-box tmx-empty">
             <b>На даний момент AI команди не запущені</b>
-            <p>Оберіть, що потрібно для клієнта: креативи, аналітику кабінетів або звіти. Перед запуском система перевірить, чи все заповнено, і покаже, що ще треба додати.</p>
+            <div className="tmx-flow">
+              {TEAMS.map((d, i) => <span key={d.key} className="tmx-flow-i">{i > 0 && <span className="tmx-ln" aria-hidden="true" />}<span className="tmx-nd"><TeamRing name={d.key} size={44} />{d.title}</span></span>)}
+            </div>
+            <p>Команди працюють разом: креативи беруть висновки аналітики, звіти збирають результат. Перед запуском система перевірить, чи все заповнено, і покаже, що ще треба додати.</p>
             <button type="button" className="btn btn-p" onClick={() => setWizard(true)}>Запустити команду</button>
-          </div>
+          </section>
         )}
 
-        <div className="tm-list">
-          {runningTeams.map((t) => {
-            const [line1, line2] = summary(t);
-            const [label, tone] = STATE[t.state];
-            return (
-              <article key={t.key} className={'tm-team is-' + t.state}>
-                <div className="tm-team-main">
-                  <div className="tm-team-title"><b>{t.def.title}</b><span className={'pcr-state ' + tone}>{label}</span></div>
-                  <small>{line1}</small><small>{line2}</small>
-                </div>
-                <div className="tm-team-acts">
-                  <button type="button" className="btn" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Відкрити команду'}</button>
-                  <button type="button" className="btn" disabled={busy === t.key} onClick={() => toggle(t)}>{t.state === 'running' ? 'Зупинити' : 'Продовжити'}</button>
-                  <button type="button" className="btn" disabled={busy === t.key} onClick={() => remove(t)}>Видалити команду</button>
+        {!empty && view && (
+          <div className="tmx-list">
+            {runningTeams.map((t) => {
+              const [line1, line2] = summary(t);
+              const [label, tone] = STATE[t.state];
+              const run = t.state === 'running';
+              const chain = chainOf(t);
+              return (
+                <article key={t.key} className={'tmx-team is-' + t.state}>
+                  <div className="tmx-row">
+                    <div className="tmx-main">
+                      <div className="tmx-t"><TeamRing name={t.key} size={32} />{t.campaign ? <><InlineName as="h3" className="tt-name" value={t.campaign.config?.title || ''} fallback={t.def.title} label="Назва команди" onSave={(n) => nameTeam(t, n)} />{t.campaign.config?.title && <span className="tt-type">{t.def.title}</span>}</> : <b>{t.def.title}</b>}<span className={'pcr-state ' + tone}>{label}</span></div>
+                      <small>{line1} · {line2}</small>
+                    </div>
+                    <div className="tmx-btns">
+                      <button type="button" className="btn btn-p" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Відкрити команду'}</button>
+                      <RoundBtn icon={run ? 'pause' : 'play'} label={run ? 'Зупинити' : 'Продовжити'} disabled={busy === t.key} onClick={() => toggle(t)} />
+                      <RoundBtn icon="trash" label="Видалити команду" disabled={busy === t.key} onClick={() => remove(t)} />
+                    </div>
+                  </div>
+                  {chain.length > 0 && (
+                    <div className="tmx-chain" aria-label="Агенти команди">
+                      {chain.map((a, i) => <span key={a.id} className="tmx-chain-i"><span className={'tmx-a' + (a.on ? '' : ' is-off')}><i />{a.name}</span>{i < chain.length - 1 && <span className="tmx-ln" aria-hidden="true" />}</span>)}
+                    </div>
+                  )}
+                  {t.key === 'creative' && t.campaign && (
+                    <TeamTasks campaign={t.campaign} cockpit={cockpit.byId?.[t.campaign.id]} busy={busy} say={say} onSeasonAction={seasonAction}
+                      onOpen={() => setOpen({ campaignId: t.campaign.id, regularFirst: false })} onNewRegular={() => setOpen({ campaignId: t.campaign.id, regularFirst: true })}
+                      onNewSeasonal={() => setCreativeTask({ campaign: t.campaign, seasonal: true })} onNewOneoff={() => setCreativeTask({ campaign: t.campaign, seasonal: false })}
+                      onChanged={() => Promise.all([load(), cockpit.reload?.()])} />
+                  )}
+                </article>
+              );
+            })}
+            {view.legacy.map((l) => (
+              <article key={'l' + l.campaign.id} className={'tmx-team tm-legacy is-' + l.state}>
+                <div className="tmx-row">
+                  <div className="tmx-main"><div className="tmx-t"><TeamRing name="users" size={32} /><b>{l.campaign.name}</b><span className="pcr-state is-wait">стара операція · {l.label}</span></div><small>Запущена за старою схемою: працює як працювала, відкрийте, щоб побачити роботу.</small></div>
+                  <div className="tmx-btns"><button type="button" className="btn" onClick={() => setOpen({ campaignId: l.campaign.id, regularFirst: false })}>Відкрити</button></div>
                 </div>
               </article>
-            );
-          })}
-          {seasons.map((r) => {
-            const today = kyivToday();
-            const waiting = r.startDate && today < r.startDate;
-            const [label, tone] = !r.enabled ? ['зупинено', 'is-wait'] : waiting ? [`почнеться ${dayMonthOf(r.startDate)}`, 'is-wait'] : ['працює', 'is-ok'];
-            return (
-              <article key={'s' + r.id} className={'tm-team tm-season is-' + (r.enabled ? 'running' : 'paused')}>
-                <div className="tm-team-main">
-                  <div className="tm-team-title"><b>Сезонне: {r.title}</b><span className={'pcr-state ' + tone}>{label}</span></div>
-                  <small>{[r.startDate ? `${dayMonthOf(r.startDate)} – ${dayMonthOf(r.endDate)}` : `до ${dayMonthOf(r.endDate)}`, describeRegular(r)].filter(Boolean).join(' · ')}</small>
-                  <small>{r.replaces.length ? 'основне регулярне завдання на ці дати на паузі' : 'працює паралельно з основним'}</small>
-                </div>
-                <div className="tm-team-acts">
-                  <button type="button" className="btn" disabled={busy === 'season:' + r.id} onClick={() => seasonAction(r, r.enabled ? 'stop' : 'resume')}>{r.enabled ? 'Зупинити' : 'Продовжити'}</button>
-                  <button type="button" className="btn" disabled={busy === 'season:' + r.id} onClick={() => seasonAction(r, 'remove')}>Видалити</button>
-                </div>
-              </article>
-            );
-          })}
-          {view?.legacy.map((l) => (
-            <article key={'l' + l.campaign.id} className={'tm-team tm-legacy is-' + l.state}>
-              <div className="tm-team-main"><b>{l.campaign.name}</b><span className="pcr-state is-wait">стара операція · {l.label}</span><small>Запущена за старою схемою: працює як працювала, відкрийте, щоб побачити роботу.</small></div>
-              <div className="tm-team-acts"><button type="button" className="btn" onClick={() => setOpen({ campaignId: l.campaign.id, regularFirst: false })}>Відкрити</button></div>
-            </article>
-          ))}
-          {!empty && view && <div className="tm-add"><button type="button" className="btn" onClick={() => setOneoff(true)}>Додаткове завдання</button><button type="button" className="btn btn-p" onClick={() => setWizard(true)}>+ Запустити команду</button></div>}
-        </div>
-      </section>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="tm-dialogs" data-dd="hub">
+        {confirmDialog}
 
       {wizard && data && (
         <LaunchTeamWizard data={data} reload={load} email={email}
@@ -199,6 +233,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
         <OperationCard key={openCampaign.id} campaign={openCampaign} project={project} cockpit={cockpit} regularFirst={!!open.regularFirst}
           onClose={() => { setOpen(null); load(); }} onBackToProject={() => { setOpen(null); load(); }} onGoFill={(section) => { setOpen(null); onGoFill?.(section); }} onChanged={load} />
       )}
-    </div>
+      </div>
+    </>
   );
 }

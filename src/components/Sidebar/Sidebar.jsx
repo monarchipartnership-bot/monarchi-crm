@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MonoKnot } from '../Logo/Logo';
 import { DEPTS } from './sidebarData';
@@ -50,6 +50,38 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const activeId = pickActiveId(pathname);
 
+  // The light pill of the active item slides to the new one (owner, 2026-11-12). It lives inside the scrolling list and follows the active link; the first
+  // placement has no transition. Until it is placed, the active link paints its own pill (see .has-ind in Sidebar.css).
+  const scrollRef = useRef(null);
+  const indRef = useRef(null);
+  const placedOnce = useRef(false);
+  const [indReady, setIndReady] = useState(false);
+  const placeIndicator = useCallback(() => {
+    const box = scrollRef.current;
+    const ind = indRef.current;
+    if (!box || !ind) return;
+    const cur = box.querySelector('.side-node.active');
+    if (!cur) { setIndReady(false); return; }
+    if (!placedOnce.current) {
+      ind.style.transition = 'none';
+      placedOnce.current = true;
+      requestAnimationFrame(() => { if (indRef.current) indRef.current.style.transition = ''; });
+    }
+    ind.style.transform = `translate(${cur.offsetLeft}px, ${cur.offsetTop}px)`;
+    ind.style.width = cur.offsetWidth + 'px';
+    ind.style.height = cur.offsetHeight + 'px';
+    setIndReady(true);
+  }, []);
+  useLayoutEffect(() => { placeIndicator(); }, [activeId, collapsed, placeIndicator]);
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => placeIndicator());
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [placeIndicator]);
+  let seq = 0; // the order of the cascade at load: the brand, then every heading and item one after another
+
   function toggleCollapsed() {
     setCollapsed((c) => {
       const next = !c;
@@ -59,16 +91,17 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
   }
 
   return (
-    <aside className={'sidebar monarchi-sidebar' + (mobileOpen ? ' open' : '') + (collapsed ? ' is-collapsed' : '')}>
-      <Link className="side-brand" to="/" onClick={onCloseMobile} aria-label="Monarchi Hub — головна">
+    <aside className={'sidebar monarchi-sidebar' + (mobileOpen ? ' open' : '') + (collapsed ? ' is-collapsed' : '') + (indReady ? ' has-ind' : '')}>
+      <Link className="side-brand" to="/" onClick={onCloseMobile} aria-label="Monarchi Hub — головна" style={{ '--i': seq++ }}>
         <MonoKnot className="side-brand-mark" aria-hidden="true" />
         <span className="side-brand-name">Monarchi <span className="side-brand-hub">Hub</span></span>
       </Link>
 
-      <nav className="side-scroll" aria-label="Головне меню">
+      <nav className="side-scroll" aria-label="Головне меню" ref={scrollRef}>
+        <span className="side-ind" ref={indRef} aria-hidden="true" />
         {Object.entries(DEPTS).map(([dk, d]) => (
           <div className="side-group" key={dk}>
-            <div className={'side-group-label' + (d.hideLabel ? ' sr-only' : '')}>{d.label.replace(' Department', '')}</div>
+            <div className={'side-group-label' + (d.hideLabel ? ' sr-only' : '')} style={{ '--i': seq++ }}>{d.label.replace(' Department', '')}</div>
             {d.items.map((it) => {
               const isActive = activeId === `${dk}:${it.key}`;
               const showBadge = it.key === 'constellation' && agentReviewCount > 0;
@@ -80,6 +113,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
                   onClick={onCloseMobile}
                   aria-current={isActive ? 'page' : undefined}
                   title={collapsed ? it.name : undefined}
+                  style={{ '--i': seq++ }}
                 >
                   <img className="side-icon" src={it.icon} alt="" width="32" height="32" draggable="false" />
                   <span className="side-label">{it.name}</span>

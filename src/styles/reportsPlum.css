@@ -1,0 +1,20 @@
+/* The tab «Звітність» on the dark plum page: the hand-made part (owner's picks 2026-11-12: a text switch with a glowing line, mode tiles, translucent cards with a ring,
+   a dark striped table, a dark glass bar at the bottom). The rest (every light colour of the report styles) is in reportsPlum.generated.css, made by a script. Scoped to .pw-rep. */
+.project-detail-page.pw.is-plum .pw-rep { --ink: #F6E9FA; --ink-soft: #D6AEE0; --muted: #D6AEE0; --text: #F6E9FA; --border: rgba(235, 156, 239, .3); --border-strong: rgba(235, 156, 239, .45); --card: rgba(255, 255, 255, .04); --surface: rgba(255, 255, 255, .06); color: #F6E9FA; }
+/* the switch of the four sections */
+.project-detail-page.pw.is-plum .pw-rep .pcr-tabs.pw-sub.pw-isub { justify-content: center; margin-bottom: 16px; }
+.project-detail-page.pw.is-plum .pw-rep .pw-isub .pcr-tab em { font-style: normal; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; display: inline-grid; place-items: center; background: linear-gradient(135deg, #FBBF24, #E08A06); color: #fff; font-size: 11.5px; font-weight: 800; }
+/* the modes of «Формування звіту» */
+.project-detail-page.pw.is-plum .pw-rep .ch-tile { opacity: .7; }
+.project-detail-page.pw.is-plum .pw-rep .ch-tile.on { opacity: 1; border-color: #EB9CEF; box-shadow: 0 0 16px rgba(181, 68, 181, .3); }
+/* the bottom panel: dark glass */
+.project-detail-page.pw.is-plum .pw-rep .ch-save { background: rgba(30, 8, 36, .92); border-color: rgba(235, 156, 239, .3); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); backdrop-filter: blur(6px); }
+/* the table of the figures: dark, striped */
+.project-detail-page.pw.is-plum .pw-rep .prep-table th { background: rgba(181, 68, 181, .25); color: #fff; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table td { border-bottom: 0; color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, .04); }
+.project-detail-page.pw.is-plum .pw-rep .prep-table .total, .project-detail-page.pw.is-plum .pw-rep .prep-table td.total, .project-detail-page.pw.is-plum .pw-rep .prep-table th.total, .project-detail-page.pw.is-plum .pw-rep .prep-table tr.total td { background: rgba(181, 68, 181, .2); font-weight: 800; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table td.best { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .prep-table--wide td.lbl, .project-detail-page.pw.is-plum .pw-rep .prep-table--wide th:first-child { background: #2a0c2f; }
+/* the sticky panels hold the page behind them: dark glass */
+.project-detail-page.pw.is-plum .pw-rep .bld-bar, .project-detail-page.pw.is-plum .pw-rep .wbe-bar { background: rgba(30, 8, 36, .94); border-color: rgba(235, 156, 239, .3); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); backdrop-filter: blur(6px); }
