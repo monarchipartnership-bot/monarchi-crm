@@ -6,7 +6,7 @@ import { fileNameOf } from '../creatives/download.js';
 import { directionLimit } from './creativeTeam.js';
 import { mergeNotes } from './agentNotes.js';
 import { intelSummaryLine } from './clientIntel.js';
-import { effectiveStyle } from './projectStyle.js';
+import { cleanManual, cleanStyle, effectiveStyle } from './projectStyle.js';
 import { regularsOf } from './operationCycles.js';
 
 export const STAGES = [
@@ -172,6 +172,7 @@ export function intelView(intel, scoutTasks = [], now = null) {
     business: clip(p.business, 900), tone: clip(p.tone, 500), visualStyle: clip(p.visual_style, 900), priceRange: clip(p.price_range, 160),
     categories: Array.isArray(p.categories) ? p.categories : [], products: Array.isArray(p.products) ? p.products : [], ads: p.ads || null, gaps: Array.isArray(p.gaps) ? p.gaps : [],
     photos: Array.isArray(intel?.photos) ? intel.photos.map((x) => ({ url: x.url, label: x.label || '', use: x.use || 'product' })) : [],
+    autoStyle: cleanStyle(p.style), styleManual: cleanManual(intel?.style_manual), // the scout's own decision and what a person set (the editor of the style needs both)
     style: effectiveStyle(p.style, intel?.style_manual), // the style of the creatives: what the scout decided and what a person changed, with the source of every field
     costUsd: num(intel?.cost_usd), now,
   };
@@ -215,7 +216,7 @@ export function buildCockpit(raw) {
       const items = c.slice().sort((a, b) => num(a.id) - num(b.id)).map((x) => {
         const url = x.final_url || x.asset_url || '';
         const v = x.copy?.variants?.[0] || null;
-        const item = { id: x.id, url, hasText: !!x.final_url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
+        const item = { id: x.id, url, rawUrl: x.asset_url || '', hasText: !!x.final_url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
           copy: v ? { headline: clip(v.headline, 200), text: clip(v.primary || v.text || v.body, 900), description: clip(v.description, 300), cta: clip(v.cta, 60) } : null };
         return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
       });

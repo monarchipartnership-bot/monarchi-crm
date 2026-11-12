@@ -1,0 +1,26 @@
+/* The editor of the look of the words on the creatives (step 3.1d), inside the card «Розвідка клієнта». Colours are the cabinet's own tokens (--ck-*). */
+.se { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid var(--ck-ln); }
+.se-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--ck-ink); font-size: .95rem; }
+.se-head .ckp-chip.is-manual { background: var(--ck-chip); color: var(--ck-deep); }
+.se-grid { display: grid; grid-template-columns: minmax(0, 250px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.se-left { display: flex; flex-direction: column; gap: 10px; }
+.se-pv { border-radius: 12px; overflow: hidden; background: var(--ck-field); box-shadow: inset 0 0 0 1.5px var(--ck-ln); line-height: 0; }
+.se-pv canvas { width: 100%; height: auto; display: block; }
+.se-err { margin: 0; padding: 10px 12px; font-size: .8rem; line-height: 1.4; color: var(--ck-bad); }
+.se-samples { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.se-samples button { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: var(--ck-field); cursor: pointer; box-shadow: inset 0 0 0 1.5px var(--ck-ln); }
+.se-samples button.is-on { box-shadow: 0 0 0 2px var(--ck-deep); }
+.se-samples img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.se-samples button:focus-visible { outline: 2px solid var(--ck-deep); outline-offset: 2px; }
+.se-ctl { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.se-row { display: flex; flex-direction: column; gap: 6px; }
+.se-lab { display: flex; justify-content: space-between; gap: 10px; color: var(--ck-sec); font-size: .78rem; font-weight: 650; }
+.se-lab b { color: var(--ck-ink); font-weight: 650; }
+.se-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.se-chip { min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--ck-card); color: var(--ck-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; box-shadow: inset 0 0 0 1.5px var(--ck-ln); }
+.se-chip.is-on { background: var(--ck-chip); color: var(--ck-deep); box-shadow: inset 0 0 0 1.5px var(--ck-deep); }
+.se-chip:focus-visible { outline: 2px solid var(--ck-deep); outline-offset: 2px; }
+.se-slide { display: flex; align-items: center; gap: 10px; }
+.se-slide input[type=range] { flex: 1; min-width: 0; accent-color: var(--ck-deep); }
+.se-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+@media (max-width: 640px) { .se-grid { grid-template-columns: minmax(0, 1fr); } .se-left { max-width: 250px; } }

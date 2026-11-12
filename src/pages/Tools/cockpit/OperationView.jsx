@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { kickQueue, startIntel } from '../../../lib/api/agents';
+import { saveStyleManual } from '../../../lib/api/projectCockpit';
+import { styleSamplesOf } from '../../../lib/agents/projectStyle';
 import { addInstruction, fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
@@ -132,6 +134,9 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
     if (!yes) return;
     await guard('intel', async () => { const r = await startIntel(campaign.id, { force: again }); if (!r?.started && r?.reason === 'active') throw new Error('Розвідник уже працює: кроки видно нижче.'); }, 'Розвідка запущена: кроки видно в блоці «Кроки розвідника».');
   };
+  // the look of the words on the creatives, set by a person (step 3.1d): saved for the project, the scout does not overwrite it
+  const saveStyle = (manual) => guard('style', () => saveStyleManual(c.projectId, manual), Object.keys(manual?.text || {}).length ? 'Оформлення збережено: воно діє на нових креативах проєкту.' : 'Повернуто вибір розвідки.');
+  const styleSamples = useMemo(() => styleSamplesOf(c), [c]);
   const startCycle = (cycle) => guard('start' + cycle.id, () => act(null, 'start_cycle', { requestId: cycle.id }), 'Завдання запущено: агенти працюють.');
 
   // the form: a regular cycle is kept in the operation (the form sends its day and time), a one-off one becomes a request and starts
@@ -189,7 +194,7 @@ export default function OperationView({ campaign, cockpit: c, project, loading =
             </div>
           )}
           {view.creative && c && (
-            <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} />
+            <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} samples={styleSamples} onSaveStyle={saveStyle} />
           )}
           {!view.creative && <Passes campaignId={campaign.id} />}
           {view.creative && (

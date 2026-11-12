@@ -20,8 +20,9 @@ export function wrapLines(measure, text, maxWidth) {
 
 // The free area of the picture for the words, by the zone the brief names. maxW (px): the width of the calm part of the picture beside the subject
 // (found by looking at the picture), so the words do not run onto the subject; only for the side zones.
-export function zoneBox(zone, W, H, maxW = Infinity, span = null) {
-  const pad = Math.round(W * 0.07);
+// padK: the margin from the edge as a share of the width (the style of the project may change it; 0.07 is the default).
+export function zoneBox(zone, W, H, maxW = Infinity, span = null, padK = 0.07) {
+  const pad = Math.round(W * padK);
   const side = (w) => Math.max(Math.round(W * 0.22), Math.min(w, maxW));
   if (zone === 'right') { const w = side(Math.round(W * 0.5) - pad); return { x: W - pad - w, y: Math.round(H * 0.1), w, h: Math.round(H * 0.8), align: 'left' }; }
   if (zone === 'top') return { x: span ? span.x : pad, y: pad, w: span ? span.w : W - 2 * pad, h: Math.round(H * 0.36), align: 'left' };
@@ -32,8 +33,8 @@ export function zoneBox(zone, W, H, maxW = Infinity, span = null) {
 
 // The positions of every line, pill and the button inside the box: { items: [{ kind, x, y, w, h, lines, size, weight }] } where y is the top of the item.
 // measure(text, size, weight) → width. Sizes follow the width of the picture (1080 px wide = headline 64 px).
-export function layoutText({ measure, W, H, zone, headline, subline, badge, cta, maxW = Infinity, span = null, fit = 1 }) {
-  const box = zoneBox(zone, W, H, maxW, span);
+export function layoutText({ measure, W, H, zone, headline, subline, badge, cta, maxW = Infinity, span = null, fit = 1, padK = 0.07 }) {
+  const box = zoneBox(zone, W, H, maxW, span, padK);
   const k = (W / 1080) * fit; // fit < 1: smaller type, so the words fit the calm part of a picture
   const items = [];
   const gap = Math.round(26 * k);
@@ -116,10 +117,10 @@ export function pickZone(ctx, W, H, preferred = 'left') {
 
 // The longest calm stretch along a top or bottom zone (bands of columns whose brightness hardly changes): the words start there and stay inside it, so they do not run onto the
 // logo in a corner or onto the subject. → { x, w } or null when the whole width is fine or nothing wide enough is calm.
-export function calmSpan(ctx, W, H, zone, rows = null) {
+export function calmSpan(ctx, W, H, zone, rows = null, padK = 0.07) {
   if (zone !== 'top' && zone !== 'bottom') return null;
   try {
-    const box = { ...zoneBox(zone, W, H), ...(rows ? { y: Math.round(rows.y), h: Math.max(8, Math.round(rows.h)) } : {}) };
+    const box = { ...zoneBox(zone, W, H, Infinity, null, padK), ...(rows ? { y: Math.round(rows.y), h: Math.max(8, Math.round(rows.h)) } : {}) };
     const bands = 40;
     const bw = Math.max(1, Math.round(box.w / bands));
     const calm = [];
@@ -175,11 +176,12 @@ function calmWidth(ctx, W, H, zone) {
 export function paintText(ctx, { W, H, zone: wanted = 'left', headline = '', subline = '', badge = '', cta = '', font = FONT, smart = true, style = null }) {
   const st = style || {};
   const asked = st.zoneLock || wanted; // a zone fixed by the style wins over the zone of the brief
+  const padK = st.margin > 0 ? st.margin : 0.07; // the margin from the edge, a share of the width
   const measure = (t, size, weight) => { ctx.font = `${weight} ${size}px ${font}`; return ctx.measureText(t).width; };
   // the zone of the brief is a wish: the picture decides. Every zone is laid out for real and the picture is read under the rectangle the words would take (the zone of the brief has a head start);
   // a top or bottom zone narrows to the calm stretch when a logo or the subject is in the way.
   const maxW = (z) => calmWidth(ctx, W, H, z);
-  const lay0 = (z, span = null, fit = 1) => layoutText({ measure, W, H, zone: z, headline, subline, badge, cta, maxW: maxW(z), span, fit });
+  const lay0 = (z, span = null, fit = 1) => layoutText({ measure, W, H, zone: z, headline, subline, badge, cta, maxW: maxW(z), span, fit, padK });
   // the picture is read under the words AND a margin around them (5% of the width): the words never touch a logo or the subject
   const mg = Math.round(W * 0.05);
   const readRect = (l) => { const x = Math.max(0, l.rect.x - mg); const y = Math.max(0, l.rect.y - Math.round(mg * 0.6)); return busyOf(ctx, x, y, Math.min(W - x, l.rect.w + 2 * mg), Math.min(H - y, l.rect.h + Math.round(mg * 1.2))); };
@@ -190,7 +192,7 @@ export function paintText(ctx, { W, H, zone: wanted = 'left', headline = '', sub
       for (const fit of (st.scale ? [st.scale] : [1, 0.85, 0.72, 0.6, 0.5])) { // a size fixed by the style is not shrunk; otherwise // smaller type when the calm place is small; the bigger the better
         const variants = [lay0(z, null, fit)];
         if (z === 'top' || z === 'bottom') { // and the same words narrowed to the calm stretch of their rows (a logo in a corner, the subject)
-          const span = calmSpan(ctx, W, H, z, { y: variants[0].rect.y, h: variants[0].rect.h });
+          const span = calmSpan(ctx, W, H, z, { y: variants[0].rect.y, h: variants[0].rect.h }, padK);
           if (span) variants.push(lay0(z, { x: span.x + Math.round(mg * 0.5), w: Math.max(Math.round(W * 0.25), span.w - Math.round(mg * 1.5)) }, fit));
         }
         let fitBest = null;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Ic, Spinner } from './parts';
 import { fmtAgo, fmtUsd } from './format';
 import LiveSteps from './LiveSteps';
+import StyleEditor from './StyleEditor';
 import { styleRows } from '../../../lib/agents/projectStyle';
 import '../../../styles/stepDetails.css';
 
@@ -13,8 +14,9 @@ const STATE = {
 // «Розвідка клієнта» (owner, 2026-11-12): what the scout learned about the client before the first creative: the site (products, tone, look), the ads that already ran, the product photos
 // taken from the site (the maker uses them as references by itself). The agents read this profile; the manager sees it, and can make it again.
 //   intel: cockpit.intel (or null)   steps: the live lines of the scout   busy   onRefresh(): starts the scout (the page asks first, it costs about $0.3-0.6)
-export default function IntelCard({ intel, steps = [], busy = false, onRefresh }) {
+export default function IntelCard({ intel, steps = [], busy = false, onRefresh, samples = [], onSaveStyle }) {
   const [open, setOpen] = useState(false);
+  const [styling, setStyling] = useState(false);
   const [photo, setPhoto] = useState(null);
   const st = STATE[intel?.status || 'none'];
   const working = ['running', 'refreshing'].includes(intel?.status);
@@ -46,6 +48,12 @@ export default function IntelCard({ intel, steps = [], busy = false, onRefresh }
             </div>
           )}
           <button type="button" className="sd-more" aria-expanded={open} onClick={() => setOpen((v) => !v)}>{open ? 'Сховати профіль' : 'Показати профіль повністю'}</button>
+          {onSaveStyle && (
+            <>
+              <button type="button" className="sd-more" aria-expanded={styling} onClick={() => setStyling((v) => !v)}>{styling ? 'Сховати оформлення тексту' : 'Змінити оформлення тексту на креативах'}</button>
+              {styling && <StyleEditor autoStyle={intel.autoStyle} manual={intel.styleManual} samples={samples} onSave={onSaveStyle} />}
+            </>
+          )}
           {open && (
             <dl className="sd-rows sd-profile">
               {intel.business && <div><dt>Бізнес</dt><dd>{intel.business}</dd></div>}

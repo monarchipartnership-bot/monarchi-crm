@@ -87,7 +87,7 @@ import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.
 import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
-import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, effectiveStyle, styleBlock, styleRows } from '../src/lib/agents/projectStyle.js';
+import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, effectiveStyle, manualFromDraft, styleBlock, styleRows, styleSamplesOf } from '../src/lib/agents/projectStyle.js';
 import { overlayFields, applyText, applyTextForRequest } from '../api/_lib/creativeText.js';
 import { composeTextServer } from '../api/_lib/composeServer.js';
 import { busyOf, calmSpan } from '../src/lib/creatives/composeText.js';
@@ -5537,19 +5537,38 @@ await ok('project style (3.1c): the scout decides, a person corrects, the manual
   assert.deepEqual([auto.image.formats, auto.image.tone, auto.copy.tone], [['1:1', '9:16'], 'warm beige', 'direct, short']);
   assert.deepEqual(cleanStyle(null).text, AUTO_TEXT); assert.equal(cleanStyle({ text: { size: '85' } }).text.size, 85); assert.equal(cleanStyle({ text: { size: 9999 } }).text.size, 140);
   // the manual part keeps only what the person really set
-  assert.deepEqual(cleanManual({ text: { zone: 'auto', plate: 'off', size: 'auto' }, image: { formats: [] }, copy: { tone: '' } }), { text: { plate: 'off' }, image: {}, copy: {} });
+  // an «auto» that was really typed is kept (the person takes the decision back from the scout); unknown values and defaults of the cleaning are not
+  assert.deepEqual(cleanManual({ text: { zone: 'auto', plate: 'off', size: 'auto' }, image: { formats: [] }, copy: { tone: '' } }), { text: { zone: 'auto', plate: 'off', size: 'auto' }, image: {}, copy: {} });
+  assert.deepEqual(cleanManual({ text: { zone: 'nonsense', margin: '9' } }), { text: { margin: 9 }, image: {}, copy: {} });
+  assert.equal(cleanStyle({ text: { margin: 40 } }).text.margin, 15); assert.equal(cleanStyle({ text: { margin: 'x' } }).text.margin, 'auto');
+  // «auto» of a person beats the scout's value
+  const retaken = effectiveStyle({ text: { zone: 'top', margin: 5 } }, { text: { zone: 'auto' } });
+  assert.deepEqual([retaken.value.text.zone, retaken.text.zone.source, retaken.value.text.margin, retaken.text.margin.source], ['auto', 'manual', 5, 'auto']);
   // the style that counts: the manual value wins, the rest stays the scout's, and every field knows its source
   const eff = effectiveStyle({ text: { zone: 'top', plate: 'yes', size: 'small' }, image: { tone: 'warm' } }, { text: { zone: 'bottom' }, copy: { tone: 'formal' } });
   assert.deepEqual([eff.value.text.zone, eff.text.zone.source, eff.value.text.plate, eff.text.plate.source, eff.value.copy.tone, eff.copy.tone.source, eff.value.image.tone, eff.image.tone.source], ['bottom', 'manual', 'on', 'auto', 'formal', 'manual', 'warm', 'auto']);
   assert.equal(effectiveStyle({}, {}).value.text.zone, 'auto'); // nobody decided: the picture decides
   // for the painter: a fixed zone, a size, a plate, an ink; «auto» stays open
-  assert.deepEqual(composerOptions({ zone: 'bottom', size: 'small', plate: 'on', color: 'light', plate_strength: 30 }), { zoneLock: 'bottom', scale: 0.8, plate: 'on', plateAlpha: 0.3, ink: 'light' });
-  assert.deepEqual(composerOptions({ zone: 'auto', size: 120, plate: 'off' }), { zoneLock: null, scale: 1.2, plate: 'off', plateAlpha: null, ink: 'auto' });
-  assert.deepEqual(composerOptions(AUTO_TEXT), { zoneLock: null, scale: null, plate: 'auto', plateAlpha: null, ink: 'auto' });
+  assert.deepEqual(composerOptions({ zone: 'bottom', size: 'small', plate: 'on', color: 'light', plate_strength: 30 }), { zoneLock: 'bottom', margin: null, scale: 0.8, plate: 'on', plateAlpha: 0.3, ink: 'light' });
+  assert.deepEqual(composerOptions({ zone: 'auto', size: 120, plate: 'off' }), { zoneLock: null, margin: null, scale: 1.2, plate: 'off', plateAlpha: null, ink: 'auto' });
+  assert.deepEqual(composerOptions(AUTO_TEXT), { zoneLock: null, margin: null, scale: null, plate: 'auto', plateAlpha: null, ink: 'auto' });
   // the card of the client: every row says where the value came from
   const rows = styleRows(effectiveStyle({ text: { zone: 'top', size: 'large' }, image: { tone: 'warm' } }, { text: { zone: 'bottom' } }));
   assert.deepEqual(rows.slice(0, 2).map((r) => [r.value, r.source]), [['знизу', 'manual'], ['більший', 'auto']]);
   assert.ok(rows.some((r) => r.label === 'Тон картинок' && r.source === 'auto')); assert.deepEqual(styleRows(null), []);
+  // the editor (3.1d): the draft shows the scout's decision with the manual one over it; what is saved is only what differs from the scout
+  const scout = cleanStyle({ text: { zone: 'bottom', size: 'large', plate: 'off', margin: 5 } }).text;
+  const d0 = draftFromStyle(scout, {});
+  assert.deepEqual([d0.zone, d0.size, d0.plate, d0.strength, d0.color, d0.margin], ['bottom', 120, 'off', 55, 'auto', 5]);
+  assert.deepEqual(manualFromDraft(d0, scout), {}); // nothing changed: nothing is manual
+  assert.deepEqual(manualFromDraft({ ...d0, zone: 'top', plate: 'on', strength: 70 }, scout), { zone: 'top', plate: 'on', plate_strength: 70 });
+  assert.deepEqual(manualFromDraft({ ...d0, zone: 'auto', size: 'auto', margin: 'auto' }, scout), { zone: 'auto', size: 'auto', margin: 'auto' }); // the picture decides: kept as a decision of the person
+  assert.deepEqual(manualFromDraft({ ...d0, size: 90, margin: 5 }, scout), { size: 90 }); // a value put back to the scout's own is no longer manual
+  const back = draftFromStyle(scout, manualFromDraft({ ...d0, zone: 'top', plate: 'on', strength: 70 }, scout));
+  assert.deepEqual([back.zone, back.plate, back.strength], ['top', 'on', 70]);
+  const samples = styleSamplesOf({ requests: [{ createdAt: '2026-11-01', items: [{ id: 1, rawUrl: 'old.png', conceptName: 'A', copy: { headline: 'Old' } }] }, { createdAt: '2026-11-12', items: [{ id: 2, rawUrl: 'new.png', conceptName: 'B', copy: { headline: 'New', cta: 'Buy' } }, { id: 3, rawUrl: '' }, { id: 4, rawUrl: 'new.png' }] }], intel: { photos: [{ url: 'site.jpg', use: 'product', label: 'Ring' }, { url: 'logo.png', use: 'logo' }] } });
+  assert.deepEqual(samples.map((x) => x.url), ['new.png', 'old.png', 'site.jpg']); // newest first, no empty or repeated picture, the logo is not a sample
+  assert.deepEqual([samples[0].headline, samples[0].cta], ['New', 'Buy']);
   // for the agents: the block lists only what is decided
   assert.equal(styleBlock({}), null);
   assert.match(styleBlock({ text: { zone: 'top', plate: 'off' }, image: { formats: ['4:5'], tone: 'warm beige' }, copy: { tone: 'direct' } }).text, /sit at the top[\s\S]*No plate[\s\S]*4:5[\s\S]*warm beige[\s\S]*direct/);
@@ -5577,6 +5596,10 @@ await ok('project style (3.1c): the scout decides, a person corrects, the manual
   const sized = await composeTextServer({ image: png, zone: 'top', headline: 'Words', style: composerOptions({ size: 'small' }) });
   const normal = await composeTextServer({ image: png, zone: 'top', headline: 'Words' });
   assert.ok(sized.layout.items[0].size < normal.layout.items[0].size); // a smaller type, as asked
+  // the margin from the edge: 12% moves the words further from the left edge than 4%
+  const wide = await composeTextServer({ image: png, zone: 'top', headline: 'Words', style: composerOptions({ margin: 12 }) });
+  const narrow = await composeTextServer({ image: png, zone: 'top', headline: 'Words', style: composerOptions({ margin: 4 }) });
+  assert.ok(wide.layout.items[0].x > normal.layout.items[0].x && normal.layout.items[0].x > narrow.layout.items[0].x);
 });
 
 console.log(`\n${passed} checks passed`);
