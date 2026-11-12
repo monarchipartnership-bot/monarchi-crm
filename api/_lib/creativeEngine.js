@@ -38,6 +38,24 @@ async function enqueue(db, agent, { campaignId, requestId, brief, by }) {
   return must(await db.from('ag_tasks').insert({ agent_id: agent.id, type: 'creative', status: 'queued', brief, created_by: by, request_id: requestId, campaign_id: campaignId }).select().single(), 'task');
 }
 
+// The quality checker looks at a FINISHED creative (step 3.2): once per picture, only when the checker takes part in this client's chain and the creative waits for the person. → { queued, reason? }
+export async function queueInspection(ctx, creativeId, { force = false } = {}) {
+  const { db } = ctx;
+  const c = (await db.from('ag_creatives').select('id, request_id, status, asset_url, final_url, qc').eq('id', creativeId).maybeSingle()).data;
+  if (!c || c.status !== 'review' || !c.asset_url) return { queued: false, reason: 'not-ready' };
+  if (!force && c.qc?.picture_url && c.qc.picture_url === (c.final_url || c.asset_url)) return { queued: false, reason: 'checked' };
+  const req = (await db.from('ag_creative_requests').select('id, campaign_id').eq('id', c.request_id).maybeSingle()).data;
+  if (!req) return { queued: false, reason: 'no-request' };
+  const dept = await loadDepartment(db);
+  const checker = dept.byRole.get('creative_quality');
+  const links = await loadClientLinks(db, req.campaign_id);
+  if (!takesPart(checker, links.get(checker?.id))) return { queued: false, reason: 'off' };
+  const open = (await db.from('ag_tasks').select('id, brief').eq('agent_id', checker.id).eq('request_id', req.id).in('status', ['queued', 'running'])).data || [];
+  if (open.some((t) => Number(t.brief?.creativeId) === Number(creativeId))) return { queued: false, reason: 'queued' };
+  await enqueue(db, checker, { campaignId: req.campaign_id, requestId: req.id, brief: { trigger: 'inspect', creativeId: Number(creativeId) }, by: 'контроль якості' });
+  return { queued: true };
+}
+
 // The scout of the client (owner, 2026-11-12): studies the site and the cabinet once and writes the profile that the agents read. It starts when the team is launched, when a request
 // finds no profile, when a profile is older than 30 days (then the work does not wait) and by the «Оновити» button (force). One scout task per client at a time.
 // → { started, reason? }

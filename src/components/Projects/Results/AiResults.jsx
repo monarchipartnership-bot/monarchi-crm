@@ -5,6 +5,7 @@ import { fetchDeliverables } from '../../../lib/api/deliverables';
 import { RUN_FILTERS, buildRuns, dateTimeText, filterRuns, groupItems, runCounts } from '../../../lib/agents/aiResults';
 import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
 import StepCards from '../../../pages/Tools/cockpit/StepCards';
+import QcLine from '../../../pages/Tools/cockpit/QcLine';
 import ReturnDialog from '../../../pages/Tools/cockpit/ReturnDialog';
 import TextEditDialog from '../../../pages/Tools/cockpit/TextEditDialog';
 import { fmtUsd } from '../../../pages/Tools/cockpit/format';
@@ -37,11 +38,13 @@ function ResultCard({ item, onOpen, onAct, busy, styleCtx }) {
         <b>{item.conceptName}</b><small>{item.ratio || '4:5'}</small>
         {item.copy?.headline && <p className="ar-copy"><strong>{item.copy.headline}</strong>{item.copy.text ? ` ${item.copy.text}` : ''}</p>}
         {item.note && <p className="ar-note">{item.note}</p>}
+        <QcLine qc={item.qc} />
       </div>
       <div className="ar-acts">
         {canApprove(item) && <button type="button" className="btn btn-p" disabled={!!busy} onClick={() => simple('approve_one')}>Схвалити</button>}
         {canReturn(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => setReturning(true)}>Повернути</button>}
         {canEditText && <button type="button" className="btn" disabled={!!busy} onClick={() => setEditing(true)}>Редагувати текст</button>}
+        {canEditText && item.status === 'review' && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('inspect')}>{item.qc ? 'Перевірити ще раз' : 'Перевірити якість'}</button>}
         {canDownload(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('download_one')} aria-label={`Завантажити: ${item.conceptName}`}>Завантажити</button>}
       </div>
       {err && <p className="ar-err" role="alert">{err}</p>}

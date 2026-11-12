@@ -24,7 +24,7 @@ export function overlayFields(concept, creative) {
 }
 
 // The concept of a creative: from the newest finished brief of its request.
-async function conceptOf(db, creative) {
+export async function conceptOf(db, creative) {
   const rows = (await db.from('ag_tasks').select('output').eq('request_id', creative.request_id).eq('status', 'done').order('id', { ascending: false })).data || [];
   const brief = rows.find((r) => Array.isArray(r.output?.json?.concepts));
   return brief?.output?.json?.concepts.find((c) => c.key === creative.concept_key) || null;
@@ -37,9 +37,14 @@ async function projectOf(db, requestId) {
   return camp?.project_id ?? -1;
 }
 
+// The quality checker is asked to look at a finished creative (step 3.2). A dynamic import: the engine imports this module.
+export async function inspectLater(ctx, creativeId) {
+  try { const { queueInspection } = await import('./creativeEngine.js'); return await queueInspection(ctx, creativeId); } catch (e) { console.warn('queueInspection failed:', e?.message || e); return { queued: false, reason: 'error' }; }
+}
+
 // Puts the words on ONE creative and saves the result. force: also when it already has them (the button «Накласти текст знову»).
 // → { ok, reason? }: reasons: 'no-picture', 'no-text' (the concept wants no text), 'no-headline' (the copy is not ready yet: it is tried again when it arrives), 'has-text'
-export async function applyText(ctx, creativeId, { force = false } = {}) {
+export async function applyText(ctx, creativeId, { force = false, inspect = false } = {}) {
   const { db } = ctx;
   const c = (await db.from('ag_creatives').select('*').eq('id', creativeId).maybeSingle()).data;
   if (!c || !c.asset_url) return { ok: false, reason: 'no-picture' };
@@ -59,6 +64,7 @@ export async function applyText(ctx, creativeId, { force = false } = {}) {
   if (up.error) throw new Error(up.error.message || 'Не вдалося зберегти картинку з текстом.');
   const url = db.storage.from(BUCKET).getPublicUrl(path).data?.publicUrl;
   await db.from('ag_creatives').update({ final_url: url, final_path: path, updated_at: new Date().toISOString() }).eq('id', c.id);
+  if (inspect) await inspectLater(ctx, c.id); // a NEW picture with its words: the quality checker looks at it (not after a hand edit of a person)
   return { ok: true, url, zone: out.layout.zone, busy: out.layout.busy };
 }
 
@@ -67,7 +73,7 @@ export async function applyTextForRequest(ctx, requestId) {
   const rows = (await ctx.db.from('ag_creatives').select('id, asset_url, final_url, status').eq('request_id', requestId)).data || [];
   const done = [];
   for (const r of rows.filter((x) => x.asset_url && !x.final_url && ['review', 'approved'].includes(x.status))) {
-    try { const out = await applyText(ctx, r.id); if (out.ok) done.push(r.id); } catch (e) { console.warn('applyText failed:', e?.message || e); }
+    try { const out = await applyText(ctx, r.id, { inspect: true }); if (out.ok) done.push(r.id); } catch (e) { console.warn('applyText failed:', e?.message || e); }
   }
   return done;
 }

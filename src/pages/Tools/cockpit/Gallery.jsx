@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Ic, Spinner } from './parts';
+import QcLine from './QcLine';
 import ReturnDialog from './ReturnDialog';
 import TextEditDialog from './TextEditDialog';
 
@@ -111,10 +112,12 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
             <div className="ckp-gmeta"><span className="ckp-chip">{open.ratio || '4:5'}</span><span className="ckp-chip">{open.kind === 'video' ? 'відео' : 'зображення'}</span>{open.fileName && <span className="ckp-chip is-grey">{open.fileName}</span>}</div>
             <h3>{open.conceptName}</h3>
             {open.note && <p>{open.note}</p>}
+            <QcLine qc={open.qc} />
             <div className="ckp-acts">
               {canApprove(open) && <button type="button" className="ckp-btn is-ok" disabled={!!busy} onClick={() => approve(open)}>{busy === 'ap' + open.id ? <Spinner /> : <Ic n="check" size={15} />}Схвалити</button>}
               {canReturn(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => giveBack(open)}>{busy === 'rt' + open.id && <Spinner />}Повернути</button>}
               {canEditText(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => setEditing(open)}><Ic n="pen" size={15} />Редагувати текст</button>}
+              {open.status === 'review' && open.rawUrl && !!textEdit && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => act('inspect', { creativeId: open.id }, 'qc' + open.id)}>{busy === 'qc' + open.id && <Spinner />}{open.qc ? 'Перевірити якість ще раз' : 'Перевірити якість'}</button>}
               {canDownload(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => download(open)}>{busy === 'dl' + open.id ? <Spinner /> : <Ic n="download" size={15} />}Завантажити</button>}
             </div>
             <div className="ckp-acts">
@@ -141,6 +144,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
             <button type="button" className="ckp-gopen" onClick={() => setOpenId(i.id)} aria-label={`Розгорнути: ${i.conceptName}`}><Picture item={i} index={k} /></button>
             <div className="gx-ov">
               <div className="ckp-gname">{i.conceptName}<small>{i.ratio || '4:5'} · {i.kind === 'video' ? 'відео' : 'зображення'}</small></div>
+              <QcLine qc={i.qc} compact />
               <div className="ckp-gacts">
                 <button type="button" className="ckp-gb is-ok" disabled={!canApprove(i) || !!busy} onClick={() => approve(i)} aria-label={`Схвалити: ${i.conceptName}`}>{busy === 'ap' + i.id ? <Spinner /> : <Ic n="check" size={14} />}</button>
                 <button type="button" className="ckp-gb ckp-gap" disabled={!canReturn(i) || !!busy} onClick={() => giveBack(i)}>Повернути</button>

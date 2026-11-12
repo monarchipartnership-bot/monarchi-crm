@@ -139,7 +139,7 @@ function requestAttention(request, tasks, creatives, roleOf, library, { onlyRevi
   }
 
   // remarks of the quality control
-  const qc = lastBy(mine, (x) => roleOf(x.agent_id) === 'creative_quality' && x.status === 'done');
+  const qc = lastBy(mine, (x) => roleOf(x.agent_id) === 'creative_quality' && x.status === 'done' && !x.inspect); // the looks at finished pictures live on the creatives
   const issues = Array.isArray(qc?.issues) ? qc.issues : Array.isArray(qc?.output?.json?.issues) ? qc.output.json.issues : [];
   if (issues.length && !onlyReview && ['review', 'problem'].includes(request.status)) {
     items.push({ id: `qc:${qc.id}`, kind: 'qc_remark', tone: 'attention', title: `Зауваження контролю якості: ${issues.length}`, requestId: request.id,
@@ -216,7 +216,8 @@ export function buildCockpit(raw) {
       const items = c.slice().sort((a, b) => num(a.id) - num(b.id)).map((x) => {
         const url = x.final_url || x.asset_url || '';
         const v = x.copy?.variants?.[0] || null;
-        const item = { id: x.id, url, rawUrl: x.asset_url || '', hasText: !!x.final_url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
+        const qcv = x.qc && x.qc.source === 'picture' ? { verdict: x.qc.verdict, summary: clip(x.qc.summary, 300), issues: (Array.isArray(x.qc.issues) ? x.qc.issues : []).slice(0, 8).map((i) => ({ aspect: i.aspect, severity: i.severity, comment: clip(i.comment, 400) })), checkedAt: x.qc.checked_at || null } : null;
+        const item = { id: x.id, url, rawUrl: x.asset_url || '', qc: qcv, hasText: !!x.final_url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
           copy: v ? { headline: clip(v.headline, 200), text: clip(v.primary || v.text || v.body, 900), description: clip(v.description, 300), cta: clip(v.cta, 60) } : null };
         return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
       });

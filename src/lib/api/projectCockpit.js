@@ -20,7 +20,7 @@ export async function fetchCockpits() {
   const [requests, projects, tasks, agents, assets, spend, stepRows, intelRows] = await Promise.all([
     supabase.from('ag_creative_requests').select('*').in('campaign_id', ids).order('created_at', { ascending: false }).limit(300),
     supabase.from('projects').select('id, name, client').in('id', [...new Set(campaigns.map((c) => c.project_id).filter(Boolean))]),
-    supabase.from('ag_tasks').select('id, agent_id, request_id, campaign_id, status, error, cost_usd, created_at, started_at, finished_at, summary:output->>summary, notes:output->json->>notes, issues:output->json->issues').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1500),
+    supabase.from('ag_tasks').select('id, agent_id, request_id, campaign_id, status, error, cost_usd, created_at, started_at, finished_at, summary:output->>summary, notes:output->json->>notes, issues:output->json->issues, inspect:output->>inspect').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1500),
     supabase.from('ag_agents').select('id, role').eq('team', 'creative'),
     supabase.from('project_creative_assets').select('project_id'),
     supabase.from('ag_creative_spend').select('campaign_id, usd').in('campaign_id', ids),
@@ -29,7 +29,7 @@ export async function fetchCockpits() {
     projectIds.length ? supabase.from('ag_project_intel').select('*').in('project_id', projectIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const reqs = must(requests) || [];
-  const creatives = reqs.length ? must(await supabase.from('ag_creatives').select('id, request_id, concept_key, concept_name, ratio, status, asset_url, final_url, cost_usd, note, copy').in('request_id', reqs.map((r) => r.id))) || [] : [];
+  const creatives = reqs.length ? must(await supabase.from('ag_creatives').select('id, request_id, concept_key, concept_name, ratio, status, asset_url, final_url, cost_usd, note, copy, qc').in('request_id', reqs.map((r) => r.id))) || [] : [];
   const projectOf = new Map((must(projects) || []).map((p) => [p.id, p]));
   const assetCount = {};
   (must(assets) || []).forEach((a) => { assetCount[a.project_id] = (assetCount[a.project_id] || 0) + 1; });
@@ -126,6 +126,12 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     return {};
   }
   if (key === 'overlay') { await agentAction('overlay_creative', { creativeId: payload.creativeId }); return {}; } // the headline and the button over the picture, made again
+  if (key === 'inspect') { // the quality checker looks at ONE finished picture now (about a cent)
+    const r = await agentAction('inspect_creative', { creativeId: payload.creativeId });
+    if (!r?.queued) throw new Error({ off: 'Контроль якості вимкнений у команді цього клієнта.', 'not-ready': 'Креатив має бути на перегляді й мати картинку.', queued: 'Цей креатив уже перевіряється.' }[r?.reason] || 'Не вдалося запустити перевірку.');
+    kick();
+    return {};
+  }
   if (key === 'edit_text') { // the words of a ready creative changed by a person: put on the same picture again (free); edit null = back to what the agents made
     const r = await agentAction('edit_creative_text', { creativeId: payload.creativeId, edit: payload.edit ?? null });
     if (r?.ok === false) throw new Error({ 'no-picture': 'У креатива немає картинки, на яку можна накласти текст.', 'empty-edit': 'Нічого змінювати.', 'no-creative': 'Креатив не знайдено.' }[r.reason] || 'Не вдалося накласти текст.');

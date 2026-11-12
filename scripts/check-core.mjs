@@ -91,6 +91,8 @@ import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, p
 import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, effectiveStyle, manualFromDraft, mergeManual, styleBlock, styleRows, styleSamplesOf } from '../src/lib/agents/projectStyle.js';
 import { overlayFields, applyText, applyTextForRequest, saveTextEdit, textInfo } from '../api/_lib/creativeText.js';
 import { cleanTextEdit } from '../src/lib/creatives/textEdit.js';
+import { inspectRun, parsePictureQc, qcNote } from '../api/_lib/creativeInspect.js';
+import { queueInspection } from '../api/_lib/creativeEngine.js';
 import { composeTextServer } from '../api/_lib/composeServer.js';
 import { busyOf, calmSpan } from '../src/lib/creatives/composeText.js';
 import { startIntel, releaseWaitingRequests } from '../api/_lib/creativeEngine.js';
@@ -5497,6 +5499,58 @@ await ok('task cards (3.0b): every task has its own runs, notes and money; the l
   assert.deepEqual(every.map((r) => r.date), ['2026-11-13', '2026-11-16', '2026-11-19']); // from the next run, every 3 days, up to the last day of the season
   const groups = groupByProject(list);
   assert.deepEqual(groups.map((g) => g.projectName), ['Mellow', 'Joia']); // the project with the tasks that wait for the person comes first
+});
+
+await ok('picture quality control (3.2): the checker looks at the FINISHED creative against the brand rules; a real problem returns it with the reasons, nothing is spent, a person decides', async () => {
+  // the verdict comes from the issues, not from what the model says
+  const pass = parsePictureQc('```json\n{"verdict":"fail","summary":"Ок","issues":[{"aspect":"brand","severity":"low","comment":"Трохи холодний тон"},{"aspect":"text","severity":"medium","comment":"Кнопка дрібна"}]}\n```');
+  assert.deepEqual([pass.verdict, pass.issues.length, pass.issues[0].aspect], ['pass', 2, 'brand']); // one medium and one low: not a problem
+  assert.equal(parsePictureQc('{"verdict":"pass","issues":[{"aspect":"product","severity":"high","comment":"Флакон спотворений"}]}').verdict, 'fail');
+  assert.equal(parsePictureQc('{"issues":[{"severity":"medium","comment":"a"},{"severity":"medium","comment":"b"},{"severity":"medium","comment":"c"}]}').verdict, 'fail'); // three medium ones
+  assert.throws(() => parsePictureQc('not json'), /вердикт/);
+  assert.deepEqual(parsePictureQc('{"issues":[{"aspect":"weird","severity":"urgent","comment":"x"},{"comment":""}]}').issues, [{ aspect: 'artifact', severity: 'low', comment: 'x' }]); // unknown values are made safe, empty ones dropped
+  assert.match(qcNote({ summary: 'Флакон не схожий', issues: [{ severity: 'high', comment: 'форма іншого флакона' }, { severity: 'low', comment: 'дрібниця' }] }), /^Контроль якості: Флакон не схожий \(форма іншого флакона\)$/);
+  // the whole step with a database: a creative on review, the brief with its concept, the model's answer
+  const concept = { key: 'c1', text_render: 'overlay', needs_text: true, layout: { text_zone: 'top' }, cta: { show: true, text: 'Shop' }, copy: { headline: 'Big idea', subline: '', badge: '' }, visual: 'A white bottle on a pink pedestal' };
+  const mk = () => ({ ag_creatives: [{ id: 1, request_id: 5, concept_key: 'c1', concept_name: 'Idea', ratio: '4:5', status: 'review', asset_url: 'https://s/raw.png', final_url: 'https://s/final.png', copy: { variants: [{ headline: 'Big idea' }] }, qc: null, note: '' }],
+    ag_tasks: [{ id: 1, request_id: 5, status: 'done', output: { json: { concepts: [concept] } } }] });
+  const run = async (answer, tables = mk()) => {
+    const db = fakeDb(tables); const seen = []; const steps = [];
+    const rec = { callModel: async (a) => { seen.push(a); if (answer instanceof Error) throw answer; return { text: answer }; } };
+    const out = await inspectRun({ ctx: { db }, agent: { id: 9, model: '' }, task: { id: 77, brief: { trigger: 'inspect', creativeId: 1 } }, prompt: { body: 'You check.' }, rec, campaign: { id: 4 }, req: { id: 5 }, blocks: [{ title: 'Обмеження клієнта', text: 'No red colour, no prices' }],
+      materials: [{ kind: 'logo', name: 'logo.png', url: 'https://s/logo.png' }, { kind: 'product', name: 'bottle.jpg', url: 'https://s/bottle.jpg' }, { kind: 'style', name: 'x.jpg', url: 'https://s/x.jpg' }], mine: {}, language: 'Ukrainian', step: async (text, state) => steps.push([text, state]) });
+    return { out, tables, seen, steps };
+  };
+  const bad = await run('{"verdict":"fail","summary":"Флакон не схожий на товар клієнта","issues":[{"aspect":"product","severity":"high","comment":"Інша форма флакона"}]}');
+  assert.equal(bad.tables.ag_creatives[0].status, 'rejected'); // a real problem: returned with the reasons
+  assert.match(bad.tables.ag_creatives[0].note, /^Контроль якості: Флакон не схожий/); assert.equal(bad.tables.ag_creatives[0].qc.verdict, 'fail');
+  assert.equal(bad.tables.ag_creatives[0].qc.picture_url, 'https://s/final.png'); // the finished picture with the words is what was checked
+  const parts = bad.seen[0].params.messages[0].content;
+  assert.ok(parts[0].text.includes('No red colour, no prices') && parts[0].text.includes('Words put over the picture by the system: headline "Big idea"')); // the brand rules and the words are in front of the checker
+  const imgs = parts.filter((x) => x.type === 'image').map((x) => x.source.url); assert.deepEqual(imgs, ['https://s/logo.png', 'https://s/bottle.jpg', 'https://s/final.png']); // the logo and the product are references, the creative comes LAST, a «style» material is not one
+  assert.equal(bad.out.output.json.inspect, true); assert.equal(bad.out.output.json.verdict, 'fail'); assert.notEqual(bad.out.output.json.verdict, 'revise'); // never the verdict that makes the agents work again (and spend)
+  const ok = await run('{"verdict":"pass","summary":"Усе гаразд","issues":[]}');
+  assert.deepEqual([ok.tables.ag_creatives[0].status, ok.tables.ag_creatives[0].qc.verdict, ok.tables.ag_creatives[0].note], ['review', 'pass', '']); // fine: stays for the person, with a mark
+  const soft = await run(new Error('overloaded'));
+  assert.deepEqual([soft.out.output.skipped, soft.tables.ag_creatives[0].status, soft.tables.ag_creatives[0].qc], [true, 'review', null]); // a model that cannot answer breaks nothing
+  const approved = mk(); approved.ag_creatives[0].status = 'approved';
+  const late = await run('{"verdict":"fail","summary":"x","issues":[{"severity":"high","comment":"y"}]}', approved);
+  assert.deepEqual([late.out.output.skipped, approved.ag_creatives[0].status], [true, 'approved']); // a creative the person already approved is not touched
+  // asking the checker: once per picture, only when it takes part in the chain of this client
+  const eng = () => ({ ag_agents: [{ id: 9, role: 'creative_quality', team: 'creative', scope_type: 'internal', scope_id: '', enabled: true }], ag_links: [], ag_agent_clients: [{ agent_id: 9, campaign_id: 4, enabled: true, mode: 'auto' }],
+    ag_creative_requests: [{ id: 5, campaign_id: 4 }], ag_creatives: [{ id: 1, request_id: 5, status: 'review', asset_url: 'https://s/raw.png', final_url: 'https://s/final.png', qc: null }], ag_tasks: [] });
+  const e1 = eng(); const ctx1 = { db: fakeDb(e1) };
+  assert.deepEqual(await queueInspection(ctx1, 1), { queued: true });
+  assert.deepEqual([e1.ag_tasks.length, e1.ag_tasks[0].brief, e1.ag_tasks[0].status], [1, { trigger: 'inspect', creativeId: 1 }, 'queued']);
+  assert.deepEqual(await queueInspection(ctx1, 1), { queued: false, reason: 'queued' }); // already waiting
+  e1.ag_tasks.length = 0; e1.ag_creatives[0].qc = { picture_url: 'https://s/final.png' };
+  assert.deepEqual(await queueInspection(ctx1, 1), { queued: false, reason: 'checked' }); // this very picture was looked at; a new picture (another file) would be looked at again
+  e1.ag_creatives[0].final_url = 'https://s/final-2.png';
+  assert.equal((await queueInspection(ctx1, 1)).queued, true);
+  const e2 = eng(); e2.ag_agent_clients[0].enabled = false;
+  assert.deepEqual(await queueInspection({ db: fakeDb(e2) }, 1), { queued: false, reason: 'off' }); // the checker is not in this client's team
+  const e3 = eng(); e3.ag_creatives[0].status = 'approved';
+  assert.deepEqual(await queueInspection({ db: fakeDb(e3) }, 1), { queued: false, reason: 'not-ready' });
 });
 
 await ok('text edit (3.1e): a person changes the words of a ready creative; the picture stays, the words are put again; the edit wins and survives a new text of the copywriter', async () => {

@@ -21,6 +21,7 @@ import { scoutRun } from './creativeScout.js';
 import { intelBlock } from '../../src/lib/agents/clientIntel.js';
 import { effectiveStyle } from '../../src/lib/agents/projectStyle.js';
 import { stepsOf } from './taskSteps.js';
+import { inspectRun } from './creativeInspect.js';
 
 const MODEL = 'claude-sonnet-5';
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -383,6 +384,8 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   if (agent.role !== 'creative_analyst') blocks.push(...own.blocks);
   const intel = agent.role === 'creative_analyst' ? null : intelBlock(intelRow, now, b.style);
   if (intel) blocks.push(intel);
+  // the quality checker asked to look at ONE FINISHED picture (step 3.2): the brand rules above are what it checks against
+  if (agent.role === 'creative_quality' && task.brief?.trigger === 'inspect') return inspectRun({ ctx, agent, task, prompt, rec, campaign, req, blocks, materials, mine, language, step });
   const failed = [];
   const accounts = await loadAccounts(db, campaign.project_id);
   const dept = sub;
