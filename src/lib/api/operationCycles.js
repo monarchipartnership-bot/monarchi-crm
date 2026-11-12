@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { MAX_REGULARS, cleanRegular, kyivToday, rawRegulars, regularRequest, regularsOf, seasonOver } from '../agents/operationCycles';
 import { cleanRequest } from '../agents/creativeTeam';
+import { cleanManual, isEmptyManual } from '../agents/projectStyle';
 import { createRequest, startRequest } from './creatives';
 
 // The cycles of an operation (lib/agents/operationCycles.js): the regular ones are kept in the operation itself (config.regulars), an extra one is a request.
@@ -75,6 +76,22 @@ export async function createExtraCycle(campaignId, values, email = null, start =
 export async function updateExtraCycle(requestId, values) {
   const clean = cleanRequest({ ...values, kind: 'extra' });
   return must(await supabase.from('ag_creative_requests').update({ title: clean.title, brief: clean.brief, materials: clean.materials, updated_at: new Date().toISOString() }).eq('id', requestId).select().single());
+}
+
+// The look of a task (owner, 2026-11-12: every task has its own style): kept in its brief. A regular task keeps it for every next run; a one-off task in its request. manual: { text, image, copy } (an empty
+// one gives the decision back to the scout).
+export async function setRegularStyle(campaignId, id, manual) {
+  const row = await readRow(campaignId);
+  const r = rawRegulars(row).find((x) => x.id === id);
+  if (!r) throw new Error('Регулярне завдання не знайдено.');
+  const { style: _old, ...rest } = r.brief || {};
+  const clean = cleanManual(manual);
+  return saveRegular(campaignId, { id, enabled: r.enabled, title: r.title, weekdays: r.weekdays, weekday: r.weekday, everyDays: r.everyDays, startDate: r.startDate, time: r.time, brief: isEmptyManual(clean) ? rest : { ...rest, style: clean } });
+}
+export async function setRequestStyle(requestId, brief, manual) {
+  const { style: _old, ...rest } = brief || {};
+  const clean = cleanManual(manual);
+  return must(await supabase.from('ag_creative_requests').update({ brief: isEmptyManual(clean) ? rest : { ...rest, style: clean }, updated_at: new Date().toISOString() }).eq('id', requestId).select().single());
 }
 
 // Names (owner, 2026-11-12): the team and its tasks get names the person chooses. A regular task keeps its name in the operation, so the next runs carry it; a one-off task is a request.

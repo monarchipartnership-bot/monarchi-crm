@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import '@fontsource/onest/500.css';
 import '@fontsource/onest/800.css';
 import { paintText } from '../../../lib/creatives/composeText';
-import { DEFAULT_MARGIN, TEXT_SIZES, cleanManual, cleanStyle, composerOptions, draftFromStyle, manualFromDraft } from '../../../lib/agents/projectStyle';
+import { DEFAULT_MARGIN, cleanManual, cleanStyle, composerOptions, draftFromStyle, isEmptyManual, manualFromDraft } from '../../../lib/agents/projectStyle';
 import { Spinner } from './parts';
 import '../../../styles/styleEditor.css';
 
@@ -67,6 +67,15 @@ function Chips({ label, value, options, onPick }) {
   );
 }
 
+function Field({ label, value, placeholder, onChange }) {
+  return (
+    <label className="se-row se-field">
+      <span className="se-lab">{label}</span>
+      <textarea rows={2} maxLength={300} value={value} placeholder={placeholder ? `За замовчуванням (розвідка): ${placeholder}` : 'Як вирішила розвідка'} onChange={(e) => onChange(e.target.value)} aria-label={label} />
+    </label>
+  );
+}
+
 function Slider({ label, value, auto, min, max, step, unit = '%', autoLabel = 'за замовчуванням', onChange, onAuto, fallback }) {
   const shown = auto ? fallback : value;
   return (
@@ -80,22 +89,27 @@ function Slider({ label, value, auto, min, max, step, unit = '%', autoLabel = '�
   );
 }
 
-// «Оформлення тексту на креативах» (owner's mockup, step 3.1d): the style of the words that the scout decided, changed by a person with a live preview on a picture of the project.
-//   style: intel.style (effective: { value, text: { zone: { source } ... } })   autoStyle / manual: the scout's decision and what is saved by a person
+// «Стиль цього завдання» (owner's mockup, step 3.1d; moved into the settings of a TASK on 2026-11-12: every task has its own look): the style the scout decided for the client is only the starting point,
+// the person changes it for this task with a live preview on a picture: the words on the picture, the tone of the pictures, the tone of the texts.
+//   autoStyle: the scout's decision (cleanStyle)   manual: what is saved for the task (cleanManual: { text, image, copy })
 //   samples: [{ id, url, label, headline, cta }]   onSave(manual) → Promise (an empty object gives the decision back to the scout)
 export default function StyleEditor({ autoStyle, manual, samples = [], onSave }) {
-  const auto = useMemo(() => cleanStyle(autoStyle).text, [autoStyle]);
+  const autoFull = useMemo(() => cleanStyle(autoStyle), [autoStyle]);
+  const auto = autoFull.text;
   const saved = useMemo(() => cleanManual(manual), [manual]);
   const start = useMemo(() => draftFromStyle(auto, saved.text), [auto, saved]);
   const [draft, setDraft] = useState(start);
+  const startTones = useMemo(() => ({ tone: saved.image.tone || '', mood: saved.image.mood || '', copy: saved.copy.tone || '' }), [saved]);
+  const [tones, setTones] = useState(startTones);
+  useEffect(() => { setTones(startTones); }, [startTones]);
   const [pick, setPick] = useState(0);
   const [busy, setBusy] = useState(false);
   useEffect(() => { setDraft(start); }, [start]);
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
-  const next = useMemo(() => manualFromDraft(draft, auto), [draft, auto]);
-  const dirty = JSON.stringify(next) !== JSON.stringify(saved.text);
-  const hasManual = Object.keys(saved.text).length > 0;
+  const next = useMemo(() => cleanManual({ text: manualFromDraft(draft, auto), image: { tone: tones.tone, mood: tones.mood }, copy: { tone: tones.copy } }), [draft, auto, tones]);
+  const dirty = JSON.stringify(next) !== JSON.stringify(saved);
+  const hasManual = !isEmptyManual(saved);
   const text = useMemo(() => ({ zone: draft.zone, size: draft.size, plate: draft.plate, color: draft.color, margin: draft.margin, ...(draft.plate === 'on' ? { plate_strength: draft.strength } : {}) }), [draft]);
   const sample = samples[Math.min(pick, samples.length - 1)];
 
@@ -104,7 +118,7 @@ export default function StyleEditor({ autoStyle, manual, samples = [], onSave })
 
   return (
     <div className="se">
-      <div className="se-head"><b>Оформлення тексту на креативах</b><span className={'ckp-chip ' + badge.cls}>{badge.text}</span></div>
+      <div className="se-head"><b>Стиль цього завдання</b><span className={'ckp-chip ' + badge.cls}>{badge.text}</span></div>
       {!sample && <p className="sd-note">Для превʼю потрібна картинка проєкту. Вона зʼявиться, коли буде перший креатив або фото з сайту.</p>}
       {sample && (
         <div className="se-grid">
@@ -125,11 +139,14 @@ export default function StyleEditor({ autoStyle, manual, samples = [], onSave })
             {draft.plate === 'on' && <Slider label="Сила підкладки" value={draft.strength} auto={false} min={10} max={90} step={5} fallback={55} onChange={(strength) => set({ strength })} onAuto={() => set({ strength: 55 })} />}
             <Chips label="Колір тексту" value={draft.color} options={INKS} onPick={(color) => set({ color })} />
             <Slider label="Відступ від краю" value={typeof draft.margin === 'number' ? draft.margin : DEFAULT_MARGIN} auto={draft.margin === 'auto'} min={3} max={15} step={1} fallback={DEFAULT_MARGIN} onChange={(margin) => set({ margin })} onAuto={() => set({ margin: draft.margin === 'auto' ? DEFAULT_MARGIN : 'auto' })} />
+            <Field label="Тон і світло картинок" value={tones.tone} placeholder={autoFull.image.tone} onChange={(v) => setTones((x) => ({ ...x, tone: v }))} />
+            <Field label="Настрій" value={tones.mood} placeholder={autoFull.image.mood} onChange={(v) => setTones((x) => ({ ...x, mood: v }))} />
+            <Field label="Тон текстів" value={tones.copy} placeholder={autoFull.copy.tone} onChange={(v) => setTones((x) => ({ ...x, copy: v }))} />
             <div className="se-acts">
-              <button type="button" className="ckp-btn is-primary" disabled={busy || !dirty} onClick={() => save({ text: next })}>{busy ? <Spinner /> : null}Зберегти для проєкту</button>
-              <button type="button" className="ckp-btn" disabled={busy || (!hasManual && !dirty)} onClick={() => { if (dirty && !hasManual) setDraft(start); else save({}); }}>Повернути вибір розвідки</button>
+              <button type="button" className="ckp-btn is-primary" disabled={busy || !dirty} onClick={() => save(next)}>{busy ? <Spinner /> : null}Зберегти для проєкту</button>
+              <button type="button" className="ckp-btn" disabled={busy || (!hasManual && !dirty)} onClick={() => { if (dirty && !hasManual) { setDraft(start); setTones(startTones); } else save({}); }}>Скинути до стилю розвідки</button>
             </div>
-            <small className="sd-note">Збережене діє на всіх нових креативах проєкту й не затирається, коли розвідник оновлює профіль. Готові креативи не змінюються.</small>
+            <small className="sd-note">Збережене діє на креативах цього завдання (у регулярного, з наступних запусків) і не залежить від того, що розвідник вирішив для клієнта: в іншого завдання може бути зовсім інший стиль. Порожнє поле означає «як вирішила розвідка». Готові креативи не змінюються.</small>
           </div>
         </div>
       )}

@@ -68,6 +68,8 @@ export function cleanManual(raw) {
   return out;
 }
 
+export const isEmptyManual = (m) => !m || (!Object.keys(m.text || {}).length && !Object.keys(m.image || {}).length && !Object.keys(m.copy || {}).length);
+
 // auto (the scout) + manual (the person) → the style that counts, with the source of every field: { text: { zone: { value, source } ... }, ..., value: the plain style }
 export function effectiveStyle(auto, manual) {
   const a = cleanStyle(auto);
@@ -117,7 +119,7 @@ export function styleBlock(style) {
     s.image.mood && `Mood: ${s.image.mood}`,
     s.copy.tone && `Tone of the copy: ${s.copy.tone}`,
   ].filter(Boolean);
-  return lines.length ? { title: 'Стиль оформлення клієнта (рішення розвідки й менеджера)', text: lines.join('\n') } : null;
+  return lines.length ? { title: 'Стиль оформлення цього завдання (рішення розвідки для клієнта, поверх нього налаштування завдання)', text: lines.join('\n') } : null;
 }
 
 const ZONE_UA = { auto: 'за картинкою', top: 'зверху', bottom: 'знизу', left: 'зліва', right: 'справа', center: 'по центру' };

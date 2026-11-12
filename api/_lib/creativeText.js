@@ -47,8 +47,9 @@ export async function applyText(ctx, creativeId, { force = false } = {}) {
   const res = await (ctx.fetchImage ? ctx.fetchImage(c.asset_url) : fetch(c.asset_url));
   if (!res.ok) throw new Error(`Не вдалося завантажити картинку для тексту (HTTP ${res.status}).`);
   // the style of the project (the scout decided it, a person corrected it) says where and how the words sit; what it leaves open the picture decides
-  const intel = (await db.from('ag_project_intel').select('profile, style_manual').eq('project_id', await projectOf(db, c.request_id)).maybeSingle()).data;
-  const style = composerOptions(effectiveStyle(intel?.profile?.style, intel?.style_manual).value.text);
+  const intel = (await db.from('ag_project_intel').select('profile').eq('project_id', await projectOf(db, c.request_id)).maybeSingle()).data;
+  const brief = (await db.from('ag_creative_requests').select('brief').eq('id', c.request_id).maybeSingle()).data?.brief || {};
+  const style = composerOptions(effectiveStyle(intel?.profile?.style, brief.style).value.text); // the look of THIS task over the scout's decision
   const out = await composeTextServer({ image: Buffer.from(await res.arrayBuffer()), ...f, style });
   const path = `requests/${c.request_id}/final-${c.id}-${Date.now()}.png`;
   const up = await db.storage.from(BUCKET).upload(path, out.png, { contentType: 'image/png', upsert: false });

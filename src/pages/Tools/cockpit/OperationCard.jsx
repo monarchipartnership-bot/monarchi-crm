@@ -73,7 +73,7 @@ export default function OperationCard({ campaign, project, cockpit, regularFirst
   const [label, tone] = preparing ? ['підготовка', 'is-warn'] : (OP_STATUS[campaign.status] || [campaign.status, '']);
   return createPortal(
     <div className="ckp ckp-overlay is-night ai-immersive pcd-overlay" data-ai-safe>
-      <div ref={box} className="ckp-win pcd-win" role="dialog" aria-modal="true" aria-label={task ? `Завдання ${task.title}` : teamOnly ? `Налаштування команди ${campaign.name}` : `Операція ${campaign.name}`} tabIndex={-1}>
+      <div ref={box} className="ckp-win pcd-win" role="dialog" aria-modal="true" aria-label={task ? `Завдання ${task.title}` : teamOnly ? `Загальні налаштування ${campaign.name}` : `Операція ${campaign.name}`} tabIndex={-1}>
         <header className="ckp-whd pcd-head">
           {onBackToProject && <button type="button" className="ckp-btn pcd-back" onClick={onBackToProject}><Ic n="back" size={16} />До проєкту</button>}
           <Avatar name={client} size={48} />
@@ -81,11 +81,11 @@ export default function OperationCard({ campaign, project, cockpit, regularFirst
             {task ? (
               <div className="pcd-optitle"><NameEdit as="h2" value={task.title} label="Назва завдання" onSave={async (name) => { if (regular) await renameRegular(campaign.id, regular.id, name); else if (request) await renameRequest(request.id, name); notify('Назву завдання збережено.'); await changed(); }} /><span className="ckp-chip">{task.kindLabel}</span><span className={'ckp-chip ' + (TASK_TONE[task.state] || '')}>{task.stateText}</span></div>
             ) : teamOnly ? (
-              <div className="pcd-optitle"><h2>Налаштування команди</h2><span className={'ckp-chip ' + tone}>{label}</span></div>
+              <div className="pcd-optitle"><h2>Загальні налаштування</h2><span className={'ckp-chip ' + tone}>{label}</span></div>
             ) : (
             <div className="pcd-optitle"><NameEdit as="h2" value={campaign.name} label="Назва операції" onSave={async (name) => { await updateCampaign(campaign.id, { name }); notify('Назву операції збережено.'); await changed(); }} /><span className="ckp-chip">{modeLabelOf(campaign)}</span><span className={'ckp-chip ' + tone}>{label}</span></div>
             )}
-            <p>{task ? [client, 'Креативи', task.line].filter(Boolean).join(' · ') : teamOnly ? [client, 'Креативи', 'профіль клієнта, ліміти, витрати'].join(' · ') : [client, (campaign.platforms || []).map((k) => PLATFORM_LABEL[k] || k).join(' + ')].filter(Boolean).join(' · ')}</p>
+            <p>{task ? [client, 'Креативи', task.line].filter(Boolean).join(' · ') : teamOnly ? [client, 'Креативи', 'профіль клієнта, ліміт, пауза, витрати'].join(' · ') : [client, (campaign.platforms || []).map((k) => PLATFORM_LABEL[k] || k).join(' + ')].filter(Boolean).join(' · ')}</p>
           </div>
           <div className="pcd-head-actions">
             {onOpenProject && campaign.project_id != null && <button type="button" className="ckp-btn" onClick={() => onOpenProject(campaign.project_id, campaign.id)}><Ic n="folder" size={16} />Картка проєкту</button>}

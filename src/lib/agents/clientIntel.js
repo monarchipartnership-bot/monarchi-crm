@@ -131,7 +131,8 @@ export function parseIntel(json, { photos = [], ads = [] } = {}) {
 }
 
 // What the other agents read (a block of their prompt). `row` is ag_project_intel.
-export function intelBlock(row, now = new Date()) {
+// manual: the style the person set for the task that is being worked on (brief.style); the scout's own decision is the starting point
+export function intelBlock(row, now = new Date(), manual = null) {
   if (!row || !['ready', 'partial'].includes(row.status)) return null;
   const p = row.profile || {};
   const days = Math.max(0, Math.floor((now.getTime() - new Date(row.updated_at || now).getTime()) / DAY));
@@ -149,7 +150,7 @@ export function intelBlock(row, now = new Date()) {
     p.ads?.notes && `Notes on the ads: ${p.ads.notes}`,
     asList(p.photos).length && `Product photos taken from the site (the maker uses them as references): ${p.photos.length}`,
     asList(p.gaps).length && `Not learned (say so, do not invent): ${p.gaps.join('; ')}`,
-    (() => { const sb = styleBlock(effectiveStyle(p.style, row.style_manual).value); return sb ? `${sb.title}:
+    (() => { const sb = styleBlock(effectiveStyle(p.style, manual).value); return sb ? `${sb.title}:
 ${sb.text}` : ''; })(),
   ].filter(Boolean);
   return { title: `Профіль клієнта від Розвідника (${days ? `${days} дн. тому` : 'сьогодні'}${row.status === 'partial' ? ', неповний' : ''})`, text: lines.join('\n') };

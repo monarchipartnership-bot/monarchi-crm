@@ -6,6 +6,7 @@
 // A request starts the strategist; every finished task starts the agents below it for the same client and request.
 import { CREATIVE_PROMPTS } from './creativePrompts.js';
 import { isValidLanguage } from './languages.js';
+import { cleanManual, isEmptyManual } from './projectStyle.js';
 
 export const CREATIVE_TEAM = 'creative';
 
@@ -179,6 +180,8 @@ export function cleanRequest(input = {}) {
   };
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(input.scheduled_for || ''))) brief.scheduled_for = input.scheduled_for;
   if (/^r[a-z0-9]{1,20}$/.test(String(input.regular_id || ''))) brief.regular_id = input.regular_id; // which regular cycle made it
+  const style = cleanManual(input.style);
+  if (!isEmptyManual(style)) brief.style = style; // the look of THIS task (words on the picture, tone of the pictures and of the copy): it wins over what the scout decided for the client
   const agentSettings = cleanAgentSettings(input.agent_settings);
   if (Object.keys(agentSettings).length) brief.agent_settings = agentSettings; // what the person asked of each agent for this cycle
   if (!brief.goal) throw new Error('Опишіть, що потрібно від креативів.');

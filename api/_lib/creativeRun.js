@@ -381,7 +381,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   if (req) blocks.push(requestBlock(req), materialsBlock(materials));
   const own = await projectCreativeBlocks(db, campaign.project_id, now, { inputs: agent.role === 'creative_strategy' });
   if (agent.role !== 'creative_analyst') blocks.push(...own.blocks);
-  const intel = agent.role === 'creative_analyst' ? null : intelBlock(intelRow, now);
+  const intel = agent.role === 'creative_analyst' ? null : intelBlock(intelRow, now, b.style);
   if (intel) blocks.push(intel);
   const failed = [];
   const accounts = await loadAccounts(db, campaign.project_id);
@@ -497,7 +497,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     return { output: { text: renderPlan(parsed), summary: parsed.summary, json: parsed, requestId: rid, campaignId, figma: figmaInfo, imagesSeen: images.length, imagesNote }, summary: parsed.summary || `Напрямів: ${parsed.directions.length}` };
   }
   if (agent.role === 'creative_brief') {
-    const parsed = parseCreativeBrief(raw, req, plan.directions, effectiveStyle(intelRow?.profile?.style, intelRow?.style_manual).value.text);
+    const parsed = parseCreativeBrief(raw, req, plan.directions, effectiveStyle(intelRow?.profile?.style, b.style).value.text);
     return { output: { text: renderBrief(parsed), summary: parsed.summary, json: parsed, requestId: rid, campaignId }, summary: parsed.summary || `Концепцій: ${parsed.concepts.length}` };
   }
   if (agent.role === 'creative_copywriter') {

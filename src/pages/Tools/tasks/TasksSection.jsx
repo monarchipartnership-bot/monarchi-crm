@@ -109,7 +109,7 @@ export default function TasksSection({ cockpit, onOpenProject = null, openCampai
             <b>{g.projectName}</b>
             {g.campaignStatus === 'paused' && <span className="ts-pill is-paused">команда на паузі</span>}
             <span className="ts-gh-acts">
-              <button type="button" className="ts-link" onClick={() => setCard({ campaignId: g.tasks[0].campaignId, taskKey: null, teamOnly: true })}>Налаштування команди</button>
+              <button type="button" className="ts-link" onClick={() => setCard({ campaignId: g.tasks[0].campaignId, taskKey: null, teamOnly: true })}>Загальні налаштування</button>
               {onOpenProject && g.projectId != null && <button type="button" className="ts-link" onClick={() => onOpenProject(g.projectId)}>Картка проєкту</button>}
             </span>
           </div>

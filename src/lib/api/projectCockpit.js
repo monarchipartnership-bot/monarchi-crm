@@ -5,7 +5,6 @@ import { estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, 
 import { reviewOutcome } from '../agents/operationCycles';
 import { uploadAsset } from './projectCreative';
 import { downloadOne, downloadZip } from '../creatives/download';
-import { cleanManual } from '../agents/projectStyle';
 
 const must = ({ data, error }) => { if (error) throw error; return data; };
 const WINDOW_DAYS = 30;
@@ -163,14 +162,4 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
 export async function pollProducing(byId) {
   const open = Object.values(byId).flatMap((c) => c.requests.filter((r) => r.creatives.producing > 0).map((r) => r.id));
   for (const id of open.slice(0, 3)) await pollCreatives(id).catch(() => {});
-}
-
-// What a person decided about the look of the words on the creatives of a project (step 3.1d): saved in ag_project_intel.style_manual. It wins over the scout's decision field by field and the scout never
-// writes this column, so it stays when the profile is made again. An empty object gives the decision back to the scout. → the saved (clean) manual style
-export async function saveStyleManual(projectId, manual) {
-  const clean = cleanManual(manual);
-  const { data, error } = await supabase.from('ag_project_intel').update({ style_manual: clean }).eq('project_id', projectId).select('project_id');
-  if (error) throw error;
-  if (!data?.length) throw new Error('Профілю клієнта ще немає: спочатку нехай розвідник його складе.');
-  return clean;
 }

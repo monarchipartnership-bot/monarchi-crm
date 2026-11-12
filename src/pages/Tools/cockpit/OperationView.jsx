@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { kickQueue, startIntel } from '../../../lib/api/agents';
-import { saveStyleManual } from '../../../lib/api/projectCockpit';
 import { styleSamplesOf } from '../../../lib/agents/projectStyle';
 import { addInstruction, fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
-import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled, updateExtraCycle } from '../../../lib/api/operationCycles';
+import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled, setRegularStyle, setRequestStyle, updateExtraCycle } from '../../../lib/api/operationCycles';
+import PicturesSetting from './PicturesSetting';
 import { startRequest } from '../../../lib/api/creatives';
 import { scopeCockpit } from '../../../lib/agents/taskScope';
 import { MAX_REGULARS, SECTIONS, buildOperationView, cycleCosts, describeCycle } from '../../../lib/agents/operationCycles';
@@ -19,7 +19,8 @@ import AgentsSettings from './AgentsSettings';
 import StepCards from './StepCards';
 import LiveSteps from './LiveSteps';
 import IntelCard from './IntelCard';
-import PicturesSetting from './PicturesSetting';
+import StyleEditor from './StyleEditor';
+import TeamLimit from './TeamLimit';
 import AgentNotes from './AgentNotes';
 import AttentionRow from './AttentionRow';
 import Gallery from './Gallery';
@@ -31,7 +32,7 @@ import './ProjectCard.css';
 
 // the sections of the card of ONE task and of the card of the team (step 3.0b); the card of a whole operation (SECTIONS) is kept for the old operations
 const TASK_SECTIONS = [['review', 'Результати'], ['now', 'Хід роботи'], ['settings', 'Налаштування'], ['spend', 'Витрати']];
-const TEAM_SECTIONS = [['client', 'Про клієнта'], ['settings', 'Налаштування команди'], ['spend', 'Витрати']];
+const TEAM_SECTIONS = [['client', 'Профіль клієнта'], ['settings', 'Ліміт і пауза'], ['spend', 'Витрати']];
 const REQ_CHIP = { draft: 'is-grey', running: 'is-work', review: 'is-warn', problem: 'is-bad', approved: 'is-ok' };
 const STATE_CHIP = { review: 'is-warn', rework: 'is-back', checked: 'is-ok' };
 const PASS_STATUS = { ok: 'успішно', failed: 'помилка', running: 'працює' };
@@ -141,8 +142,6 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
     if (!yes) return;
     await guard('intel', async () => { const r = await startIntel(campaign.id, { force: again }); if (!r?.started && r?.reason === 'active') throw new Error('Розвідник уже працює: кроки видно нижче.'); }, 'Розвідка запущена: кроки видно в блоці «Кроки розвідника».');
   };
-  // the look of the words on the creatives, set by a person (step 3.1d): saved for the project, the scout does not overwrite it
-  const saveStyle = (manual) => guard('style', () => saveStyleManual(c.projectId, manual), Object.keys(manual?.text || {}).length ? 'Оформлення збережено: воно діє на нових креативах проєкту.' : 'Повернуто вибір розвідки.');
   const styleSamples = useMemo(() => styleSamplesOf(c), [c]);
   const startCycle = (cycle) => guard('start' + cycle.id, () => act(null, 'start_cycle', { requestId: cycle.id }), 'Завдання запущено: агенти працюють.');
 
@@ -163,7 +162,10 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
   // the settings of the card of a task (step 3.0b): the regular task is saved in the operation (its title and its on/off state stay), a one-off task in its request
   const taskReg = task?.regularId ? view.regulars.find((r) => r.id === task.regularId) || null : null;
   const taskReq = task?.requestId != null ? (cAll?.requests || []).find((r) => r.id === task.requestId) || null : null;
-  async function saveTaskForm(values, start, schedule) {
+  // the look of THIS task: saved in its brief (a regular task keeps it for every next run)
+  const saveTaskStyle = (manual) => guard('style', () => (taskReg ? setRegularStyle(campaign.id, taskReg.id, manual) : setRequestStyle(taskReq.id, taskReq.brief, manual)), 'Стиль завдання збережено: він діє на креативах цього завдання.');
+  async function saveTaskForm(valuesIn, start, schedule) {
+    const values = { ...valuesIn, style: (taskReg || taskReq)?.brief?.style }; // the form does not know the style of the task: it stays as it is
     if (taskReg) {
       const { campaign: saved, regular } = await saveRegular(campaign.id, { id: taskReg.id, enabled: taskReg.enabled, title: taskReg.title, ...schedule, brief: values }, email);
       if (start) { await runRegularNow(saved, regular, email); kickQueue().catch(() => {}); }
@@ -225,7 +227,7 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
             </div>
           )}
           {view.creative && c && !task && (
-            <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} samples={styleSamples} onSaveStyle={saveStyle} />
+            <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} />
           )}
           {!view.creative && <Passes campaignId={campaign.id} />}
           {view.creative && (
@@ -370,15 +372,10 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
       )}
 
       {section === 'client' && teamOnly && view.creative && c && (
-        <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} samples={styleSamples} onSaveStyle={saveStyle} />
+        <IntelCard intel={c.intel} steps={c.scoutSteps || []} busy={busy === 'intel'} onRefresh={refreshIntel} />
       )}
 
-      {section === 'settings' && teamOnly && (
-        <>
-          {view.creative && <PicturesSetting campaign={campaign} notify={notify} onChanged={onChanged} />}
-          {campaign.status !== 'draft' && <div className="cmp-section pcd-embed"><CampaignControl campaign={campaign} notify={notify} /></div>}
-        </>
-      )}
+      {section === 'settings' && teamOnly && campaign.status !== 'draft' && <TeamLimit campaign={campaign} notify={notify} onChanged={onChanged} />}
 
       {section === 'settings' && task && (
         <>
@@ -392,6 +389,11 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
               </div>
             )}
           </section>
+          {(taskReg || taskReq) && c?.intel && (
+            <section className="ckp-box" aria-label="Стиль завдання">
+              <StyleEditor key={task.key} autoStyle={c.intel.autoStyle} manual={(taskReg || taskReq).brief?.style} samples={styleSamples} onSave={saveTaskStyle} />
+            </section>
+          )}
           {(taskReg || taskReq) && (
             <div className="cmp-section pcd-embed">
               <RequestForm key={task.key} campaign={campaign} mode={taskReg ? 'regular' : 'extra'} title="Налаштування завдання" initial={taskReg ? { ...taskReg.brief, materials: [] } : { ...taskReq.brief, title: taskReq.title, materials: [] }}

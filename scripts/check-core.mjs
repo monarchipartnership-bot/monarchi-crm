@@ -5616,8 +5616,13 @@ await ok('project style (3.1c): the scout decides, a person corrects, the manual
   // the profile of the scout carries the style; the block the agents read carries the effective style (the person's value included)
   const profile = parseIntel({ summary: 'A shop.', products: [{ name: 'Luna' }], style: { text: { zone: 'top', plate: 'no' }, copy: { tone: 'warm' } } }, {});
   assert.deepEqual([profile.style.text.zone, profile.style.text.plate], ['top', 'off']);
-  const block = intelBlock({ status: 'ready', updated_at: '2026-11-12T10:00:00Z', profile, style_manual: { text: { zone: 'bottom' } } }, new Date('2026-11-12T11:00:00Z'));
-  assert.match(block.text, /Стиль оформлення клієнта[\s\S]*sit at the bottom/);
+  const block = intelBlock({ status: 'ready', updated_at: '2026-11-12T10:00:00Z', profile }, new Date('2026-11-12T11:00:00Z'), { text: { zone: 'bottom' } }); // the style of the TASK over the scout's
+  assert.match(block.text, /Стиль оформлення цього завдання[\s\S]*sit at the bottom/);
+  // the style of a task lives in its brief; the cleaning of a request keeps it, drops what is not valid, and leaves nothing when it is empty
+  const withStyle = cleanRequest({ goal: 'Sale', ratios: ['1:1'], style: { text: { zone: 'TOP', margin: '9', nonsense: 1 }, image: { tone: ' warm ' }, copy: {} } });
+  assert.deepEqual(withStyle.brief.style, { text: { zone: 'top', margin: 9 }, image: { tone: 'warm' }, copy: {} });
+  assert.equal('style' in cleanRequest({ goal: 'Sale', ratios: ['1:1'], style: { text: { zone: 'auto-ish' } } }).brief, false);
+  assert.equal('style' in cleanRequest({ goal: 'Sale', ratios: ['1:1'] }).brief, false);
   assert.doesNotMatch(block.text, /sit at the top/); // the manual zone wins in what the agents read
   // the brief: a zone fixed by the style wins over the zone the agent proposed; a concept without text has none
   const request = { brief: { texts: 'yes', ratios: ['1:1'], language: 'en' }, materials: [] };
