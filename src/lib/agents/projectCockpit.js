@@ -6,6 +6,7 @@ import { fileNameOf } from '../creatives/download.js';
 import { directionLimit } from './creativeTeam.js';
 import { mergeNotes } from './agentNotes.js';
 import { intelSummaryLine } from './clientIntel.js';
+import { effectiveStyle } from './projectStyle.js';
 import { regularsOf } from './operationCycles.js';
 
 export const STAGES = [
@@ -171,6 +172,7 @@ export function intelView(intel, scoutTasks = [], now = null) {
     business: clip(p.business, 900), tone: clip(p.tone, 500), visualStyle: clip(p.visual_style, 900), priceRange: clip(p.price_range, 160),
     categories: Array.isArray(p.categories) ? p.categories : [], products: Array.isArray(p.products) ? p.products : [], ads: p.ads || null, gaps: Array.isArray(p.gaps) ? p.gaps : [],
     photos: Array.isArray(intel?.photos) ? intel.photos.map((x) => ({ url: x.url, label: x.label || '', use: x.use || 'product' })) : [],
+    style: effectiveStyle(p.style, intel?.style_manual), // the style of the creatives: what the scout decided and what a person changed, with the source of every field
     costUsd: num(intel?.cost_usd), now,
   };
 }

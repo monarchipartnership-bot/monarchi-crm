@@ -4,6 +4,7 @@
 // The picture without words stays as asset_url; the one with words is final_url (that one is shown and downloaded).
 import { composeTextServer } from './composeServer.js';
 import { ZONES } from '../../src/lib/creatives/composeText.js';
+import { composerOptions, effectiveStyle } from '../../src/lib/agents/projectStyle.js';
 
 const BUCKET = 'creative-assets';
 const clip = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
@@ -26,6 +27,13 @@ async function conceptOf(db, creative) {
   return brief?.output?.json?.concepts.find((c) => c.key === creative.concept_key) || null;
 }
 
+// The project of a request (through its operation).
+async function projectOf(db, requestId) {
+  const req = (await db.from('ag_creative_requests').select('campaign_id').eq('id', requestId).maybeSingle()).data;
+  const camp = req ? (await db.from('ag_campaigns').select('project_id').eq('id', req.campaign_id).maybeSingle()).data : null;
+  return camp?.project_id ?? -1;
+}
+
 // Puts the words on ONE creative and saves the result. force: also when it already has them (the button «Накласти текст знову»).
 // → { ok, reason? }: reasons: 'no-picture', 'no-text' (the concept wants no text), 'no-headline' (the copy is not ready yet: it is tried again when it arrives), 'has-text'
 export async function applyText(ctx, creativeId, { force = false } = {}) {
@@ -38,7 +46,10 @@ export async function applyText(ctx, creativeId, { force = false } = {}) {
   if (!f.headline) return { ok: false, reason: 'no-headline' };
   const res = await (ctx.fetchImage ? ctx.fetchImage(c.asset_url) : fetch(c.asset_url));
   if (!res.ok) throw new Error(`Не вдалося завантажити картинку для тексту (HTTP ${res.status}).`);
-  const out = await composeTextServer({ image: Buffer.from(await res.arrayBuffer()), ...f });
+  // the style of the project (the scout decided it, a person corrected it) says where and how the words sit; what it leaves open the picture decides
+  const intel = (await db.from('ag_project_intel').select('profile, style_manual').eq('project_id', await projectOf(db, c.request_id)).maybeSingle()).data;
+  const style = composerOptions(effectiveStyle(intel?.profile?.style, intel?.style_manual).value.text);
+  const out = await composeTextServer({ image: Buffer.from(await res.arrayBuffer()), ...f, style });
   const path = `requests/${c.request_id}/final-${c.id}-${Date.now()}.png`;
   const up = await db.storage.from(BUCKET).upload(path, out.png, { contentType: 'image/png', upsert: false });
   if (up.error) throw new Error(up.error.message || 'Не вдалося зберегти картинку з текстом.');

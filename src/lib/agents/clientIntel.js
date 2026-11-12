@@ -8,6 +8,8 @@ export const MAX_SITE_PAGES = 8; // the home page and up to seven pages of the c
 export const MAX_SITE_PHOTOS = 8; // the pictures of the site the model looks at (and may mark as references for the maker)
 export const MAX_ADS = 6; // the best ads of the cabinet it looks at
 
+import { cleanStyle, effectiveStyle, styleBlock } from './projectStyle.js';
+
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
 const asList = (v) => (Array.isArray(v) ? v : []);
 const DAY = 86400000;
@@ -124,6 +126,7 @@ export function parseIntel(json, { photos = [], ads = [] } = {}) {
     ads: { worked: list(j.ads?.worked, 8, 240), avoid: list(j.ads?.avoid, 8, 240), formats: list(j.ads?.formats, 6, 120), notes: clip(j.ads?.notes, 600), seen: ads.length },
     gaps: list(j.gaps, 8, 240),
     photos: refs,
+    style: cleanStyle(j.style), // the style of the creatives the scout read from the site and the past ads (a person corrects it: style_manual)
   };
 }
 
@@ -146,6 +149,8 @@ export function intelBlock(row, now = new Date()) {
     p.ads?.notes && `Notes on the ads: ${p.ads.notes}`,
     asList(p.photos).length && `Product photos taken from the site (the maker uses them as references): ${p.photos.length}`,
     asList(p.gaps).length && `Not learned (say so, do not invent): ${p.gaps.join('; ')}`,
+    (() => { const sb = styleBlock(effectiveStyle(p.style, row.style_manual).value); return sb ? `${sb.title}:
+${sb.text}` : ''; })(),
   ].filter(Boolean);
   return { title: `Профіль клієнта від Розвідника (${days ? `${days} дн. тому` : 'сьогодні'}${row.status === 'partial' ? ', неповний' : ''})`, text: lines.join('\n') };
 }
@@ -166,6 +171,7 @@ export const SCOUT_PROMPT = `You are the scout of the creative department of a p
 
 export const SCOUT_CONTRACT = [
   'The answer is machine-read JSON: escape every double quote inside a text as \\" or use single quotes; write each line break as the two characters backslash and n; no trailing commas; no text before or after the JSON object.',
-  'Answer with ONE JSON object: {"summary":"4-7 sentences in Ukrainian: who the client is, what it sells, to whom, how it positions itself","business":"one paragraph in Ukrainian: the business model and the main offer","categories":["main categories of the range"],"products":[{"name":"","category":"","price":"as written on the site, with currency","note":"what is special, or empty"}],"price_range":"e.g. from 120 to 940 EUR","tone":"the tone of voice of the site and the ads","visual_style":"colours, photography, composition, mood, what the brand imagery looks like","ads":{"worked":["what the best ads did, with the numbers you saw"],"avoid":["what to avoid, from weak or missing results"],"formats":["static image, carousel, video..."],"notes":""},"photo_picks":[{"n":1,"use":"product|logo|skip","label":"what is on the picture"}],"gaps":["what you could not learn and why (closed site, no catalogue in the HTML, no cabinet)"]}.',
+  'Answer with ONE JSON object: {"summary":"4-7 sentences in Ukrainian: who the client is, what it sells, to whom, how it positions itself","business":"one paragraph in Ukrainian: the business model and the main offer","categories":["main categories of the range"],"products":[{"name":"","category":"","price":"as written on the site, with currency","note":"what is special, or empty"}],"price_range":"e.g. from 120 to 940 EUR","tone":"the tone of voice of the site and the ads","visual_style":"colours, photography, composition, mood, what the brand imagery looks like","ads":{"worked":["what the best ads did, with the numbers you saw"],"avoid":["what to avoid, from weak or missing results"],"formats":["static image, carousel, video..."],"notes":""},"photo_picks":[{"n":1,"use":"product|logo|skip","label":"what is on the picture"}],"style":{"text":{"zone":"top|bottom|left|right|center|auto","size":"small|medium|large|auto","plate":"yes|no|auto"},"image":{"formats":["1:1","4:5","9:16","16:9"],"tone":"colour and light of the pictures that suit this client","mood":"the mood"},"copy":{"tone":"the tone of the ad copy"}},"gaps":["what you could not learn and why (closed site, no catalogue in the HTML, no cabinet)"]}.',
+  '"style" is what the creatives of THIS client should look like, judged from the ads that worked and from the site: where the words sit in the best ads (zone), whether they sit on a plate (plate), how big the type is (size), which formats those ads use, the colour and light of the pictures, the tone of the copy. Say "auto" for a field you cannot judge; never guess a format that no ad used.',
   'At most 24 products, the ones that look the most representative. "photo_picks" refers to the numbered SITE pictures only (n is the number in brackets before the picture); list only the pictures worth keeping (product or logo). When a part of the material is missing (the site could not be read, there is no ad account), say so in "gaps" and leave that part empty: never guess.',
 ].join('\n');

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Ic, Spinner } from './parts';
 import { fmtAgo, fmtUsd } from './format';
 import LiveSteps from './LiveSteps';
+import { styleRows } from '../../../lib/agents/projectStyle';
 import '../../../styles/stepDetails.css';
 
 const STATE = {
@@ -55,6 +56,7 @@ export default function IntelCard({ intel, steps = [], busy = false, onRefresh }
               {intel.visualStyle && <div><dt>Оформлення</dt><dd>{intel.visualStyle}</dd></div>}
               {intel.ads?.worked?.length > 0 && <div><dt>Що працювало в рекламі</dt><dd>{intel.ads.worked.join('; ')}</dd></div>}
               {intel.ads?.avoid?.length > 0 && <div><dt>Чого уникати</dt><dd>{intel.ads.avoid.join('; ')}</dd></div>}
+              {styleRows(intel.style).map((r) => <div key={r.label}><dt>{r.label}</dt><dd>{r.value}<span className="sd-note"> · {r.source === 'manual' ? 'виставив менеджер' : 'вирішила розвідка'}</span></dd></div>)}
               {intel.gaps?.length > 0 && <div><dt>Не вдалося дізнатись</dt><dd>{intel.gaps.join(' ')}</dd></div>}
             </dl>
           )}

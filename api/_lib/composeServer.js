@@ -28,7 +28,7 @@ export function registerFonts() {
 }
 
 // image: a Buffer of the picture (png / jpg / webp). → { png: Buffer, width, height, layout }
-export async function composeTextServer({ image, zone = 'left', headline = '', subline = '', badge = '', cta = '', maxSide = 2400 }) {
+export async function composeTextServer({ image, zone = 'left', headline = '', subline = '', badge = '', cta = '', maxSide = 2400, style = null }) {
   const { createCanvas, loadImage } = lib();
   registerFonts();
   const img = await loadImage(image);
@@ -38,6 +38,6 @@ export async function composeTextServer({ image, zone = 'left', headline = '', s
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0, W, H);
-  const layout = paintText(ctx, { W, H, zone, headline, subline, badge, cta, font: "'Onest', sans-serif" });
+  const layout = paintText(ctx, { W, H, zone, headline, subline, badge, cta, font: "'Onest', sans-serif", style });
   return { png: canvas.toBuffer('image/png'), width: W, height: H, layout };
 }

@@ -19,6 +19,7 @@ import { figmaText, figmaToken, readFigma } from './figma.js';
 import { generateCreatives } from './creativeMake.js';
 import { scoutRun } from './creativeScout.js';
 import { intelBlock } from '../../src/lib/agents/clientIntel.js';
+import { effectiveStyle } from '../../src/lib/agents/projectStyle.js';
 import { stepsOf } from './taskSteps.js';
 
 const MODEL = 'claude-sonnet-5';
@@ -69,7 +70,7 @@ export function textRender(brief = {}, needsText = true) {
 export const COPY_LINES = (c) => [c.copy?.headline && `headline "${c.copy.headline}"`, c.copy?.subline && `subline "${c.copy.subline}"`, c.copy?.badge && `badge "${c.copy.badge}"`].filter(Boolean);
 
 // The brief writer's answer → { summary, concepts, notes }. Concepts are checked against the request (how many, which formats, texts or not).
-export function parseCreativeBrief(text, request = {}, directions = []) {
+export function parseCreativeBrief(text, request = {}, directions = [], style = null) {
   const j = readJson(text);
   const brief = request.brief || {};
   const allowed = asList(brief.ratios).filter((r) => RATIO_KEYS.includes(r));
@@ -92,7 +93,8 @@ export function parseCreativeBrief(text, request = {}, directions = []) {
     const at = directions.findIndex((d) => d.key === clip(c?.direction, 20));
     const g = given[at >= 0 ? at : i];
     const copy = g ? { source: 'given', headline: g.headline, subline: g.subline, badge: g.badge } : { source: needsText ? 'copywriter' : 'none', headline: '', subline: '', badge: '' };
-    const zone = TEXT_ZONES.includes(c?.layout?.text_zone) ? c.layout.text_zone : needsText ? 'left' : 'none';
+    const locked = style?.zone && style.zone !== 'auto' && TEXT_ZONES.includes(style.zone) ? style.zone : null; // the style of the project fixes where the words sit
+    const zone = !needsText ? 'none' : locked || (TEXT_ZONES.includes(c?.layout?.text_zone) ? c.layout.text_zone : 'left');
     return {
       key, direction: clip(c?.direction, 20), name: clip(c?.name, 80) || `Концепція ${i + 1}`, angle: clip(c?.angle, 400), audience: clip(c?.audience, 300), message: clip(c?.message, 400),
       visual: clip(c?.visual, 1200), references, uses_materials: files, layout: { text_zone: zone, note: clip(c?.layout?.note, 300) },
@@ -482,7 +484,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     return { output: { text: renderPlan(parsed), summary: parsed.summary, json: parsed, requestId: rid, campaignId, figma: figmaInfo, imagesSeen: images.length, imagesNote }, summary: parsed.summary || `Напрямів: ${parsed.directions.length}` };
   }
   if (agent.role === 'creative_brief') {
-    const parsed = parseCreativeBrief(raw, req, plan.directions);
+    const parsed = parseCreativeBrief(raw, req, plan.directions, effectiveStyle(intelRow?.profile?.style, intelRow?.style_manual).value.text);
     return { output: { text: renderBrief(parsed), summary: parsed.summary, json: parsed, requestId: rid, campaignId }, summary: parsed.summary || `Концепцій: ${parsed.concepts.length}` };
   }
   if (agent.role === 'creative_copywriter') {

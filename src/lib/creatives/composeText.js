@@ -171,7 +171,10 @@ function calmWidth(ctx, W, H, zone) {
 
 // Paints the words over a picture that is ALREADY drawn on ctx (a browser canvas or the canvas of the server, the same calls): the layout, the colour of the words by the brightness of the picture
 // under them, a soft veil on that side, the pills of the badge and the button. → the layout (what was placed where).
-export function paintText(ctx, { W, H, zone: asked = 'left', headline = '', subline = '', badge = '', cta = '', font = FONT, smart = true }) {
+// style: what the project's style decides (lib/agents/projectStyle.js composerOptions): { zoneLock, scale, plate: 'auto'|'on'|'off', plateAlpha, ink: 'auto'|'light'|'dark' }; what it leaves open the picture decides.
+export function paintText(ctx, { W, H, zone: wanted = 'left', headline = '', subline = '', badge = '', cta = '', font = FONT, smart = true, style = null }) {
+  const st = style || {};
+  const asked = st.zoneLock || wanted; // a zone fixed by the style wins over the zone of the brief
   const measure = (t, size, weight) => { ctx.font = `${weight} ${size}px ${font}`; return ctx.measureText(t).width; };
   // the zone of the brief is a wish: the picture decides. Every zone is laid out for real and the picture is read under the rectangle the words would take (the zone of the brief has a head start);
   // a top or bottom zone narrows to the calm stretch when a logo or the subject is in the way.
@@ -183,8 +186,8 @@ export function paintText(ctx, { W, H, zone: asked = 'left', headline = '', subl
   let zone = asked; let lay = lay0(zone); let score = 0; let busy = false;
   if (smart) {
     let best = null;
-    for (const z of (asked === 'center' ? ['center'] : ['top', 'bottom', 'left', 'right'])) {
-      for (const fit of [1, 0.85, 0.72, 0.6, 0.5]) { // smaller type when the calm place is small; the bigger the better
+    for (const z of (st.zoneLock ? [st.zoneLock] : asked === 'center' ? ['center'] : ['top', 'bottom', 'left', 'right'])) {
+      for (const fit of (st.scale ? [st.scale] : [1, 0.85, 0.72, 0.6, 0.5])) { // a size fixed by the style is not shrunk; otherwise // smaller type when the calm place is small; the bigger the better
         const variants = [lay0(z, null, fit)];
         if (z === 'top' || z === 'bottom') { // and the same words narrowed to the calm stretch of their rows (a logo in a corner, the subject)
           const span = calmSpan(ctx, W, H, z, { y: variants[0].rect.y, h: variants[0].rect.h });
@@ -212,14 +215,17 @@ export function paintText(ctx, { W, H, zone: asked = 'left', headline = '', subl
     for (let i = 0; i < d.length; i += 4 * 37) { sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; n += 1; }
     lum = n ? sum / n : 0.5;
   } catch { /* a picture that cannot be read: white words on a veil */ lum = 0.3; }
-  const light = !busy && lum > 0.55;
+  let light = !busy && lum > 0.55; // true: dark words on a light picture
+  if (st.plate === 'on' && st.ink !== 'dark') light = false; // a plate: a dark veil and white words, unless dark words were asked for
+  if (st.ink === 'light') light = false; else if (st.ink === 'dark') light = true;
+  const veil = st.plate === 'off' ? 0 : (st.plateAlpha ?? (busy ? 0.7 : 0.42));
   const ink = light ? '#1B0A22' : '#FFFFFF';
   const back = light ? '#FFFFFF' : '#1B0A22';
   const a = light ? 255 : 0;
   const horizontal = zone === 'left' || zone === 'right';
   const g = horizontal ? ctx.createLinearGradient(zone === 'left' ? 0 : W, 0, zone === 'left' ? W * 0.6 : W * 0.4, 0) : ctx.createLinearGradient(0, zone === 'bottom' ? H : 0, 0, zone === 'bottom' ? H * 0.55 : H * 0.5);
-  g.addColorStop(0, `rgba(${a},${a},${a},${busy ? 0.7 : 0.42})`); g.addColorStop(1, `rgba(${a},${a},${a},0)`);
-  if (zone !== 'center') { ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); } else { ctx.fillStyle = `rgba(${a},${a},${a},0.22)`; ctx.fillRect(lay.box.x - 24, lay.box.y, lay.box.w + 48, lay.box.h); }
+  g.addColorStop(0, `rgba(${a},${a},${a},${veil})`); g.addColorStop(1, `rgba(${a},${a},${a},0)`);
+  if (veil > 0) { if (zone !== 'center') { ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); } else { ctx.fillStyle = `rgba(${a},${a},${a},${Math.min(0.9, veil * 0.55)})`; ctx.fillRect(lay.box.x - 24, lay.box.y, lay.box.w + 48, lay.box.h); } }
   ctx.textBaseline = 'top';
   for (const it of lay.items) {
     ctx.font = `${it.weight} ${it.size}px ${font}`;

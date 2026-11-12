@@ -87,6 +87,7 @@ import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.
 import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
+import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, effectiveStyle, styleBlock, styleRows } from '../src/lib/agents/projectStyle.js';
 import { overlayFields, applyText, applyTextForRequest } from '../api/_lib/creativeText.js';
 import { composeTextServer } from '../api/_lib/composeServer.js';
 import { busyOf, calmSpan } from '../src/lib/creatives/composeText.js';
@@ -5524,6 +5525,55 @@ await ok('team phase (3.1b): a launched creative team prepares while the scout s
   assert.equal(teamPhase(live, { intel: { status: 'failed' } }).phase, 'running'); // a scout that failed does not hold it either
   assert.equal(teamPhase(live, null).phase, 'running'); // a team from before the scout (no profile at all)
   assert.deepEqual([teamPhase({ key: 'creative', state: 'paused' }, { intel: { status: 'running' } }).phase, teamPhase({ key: 'analytics', state: 'running' }, { intel: { status: 'running' } }).phase, teamPhase({ key: 'reports', state: 'none' }).phase], ['paused', 'running', 'none']);
+});
+
+await ok('project style (3.1c): the scout decides, a person corrects, the manual value wins field by field and survives the next profile; the painter and the brief obey it', async () => {
+  // what comes in is cleaned: only known values, a plate as yes/no, a size as a word or a percent
+  const auto = cleanStyle({ text: { zone: 'TOP', size: 'large', plate: 'yes', color: 'neon', plate_strength: 400 }, image: { formats: ['1:1', '2:3', '1:1', '9:16'], tone: ' warm   beige ', mood: 'calm' }, copy: { tone: 'direct, short' } });
+  assert.deepEqual([auto.text.zone, auto.text.size, auto.text.plate, auto.text.color, auto.text.plate_strength], ['top', 'large', 'on', 'auto', 90]);
+  assert.deepEqual([auto.image.formats, auto.image.tone, auto.copy.tone], [['1:1', '9:16'], 'warm beige', 'direct, short']);
+  assert.deepEqual(cleanStyle(null).text, AUTO_TEXT); assert.equal(cleanStyle({ text: { size: '85' } }).text.size, 85); assert.equal(cleanStyle({ text: { size: 9999 } }).text.size, 140);
+  // the manual part keeps only what the person really set
+  assert.deepEqual(cleanManual({ text: { zone: 'auto', plate: 'off', size: 'auto' }, image: { formats: [] }, copy: { tone: '' } }), { text: { plate: 'off' }, image: {}, copy: {} });
+  // the style that counts: the manual value wins, the rest stays the scout's, and every field knows its source
+  const eff = effectiveStyle({ text: { zone: 'top', plate: 'yes', size: 'small' }, image: { tone: 'warm' } }, { text: { zone: 'bottom' }, copy: { tone: 'formal' } });
+  assert.deepEqual([eff.value.text.zone, eff.text.zone.source, eff.value.text.plate, eff.text.plate.source, eff.value.copy.tone, eff.copy.tone.source, eff.value.image.tone, eff.image.tone.source], ['bottom', 'manual', 'on', 'auto', 'formal', 'manual', 'warm', 'auto']);
+  assert.equal(effectiveStyle({}, {}).value.text.zone, 'auto'); // nobody decided: the picture decides
+  // for the painter: a fixed zone, a size, a plate, an ink; «auto» stays open
+  assert.deepEqual(composerOptions({ zone: 'bottom', size: 'small', plate: 'on', color: 'light', plate_strength: 30 }), { zoneLock: 'bottom', scale: 0.8, plate: 'on', plateAlpha: 0.3, ink: 'light' });
+  assert.deepEqual(composerOptions({ zone: 'auto', size: 120, plate: 'off' }), { zoneLock: null, scale: 1.2, plate: 'off', plateAlpha: null, ink: 'auto' });
+  assert.deepEqual(composerOptions(AUTO_TEXT), { zoneLock: null, scale: null, plate: 'auto', plateAlpha: null, ink: 'auto' });
+  // the card of the client: every row says where the value came from
+  const rows = styleRows(effectiveStyle({ text: { zone: 'top', size: 'large' }, image: { tone: 'warm' } }, { text: { zone: 'bottom' } }));
+  assert.deepEqual(rows.slice(0, 2).map((r) => [r.value, r.source]), [['знизу', 'manual'], ['більший', 'auto']]);
+  assert.ok(rows.some((r) => r.label === 'Тон картинок' && r.source === 'auto')); assert.deepEqual(styleRows(null), []);
+  // for the agents: the block lists only what is decided
+  assert.equal(styleBlock({}), null);
+  assert.match(styleBlock({ text: { zone: 'top', plate: 'off' }, image: { formats: ['4:5'], tone: 'warm beige' }, copy: { tone: 'direct' } }).text, /sit at the top[\s\S]*No plate[\s\S]*4:5[\s\S]*warm beige[\s\S]*direct/);
+  // the profile of the scout carries the style; the block the agents read carries the effective style (the person's value included)
+  const profile = parseIntel({ summary: 'A shop.', products: [{ name: 'Luna' }], style: { text: { zone: 'top', plate: 'no' }, copy: { tone: 'warm' } } }, {});
+  assert.deepEqual([profile.style.text.zone, profile.style.text.plate], ['top', 'off']);
+  const block = intelBlock({ status: 'ready', updated_at: '2026-11-12T10:00:00Z', profile, style_manual: { text: { zone: 'bottom' } } }, new Date('2026-11-12T11:00:00Z'));
+  assert.match(block.text, /Стиль оформлення клієнта[\s\S]*sit at the bottom/);
+  assert.doesNotMatch(block.text, /sit at the top/); // the manual zone wins in what the agents read
+  // the brief: a zone fixed by the style wins over the zone the agent proposed; a concept without text has none
+  const request = { brief: { texts: 'yes', ratios: ['1:1'], language: 'en' }, materials: [] };
+  const concepts = (style, brief = request) => parseCreativeBrief(JSON.stringify({ concepts: [{ key: 'c1', direction: 'd1', visual: 'Scene', layout: { text_zone: 'right' } }] }), brief, [{ key: 'd1' }], style).concepts[0];
+  assert.deepEqual([concepts(null).layout.text_zone, concepts({ zone: 'auto' }).layout.text_zone, concepts({ zone: 'top' }).layout.text_zone, concepts({ zone: 'top' }, { ...request, brief: { ...request.brief, texts: 'no' } }).layout.text_zone], ['right', 'right', 'top', 'none']);
+  // the painter: the plate off leaves the picture untouched where there are no words; the zone fixed by the style is obeyed even when the other one is calmer
+  const { createCanvas, loadImage } = await import('@napi-rs/canvas');
+  const c = createCanvas(1000, 1000); const g = c.getContext('2d'); g.fillStyle = '#F4F0EA'; g.fillRect(0, 0, 1000, 1000);
+  const png = c.toBuffer('image/png');
+  const px = async (buf, x, y) => { const i = await loadImage(buf); const cv = createCanvas(1000, 1000); const cx = cv.getContext('2d'); cx.drawImage(i, 0, 0); const d = cx.getImageData(x, y, 1, 1).data; return [d[0], d[1], d[2]]; };
+  const free = await composeTextServer({ image: png, zone: 'top', headline: 'Words', style: composerOptions({ plate: 'off' }) });
+  assert.deepEqual(await px(free.png, 900, 900), [244, 240, 234]); // no veil anywhere
+  const plated = await composeTextServer({ image: png, zone: 'top', headline: 'Words', style: composerOptions({ plate: 'on', plate_strength: 80 }) });
+  const veil = await px(plated.png, 20, 20); assert.ok(veil[0] < 120); // a dark plate under the words
+  const locked = await composeTextServer({ image: png, zone: 'top', headline: 'Words', style: composerOptions({ zone: 'bottom' }) });
+  assert.equal(locked.layout.zone, 'bottom');
+  const sized = await composeTextServer({ image: png, zone: 'top', headline: 'Words', style: composerOptions({ size: 'small' }) });
+  const normal = await composeTextServer({ image: png, zone: 'top', headline: 'Words' });
+  assert.ok(sized.layout.items[0].size < normal.layout.items[0].size); // a smaller type, as asked
 });
 
 console.log(`\n${passed} checks passed`);
