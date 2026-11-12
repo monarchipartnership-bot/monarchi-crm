@@ -20,21 +20,21 @@ export function wrapLines(measure, text, maxWidth) {
 
 // The free area of the picture for the words, by the zone the brief names. maxW (px): the width of the calm part of the picture beside the subject
 // (found by looking at the picture), so the words do not run onto the subject; only for the side zones.
-export function zoneBox(zone, W, H, maxW = Infinity) {
+export function zoneBox(zone, W, H, maxW = Infinity, span = null) {
   const pad = Math.round(W * 0.07);
   const side = (w) => Math.max(Math.round(W * 0.22), Math.min(w, maxW));
   if (zone === 'right') { const w = side(Math.round(W * 0.5) - pad); return { x: W - pad - w, y: Math.round(H * 0.1), w, h: Math.round(H * 0.8), align: 'left' }; }
-  if (zone === 'top') return { x: pad, y: pad, w: W - 2 * pad, h: Math.round(H * 0.36), align: 'left' };
-  if (zone === 'bottom') return { x: pad, y: Math.round(H * 0.62), w: W - 2 * pad, h: Math.round(H * 0.3), align: 'left' };
+  if (zone === 'top') return { x: span ? span.x : pad, y: pad, w: span ? span.w : W - 2 * pad, h: Math.round(H * 0.36), align: 'left' };
+  if (zone === 'bottom') return { x: span ? span.x : pad, y: Math.round(H * 0.62), w: span ? span.w : W - 2 * pad, h: Math.round(H * 0.3), align: 'left' };
   if (zone === 'center') return { x: Math.round(W * 0.15), y: Math.round(H * 0.3), w: Math.round(W * 0.7), h: Math.round(H * 0.4), align: 'center' };
   return { x: pad, y: Math.round(H * 0.1), w: side(Math.round(W * 0.5) - pad), h: Math.round(H * 0.8), align: 'left' }; // left (the default)
 }
 
 // The positions of every line, pill and the button inside the box: { items: [{ kind, x, y, w, h, lines, size, weight }] } where y is the top of the item.
 // measure(text, size, weight) → width. Sizes follow the width of the picture (1080 px wide = headline 64 px).
-export function layoutText({ measure, W, H, zone, headline, subline, badge, cta, maxW = Infinity }) {
-  const box = zoneBox(zone, W, H, maxW);
-  const k = W / 1080;
+export function layoutText({ measure, W, H, zone, headline, subline, badge, cta, maxW = Infinity, span = null, fit = 1 }) {
+  const box = zoneBox(zone, W, H, maxW, span);
+  const k = (W / 1080) * fit; // fit < 1: smaller type, so the words fit the calm part of a picture
   const items = [];
   const gap = Math.round(26 * k);
   let y = 0;
@@ -42,7 +42,8 @@ export function layoutText({ measure, W, H, zone, headline, subline, badge, cta,
     if (!text) return;
     const lines = wrapLines((t) => measure(t, size, weight), text, box.w);
     const h = Math.round(lines.length * size * lineHeight);
-    items.push({ kind, lines, size, weight, x: box.x, y, w: box.w, h, lineHeight });
+    const tw = Math.round(Math.max(...lines.map((l) => measure(l, size, weight))));
+    items.push({ kind, lines, size, weight, x: box.x, y, w: box.w, tw, h, lineHeight });
     y += h + gap;
   };
   // a pill (the badge, the button): the type shrinks (down to 62%) until the text fits the zone, then the text wraps inside the pill
@@ -71,10 +72,73 @@ export function layoutText({ measure, W, H, zone, headline, subline, badge, cta,
     it.y += top;
     if (box.align === 'center') it.x = Math.round(box.x + (box.w - (it.kind === 'badge' || it.kind === 'cta' ? it.w : box.w)) / 2);
   });
-  return { box, items, total };
+  const left = Math.min(...items.map((it) => it.x));
+  const right = Math.max(...items.map((it) => it.x + (it.kind === 'badge' || it.kind === 'cta' ? it.w : it.tw)));
+  const rect = items.length ? { x: left, y: Math.min(...items.map((it) => it.y)), w: Math.max(1, right - left), h: Math.max(1, total) } : { x: box.x, y: box.y, w: 1, h: 1 };
+  return { box, items, total, rect };
 }
 
-// ---------------------------------------------------------------------------------------------------------------- drawing (browser only)
+
+// ---------------------------------------------------------------------------------------------------------------- reading the picture (browser canvas or server canvas)
+const lum = (d, i) => (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+export const BUSY = 0.12; // above this share of «something is here» the zone is busy (hair, a face, a product): the words go on a dark veil
+export const IN_THE_WAY = 0.02; // above this share even a small thing (a logo in a corner) is under the words: another place or a narrower stretch is tried
+
+// How much of a rectangle is NOT the plain background: the share of the sampled pixels whose brightness differs from the median of the rectangle by more than a slow gradient or a
+// vignette can explain. A smooth wall gives ~0, a logo in a corner a few percent, hair or a face tens of percent. → 0..1
+export function busyOf(ctx, x, y, w, h) {
+  try {
+    const bw = Math.max(1, Math.round(w)); const bh = Math.max(1, Math.round(h));
+    const d = ctx.getImageData(Math.round(x), Math.round(y), bw, bh).data;
+    const stride = Math.max(1, Math.round(Math.sqrt((bw * bh) / 40000)));
+    const vals = [];
+    for (let r = 0; r < bh; r += stride) for (let c = 0; c < bw; c += stride) vals.push(lum(d, (r * bw + c) * 4));
+    if (!vals.length) return 0;
+    const sorted = [...vals].sort((p, q) => p - q);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    return vals.filter((v) => Math.abs(v - median) > 0.14).length / vals.length;
+  } catch { return 0.05; }
+}
+
+// The calmest of the four zones; the zone the brief names gets a head start (a person asked for it). → { zone, score }
+export function pickZone(ctx, W, H, preferred = 'left') {
+  const zones = ['top', 'bottom', 'left', 'right'];
+  if (preferred === 'center') return { zone: 'center', score: busyOf(ctx, W * 0.15, H * 0.3, W * 0.7, H * 0.4) };
+  let best = null;
+  for (const z of zones) {
+    const b = zoneBox(z, W, H);
+    const score = busyOf(ctx, b.x, b.y, b.w, b.h);
+    const weighted = z === preferred ? score * 0.8 : score;
+    if (!best || weighted < best.weighted) best = { zone: z, score, weighted };
+  }
+  return { zone: best.zone, score: best.score };
+}
+
+// The longest calm stretch along a top or bottom zone (bands of columns whose brightness hardly changes): the words start there and stay inside it, so they do not run onto the
+// logo in a corner or onto the subject. → { x, w } or null when the whole width is fine or nothing wide enough is calm.
+export function calmSpan(ctx, W, H, zone, rows = null) {
+  if (zone !== 'top' && zone !== 'bottom') return null;
+  try {
+    const box = { ...zoneBox(zone, W, H), ...(rows ? { y: Math.round(rows.y), h: Math.max(8, Math.round(rows.h)) } : {}) };
+    const bands = 40;
+    const bw = Math.max(1, Math.round(box.w / bands));
+    const calm = [];
+    for (let i = 0; i < bands; i += 1) {
+      const d = ctx.getImageData(box.x + i * bw, box.y, bw, box.h).data;
+      let sum = 0; let sq = 0; let n = 0;
+      for (let p = 0; p < d.length; p += 4 * 13) { const l = lum(d, p); sum += l; sq += l * l; n += 1; }
+      const mean = n ? sum / n : 0;
+      calm.push(Math.sqrt(Math.max(0, (n ? sq / n : 0) - mean * mean)) <= 0.07);
+    }
+    let best = { start: 0, len: 0 }; let cur = { start: 0, len: 0 };
+    calm.forEach((c, i) => { if (c) { if (!cur.len) cur.start = i; cur.len += 1; if (cur.len > best.len) best = { ...cur }; } else cur = { start: 0, len: 0 }; });
+    if (best.len >= bands) return null; // everything is calm: the default width
+    if (best.len < bands * 0.34) return null; // nothing wide enough: the words keep the default width and get the dark veil
+    return { x: Math.round(box.x + best.start * bw), w: Math.round(best.len * bw) };
+  } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------------------------------------------- drawing
 const loadImage = (url) => new Promise((resolve, reject) => {
   const img = new Image();
   img.crossOrigin = 'anonymous';
@@ -105,39 +169,54 @@ function calmWidth(ctx, W, H, zone) {
   } catch { return Infinity; }
 }
 
-// → a PNG Blob: the picture with the words over it. The colour of the words follows the brightness of the picture under them.
-export async function composeText({ imageUrl, zone = 'left', headline = '', subline = '', badge = '', cta = '', maxSide = 4096 }) {
-  const img = await loadImage(imageUrl);
-  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-  const W = Math.round(img.naturalWidth * scale);
-  const H = Math.round(img.naturalHeight * scale);
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, W, H);
-  try { await document.fonts.load(`800 40px ${FONT}`); await document.fonts.load(`500 30px ${FONT}`); } catch { /* the fallback font is fine */ }
-  const measure = (t, size, weight) => { ctx.font = `${weight} ${size}px ${FONT}`; return ctx.measureText(t).width; };
-  const lay = layoutText({ measure, W, H, zone, headline, subline, badge, cta, maxW: calmWidth(ctx, W, H, zone) });
+// Paints the words over a picture that is ALREADY drawn on ctx (a browser canvas or the canvas of the server, the same calls): the layout, the colour of the words by the brightness of the picture
+// under them, a soft veil on that side, the pills of the badge and the button. → the layout (what was placed where).
+export function paintText(ctx, { W, H, zone: asked = 'left', headline = '', subline = '', badge = '', cta = '', font = FONT, smart = true }) {
+  const measure = (t, size, weight) => { ctx.font = `${weight} ${size}px ${font}`; return ctx.measureText(t).width; };
+  // the zone of the brief is a wish: the picture decides. Every zone is laid out for real and the picture is read under the rectangle the words would take (the zone of the brief has a head start);
+  // a top or bottom zone narrows to the calm stretch when a logo or the subject is in the way.
+  const maxW = (z) => calmWidth(ctx, W, H, z);
+  const lay0 = (z, span = null, fit = 1) => layoutText({ measure, W, H, zone: z, headline, subline, badge, cta, maxW: maxW(z), span, fit });
+  const readRect = (l) => busyOf(ctx, l.rect.x, l.rect.y, l.rect.w, l.rect.h);
+  let zone = asked; let lay = lay0(zone); let score = 0; let busy = false;
+  if (smart) {
+    let best = null;
+    for (const z of (asked === 'center' ? ['center'] : ['top', 'bottom', 'left', 'right'])) {
+      for (const fit of [1, 0.85, 0.72, 0.6]) { // smaller type when the calm place is small; the bigger the better
+        let l = lay0(z, null, fit);
+        let sc = readRect(l);
+        if (sc > IN_THE_WAY && (z === 'top' || z === 'bottom')) { // narrow to the calm stretch of the rows the words take and look again
+          const span = calmSpan(ctx, W, H, z, { y: l.rect.y, h: l.rect.h });
+          if (span) { const l2 = lay0(z, span, fit); const sc2 = readRect(l2); if (sc2 < sc) { l = l2; sc = sc2; } }
+        }
+        const lines = (l.items.find((it) => it.kind === 'headline')?.lines.length) || 1;
+        const weighted = sc + Math.max(0, lines - 2) * 0.04 + (l.rect.w < W * 0.3 ? 0.03 : 0) + (z === asked ? 0 : 0.004) + (1 - fit) * 0.06; // a narrow column, a tall headline, small type: all worse than a wide calm place
+        if (!best || weighted < best.weighted) best = { z, l, sc, weighted };
+        if (sc <= IN_THE_WAY) break; // fits here: no need for a smaller type
+      }
+    }
+    zone = best.z; lay = best.l; score = best.sc; busy = score > BUSY;
+  }
   // the picture under the words: dark → white words, light → near-black words, plus a soft veil on that side for legibility
   let lum = 0.5;
   try {
-    const b = lay.box;
+    const b = lay.rect;
     const d = ctx.getImageData(b.x, b.y, Math.max(1, b.w), Math.max(1, b.h)).data;
     let sum = 0; let n = 0;
     for (let i = 0; i < d.length; i += 4 * 37) { sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; n += 1; }
     lum = n ? sum / n : 0.5;
-  } catch { /* a picture the browser does not let us read: white words on a veil */ lum = 0.3; }
-  const light = lum > 0.55;
+  } catch { /* a picture that cannot be read: white words on a veil */ lum = 0.3; }
+  const light = !busy && lum > 0.55;
   const ink = light ? '#1B0A22' : '#FFFFFF';
   const back = light ? '#FFFFFF' : '#1B0A22';
   const a = light ? 255 : 0;
   const horizontal = zone === 'left' || zone === 'right';
   const g = horizontal ? ctx.createLinearGradient(zone === 'left' ? 0 : W, 0, zone === 'left' ? W * 0.6 : W * 0.4, 0) : ctx.createLinearGradient(0, zone === 'bottom' ? H : 0, 0, zone === 'bottom' ? H * 0.55 : H * 0.5);
-  g.addColorStop(0, `rgba(${a},${a},${a},0.42)`); g.addColorStop(1, `rgba(${a},${a},${a},0)`);
+  g.addColorStop(0, `rgba(${a},${a},${a},${busy ? 0.7 : 0.42})`); g.addColorStop(1, `rgba(${a},${a},${a},0)`);
   if (zone !== 'center') { ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); } else { ctx.fillStyle = `rgba(${a},${a},${a},0.22)`; ctx.fillRect(lay.box.x - 24, lay.box.y, lay.box.w + 48, lay.box.h); }
   ctx.textBaseline = 'top';
   for (const it of lay.items) {
-    ctx.font = `${it.weight} ${it.size}px ${FONT}`;
+    ctx.font = `${it.weight} ${it.size}px ${font}`;
     if (it.kind === 'badge' || it.kind === 'cta') {
       const r = Math.min(it.h / 2, it.size * 1.4);
       ctx.beginPath(); ctx.roundRect(it.x, it.y, it.w, it.h, r);
@@ -148,5 +227,20 @@ export async function composeText({ imageUrl, zone = 'left', headline = '', subl
       it.lines.forEach((line, i) => ctx.fillText(line, it.x, it.y + i * it.size * it.lineHeight));
     }
   }
+  return { ...lay, zone, busy, asked, score };
+}
+
+// → a PNG Blob: the picture with the words over it (in the browser).
+export async function composeText({ imageUrl, zone = 'left', headline = '', subline = '', badge = '', cta = '', maxSide = 4096 }) {
+  const img = await loadImage(imageUrl);
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const W = Math.round(img.naturalWidth * scale);
+  const H = Math.round(img.naturalHeight * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, W, H);
+  try { await document.fonts.load(`800 40px ${FONT}`); await document.fonts.load(`500 30px ${FONT}`); } catch { /* the fallback font is fine */ }
+  paintText(ctx, { W, H, zone, headline, subline, badge, cta });
   return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Не вдалося зібрати картинку.'))), 'image/png'));
 }

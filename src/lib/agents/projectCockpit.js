@@ -213,7 +213,7 @@ export function buildCockpit(raw) {
       const items = c.slice().sort((a, b) => num(a.id) - num(b.id)).map((x) => {
         const url = x.final_url || x.asset_url || '';
         const v = x.copy?.variants?.[0] || null;
-        const item = { id: x.id, url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
+        const item = { id: x.id, url, hasText: !!x.final_url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
           copy: v ? { headline: clip(v.headline, 200), text: clip(v.primary || v.text || v.body, 900), description: clip(v.description, 300), cta: clip(v.cta, 60) } : null };
         return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
       });

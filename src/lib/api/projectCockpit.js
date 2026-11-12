@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { buildCockpit, isActiveCampaign, sortProjects, summaryOf } from '../agents/projectCockpit';
-import { kickQueue } from './agents';
+import { agentAction, kickQueue } from './agents';
 import { estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, setCreativeStatus, startRequest } from './creatives';
 import { reviewOutcome } from '../agents/operationCycles';
 import { uploadAsset } from './projectCreative';
@@ -125,6 +125,7 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     await settleReview(rid);
     return {};
   }
+  if (key === 'overlay') { await agentAction('overlay_creative', { creativeId: payload.creativeId }); return {}; } // the headline and the button over the picture, made again
   if (key === 'approve_one') { await setCreativeStatus(payload.creativeId, 'approved'); await settleReview(rid); return {}; }
   if (key === 'return') {
     const ids = payload.creativeIds?.length ? payload.creativeIds : (item?.creatives || []).map((c) => c.id);

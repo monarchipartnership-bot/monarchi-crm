@@ -8,6 +8,7 @@ import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { CREATIVE_TEAM, REQUEST_ENTRY_ROLE, connectCampaign, isCreativeRole, requestRoles } from '../../src/lib/agents/creativeTeam.js';
 import { SCOUT_ROLE, intelState } from '../../src/lib/agents/clientIntel.js';
 import { scoutFailed } from './creativeScout.js';
+import { applyTextForRequest } from './creativeText.js';
 
 export const MAX_REWORK_ROUNDS = 2; // the quality checker may send the work back twice; the third time it goes to the person as it is
 
@@ -249,6 +250,7 @@ export async function settleRequest(ctx, rid, failure = null) {
     return 'running';
   }
   await attachCopy(db, rid, dept, tasks);
+  try { await applyTextForRequest(ctx, rid); } catch (e) { console.warn('applyTextForRequest failed:', e?.message || e); } // the pictures that were ready before the copy get their words now
   must(await db.from('ag_creative_requests').update({ status: 'review', error: null, finished_at: now, updated_at: now }).eq('id', rid), 'request');
   return 'review';
 }

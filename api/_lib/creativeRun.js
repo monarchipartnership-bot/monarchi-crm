@@ -59,12 +59,12 @@ function parseInventory(j) {
 
 const TEXT_ZONES = ['left', 'right', 'top', 'bottom', 'center', 'none'];
 const REF_ROLES = ['product', 'logo', 'style', 'person', 'other'];
-// Who puts the words on the picture: the image model itself ('model', tried on English: it spells exactly), the system over a clean picture ('overlay',
-// the default for other languages until the model is tried on them), or nobody ('none'). Decided by the system from the request, not by an agent.
+// Who puts the words on the picture: the system over a clean picture ('overlay', always since 2026-11-12, api/_lib/creativeText.js), or nobody ('none'). The image model
+// itself ('model') is no longer used. Decided by the system from the request, not by an agent.
 export function textRender(brief = {}, needsText = true) {
   if (!needsText || brief.texts === 'no') return 'none';
   if (!overlaySafe(brief.language)) return 'none'; // the words of a language that needs its own fonts or another layout are handed over apart from the picture
-  return brief.language === 'en' ? 'model' : 'overlay';
+  return 'overlay'; // the system puts the words in every language (owner, 2026-11-12): the image model is not trusted to spell, not even English
 }
 export const COPY_LINES = (c) => [c.copy?.headline && `headline "${c.copy.headline}"`, c.copy?.subline && `subline "${c.copy.subline}"`, c.copy?.badge && `badge "${c.copy.badge}"`].filter(Boolean);
 

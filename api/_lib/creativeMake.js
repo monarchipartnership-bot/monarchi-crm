@@ -10,6 +10,7 @@ import * as hfReal from './hfImage.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { creativeAutoOf } from '../../src/lib/agents/creativeTeam.js';
 import { logStep } from './taskSteps.js';
+import { applyText } from './creativeText.js';
 
 export const DEFAULT_LIMIT_USD = 3;
 const STALE_MS = 40 * 60 * 1000; // a picture that is still «producing» after this long is given up
@@ -115,7 +116,12 @@ export async function pollCreatives(ctx, { requestId = null } = {}) {
       const saved = await hf.persist({ db, url: r.url, requestId: row.request_id, creativeId: row.id });
       must(await db.from('ag_creatives').update({ status: 'review', asset_url: saved.url, asset_path: saved.path || null, hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id), 'creative');
       changed += 1;
-      await logStep(ctx, { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' }, 'Higgsfield: картинка «' + (row.concept_name || row.concept_key) + '», ' + row.ratio + ' готова', 'done');
+      const who = { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' };
+      await logStep(ctx, who, 'Higgsfield: картинка «' + (row.concept_name || row.concept_key) + '», ' + row.ratio + ' готова', 'done');
+      try { // the words over the clean picture (the copy may still be on its way: then it is done when the copy arrives)
+        const t = await applyText(ctx, row.id);
+        if (t.ok) await logStep(ctx, who, 'Текст накладено на картинку «' + (row.concept_name || row.concept_key) + '»', 'done');
+      } catch (e) { await logStep(ctx, who, 'Текст не вдалося накласти: ' + String(e?.message || e).slice(0, 100), 'failed'); }
     } else if (r.state === 'failed' || timedOut) {
       // the provider refused it (failed, moderated, canceled): it does not charge, so the price of this generation goes back. A picture that only
       // took too long may still be made and charged: its price stays.

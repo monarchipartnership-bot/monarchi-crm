@@ -87,6 +87,9 @@ import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.
 import { TASK_KIND, teamTasksOf } from '../src/lib/agents/teamTasks.js';
 import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
+import { overlayFields, applyText, applyTextForRequest } from '../api/_lib/creativeText.js';
+import { composeTextServer } from '../api/_lib/composeServer.js';
+import { busyOf, calmSpan } from '../src/lib/creatives/composeText.js';
 import { startIntel, releaseWaitingRequests } from '../api/_lib/creativeEngine.js';
 import { readShop } from '../api/_lib/creativeScout.js';
 import { makerTokens, parseCreativeBrief, parseCreativeCopy, parseCreativeMaker, parseCreativePlan, parseCreativeQc, salvageCreatives } from '../api/_lib/creativeRun.js';
@@ -2082,20 +2085,20 @@ await ok('creative brief for Higgsfield: references checked against the material
   assert.deepEqual([c1.copy.source, c1.copy.badge, c2.copy.headline, c2.copy.subline], ['given', 'FALL SALE · 15% OFF', 'We Style It. You Wear It.', '']);
   assert.deepEqual(c2.references, [{ file: 'kbb-worn.jpg', role: 'product', keep: 'dark chocolate brown, tight coils, fringe' }]); // a file that is not in the materials is dropped
   assert.deepEqual([c1.references[0].role, c1.layout.text_zone, c2.layout.text_zone, c1.ratios, c2.ratios], ['other', 'left', 'left', ['4:5'], ['4:5', '9:16']]);
-  assert.deepEqual([c1.text_render, c1.cta, c1.needs_text], ['model', { show: true, text: 'Shop now' }, true]);
+  assert.deepEqual([c1.text_render, c1.cta, c1.needs_text], ['overlay', { show: true, text: 'Shop now' }, true]); // the system puts the words, in English too
   assert.deepEqual(COPY_LINES(c2), ['headline "We Style It. You Wear It."', 'badge "FALL SALE · 15% OFF"']);
   const rendered = renderBrief(brief);
   assert.match(rendered, /Референси: kbb-worn\.jpg \(product; лишити як у файлі: dark chocolate brown/);
   assert.match(rendered, /Текст: заданий менеджером, дослівно: headline "Salon-Fresh Hair\. Without the Salon\."/);
-  assert.match(rendered, /Хто робить текст на картинці: модель/);
+  assert.match(rendered, /Хто робить текст на картинці: система накладає поверх чистої картинки/);
   assert.match(rendered, /Кнопка заклику до дії: так, «Shop now»/);
   // who renders the text: English the model (tried), other languages the system over a clean picture, no texts nobody
-  assert.deepEqual([textRender({ language: 'en', texts: 'yes' }), textRender({ language: 'uk', texts: 'yes' }), textRender({ language: 'en', texts: 'no' }), textRender({ language: 'en' }, false)], ['model', 'overlay', 'none', 'none']);
+  assert.deepEqual([textRender({ language: 'en', texts: 'yes' }), textRender({ language: 'uk', texts: 'yes' }), textRender({ language: 'en', texts: 'no' }), textRender({ language: 'en' }, false)], ['overlay', 'overlay', 'none', 'none']);
   // the Ukrainian request: a clean picture with a free zone, the button as the request says
   const uk = parseCreativeBrief(JSON.stringify({ concepts: [{ key: 'c1', direction: 'd1', visual: 'Scene', layout: { text_zone: 'top' } }] }), cleanRequest({ goal: 'x', texts: 'yes', language: 'uk', cta: false, materials: mats }), [{ key: 'd1' }]);
   assert.deepEqual([uk.concepts[0].text_render, uk.concepts[0].cta.show, uk.concepts[0].layout.text_zone, uk.concepts[0].copy.source], ['overlay', false, 'top', 'copywriter']);
   // the maker: when the model renders the text and the answer lacks a prompt, the fallback carries the exact words; otherwise the picture is asked to have none
-  const made = parseCreativeMaker('{"creatives":[]}', [{ ...c1, ratios: ['4:5'] }], 'Soft daylight');
+  const made = parseCreativeMaker('{"creatives":[]}', [{ ...c1, text_render: 'model', ratios: ['4:5'] }], 'Soft daylight');
   assert.match(made.creatives[0].prompt, /headline "Salon-Fresh Hair\. Without the Salon\."[\s\S]*badge "FALL SALE · 15% OFF"[\s\S]*No other words/);
   assert.doesNotMatch(made.creatives[0].negative_prompt, /^text, letters/);
   const clean = parseCreativeMaker('{"creatives":[]}', uk.concepts, '');
@@ -4431,7 +4434,7 @@ await ok('language of the client: any language of the list, names for the prompt
   assert.match(rules, /in German/); assert.match(rules, /for the TEAM[^.]*in Ukrainian/); assert.match(rules, /Ukrainian, Russian or English/);
   assert.doesNotMatch(creativeLockedText('creative_copywriter', null), /in German|CLIENT's audience/);
   // who puts the words on the picture: English by the model, other latin / cyrillic / greek languages over a clean picture, the other scripts: no words on the picture
-  assert.deepEqual(['en', 'de', 'uk', 'ar', 'zh'].map((l) => textRender({ language: l, texts: 'yes' })), ['model', 'overlay', 'overlay', 'none', 'none']);
+  assert.deepEqual(['en', 'de', 'uk', 'ar', 'zh'].map((l) => textRender({ language: l, texts: 'yes' })), ['overlay', 'overlay', 'overlay', 'none', 'none']);
   // the request keeps any language of the list (an unknown one falls back to Ukrainian)
   assert.deepEqual([cleanRequest({ goal: 'x', language: 'de' }).brief.language, cleanRequest({ goal: 'x', language: 'zz' }).brief.language], ['de', 'uk']);
 });
@@ -5448,6 +5451,58 @@ await ok('team tasks: the tasks of a team are listed with names and marks: main 
   const stopped = teamTasksOf({ campaign: { ...campaign, config: { ...campaign.config, regulars: [reg('r1', 'Суслики', { enabled: false })] } }, cockpit: null, now });
   assert.deepEqual(stopped.map((t) => [t.kind, t.state, t.stateText]), [['main', 'paused', 'зупинено']]);
   assert.deepEqual(teamTasksOf({ campaign: { id: 1, config: {} }, cockpit: null, now }), []);
+});
+
+await ok('words on a creative (3.1): the text comes from the brief and the copywriter, the system puts it on the clean picture, in a real font, on the server', async () => {
+  const concept = { key: 'c1', text_render: 'overlay', needs_text: true, layout: { text_zone: 'top' }, cta: { show: true, text: '' }, copy: { headline: '', subline: '', badge: '' } };
+  const creative = { copy: { variants: [{ headline: 'Edges This Real? Yes, Really.', cta: 'Shop Now' }] } };
+  assert.deepEqual(overlayFields(concept, creative), { zone: 'top', headline: 'Edges This Real? Yes, Really.', subline: '', badge: '', cta: 'Shop Now' }); // the headline of the copywriter, the button of its first variant
+  assert.deepEqual(overlayFields({ ...concept, copy: { headline: 'Given by the manager', subline: 'Line 2', badge: '-20%' }, cta: { show: false } }, creative), { zone: 'top', headline: 'Given by the manager', subline: 'Line 2', badge: '-20%', cta: '' }); // given texts win, a concept without a button has none
+  assert.equal(overlayFields({ ...concept, text_render: 'none' }, creative), null); // no text wanted
+  assert.equal(overlayFields({ ...concept, layout: { text_zone: 'nowhere' } }, creative).zone, 'top'); // an unknown zone is the top
+  assert.equal(overlayFields(concept, {}).headline, ''); // the copy is not ready: the caller waits
+
+  // a real picture (a plain light wall with a darker object low in the frame): the words are put in the calm top, in Ukrainian with its own letters
+  const { createCanvas } = await import('@napi-rs/canvas');
+  const c = createCanvas(1000, 1000); const g = c.getContext('2d');
+  g.fillStyle = '#F4F0EA'; g.fillRect(0, 0, 1000, 1000); g.fillStyle = '#3A2418'; g.fillRect(250, 520, 500, 480);
+  const png = c.toBuffer('image/png');
+  const out = await composeTextServer({ image: png, zone: 'top', headline: 'Лінія волосся, що виглядає як ваша власна', subline: 'Без клею', cta: 'Замовити зараз' });
+  assert.deepEqual([out.width, out.height, out.layout.zone, out.layout.busy], [1000, 1000, 'top', false]);
+  assert.ok(out.png.length > png.length * 0.5 && out.png.subarray(1, 4).toString() === 'PNG'); // a PNG came out
+  assert.ok(out.layout.rect.y + out.layout.rect.h < 520); // and the words stay above the object
+  // the zone of the brief is a wish: when the top is a busy one, a calm place is taken; a plain dark area is calm (white words on it)
+  const c2 = createCanvas(1000, 1000); const g2 = c2.getContext('2d'); g2.fillStyle = '#F4F0EA'; g2.fillRect(0, 0, 1000, 1000); g2.fillStyle = '#2A1A10'; for (let x = 0; x < 1000; x += 40) g2.fillRect(x, 0, 20, 450); // stripes: a busy top
+  const moved = await composeTextServer({ image: c2.toBuffer('image/png'), zone: 'top', headline: 'Calm place wanted', cta: 'Shop' });
+  assert.notEqual(moved.layout.zone, 'top');
+  // the layout is exact: the rectangle of the words is inside the picture, the lines are the strings of the brief
+  const measure = (t, size) => t.length * size * 0.5;
+  const lay = layoutText({ measure, W: 1080, H: 1080, zone: 'top', headline: 'Skip The Salon. Keep The Look.', subline: 'Ready to wear', cta: 'Shop Now' });
+  assert.ok(lay.rect.x >= 0 && lay.rect.y >= 0 && lay.rect.x + lay.rect.w <= 1080 && lay.rect.y + lay.rect.h <= 1080);
+  assert.deepEqual(lay.items.map((i) => [i.kind, i.lines.join(' ')]), [['headline', 'Skip The Salon. Keep The Look.'], ['subline', 'Ready to wear'], ['cta', 'Shop Now']]);
+  const narrow = layoutText({ measure, W: 1080, H: 1080, zone: 'top', headline: 'Skip The Salon. Keep The Look.', span: { x: 100, w: 400 } });
+  assert.deepEqual([narrow.box.x, narrow.box.w], [100, 400]); // a calm stretch narrows the words
+  // the reading of the picture: a plain wall is not busy, an object in the rectangle is
+  const plain = { getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4).fill(240) }) };
+  assert.equal(busyOf(plain, 0, 0, 100, 100), 0);
+  const split = { getImageData: (x, y, w, h) => { const d = new Uint8ClampedArray(w * h * 4).fill(240); for (let i = 0; i < w * h; i += 1) if (i % w < w / 2) { d[i * 4] = 20; d[i * 4 + 1] = 20; d[i * 4 + 2] = 20; } return { data: d }; } };
+  assert.ok(busyOf(split, 0, 0, 100, 100) > 0.4);
+  assert.equal(calmSpan(plain, 1000, 1000, 'left'), null); // only the top and the bottom have a stretch
+  // the whole step with a database: the picture is fetched, the words are put, the result is stored and becomes final_url; a creative that wants no text stays as it is
+  const tables = { ag_creatives: [{ id: 1, request_id: 5, concept_key: 'c1', status: 'review', asset_url: 'https://s/raw.png', final_url: null, copy: creative.copy }, { id: 2, request_id: 5, concept_key: 'c2', status: 'review', asset_url: 'https://s/raw2.png', final_url: null }],
+    ag_tasks: [{ id: 1, request_id: 5, status: 'done', output: { json: { concepts: [concept, { ...concept, key: 'c2', text_render: 'none' }] } } }] };
+  const db = fakeDb(tables);
+  const stored = [];
+  db.storage = { from: () => ({ upload: async (path, bytes) => { stored.push([path, bytes.length > 100]); return { error: null }; }, getPublicUrl: (path) => ({ data: { publicUrl: `https://s/${path}` } }) }) };
+  const ctx = { db, fetchImage: async () => ({ ok: true, arrayBuffer: async () => png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) }) };
+  assert.deepEqual(await applyTextForRequest(ctx, 5), [1]);
+  assert.match(tables.ag_creatives[0].final_url, /requests\/5\/final-1-\d+\.png$/);
+  assert.deepEqual([tables.ag_creatives[1].final_url, stored.length, stored[0][1]], [null, 1, true]);
+  assert.deepEqual(await applyText(ctx, 1), { ok: false, reason: 'has-text' });
+  assert.equal((await applyText(ctx, 1, { force: true })).ok, true); // the button «Текст знову»
+  assert.deepEqual(await applyText(ctx, 2), { ok: false, reason: 'no-text' });
+  tables.ag_creatives[0].copy = null; tables.ag_creatives[0].final_url = null;
+  assert.deepEqual(await applyText(ctx, 1), { ok: false, reason: 'no-headline' }); // no copy yet: it is done when the copy arrives
 });
 
 console.log(`\n${passed} checks passed`);

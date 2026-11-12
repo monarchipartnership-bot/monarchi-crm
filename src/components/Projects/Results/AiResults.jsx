@@ -47,6 +47,7 @@ function ResultCard({ item, onOpen, onAct, busy }) {
       <div className="ar-acts">
         {canApprove(item) && <button type="button" className="btn btn-p" disabled={!!busy} onClick={() => simple('approve_one')}>Схвалити</button>}
         {canReturn(item) && <button type="button" className="btn" disabled={!!busy} onClick={giveBack}>{asking ? 'Повернути ↵' : 'Повернути'}</button>}
+        {item.url && ['review', 'approved'].includes(item.status) && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('overlay')}>{item.hasText ? 'Текст знову' : 'Накласти текст'}</button>}
         {canDownload(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('download_one')} aria-label={`Завантажити: ${item.conceptName}`}>Завантажити</button>}
       </div>
       {err && <p className="ar-err" role="alert">{err}</p>}
