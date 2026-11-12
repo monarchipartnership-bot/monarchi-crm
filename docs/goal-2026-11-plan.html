@@ -25,6 +25,16 @@ p { margin: 0; }
 .eyebrow { font-size: .72rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
 header.top { display: flex; flex-direction: column; gap: 12px; }
 .lead { max-width: 68ch; color: var(--muted); font-size: 1rem; }
+.progress { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; }
+.overall { display: grid; grid-template-columns: auto 1fr; gap: 6px 20px; align-items: end; }
+.overall .pct { font-size: clamp(2.6rem, 9vw, 3.8rem); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.overall .lab { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px; } .overall .lab b { font-size: 1rem; } .overall .lab span { color: var(--muted); font-size: .86rem; }
+.overall .bigbar { grid-column: 1 / -1; height: 12px; border-radius: 12px; background: var(--todo-soft); overflow: hidden; } .overall .bigbar i { display: block; height: 100%; background: var(--accent); border-radius: 12px; }
+.cats { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 22px; }
+.cat { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cat .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; } .cat .row b { font-weight: 600; font-size: .92rem; min-width: 0; } .cat .row span { font-variant-numeric: tabular-nums; font-weight: 700; }
+.cat .mini { height: 7px; border-radius: 7px; background: var(--todo-soft); overflow: hidden; } .cat .mini i { display: block; height: 100%; background: var(--accent); border-radius: 7px; }
+.cat small { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .tile b { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; } .tile span { color: var(--muted); font-size: .85rem; }
@@ -74,9 +84,19 @@ footer { color: var(--muted); font-size: .82rem; }
     <p class="lead">Агент діє сам, де це безпечно, або за командою людини. П'ять напрямків від керівництва, кожен розбитий на невеликі кроки: зробили крок, перевірили й протестували, перейшли до наступного.</p>
   </header>
 
-  <section class="strip" aria-label="Загальний стан">
+  <section class="progress" aria-label="Виконання плану">
+    <div class="overall">
+      <span class="pct" id="o-pct">0%</span>
+      <span class="lab"><b>Виконано загалом</b><span id="o-sub">—</span></span>
+      <span class="bigbar" role="progressbar" aria-label="Загальний відсоток виконання" aria-valuemin="0" aria-valuemax="100" id="o-bar"><i style="width:0%"></i></span>
+    </div>
+    <div class="cats" id="cats"></div>
+    <p class="muted" style="font-size:.84rem">У відсоток входять лише кроки, які ви підтвердили. База (що вже було до плану) і кроки «пізніше» не рахуються.</p>
+  </section>
+
+  <section class="strip" aria-label="Стан кроків">
     <div class="tile"><b id="t-days">—</b><span>днів до 30 листопада</span></div>
-    <div class="tile"><b id="t-done">—</b><span>кроків готово з <span id="t-all">—</span></span></div>
+    <div class="tile"><b id="t-check">—</b><span>на вашій перевірці</span></div>
     <div class="tile"><b id="t-wait">—</b><span>чекають вашого рішення чи доступу</span></div>
     <div class="tile"><b id="t-must">—</b><span>обов'язкових кроків залишилось</span></div>
   </section>
@@ -87,6 +107,7 @@ footer { color: var(--muted); font-size: .82rem; }
       <div class="rule"><b>Малими обсягами</b>Один крок за раз, кожен можна перевірити окремо.</div>
       <div class="rule"><b>Перевірка до наступного кроку</b>У кожного кроку записано, як саме ми перевіряємо результат.</div>
       <div class="rule"><b>Без великих переробок</b>Спочатку безпечний каркас і формат, потім функції на ньому.</div>
+      <div class="rule"><b>Виконано тільки з вашого підтвердження</b>Зроблений крок отримує статус «На перевірці». Він стає «Готово» й іде у відсотки після вашого «приймаю».</div>
       <div class="rule"><b>Деплой тільки за вашим словом</b>Готове лежить локально, на прод виходить після вашого «деплой».</div>
     </div>
     <div class="legend"><span>Пріоритет:</span><span class="chip done">М — обов'язково</span><span class="chip prog">С — бажано</span><span class="chip">Н — якщо вистачить часу</span><span>· Обсяг: S до пів дня, M до дня, L 2–3 дні</span></div>
@@ -118,7 +139,7 @@ footer { color: var(--muted); font-size: .82rem; }
     </ul>
   </section>
 
-  <footer>Оновлено 12.11.2026. Статуси змінюються після кожного завершеного кроку.</footer>
+  <footer>Оновлено 12.11.2026. Крок позначається виконаним лише після вашого підтвердження.</footer>
 </div>
 
 <script>
@@ -184,22 +205,32 @@ const NEED = [
   ['Перелік онбординг-процесів, що повторюються', '5.7', '22.11'],
 ];
 const WEEKS = [{ w: 1, h: '12–16 листопада', note: 'Формат, перевірка наявного, доступи' }, { w: 2, h: '17–23 листопада', note: 'Безпечний каркас дій, Meta, рекомендації, календар' }, { w: 3, h: '24–30 листопада', note: 'Google, рахунки, відео, фінальна перевірка' }];
-const LABEL = { done: 'Готово', prog: 'У роботі', todo: 'Не розпочато', wait: 'Чекає вас', later: 'Пізніше' };
+// status check = I made it and wait for the owner's «приймаю»; only done (confirmed) counts in the percentages
+const LABEL = { done: 'Готово', check: 'На перевірці', prog: 'У роботі', todo: 'Не розпочато', wait: 'Чекає вас', later: 'Пізніше' };
+const SHORT = { 1: 'Стратегія', 2: 'Звітність', 3: 'Креативи', 4.1: 'Аналітика й рекомендації', 4.2: 'Запуск реклами', 5: 'Проджект-ассистент' };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const all = GOALS.flatMap((g) => g.steps);
-const planned = all.filter((s) => s.st !== 'done');
-document.getElementById('t-done').textContent = all.filter((s) => s.st === 'done').length;
-document.getElementById('t-all').textContent = all.length;
-document.getElementById('t-wait').textContent = all.filter((s) => s.st === 'wait').length;
-document.getElementById('t-must').textContent = planned.filter((s) => s.p === 'М' && s.st !== 'later').length;
+const counted = (g) => g.steps.filter((s) => s.w !== 0 && s.st !== 'later'); // the base steps and the steps «later» are not part of the percentage
+const pctOf = (steps) => (steps.length ? Math.round((steps.filter((s) => s.st === 'done').length / steps.length) * 100) : 0);
+const allCounted = GOALS.flatMap(counted);
+const overall = pctOf(allCounted);
+document.getElementById('o-pct').textContent = overall + '%';
+document.getElementById('o-sub').textContent = `${allCounted.filter((s) => s.st === 'done').length} з ${allCounted.length} кроків підтверджено`;
+const ob = document.getElementById('o-bar'); ob.setAttribute('aria-valuenow', overall); ob.firstElementChild.style.width = overall + '%';
+document.getElementById('cats').innerHTML = GOALS.map((g) => { const c = counted(g); const p = pctOf(c); return `<div class="cat"><div class="row"><b>${esc(g.n)}. ${esc(SHORT[g.n] || g.name)}</b><span>${p}%</span></div><div class="mini" role="progressbar" aria-label="${esc(SHORT[g.n] || g.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i style="width:${p}%"></i></div><small>${c.filter((s) => s.st === 'done').length} з ${c.length} підтверджено${c.some((s) => s.st === 'check') ? `, на перевірці: ${c.filter((s) => s.st === 'check').length}` : ''}</small></div>`; }).join('');
+document.getElementById('t-check').textContent = allCounted.filter((s) => s.st === 'check').length;
+document.getElementById('t-wait').textContent = allCounted.filter((s) => s.st === 'wait').length;
+document.getElementById('t-must').textContent = allCounted.filter((s) => s.p === 'М' && s.st !== 'done').length;
 const left = Math.ceil((new Date('2026-11-30T23:59:59+02:00') - new Date()) / 86400000);
 document.getElementById('t-days').textContent = Math.max(0, left);
 document.getElementById('weeks').innerHTML = WEEKS.map((k) => `<div class="week"><h3>${esc(k.h)}</h3><small>${esc(k.note)}</small><ul>${all.filter((s) => s.w === k.w && s.st !== 'later').map((s) => `<li><code>${esc(s.id)}</code><span>${esc(s.t.split(':')[0])}</span></li>`).join('')}</ul></div>`).join('');
 document.getElementById('goals').innerHTML = GOALS.map((g, i) => {
-  const done = g.steps.filter((s) => s.st === 'done').length;
-  const pct = Math.round((done / g.steps.length) * 100);
-  const waiting = g.steps.filter((s) => s.st === 'wait').length;
-  return `<details class="goal"${i === 0 ? ' open' : ''}><summary><span class="gnum">${esc(g.n)}</span><span class="gname"><h3>${esc(g.name)}</h3><small>${esc(g.sub)}</small></span><span class="gmeta"><span class="chip done">${done} з ${g.steps.length}</span>${waiting ? `<span class="chip wait">чекає вас: ${waiting}</span>` : ''}</span><span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span></summary>
+  const c = counted(g);
+  const done = c.filter((s) => s.st === 'done').length;
+  const pct = pctOf(c);
+  const waiting = c.filter((s) => s.st === 'wait').length;
+  const check = c.filter((s) => s.st === 'check').length;
+  return `<details class="goal"${i === 0 ? ' open' : ''}><summary><span class="gnum">${esc(g.n)}</span><span class="gname"><h3>${esc(g.name)}</h3><small>${esc(g.sub)}</small></span><span class="gmeta"><span class="chip done">${done} з ${c.length} · ${pct}%</span>${check ? `<span class="chip prog">на перевірці: ${check}</span>` : ''}${waiting ? `<span class="chip wait">чекає вас: ${waiting}</span>` : ''}</span><span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span></summary>
   <ol class="steps">${g.steps.map((s) => `<li class="step is-${s.st}"><span class="sid"><code>${esc(s.id)}</code></span><div><div class="stitle">${esc(s.t)}</div><div class="scheck"><b>Перевірка:</b> ${esc(s.c)}</div></div><div class="sright"><span class="chip ${s.st}">${LABEL[s.st]}</span>${s.p ? `<span class="tags"><span title="Пріоритет">${s.p}</span><span title="Обсяг">${s.s}</span><span title="Тиждень">т${s.w}</span></span>` : ''}</div></li>`).join('')}</ol></details>`;
 }).join('');
 document.getElementById('need').innerHTML = NEED.map((r) => `<tr><td>${esc(r[0])}</td><td><code>${esc(r[1])}</code></td><td>${esc(r[2])}</td></tr>`).join('');
