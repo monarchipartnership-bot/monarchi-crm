@@ -31,7 +31,7 @@ import '../../../styles/studio.css';
 import './ProjectCard.css';
 
 // the sections of the card of ONE task and of the card of the team (step 3.0b); the card of a whole operation (SECTIONS) is kept for the old operations
-const TASK_SECTIONS = [['review', 'Результати'], ['now', 'Хід роботи'], ['settings', 'Налаштування'], ['spend', 'Витрати']];
+const TASK_SECTIONS = [['now', 'Хід роботи'], ['review', 'Результати'], ['spend', 'Витрати'], ['settings', 'Налаштування']];
 const TEAM_SECTIONS = [['client', 'Профіль клієнта'], ['settings', 'Ліміт і пауза'], ['spend', 'Витрати']];
 const REQ_CHIP = { draft: 'is-grey', running: 'is-work', review: 'is-warn', problem: 'is-bad', approved: 'is-ok' };
 const STATE_CHIP = { review: 'is-warn', rework: 'is-back', checked: 'is-ok' };
@@ -107,7 +107,7 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
   const c = useMemo(() => (task ? scopeCockpit(cAll, task) : cAll), [cAll, task]);
   const { email } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
-  const [section, setSection] = useState(task ? 'review' : teamOnly ? 'client' : 'now');
+  const [section, setSection] = useState(task ? 'now' : teamOnly ? 'client' : 'now');
   // the form of a cycle: { mode: 'extra', allowKind } (a new one, the kind is chosen in the form) | { mode: 'regular', regularId? } (a regular one: new or edited)
   const [form, setForm] = useState(regularFirst ? { mode: 'regular' } : null);
   const [openCycle, setOpenCycle] = useState(null);
@@ -377,30 +377,30 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
 
       {section === 'settings' && teamOnly && campaign.status !== 'draft' && <TeamLimit campaign={campaign} notify={notify} onChanged={onChanged} />}
 
-      {section === 'settings' && task && (
-        <>
-          <section className="ckp-box opv-regular" aria-label="Налаштування завдання">
-            <div className="ckp-sec-h"><h3>Налаштування завдання</h3><span className="ckp-chip">{task.kindLabel}</span></div>
-            <p className="opv-what">{task.regularId ? 'Усе тут діє лише для цього завдання: в інших завдань клієнта свої налаштування, зокрема й у кожного агента. Зміни застосуються до наступних запусків.' : 'Усе тут діє лише для цього завдання, зокрема й налаштування кожного агента. Зміни застосуються, коли ви запустите завдання ще раз.'}</p>
-            {taskReg && (
-              <div className="ckp-acts">
-                <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => guard('reg' + taskReg.id, () => setRegularEnabled(campaign.id, taskReg.id, !taskReg.enabled, email), taskReg.enabled ? 'Регулярне завдання вимкнено.' : 'Регулярне завдання увімкнено.')}><Ic n={taskReg.enabled ? 'stop' : 'play'} size={15} />{taskReg.enabled ? 'Вимкнути' : 'Увімкнути'}</button>
-                <button type="button" className="ckp-btn is-danger" disabled={!!busy} onClick={async () => { if (await dropRegular(taskReg)) onBack?.(); }}>Видалити завдання</button>
-              </div>
-            )}
-          </section>
-          {(taskReg || taskReq) && c?.intel && (
-            <section className="ckp-box" aria-label="Стиль завдання">
-              <StyleEditor key={task.key} autoStyle={c.intel.autoStyle} manual={(taskReg || taskReq).brief?.style} samples={styleSamples} onSave={saveTaskStyle} />
-            </section>
-          )}
-          {(taskReg || taskReq) && (
-            <div className="cmp-section pcd-embed">
-              <RequestForm key={task.key} campaign={campaign} mode={taskReg ? 'regular' : 'extra'} title="Налаштування завдання" initial={taskReg ? { ...taskReg.brief, title: taskReg.title, materials: [] } : { ...taskReq.brief, title: taskReq.title, materials: [] }}
-                schedule={taskReg ? { weekdays: taskReg.weekdays, everyDays: taskReg.everyDays, time: taskReg.time } : null} canStartNow={!stopped} inline onClose={() => {}} onSave={saveTaskForm} />
-            </div>
-          )}
-        </>
+      {section === 'settings' && task && (taskReg || taskReq) && (
+        <div className="cmp-section pcd-embed">
+          <RequestForm key={task.key} campaign={campaign} mode={taskReg ? 'regular' : 'extra'} title="Налаштування завдання" initial={taskReg ? { ...taskReg.brief, title: taskReg.title, materials: [] } : { ...taskReq.brief, title: taskReq.title, materials: [] }}
+            schedule={taskReg ? { weekdays: taskReg.weekdays, everyDays: taskReg.everyDays, time: taskReg.time } : null} canStartNow={!stopped} inline onClose={() => {}} onSave={saveTaskForm}
+            extraPanels={[
+              ...(c?.intel ? [{ key: 'style', label: 'Стиль', after: 'creatives', node: (
+                <section className="ckp-box" aria-label="Стиль завдання">
+                  <StyleEditor key={task.key} autoStyle={c.intel.autoStyle} manual={(taskReg || taskReq).brief?.style} samples={styleSamples} onSave={saveTaskStyle} />
+                </section>
+              ) }] : []),
+              { key: 'control', label: 'Керування', after: 'more', node: (
+                <section className="ckp-box opv-regular" aria-label="Керування завданням">
+                  <div className="ckp-sec-h"><h3>Керування завданням</h3><span className="ckp-chip">{task.kindLabel}</span></div>
+                  <p className="opv-what">{task.regularId ? 'Усе в цих розділах діє лише для цього завдання: в інших завдань клієнта свої налаштування, зокрема й у кожного агента. Зміни застосуються до наступних запусків.' : 'Усе в цих розділах діє лише для цього завдання, зокрема й налаштування кожного агента. Зміни застосуються, коли ви запустите завдання ще раз.'}</p>
+                  {taskReg ? (
+                    <div className="ckp-acts">
+                      <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => guard('reg' + taskReg.id, () => setRegularEnabled(campaign.id, taskReg.id, !taskReg.enabled, email), taskReg.enabled ? 'Регулярне завдання вимкнено.' : 'Регулярне завдання увімкнено.')}><Ic n={taskReg.enabled ? 'stop' : 'play'} size={15} />{taskReg.enabled ? 'Вимкнути завдання' : 'Увімкнути завдання'}</button>
+                      <button type="button" className="ckp-btn is-danger" disabled={!!busy} onClick={async () => { if (await dropRegular(taskReg)) onBack?.(); }}>Видалити завдання</button>
+                    </div>
+                  ) : <p className="ckp-empty-line">Разове завдання: його можна запустити ще раз кнопкою «Зберегти й запустити ще раз» внизу.</p>}
+                </section>
+              ) },
+            ]} />
+        </div>
       )}
 
       {section === 'settings' && !task && !teamOnly && (

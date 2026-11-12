@@ -47,8 +47,10 @@ const ageOf = (item) => {
 //   title: the heading of the window; schedule: { weekdays | weekday | everyDays, time } of the regular task that is already saved.
 //   inline (step 3.0b): the form sits IN THE PAGE (the settings of a task), not in a window: the same cards (the basics, the creatives, the card of the project, the agents one by one), a bar with the save button at the bottom
 //   allowKind: the person chooses in the form whether the cycle is one-off or regular («Створити додаткове завдання»)
-export default function RequestForm({ campaign, initial = null, onClose, onSave, mode = 'extra', title = 'Нове завдання: запит на креативи', schedule = null, canStartNow = true, allowKind = false, inline = false }) {
+export default function RequestForm({ campaign, initial = null, onClose, onSave, mode = 'extra', title = 'Нове завдання: запит на креативи', schedule = null, canStartNow = true, allowKind = false, inline = false, extraPanels = [] }) {
   const [kind, setKind] = useState(mode); // extra | regular
+  const [panel, setPanel] = useState('main'); // the inline form shows one shelf at a time
+  const show = (k) => !inline || panel === k;
   const regular = kind === 'regular';
   const [sched, setSched] = useState(() => ({ kind: schedule?.everyDays ? 'every' : 'week', every: String(schedule?.everyDays || 3), days: (schedule?.weekdays?.length ? schedule.weekdays : schedule?.weekday ? [schedule.weekday] : [1]).map(Number), time: schedule?.time || '09:00', startNow: !schedule && canStartNow })); // canStartNow false: the operation is paused, nothing can start
   const { email } = useAuth();
@@ -179,45 +181,15 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
     } catch (e) { setError(e.message || 'Не вдалося зберегти запит.'); setBusy(''); }
   }
 
+  // the shelves of the inline form: the same cards as in the window, one at a time; the pages that live outside the form (the style, the control of the task) come as extra panels
+  const baseShelves = [['main', 'Основне'], ['creatives', 'Креативи'], ['card', 'Картка проєкту'], ['agents', 'Агенти'], ['more', 'Додатково']];
+  const shelves = baseShelves.reduce((out, sh) => [...out, sh, ...extraPanels.filter((x) => x.after === sh[0]).map((x) => [x.key, x.label])], []);
   const total = (given ? f.given_texts.length : f.count) * Math.max(1, f.ratios.length);
   const materialsOn = library.assets.filter(picked).length;
   const cardLine = [...cardRows.map((r) => r.k.toLowerCase()).filter((k) => k !== 'конкуренти'), library.assets.length ? `${materialsOn} з ${library.assets.length} матеріалів` : ''].filter(Boolean).join(', ');
 
-  return (
-    <div className={inline ? 'qr-page' : 'cmp-overlay'} role={inline ? undefined : 'presentation'} onMouseDown={inline ? undefined : (e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div ref={box} className={inline ? 'stu-form qr qr-inline' : 'cmp-wizard stu-form qr'} role={inline ? undefined : 'dialog'} aria-modal={inline ? undefined : 'true'} aria-labelledby="stu-form-title" tabIndex={-1}>
-        <header className={inline ? 'qr-ihead' : 'cmp-wiz-head'}>
-          <div>{!inline && <span className="cmp-kicker">Креативна студія · {campaign.name}</span>}<h2 id="stu-form-title">{inline ? 'Основні налаштування завдання' : regular ? 'Регулярне завдання: що робити щотижня' : allowKind ? 'Створити додаткове завдання' : title}</h2></div>
-          {!inline && <button type="button" className="cmp-x" onClick={onClose} disabled={!!busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>}
-        </header>
-        <div className={inline ? 'qr-body' : 'cmp-wiz-body qr-body'}>
-          {error && <p className="cmp-error" role="alert">{error}</p>}
-
-          {/* 1. the name and the kind of the cycle */}
-          <div className="qr-card">
-            <h4 className="qr-h">Основне</h4>
-            <label htmlFor="stu-name" className="qr-lab">Назва завдання {srcBadge('f.title')}</label>
-            <input id="stu-name" className="cmp-input" value={f.title} maxLength={100} onChange={(e) => set({ title: e.target.value })} placeholder="Наприклад: Осінній розпродаж, нова колекція (порожньо: назвемо за описом)" autoFocus={!initial} />
-            {allowKind && (
-              <div className="qr-g qr-wrap">
-                <span className="qr-lab">Тип завдання</span>
-                <Chips label="Тип завдання" value={kind} options={[['extra', 'Одноразовий'], ['regular', 'Регулярний (щотижня)']]} onPick={setKind} />
-              </div>
-            )}
-            {allowKind && <p className="qr-mut">{regular ? 'Запускатиметься само за розкладом (щотижня або кожні N днів), з однаковими параметрами.' : 'Запускається один раз, зараз. Параметри діють лише для цього завдання.'}</p>}
-            {regular && (
-              <div className="qr-g qr-wrap">
-                <span className="qr-lab">Запускати</span>
-                <select className="cmp-input ccx-select" value={sched.kind} onChange={(e) => setSched((s) => ({ ...s, kind: e.target.value }))} aria-label="Як часто"><option value="week">Щотижня</option><option value="every">Кожні N днів</option></select>
-                {sched.kind === 'every'
-                  ? <><input className="cmp-input ccx-time" type="number" min="1" max="60" value={sched.every} onChange={(e) => setSched((s) => ({ ...s, every: e.target.value }))} aria-label="Кожні скільки днів" /><span className="qr-mut">дн.</span></>
-                  : <span className="qr-days" role="group" aria-label="Дні тижня">{WEEKDAYS.map((d, i) => <button key={d} type="button" aria-pressed={sched.days.includes(i + 1)} className={'cmp-btn' + (sched.days.includes(i + 1) ? ' cmp-btn--primary' : '')} onClick={() => setSched((s) => ({ ...s, days: s.days.includes(i + 1) ? s.days.filter((x) => x !== i + 1) : [...s.days, i + 1].sort((a, b) => a - b) }))}>{d.slice(0, 2)}</button>)}</span>}
-                <input className="cmp-input ccx-time" type="text" inputMode="numeric" value={sched.time} onChange={(e) => setSched((s) => ({ ...s, time: e.target.value }))} placeholder="09:00" aria-label="Час запуску (Київ)" />
-                {!inline && <button type="button" className={'qr-sw' + (sched.startNow ? ' on' : '')} role="switch" aria-checked={sched.startNow} disabled={!canStartNow} title={canStartNow ? '' : 'Операція на паузі: перше завдання почнеться за розкладом після відновлення'} onClick={() => setSched((s) => ({ ...s, startNow: !s.startNow }))}><i /><span>{canStartNow ? 'Запустити перше завдання одразу' : 'Операція на паузі: запуск за розкладом після відновлення'}</span></button>}
-              </div>
-            )}
-          </div>
-
+  const goalBlock = (
+    <>
           {/* 2. what is needed: typed or dictated */}
           <div className="qr-comp">
             <label htmlFor="stu-goal" className="qr-lab">Що потрібно</label>
@@ -248,7 +220,58 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
               <p className="qr-mut">Усе підставлено як чернетку: нижче можна виправити будь-яке поле.</p>
             </div>
           )}
+    </>
+  );
 
+  return (
+    <div className={inline ? 'qr-page' : 'cmp-overlay'} role={inline ? undefined : 'presentation'} onMouseDown={inline ? undefined : (e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div ref={box} className={inline ? 'stu-form qr qr-inline' : 'cmp-wizard stu-form qr'} role={inline ? undefined : 'dialog'} aria-modal={inline ? undefined : 'true'} aria-labelledby="stu-form-title" tabIndex={-1}>
+        <header className={inline ? 'qr-ihead' : 'cmp-wiz-head'}>
+          <div>{!inline && <span className="cmp-kicker">Креативна студія · {campaign.name}</span>}<h2 id="stu-form-title">{inline ? 'Основні налаштування завдання' : regular ? 'Регулярне завдання: що робити щотижня' : allowKind ? 'Створити додаткове завдання' : title}</h2></div>
+          {!inline && <button type="button" className="cmp-x" onClick={onClose} disabled={!!busy} aria-label="Закрити"><ActionIcon name="close" size={20} /></button>}
+        </header>
+        <div className={inline ? 'qr-body' : 'cmp-wiz-body qr-body'}>
+          {error && <p className="cmp-error" role="alert">{error}</p>}
+          {inline && goalBlock}
+          {inline && (
+            <nav className="qr-shelves" role="tablist" aria-label="Розділи налаштувань завдання">
+              {shelves.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={panel === k} className={'qr-shelf' + (panel === k ? ' on' : '')} onClick={() => setPanel(k)}>{label}</button>)}
+            </nav>
+          )}
+
+          {show('main') && (
+            <>
+          {/* 1. the name and the kind of the cycle */}
+          <div className="qr-card">
+            <h4 className="qr-h">Основне</h4>
+            <label htmlFor="stu-name" className="qr-lab">Назва завдання {srcBadge('f.title')}</label>
+            <input id="stu-name" className="cmp-input" value={f.title} maxLength={100} onChange={(e) => set({ title: e.target.value })} placeholder="Наприклад: Осінній розпродаж, нова колекція (порожньо: назвемо за описом)" autoFocus={!initial} />
+            {allowKind && (
+              <div className="qr-g qr-wrap">
+                <span className="qr-lab">Тип завдання</span>
+                <Chips label="Тип завдання" value={kind} options={[['extra', 'Одноразовий'], ['regular', 'Регулярний (щотижня)']]} onPick={setKind} />
+              </div>
+            )}
+            {allowKind && <p className="qr-mut">{regular ? 'Запускатиметься само за розкладом (щотижня або кожні N днів), з однаковими параметрами.' : 'Запускається один раз, зараз. Параметри діють лише для цього завдання.'}</p>}
+            {regular && (
+              <div className="qr-g qr-wrap">
+                <span className="qr-lab">Запускати</span>
+                <select className="cmp-input ccx-select" value={sched.kind} onChange={(e) => setSched((s) => ({ ...s, kind: e.target.value }))} aria-label="Як часто"><option value="week">Щотижня</option><option value="every">Кожні N днів</option></select>
+                {sched.kind === 'every'
+                  ? <><input className="cmp-input ccx-time" type="number" min="1" max="60" value={sched.every} onChange={(e) => setSched((s) => ({ ...s, every: e.target.value }))} aria-label="Кожні скільки днів" /><span className="qr-mut">дн.</span></>
+                  : <span className="qr-days" role="group" aria-label="Дні тижня">{WEEKDAYS.map((d, i) => <button key={d} type="button" aria-pressed={sched.days.includes(i + 1)} className={'cmp-btn' + (sched.days.includes(i + 1) ? ' cmp-btn--primary' : '')} onClick={() => setSched((s) => ({ ...s, days: s.days.includes(i + 1) ? s.days.filter((x) => x !== i + 1) : [...s.days, i + 1].sort((a, b) => a - b) }))}>{d.slice(0, 2)}</button>)}</span>}
+                <input className="cmp-input ccx-time" type="text" inputMode="numeric" value={sched.time} onChange={(e) => setSched((s) => ({ ...s, time: e.target.value }))} placeholder="09:00" aria-label="Час запуску (Київ)" />
+                {!inline && <button type="button" className={'qr-sw' + (sched.startNow ? ' on' : '')} role="switch" aria-checked={sched.startNow} disabled={!canStartNow} title={canStartNow ? '' : 'Операція на паузі: перше завдання почнеться за розкладом після відновлення'} onClick={() => setSched((s) => ({ ...s, startNow: !s.startNow }))}><i /><span>{canStartNow ? 'Запустити перше завдання одразу' : 'Операція на паузі: запуск за розкладом після відновлення'}</span></button>}
+              </div>
+            )}
+          </div>
+            </>
+          )}
+
+          {!inline && goalBlock}
+
+          {show('creatives') && (
+            <>
           {/* 3. the creatives: how many, which formats, the texts */}
           <div className="qr-card">
             <h4 className="qr-h">Креативи</h4>
@@ -305,7 +328,11 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
               <p className="qr-mut">Тексти використаємо дослівно, до {MAX_GIVEN_TEXTS}. Порядок «заголовок, підзаголовок, плашка» розпізнано за рядками; олівцем можна поправити будь-який.</p>
             </div>
           )}
+            </>
+          )}
 
+          {show('card') && (
+            <>
           {showAsk && (
             <div className="qr-ask">
               <p className="qr-top"><b>Картка проєкту ще не заповнена.</b> Щоб креативи були точними, дайте мінімум: що продаємо і логотип або фото продукту.</p>
@@ -378,7 +405,11 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
               )}
             </div>
           )}
+            </>
+          )}
 
+          {show('agents') && (
+            <>
           {/* 4. what each agent is asked for THIS cycle only */}
           <div className="qr-card qr-agents">
             <h4 className="qr-h">Налаштування агентів для цього завдання</h4>
@@ -417,7 +448,10 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
               );
             })}
           </div>
+            </>
+          )}
 
+          {show('more') && (
           <div className={'qr-ex' + (more ? ' open' : '')}>
             <button type="button" className="qr-bar" aria-expanded={more} onClick={() => setMore(!more)}>
               <span className="qr-chev" aria-hidden="true">▾</span><b>Додатково</b><span className="qr-sub">аудиторія, меседж, тон, чого не можна, конкуренти, джерело ідей, Figma, мова · усе необовʼязкове</span>
@@ -440,8 +474,10 @@ export default function RequestForm({ campaign, initial = null, onClose, onSave,
               </div>
             )}
           </div>
+          )}
+          {inline && extraPanels.filter((x) => x.key === panel).map((x) => <div key={x.key} className="qr-extra">{x.node}</div>)}
         </div>
-        <footer className={inline ? 'qr-foot' : 'cmp-wiz-foot'}>
+        <footer className={inline ? 'qr-savebar' : 'cmp-wiz-foot'}>
           <span className="cmp-foot-note">{regular ? 'Агенти запускатимуться самі за розкладом. Картинки генеруються автоматично в межах ліміту; готове йде на ваше затвердження.' : !canStartNow ? 'Операція на паузі: завдання можна лише зберегти як чернетку, запустити його можна після відновлення операції.' : 'Нічого не публікується й не завантажується в рекламні кабінети: результат іде на ваше затвердження.'}</span>
           {!regular && <button type="button" className="cmp-btn" disabled={!!busy} onClick={() => submit(false)}>{busy === 'save' ? 'Зберігаємо…' : inline ? 'Зберегти налаштування' : 'Зберегти чернетку'}</button>}
           {regular
