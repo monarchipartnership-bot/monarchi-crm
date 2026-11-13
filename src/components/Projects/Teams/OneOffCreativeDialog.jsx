@@ -2,10 +2,11 @@ import { useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { createExtraCycle, createSeasonal } from '../../../lib/api/operationCycles';
 import { kickQueue } from '../../../lib/api/agents';
-import { DEFAULT_CONCEPTS } from '../../../lib/agents/creativeTeam';
+import { DEFAULT_CONCEPTS, creativeAutoOf } from '../../../lib/agents/creativeTeam';
 import { kyivToday, regularsOf, seasonOver } from '../../../lib/agents/operationCycles';
 import { dayMonthOf, previewRuns } from '../../../lib/agents/scheduleCalendar';
 import TaskBrief, { clearTaskDraft } from './TaskBrief';
+import TaskExtras, { briefFromForm, extrasInitial } from './TaskExtras';
 import ScheduleCalendar from './ScheduleCalendar';
 
 // An additional task of creatives in the Hub style (owner, 2026-11-12): the same window look as the launch of a team. `seasonal` false: a one-off task (once, now); true: a task for a
@@ -17,7 +18,7 @@ export default function OneOffCreativeDialog({ data, campaign, email, seasonal =
   const paused = campaign.status === 'paused';
   const today = useMemo(() => kyivToday(), []);
   const draftKey = `tm-${seasonal ? 'season' : 'oneoff'}-draft-${data.project.id}`;
-  const [v, setV] = useState({ goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: data.project.client_language || 'uk' });
+  const [v, setV] = useState({ goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: data.project.client_language || 'uk', ...extrasInitial() });
   const [title, setTitle] = useState('');
   // the period: the calendar of the schedule (every N days from the first day, or days of the week) and the last day
   const [sch, setSch] = useState({ mode: 'every', every: '3', days: [1, 3, 5], time: '09:00', start: today, startNow: false });
@@ -29,12 +30,12 @@ export default function OneOffCreativeDialog({ data, campaign, email, seasonal =
   useDialogA11y(box, () => { if (!busy) onClose(); });
   const first = sch.startNow ? today : sch.start;
   const runs = useMemo(() => (seasonal && end ? previewRuns({ ...sch, start: first, end }, today, 120) : []), [seasonal, sch, first, end, today]);
-  const ready = v.goal.trim().length >= 3 && v.ratios.length > 0 && (!seasonal || (title.trim() && end && end >= first && runs.length > 0));
+  const ready = v.goal.trim().length >= 3 && v.ratios.length > 0 && (v.texts !== 'given' || v.given_texts.length > 0) && (!seasonal || (title.trim() && end && end >= first && runs.length > 0));
 
   async function create() {
     setBusy(true); setError('');
     try {
-      const brief = { goal: v.goal, count: Number(v.count), ratios: v.ratios, texts: v.texts, language: v.language };
+      const brief = briefFromForm(v);
       if (seasonal) {
         const schedule = sch.mode === 'every' ? { everyDays: Number(sch.every), time: sch.time } : { weekdays: sch.days, time: sch.time };
         await createSeasonal(campaign, { title: title.trim(), brief, schedule, startDate: first, endDate: end, replaces: stance === 'pause' ? mains.map((r) => r.id) : [], startNow: sch.startNow && !paused }, email);
@@ -60,7 +61,8 @@ export default function OneOffCreativeDialog({ data, campaign, email, seasonal =
           {paused && <p className="tm-hint">Команда «Креативи» зараз на паузі: {seasonal ? 'сезонне завдання збережеться, але почне працювати, лише коли ви продовжите команду.' : 'завдання збережеться чернеткою й запуститься, коли ви продовжите команду й запустите його.'}</p>}
           <label className="tm-fl"><span>{seasonal ? 'Назва сезону' : 'Назва завдання (необовʼязково)'}</span>
             <input className="tm-sel tm-text" type="text" maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={seasonal ? 'Наприклад: Новий рік' : 'Наприклад: Осінній розпродаж (порожньо: назвемо за описом)'} aria-label="Назва" /></label>
-          <TaskBrief value={v} onChange={(patch) => setV((x) => ({ ...x, ...patch }))} projectId={data.project.id} draftKey={draftKey}>
+          <TaskBrief value={v} onChange={(patch) => setV((x) => ({ ...x, ...patch }))} projectId={data.project.id} draftKey={draftKey} allowGiven={!seasonal}>
+            <TaskExtras value={v} onChange={(patch) => setV((x) => ({ ...x, ...patch }))} teamLimit={creativeAutoOf(campaign).maxUsd || null} />
             {seasonal && (
               <div className="tm-fl tm-w2"><span>Період і частота</span>
                 <ScheduleCalendar value={{ ...sch, end }} today={today} onChange={(patch) => setSch((x) => ({ ...x, ...patch }))} />

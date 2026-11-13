@@ -2288,6 +2288,34 @@ await ok('words over a clean picture: lines wrap to the zone, the items stack wi
   assert.equal(zoneBox('top', W, H, 100).w, W - 2 * Math.round(W * 0.07)); // top and bottom zones ignore it
 });
 
+await ok('task asks for videos (3.8): the settings are cleaned, the first finished pictures become videos by themselves up to the asked number, within the limit; none while the task is held', async () => {
+  const base = { goal: 'x', count: 2, ratios: ['1:1', '4:5'] };
+  assert.equal(cleanRequest({ ...base }).brief.media, undefined); // pictures only: nothing is stored
+  const b = cleanRequest({ ...base, media: 'both', video_count: 99, video_seconds: 7, video_sound: true, video_motion: ' slow ' }).brief;
+  assert.deepEqual([b.media, b.video_count, b.video_seconds, b.video_sound, b.video_motion], ['both', 4, 5, true, 'slow']); // never more videos than pictures (2 ideas × 2 formats); an odd length goes back to 5
+  assert.equal(cleanRequest({ ...base, media: 'video', video_count: 0 }).brief.video_count, 1);
+  assert.equal(cleanRequest({ ...base, media: 'nonsense' }).brief.media, undefined);
+
+  const { tables, db, ctx } = creativeWorld();
+  await ensureCreativeDepartment(db, 'a@x.com');
+  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'running', title: 't', brief: { media: 'both', video_count: 1, video_seconds: 5, agent_settings: { creative_maker: { max_usd: '2' } } }, materials: [] });
+  const pic = (id, key) => ({ id, request_id: 1, concept_key: key, concept_name: `Idea ${key}`, ratio: '1:1', prompt: 'p', negative_prompt: '', copy: {}, status: 'producing', cost_usd: 0.2, generations: 1, hf: { status_url: `https://api.higgsfield.ai/requests/${id}/status`, submitted_at: ctx.now().toISOString() } });
+  tables.ag_creatives.push(pic(1, 'c1'), pic(2, 'c2'));
+  ctx.hfImage = { estimate: async () => 0.1, submit: async () => ({}), check: async () => ({ state: 'ready', url: 'https://cdn/p.png' }), persist: async ({ creativeId }) => ({ url: `https://x/p${creativeId}.png`, path: 'p' }) };
+  const sent = [];
+  ctx.hfVideo = { profile: () => videoProfileFromEnv({}), estimate: async () => 0.4, submit: async ({ request }) => { sent.push(request.body.image_url); return { jobId: 'j', statusUrl: 'https://api.higgsfield.ai/requests/v/status' }; }, check: async () => ({ state: 'pending' }), persist: async () => ({}) };
+  // held: the pictures arrive but no video starts
+  tables.ag_creative_requests[0].status = 'paused';
+  assert.equal(await pollCreatives(ctx, { requestId: 1 }), 2);
+  assert.deepEqual([sent.length, tables.ag_creatives.filter((r) => r.hf?.kind === 'video').length], [0, 0]);
+  // not held: ONE video (the task asked for one) from the first finished picture
+  tables.ag_creative_requests[0].status = 'running';
+  tables.ag_creatives.forEach((r) => { r.status = 'producing'; });
+  assert.ok(await pollCreatives(ctx, { requestId: 1 }) >= 2);
+  assert.deepEqual([sent, tables.ag_creatives.filter((r) => r.hf?.kind === 'video').map((r) => [r.hf.source_id, r.status])], [['https://x/p1.png'], [[1, 'producing']]]);
+  assert.ok(tables.ag_task_steps.some((x) => /задача просила відео/.test(x.text)));
+});
+
 await ok('agent question stops the chain (3.7): nothing below starts and nothing is paid until the manager answers; the same agent works again with the answer; «continue without an answer» takes the result as it is', async () => {
   const setup = async () => {
     const w = creativeWorld();

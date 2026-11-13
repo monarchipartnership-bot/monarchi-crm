@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import useSpeechInput, { SPEECH_LANGS } from '../../../lib/useSpeechInput';
 import { fillCycleForm } from '../../../lib/api/creatives';
 import { MIN_FILL_CHARS, applyFill } from '../../../lib/agents/cycleFormFill';
-import { MAX_CONCEPTS, REQUEST_RATIOS, TEXT_MODES } from '../../../lib/agents/creativeTeam';
+import { MAX_CONCEPTS, MAX_GIVEN_TEXTS, REQUEST_RATIOS, TEXT_MODES, parseGivenTexts } from '../../../lib/agents/creativeTeam';
 import { languageLabel } from '../../../lib/agents/languages';
 import Select from '../../common/Select';
 
@@ -12,7 +12,12 @@ import Select from '../../common/Select';
 //   value: { goal, count, ratios, texts, language }   onChange(patch)   projectId   draftKey   children: more fields of the window (they come last in the same grid)
 export const clearTaskDraft = (draftKey) => { try { localStorage.removeItem(draftKey); } catch { /* no storage */ } };
 
-export default function TaskBrief({ value, onChange, projectId, draftKey, children }) {
+const PASTE_HINT = 'Вставте всі тексти разом, по три рядки на кожен: заголовок, підзаголовок, плашка.\nТексти розділіть номерами «1)» або порожнім рядком.';
+
+// allowGiven: the manager may give the texts himself (a one-off task only): each becomes its own creative, word for word (step 3.8)
+export default function TaskBrief({ value, onChange, projectId, draftKey, children, allowGiven = false }) {
+  const [paste, setPaste] = useState('');
+  const onPaste = (txt) => { setPaste(txt); onChange({ given_texts: parseGivenTexts(txt).slice(0, MAX_GIVEN_TEXTS) }); };
   const [voiceLang, setVoiceLang] = useState('uk');
   const [an, setAn] = useState({ busy: false, error: '', rows: null, questions: [] });
   const touched = useRef(new Set());
@@ -79,7 +84,13 @@ export default function TaskBrief({ value, onChange, projectId, draftKey, childr
         {REQUEST_RATIOS.map((r) => <label key={r.key} className="tm-chk"><input type="checkbox" checked={value.ratios.includes(r.key)} onChange={(e) => byHand({ ratios: e.target.checked ? [...value.ratios, r.key] : value.ratios.filter((x) => x !== r.key) })} />{r.label}</label>)}
       </fieldset>
       <label className="tm-fl"><span>Тексти на креативах</span>
-        <Select className="tm-ssel tm-text" value={value.texts} onChange={(v) => byHand({ texts: v })} options={['yes', 'no'].map((k) => ({ value: k, label: TEXT_MODES[k] }))} ariaLabel="Тексти на креативах" /></label>
+        <Select className="tm-ssel tm-text" value={value.texts} onChange={(v) => byHand({ texts: v })} options={['yes', 'no', ...(allowGiven ? ['given'] : [])].map((k) => ({ value: k, label: k === 'given' ? 'Мої готові тексти' : TEXT_MODES[k] }))} ariaLabel="Тексти на креативах" /></label>
+      {allowGiven && value.texts === 'given' && (
+        <div className="tm-fl tm-w2"><label htmlFor="tm-given">Мої тексти</label>
+          <textarea id="tm-given" className="tm-area" rows={6} value={paste} onChange={(e) => onPaste(e.target.value)} placeholder={PASTE_HINT} aria-label="Усі тексти разом" />
+          <small className="tm-hint">{(value.given_texts || []).length ? `Розпізнано: ${value.given_texts.length}. Кожен текст стане окремим креативом і буде використаний дослівно (до ${MAX_GIVEN_TEXTS}).` : `Тексти використаємо дослівно, до ${MAX_GIVEN_TEXTS}; кожен стане окремим креативом.`}</small>
+        </div>
+      )}
       <div className="tm-fl"><span>Мова текстів для клієнта</span><b className="tm-lang">{languageLabel(value.language)}</b><small className="tm-hint">Мова клієнта з картки проєкту. Для команди результати завжди українською.</small></div>
       {children}
     </div>

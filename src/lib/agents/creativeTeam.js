@@ -85,6 +85,9 @@ export const REQUEST_LANGUAGES = { uk: 'Українська', en: 'English' };
 export const TEXT_MODES = { auto: 'Агент вирішує', yes: 'Напише агент', given: 'Задані менеджером', no: 'Без тексту' };
 export const MATERIAL_KINDS = { logo: 'Логотип', product: 'Фото продукту', style: 'Приклад стилю', competitor: 'Реклама конкурента', other: 'Інше' };
 export const DEFAULT_CONCEPTS = 3; // how many directions when the request does not say
+export const MAX_VIDEOS = 6; // videos of ONE task (step 3.8): each costs about as much as two pictures
+export const VIDEO_SECONDS = [5, 8];
+export const MEDIA_MODES = { photo: 'Лише фото', both: 'Фото і відео', video: 'Лише відео' };
 export const MAX_CONCEPTS = 10; // the strategist makes at most ten directions (owner, 2026-11-11: raised from three), the brief one concept per direction
 export const MAX_GIVEN_TEXTS = 10; // with given texts there is one direction (and creative) per text
 export const MAX_MATERIALS = 16;
@@ -185,6 +188,17 @@ export function cleanRequest(input = {}) {
   if (look) brief.look = look; // the realism look of THIS task (the cues added to every prompt for the pictures); absent = «std», nothing is added
   const style = cleanManual(input.style);
   if (!isEmptyManual(style)) brief.style = style; // the look of THIS task (words on the picture, tone of the pictures and of the copy): it wins over what the scout decided for the client
+  // what the task makes (step 3.8): only pictures (the default, nothing is stored), pictures and videos, or videos only (the pictures are then the first frames). The videos start by themselves
+  // from the first finished pictures, within the limit of the task; never more than there are pictures.
+  if (input.media === 'both' || input.media === 'video') {
+    const pictures = (texts === 'given' && given.length ? given.length : brief.count) * brief.ratios.length;
+    brief.media = input.media;
+    brief.video_count = Math.min(MAX_VIDEOS, pictures, Math.max(1, Math.round(Number(input.video_count)) || 1));
+    brief.video_seconds = VIDEO_SECONDS.includes(Number(input.video_seconds)) ? Number(input.video_seconds) : 5;
+    if (input.video_sound === true) brief.video_sound = true;
+    const motion = clip(input.video_motion, 400);
+    if (motion) brief.video_motion = motion;
+  }
   const agentSettings = cleanAgentSettings(input.agent_settings);
   if (Object.keys(agentSettings).length) brief.agent_settings = agentSettings; // what the person asked of each agent for this cycle
   if (!brief.goal) throw new Error('Опишіть, що потрібно від креативів.');

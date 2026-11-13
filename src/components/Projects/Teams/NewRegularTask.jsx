@@ -2,9 +2,10 @@ import { useMemo, useRef, useState } from 'react';
 import useDialogA11y from '../../../lib/useDialogA11y';
 import { runRegularNow, saveRegular } from '../../../lib/api/operationCycles';
 import { kickQueue } from '../../../lib/api/agents';
-import { DEFAULT_CONCEPTS } from '../../../lib/agents/creativeTeam';
+import { DEFAULT_CONCEPTS, creativeAutoOf } from '../../../lib/agents/creativeTeam';
 import { describeRegular, kyivToday } from '../../../lib/agents/operationCycles';
 import TaskBrief, { clearTaskDraft } from './TaskBrief';
+import TaskExtras, { briefFromForm, extrasInitial } from './TaskExtras';
 import ScheduleCalendar from './ScheduleCalendar';
 
 // An additional REGULAR task of creatives (owner, 2026-11-12, step 3.0b): its own schedule and its own brief; everything about the client the agents take from the card of the project, and the
@@ -15,7 +16,7 @@ export default function NewRegularTask({ data, campaign, email, onClose, onCreat
   const paused = campaign.status === 'paused';
   const today = useMemo(() => kyivToday(), []);
   const draftKey = `tm-regular-draft-${data.project.id}`;
-  const [v, setV] = useState({ goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: data.project.client_language || 'uk' });
+  const [v, setV] = useState({ goal: '', count: String(DEFAULT_CONCEPTS), ratios: ['1:1'], texts: 'yes', language: data.project.client_language || 'uk', ...extrasInitial() });
   const [title, setTitle] = useState('');
   const [sch, setSch] = useState({ mode: 'every', every: '3', days: [1, 3, 5], time: '09:00', start: today, startNow: false });
   const [busy, setBusy] = useState(false);
@@ -27,7 +28,7 @@ export default function NewRegularTask({ data, campaign, email, onClose, onCreat
   async function create() {
     setBusy(true); setError('');
     try {
-      const brief = { goal: v.goal, count: Number(v.count), ratios: v.ratios, texts: v.texts, language: v.language };
+      const brief = { ...briefFromForm(v), given_texts: [] }; // ready texts are for a one-off task only
       const schedule = sch.mode === 'every' ? { everyDays: Number(sch.every), time: String(sch.time).trim(), ...(sch.startNow ? {} : { startDate: sch.start }) } : { weekdays: sch.days, time: String(sch.time).trim() };
       const { campaign: saved, regular } = await saveRegular(campaign.id, { enabled: true, ...(title.trim() ? { title: title.trim() } : {}), ...schedule, brief }, email);
       if (sch.startNow && !paused) { await runRegularNow(saved, regular, email); kickQueue().catch(() => {}); }
@@ -47,6 +48,7 @@ export default function NewRegularTask({ data, campaign, email, onClose, onCreat
           <label className="tm-fl"><span>Назва завдання (необовʼязково)</span>
             <input className="tm-sel tm-text" type="text" maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Наприклад: Бестселери щотижня" /></label>
           <TaskBrief value={v} onChange={(patch) => setV((x) => ({ ...x, ...patch }))} projectId={data.project.id} draftKey={draftKey}>
+            <TaskExtras value={v} onChange={(patch) => setV((x) => ({ ...x, ...patch }))} teamLimit={creativeAutoOf(campaign).maxUsd || null} regular />
             <div className="tm-fl tm-w2"><span>Коли запускати</span>
               <ScheduleCalendar value={sch} today={today} onChange={(patch) => setSch((x) => ({ ...x, ...patch }))} />
             </div>

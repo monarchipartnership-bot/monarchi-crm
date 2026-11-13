@@ -107,7 +107,8 @@ export async function startVideo(ctx, creativeId, { prompt = '', seconds = hfVid
   if (c.hf?.kind === 'video') return { ok: false, reason: 'is-video' };
   if (!/^https:\/\//i.test(c.asset_url || '')) return { ok: false, reason: 'no-picture' };
   if (!['review', 'approved', 'rejected'].includes(c.status)) return { ok: false, reason: 'not-ready' };
-  const req = must(await db.from('ag_creative_requests').select('id, campaign_id, brief').eq('id', c.request_id).maybeSingle(), 'request');
+  const req = must(await db.from('ag_creative_requests').select('id, campaign_id, brief, status').eq('id', c.request_id).maybeSingle(), 'request');
+  if (!estimateOnly && ['paused', 'waiting'].includes(req.status)) return { ok: false, held: req.status, error: 'Завдання на паузі або чекає вашої відповіді: відео не створюється.' };
   if (!estimateOnly && (await cappedCampaigns(db)).has(String(req.campaign_id))) return { ok: false, capped: true, error: CAP_MESSAGE };
   const cycleMax = Number(req.brief?.agent_settings?.creative_maker?.max_usd);
   const teamMax = creativeAutoOf((await db.from('ag_campaigns').select('config').eq('id', req.campaign_id).maybeSingle()).data).maxUsd;
@@ -136,6 +137,23 @@ export async function startVideo(ctx, creativeId, { prompt = '', seconds = hfVid
     must(await db.from('ag_creatives').update({ status: 'failed', note: String(e.message || e).slice(0, 300), updated_at: now }).eq('id', row.id), 'creative');
     return { ok: false, error: String(e?.message || e) };
   }
+}
+
+// A task that asks for videos (brief.media «both» / «video», step 3.8): the first finished pictures become videos by themselves, as many as the task asks, within its limit (the price is checked
+// by startVideo like for a video made by hand; what does not fit is told in the journal and the manager can make it by hand). Compare rows and videos are never sources.
+async function autoVideo(ctx, creativeId, who) {
+  const { db } = ctx;
+  const c = (await db.from('ag_creatives').select('id, request_id, concept_key, concept_name, hf').eq('id', creativeId).maybeSingle()).data;
+  if (!c || c.hf?.kind === 'video' || String(c.concept_key).includes('~')) return;
+  const req = (await db.from('ag_creative_requests').select('brief').eq('id', c.request_id).maybeSingle()).data;
+  const b = req?.brief || {};
+  if (!['both', 'video'].includes(b.media)) return;
+  const rows = must(await db.from('ag_creatives').select('id, status, hf').eq('request_id', c.request_id), 'creatives') || [];
+  const videos = rows.filter((r) => r.hf?.kind === 'video' && r.status !== 'failed');
+  if (videos.length >= (Number(b.video_count) || 0) || videos.some((v) => v.hf?.source_id === c.id)) return;
+  const r = await startVideo(ctx, c.id, { seconds: b.video_seconds, sound: b.video_sound === true, prompt: b.video_motion || '' });
+  if (r.ok) await logStep(ctx, who, 'Відео ' + (r.seconds || '') + ' с із картинки «' + (c.concept_name || c.concept_key) + '» відправлено (задача просила відео)', 'running');
+  else await logStep(ctx, who, 'Відео з картинки «' + (c.concept_name || c.concept_key) + '» не створено: ' + (r.reason === 'over-limit' ? 'не вміщається в ліміт задачі (ціна ≈ $' + Number(r.usd || 0).toFixed(2) + ')' : r.held ? 'завдання на паузі' : r.capped ? 'ліміт операції' : String(r.error || r.reason || '').slice(0, 100)), 'info');
 }
 
 // Compares the realism looks on the SAME scene (step 3.4): for the picture the person points at, one new picture per chosen look is made from the same scene prompt with the cues of that look added, next to
@@ -218,6 +236,7 @@ export async function pollCreatives(ctx, { requestId = null } = {}) {
       changed += 1;
       const who = { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' };
       await logStep(ctx, who, 'Higgsfield: картинка «' + (row.concept_name || row.concept_key) + '», ' + row.ratio + ' готова', 'done');
+      try { await autoVideo(ctx, row.id, who); } catch (e) { await logStep(ctx, who, 'Автоматичне відео не створено: ' + String(e?.message || e).slice(0, 100), 'failed'); } // the task asked for videos (step 3.8)
       try { // the words over the clean picture (the copy may still be on its way: then it is done when the copy arrives)
         const t = await applyText(ctx, row.id, { inspect: true });
         if (t.ok) await logStep(ctx, who, 'Текст накладено на картинку «' + (row.concept_name || row.concept_key) + '»', 'done');

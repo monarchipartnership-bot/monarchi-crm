@@ -1,0 +1,8 @@
+/* The settings of a task in the window of a new task (step 3.8). Uses the look of the other tm-* fields. */
+.tx-sec { border: 0; padding: 0; margin: 0; min-width: 0; }
+.tx-sec > legend { padding: 0; font-size: .86rem; font-weight: 700; margin-bottom: 6px; }
+.tx-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
+.tx-sum { margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; background: rgba(181, 68, 181, .1); font-size: .84rem; line-height: 1.5; }
+.tx-more > summary { cursor: pointer; font-size: .86rem; font-weight: 700; }
+.tx-more > summary small { display: block; font-weight: 400; opacity: .7; margin-top: 2px; }
+.tx-limit small { font-weight: 400; opacity: .7; }
