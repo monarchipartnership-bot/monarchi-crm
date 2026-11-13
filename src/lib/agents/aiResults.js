@@ -29,6 +29,8 @@ export function runKindOf(request, regulars = []) {
 export function creativeRunState(request) {
   const c = request.creatives || {};
   const open = n(c.planned) + n(c.failed);
+  if (request.status === 'paused') return { state: 'wait', text: 'На паузі' }; // held by the manager (step 3.7)
+  if (request.status === 'waiting') return { state: 'wait', text: 'Чекає вашої відповіді агенту' };
   if (n(c.review) > 0) return { state: 'wait', text: `Чекають рішення: ${c.review}` };
   if (['draft', 'running'].includes(request.status) && !n(c.total)) return { state: 'work', text: 'Агенти працюють' };
   if (n(c.producing) > 0) return { state: 'work', text: `Генеруються картинки: ${c.producing}` };

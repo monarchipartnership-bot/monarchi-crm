@@ -1,0 +1,22 @@
+/* The question of an agent to the manager and the journal of a task (step 3.7). Uses the colours of the cockpit (--ck-*), works in the dark task card. */
+.qst { margin: 12px 0; padding: 16px 18px; border-radius: 18px; background: var(--ck-card); box-shadow: inset 0 0 0 1.5px #F5B04A, 0 12px 30px -20px #F5B04A99; display: flex; flex-direction: column; gap: 10px; }
+.qst h4 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 800; color: var(--ck-ink); }
+.qst-mark { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(150deg, #F5B04A, #D9832B); color: #fff; font-weight: 800; font-size: .95rem; box-shadow: 0 6px 14px -6px #D9832Baa; }
+.qst-lead { margin: 0; color: var(--ck-sec); font-size: .82rem; line-height: 1.45; }
+.qst-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: .9rem; line-height: 1.45; color: var(--ck-ink); }
+.qst-field { display: flex; flex-direction: column; gap: 6px; font-size: .8rem; font-weight: 700; color: var(--ck-ink); }
+.qst-field textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: 9px 12px; border: 0; border-radius: 12px; background: var(--ck-field); color: var(--ck-ink); font: inherit; font-size: .88rem; font-weight: 400; line-height: 1.4; box-shadow: inset 0 0 0 1.5px var(--ck-ln); }
+.qst-field textarea:focus-visible { outline: 2px solid var(--ck-deep); outline-offset: 2px; }
+.qst-field textarea::placeholder { color: var(--ck-dim); }
+.qst-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.rjn-lead { margin: 0 0 10px; color: var(--ck-sec); font-size: .82rem; line-height: 1.45; }
+.rjn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rjn-run { border-radius: 14px; background: var(--ck-card); box-shadow: inset 0 0 0 1px var(--ck-ln); overflow: hidden; }
+.rjn-head { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 11px 14px; border: 0; background: transparent; color: var(--ck-ink); font: inherit; font-size: .9rem; text-align: left; cursor: pointer; }
+.rjn-head:focus-visible { outline: 2px solid var(--ck-deep); outline-offset: -2px; border-radius: 14px; }
+.rjn-head small { color: var(--ck-sec); font-size: .76rem; margin-right: auto; }
+.rjn-head i { font-style: normal; font-weight: 800; color: var(--ck-sec); width: 18px; text-align: center; }
+.rjn-body { padding: 0 14px 12px; }
+.rjn-note { margin: 8px 0 0; color: var(--ck-sec); font-size: .78rem; line-height: 1.4; }
+.sd-line.is-mgr em { color: #F5B04A; }

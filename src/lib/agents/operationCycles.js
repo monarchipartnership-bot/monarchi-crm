@@ -177,6 +177,8 @@ export function cycleStage(cycle = {}) {
   const stages = (cycle.stages || []).filter((s) => s.key !== 'you');
   const c = cycle.creatives || {};
   if (cycle.status === 'draft') return { now: 'Чернетка: завдання збережено, але не запущено', next: 'Після запуску почне працювати стратег', blocked: 'draft' };
+  if (cycle.status === 'paused') return { now: 'Завдання на паузі: нові кроки й нові платні запити не стартують', next: 'Натисніть «Продовжити», щоб агенти працювали далі', blocked: 'paused' };
+  if (cycle.status === 'waiting') return { now: 'Агент питає вас: завдання стоїть, поки ви не відповісте', next: 'Після вашої відповіді цей агент працює знову й передає результат далі', blocked: 'question' };
   const failed = stages.find((s) => s.state === 'failed');
   if (failed) return { now: `Крок «${failed.label}» зупинився`, next: 'Повторіть крок у розділі «Повідомлення від агентів»', blocked: 'failed' };
   const live = stages.filter((s) => ['working', 'waiting'].includes(s.state));
@@ -196,7 +198,7 @@ export function cycleStage(cycle = {}) {
 }
 
 // A cycle is «in work» until all its pictures reached the person: the chain runs, or the pictures are planned / being made.
-export const isInWork = (cycle) => ['draft', 'running', 'problem'].includes(cycle.status) || (cycle.status === 'review' && (openOf(cycle.creatives) > 0 || !madeOf(cycle.creatives)));
+export const isInWork = (cycle) => ['draft', 'running', 'problem', 'paused', 'waiting'].includes(cycle.status) || (cycle.status === 'review' && (openOf(cycle.creatives) > 0 || !madeOf(cycle.creatives)));
 // A cycle has something to look at when at least one picture is made.
 export const hasMaterials = (cycle) => madeOf(cycle.creatives) > 0;
 // review: pictures wait for the decision; rework: nothing waits, some are returned; checked: every made picture is approved

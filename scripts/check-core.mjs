@@ -51,7 +51,7 @@ import { LANGUAGES, isValidLanguage, languageEnglish, languageLabel, languageOpt
 import { creativeLockedText } from '../src/lib/agents/creativePrompts.js';
 import { endTime, monthCells, previewRuns, weekdayOf, windowText } from '../src/lib/agents/scheduleCalendar.js';
 import { ONEOFF, describePlanSchedule, estimateMonthly, runsPerMonth, teamAgentPlan, teamReadiness, teamsOf, whereToFill } from '../src/lib/agents/teams.js';
-import { buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, pausedBySeason, seasonOver, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
+import { isInWork, buildOperationView, cleanRegular, conflictMessage, cycleCosts, cycleProgress, cycleStage, describeRegular, dueRegulars, kyivToday, nextOf, nextRegular, pausedBySeason, seasonOver, rawRegulars, regularDue, regularOf, regularRequest, regularsOf, reviewOutcome, sameModeConflict } from '../src/lib/agents/operationCycles.js';
 import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText.js';
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
 import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
@@ -95,6 +95,7 @@ import { cleanTextEdit } from '../src/lib/creatives/textEdit.js';
 import { inspectRun, parsePictureQc, qcNote } from '../api/_lib/creativeInspect.js';
 import { LOOKS, LOOK_NEGATIVE, applyLook, cleanLook, lookBlock, lookOf } from '../src/lib/creatives/realism.js';
 import { queueInspection } from '../api/_lib/creativeEngine.js';
+import { answerQuestion, pauseRequest, resumeRequest } from '../api/_lib/creativeHold.js';
 import { composeTextServer } from '../api/_lib/composeServer.js';
 import { busyOf, calmSpan } from '../src/lib/creatives/composeText.js';
 import { startIntel, releaseWaitingRequests } from '../api/_lib/creativeEngine.js';
@@ -1927,7 +1928,7 @@ const creativeWorld = () => {
     if (args.agentKey === 'creative-creative_strategy') return body(JSON.stringify({ summary: 'Two directions for the sofa line.', inventory: { have: [{ file: 'luna.jpg', what: 'Grey sofa on white', use: 'hero product shot' }], missing: ['A lifestyle scene'], to_generate: ['Living room background'] }, directions: [
       { key: 'd2', name: 'Autumn cosiness', priority: 2, why: 'Season', audience: 'Families', angle: 'Warm evenings', message: 'Warmth', tests: 'Lifestyle vs product' },
       { key: 'd1', name: 'Morning comfort', priority: 1, why: 'Site stresses comfort', audience: 'Couples', angle: 'Slow mornings', message: 'Comfort', tests: 'Comfort angle' },
-      { key: 'd3', name: 'Third', priority: 3, why: 'x', angle: 'cut by the limit of two' }], clarify: 'Confirm the 15% discount.' }));
+      { key: 'd3', name: 'Third', priority: 3, why: 'x', angle: 'cut by the limit of two' }], clarify: this.ask ? 'Confirm the 15% discount.' : '' }));
     if (args.agentKey === 'creative-creative_brief') {
       if (failBrief) { failBrief = false; return body('Sorry, I cannot do this as JSON.'); }
       return body(JSON.stringify({ summary: 'Two daylight concepts.', concepts: [
@@ -2287,52 +2288,102 @@ await ok('words over a clean picture: lines wrap to the zone, the items stack wi
   assert.equal(zoneBox('top', W, H, 100).w, W - 2 * Math.round(W * 0.07)); // top and bottom zones ignore it
 });
 
-await ok('quality loop: a «revise» verdict sends the work back to the agents it names with their own issues, twice at most, and the checker looks again only when they delivered', async () => {
-  const issue = (target, comment, severity = 'high') => ({ target, concept: 'c1', severity, comment });
-  const run = async (queue) => {
+await ok('agent question stops the chain (3.7): nothing below starts and nothing is paid until the manager answers; the same agent works again with the answer; «continue without an answer» takes the result as it is', async () => {
+  const setup = async () => {
     const w = creativeWorld();
     await ensureCreativeDepartment(w.db, 'a@x.com');
     await connectCampaign(w.db, w.tables.ag_campaigns[0], { email: 'a@x.com' });
     newRequest(w.tables, 1, 1);
-    w.model.qcQueue = queue;
+    w.model.ask = true;
     await startRequest(w.ctx, 1);
     await processQueue(w.ctx);
-    await retryTask(w.ctx, w.tables.ag_tasks.find((t) => t.status === 'failed').id); // the stand-in brief writer fails once, as in the chain test
-    await processQueue(w.ctx);
-    const A = (r) => w.tables.ag_agents.find((a) => a.role === r);
-    const tasksOf = (r) => w.tables.ag_tasks.filter((t) => t.agent_id === A(r).id && t.request_id === 1);
-    return { ...w, A, tasksOf };
+    return w;
   };
+  const w = await setup();
+  const A = (r) => w.tables.ag_agents.find((a) => a.role === r);
+  const tasksOf = (w2, r) => w2.tables.ag_tasks.filter((t) => t.agent_id === w2.tables.ag_agents.find((a) => a.role === r).id && t.request_id === 1);
+  const asked = tasksOf(w, 'creative_strategy')[0];
+  assert.equal(asked.output.awaiting_answer.question, 'Confirm the 15% discount.');
+  assert.deepEqual([w.tables.ag_creative_requests[0].status, tasksOf(w, 'creative_brief').length, w.tables.ag_creatives.length], ['waiting', 0, 0]); // the chain stopped at the strategist
+  assert.ok(w.tables.notifications.some((n) => n.type === 'ai_agent' && /питає/.test(n.title))); // the manager is told
+  assert.ok(w.tables.ag_task_steps.some((x) => /Питання менеджеру/.test(x.text)));
+  assert.equal((await processQueue(w.ctx)).processed, 0);
+  // the answer must say something; a closed question cannot be answered twice
+  await assert.rejects(() => answerQuestion(w.ctx, asked.id, { answer: ' ' }), /відповідь/);
+  w.model.ask = false;
+  assert.deepEqual(await answerQuestion(w.ctx, asked.id, { answer: 'No discount: «пирожки» is a typo for the plaid.' }), { ok: true, rerun: 'creative_strategy' });
+  await assert.rejects(() => answerQuestion(w.ctx, asked.id, { answer: 'again' }), /закрите/);
+  assert.equal(w.tables.ag_creative_requests[0].brief.clarifications[0].answer, 'No discount: «пирожки» is a typo for the plaid.');
+  assert.equal(asked.output.awaiting_answer, null); assert.equal(asked.output.answered.answer, 'No discount: «пирожки» is a typo for the plaid.');
+  await processQueue(w.ctx);
+  const strat = tasksOf(w, 'creative_strategy');
+  assert.deepEqual([strat.length, strat[1].brief.trigger], [2, 'answer']); // the same agent worked again
+  assert.match(w.tables.ag_runs.filter((r) => r.agent_id === A('creative_strategy').id).at(-1).user_prompt, /Уточнення менеджера[\s\S]*Відповідь менеджера: No discount/); // with the answer in front of it
+  assert.ok(tasksOf(w, 'creative_brief').length >= 1); // and now the chain goes on
 
-  // 1) a copy issue: only the copywriter works again, with the issue and its own previous version, then the checker passes
-  const one = await run([{ verdict: 'revise', summary: 'The hook is weak.', issues: [issue('copy', 'Hook is vague'), issue('copy', 'Minor typo', 'low')] }]);
-  assert.deepEqual([one.tasksOf('creative_copywriter').length, one.tasksOf('creative_maker').length, one.tasksOf('creative_quality').length], [2, 1, 2]);
-  const rework = one.tasksOf('creative_copywriter')[1];
-  assert.deepEqual([rework.brief.trigger, rework.brief.round, rework.brief.feedback.map((f) => f.comment)], ['rework', 1, ['Hook is vague']]); // low issues are not sent
-  assert.deepEqual(one.tasksOf('creative_quality')[0].output.rework, { round: 1, sent: ['creative_copywriter'], skipped: [], stopped: false });
-  const writerRuns = one.tables.ag_runs.filter((r) => r.agent_id === one.A('creative_copywriter').id);
-  assert.match(writerRuns.at(-1).user_prompt, /круг переробки 1[\s\S]*- \[high\] c1: Hook is vague[\s\S]*Ваша попередня версія/);
-  assert.doesNotMatch(writerRuns[0].user_prompt, /круг переробки/);
-  assert.equal(one.tables.ag_creative_requests[0].status, 'review');
+  // an agent that still has a question asks again (any number of rounds)
+  const w2 = await setup();
+  const first = tasksOf(w2, 'creative_strategy')[0];
+  await answerQuestion(w2.ctx, first.id, { answer: 'Maybe.' });
+  await processQueue(w2.ctx);
+  assert.equal(w2.tables.ag_creative_requests[0].status, 'waiting');
+  assert.equal(tasksOf(w2, 'creative_strategy')[1].output.awaiting_answer.round, 2);
 
-  // 2) issues for both: both work again and the checker waits for the last of them (its new task is newer than both)
-  const both = await run([{ verdict: 'revise', summary: 's', issues: [issue('copy', 'Weak hook'), issue('creative', 'Prompt ignores the sofa reference')] }]);
-  assert.deepEqual([both.tasksOf('creative_copywriter').length, both.tasksOf('creative_maker').length, both.tasksOf('creative_quality').length], [2, 2, 2]);
-  const lastQc = both.tasksOf('creative_quality')[1];
-  assert.ok(lastQc.id > both.tasksOf('creative_copywriter')[1].id && lastQc.id > both.tasksOf('creative_maker')[1].id);
-  assert.equal(both.tables.ag_creative_requests[0].status, 'review');
+  // «continue without an answer»: the result is taken as it is and the agents below start
+  const w3 = await setup();
+  const only = tasksOf(w3, 'creative_strategy')[0];
+  w3.model.ask = false;
+  assert.deepEqual(await answerQuestion(w3.ctx, only.id, { proceed: true }), { ok: true, proceeded: true });
+  assert.ok(tasksOf(w3, 'creative_brief').length >= 1);
+  assert.equal(only.output.answered.proceeded, true);
+});
 
-  // 3) it never gets better: after two rounds the request goes to the person with the issues still on it (the third verdict is not sent back)
-  const stuck = await run([1, 2, 3].map((n) => ({ verdict: 'revise', summary: `round ${n}`, issues: [issue('creative', `Still wrong ${n}`)] })));
-  assert.deepEqual([stuck.tasksOf('creative_maker').length, stuck.tasksOf('creative_quality').length, stuck.tasksOf('creative_copywriter').length], [3, 3, 1]); // one run + two reworks
-  const last = stuck.tasksOf('creative_quality')[2].output.rework;
-  assert.deepEqual([last.round, last.stopped], [3, true]);
-  assert.equal(stuck.tables.ag_creative_requests[0].status, 'review');
-  assert.equal(stuck.tables.ag_tasks.filter((t) => ['queued', 'running'].includes(t.status)).length, 0);
+await ok('pause (3.7): a paused task starts nothing new and pays for nothing; what finishes meanwhile does not move the chain; the resume starts what was held back', async () => {
+  const w = creativeWorld();
+  await ensureCreativeDepartment(w.db, 'a@x.com');
+  await connectCampaign(w.db, w.tables.ag_campaigns[0], { email: 'a@x.com' });
+  newRequest(w.tables, 1, 1);
+  await startRequest(w.ctx, 1);
+  assert.deepEqual(await pauseRequest(w.ctx, 1), { ok: true, was: 'running' });
+  assert.deepEqual(await pauseRequest(w.ctx, 1), { ok: true, was: 'paused' }); // again: nothing changes
+  assert.equal(w.tables.ag_creative_requests[0].status, 'paused');
+  assert.equal((await processQueue(w.ctx)).processed, 0); // the queued strategist does not start
+  assert.equal(w.tables.ag_tasks.filter((t) => t.status === 'queued').length, 1);
+  // the strategist was already working when the pause came: it finishes, but nothing below it starts and the state stays
+  const strat = w.tables.ag_agents.find((a) => a.role === 'creative_strategy');
+  await runNow(w.ctx, strat.id, { campaignId: 1, requestId: 1 });
+  assert.deepEqual([w.tables.ag_creative_requests[0].status, w.tables.ag_tasks.some((t) => t.agent_id !== strat.id && t.request_id === 1)], ['paused', false]);
+  // the pictures are not sent either
+  w.ctx.hfImage = { estimate: async () => 0.1, submit: async () => ({ jobId: 'j', statusUrl: 'https://api.higgsfield.ai/requests/j/status' }), check: async () => ({ state: 'pending' }), persist: async () => ({ url: 'u', path: 'p' }) };
+  assert.equal((await generateCreatives(w.ctx, 1)).held, 'paused');
+  // resume: back to work, the brief writer starts and the chain goes to the manager
+  assert.deepEqual((await resumeRequest(w.ctx, 1)).now, 'running');
+  await assert.rejects(() => resumeRequest(w.ctx, 1), /не на паузі/);
+  await processQueue(w.ctx);
+  await retryTask(w.ctx, w.tables.ag_tasks.find((t) => t.status === 'failed').id); // the stand-in brief writer fails once, as in the chain test
+  await processQueue(w.ctx);
+  assert.equal(w.tables.ag_creative_requests[0].status, 'review');
+  assert.ok(w.tables.ag_task_steps.some((x) => /на паузу/.test(x.text)) && w.tables.ag_task_steps.some((x) => /продовжив/.test(x.text))); // the journal keeps who did what
+  // a finished or cancelled task cannot be paused
+  await assert.rejects(() => pauseRequest(w.ctx, 99), /не знайдено/);
+});
 
-  // 4) a pass sends nothing back
-  const clean = await run([]);
-  assert.deepEqual([clean.tasksOf('creative_quality').length, clean.tasksOf('creative_quality')[0].output.rework], [1, undefined]);
+await ok('quality check is ADVICE only (3.7): a «revise» verdict sends nothing back by itself; the request goes to the person with the verdict on it', async () => {
+  const issue = (target, comment, severity = 'high') => ({ target, concept: 'c1', severity, comment });
+  const w = creativeWorld();
+  await ensureCreativeDepartment(w.db, 'a@x.com');
+  await connectCampaign(w.db, w.tables.ag_campaigns[0], { email: 'a@x.com' });
+  newRequest(w.tables, 1, 1);
+  w.model.qcQueue = [{ verdict: 'revise', summary: 'The hook is weak.', issues: [issue('copy', 'Hook is vague'), issue('creative', 'Prompt ignores the reference')] }];
+  await startRequest(w.ctx, 1);
+  await processQueue(w.ctx);
+  await retryTask(w.ctx, w.tables.ag_tasks.find((t) => t.status === 'failed').id); // the stand-in brief writer fails once, as in the chain test
+  await processQueue(w.ctx);
+  const A = (r) => w.tables.ag_agents.find((a) => a.role === r);
+  const tasksOf = (r) => w.tables.ag_tasks.filter((t) => t.agent_id === A(r).id && t.request_id === 1);
+  assert.deepEqual([tasksOf('creative_copywriter').length, tasksOf('creative_maker').length, tasksOf('creative_quality').length], [1, 1, 1]); // nobody works again
+  assert.equal(tasksOf('creative_quality')[0].output.json.verdict, 'revise'); // the advice is there for the manager
+  assert.equal(w.tables.ag_creative_requests[0].status, 'review');
 });
 
 await ok('connecting a client to the department (wizard): the chosen roles are on, the rest are switched off and kept, the required ones are always there, the autofill says where it comes from', async () => {
@@ -4923,6 +4974,10 @@ await ok('operation cycles: the six sections come from the cabinet: what is in w
   assert.equal(buildOperationView({ campaign: { id: 9, status: 'active', config: { mode: 'ads' } }, cockpit: null }).creative, false);
   // the steps of a cycle in words
   assert.equal(cycleStage({ status: 'review', stages: [], creatives: { total: 4, planned: 4 } }).blocked, 'estimate');
+  // a held task (3.7): it is «in work» for the manager, says why it stands and what to do, whatever its pictures are
+  assert.deepEqual([cycleStage({ status: 'paused', stages: [], creatives: { total: 3, review: 3 } }).blocked, cycleStage({ status: 'waiting', stages: [{ key: 'strategy', state: 'working' }] }).blocked], ['paused', 'question']);
+  assert.deepEqual([isInWork({ status: 'paused' }), isInWork({ status: 'waiting' }), isInWork({ status: 'review', creatives: { total: 3, review: 3 } })], [true, true, false]);
+  assert.deepEqual([creativeRunState({ status: 'paused', creatives: { review: 2 } }), creativeRunState({ status: 'waiting', creatives: {} }).text], [{ state: 'wait', text: 'На паузі' }, 'Чекає вашої відповіді агенту']);
   assert.match(cycleStage({ status: 'review', stages: [], creatives: { total: 4, producing: 2, review: 2 } }).now, /готово 2 з 4/);
   assert.equal(cycleStage({ status: 'review', stages: [], creatives: { total: 2, review: 2 } }).blocked, 'review');
   assert.equal(cycleProgress({ status: 'review', stages: [{ key: 'a', state: 'done' }, { key: 'you', state: 'working' }], creatives: { total: 4, review: 2, producing: 2 } }), 0.8);
@@ -5667,8 +5722,9 @@ await ok('picture quality control (3.2): the checker looks at the FINISHED creat
     return { out, tables, seen, steps };
   };
   const bad = await run('{"verdict":"fail","summary":"Флакон не схожий на товар клієнта","issues":[{"aspect":"product","severity":"high","comment":"Інша форма флакона"}]}');
-  assert.equal(bad.tables.ag_creatives[0].status, 'rejected'); // a real problem: returned with the reasons
-  assert.match(bad.tables.ag_creatives[0].note, /^Контроль якості: Флакон не схожий/); assert.equal(bad.tables.ag_creatives[0].qc.verdict, 'fail');
+  assert.equal(bad.tables.ag_creatives[0].status, 'review'); // a real problem is ADVICE: the status stays, the manager decides (3.7)
+  assert.equal(bad.tables.ag_creatives[0].qc.verdict, 'fail'); assert.match(bad.tables.ag_creatives[0].qc.summary, /^Флакон не схожий/);
+  assert.match(bad.steps.at(-1)[0], /не схвалив би/);
   assert.equal(bad.tables.ag_creatives[0].qc.picture_url, 'https://s/final.png'); // the finished picture with the words is what was checked
   const parts = bad.seen[0].params.messages[0].content;
   assert.ok(parts[0].text.includes('No red colour, no prices') && parts[0].text.includes('Words put over the picture by the system: headline "Big idea"')); // the brand rules and the words are in front of the checker

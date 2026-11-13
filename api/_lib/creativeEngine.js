@@ -10,7 +10,7 @@ import { SCOUT_ROLE, intelState } from '../../src/lib/agents/clientIntel.js';
 import { scoutFailed } from './creativeScout.js';
 import { applyTextForRequest } from './creativeText.js';
 
-export const MAX_REWORK_ROUNDS = 2; // the quality checker may send the work back twice; the third time it goes to the person as it is
+export const MAX_REWORK_ROUNDS = 0; // owner, 2026-11-13: the quality checker only ADVISES; it never sends the work back by itself (every rework is the manager's decision)
 
 const iso = (d) => d.toISOString();
 const must = (r, what) => { if (r.error) throw new Error(`${what}: ${r.error.message}`); return r.data; };
@@ -179,7 +179,7 @@ export async function fanOutRequest(ctx, team, agent, task) {
   if (!rid) return;
   const { db } = ctx;
   const req = must(await db.from('ag_creative_requests').select('status, campaign_id').eq('id', rid).maybeSingle(), 'request');
-  if (!req || req.status === 'cancelled') return;
+  if (!req || req.status === 'cancelled' || ['paused', 'waiting'].includes(req.status)) return; // a held task (a pause or a question to the manager, step 3.7) starts nothing new
   const dept = await loadDepartment(db);
   const links = await loadClientLinks(db, req.campaign_id);
   const parts = participantsOf(dept, links);
@@ -248,7 +248,7 @@ export async function passOn(ctx, taskId) {
 export async function settleRequest(ctx, rid, failure = null) {
   const { db } = ctx;
   const req = must(await db.from('ag_creative_requests').select('*').eq('id', rid).maybeSingle(), 'request');
-  if (!req || ['cancelled', 'done'].includes(req.status)) return null;
+  if (!req || ['cancelled', 'done', 'paused', 'waiting'].includes(req.status)) return null; // a held task keeps its state until the manager lets it go
   const now = iso(ctx.now());
   if (failure) {
     must(await db.from('ag_creative_requests').update({ status: 'problem', error: String(failure).slice(0, 500), updated_at: now }).eq('id', rid), 'request');

@@ -22,6 +22,7 @@ import { pollCreatives } from './creativeMake.js';
 import { campaignRole } from './campaignRun.js';
 import { creativeRole } from './creativeRun.js';
 import { fanOutRequest, passOn, scoutEnded, settleRequest, touchClientLink } from './creativeEngine.js';
+import { heldRequestIds, questionGate } from './creativeHold.js';
 import { logStep } from './taskSteps.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { runRegularCycles } from './regularCycles.js';
@@ -424,7 +425,9 @@ export async function runTask(ctx, team, task) {
     if (agent.role === 'creative_scout' && !outcome.ok) { try { await scoutEnded(ctx, task); } catch (e) { console.warn('scoutEnded failed:', e?.message || e); } }
   }
   // a result that must wait for the person's OK before it goes on (confirm_before_pass of the client's link) does not start the next agents
-  const gate = outcome.ok && (agent?.team === CREATIVE_TEAM || agent?.team === CAMPAIGN_TEAM) ? await confirmGate(ctx, task, agent, outcome) : false;
+  let gate = outcome.ok && (agent?.team === CREATIVE_TEAM || agent?.team === CAMPAIGN_TEAM) ? await confirmGate(ctx, task, agent, outcome) : false;
+  // an agent with a question for the manager stops the chain: nothing below it starts until the answer (step 3.7)
+  if (outcome.ok && !gate && agent?.team === CREATIVE_TEAM) { try { gate = await questionGate(ctx, task, agent, outcome); } catch (e) { console.warn('questionGate failed:', e?.message || e); } }
   if (outcome.ok && agent && !gate) { try { await fanOut(ctx, team, agent, task); } catch (e) { console.warn('fanOut failed:', e?.message || e); } }
   if (task.request_id) { try { await settleRequest(ctx, task.request_id, outcome.ok ? null : `${agent?.name || 'Агент'}: ${outcome.error}`); } catch (e) { console.warn('settleRequest failed:', e?.message || e); } }
   if (outcome.ok && outcome.advance) { try { await advancePost(ctx, team, outcome.advance); } catch (e) { console.warn('advancePost failed:', e?.message || e); } }
@@ -519,7 +522,8 @@ export async function processQueue(ctx, { maxMs = 200000, parallel = 3 } = {}) {
     const prio = (t) => all.clients.get(`${t.agent_id}:${t.campaign_id}`)?.priority ?? 100;
     const capped = await cappedCampaigns(ctx.db).catch(() => new Set()); // a campaign over its money cap starts nothing new
     const campaignOfTask = (t) => String(t.campaign_id || (all.byId.get(t.agent_id)?.team === CAMPAIGN_TEAM ? all.byId.get(t.agent_id).scope_id : ''));
-    const ready = tasks.filter((t) => !capped.has(campaignOfTask(t))).filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).sort((a, b) => prio(a) - prio(b) || a.id - b.id); // clients by priority, then in turn
+    const held = await heldRequestIds(ctx.db).catch(() => new Set()); // a paused task, or one that waits for the manager's answer, starts nothing (step 3.7)
+    const ready = tasks.filter((t) => !capped.has(campaignOfTask(t))).filter((t) => !(t.request_id && held.has(t.request_id))).filter((t) => runnable(all, states, all.byId.get(t.agent_id), t)).sort((a, b) => prio(a) - prio(b) || a.id - b.id); // clients by priority, then in turn
     stats.waiting = tasks.length - ready.length;
     stats.left = ready.length;
     if (!ready.length) break;

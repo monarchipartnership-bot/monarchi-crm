@@ -24,6 +24,9 @@ export const CREATIVE_RULES = [
   'Generated pictures carry words only when the technical brief marks the concept with text_render "model": then exactly the strings of its copy, spelled as given, and nothing else. In every other case a picture has no words. Never logos drawn from scratch, prices that are not in the copy, or interface screenshots.',
 ];
 
+// The agents may stop the chain with a question (step 3.7, owner 2026-11-13): the rule of the «clarify» field, the same for every role that has it.
+export const CLARIFY_RULE = 'The "clarify" field is read by the manager and STOPS the work until they answer: use it ONLY for a question without whose answer you cannot do your step correctly (a word or an instruction you do not understand, a missing fact the result depends on). Never for taste, small risks or things you can safely assume: put those in "notes" or work with a sensible assumption. At most three short questions, one sentence each; empty when there is nothing to ask. When "Уточнення менеджера" lists answers to earlier questions, follow them and do not ask the same thing again.';
+
 const MD_REPORT = 'Write the report in Markdown. Start with a section titled «Підсумок» (translate the title into the language of the report) of 2 to 4 sentences: the main findings. Then the body. End with a short section on what is missing or could not be read.';
 
 // What each role must answer. The analyst writes a Markdown report; the others answer in JSON.
@@ -35,22 +38,26 @@ export const CREATIVE_CONTRACTS = {
     'Answer with ONE JSON object: {"summary":"2-4 sentences: the plan and why","directions":[{"key":"d1","name":"2 to 5 words","priority":1,"why":"the facts that support it","audience":"who it is for","angle":"the one idea","message":"what the viewer must understand or feel","tests":"what this direction proves or tests","notes":"risks or what to avoid"}],"inventory":{"have":[{"file":"file name exactly as in the materials list","what":"what the picture shows, in one short phrase","use":"how it can be used in creatives"}],"missing":["what a good set of creatives needs and the files do not give"],"to_generate":["what can be generated instead, for example a lifestyle scene"]},"clarify":"what the manager must clarify (or empty)"}.',
     'Pictures may be attached: the client\'s materials, screenshots of competitors\' ads, frames of the Figma brand file. Describe in "inventory" only what you really see; when no pictures were attached, say in "missing" that you did not see the files. Competitors\' ads are examples to learn from (hooks, layouts, offers): never copy their text, brand or imagery. Follow the idea source of the request (competitors, own, mix).',
     'At most ten directions, ordered by priority (1 is first). Never more than the request asks for; with many directions keep every field short. Exception: when the request lists texts given by the manager, make exactly one direction per given text, in the order given, and the given text is that direction\'s message.',
+    CLARIFY_RULE,
   ],
   creative_brief: [
     JSON_RULES,
-    'Answer with ONE JSON object: {"summary":"2-4 sentences: the idea of the request and the approach","concepts":[{"key":"c1","direction":"the key of the strategist\'s direction","name":"2 to 5 words","angle":"the one idea","audience":"who it is for","message":"what the viewer must understand or feel","visual":"the scene: subject, setting, composition, mood, light, colors; leave empty space for the text where layout says; no words in this description","references":[{"file":"file name exactly as in the materials list","role":"product|logo|style|person|other","keep":"what must stay exactly as in the file: colour, texture, shape, logo"}],"layout":{"text_zone":"left|right|top|bottom|center|none","note":"where the text and the button sit"},"ratios":["1:1"],"needs_text":true,"text_brief":"what the copywriter should write (only when the copy is not given)","avoid":"what must not appear"}],"notes":"what a person must check or provide"}.',
+    'Answer with ONE JSON object: {"summary":"2-4 sentences: the idea of the request and the approach","concepts":[{"key":"c1","direction":"the key of the strategist\'s direction","name":"2 to 5 words","angle":"the one idea","audience":"who it is for","message":"what the viewer must understand or feel","visual":"the scene: subject, setting, composition, mood, light, colors; leave empty space for the text where layout says; no words in this description","references":[{"file":"file name exactly as in the materials list","role":"product|logo|style|person|other","keep":"what must stay exactly as in the file: colour, texture, shape, logo"}],"layout":{"text_zone":"left|right|top|bottom|center|none","note":"where the text and the button sit"},"ratios":["1:1"],"needs_text":true,"text_brief":"what the copywriter should write (only when the copy is not given)","avoid":"what must not appear"}],"notes":"what a person must check or provide","clarify":"questions for the manager (or empty)"}.',
     'One concept per direction of the strategist (or fewer). When the request lists texts given by the manager, set "needs_text" to true: the system puts each given text into its concept word for word, so do not copy it anywhere. "ratios" uses only the formats the request lists. "references" lists only files from the materials list (or an empty list). "needs_text" follows the request: true when texts are asked, false when not, your judgement when the request leaves it to you.',
+    CLARIFY_RULE,
   ],
   creative_copywriter: [
     JSON_RULES,
-    'Answer with ONE JSON object: {"texts":[{"concept":"the key of the concept","headline":"max 40 characters","primary_text":"the main ad text","description":"max 90 characters","cta":"the call to action"}],"notes":"what the manager must confirm (or empty)"}.',
+    'Answer with ONE JSON object: {"texts":[{"concept":"the key of the concept","headline":"max 40 characters","primary_text":"the main ad text","description":"max 90 characters","cta":"the call to action"}],"notes":"what the manager must confirm (or empty)","clarify":"questions for the manager (or empty)"}.',
     'Write 2 variants per concept that needs text (two objects with the same "concept"). Do not write for concepts that do not need text. Keep the language of the request.',
+    CLARIFY_RULE,
   ],
   creative_maker: [
     JSON_RULES,
-    'Answer with ONE JSON object: {"creatives":[{"concept":"the key of the concept","ratio":"1:1|4:5|9:16|16:9","prompt":"the full generation prompt in English","negative_prompt":"what must not appear","references":["file names of the client materials used as references"],"look":"the key of the realism look, only when the input lists the looks"}],"notes":"what a person must check (or empty)"}.',
+    'Answer with ONE JSON object: {"creatives":[{"concept":"the key of the concept","ratio":"1:1|4:5|9:16|16:9","prompt":"the full generation prompt in English","negative_prompt":"what must not appear","references":["file names of the client materials used as references"],"look":"the key of the realism look, only when the input lists the looks"}],"notes":"what a person must check (or empty)","clarify":"questions for the manager (or empty)"}.',
     'One object per concept and format, in the order of the brief. "references" uses names exactly as in the materials list (or an empty list). When the concept\'s text_render is "model", the prompt contains the exact strings of its copy in quotation marks and keeps the text zone free of detail; otherwise it asks for no words at all.',
     'Keep every prompt under 80 words and every negative prompt under 25 words: the answer holds one prompt for every concept and format, so it must stay short or it gets cut off.',
+    CLARIFY_RULE,
   ],
   creative_quality: [
     JSON_RULES,

@@ -27,6 +27,7 @@ import { addInstruction, editOutput, removeInstruction, setAgentMode, setAgentSc
 import { cancelRequest, reviseStep, startIntel, startRequest } from './_lib/creativeEngine.js';
 import { applyText, saveTextEdit, textInfo } from './_lib/creativeText.js';
 import { queueInspection } from './_lib/creativeEngine.js';
+import { answerQuestion, pauseRequest, resumeRequest } from './_lib/creativeHold.js';
 import { estimateInputs } from './_lib/estimateInputs.js';
 import { auditAfter, checkRights } from './_lib/agentAudit.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
@@ -92,6 +93,9 @@ export default async function handler(req, res) {
     else if (action === 'creative_text_info') out = await textInfo(ctx, Number(body.creativeId)); // the words that are on a creative now (the editor of the words)
     else if (action === 'edit_creative_text') out = await saveTextEdit(ctx, Number(body.creativeId), body.edit ?? null); // a person changed the words of a ready creative: put on the same picture again (free)
     else if (action === 'cancel_request') out = await cancelRequest(ctx, Number(body.requestId));
+    else if (action === 'pause_request') out = await pauseRequest(ctx, Number(body.requestId)); // a task is stopped at any moment (step 3.7)
+    else if (action === 'resume_request') { out = await resumeRequest(ctx, Number(body.requestId)); if (out.now === 'running') out.queue = await processQueue(ctx, { maxMs: 60000 }); }
+    else if (action === 'answer_question') { out = await answerQuestion(ctx, Number(body.taskId), { answer: body.answer, proceed: body.proceed === true }); out.queue = await processQueue(ctx, { maxMs: 60000 }); } // the manager answers an agent's question: the agent works again
     else if (action === 'restart_agent') { out = await restartAgent(ctx, Number(body.agentId)); if (out.requeued) out.queue = await processQueue(ctx, { maxMs: 60000 }); }
     else if (action === 'dry_run') out = await dryRun(ctx, Number(body.agentId), { campaignId: body.campaignId, requestId: body.requestId, promptBody: body.promptBody });
     else if (action === 'pass_on') { out = await passOnAny(ctx, Number(body.taskId)); out.queue = await processQueue(ctx, { maxMs: 60000 }); } // the person's OK on a result that waited: the chain goes on

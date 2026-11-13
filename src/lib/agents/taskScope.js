@@ -52,7 +52,9 @@ export function tasksOfOperation({ campaign, cockpit = null, now = new Date() } 
     if (over) { state = 'done'; stateText = 'сезон завершено'; } else if (!r.enabled) { state = 'paused'; stateText = 'зупинено'; } else if (rest) { state = 'paused'; stateText = `на паузі до ${dayMonth(rest.endDate)}`; } else if (seasonal && r.startDate && today < r.startDate) { state = 'soon'; stateText = `почнеться ${dayMonth(r.startDate)}`; }
     const runs = runsOf(r.id);
     const review = sum(runs, (x) => x.creatives?.review || 0);
-    if (state === 'work' && review > 0) { state = 'wait'; stateText = 'чекає вас'; }
+    if (state === 'work' && runs.some((x) => x.status === 'waiting')) { state = 'wait'; stateText = 'агент питає вас'; } // step 3.7
+    else if (state === 'work' && runs.some((x) => x.status === 'paused')) { state = 'wait'; stateText = 'запуск на паузі'; }
+    else if (state === 'work' && review > 0) { state = 'wait'; stateText = 'чекає вас'; }
     const period = seasonal ? `${r.startDate ? `${dayMonth(r.startDate)} – ` : 'до '}${dayMonth(r.endDate)}` : '';
     const line = [period, r.whenText, r.enabled && state !== 'paused' && !over && r.next?.text ? `наступний запуск ${r.next.text}` : ''].filter(Boolean).join(' · ');
     out.push({ key: `reg:${r.id}`, campaignId: campaign.id, projectId: campaign.project_id ?? null, kind, kindLabel: TASK_KIND[kind], title: r.title || 'Без назви', line, state, stateText, regularId: r.id, enabled: r.enabled,
@@ -62,7 +64,7 @@ export function tasksOfOperation({ campaign, cockpit = null, now = new Date() } 
   (cockpit?.requests || []).filter((r) => r.kind !== 'regular').forEach((r) => {
     const st = creativeRunState(r);
     out.push({ key: `one:${r.id}`, campaignId: campaign.id, projectId: campaign.project_id ?? null, kind: 'oneoff', kindLabel: TASK_KIND.oneoff, title: r.title || `Завдання №${r.id}`,
-      line: [r.createdAt ? dayMonth(String(r.createdAt).slice(0, 10)) : '', st.text].filter(Boolean).join(' · '), state: st.state === 'ok' ? 'done' : st.state, stateText: st.state === 'ok' ? 'завершено' : st.state === 'wait' ? 'чекає вас' : st.state === 'stopped' ? 'зупинилось' : 'працює',
+      line: [r.createdAt ? dayMonth(String(r.createdAt).slice(0, 10)) : '', st.text].filter(Boolean).join(' · '), state: st.state === 'ok' ? 'done' : st.state, stateText: st.state === 'ok' ? 'завершено' : r.status === 'waiting' ? 'агент питає вас' : r.status === 'paused' ? 'на паузі' : st.state === 'wait' ? 'чекає вас' : st.state === 'stopped' ? 'зупинилось' : 'працює',
       requestId: r.id, review: r.creatives?.review || 0, approved: r.creatives?.approved || 0, costUsd: Math.round(((r.cost?.model || 0) + (r.cost?.higgsfield || 0)) * 100) / 100, runs: 1, lastAt: r.updatedAt || r.createdAt || null });
   });
   return out.sort((a, b) => at(b.lastAt) - at(a.lastAt));

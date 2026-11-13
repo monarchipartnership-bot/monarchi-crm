@@ -18,6 +18,8 @@ import RequestForm from '../campaigns/studio/RequestForm';
 import AgentsSettings from './AgentsSettings';
 import StepCards from './StepCards';
 import LiveSteps from './LiveSteps';
+import QuestionCard from './QuestionCard';
+import RunJournal from './RunJournal';
 import IntelCard from './IntelCard';
 import StyleEditor from './StyleEditor';
 import RealismPicker from './RealismPicker';
@@ -34,14 +36,14 @@ import './ProjectCard.css';
 // the sections of the card of ONE task and of the card of the team (step 3.0b); the card of a whole operation (SECTIONS) is kept for the old operations
 const TASK_SECTIONS = [['now', 'Хід роботи'], ['review', 'Результати'], ['spend', 'Витрати'], ['settings', 'Налаштування']];
 const TEAM_SECTIONS = [['client', 'Профіль клієнта'], ['settings', 'Ліміт і пауза'], ['spend', 'Витрати']];
-const REQ_CHIP = { draft: 'is-grey', running: 'is-work', review: 'is-warn', problem: 'is-bad', approved: 'is-ok' };
+const REQ_CHIP = { draft: 'is-grey', running: 'is-work', review: 'is-warn', problem: 'is-bad', approved: 'is-ok', paused: 'is-grey', waiting: 'is-warn' };
 const STATE_CHIP = { review: 'is-warn', rework: 'is-back', checked: 'is-ok' };
 const PASS_STATUS = { ok: 'успішно', failed: 'помилка', running: 'працює' };
 const fmtWhen = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')} о ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 const countsLine = (c = {}) => [c.review ? `на перегляд: ${c.review}` : '', c.approved ? `затверджено: ${c.approved}` : '', c.rejected ? `повернено: ${c.rejected}` : '', c.producing ? `генерується: ${c.producing}` : ''].filter(Boolean).join(' · ') || 'рішень ще немає';
 
 // One cycle that is in work: what it makes, how far it is, the step of the chain, what comes after it.
-function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised, onDismissNote, onAnswerNote, onGoFill }) {
+function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised, onDismissNote, onAnswerNote, onGoFill, onPause, onResume, onAnswer }) {
   const s = cycle.stage;
   const pct = Math.round((cycle.progress || 0) * 100);
   return (
@@ -54,6 +56,7 @@ function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised, onDi
       </div>
       <p className="opv-what">{cycle.text}</p>
       <div className="opv-prog"><Progress value={cycle.progress} /><em>{pct}%</em></div>
+      {cycle.question && <QuestionCard question={cycle.question} busy={busy === 'answer' + cycle.id ? 'answer' : busy === 'proceed' + cycle.id ? 'proceed' : ''} onAnswer={(text) => onAnswer(cycle, { answer: text })} onProceed={() => onAnswer(cycle, { proceed: true })} />}
       {cycle.status !== 'draft' && <StageLine stages={cycle.stages} currentKey={cycle.currentStageKey} />}
       {cycle.status !== 'draft' && <LiveSteps steps={cycle.steps || []} working={cycle.status === 'running' && cycle.stages.some((x) => x.state === 'working')} />}
       <dl className="opv-steps">
@@ -67,6 +70,8 @@ function CycleCard({ cycle, busy, onStart, onGo, paused = false, onRevised, onDi
         )}
         {(s.blocked === 'failed' || s.blocked === 'estimate') && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('messages')}>{s.blocked === 'estimate' ? 'Підтвердити генерацію картинок' : 'Перейти до повідомлень'}<Ic n="arrow" size={15} /></button>}
         {s.blocked === 'review' && <button type="button" className="ckp-btn is-primary" onClick={() => onGo('review', cycle.id)}>Перейти до перевірки<Ic n="arrow" size={15} /></button>}
+        {cycle.status === 'paused' && <button type="button" className="ckp-btn is-primary" disabled={!!busy} onClick={() => onResume(cycle)}>{busy === 'resume' + cycle.id ? <Spinner /> : <Ic n="play" size={15} />}Продовжити завдання</button>}
+        {['running', 'review', 'problem'].includes(cycle.status) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => onPause(cycle)} title="Нові кроки й нові платні запити не стартують. Картинки, що вже відправлені в Higgsfield, дійдуть і зачекають на вас.">{busy === 'pause' + cycle.id ? <Spinner /> : <Ic n="clock" size={15} />}Пауза</button>}
       </div>
       {cycle.status !== 'draft' && <AgentNotes notes={cycle.notes || []} onDismiss={onDismissNote} onAnswer={onAnswerNote} onGoFill={onGoFill} />}
       {cycle.status !== 'draft' && <StepCards stages={cycle.stages} paused={paused} onRevised={onRevised} />}
@@ -145,6 +150,9 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
   };
   const styleSamples = useMemo(() => styleSamplesOf(c), [c]);
   const startCycle = (cycle) => guard('start' + cycle.id, () => act(null, 'start_cycle', { requestId: cycle.id }), 'Завдання запущено: агенти працюють.');
+  const pauseCycle = (cycle) => guard('pause' + cycle.id, () => act(null, 'pause', { requestId: cycle.id }), 'Завдання на паузі: нові кроки й нові платні запити не стартують.');
+  const resumeCycle = (cycle) => guard('resume' + cycle.id, () => act(null, 'resume', { requestId: cycle.id }), 'Завдання продовжено.');
+  const answerCycle = (cycle, { answer = '', proceed = false }) => guard((proceed ? 'proceed' : 'answer') + cycle.id, () => act(null, 'answer', { requestId: cycle.id, taskId: cycle.question.taskId, answer, proceed }), proceed ? 'Продовжуємо без відповіді: результат агента береться як є.' : 'Відповідь передано: агент працює над своїм кроком знову.');
 
   // the form: a regular cycle is kept in the operation (the form sends its day and time), a one-off one becomes a request and starts
   async function saveForm(values, start, schedule) {
@@ -237,9 +245,10 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
               {!view.inWork.length && (
                 <div className="ckp-calm"><IconBadge n="check" tone="green" /><div><b>Зараз нічого не в роботі</b><p>{view.counts.review ? `На вашу перевірку чекає креативів: ${view.counts.review}. ` : ''}{task ? task.line : view.nextText}</p></div></div>
               )}
-              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} onDismissNote={(n) => act({ id: n.id }, 'dismiss')} onAnswerNote={answerNote} onGoFill={onGoFill} onRevised={(r) => { notify?.(r?.paused ? 'Правку прийнято. Крок виконається, коли ви відновите операцію.' : 'Правку надіслано: агент переробляє крок.'); onChanged?.(); }} />)}
+              {view.inWork.map((x) => <CycleCard key={x.id} cycle={x} busy={busy} onStart={startCycle} onGo={go} paused={stopped} onDismissNote={(n) => act({ id: n.id }, 'dismiss')} onAnswerNote={answerNote} onGoFill={onGoFill} onPause={pauseCycle} onResume={resumeCycle} onAnswer={answerCycle} onRevised={(r) => { notify?.(r?.paused ? 'Правку прийнято. Крок виконається, коли ви відновите операцію.' : 'Правку надіслано: агент переробляє крок.'); onChanged?.(); }} />)}
             </div>
           )}
+          {view.creative && !teamOnly && <RunJournal runs={(c?.requests || []).filter((r) => r.status !== 'draft')} />}
         </>
       )}
 

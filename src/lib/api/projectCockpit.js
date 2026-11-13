@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { buildCockpit, isActiveCampaign, sortProjects, summaryOf } from '../agents/projectCockpit';
+import { buildCockpit, isActiveCampaign, sortProjects, stepLabelOf, summaryOf } from '../agents/projectCockpit';
 import { agentAction, kickQueue } from './agents';
 import { estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, setCreativeStatus, startRequest } from './creatives';
 import { reviewOutcome } from '../agents/operationCycles';
@@ -20,7 +20,7 @@ export async function fetchCockpits() {
   const [requests, projects, tasks, agents, assets, spend, stepRows, intelRows] = await Promise.all([
     supabase.from('ag_creative_requests').select('*').in('campaign_id', ids).order('created_at', { ascending: false }).limit(300),
     supabase.from('projects').select('id, name, client').in('id', [...new Set(campaigns.map((c) => c.project_id).filter(Boolean))]),
-    supabase.from('ag_tasks').select('id, agent_id, request_id, campaign_id, status, error, cost_usd, created_at, started_at, finished_at, summary:output->>summary, notes:output->json->>notes, issues:output->json->issues, inspect:output->>inspect').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1500),
+    supabase.from('ag_tasks').select('id, agent_id, request_id, campaign_id, status, error, cost_usd, created_at, started_at, finished_at, summary:output->>summary, notes:output->json->>notes, issues:output->json->issues, inspect:output->>inspect, question:output->awaiting_answer').in('campaign_id', ids).gte('created_at', since).order('id', { ascending: false }).limit(1500),
     supabase.from('ag_agents').select('id, role').eq('team', 'creative'),
     supabase.from('project_creative_assets').select('project_id'),
     supabase.from('ag_creative_spend').select('campaign_id, usd').in('campaign_id', ids),
@@ -76,6 +76,12 @@ async function settleReview(requestId) {
 }
 
 // What the person presses in a card (the names of the actions are the contract with the design components). Every function throws a readable Error.
+// The whole journal of ONE task run (step 3.7): every line the agents and the manager wrote, oldest first, without the window of days and the cap of the cabinet. → [{ id, role, label, text, state, at }]
+export async function fetchRunJournal(requestId) {
+  const rows = must(await supabase.from('ag_task_steps').select('id, role, text, state, created_at').eq('request_id', requestId).order('id', { ascending: true }).limit(3000)) || [];
+  return rows.map((x) => ({ id: x.id, role: x.role, label: stepLabelOf(x.role), text: x.text, state: x.state, at: x.created_at }));
+}
+
 export async function runCockpitAction(item, key, payload = {}, { cockpit = null, email = null } = {}) {
   const kick = () => kickQueue().catch(() => {});
   if (key === 'download_one') {
@@ -136,6 +142,18 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     if (!r?.submitted) throw new Error('Нічого не запущено: картинки не вміщаються в ліміт витрат на це завдання.');
     kick();
     return { submitted: r.submitted };
+  }
+  if (key === 'pause' || key === 'resume') { // a task is stopped at any moment / goes on (step 3.7)
+    if (!rid) throw new Error('Завдання не знайдено.');
+    await agentAction(key === 'pause' ? 'pause_request' : 'resume_request', { requestId: rid });
+    if (key === 'resume') kick();
+    return {};
+  }
+  if (key === 'answer') { // the manager answers the question of an agent (or goes on without an answer)
+    const r = await agentAction('answer_question', { taskId: payload.taskId, answer: payload.answer, proceed: payload.proceed === true });
+    if (r?.ok === false) throw new Error(r.error || 'Не вдалося передати відповідь.');
+    kick();
+    return {};
   }
   if (key === 'video_estimate' || key === 'video_run') { // a short video from a finished picture (step 3.5): the price first, then the video
     const r = await agentAction('make_video', { creativeId: payload.creativeId, prompt: payload.prompt, seconds: payload.seconds, sound: payload.sound === true, estimateOnly: key === 'video_estimate' });

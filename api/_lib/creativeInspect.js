@@ -68,9 +68,9 @@ export async function inspectRun({ ctx, agent, task, prompt, rec, campaign, req,
   const qc = { ...parsed, source: 'picture', picture_url: url, task_id: task.id, checked_at: new Date().toISOString() };
   const patch = { qc, updated_at: qc.checked_at };
   const back = parsed.verdict === 'fail';
-  if (back) { patch.status = 'rejected'; patch.note = qcNote(qc); } // the manager still decides: «Схвалити» works on a returned creative, a new picture asks the price first
+  // ADVICE only (owner, 2026-11-13: «агент по качеству не может сам утверждать»): the verdict is stored and shown, the status of the creative never changes by it: the manager decides
   await db.from('ag_creatives').update(patch).eq('id', creative.id).eq('status', 'review');
-  await step(back ? 'Контроль якості: креатив «' + (creative.concept_name || creative.concept_key) + '» повернено з зауваженнями' : 'Контроль якості: креатив «' + (creative.concept_name || creative.concept_key) + '» без зауважень', 'done');
+  await step(back ? 'Контроль якості: не схвалив би креатив «' + (creative.concept_name || creative.concept_key) + '»: ' + clip(parsed.summary, 120) : 'Контроль якості: схвалив би креатив «' + (creative.concept_name || creative.concept_key) + '»', 'done');
   const text = [`## Підсумок\n${parsed.summary || (back ? 'Є зауваження.' : 'Зауважень немає.')}`, '', ...parsed.issues.map((i) => `- [${i.severity}] ${ASPECTS[i.aspect]}: ${i.comment}`)].join('\n');
-  return { output: { text, summary: parsed.summary || parsed.verdict, json: { ...parsed, inspect: true, creativeId: creative.id }, inspect: true, requestId: req?.id ?? null, campaignId: campaign.id, creativeId: creative.id }, summary: `${back ? 'Повернено' : 'Без зауважень'}: ${parsed.summary || ''}` };
+  return { output: { text, summary: parsed.summary || parsed.verdict, json: { ...parsed, inspect: true, creativeId: creative.id }, inspect: true, requestId: req?.id ?? null, campaignId: campaign.id, creativeId: creative.id }, summary: `${back ? 'Не схвалив би' : 'Схвалив би'}: ${parsed.summary || ''}` };
 }

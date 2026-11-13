@@ -24,6 +24,9 @@ export const ACTION_RULES = {
   inspect_creative: { level: 'paid', label: 'Перевірка якості готового креатива' },
   edit_creative_text: { level: 'logged', label: 'Правка тексту на готовому креативі' },
   cancel_request: { level: 'logged', label: 'Зупинка запиту' },
+  pause_request: { level: 'logged', label: 'Пауза завдання' },
+  resume_request: { level: 'logged', label: 'Продовження завдання' },
+  answer_question: { level: 'logged', label: 'Відповідь на питання агента' },
   set_agent_schedule: { level: 'logged', label: 'Зміна розкладу агента' },
   set_agent_mode: { level: 'logged', label: 'Зміна режиму агента' },
   add_instruction: { level: 'logged', label: 'Вказівка для операції' },
@@ -78,6 +81,9 @@ export function auditEntry(action, body = {}, out = {}) {
     case 'start_intel': summary = body.force ? 'Оновив профіль клієнта (розвідка)' : 'Запустив розвідку клієнта'; break;
     case 'start_request': summary = 'Запустив запит на креативи'; meta.requestId = body.requestId; break;
     case 'cancel_request': summary = 'Зупинив запит на креативи'; meta.requestId = body.requestId; break;
+    case 'pause_request': summary = 'Поставив завдання на паузу'; meta.requestId = body.requestId; break;
+    case 'resume_request': summary = 'Продовжив завдання'; meta.requestId = body.requestId; break;
+    case 'answer_question': summary = body.proceed ? 'Продовжив без відповіді на питання агента' : 'Відповів на питання агента'; meta.taskId = body.taskId; break;
     case 'run_agent': summary = 'Запустив агента вручну'; meta.agentId = body.agentId; break;
     case 'retry_task': summary = 'Повторив крок'; meta.taskId = body.taskId; break;
     case 'cancel_task': summary = 'Скасував крок'; meta.taskId = body.taskId; break;

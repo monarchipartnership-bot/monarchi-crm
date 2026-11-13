@@ -18,7 +18,7 @@ export const STAGES = [
   { key: 'you', label: 'Ви', role: null },
 ];
 const MODE_LABEL = { creative: 'Тільки креативи', full: 'Повна операція', strategy: 'Тільки стратегія', ads: 'Аналіз і оптимізація', report: 'Тільки звіт' };
-export const REQUEST_STATUS_LABEL = { draft: 'Чернетка', running: 'Працює', review: 'На перегляд', approved: 'Затверджено', problem: 'Проблема' };
+export const REQUEST_STATUS_LABEL = { draft: 'Чернетка', running: 'Працює', review: 'На перегляд', approved: 'Затверджено', problem: 'Проблема', paused: 'На паузі', waiting: 'Чекає вашої відповіді' };
 const DB_STATUS = { done: 'approved' }; // the database says «done», the screens say «approved»
 const STALE_REQUEST_DAYS = 14; // an open request nobody touched for this long is history
 const TASK_STATE = { queued: 'waiting', running: 'working', done: 'done', failed: 'failed' };
@@ -77,10 +77,13 @@ function scoutStage(request, tasks, roleOf, intel) {
 
 // The steps of the agents that are shown live (lib/api/projectCockpit.js reads ag_task_steps): the lines of ONE request, plus the scout's lines (it works for the whole client).
 // → [{ id, role, label, text, state, at }] newest first
+// the name of the author of a line of the journal: an agent of the chain or the manager
+export const stepLabelOf = (role) => (role === 'manager' ? 'Менеджер' : [SCOUT, ...STAGES].find((s) => s.role === role)?.label || '');
+
 export function stepsOfRequest(request, steps = [], tasks = [], roleOf = () => null) {
   const scoutTaskIds = tasks.filter((x) => x.campaign_id === request.campaign_id && roleOf(x.agent_id) === SCOUT.role).map((x) => x.id);
   const lastScout = scoutTaskIds.length ? Math.max(...scoutTaskIds) : null;
-  const labelOf = (role) => [SCOUT, ...STAGES].find((s) => s.role === role)?.label || '';
+  const labelOf = (role) => (role === 'manager' ? 'Менеджер' : [SCOUT, ...STAGES].find((s) => s.role === role)?.label || '');
   return steps.filter((x) => (x.request_id === request.id) || (x.role === SCOUT.role && x.campaign_id === request.campaign_id && (lastScout == null || x.task_id === lastScout)))
     .sort((a, b) => num(b.id) - num(a.id)).slice(0, 80).map((x) => ({ id: x.id, role: x.role, label: labelOf(x.role), text: x.text, state: x.state, at: x.created_at }));
 }
@@ -212,6 +215,9 @@ export function buildCockpit(raw) {
       const c = creatives.filter((x) => x.request_id === r.id);
       const status = DB_STATUS[r.status] || r.status;
       const own = buildStages(r, tasks, roleOf, extra);
+      // an agent asked the manager (step 3.7): the question waits on the task that asked it
+      const asked = tasks.filter((t) => t.request_id === r.id && t.status === 'done' && t.question && t.question.question).sort((a, b) => num(b.id) - num(a.id))[0] || null;
+      const question = asked ? { taskId: asked.id, role: roleOf(asked.agent_id), label: [SCOUT, ...STAGES].find((s) => s.role === roleOf(asked.agent_id))?.label || 'Агент', text: clip(asked.question.question, 900), round: num(asked.question.round) || 1 } : null;
       const brief = r.brief || {};
       const items = c.slice().sort((a, b) => num(a.id) - num(b.id)).map((x) => {
         const url = x.final_url || x.asset_url || '';
@@ -222,7 +228,7 @@ export function buildCockpit(raw) {
         return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
       });
       const n = (s) => c.filter((x) => x.status === s).length;
-      return { id: r.id, title: clip(r.title, 90), brief, status, statusLabel: REQUEST_STATUS_LABEL[status] || status, items, updatedAt: r.updated_at || r.created_at, createdAt: r.created_at || null,
+      return { id: r.id, title: clip(r.title, 90), brief, status, statusLabel: REQUEST_STATUS_LABEL[status] || status, question, items, updatedAt: r.updated_at || r.created_at, createdAt: r.created_at || null,
         // the cycle: regular (made by the schedule) or extra, what was asked, its own chain and its money (lib/agents/operationCycles.js)
         kind: brief.kind === 'regular' ? 'regular' : 'extra', scheduledFor: brief.scheduled_for || null, regularId: brief.regular_id || null, goal: clip(brief.goal, 400), ratios: Array.isArray(brief.ratios) && brief.ratios.length ? brief.ratios : ['1:1'], directions: directionLimit(brief),
         stages: own.stages, steps: stepsOfRequest(r, raw.steps || [], tasks, roleOf), currentStageKey: own.currentStageKey, error: clip(r.error, 300), notes: ['draft', 'running', 'review', 'problem'].includes(r.status) ? stepNotes(r, tasks, roleOf, { hasAssets: !!((r.materials || []).length || library.assets || library.sitePhotos) }) : [],

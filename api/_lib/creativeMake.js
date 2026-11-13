@@ -44,6 +44,7 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
   const req = must(await db.from('ag_creative_requests').select('id, status, campaign_id, brief').eq('id', requestId).maybeSingle(), 'request');
   if (!req) throw new Error('Запит не знайдено.');
   if (!estimateOnly && (await cappedCampaigns(db)).has(String(req.campaign_id))) return { ok: false, capped: true, error: CAP_MESSAGE }; // the pictures cost real money: not over the cap
+  if (!estimateOnly && ['paused', 'waiting'].includes(req.status)) return { ok: false, held: req.status, error: req.status === 'paused' ? 'Завдання на паузі: картинки не відправляються.' : 'Завдання чекає вашої відповіді: картинки не відправляються.' }; // step 3.7
   // the cycle may carry its own limit (the form of the cycle, «Агент креативщик»); otherwise the limit of the agent
   const cycleMax = Number(req.brief?.agent_settings?.creative_maker?.max_usd);
   const teamMax = creativeAutoOf((await db.from('ag_campaigns').select('config').eq('id', req.campaign_id).maybeSingle()).data).maxUsd; // the limit of one task of the team

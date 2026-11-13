@@ -33,6 +33,13 @@ const asList = (v) => (Array.isArray(v) ? v : []);
 
 // ------------------------------------------------------------------------------------------------------------------------ parsers
 // The strategist's answer → { summary, directions, clarify }: at most three directions (and not more than the request asks), by priority.
+// What an agent asks the manager (the «clarify» field; a string or a list of questions). A non-empty one STOPS the chain until the manager answers (step 3.7).
+export function clarifyOf(j) {
+  const v = j?.clarify;
+  const text = Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean).join(' / ') : String(v ?? '').trim();
+  return text.length < 3 ? '' : text.slice(0, 800);
+}
+
 export function parseCreativePlan(text, request = {}) {
   const j = readJson(text);
   const max = directionLimit(request.brief || {});
@@ -47,7 +54,7 @@ export function parseCreativePlan(text, request = {}) {
     };
   }).filter((d) => d.angle || d.why).sort((a, b) => a.priority - b.priority).slice(0, max);
   if (!directions.length) throw new Error('Стратег не повернув жодного напряму. Спробуйте ще раз.');
-  return { summary: clip(j?.summary, 800), directions, inventory: parseInventory(j), clarify: clip(j?.clarify, 600) };
+  return { summary: clip(j?.summary, 800), directions, inventory: parseInventory(j), clarify: clarifyOf(j) };
 }
 
 // What the strategist saw in the materials: what is there and what it is good for, what is missing, what can be generated instead.
@@ -105,7 +112,7 @@ export function parseCreativeBrief(text, request = {}, directions = [], style = 
     };
   }).filter((c) => c.visual);
   if (!concepts.length) throw new Error('Агент по ТЗ не повернув жодної концепції з описом картинки. Спробуйте ще раз.');
-  return { summary: clip(j?.summary, 800), concepts, notes: clip(j?.notes, 800) };
+  return { summary: clip(j?.summary, 800), concepts, notes: clip(j?.notes, 800), clarify: clarifyOf(j) };
 }
 
 // The copywriter sometimes writes the concept as «c1. Name» or «c1 — Name» instead of the plain key (live, Joiavegan-shop 2026-11-12: every text was dropped, «Текстів: 0»). The key is found at the start, or the name.
@@ -127,7 +134,7 @@ export function parseCreativeCopy(text, concepts = []) {
   const texts = asList(j?.texts).map((t) => ({
     concept: conceptKeyOf(t?.concept, concepts), headline: clip(t?.headline, 90), primary_text: clip(t?.primary_text, 900), description: clip(t?.description, 160), cta: clip(t?.cta, 60),
   })).filter((t) => t.concept && (t.headline || t.primary_text));
-  return { texts, notes: clip(j?.notes, 800) };
+  return { texts, notes: clip(j?.notes, 800), clarify: clarifyOf(j) };
 }
 
 // An answer cut off by the token limit still holds the complete objects before the cut: they are taken, the rest of the pictures get the plain prompt of the brief.
@@ -172,7 +179,7 @@ export function parseCreativeMaker(text, concepts = [], style = '', look = 'std'
     }
   }
   if (!j || !creatives.length) throw new Error('Агент креативщик не повернув запитів. Спробуйте ще раз.');
-  return { creatives, notes: clip(j?.notes, 800) };
+  return { creatives, notes: clip(j?.notes, 800), clarify: clarifyOf(j) };
 }
 
 // The checker's verdict: revise on any high issue or three medium ones, whatever the model said.
@@ -243,6 +250,13 @@ function projectBlock(project, campaign) {
   };
 }
 
+// The manager's answers to the questions of the agents (step 3.7): they count above the rest of the request.
+function clarificationLines(list) {
+  const rows = asList(list).filter((c) => c && c.answer);
+  if (!rows.length) return [];
+  return ['Уточнення менеджера (відповіді на питання агентів; вони важливіші за решту запиту, не питайте про це знову):', ...rows.map((c, i) => `${i + 1}. Питання: ${clip(c.question, 500)} Відповідь менеджера: ${clip(c.answer, 800)}`)];
+}
+
 function requestBlock(req) {
   const b = req.brief || {};
   const ratios = asList(b.ratios).map((r) => REQUEST_RATIOS.find((x) => x.key === r)?.label || r).join(', ');
@@ -254,6 +268,7 @@ function requestBlock(req) {
       `Формати: ${ratios || '1:1'}`, b.texts === 'given' ? `Кількість напрямів: рівно ${directionLimit(b)}, по одному на кожен заданий текст` : `Кількість напрямів: до ${b.count || MAX_CONCEPTS}`,
       `Тексти до креативів: ${{ auto: 'агент вирішує', yes: 'потрібні, пише копірайтер', given: 'задані менеджером, використовувати дослівно', no: 'не потрібні' }[b.texts] || 'агент вирішує'}`,
       ...(b.texts === 'given' ? asList(b.given_texts).map((t, i) => `Заданий текст ${i + 1}: заголовок «${t.headline}»${t.subline ? `; підзаголовок «${t.subline}»` : ''}${t.badge ? `; плашка «${t.badge}»` : ''}`) : []),
+      ...clarificationLines(b.clarifications),
       `Мова текстів для клієнта: ${languageLabel(b.language) || REQUEST_LANGUAGES[b.language] || REQUEST_LANGUAGES.uk}`,
       `Звідки брати ідеї: ${IDEA_SOURCES[b.idea_source] || IDEA_SOURCES.mix}`, b.figma ? `Макет у Figma: ${b.figma}` : '',
       b.cta === false ? 'Кнопка заклику до дії: не потрібна' : `Кнопка заклику до дії: так${b.cta_text ? `, текст кнопки «${b.cta_text}»` : ''}`,
@@ -516,11 +531,12 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   }
   if (agent.role === 'creative_maker') {
     const parsed = parseCreativeMaker(raw, brief.concepts, clip(cycleSet.style || cfg.style, 600), lookOf(b));
-    const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, materials); // a trial run saves nothing
+    const asks = !!parsed.clarify; // a question to the manager (step 3.7): nothing is saved and nothing goes to Higgsfield until it is answered
+    const rows = ctx.dryRun || asks ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, materials); // a trial run saves nothing
     const text = rows.map((c) => `**${c.concept_key} · ${c.ratio}**\n${c.prompt}`).join('\n\n');
     // the pictures go to Higgsfield at once, within the limit (the team's setting, on unless switched off; the agent's own «Генерувати одразу» counts too); what does not fit waits for the person
-    const generation = !ctx.dryRun && (cycleSet.auto_generate === true || cfg.auto_generate || creativeAutoOf(campaign).auto) ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;
-    return { output: { text, summary: `Запитів до Higgsfield: ${rows.length}`, json: { creatives: parsed.creatives, notes: parsed.notes }, requestId: rid, campaignId, generation }, summary: `Запитів до Higgsfield: ${rows.length}` };
+    const generation = !ctx.dryRun && !asks && (cycleSet.auto_generate === true || cfg.auto_generate || creativeAutoOf(campaign).auto) ? await generateCreatives(ctx, rid).catch((e) => ({ ok: false, error: String(e?.message || e) })) : null;
+    return { output: { text, summary: `Запитів до Higgsfield: ${rows.length}`, json: { creatives: parsed.creatives, notes: parsed.notes, clarify: parsed.clarify }, requestId: rid, campaignId, generation }, summary: `Запитів до Higgsfield: ${rows.length}` };
   }
   if (agent.role === 'creative_quality') {
     const parsed = parseCreativeQc(raw);
