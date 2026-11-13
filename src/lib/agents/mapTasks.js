@@ -13,7 +13,7 @@ export const ROLE_TO_AGENT = {
   // the creative studio of a request
   studio_client_analyst: 'creative-performance-analyst', studio_competitor_analyst: 'competitor-research-agent', studio_brief_writer: 'creative-brief-agent', studio_copywriter: 'performance-copywriter', studio_producer: 'creative-producer-agent',
   // the creative department (the agents with their own page)
-  creative_strategy: 'creative-strategist', creative_analyst: 'creative-performance-analyst', creative_maker: 'creative-producer-agent', creative_quality: 'ai-quality-controller', creative_copywriter: 'performance-copywriter',
+  creative_scout: 'creative-scout-agent', creative_strategy: 'creative-strategist', creative_analyst: 'creative-performance-analyst', creative_maker: 'creative-producer-agent', creative_quality: 'ai-quality-controller', creative_copywriter: 'performance-copywriter',
   // the SMM team
   strategist: 'smm-content-strategist', copywriter: 'smm-copywriter', visual: 'smm-visual-agent', qc: 'smm-quality-control', publisher: 'smm-publisher', social_analyst: 'smm-social-analyst', competitors: 'smm-social-competitors', seo: 'seo-optimizer', site_analyst: 'site-analyst',
 };
