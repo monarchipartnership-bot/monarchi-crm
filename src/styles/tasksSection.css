@@ -24,6 +24,8 @@
 }
 /* the windows of a new task sit above the top bar of the section (they are carried to the body) */
 .ts-dialogs .tm-overlay { z-index: 1600; }
+/* the lists of the fields (Select, date, time) open ABOVE the dialogs of this section: the dialog is 1600, a list was 1000-1300 and opened behind it (owner, 2026-11-13) */
+.ui-select-menu, .date-picker-menu, .time-picker-menu, .platform-picker-menu { z-index: 2000 !important; }
 /* the calendar of the runs by the schedules */
 .ts-empty { margin: 4px 0 12px; font-size: .82rem; color: #C9AAD1; }
 .ts-day { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid rgba(235, 156, 239, .2); color: #F9EDF9; }
