@@ -20,6 +20,7 @@ import { generateCreatives } from './creativeMake.js';
 import { scoutRun } from './creativeScout.js';
 import { intelBlock } from '../../src/lib/agents/clientIntel.js';
 import { effectiveStyle } from '../../src/lib/agents/projectStyle.js';
+import { applyLook, cleanLook, lookBlock, lookOf } from '../../src/lib/creatives/realism.js';
 import { stepsOf } from './taskSteps.js';
 import { inspectRun } from './creativeInspect.js';
 
@@ -151,7 +152,8 @@ export function salvageCreatives(text) {
 export const makerTokens = (concepts = []) => Math.min(12000, 400 * concepts.reduce((n, c) => n + (c.ratios?.length || 1), 0) + 1000);
 
 // The maker's prompts, one per concept and format. A concept or format the model skipped gets a plain prompt from the brief, so no creative is lost.
-export function parseCreativeMaker(text, concepts = [], style = '') {
+// look: the realism look of the task: «std» adds nothing, a look of the list adds its cues to every prompt, «auto» takes the look the maker named for the idea (none named: nothing is added)
+export function parseCreativeMaker(text, concepts = [], style = '', look = 'std') {
   const j = readJson(text) || salvageCreatives(text);
   const got = asList(j?.creatives);
   const creatives = [];
@@ -160,8 +162,11 @@ export function parseCreativeMaker(text, concepts = [], style = '') {
       const hit = got.find((g) => clip(g?.concept, 20) === c.key && clip(g?.ratio, 10) === ratio && clip(g?.prompt, 4000));
       const words = c.text_render === 'model' ? COPY_LINES(c) : [];
       const base = clip(hit?.prompt, 2500) || [c.visual, style, words.length ? `Text in the picture, spelled exactly as written, clean sans-serif type with a clear hierarchy, in the free ${c.layout?.text_zone || 'left'} zone: ${words.join(', ')}. No other words` : ''].filter(Boolean).join('. ');
+      const key = look === 'auto' ? cleanLook(hit?.look) : cleanLook(look);
+      const negBase = clip(hit?.negative_prompt, 500) || (c.text_render === 'model' ? 'watermark, extra words, misspelled words, distorted hands, extra fingers' : 'text, letters, watermark, logo, distorted hands, extra fingers');
+      const looked = applyLook({ prompt: base, negative: negBase }, key);
       creatives.push({
-        concept_key: c.key, concept_name: c.name, ratio, prompt: base, negative_prompt: clip(hit?.negative_prompt, 500) || (c.text_render === 'model' ? 'watermark, extra words, misspelled words, distorted hands, extra fingers' : 'text, letters, watermark, logo, distorted hands, extra fingers'),
+        look: key, concept_key: c.key, concept_name: c.name, ratio, prompt: looked.prompt, negative_prompt: looked.negative,
         references: asList(hit?.references).map((r) => clip(r, 160)).filter(Boolean).slice(0, 6), fallback: !hit,
       });
     }
@@ -384,6 +389,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
   if (agent.role !== 'creative_analyst') blocks.push(...own.blocks);
   const intel = agent.role === 'creative_analyst' ? null : intelBlock(intelRow, now, b.style);
   if (intel) blocks.push(intel);
+  if (agent.role === 'creative_maker') { const lk = lookBlock(lookOf(b)); if (lk) blocks.push(lk); } // the realism look of the task (step 3.4)
   // the quality checker asked to look at ONE FINISHED picture (step 3.2): the brand rules above are what it checks against
   if (agent.role === 'creative_quality' && task.brief?.trigger === 'inspect') return inspectRun({ ctx, agent, task, prompt, rec, campaign, req, blocks, materials, mine, language, step });
   const failed = [];
@@ -509,7 +515,7 @@ export async function creativeRole({ ctx, team: sub, agent, task, prompt, rec })
     return { output: { text, summary: `Текстів: ${parsed.texts.length}`, json: parsed, requestId: rid, campaignId }, summary: `Текстів: ${parsed.texts.length}` };
   }
   if (agent.role === 'creative_maker') {
-    const parsed = parseCreativeMaker(raw, brief.concepts, clip(cycleSet.style || cfg.style, 600));
+    const parsed = parseCreativeMaker(raw, brief.concepts, clip(cycleSet.style || cfg.style, 600), lookOf(b));
     const rows = ctx.dryRun ? parsed.creatives : await saveCreatives(db, rid, parsed.creatives, materials); // a trial run saves nothing
     const text = rows.map((c) => `**${c.concept_key} · ${c.ratio}**\n${c.prompt}`).join('\n\n');
     // the pictures go to Higgsfield at once, within the limit (the team's setting, on unless switched off; the agent's own «Генерувати одразу» counts too); what does not fit waits for the person

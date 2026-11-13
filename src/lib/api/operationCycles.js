@@ -2,6 +2,7 @@ import { supabase } from '../supabaseClient';
 import { MAX_REGULARS, cleanRegular, kyivToday, rawRegulars, regularRequest, regularsOf, seasonOver } from '../agents/operationCycles';
 import { cleanRequest } from '../agents/creativeTeam';
 import { cleanManual, isEmptyManual } from '../agents/projectStyle';
+import { cleanLook } from '../creatives/realism';
 import { createRequest, startRequest } from './creatives';
 
 // The cycles of an operation (lib/agents/operationCycles.js): the regular ones are kept in the operation itself (config.regulars), an extra one is a request.
@@ -87,6 +88,20 @@ export async function setRegularStyle(campaignId, id, manual) {
   const { style: _old, ...rest } = r.brief || {};
   const clean = cleanManual(manual);
   return saveRegular(campaignId, { id, enabled: r.enabled, title: r.title, weekdays: r.weekdays, weekday: r.weekday, everyDays: r.everyDays, startDate: r.startDate, time: r.time, brief: isEmptyManual(clean) ? rest : { ...rest, style: clean } });
+}
+// The realism look of a task (step 3.4): kept in its brief like the style. look: a key of the list, or null = back to «std».
+export async function setRegularLook(campaignId, id, look) {
+  const row = await readRow(campaignId);
+  const r = rawRegulars(row).find((x) => x.id === id);
+  if (!r) throw new Error('Регулярне завдання не знайдено.');
+  const { look: _old, ...rest } = r.brief || {};
+  const key = cleanLook(look);
+  return saveRegular(campaignId, { id, enabled: r.enabled, title: r.title, weekdays: r.weekdays, weekday: r.weekday, everyDays: r.everyDays, startDate: r.startDate, time: r.time, brief: key ? { ...rest, look: key } : rest });
+}
+export async function setRequestLook(requestId, brief, look) {
+  const { look: _old, ...rest } = brief || {};
+  const key = cleanLook(look);
+  return must(await supabase.from('ag_creative_requests').update({ brief: key ? { ...rest, look: key } : rest, updated_at: new Date().toISOString() }).eq('id', requestId).select().single());
 }
 export async function setRequestStyle(requestId, brief, manual) {
   const { style: _old, ...rest } = brief || {};

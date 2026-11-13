@@ -4,7 +4,7 @@ import { kickQueue, startIntel } from '../../../lib/api/agents';
 import { styleSamplesOf } from '../../../lib/agents/projectStyle';
 import { addInstruction, fetchCampaignControl } from '../../../lib/api/campaignControl';
 import { useConfirm } from '../../../components/common/ConfirmDialog';
-import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled, setRegularStyle, setRequestStyle, updateExtraCycle } from '../../../lib/api/operationCycles';
+import { createExtraCycle, removeRegular, runRegularNow, saveRegular, setRegularEnabled, setRegularLook, setRegularStyle, setRequestLook, setRequestStyle, updateExtraCycle } from '../../../lib/api/operationCycles';
 import PicturesSetting from './PicturesSetting';
 import { startRequest } from '../../../lib/api/creatives';
 import { scopeCockpit } from '../../../lib/agents/taskScope';
@@ -20,6 +20,7 @@ import StepCards from './StepCards';
 import LiveSteps from './LiveSteps';
 import IntelCard from './IntelCard';
 import StyleEditor from './StyleEditor';
+import RealismPicker from './RealismPicker';
 import TeamLimit from './TeamLimit';
 import AgentNotes from './AgentNotes';
 import AttentionRow from './AttentionRow';
@@ -163,9 +164,10 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
   const taskReg = task?.regularId ? view.regulars.find((r) => r.id === task.regularId) || null : null;
   const taskReq = task?.requestId != null ? (cAll?.requests || []).find((r) => r.id === task.requestId) || null : null;
   // the look of THIS task: saved in its brief (a regular task keeps it for every next run)
+  const saveTaskLook = (look) => guard('look', () => (taskReg ? setRegularLook(campaign.id, taskReg.id, look) : setRequestLook(taskReq.id, taskReq.brief, look)), look ? 'Реалізм картинок збережено: він діє на нових картинках цього завдання.' : 'Повернуто «Як зараз»: до запитів нічого не додається.');
   const saveTaskStyle = (manual) => guard('style', () => (taskReg ? setRegularStyle(campaign.id, taskReg.id, manual) : setRequestStyle(taskReq.id, taskReq.brief, manual)), 'Стиль завдання збережено: він діє на креативах цього завдання.');
   async function saveTaskForm(valuesIn, start, schedule) {
-    const values = { ...valuesIn, style: (taskReg || taskReq)?.brief?.style }; // the form does not know the style of the task: it stays as it is
+    const values = { ...valuesIn, style: (taskReg || taskReq)?.brief?.style, look: (taskReg || taskReq)?.brief?.look }; // the form does not know the style of the task: it stays as it is
     if (taskReg) {
       const { campaign: saved, regular } = await saveRegular(campaign.id, { id: taskReg.id, enabled: taskReg.enabled, title: String(values.title || '').trim() || taskReg.title, ...schedule, brief: values }, email);
       if (start) { await runRegularNow(saved, regular, email); kickQueue().catch(() => {}); }
@@ -382,11 +384,18 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
           <RequestForm key={task.key} campaign={campaign} mode={taskReg ? 'regular' : 'extra'} title="Налаштування завдання" initial={taskReg ? { ...taskReg.brief, title: taskReg.title, materials: [] } : { ...taskReq.brief, title: taskReq.title, materials: [] }}
             schedule={taskReg ? { weekdays: taskReg.weekdays, everyDays: taskReg.everyDays, time: taskReg.time } : null} canStartNow={!stopped} inline onClose={() => {}} onSave={saveTaskForm}
             extraPanels={[
-              ...(c?.intel ? [{ key: 'style', label: 'Стиль', after: 'creatives', node: (
-                <section className="ckp-box" aria-label="Стиль завдання">
-                  <StyleEditor key={task.key} autoStyle={c.intel.autoStyle} manual={(taskReg || taskReq).brief?.style} samples={styleSamples} onSave={saveTaskStyle} />
-                </section>
-              ) }] : []),
+              { key: 'style', label: 'Стиль', after: 'creatives', node: (
+                <>
+                  <section className="ckp-box" aria-label="Реалізм картинок">
+                    <RealismPicker key={task.key} look={(taskReg || taskReq).brief?.look} onSave={saveTaskLook} />
+                  </section>
+                  {c?.intel && (
+                    <section className="ckp-box" aria-label="Стиль завдання">
+                      <StyleEditor key={task.key} autoStyle={c.intel.autoStyle} manual={(taskReg || taskReq).brief?.style} samples={styleSamples} onSave={saveTaskStyle} />
+                    </section>
+                  )}
+                </>
+              ) },
               { key: 'control', label: 'Керування', after: 'more', node: (
                 <section className="ckp-box opv-regular" aria-label="Керування завданням">
                   <div className="ckp-sec-h"><h3>Керування завданням</h3><span className="ckp-chip">{task.kindLabel}</span></div>

@@ -92,6 +92,7 @@ import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, ef
 import { overlayFields, applyText, applyTextForRequest, saveTextEdit, textInfo } from '../api/_lib/creativeText.js';
 import { cleanTextEdit } from '../src/lib/creatives/textEdit.js';
 import { inspectRun, parsePictureQc, qcNote } from '../api/_lib/creativeInspect.js';
+import { LOOKS, LOOK_NEGATIVE, applyLook, cleanLook, lookBlock, lookOf } from '../src/lib/creatives/realism.js';
 import { queueInspection } from '../api/_lib/creativeEngine.js';
 import { composeTextServer } from '../api/_lib/composeServer.js';
 import { busyOf, calmSpan } from '../src/lib/creatives/composeText.js';
@@ -5499,6 +5500,41 @@ await ok('task cards (3.0b): every task has its own runs, notes and money; the l
   assert.deepEqual(every.map((r) => r.date), ['2026-11-13', '2026-11-16', '2026-11-19']); // from the next run, every 3 days, up to the last day of the season
   const groups = groupByProject(list);
   assert.deepEqual(groups.map((g) => g.projectName), ['Mellow', 'Joia']); // the project with the tasks that wait for the person comes first
+});
+
+await ok('realism looks (3.4): a look of the task adds its cues and the «looks generated» negatives to every prompt; std adds nothing; auto takes the look the maker names; the look is a setting of the task', () => {
+  // the list and the cleaning
+  assert.deepEqual(LOOKS.map((l) => l.key), ['std', 'auto', 'studio', 'life', 'ugc', 'ed', 'macro', 'env']);
+  assert.deepEqual([cleanLook('ugc'), cleanLook('std'), cleanLook('nonsense'), cleanLook(undefined)], ['ugc', null, null, null]);
+  assert.deepEqual([lookOf({ look: 'ed' }), lookOf({}), lookOf({ look: 'junk' }), lookOf(null)], ['ed', 'std', 'std', 'std']);
+  // the cues are added at the end of the scene, the negatives after the model's own
+  const one = applyLook({ prompt: 'A white bottle on a pink pedestal.', negative: 'text, logo' }, 'studio');
+  assert.match(one.prompt, /^A white bottle on a pink pedestal\. Clean studio product photograph, softbox key light/);
+  assert.equal(one.negative, `text, logo, ${LOOK_NEGATIVE}`);
+  assert.deepEqual(applyLook({ prompt: 'P', negative: 'N' }, null), { prompt: 'P', negative: 'N' }); // nothing chosen: nothing changes
+  assert.deepEqual(applyLook({ prompt: 'P', negative: 'N' }, 'auto'), { prompt: 'P', negative: 'N' }); // «auto» has no cues of its own
+  assert.equal(applyLook({ prompt: '', negative: '' }, 'ugc').negative, LOOK_NEGATIVE);
+  const long = applyLook({ prompt: 'x '.repeat(2000), negative: 'n'.repeat(900) }, 'life'); // a very long scene is cut, the cues always stay
+  assert.ok(long.prompt.length <= 2500 && long.prompt.endsWith('subtle film grain.') && long.negative.length <= 800);
+  // the maker's answer: an explicit look for every picture, «auto» by the key the maker named, «std» nothing
+  const answer = '{"creatives":[{"concept":"c1","ratio":"1:1","prompt":"Scene one","negative_prompt":"text","look":"macro"},{"concept":"c2","ratio":"1:1","prompt":"Scene two","negative_prompt":"text","look":"nonsense"}]}';
+  const concepts = [{ key: 'c1', name: 'One', ratios: ['1:1'], visual: 'v1' }, { key: 'c2', name: 'Two', ratios: ['1:1'], visual: 'v2' }];
+  const std = parseCreativeMaker(answer, concepts, '');
+  assert.deepEqual(std.creatives.map((c) => [c.prompt, c.negative_prompt, c.look]), [['Scene one', 'text', null], ['Scene two', 'text', null]]);
+  const fixed = parseCreativeMaker(answer, concepts, '', 'ugc');
+  assert.ok(fixed.creatives.every((c) => /Casual smartphone photo look/.test(c.prompt) && c.negative_prompt.endsWith(LOOK_NEGATIVE) && c.look === 'ugc')); // the task's look wins over what the model wrote in «look»
+  const auto = parseCreativeMaker(answer, concepts, '', 'auto');
+  assert.deepEqual(auto.creatives.map((c) => c.look), ['macro', null]); // the named look is used, an unknown one adds nothing
+  assert.match(auto.creatives[0].prompt, /^Scene one\. Macro product photograph/);
+  const fallback = parseCreativeMaker('{"creatives":[]}', [{ key: 'c1', name: 'One', ratios: ['1:1'], visual: 'a sofa' }], '', 'studio'); // an idea the model skipped still gets the look
+  assert.match(fallback.creatives[0].prompt, /^a sofa\. Clean studio product photograph/);
+  // what the maker is told
+  assert.match(lookBlock('auto').text, /studio: Студійний товар[\s\S]*"look" field of EVERY creative/);
+  assert.match(lookBlock('ugc').title, /UGC: фото на телефон/); assert.equal(lookBlock('std'), null); assert.equal(lookBlock('auto').text.includes('auto: Авто'), false); // the looks without cues are not offered
+  // the look lives in the brief of the task and survives the cleaning of the request
+  assert.equal(cleanRequest({ goal: 'Sale', ratios: ['1:1'], look: 'studio' }).brief.look, 'studio');
+  assert.equal('look' in cleanRequest({ goal: 'Sale', ratios: ['1:1'], look: 'std' }).brief, false);
+  assert.equal('look' in cleanRequest({ goal: 'Sale', ratios: ['1:1'], look: 'bogus' }).brief, false);
 });
 
 await ok('picture quality control (3.2): the checker looks at the FINISHED creative against the brand rules; a real problem returns it with the reasons, nothing is spent, a person decides', async () => {

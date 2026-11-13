@@ -7,6 +7,7 @@
 import { CREATIVE_PROMPTS } from './creativePrompts.js';
 import { isValidLanguage } from './languages.js';
 import { cleanManual, isEmptyManual } from './projectStyle.js';
+import { cleanLook } from '../creatives/realism.js';
 
 export const CREATIVE_TEAM = 'creative';
 
@@ -180,6 +181,8 @@ export function cleanRequest(input = {}) {
   };
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(input.scheduled_for || ''))) brief.scheduled_for = input.scheduled_for;
   if (/^r[a-z0-9]{1,20}$/.test(String(input.regular_id || ''))) brief.regular_id = input.regular_id; // which regular cycle made it
+  const look = cleanLook(input.look);
+  if (look) brief.look = look; // the realism look of THIS task (the cues added to every prompt for the pictures); absent = «std», nothing is added
   const style = cleanManual(input.style);
   if (!isEmptyManual(style)) brief.style = style; // the look of THIS task (words on the picture, tone of the pictures and of the copy): it wins over what the scout decided for the client
   const agentSettings = cleanAgentSettings(input.agent_settings);
