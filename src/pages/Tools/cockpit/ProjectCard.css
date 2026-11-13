@@ -406,3 +406,4 @@
 /* «Готовність до роботи»: a line that sends the person to the card of the project, where all the information is filled */
 .pcd-infolink { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
 .pcd-infolink p { margin: 0; flex: 1 1 320px; font-size: 14px; line-height: 1.5; color: var(--ck-sec); }
+.opv-head-acts { display: inline-flex; align-items: center; gap: 8px; }
