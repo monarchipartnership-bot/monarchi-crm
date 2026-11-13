@@ -62,6 +62,35 @@ export function computeWeeksForMonth(year, month) {
   return weeks.map((w, i) => ({ index: i + 1, start: w.start, end: w.end }));
 }
 
+// The weeks of the PROJECT reports: whole Monday-to-Sunday weeks, never cut at a month's edge. A week belongs to the month its Monday is in, so it may run
+// into the next month (30.11 - 06.12 is the last week of November); the days before a month's first Monday are the last week of the month before.
+// Numbered 1..N within the month. The monthly report is a different thing: it is always inside its month.
+export function reportWeeksForMonth(year, month) {
+  const lastDay = new Date(year, month, 0);
+  const first = new Date(year, month - 1, 1);
+  const start = new Date(first);
+  start.setDate(1 + ((1 - first.getDay() + 7) % 7)); // the first Monday of the month
+  const weeks = [];
+  while (start <= lastDay) {
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    weeks.push({ index: weeks.length + 1, start: new Date(start), end });
+    start.setDate(start.getDate() + 7);
+  }
+  return weeks;
+}
+
+// The year, month and number of the report week that starts on the Monday `mondayIso` (or that the date falls into).
+export function reportWeekPickerOf(dateIso) {
+  const [y, m, d] = dateIso.split('-').map(Number);
+  const day = new Date(y, m - 1, d);
+  day.setDate(day.getDate() - ((day.getDay() + 6) % 7)); // back to the Monday
+  const year = day.getFullYear();
+  const month = day.getMonth() + 1;
+  const index = reportWeeksForMonth(year, month).find((w) => w.start.getTime() === day.getTime())?.index || 1;
+  return { year, month, weekIndex: index };
+}
+
 // The week (from computeWeeksForMonth) that today falls into, or the first
 // week if today isn't in this month.
 export function defaultWeekIndexFor(weeks) {

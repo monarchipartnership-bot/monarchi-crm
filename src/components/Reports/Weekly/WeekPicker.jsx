@@ -1,11 +1,12 @@
-import { MONTH_NAMES, computeWeeksForMonth, fmtDate, yearOptions } from '../../../lib/dateHelpers';
+import { MONTH_NAMES, computeWeeksForMonth, fmtDate, reportWeeksForMonth, yearOptions } from '../../../lib/dateHelpers';
 import Select from '../../common/Select';
 
 // Year / Month / Week select trio. Weeks are Monday-start calendar weeks
 // clipped to the month, numbered 1..N within that month (see
 // computeWeeksForMonth) — matching the legacy Weekly Report picker.
-export default function WeekPicker({ year, month, weekIndex, onChange, extra, years }) {
-  const weeks = computeWeeksForMonth(year, month);
+// wholeWeeks (the weeks of a project's reports): whole Monday-to-Sunday weeks that start in the month, the last may run into the next one (reportWeeksForMonth).
+export default function WeekPicker({ year, month, weekIndex, onChange, extra, years, wholeWeeks = false }) {
+  const weeks = wholeWeeks ? reportWeeksForMonth(year, month) : computeWeeksForMonth(year, month);
   const yearList = years ?? yearOptions();
 
   return (

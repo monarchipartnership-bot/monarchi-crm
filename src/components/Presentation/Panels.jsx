@@ -4,7 +4,7 @@ import SlideView from './SlideView';
 import ActionIcon from '../common/ActionIcon';
 import { AlignButtons, ColorField, FontMenu, SizeField, StyleButtons, WeightSelect, keepFocus } from './TextControls';
 import { slideTitle } from './Filmstrip';
-import { MONTH_NAMES, computeWeeksForMonth, fmtDate, yearOptions } from '../../lib/dateHelpers';
+import { MONTH_NAMES, fmtDate, reportWeeksForMonth, yearOptions } from '../../lib/dateHelpers';
 import { FONT_BY_ID } from '../../lib/presentation/fonts';
 import { PLATFORMS, STYLES, sampleSlide, typeInfo, platformName } from '../../lib/presentation/deckModel';
 import { canHaveImage, tableInfo } from '../../lib/presentation/deckOps';
@@ -18,7 +18,7 @@ const STATUS = { draft: 'Чернетка', reviewed: 'Чернетка', rework
 
 // ----- Дані ---------------------------------------------------------------------------------
 export function DataPanel({ sel, setSel, period, report, reportState, platforms, deck, hasDeck, building, message, onBuild, onClient, onPeriod, onLang }) {
-  const weeks = computeWeeksForMonth(sel.year, sel.month);
+  const weeks = reportWeeksForMonth(sel.year, sel.month); // whole Monday-to-Sunday weeks, as in the project's reports
   const lang = deck?.meta.lang || sel.lang;
   return (
     <div className="pb-panel">

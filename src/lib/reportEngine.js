@@ -4,7 +4,7 @@
 // one made by hand. Pure code: no React, no browser, no Supabase. Anything that has to reach the
 // outside world (the ad platforms, the text writer) arrives as the `post(path, body)` argument;
 // the browser passes its signed-in call, the server its own.
-import { computeWeeksForMonth, isoDate } from './dateHelpers.js';
+import { isoDate, reportWeekPickerOf } from './dateHelpers.js';
 import {
   daysInRange, fetchProjectRange, lastCompletedWeek, periodFromPicker, precedingDays, previousPicker,
 } from './periodReport.js';
@@ -27,7 +27,7 @@ const fmt = (s) => s.split('-').reverse().join('.');
 
 // ----- Which period a scheduled run is due for ---------------------------------------------------
 // today: 'YYYY-MM-DD' in the team's own time zone (the server must not use its UTC clock for this).
-// Weekly → the latest report week that has already ended; monthly → the month before today's.
+// Weekly → the latest whole week (Monday to Sunday) that has already ended; monthly → the month before today's.
 export function dueReportPeriod(periodType, today) {
   let picker;
   if (periodType === 'monthly') {
@@ -36,16 +36,14 @@ export function dueReportPeriod(periodType, today) {
   } else {
     const week = lastCompletedWeek(today);
     if (!week) return null;
-    const [y, m] = week.start.split('-').map(Number);
-    const index = computeWeeksForMonth(y, m).find((w) => iso(w.start) === week.start)?.index || 1;
-    picker = { year: y, month: m, weekIndex: index };
+    picker = reportWeekPickerOf(week.start);
   }
   return { picker, period: periodFromPicker(periodType, picker) };
 }
 
 // ----- What the numbers are compared with ---------------------------------------------------------
 //   null                       no comparison
-//   { mode: 'calendar' }       the previous report period (previous week of the month / previous month)
+//   { mode: 'calendar' }       the previous report period (the week before / the previous month)
 //   { mode: 'days' }           the same number of days right before this period
 //   { mode: 'custom', from, to } any dates
 export function comparisonPeriod(periodType, picker, period, compare) {

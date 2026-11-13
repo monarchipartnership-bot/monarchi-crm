@@ -272,8 +272,10 @@ export function buildClientModel(payload) {
   const months = keys.map((key) => {
     const range = monthRange(key);
     const planned = monthWeeks(key);
-    const weeks = views.filter((v) => v.type === 'weekly' && monthKey(v.start) === key && v.end <= range.end).sort((a, b) => a.start.localeCompare(b.start))
-      .map((v, i) => ({ n: (planned.find((w) => w.start === v.start) || { n: i + 1 }).n, label: rangeText(v.start, v.end), view: v }));
+    const found = views.filter((v) => v.type === 'weekly' && monthKey(v.start) === key).sort((a, b) => a.start.localeCompare(b.start));
+    // numbered by the month's plan; a month that still holds an old week cut short at the month's start (not in the plan) is numbered in order instead, so no number repeats
+    const legacy = found.some((v) => !planned.some((w) => w.start === v.start));
+    const weeks = found.map((v, i) => ({ n: legacy ? i + 1 : planned.find((w) => w.start === v.start).n, label: rangeText(v.start, v.end), view: v }));
     const monthly = views.find((v) => v.type === 'monthly' && v.start === `${key}-01`) || null;
     const stamps = [...weeks.map((w) => w.view.updatedAt), monthly?.updatedAt].filter(Boolean).sort();
     return {

@@ -1,13 +1,13 @@
 // «Історія проекту»: the saved reports of a project grouped into month cards, and the approval flow of one report.
 // Pure functions (no database, no network), so scripts/check-core.mjs tests all of it.
 //
-// A month card holds the weekly reports of that month (weeks are cut at the month borders: Monday to Sunday, the first and the last
-// week short, see computeWeeksForMonth), the monthly report and anything else saved for the month. The «combined» document is a VIEW of
+// A month card holds the weekly reports of that month (whole Monday-to-Sunday weeks that start in the month; the last one may run into the next
+// month, see reportWeeksForMonth), the monthly report and anything else saved for the month. The «combined» document is a VIEW of
 // the card (the weeks one under another, then the month), it is not stored.
 //
 // A report is a draft (Чернетка: it is being worked on in «Робота над звітами»), in rework (Доробка: it was returned from the history) or final
 // (Затверджено: it is in the history and the client sees it). The old value «reviewed» (На затвердженні) is read as a draft.
-import { computeWeeksForMonth } from './dateHelpers.js';
+import { reportWeeksForMonth } from './dateHelpers.js';
 
 export const DRAFT = 'draft';
 export const REWORK = 'rework';
@@ -31,9 +31,9 @@ export const monthRange = (key) => {
 // (a person saving it would stop the agent renewing it).
 export const isRunning = (row, todayIso) => Boolean(row?.data?.toDate) && monthRange(monthKey(row.period_start)).end >= String(todayIso);
 
-// The weeks of a month, cut at its borders: [{ n, start, end }] with ISO dates.
+// The weeks of a month: whole Monday-to-Sunday weeks that start in it (the last one may run into the next month): [{ n, start, end }] with ISO dates.
 export function monthWeeks(key) {
-  return computeWeeksForMonth(Number(key.slice(0, 4)), Number(key.slice(5, 7))).map((w) => ({ n: w.index, start: ymd(w.start), end: ymd(w.end) }));
+  return reportWeeksForMonth(Number(key.slice(0, 4)), Number(key.slice(5, 7))).map((w) => ({ n: w.index, start: ymd(w.start), end: ymd(w.end) }));
 }
 
 const newest = (a, b) => (String(a.updated_at || '') >= String(b.updated_at || '') ? a : b);
@@ -48,8 +48,8 @@ export function buildMonths(rows, todayIso) {
     let monthly = null;
     const others = [];
     rows.filter((r) => monthKey(r.period_start) === key).forEach((r) => {
-      // a week belongs to the card when it starts on the card's week and does not run past the month (an old Monday-based week that spans two months stays among the others)
-      const week = r.period_type === 'weekly' && r.period_end <= range.end ? weeks.find((w) => w.start === r.period_start) : null;
+      // a week belongs to the card when it starts on the card's week (it may run into the next month); an old week cut short at the month's start stays among the others
+      const week = r.period_type === 'weekly' ? weeks.find((w) => w.start === r.period_start) : null;
       if (week) week.row = week.row ? newest(week.row, r) : r;
       else if (r.period_type === 'monthly' && r.period_start === `${key}-01`) {
         if (monthly) { const keep = newest(monthly, r); others.push(keep === monthly ? r : monthly); monthly = keep; } else monthly = r;

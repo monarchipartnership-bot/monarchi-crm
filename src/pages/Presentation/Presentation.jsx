@@ -15,7 +15,7 @@ import { fetchProjectById } from '../../lib/api/projects';
 import { fetchCustomMetrics, fetchReportColumns } from '../../lib/api/projectReportStore';
 import { cleanColumns } from '../../lib/platformColumns';
 import { periodFromPicker } from '../../lib/periodReport';
-import { computeWeeksForMonth, defaultWeekIndexFor, isoDate } from '../../lib/dateHelpers';
+import { reportWeekPickerOf, todayIso } from '../../lib/dateHelpers';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import '../../styles/presentationSlides.css';
@@ -23,18 +23,13 @@ import '../../styles/presentationBuilder.css';
 
 function initialSel(params) {
   const now = new Date();
-  let year = now.getFullYear();
-  let month = now.getMonth() + 1;
-  let weekIndex = defaultWeekIndexFor(computeWeeksForMonth(year, month));
+  let { year, month, weekIndex } = reportWeekPickerOf(todayIso()); // the week that is going on now
   const type = params.get('type');
   const periodType = type === 'monthly' ? 'monthly' : type === 'custom' ? 'custom' : 'weekly';
   const start = params.get('start');
   const end = params.get('end');
   if (/^\d{4}-\d{2}-\d{2}$/.test(start || '')) {
-    year = Number(start.slice(0, 4));
-    month = Number(start.slice(5, 7));
-    const weeks = computeWeeksForMonth(year, month);
-    weekIndex = weeks.find((w) => isoDate(w.start.getFullYear(), w.start.getMonth() + 1, w.start.getDate()) === start)?.index || 1;
+    if (periodType === 'monthly') { year = Number(start.slice(0, 4)); month = Number(start.slice(5, 7)); weekIndex = 1; } else ({ year, month, weekIndex } = reportWeekPickerOf(start));
   }
   return {
     projectId: params.get('project') || null, periodType, year, month, weekIndex,

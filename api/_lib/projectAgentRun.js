@@ -8,7 +8,7 @@
 // Everything outside (database, platforms, text writer) is handed in, so the whole run is tested without a network.
 import { buildDeckFromReport } from '../../src/lib/presentation/buildDeck.js';
 import { PLATFORMS } from '../../src/lib/presentation/deckModel.js';
-import { computeWeeksForMonth } from '../../src/lib/dateHelpers.js';
+import { reportWeeksForMonth } from '../../src/lib/dateHelpers.js';
 import { projectKind } from '../../src/lib/reportMetrics.js';
 import { accountPlatforms, accountsForTab } from '../../src/lib/reportScope.js';
 import { cleanColumns } from '../../src/lib/platformColumns.js';
@@ -116,14 +116,8 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     kept.forEach((k) => notes.push(`${scopeName(k.scope)}: звіт ${k.why}, агент його не змінив.`));
 
     // 1. The numbers (and the previous period for the comparison): once per report type among the platforms that are reported.
-    let compare = { mode: 'calendar' };
-    let prev = comparisonPeriod(periodType, picker, period, compare);
-    // The weeks of a calendar month are cut at the month's edge: the week before the 2nd of November is just the 1st. A full week is then compared with the 7 days before it, not with a stub.
-    if (periodType === 'weekly' && comparisonInfo(period, prev).unequal) {
-      compare = { mode: 'days' };
-      prev = comparisonPeriod(periodType, picker, period, compare);
-      notes.push('Попередній календарний тиждень коротший за цей: порівняння з попередніми 7 днями.');
-    }
+    const compare = { mode: 'calendar' };
+    const prev = comparisonPeriod(periodType, picker, period, compare);
     const info = comparisonInfo(period, prev);
     const pulled = {};
     const errors = {};
@@ -185,7 +179,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
           let result = null;
           if (periodType === 'monthly') {
             const weeklyRows = await repo.getReports(projectId, 'weekly', scope);
-            result = await buildWhatWasDone({ source: 'weeks', periodType, period, accounts: scopeAccounts, projectName: project.name, note: config.note, weeklyRows, expectedWeeks: computeWeeksForMonth(picker.year, picker.month).length, post });
+            result = await buildWhatWasDone({ source: 'weeks', periodType, period, accounts: scopeAccounts, projectName: project.name, note: config.note, weeklyRows, expectedWeeks: reportWeeksForMonth(picker.year, picker.month).length, post });
           }
           if (!result || result.empty) result = await buildWhatWasDone({ source: 'history', periodType, period, accounts: scopeAccounts, projectName: project.name, note: config.note, post });
           whatWasDone = result.text || '';

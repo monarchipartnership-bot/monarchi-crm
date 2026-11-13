@@ -1,6 +1,6 @@
 import { authedPost } from './adAccounts.js';
 import { BASE_FIELDS, METRICS, computeMetric, metricMeta, deltaPct, deltaTone, sumBase } from './reportMetrics.js';
-import { computeWeeksForMonth, daysInMonth, isoDate, MONTH_NAMES } from './dateHelpers.js';
+import { daysInMonth, isoDate, MONTH_NAMES, reportWeeksForMonth } from './dateHelpers.js';
 import { buildColumns, groupMatches, groupsForPlatform } from './campaignGroups.js';
 import { pickCounts } from './platformColumns.js';
 
@@ -8,9 +8,15 @@ const iso = (d) => isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 const ZERO = Object.fromEntries(BASE_FIELDS.map((f) => [f, 0]));
 
 // ----- Periods ---------------------------------------------------------------
-// Weekly = a Monday-start week clipped to its month, numbered within the month
-// (the same weeks the report pickers and the managers' sheets use). Monthly = a
-// whole calendar month.
+// Weekly = a whole Monday-to-Sunday week (it may run into the next month; it belongs to the month of its Monday, numbered within that month, see
+// reportWeeksForMonth). Monthly = a whole calendar month, always inside it.
+
+// «02.11 – 08.11.2026», or with both years when the week runs over New Year
+export function weekRangeLabel(start, end) {
+  const [sy, sm, sd] = start.split('-');
+  const [ey, em, ed] = end.split('-');
+  return sy === ey ? `${sd}.${sm} – ${ed}.${em}.${ey}` : `${sd}.${sm}.${sy} – ${ed}.${em}.${ey}`;
+}
 
 // picker: { year, month, weekIndex }
 export function periodFromPicker(periodType, picker) {
@@ -18,9 +24,9 @@ export function periodFromPicker(periodType, picker) {
   if (periodType === 'monthly') {
     return { start: isoDate(year, month, 1), end: isoDate(year, month, daysInMonth(year, month)), label: `${MONTH_NAMES[month - 1]} ${year}` };
   }
-  const weeks = computeWeeksForMonth(year, month);
+  const weeks = reportWeeksForMonth(year, month);
   const w = weeks.find((x) => x.index === picker.weekIndex) || weeks[0];
-  return { start: iso(w.start), end: iso(w.end), label: `Тиждень ${w.index} · ${MONTH_NAMES[month - 1]} ${year}` };
+  return { start: iso(w.start), end: iso(w.end), label: weekRangeLabel(iso(w.start), iso(w.end)) };
 }
 
 // The period right before the picked one (for the comparison column).
@@ -29,8 +35,7 @@ export function previousPicker(periodType, picker) {
   const prevMonth = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
   if (periodType === 'monthly') return prevMonth;
   if (picker.weekIndex > 1) return { year, month, weekIndex: picker.weekIndex - 1 };
-  const weeks = computeWeeksForMonth(prevMonth.year, prevMonth.month);
-  return { ...prevMonth, weekIndex: weeks.length };
+  return { ...prevMonth, weekIndex: reportWeeksForMonth(prevMonth.year, prevMonth.month).length };
 }
 
 // ----- Fetching --------------------------------------------------------------
@@ -191,15 +196,11 @@ export function precedingDays(startIso, days) {
   return { start: f(start), end: f(end) };
 }
 
-// The latest report week (Monday-start, clipped to its month) that has already
-// ended by `todayIso` — what a weekly report is due for.
+// The latest whole week (Monday to Sunday) that has already ended by `todayIso`: what a weekly report is due for.
 export function lastCompletedWeek(todayIso) {
-  const [y, m] = todayIso.split('-').map(Number);
-  const pick = (year, month) => computeWeeksForMonth(year, month)
-    .map((w) => ({ start: iso(w.start), end: iso(w.end) }))
-    .filter((w) => w.end < todayIso);
-  const here = pick(y, m);
-  if (here.length) return here[here.length - 1];
-  const prev = m === 1 ? pick(y - 1, 12) : pick(y, m - 1);
-  return prev[prev.length - 1];
+  const [y, m, d] = todayIso.split('-').map(Number);
+  const today = new Date(Date.UTC(y, m - 1, d));
+  const monday = new Date(today.getTime() - ((today.getUTCDay() + 6) % 7) * 86400000); // this week's Monday
+  const f = (t) => new Date(t).toISOString().slice(0, 10);
+  return { start: f(monday.getTime() - 7 * 86400000), end: f(monday.getTime() - 86400000) };
 }

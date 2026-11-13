@@ -19,7 +19,7 @@ import { metricKeys } from '../../../lib/clientReport';
 import { platformInfo } from '../../../lib/adAccounts';
 import { missingColumns } from '../../../lib/platformColumns';
 import { metricMeta } from '../../../lib/reportMetrics';
-import { MONTH_NAMES, computeWeeksForMonth, defaultWeekIndexFor, todayIso, yearOptions } from '../../../lib/dateHelpers';
+import { MONTH_NAMES, reportWeekPickerOf, reportWeeksForMonth, todayIso, yearOptions } from '../../../lib/dateHelpers';
 import { useAuth } from '../../../contexts/AuthContext';
 import '../../../styles/projectReports.css';
 import Select from '../../common/Select';
@@ -40,10 +40,7 @@ const ChIcon = ({ n }) => <svg className="ch-ic" viewBox="0 0 24 24" aria-hidden
 const ChMedal = ({ n }) => <span className="hub-ring ch-md" aria-hidden="true"><span className="hub-tile hub-tile--ln"><svg viewBox="0 0 24 24">{CH_ICONS[n]}</svg></span></span>;
 
 function initialPicker() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  return { year, month, weekIndex: defaultWeekIndexFor(computeWeeksForMonth(year, month)) };
+  return reportWeekPickerOf(todayIso()); // the week that is going on now
 }
 
 // «Тижневий звіт» / «Місячний звіт»: pick the period, pull the numbers from the
@@ -174,7 +171,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   async function changePicker(next) {
     if (dirty && !(await confirm({ title: 'Незбережені зміни', body: 'Є незбережені зміни в цьому звіті. Перейти до іншого періоду без збереження?', confirmLabel: 'Перейти без збереження', cancelLabel: 'Залишитись' }))) return;
     if (periodType === 'weekly') {
-      const dim = computeWeeksForMonth(next.year, next.month).length;
+      const dim = reportWeeksForMonth(next.year, next.month).length;
       setPicker({ year: next.year, month: next.month, weekIndex: Math.min(next.weekIndex || 1, dim) });
     } else {
       setPicker({ year: next.year, month: next.month, weekIndex: 1 });
@@ -300,9 +297,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
   function openSaved(row) {
     const [y, m] = row.period_start.split('-').map(Number);
     if (periodType === 'monthly') { changePicker({ year: y, month: m, weekIndex: 1 }); return; }
-    const weeks = computeWeeksForMonth(y, m);
-    const idx = weeks.find((w) => `${w.start.getFullYear()}-${String(w.start.getMonth() + 1).padStart(2, '0')}-${String(w.start.getDate()).padStart(2, '0')}` === row.period_start)?.index || 1;
-    changePicker({ year: y, month: m, weekIndex: idx });
+    changePicker(reportWeekPickerOf(row.period_start));
   }
 
   // "What was done" from the accounts' change history (weekly) or from the month's weekly lists (monthly).
@@ -315,7 +310,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
       const weeklyRows = kind === 'weeks' ? await fetchProjectReports(projectId, 'weekly', ctx.scope) : [];
       const result = await buildWhatWasDone({
         source: kind === 'weeks' ? 'weeks' : 'history', periodType, period, accounts: ctx.accounts, projectName: ctx.project.name, note,
-        weeklyRows, expectedWeeks: computeWeeksForMonth(picker.year, picker.month).length,
+        weeklyRows, expectedWeeks: reportWeeksForMonth(picker.year, picker.month).length,
       });
       if (result.empty) { setWork({ ...result.info, empty: result.empty }); return; }
       setSections((s) => ({ ...s, whatWasDone: result.text }));
@@ -346,7 +341,7 @@ export default function PeriodReport({ projectId, periodType, platform = 'total'
         <div className="ch-pcols">
           <div className="ch-pl">
             {periodType === 'weekly' ? (
-              <WeekPicker year={picker.year} month={picker.month} weekIndex={picker.weekIndex} onChange={changePicker} years={yearOptions()} />
+              <WeekPicker year={picker.year} month={picker.month} weekIndex={picker.weekIndex} onChange={changePicker} years={yearOptions()} wholeWeeks />
             ) : (
               <div className="picker">
                 <div className="pk-field">

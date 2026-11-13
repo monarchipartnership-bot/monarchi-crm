@@ -108,7 +108,8 @@ import { botInfo, escapeHtml, peopleFromUpdate, sendMessage as tgSend, webhookSe
 import { DEFAULT_TEMPLATE, mentionOf, renderMessage, safeTemplate } from '../src/lib/siteLeadMessage.js';
 import { buildSnippet } from '../src/lib/siteLeadSnippet.js';
 import { campaignKey as gKey, buildColumns, campaignsOutsideGroups, filterCampaigns, flatCampaigns, groupCampaignKeys, groupMatches, mergeCampaigns, scopeToGroup, selectedCampaignNames } from '../src/lib/campaignGroups.js';
-import { groupCampaigns } from '../src/lib/periodReport.js';
+import { groupCampaigns, periodFromPicker } from '../src/lib/periodReport.js';
+import { isoDate, reportWeekPickerOf, reportWeeksForMonth } from '../src/lib/dateHelpers.js';
 import { accountPlatforms, accountsForTab, collapseStatuses, flatten, pickReportRow, reportScope } from '../src/lib/reportScope.js';
 import { groupsForPlatform } from '../src/lib/campaignGroups.js';
 import { META_METRICS, META_METRIC_LIST, cleanColumns, countsFor, extractCounts, insightFieldsFor, pickCounts } from '../src/lib/metaColumns.js';
@@ -143,14 +144,40 @@ const post = async (path, body) => {
 };
 const accounts = [{ platform: 'meta', account_id: '123', currency: 'USD', account_name: 'Test' }];
 
-await ok('due weekly period (Thursday 8 Oct 2026 → week 1 of October, 1–4 Oct)', () => {
+await ok('due weekly period (Thursday 8 Oct 2026 → the whole week 28 Sep – 4 Oct, which belongs to September: its Monday is there)', () => {
   const due = dueReportPeriod('weekly', '2026-10-08');
-  assert.deepEqual([due.period.start, due.period.end], ['2026-10-01', '2026-10-04']);
-  assert.deepEqual(due.picker, { year: 2026, month: 10, weekIndex: 1 });
+  assert.deepEqual([due.period.start, due.period.end], ['2026-09-28', '2026-10-04']);
+  assert.deepEqual(due.picker, { year: 2026, month: 9, weekIndex: 4 });
+  assert.equal(due.period.label, '28.09 – 04.10.2026');
 });
-await ok('due weekly period on a month edge (report weeks are clipped to their month: Sun 1 Nov 2026 is its own one-day week)', () => {
-  assert.deepEqual([dueReportPeriod('weekly', '2026-11-02').period.start, dueReportPeriod('weekly', '2026-11-02').period.end], ['2026-11-01', '2026-11-01']);
-  assert.deepEqual([dueReportPeriod('weekly', '2026-11-09').period.start, dueReportPeriod('weekly', '2026-11-09').period.end], ['2026-11-02', '2026-11-08']);
+await ok('due weekly period on a month edge: weeks are whole Monday-to-Sunday, never a one-day stub (13.11 owner rule)', () => {
+  const week = (today) => { const d = dueReportPeriod('weekly', today); return [d.period.start, d.period.end]; };
+  assert.deepEqual(week('2026-11-02'), ['2026-10-26', '2026-11-01']); // Monday 2 Nov: the week before, across the month edge
+  assert.deepEqual(week('2026-11-01'), ['2026-10-19', '2026-10-25']); // Sunday: that week is not over yet
+  assert.deepEqual(week('2026-11-09'), ['2026-11-02', '2026-11-08']);
+  assert.deepEqual(week('2027-01-05'), ['2026-12-28', '2027-01-03']); // over the New Year
+  assert.equal(dueReportPeriod('weekly', '2027-01-05').period.label, '28.12.2026 – 03.01.2027');
+  assert.deepEqual(dueReportPeriod('weekly', '2027-01-05').picker, { year: 2026, month: 12, weekIndex: 4 });
+  // the week before a week is always as long as it: the comparison is never with a stub
+  ['2026-11-02', '2026-11-09', '2026-12-01', '2027-01-05', '2026-10-08'].forEach((today) => {
+    const { picker, period } = dueReportPeriod('weekly', today);
+    const prev = comparisonPeriod('weekly', picker, period, { mode: 'calendar' });
+    assert.equal(comparisonInfo(period, prev).unequal, false);
+    assert.equal(comparisonInfo(period, prev).daysCur, 7);
+  });
+});
+await ok('report weeks of a month: whole weeks that start in it, the days before the first Monday are the last week of the month before', () => {
+  const list = (y, m) => reportWeeksForMonth(y, m).map((w) => [w.index, isoDate(w.start.getFullYear(), w.start.getMonth() + 1, w.start.getDate()), isoDate(w.end.getFullYear(), w.end.getMonth() + 1, w.end.getDate())]);
+  assert.deepEqual(list(2026, 11), [[1, '2026-11-02', '2026-11-08'], [2, '2026-11-09', '2026-11-15'], [3, '2026-11-16', '2026-11-22'], [4, '2026-11-23', '2026-11-29'], [5, '2026-11-30', '2026-12-06']]);
+  assert.deepEqual(list(2026, 8).at(-1), [5, '2026-08-31', '2026-09-06']);
+  assert.deepEqual(reportWeekPickerOf('2026-12-03'), { year: 2026, month: 11, weekIndex: 5 }); // a Thursday: its Monday is 30 Nov
+  assert.deepEqual(reportWeekPickerOf('2026-11-01'), { year: 2026, month: 10, weekIndex: 4 });
+  // every day of a year is in exactly one report week
+  const seen = new Map();
+  for (let m = 1; m <= 12; m += 1) reportWeeksForMonth(2026, m).forEach((w) => { const k = w.start.getTime(); seen.set(k, (seen.get(k) || 0) + 1); });
+  assert.ok([...seen.values()].every((n) => n === 1));
+  // the month's own report is a month, never longer
+  assert.deepEqual([periodFromPicker('monthly', { year: 2026, month: 11 }).start, periodFromPicker('monthly', { year: 2026, month: 11 }).end], ['2026-11-01', '2026-11-30']);
 });
 await ok('due monthly period (January → previous December)', () => {
   const due = dueReportPeriod('monthly', '2027-01-05');
@@ -461,18 +488,16 @@ await ok('meta columns: only picked columns are shown, and only they can be used
   assert.ok(META_METRIC_LIST.every((m) => META_METRICS[m.key] === m && m.label && m.en && ['number', 'money', 'percent', 'ratio'].includes(m.format)));
   assert.equal(new Set(META_METRIC_LIST.map((m) => m.key)).size, META_METRIC_LIST.length);
 });
-await ok('agent run: a full week after a month-edge stub is compared with the 7 days before it, not with the one-day stub (13.11: 02-08 Nov vs 1 Nov)', async () => {
-  const stub = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] });
-  const r = await runProjectReport({ repo: stub, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-11-13' });
+await ok('agent run: a week across a month edge is whole and is compared with the whole week before it (13.11 owner rule: no one-day weeks)', async () => {
+  const across = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] });
+  const r = await runProjectReport({ repo: across, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-11-02' });
   assert.equal(r.status, 'ok');
-  const d = stub.log.reports[0].data;
-  assert.equal(d.compare.mode, 'days');
-  assert.deepEqual(d.previous.period, { start: '2026-10-26', end: '2026-11-01' });
+  const d = across.log.reports[0].data;
+  assert.deepEqual([across.log.reports[0].period_start, across.log.reports[0].period_end], ['2026-10-26', '2026-11-01']);
+  assert.equal(d.compare.mode, 'calendar');
   assert.equal(d.compare.unequal, false);
-  assert.ok(r.notes.some((n) => /попередніми 7 днями/.test(n)));
-  const normal = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] }); // two full weeks: the calendar week before is used as before
-  await runProjectReport({ repo: normal, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-11-17' });
-  assert.equal(normal.log.reports[0].data.compare.mode, 'calendar');
+  assert.deepEqual(d.previous.period, { start: '2026-10-19', end: '2026-10-25' });
+  assert.equal(r.notes.some((n) => /різної тривалості/.test(n)), false);
 });
 await ok('agent run: the extra columns picked for the project are asked of the platform', async () => {
   const seen = [];
@@ -912,9 +937,9 @@ await ok('pagespeed: the analyst run measures speed when a key is set, saves it 
   assert.equal(noKey.status, 'done');
   assert.equal(tables.smm_site_stats[1].data.extras.speed.configured, false);
 });
-await ok('project history: weeks are cut at the month borders (Monday to Sunday, the first and the last short)', () => {
-  assert.deepEqual(monthWeeks('2026-09').map((w) => [w.n, w.start, w.end]), [[1, '2026-09-01', '2026-09-06'], [2, '2026-09-07', '2026-09-13'], [3, '2026-09-14', '2026-09-20'], [4, '2026-09-21', '2026-09-27'], [5, '2026-09-28', '2026-09-30']]);
-  assert.deepEqual(monthWeeks('2026-10').map((w) => [w.start, w.end]), [['2026-10-01', '2026-10-04'], ['2026-10-05', '2026-10-11'], ['2026-10-12', '2026-10-18'], ['2026-10-19', '2026-10-25'], ['2026-10-26', '2026-10-31']]);
+await ok('project history: the weeks of a month are whole Monday-to-Sunday weeks that start in it (the last may run into the next month)', () => {
+  assert.deepEqual(monthWeeks('2026-09').map((w) => [w.n, w.start, w.end]), [[1, '2026-09-07', '2026-09-13'], [2, '2026-09-14', '2026-09-20'], [3, '2026-09-21', '2026-09-27'], [4, '2026-09-28', '2026-10-04']]);
+  assert.deepEqual(monthWeeks('2026-10').map((w) => [w.start, w.end]), [['2026-10-05', '2026-10-11'], ['2026-10-12', '2026-10-18'], ['2026-10-19', '2026-10-25'], ['2026-10-26', '2026-11-01']]);
   assert.equal(monthLabel('2026-09'), 'Вересень 2026');
 });
 await ok('project history: reports are grouped into month cards, the current month is always there, strays are kept apart', () => {
@@ -923,14 +948,14 @@ await ok('project history: reports are grouped into month cards, the current mon
   const months = buildMonths(rows, '2026-10-21');
   assert.deepEqual(months.map((m) => m.key), ['2026-10', '2026-09', '2026-08']); // newest first, October is there with nothing in it
   const sep = months[1];
-  assert.deepEqual([sep.counts.approved, sep.counts.rework, sep.counts.missing, sep.counts.total], [1, 1, 3, 5]);
-  assert.equal(sep.weeks[0].row.id, 1);
+  assert.deepEqual([sep.counts.approved, sep.counts.rework, sep.counts.missing, sep.counts.total], [0, 1, 3, 4]);
+  assert.equal(sep.weeks[0].row.id, 2);
   assert.equal(sep.monthly.id, 3);
-  assert.deepEqual(sep.others.map((o) => o.id), [5]); // a custom period is kept, not lost
-  assert.equal(months[2].others[0].id, 4); // an old Monday-based week belongs to the month it starts in
+  assert.deepEqual(sep.others.map((o) => o.id), [1, 5]); // a custom period and an old short week (1-6 Sep) are kept, not lost
+  assert.equal(months[2].weeks.at(-1).row.id, 4); // the whole week 31 Aug - 6 Sep belongs to the month it starts in, and is the last week of August
   assert.equal(sep.complete, false);
-  assert.equal(months[0].counts.missing, 5);
-  const all = [1, 2, 3, 4, 5].map((n, i) => r(10 + n, 'weekly', monthWeeks('2026-09')[i].start, monthWeeks('2026-09')[i].end, 'final'));
+  assert.equal(months[0].counts.missing, 4);
+  const all = [1, 2, 3, 4].map((n, i) => r(10 + n, 'weekly', monthWeeks('2026-09')[i].start, monthWeeks('2026-09')[i].end, 'final'));
   const done = buildMonths([...all, r(20, 'monthly', '2026-09-01', '2026-09-30', 'final')], '2026-10-21').find((m) => m.key === '2026-09');
   assert.equal(done.complete, true);
 });
@@ -1280,7 +1305,7 @@ await ok('tick: two jobs of one project never run at once, and a pass stops star
   await runDueAgents({ repo, now: NOW, batch: 4, runFor: async (job) => { active += 1; if (active > 1 && order.length && order[order.length - 1].projectId === job.projectId) overlap += 1; order.push(job); await new Promise((r) => setTimeout(r, 5)); active -= 1; return { status: 'ok' }; } });
   assert.ok(order.length >= 2); assert.equal(overlap, 0);
   let t = 0; const started = [];
-  const r = await runDueAgents({ repo, now: NOW, batch: 4, budgetMs: 100, clock: () => (t += 60), runFor: async (job) => { started.push(job); return { status: 'ok' }; } });
+  const r = await runDueAgents({ repo, now: NOW, batch: 4, budgetMs: 50, clock: () => (t += 60), runFor: async (job) => { started.push(job); return { status: 'ok' }; } });
   assert.ok(started.length < 4 && r.waiting > 0, 'the rest wait for the next tick');
 });
 await ok('notices: a ready report tells the confirming people and the ones chosen for notices, a problem only the chosen', () => {
@@ -1297,16 +1322,16 @@ await ok('tick: starts due reports with the scheduled day as their date, a few p
   const repo = { listEnabledAgents: async () => agents, getRecentRuns: async () => [] };
   const r = await runDueAgents({ repo, now: NOW, batch: 4, runFor: async (job) => { started.push(job); return { status: 'ok', message: 'done' }; } });
   assert.equal(r.checked, 5);
-  assert.equal(r.due, 10); // each project: the week 1-4 Oct (Monday 5 Oct) and the week 28-30 Sep that ended with the month (the 1st)
+  assert.equal(r.due, 5); // each project: the whole week 28 Sep - 4 Oct, on its Monday 5 Oct (no extra run on the 1st: weeks are never cut at the month)
   assert.equal(r.started.length, 4);
-  assert.equal(r.waiting, 6);
-  assert.ok(started.every((j) => j.periodType === 'weekly' && ['2026-10-05', '2026-10-01'].includes(j.scheduledFor)));
-  // the week that ends mid-week with the month is reported on the 1st, once, and is not asked again when it is done
+  assert.equal(r.waiting, 1);
+  assert.ok(started.every((j) => j.periodType === 'weekly' && j.scheduledFor === '2026-10-05'));
+  // a week is reported once and is not asked again when it is done
   const one = { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [] };
   const jobs = [];
   await runDueAgents({ repo: one, now: NOW, batch: 10, runFor: async (job) => { jobs.push([job.scheduledFor, job.periodStart]); return { status: 'ok' }; } });
-  assert.deepEqual(jobs.sort(), [['2026-10-01', '2026-09-28'], ['2026-10-05', '2026-10-01']]);
-  const done = { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [{ status: 'ok', period_start: '2026-09-28' }, { status: 'ok', period_start: '2026-10-01' }] };
+  assert.deepEqual(jobs.sort(), [['2026-10-05', '2026-09-28']]);
+  const done = { listEnabledAgents: async () => [agents[0]], getRecentRuns: async () => [{ status: 'ok', period_start: '2026-09-28' }] };
   assert.equal((await runDueAgents({ repo: done, now: NOW, runFor: async () => { throw new Error('must not run'); } })).due, 0);
   const none = await runDueAgents({ repo: { listEnabledAgents: async () => [], getRecentRuns: async () => [] }, now: NOW, runFor: async () => { throw new Error('must not run'); } });
   assert.deepEqual([none.checked, none.due, none.started.length], [0, 0, 0]);
@@ -3920,11 +3945,11 @@ await ok('client model: months in order, weeks numbered by the month plan, the r
   };
   const m = buildClientModel(payload);
   assert.deepEqual(m.months.map((x) => x.key), ['2026-09', '2026-10']);
-  assert.deepEqual(m.months[0].weeks.map((w) => [w.n, w.label]), [[1, '01.09 – 06.09'], [2, '07.09 – 13.09']]); // sorted, numbered by the plan of the month
-  assert.equal(m.months[0].weeksTotal, 5);
+  assert.deepEqual(m.months[0].weeks.map((w) => [w.n, w.label]), [[1, '01.09 – 06.09'], [2, '07.09 – 13.09']]); // sorted; the old short week 1-6 Sep is not in the plan, so the month is numbered in order
+  assert.equal(m.months[0].weeksTotal, 4);
   assert.equal(m.months[0].running, false);
   assert.equal(m.months[1].running, true); // the month to date: «draft» in the database, but the client never sees a status for it
-  assert.equal(m.months[1].weeks[0].n, 2); // 5–11 Oct is the second week of October
+  assert.equal(m.months[1].weeks[0].n, 1); // 5–11 Oct is the first whole week of October (the 1st-4th belong to the last week of September)
   assert.deepEqual(m.history.map((h) => [h.key, h.partial]), [['2026-09', false], ['2026-10', true]]);
   assert.equal(m.history[0].roas, 4); // 600 / 150
   assert.equal(m.asOf, '2026-10-12');
