@@ -7,8 +7,8 @@ import { FILE_TYPES, MAX_FILE_MB } from '../../../lib/api/creatives';
 import { supabase } from '../../../lib/supabaseClient';
 import { analyzeBrand, deleteAsset, fetchProjectCreative, importMetaExamples, saveInput, saveSettings, uploadAsset } from '../../../lib/api/projectCreative';
 import { ASSET_GROUPS, CTA_MAX_VARIANTS, CTA_MODES, FRESH_DAYS, addCtaVariant, addLink, ctaVariants, inputState, parseLinks, removeCtaVariant, removeLink, sectionFields } from '../../../lib/agents/projectCreative';
-import { agentsNeeding, filledFields, readinessByMode } from '../../../lib/agents/agentRequirements';
-import { MODES, MODE_ORDER } from '../../../lib/agents/campaignModes';
+import { agentsNeeding, filledFields } from '../../../lib/agents/agentRequirements';
+import { TEAMS, teamReadiness } from '../../../lib/agents/teams';
 import { HubTitle } from '../hubIcons';
 import { STATUS_LABEL } from '../../../lib/projectConstants';
 import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
@@ -181,8 +181,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
   if (!data) return <div className="pcr-wrap"><div className="empty-hint">Завантаження…</div></div>;
   const settings = data.settings;
   const have = filledFields({ settings, assets: data.assets, accounts });
-  const platforms = [...new Set(accounts.map((a) => a.platform).filter((p) => p === 'meta' || p === 'google'))];
-  const ready = readinessByMode(have, platforms);
+  const ready = Object.fromEntries(TEAMS.map((t) => [t.key, teamReadiness(t.key, { settings, assets: data.assets, accounts, project: crm })]));
 
   // one row of a field: its name, who fills it, the value (or the hint), the state and the button
   const renderRows = (fields, whoOf, extra = null) => fields.map((f) => {
@@ -228,7 +227,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
 
   const facts = crmFacts(crm);
   const tabs = showDeliverables ? [...TABS, ['materials', 'Готові матеріали']] : TABS;
-  const missing = MODE_ORDER.filter((m) => ready[m].required.length).length;
+  const missing = TEAMS.filter((t) => ready[t.key].required.length).length;
   return (
     <div className="pcr-wrap">
       {!section && <div className="pcr-tabs" role="tablist" aria-label="Розділи інформації">
@@ -242,16 +241,16 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
         <div className="pcr-head">
           <div>
             <HubTitle icon="users">Готовність до операцій</HubTitle>
-            <p className="pcr-sub">Чого агентам ще не вистачає, щоб операція кожного типу працювала як слід. Обовʼязкове без якого агент не зробить нічого корисного, бажане покращує результат.{crmLink ? ' Заповнюється все в картці проєкту, у розділі «Інформація про проєкт».' : ''}</p>
+            <p className="pcr-sub">Чого агентам ще не вистачає, щоб кожна команда запуску працювала як слід. Обовʼязкове без якого агент не зробить нічого корисного, бажане покращує результат.{crmLink ? ' Заповнюється все в картці проєкту, у розділі «Інформація про проєкт».' : ''}</p>
           </div>
         </div>
         <ul className="pcr-ready">
-          {MODE_ORDER.map((mode) => {
-            const m = ready[mode];
+          {TEAMS.map((team) => {
+            const m = ready[team.key];
             const state = m.required.length ? 'bad' : m.recommended.length ? 'warn' : 'ok';
             return (
-              <li key={mode} className={'pcr-ready-row is-' + state}>
-                <b>{MODES[mode].title}</b>
+              <li key={team.key} className={'pcr-ready-row is-' + state}>
+                <b>{team.title}</b>
                 <span className={'pcr-state is-' + (state === 'ok' ? 'ok' : state === 'warn' ? 'old' : 'wait')}>{state === 'ok' ? 'Усе є' : state === 'warn' ? 'Є бажане' : 'Бракує обовʼязкового'}</span>
                 <span className="pcr-ready-text">
                   {m.required.length > 0 && <>Обовʼязкове: {m.required.map((x) => x.label).join(', ')}. </>}

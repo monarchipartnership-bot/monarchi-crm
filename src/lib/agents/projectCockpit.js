@@ -17,7 +17,7 @@ export const STAGES = [
   { key: 'quality', label: 'Контроль якості', role: 'creative_quality' },
   { key: 'you', label: 'Ви', role: null },
 ];
-const MODE_LABEL = { creative: 'Тільки креативи', full: 'Повна операція', strategy: 'Тільки стратегія', ads: 'Аналіз і оптимізація', report: 'Тільки звіт' };
+const MODE_LABEL = { creative: 'Креативи', ads: 'Аналітика й оптимізація', full: 'Операція' };
 export const REQUEST_STATUS_LABEL = { draft: 'Чернетка', running: 'Працює', review: 'На перегляд', approved: 'Затверджено', problem: 'Проблема', paused: 'На паузі', waiting: 'Чекає вашої відповіді' };
 const DB_STATUS = { done: 'approved' }; // the database says «done», the screens say «approved»
 const STALE_REQUEST_DAYS = 14; // an open request nobody touched for this long is history
@@ -28,7 +28,7 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const round = (n) => Math.round(n * 10000) / 10000;
 const at = (v) => { const t = new Date(v).getTime(); return Number.isNaN(t) ? 0 : t; };
 
-export const modeLabelOf = (campaign) => MODE_LABEL[campaign?.config?.mode] || (campaign?.config?.mode ? campaign.config.mode : 'Повна операція');
+export const modeLabelOf = (campaign) => MODE_LABEL[campaign?.config?.mode] || (campaign?.config?.mode ? campaign.config.mode : 'Операція');
 
 // notes of the agents are numbered («1) …  2) …» or «1. …  2. …»): every point is one question to the person; a note without numbers is one point
 export function splitNotes(text) {

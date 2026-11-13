@@ -15,7 +15,6 @@
 //   POST { action: 'site_speed' }                    Google PageSpeed of the site's front page (phone and computer, 10-30 s)
 //   POST { action: 'site_overview' }                 the website analyst's main page: is GA4 / Search Console connected, and the live figures
 //   POST { action: 'set_agent_schedule' | 'set_agent_mode' | 'add_instruction' | 'remove_instruction' | 'edit_output' }  the manager's control over a campaign while it works
-//   POST { action: 'estimate_inputs' }               the numbers of the pre-launch estimate: the price of one picture at Higgsfield and the average run of each agent
 //   POST { action: 'poll_assets' }                   look at the pictures/videos being generated; { action: 'redo_visual', postId, note? }; { action: 'status' }
 // A person acts with their own session (row-level security applies); the cron signs in as the agent user. The model key stays on the server.
 import { createClient } from '@supabase/supabase-js';
@@ -28,7 +27,6 @@ import { cancelRequest, reviseStep, startIntel, startRequest } from './_lib/crea
 import { applyText, saveTextEdit, textInfo } from './_lib/creativeText.js';
 import { queueInspection } from './_lib/creativeEngine.js';
 import { answerQuestion, pauseRequest, resumeRequest } from './_lib/creativeHold.js';
-import { estimateInputs } from './_lib/estimateInputs.js';
 import { auditAfter, checkRights } from './_lib/agentAudit.js';
 import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { siteOverview } from './_lib/googleSiteData.js';
@@ -106,7 +104,6 @@ export default async function handler(req, res) {
     else if (action === 'remove_instruction') out = await removeInstruction(ctx, Number(body.campaignId), String(body.at || ''));
     else if (action === 'revise_step') out = await reviseStep(ctx, Number(body.taskId), body.comment); // the person tells what to change in a step: the agent makes it again, the agents below follow
     else if (action === 'edit_output') out = await editOutput(ctx, Number(body.taskId), body.text); // the person corrects a result before the next agents read it
-    else if (action === 'estimate_inputs') out = await estimateInputs(ctx, { ratio: typeof body.ratio === 'string' ? body.ratio : '4:5' }); // the price of one picture + the average cost of each agent run (nothing is spent)
     else if (action === 'site_speed') { // PageSpeed of the front page (10-30 s, so apart from the quick overview)
       const speed = await collectSpeed({ url: await siteUrlOf(ctx.db), key: speedKeyFromEnv() });
       out = { speed, ...speedFindings(speed) };

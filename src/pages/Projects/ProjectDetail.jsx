@@ -209,9 +209,9 @@ function ProjectDetailCard() {
   useEffect(() => {
     let off = false;
     if (!id) return undefined;
-    fetchProjectCreative(id).then((d) => { if (!off) setFill(infoProgress({ settings: d.settings, assets: d.assets, accounts: linkedAccounts })); }).catch(() => { if (!off) setFill(null); });
+    fetchProjectCreative(id).then((d) => { if (!off) setFill(infoProgress({ settings: d.settings, assets: d.assets, accounts: linkedAccounts, project })); }).catch(() => { if (!off) setFill(null); });
     return () => { off = true; };
-  }, [id, linkedAccounts, info, tab]);
+  }, [id, linkedAccounts, info, tab, project]);
   // The agent's state for the chip in the header (the tab itself loads everything it needs).
   const [agentChip, setAgentChip] = useState(null);
   // The project name in the header is a field that saves itself (like the deal title).

@@ -13,7 +13,7 @@ export const CYCLE_KIND = { regular: 'Регулярне завдання', extr
 export const REGULAR_LATE_HOURS = 36; // a regular run that could not start within this time waits for the next week (an operation that was paused does not fire at once)
 export const SECTIONS = [['now', 'Зараз в роботі'], ['review', 'Потребує перевірки'], ['messages', 'Повідомлення від агентів'], ['spend', 'Витрати'], ['settings', 'Налаштування'], ['ready', 'Готові матеріали']];
 
-const MODE_TITLE = { creative: 'Тільки креативи', full: 'Повна операція', strategy: 'Тільки стратегія', ads: 'Аналіз і оптимізація', report: 'Тільки звіт' };
+const MODE_TITLE = { creative: 'Креативи', ads: 'Аналітика й оптимізація', full: 'Операція' }; // the operations of the teams of a project (the five modes of the old wizard are gone)
 const at = (v) => { const t = new Date(v).getTime(); return Number.isNaN(t) ? 0 : t; };
 const clip = (v, n) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).trim()}…` : t; };
 const round = (n) => Math.round(n * 100) / 100;
@@ -22,7 +22,7 @@ const dayMonth = (date) => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
 
 export const kindOf = (brief) => (brief?.kind === 'regular' ? 'regular' : 'extra');
 export const modeOf = (campaign) => campaign?.config?.mode || 'full';
-// The creative department works in «Тільки креативи» and, when it was connected, in «Повна операція»: only such an operation has cycles of creatives.
+// The creative department works in the operation of the team «Креативи» and, when it was connected, in an older full operation: only such an operation has cycles of creatives.
 export const hasCreativeCycles = (campaign) => modeOf(campaign) === 'creative' || (modeOf(campaign) === 'full' && campaign?.config?.creative?.enabled !== false);
 
 // ---- one operation of a kind per project (owner: «на одном проекте не может быть запущено 2 одинаковые операции одновременно»)

@@ -99,8 +99,6 @@ export const estimateGeneration = (requestId, ids = null) => agentAction('genera
 export const generateCreatives = (requestId, ids = null) => agentAction('generate_creatives', { requestId, ids });
 export const pollCreatives = (requestId) => agentAction('poll_creatives', { requestId });
 
-// The numbers of the pre-launch estimate (src/lib/agents/campaignEstimate.js): the price of one picture and the average cost of each agent's run. Nothing is spent.
-export const fetchEstimateInputs = (ratio = '4:5') => agentAction('estimate_inputs', { ratio });
 
 // The person's decision on a finished picture.
 export async function setCreativeStatus(id, status, note = null) {

@@ -19,9 +19,6 @@ export const TEAMS = [
 ];
 export const teamDef = (key) => TEAMS.find((t) => t.key === key) || null;
 
-// the legacy operations of other modes are not a team: they stay visible, so nothing that works is lost
-export const LEGACY_MODES = { full: 'Повна операція', strategy: 'Тільки стратегія', report: 'Тільки звіт' };
-
 // One-off tasks of a project that run at once from the research agents (the creatives and the report of a period go to their own screens): see lib/api/oneoff.js
 export const ONEOFF = [
   { key: 'competitors', role: 'competitor_research', title: 'Аналіз конкурентів', text: 'Хто конкуренти клієнта, як вони себе позиціонують і де є шанс виграти. Береться з сайтів конкурентів у картці проєкту.' },
@@ -81,7 +78,7 @@ export function teamReadiness(teamKey, ctx = {}) {
 }
 
 // ---- the teams of a project as they run now. campaigns: ag_campaigns rows of the project; agent: the row of project_agents (or null)
-// → [{ key, def, state: 'none' | 'running' | 'paused', campaign?, agent?, detail }] for the three teams, and legacy: operations of the old modes
+// → { teams: [{ key, def, state: 'none' | 'running' | 'paused', campaign?, agent? }], running } for the three teams
 export function teamsOf({ campaigns = [], agent = null } = {}) {
   const alive = campaigns.filter((c) => ['active', 'paused'].includes(c.status));
   const byMode = (mode) => alive.find((c) => (c.config?.mode || 'full') === mode) || null;
@@ -93,8 +90,7 @@ export function teamsOf({ campaigns = [], agent = null } = {}) {
     const c = byMode(def.mode);
     return { key: def.key, def, state: !c ? 'none' : c.status === 'active' ? 'running' : 'paused', campaign: c };
   });
-  const legacy = alive.filter((c) => !['creative', 'ads'].includes(c.config?.mode || 'full')).map((c) => ({ campaign: c, label: LEGACY_MODES[c.config?.mode || 'full'] || 'Операція', state: c.status === 'active' ? 'running' : 'paused' }));
-  return { teams: out, legacy, running: out.filter((t) => t.state !== 'none').length };
+  return { teams: out, running: out.filter((t) => t.state !== 'none').length };
 }
 
 // ---- the schedules a team starts with: the agents of the team of a campaign and how often each works. A person changes any of them in the launch.

@@ -4,7 +4,7 @@
 import { INPUT_FIELDS, PROFILE_FIELDS } from './projectCreative.js';
 import { CAMPAIGN_ROLES } from './campaignTeam.js';
 import { CREATIVE_ROLES } from './creativeTeam.js';
-import { MODES, modeHasDepartment, modeRoles, shortName } from './campaignModes.js';
+import { shortName } from './campaignModes.js';
 
 // the fields that are not in the registries of the card: the rules of the client, the button, Figma, the library and the cabinets
 export const FIELD_LABELS = {
@@ -78,15 +78,4 @@ export function missingFor(roles, have) {
   // a field that is required by one agent is not also listed as recommended for another
   out.required.forEach((_, key) => out.recommended.delete(key));
   return { required: [...out.required.values()], recommended: [...out.recommended.values()] };
-}
-
-// The agents a mode puts to work for a client (the team of the campaign plus the creative department where the mode has it).
-export function modeAgentRoles(mode, platforms, { departmentWanted = true } = {}) {
-  const dept = modeHasDepartment(mode, departmentWanted) ? CREATIVE_ROLES.map((r) => r.role) : [];
-  return [...modeRoles(mode, platforms), ...dept];
-}
-
-// → for every mode: what is missing before the campaign of this mode can start. Used by the card of the project and by the wizards.
-export function readinessByMode(have, platforms) {
-  return Object.fromEntries(Object.keys(MODES).map((mode) => [mode, missingFor(modeAgentRoles(mode, platforms), have)]));
 }

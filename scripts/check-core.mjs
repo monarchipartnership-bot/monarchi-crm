@@ -56,11 +56,8 @@ import { layoutText, wrapLines, zoneBox } from '../src/lib/creatives/composeText
 import { buildWorkbook, monthBlocks, rowBlock, sheetNameOf, titleOfRow } from '../src/lib/reportWorkbook.js';
 import { buildZip, fileNameOf } from '../src/lib/creatives/download.js';
 import { EXTRACT_KEYS, buildExtractPrompt, parseExtraction, planWrites } from '../src/lib/agents/profileExtract.js';
-import { WIZARD_STEPS, hasCabinet, wizardSummary } from '../src/lib/agents/projectWizard.js';
 import { campaignTotals, stepLevel, dueStepNotices, capReached, digestDue, digestOf, dayWindow, stepMessage } from '../src/lib/agents/spendNotices.js';
 import { runSpendNotices } from '../api/_lib/spendNotify.js';
-import { estimateCampaign, estimateSummary } from '../src/lib/agents/campaignEstimate.js';
-import { estimateInputs } from '../api/_lib/estimateInputs.js';
 import { buildSpendReport, periodRange, spendRows } from '../src/lib/agents/spendReport.js';
 import { KEYS, buildSystemState } from '../src/lib/agents/systemState.js';
 import { buildDossier, memoryBlock } from '../src/lib/agents/clientMemory.js';
@@ -77,11 +74,12 @@ import { daysText, monthNameIn, monthShortIn, normLang, trFor } from '../src/lib
 import { ACTION_RULES, AUDIT_LABELS, auditEntry, canDo, cleanApprovers, deniedEntry } from '../src/lib/agents/rights.js';
 import { auditAfter, checkRights, loadRights } from '../api/_lib/agentAudit.js';
 import { addInstruction, cappedCampaigns, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from '../api/_lib/campaignCycles.js';
-import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor, modeAgentRoles, readinessByMode } from '../src/lib/agents/agentRequirements.js';
+import { FIELD_LABELS, REQUIREMENTS, agentsNeeding, filledFields, missingFor } from '../src/lib/agents/agentRequirements.js';
 import { ALL_INPUT_KEYS, ASSET_GROUPS, ASSET_KINDS, INPUT_FIELDS, INPUT_KEYS, PROFILE_FIELDS, PROFILE_KEYS, addCtaVariant, ctaVariants, removeCtaVariant } from '../src/lib/agents/projectCreative.js';
 import { BRAND_MAX_IMAGES, buildBrandPrompt, parseBrand, pickBrandImages } from '../src/lib/agents/brandAnalysis.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
-import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
+import { modeRoles } from '../src/lib/agents/campaignModes.js';
+import { CREATIVE_ROLES } from '../src/lib/agents/creativeTeam.js';
 import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate, perSecondEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
@@ -120,7 +118,6 @@ import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.
 import { visibleKeys } from '../src/lib/periodReport.js';
 import { cleanNotices, noticeDraft, noticesChanged, pickList } from '../src/lib/agents/settingsForm.js';
 import { buildCampaignSpend, monthlySpend, periodStart } from '../src/lib/agents/campaignSpend.js';
-import { DRAFT_KEYS, draftFrom, extractedFromDraft } from '../src/lib/agents/projectWizard.js';
 import { buildTaskPath, currentStep } from '../src/lib/agents/mapTasks.js';
 import { stuckAgents, telegramTest } from '../src/lib/agents/systemState.js';
 import { agentRows } from '../src/lib/agents/aiProjects.js';
@@ -2624,7 +2621,7 @@ await ok('project cabinet: the stage is the first step of the chain that is not 
   assert.equal(cockpitSummary(c).stageLabel, 'Готово до перегляду');
   assert.equal(cockpitSummary(failed).stageLabel, 'ТЗ зупинився');
   assert.equal(cockpitSummary(buildCockpit({ ...base, requests: [], tasks: [], creatives: [] })).stageLabel, 'Чекає на запит');
-  assert.equal(c.modeLabel, 'Тільки креативи');
+  assert.equal(c.modeLabel, 'Креативи');
   // which campaigns are worked on
   assert.equal(isActiveCampaign({ id: 4, status: 'active' }, []), true);
   assert.equal(isActiveCampaign({ id: 4, status: 'draft' }, []), false);
@@ -2665,18 +2662,17 @@ await ok('download of the creatives: the file keeps its own bytes and format (no
   assert.deepEqual([second.url, second.status], ['', 'planned']);
 });
 
-await ok('what the agents need to know about a client: the fields of the card, the table of requirements per agent, what is missing for each kind of campaign', () => {
+await ok('what the agents need to know about a client: the fields of the card, the table of requirements per agent, what is missing for each team', () => {
   // the registry: the fields filled by a person are keys of `inputs` too (same age and author as the data of the agents), no clash
   assert.equal(new Set(ALL_INPUT_KEYS).size, INPUT_KEYS.length + PROFILE_KEYS.length);
   assert.deepEqual(PROFILE_FIELDS.map((f) => f.key), ['about', 'offer', 'tone', 'brand', 'markets', 'seasonality', 'goals', 'budget', 'examples', 'competitor_sites', 'competitor_notes', 'copy_rules', 'extra_info']);
-  // every requirement names a field that exists, and every role of every mode has a row (the legacy creative copies of the campaign team have none, on purpose)
+  // every requirement names a field that exists, and every role of the teams has a row (the legacy creative copies of the campaign team have none, on purpose)
   const known = new Set(Object.keys(FIELD_LABELS));
   Object.values(REQUIREMENTS).forEach((r) => [...r.required, ...r.recommended].forEach((k) => assert.ok(known.has(k), k)));
-  for (const mode of MODE_ORDER) modeAgentRoles(mode, ['meta', 'google']).forEach((role) => assert.ok(REQUIREMENTS[role], `${mode}: ${role}`));
+  [...modeRoles('ads', ['meta', 'google', 'tiktok']), ...CREATIVE_ROLES.map((r) => r.role)].forEach((role) => assert.ok(REQUIREMENTS[role], role));
   // an empty project: the creatives need the offer, the strategy needs the description and the goals, the analysts need their cabinet
   const empty = filledFields({});
-  const creatives = readinessByMode(empty, [])
-    .creative;
+  const creatives = missingFor(CREATIVE_ROLES.map((r) => r.role), empty);
   assert.deepEqual(creatives.required.map((x) => x.key).sort(), ['cabinet', 'offer']); // the creative analyst needs a cabinet, the strategist and the copywriter the offer
   assert.deepEqual(creatives.required.find((x) => x.key === 'offer').agents.sort(), ['Копірайтер', 'Креативний стратег']);
   assert.ok(creatives.recommended.some((x) => x.key === 'materials'));
@@ -2684,12 +2680,12 @@ await ok('what the agents need to know about a client: the fields of the card, t
   // a project with one Meta cabinet, the offer and the library
   const have = filledFields({ settings: { inputs: { offer: { body: 'Wigs' }, about: { body: ' ' }, goals: { body: 'ROAS 3' } }, restrictions: 'No claims', cta_mode: 'always', cta_text: 'Shop now', figma_url: '' }, assets: [{ id: 1 }], accounts: [{ platform: 'meta' }] });
   assert.deepEqual([...have].sort(), ['cabinet', 'cabinet_meta', 'cta', 'goals', 'materials', 'offer', 'restrictions']); // an empty or blank value does not count
-  const ready = readinessByMode(have, ['meta']);
-  assert.deepEqual(ready.creative.required, []); // creatives can start
-  assert.deepEqual(ready.strategy.required.map((x) => x.key).sort(), ['about', 'competitor_sites']); // the strategy lacks the description of the business and the sites of the competitors for their researcher
+  const creativeRoles = CREATIVE_ROLES.map((r) => r.role);
+  assert.deepEqual(missingFor(creativeRoles, have).required, []); // creatives can start
+  assert.deepEqual(missingFor(['business_research', 'competitor_research', 'audience_research', 'marketing_strategist'], have).required.map((x) => x.key).sort(), ['about', 'competitor_sites']); // the strategy lacks the description of the business and the sites of the competitors for their researcher
   assert.ok(filledFields({ settings: { inputs: { competitor_notes: { body: 'Brilliant Earth' } } } }).has('competitor_sites')); // competitors that are only named count too
-  assert.deepEqual(ready.ads.required, []); // a Meta cabinet and the goals are there
-  assert.deepEqual(readinessByMode(have, ['google']).ads.required.map((x) => x.key).sort(), ['cabinet_google']); // the cabinet of the other platform is not enough
+  assert.deepEqual(missingFor(modeRoles('ads', ['meta']), have).required, []); // a Meta cabinet and the goals are there
+  assert.deepEqual(missingFor(modeRoles('ads', ['google']), have).required.map((x) => x.key).sort(), ['cabinet_google']); // the cabinet of the other platform is not enough
   // who needs a field
   assert.ok(agentsNeeding('goals').required.includes('Маркетинговий стратег'));
   assert.ok(agentsNeeding('materials').recommended.includes('Креативщик'));
@@ -2717,19 +2713,6 @@ await ok('quick fill of a project: the words are laid over the fields of the car
   assert.deepEqual(plan.conflicts.map((c) => c.key), ['about']); // the offer is the same, so it is not a conflict
   assert.deepEqual(plan.settings, { restrictions: 'Без слів «найдешевше»', figma_url: 'https://www.figma.com/design/abc', cta_mode: 'always', cta_text: 'Shop now' });
   assert.deepEqual(planWrites(x, { ...existing, cta_text: 'Buy' }).settings.cta_text, undefined); // an existing button text is kept
-  // the steps of the wizard: what goes to step 2 and what still blocks the agents
-  assert.deepEqual(WIZARD_STEPS.map((s) => s.key), ['project', 'facts', 'rest', 'campaign']);
-  assert.equal(hasCabinet([]), false); assert.equal(hasCabinet([{ platform: 'tiktok' }]), false); assert.equal(hasCabinet([{ platform: 'meta' }]), true);
-  const sum = wizardSummary({ extracted: x, settings: { inputs: {}, cta_mode: 'always' }, assets: [], accounts: [{ platform: 'meta' }] });
-  assert.equal(sum.plan.writes.length, 2);
-  assert.equal(sum.hasStep2, true);
-  assert.deepEqual(sum.step2.uploads, ['Логотип', 'Фото продукту']); // an empty library asks for a logo and a photo
-  assert.deepEqual(sum.step2.links.map((l) => l.url).length, 2);
-  // the description and the offer came from the words, so only the goals (the strategist) and the competitors (their researcher) block
-  assert.deepEqual(sum.blockers.map((b) => b.key).sort(), ['competitor_sites', 'goals']);
-  assert.ok(sum.recommended.every((r) => !sum.blockers.some((b) => b.key === r.key)));
-  const all = wizardSummary({ extracted: null, settings: { inputs: { about: { body: 'a' }, offer: { body: 'o' }, goals: { body: 'g' }, competitors: { body: 'c' } }, cta_mode: 'always' }, assets: [{ id: 1 }], accounts: [{ platform: 'meta' }] });
-  assert.deepEqual(all.blockers, []); assert.equal(all.hasStep2, false);
 });
 
 await ok('money notices: a notice for every step of dollars per campaign (once), a cap notice, one daily total after the chosen hour', async () => {
@@ -2779,37 +2762,6 @@ await ok('money notices: a notice for every step of dollars per campaign (once),
   tables.ag_campaign_spend[0].higgsfield_usd = 4;
   assert.equal((await runSpendNotices({ db: fakeDb(tables), telegram: null, now: new Date('2026-11-02T08:03:00Z') })).caps, 1); // no Telegram: only the bell
   assert.equal((await runSpendNotices({ db: fakeDb({ ai_agent_settings: [{ id: 1, enabled: false }] }), telegram: tg })).skipped, 'off');
-});
-
-await ok('pre-launch estimate: the agents of the mode at their own average (a rough price when they have not run), the pictures at the Higgsfield price, a month for the repeating modes, the cap', async () => {
-  const none = estimateCampaign({ mode: 'nope' });
-  assert.equal(none.once, 0);
-  // only creatives: the department for 2 concepts in 2 formats = 4 pictures; nothing of the campaign team
-  const c = estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 2, ratios: ['4:5', '9:16'], hfUnitUsd: 0.2, history: { creative_maker: 0.3 } });
-  assert.deepEqual(c.rows.map((r) => r.role), ['creative_strategy', 'creative_brief', 'creative_copywriter', 'creative_maker', 'creative_quality']);
-  assert.equal(c.rows.find((r) => r.role === 'creative_maker').basis, 'history'); assert.equal(c.rows.find((r) => r.role === 'creative_brief').basis, 'default');
-  assert.equal(c.images, 4); assert.equal(c.higgsfield.total, 0.8); assert.equal(c.higgsfield.exact, true);
-  assert.equal(c.once, Math.round((c.claude + 0.8) * 100) / 100); assert.equal(c.monthly, null); assert.equal(c.repeats, false);
-  // without the Higgsfield price the pictures are counted but not priced
-  const noPrice = estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 1, ratios: ['4:5'] });
-  assert.equal(noPrice.higgsfield.total, null); assert.equal(noPrice.higgsfield.exact, false); assert.match(estimateSummary(noPrice), /Оцінити вартість/);
-  // no concepts → no department, no pictures
-  assert.equal(estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 0 }).rows.length, 0);
-  assert.match(estimateSummary(estimateCampaign({ mode: 'creative', platforms: ['meta'], concepts: 0 })), /нічого не витрачає/);
-  // a repeating mode: a week of the team, a month = four weeks; the cap is exceeded by the first start
-  const full = estimateCampaign({ mode: 'full', platforms: ['meta', 'google'], concepts: 1, ratios: ['4:5'], hfUnitUsd: 0.2, capUsd: 1 });
-  assert.equal(full.repeats, true); assert.equal(full.monthly, Math.round(full.claudeTeam * 4 * 100) / 100); assert.equal(full.overCap, true);
-  assert.match(estimateSummary(full), /Далі щотижня/);
-  // strategy has no department even when concepts are given
-  assert.ok(estimateCampaign({ mode: 'strategy', platforms: [], concepts: 3, ratios: ['1:1'], hfUnitUsd: 0.2 }).rows.every((r) => r.group === 'team'));
-  // the server inputs: average of the recent runs per role and the price of one picture from the free estimate
-  const tables = { ag_agents: [{ id: 1, role: 'creative_maker' }, { id: 2, role: 'creative_brief' }], ag_runs: [{ id: 1, agent_id: 1, cost_usd: 0.1 }, { id: 2, agent_id: 1, cost_usd: 0.3 }, { id: 3, agent_id: 2, cost_usd: 0.05 }, { id: 4, agent_id: 9, cost_usd: 1 }] };
-  const asked = [];
-  const inputs = await estimateInputs({ db: fakeDb(tables), hfImage: { estimate: async ({ request }) => { asked.push(request); return 0.21; } } });
-  assert.deepEqual(inputs.history, { creative_maker: 0.2, creative_brief: 0.05 }); assert.equal(inputs.unitUsd, 0.21); assert.equal(inputs.configured, true);
-  assert.equal(asked.length, 1); // one free question, not one per picture
-  assert.equal((await estimateInputs({ db: fakeDb(tables), hfImage: null })).configured, false);
-  assert.match((await estimateInputs({ db: fakeDb(tables), hfImage: { estimate: async () => { throw new Error('boom'); } } })).error, /boom/);
 });
 
 await ok('spend report: day / month / year on the Kyiv clock, against the previous period, by agent, campaign and project, Claude and Higgsfield apart', () => {
@@ -3340,42 +3292,12 @@ await ok('metric row tools: up / down swap neighbours, remove goes to the right 
   assert.equal(planMetricChange({ ...ctx, action: 'replace', key: 'cpm', toKey: 'cpm' }).noop, true);
 });
 
-await ok('wizard modes: each of the five modes switches on only the agents of its quarters (for the chosen channels), never the legacy creative copies; the scheme joins known agents', async () => {
-  assert.deepEqual(MODE_ORDER, ['creative', 'full', 'strategy', 'ads', 'report']);
-  assert.equal(MODE_ORDER.filter((m) => MODES[m].safe).join(), 'creative'); // only «Тільки креативи» is the safe one (nothing starts by itself)
+await ok('team modes: «creative» switches on no campaign roles, «ads» only the analysts, the tracking control and the optimizers of the chosen channels', () => {
   assert.deepEqual(modeRoles('creative', ['meta', 'google']), []); // the department is not a part of the campaign team
-  assert.deepEqual(modeRoles('strategy', ['meta']), ['business_research', 'competitor_research', 'audience_research', 'marketing_strategist']); // no channel needed
   assert.deepEqual(modeRoles('ads', ['meta']), ['meta_analyst', 'tracking_integrity', 'meta_optimizer']); // the channel decides: no Google, no TikTok
   assert.deepEqual(modeRoles('ads', ['google', 'tiktok']), ['google_analyst', 'tiktok_analyst', 'tracking_integrity', 'google_optimizer']);
-  assert.deepEqual(modeRoles('report', ['meta']), ['cross_channel_report', 'account_manager']);
-  const full = modeRoles('full', ['meta', 'google']);
-  assert.equal(full.length, 11); // 4 research and strategy, 2 analysts, tracking, 2 optimizers, the report and the account manager
-  for (const m of MODE_ORDER) for (const r of modeRoles(m, ['meta', 'google', 'tiktok'])) assert.ok(!LEGACY_CREATIVE_ROLES.includes(r), `${m}: ${r}`);
-  assert.deepEqual(MODE_ORDER.map((m) => modeHasDepartment(m, true)), [true, true, false, false, false]);
-  assert.equal(modeHasDepartment('full', false), false); // the department of the full campaign can be left out
-  assert.equal(modeEstimate('strategy', []), 0.28); // 4 agents x 0.07
-  assert.equal(modeEstimate('creative', ['meta']), 0); // nothing is spent before the first request
-  // the scheme: every link joins two nodes, the lit set follows the mode and the channels, the planned agent never glows
-  const ids = new Set(QUARTER_NODES.map((n) => n.id));
-  assert.ok(QUARTER_LINKS.every((l) => ids.has(l.from) && ids.has(l.to)));
-  const nodeOf = Object.fromEntries(QUARTER_NODES.map((n) => [n.id, n]));
-  const inside = QUARTER_LINKS.filter((l) => !['across', 'around'].includes(l.kind));
-  assert.ok(inside.every((l) => nodeOf[l.from].quarter === nodeOf[l.to].quarter)); // down / left / right stay in one quarter
-  assert.ok(QUARTER_LINKS.filter((l) => ['across', 'around'].includes(l.kind)).every((l) => nodeOf[l.to].quarter > nodeOf[l.from].quarter)); // a link between quarters always goes to the right
-  assert.ok(QUARTER_LINKS.filter((l) => l.kind === 'around').every((l) => nodeOf[l.to].quarter - nodeOf[l.from].quarter > 1)); // only a link that skips a quarter goes around
-  assert.ok(QUARTER_LINKS.filter((l) => l.kind === 'across').every((l) => nodeOf[l.to].quarter - nodeOf[l.from].quarter === 1)); // the others go to the next quarter
-  assert.ok(QUARTER_LINKS.filter((l) => l.kind === 'down').every((l) => nodeOf[l.to].row === nodeOf[l.from].row + 1)); // a vertical arrow joins neighbours
-  assert.ok(QUARTER_LINKS.filter((l) => l.kind === 'left').every((l) => nodeOf[l.to].row > nodeOf[l.from].row)); // a bulge goes down
-  assert.equal(new Set(QUARTER_NODES.map((n) => `${n.quarter}:${n.row}`)).size, QUARTER_NODES.length); // no two cards in one place
-  const adsMeta = litNodes('ads', ['meta']);
-  assert.deepEqual([...adsMeta].sort(), ['meta_analyst', 'meta_optimizer', 'tracking_integrity']);
-  assert.equal(adsMeta.has('tiktok_optimizer'), false);
-  assert.equal(litNodes('creative', []).size, 6); // the six agents of the department
-  assert.equal(litNodes('creative', [], { optional: { creative_analyst: false } }).has('creative_analyst'), false);
-  assert.equal(litNodes('full', ['meta', 'google'], { departmentWanted: false }).has('creative_maker'), false);
-  assert.equal(litNodes('strategy', ['meta']).has('creative_maker'), false);
+  assert.deepEqual(modeRoles('full', ['meta']), []); // the five modes of the old wizard are gone: nothing else switches roles on by a mode
 });
-
 await ok('creative department: one agent per role with a queue of clients; a request runs strategist -> brief -> copy + maker -> quality for ITS client; failure and retry; cancel', async () => {
   const { tables, db, model, ctx } = creativeWorld();
   const dept = await ensureCreativeDepartment(db, 'a@x.com');
@@ -4435,7 +4357,7 @@ await ok('map carriers: open work is one carrier per agent, operation and kind; 
 await ok('one-off tasks: the quiet operation of a project (draft, never launched) is not a team, and every one-off role has a requirement entry', () => {
   const quiet = { id: 20, status: 'draft', config: { mode: 'full', team: 'oneoff', hidden: true } };
   const v = teamsOf({ campaigns: [quiet], agent: null });
-  assert.equal(v.running, 0); assert.equal(v.legacy.length, 0); assert.ok(v.teams.every((x) => x.state === 'none'));
+  assert.equal(v.running, 0); assert.ok(v.teams.every((x) => x.state === 'none'));
   assert.deepEqual(ONEOFF.map((x) => x.role), ['competitor_research', 'audience_research', 'business_research', 'marketing_strategist']);
   assert.ok(ONEOFF.every((x) => Array.isArray(missingFor([x.role], new Set()).required)));
 });
@@ -4663,31 +4585,6 @@ await ok('notes of the agents: the same theme of several agents is one entry wit
   assert.notEqual(other[0].id, other[1].id);
   assert.deepEqual([topicOf('Немає фото товару'), topicOf('Не задано текст кнопки'), topicOf('Яка дата?')], ['materials', 'cta', 'other']);
   assert.deepEqual(mergeNotes([], 1), []);
-});
-
-await ok('project wizard: the draft of step 1 round-trips (reading or card → form → what is saved), an existing value is a conflict, step 2 lists what is missing', () => {
-  const reading = { fields: { about: 'Jewellery shop', tone: 'warm' }, restrictions: 'no discounts', cta: { mode: 'always', text: 'Shop now' }, figma: '', links: [{ url: 'https://x.com', about: 'site' }], needsFiles: ['logo'], unplaced: [] };
-  const d = draftFrom(reading);
-  assert.equal(d.fields.about, 'Jewellery shop');
-  assert.equal(d.fields.offer, ''); // every key has a field, empty when nothing was said
-  assert.equal(Object.keys(d.fields).length, DRAFT_KEYS.length);
-  d.fields.about = 'Jewellery shop in the US'; // the person corrects it
-  const out = extractedFromDraft(d, reading);
-  assert.deepEqual(Object.keys(out.fields).sort(), ['about', 'tone']); // empty fields are left out
-  assert.deepEqual(out.cta, { mode: 'always', text: 'Shop now' });
-  assert.equal(out.links.length, 1); // the links come from the reading
-  assert.equal(draftFrom({ fields: {}, cta_mode: 'none' }).ctaMode, 'none');
-  assert.equal(extractedFromDraft(draftFrom({ fields: {}, cta_mode: 'none' })).cta.mode, 'none');
-  assert.equal(extractedFromDraft(draftFrom({})).cta, null); // nothing said about the button
-  const existing = { fields: { about: 'Old text' }, restrictions: '', cta_mode: 'always', cta_text: '', figma_url: '' };
-  const plan = planWrites(out, existing);
-  assert.deepEqual(plan.conflicts.map((c) => c.key), ['about']); // never replaced without the person's yes
-  assert.deepEqual(plan.writes.map((w) => w.key), ['tone']);
-  const sum = wizardSummary({ extracted: { fields: {}, links: reading.links, needsFiles: ['logo'], unplaced: [] }, settings: { inputs: { about: { body: 'x' } } }, assets: [], accounts: [{ platform: 'meta' }] });
-  assert.ok(sum.blockers.some((b) => b.key === 'goals')); // the strategist needs the goals
-  assert.ok(!sum.blockers.some((b) => b.key === 'about')); // already filled
-  assert.deepEqual(sum.step2.uploads, ['Логотип', 'Фото продукту']); // an empty library
-  assert.equal(sum.hasStep2, true);
 });
 
 await ok('ready materials: grouped by kind newest first, filtered by decision; an approved strategy becomes a field of the card; a return keeps its reason for the memory', () => {
@@ -4994,7 +4891,7 @@ await ok('operation cycles: the regular cycle is cleaned, is due once per its da
   assert.equal(sameModeConflict(ops, { projectId: 5, mode: 'creative' }).id, 1);
   assert.equal(sameModeConflict(ops, { projectId: 5, mode: 'creative', exceptId: 1 }), null);
   assert.equal(sameModeConflict(ops, { projectId: 5, mode: 'ads' }), null); // the archived one is finished
-  assert.match(conflictMessage(ops[0]), /вже працює операція «Тільки креативи» \(«Acme creatives»\)/);
+  assert.match(conflictMessage(ops[0]), /вже працює операція «Креативи» \(«Acme creatives»\)/);
   // the person's decisions move the request
   assert.deepEqual([reviewOutcome([{ status: 'approved' }, { status: 'approved' }]), reviewOutcome([{ status: 'approved' }, { status: 'rejected' }]), reviewOutcome([{ status: 'approved' }, { status: 'producing' }]), reviewOutcome([])], ['done', 'review', null, null]);
 });
@@ -5089,7 +4986,7 @@ await ok('operation cycles: the schedule starts the regular cycle once for its d
 
   // a second «Тільки креативи» of the same project is not launched while the first one works
   tables.ag_campaigns.push({ id: 3, project_id: 5, name: 'Acme again', platforms: ['meta'], status: 'draft', config: { mode: 'creative' } });
-  await assert.rejects(() => launchCampaign(ctx, 3), /вже працює операція «Тільки креативи»/);
+  await assert.rejects(() => launchCampaign(ctx, 3), /вже працює операція «Креативи»/);
   tables.ag_campaigns[0].status = 'archived';
   assert.equal((await launchCampaign(ctx, 3)).creativeOnly, true);
 });
@@ -5335,7 +5232,7 @@ await ok('AI teams of a project: the three teams, the check of what each one nee
     { id: 3, status: 'active', config: { mode: 'full' } }, { id: 4, status: 'archived', config: { mode: 'report' } }, { id: 5, status: 'draft', config: { mode: 'creative' } },
   ], agent: { project_id: 9, enabled: true } });
   assert.deepEqual(view.teams.map((x) => [x.key, x.state]), [['creative', 'running'], ['analytics', 'paused'], ['reports', 'running']]);
-  assert.deepEqual(view.legacy.map((x) => [x.campaign.id, x.label, x.state]), [[3, 'Повна операція', 'running']]); // an old operation stays visible, an archived or a draft one is not a team
+  assert.equal(view.legacy, undefined); // no list of old operations any more: an archived or a draft operation is not a team
   assert.equal(view.running, 3);
   const none = teamsOf({ campaigns: [], agent: null });
   assert.deepEqual([none.running, none.teams.every((x) => x.state === 'none')], [0, true]);

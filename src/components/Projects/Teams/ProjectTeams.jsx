@@ -36,7 +36,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [wizard, setWizard] = useState(false);
-  const [open, setOpen] = useState(null); // { campaignId, regularFirst }: the operation card (cycles of creatives, legacy operations)
+  const [open, setOpen] = useState(null); // { campaignId, regularFirst }: the operation card (the cycles of creatives)
   const [oneoff, setOneoff] = useState(false); // the dialog of a one-off task
   const [newRegular, setNewRegular] = useState(null); // the window of a new regular task: the campaign of the creative team
   const [creativeTask, setCreativeTask] = useState(null); // the window of a one-off task of creatives: the campaign of the creative team
@@ -55,7 +55,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
   // the last and the next run of the agents of every running team
   useEffect(() => {
     if (!view) return;
-    const ids = [...view.teams.filter((t) => t.campaign).map((t) => t.campaign.id), ...view.legacy.map((l) => l.campaign.id)];
+    const ids = view.teams.filter((t) => t.campaign).map((t) => t.campaign.id);
     ids.forEach((id) => { fetchCampaignControl(id).then((c) => setControl((m) => ({ ...m, [id]: c }))).catch(() => {}); });
   }, [view]);
 
@@ -87,7 +87,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
     } catch (e) { say(e?.message || 'Не вдалося виконати.', true); } finally { setBusy(''); }
   }
   const runningTeams = view ? view.teams.filter((t) => t.state !== 'none') : [];
-  const empty = view && !runningTeams.length && !view.legacy.length;
+  const empty = view && !runningTeams.length;
   const project = data?.project ? { id: data.project.id, name: data.project.name, client: data.project.client } : null;
   const openCampaign = open && data ? data.campaigns.find((c) => c.id === open.campaignId) : null;
 
@@ -189,14 +189,6 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
                 </article>
               );
             })}
-            {view.legacy.map((l) => (
-              <article key={'l' + l.campaign.id} className={'tmx-team tm-legacy is-' + l.state}>
-                <div className="tmx-row">
-                  <div className="tmx-main"><div className="tmx-t"><TeamRing name="users" size={32} /><b>{l.campaign.name}</b><span className="pcr-state is-wait">стара операція · {l.label}</span></div><small>Запущена за старою схемою: працює як працювала, відкрийте, щоб побачити роботу.</small></div>
-                  <div className="tmx-btns"><button type="button" className="btn" onClick={() => setOpen({ campaignId: l.campaign.id, regularFirst: false })}>Відкрити</button></div>
-                </div>
-              </article>
-            ))}
           </div>
         )}
       </div>
