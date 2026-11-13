@@ -2,6 +2,9 @@
 // the «living» imperfections) to EVERY prompt for Higgsfield and a common list of what makes a picture look generated to the negative prompt, so the approach works whatever the model made of the wording.
 // The look is a setting of a TASK (brief.look): «std» (the default: nothing is added), a look of the list, or «auto» (the maker picks a look for every idea). Pure code.
 
+// The look a NEW task starts with (owner, 2026-11-13: «як стандарт студійний»); tasks made before keep «std» until a person changes it in the settings of the task.
+export const DEFAULT_LOOK = 'studio';
+
 export const LOOK_NEGATIVE = 'plastic or waxy skin, over-smoothed surfaces, oversharpened HDR look, oversaturated colours, floating objects, warped text, malformed hands, extra fingers, cartoon or CGI look';
 
 export const LOOKS = [

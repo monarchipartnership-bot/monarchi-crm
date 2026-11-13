@@ -2,7 +2,7 @@ import { supabase } from '../supabaseClient';
 import { MAX_REGULARS, cleanRegular, kyivToday, rawRegulars, regularRequest, regularsOf, seasonOver } from '../agents/operationCycles';
 import { cleanRequest } from '../agents/creativeTeam';
 import { cleanManual, isEmptyManual } from '../agents/projectStyle';
-import { cleanLook } from '../creatives/realism';
+import { DEFAULT_LOOK, cleanLook } from '../creatives/realism';
 import { createRequest, startRequest } from './creatives';
 
 // The cycles of an operation (lib/agents/operationCycles.js): the regular ones are kept in the operation itself (config.regulars), an extra one is a request.
@@ -27,7 +27,9 @@ export async function saveRegular(campaignId, input, email = null) {
   const prev = input.id ? list.find((r) => r.id === input.id) || null : null;
   const live = regularsOf({ config: { regulars: list } }).filter((r) => !seasonOver(r)).length; // a season that is over does not count
   if (!prev && live >= MAX_REGULARS) throw new Error(`Регулярних завдань в операції може бути не більше ${MAX_REGULARS}.`);
-  const regular = cleanRegular(input, { by: email, prev });
+  // a NEW regular task starts with the standard realism look; an edit keeps what the task has
+  const withLook = !prev && input.brief && input.brief.look === undefined ? { ...input, brief: { ...input.brief, look: DEFAULT_LOOK } } : input;
+  const regular = cleanRegular(withLook, { by: email, prev });
   const campaign = await writeRegulars(row, prev ? list.map((r) => (r.id === regular.id ? regular : r)) : [...list, regular]);
   return { campaign, regular };
 }
@@ -67,7 +69,7 @@ export async function runRegularNow(campaign, regular, email = null) {
 
 // An extra cycle: a one-off request with its own parameters, next to the regular one. → the request row
 export async function createExtraCycle(campaignId, values, email = null, start = true) {
-  const row = await createRequest(campaignId, { ...values, kind: 'extra' }, email);
+  const row = await createRequest(campaignId, { ...values, look: values.look === undefined ? DEFAULT_LOOK : values.look, kind: 'extra' }, email); // a new task starts with the standard realism look
   if (start) await startRequest(row.id);
   return row;
 }
