@@ -89,7 +89,7 @@ function CreativeRun({ run, onBack, onAct, styleCtx }) {
   const groups = useMemo(() => groupItems(run.items), [run.items]);
   const [light, setLight] = useState(null); // { items, index }
   const [busy, setBusy] = useState('');
-  const act = useCallback(async (key, payload) => { setBusy(key); try { await onAct(run, key, payload); } finally { setBusy(''); } }, [onAct, run]);
+  const act = useCallback(async (key, payload) => { setBusy(key); try { return await onAct(run, key, payload); } finally { setBusy(''); } }, [onAct, run]);
   const go = useCallback((d) => setLight((l) => (l ? { ...l, index: (l.index + d + l.items.length) % l.items.length } : l)), []);
   return (
     <div className="ar-run-card">
