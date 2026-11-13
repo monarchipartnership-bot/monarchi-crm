@@ -39,7 +39,8 @@ import { CREATIVE_REQUIRED, creativeAutoOf, cleanAgentSettings, cleanRequest, co
 import { cleanSettings, defaultRatios, inputState, manualInput, INFO_SECTIONS, addLink, cleanLink, parseLinks, removeLink, sectionFields } from '../src/lib/agents/projectCreative.js';
 import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
-import { compareLooks, generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
+import { compareLooks, generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes, startVideo } from '../api/_lib/creativeMake.js';
+import { DEFAULT_MOTION, buildVideoRequest, checkVideo, clampSeconds, videoProfileFromEnv } from '../api/_lib/hfVideo.js';
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
 import { reviseStep } from '../api/_lib/creativeEngine.js';
@@ -5568,6 +5569,78 @@ await ok('compare realism (3.4): the same scene in other looks, next to the orig
   assert.equal(made[0].negative_prompt, `text, ${LOOK_NEGATIVE}`); // the common negatives once
   assert.deepEqual([made[0].copy, made[0].hf.references, made[0].concept_name], [{ variants: [{ headline: 'H' }] }, refs, 'Idea one · UGC: фото на телефон']);
   assert.equal(log.length, 2); assert.equal(tables.ag_creatives[0].status, 'review'); // the original is untouched
+});
+
+await ok('video from a picture (3.5): the request is built from the picture and the settings; the price first, the limit and the cap hold; a ready video is copied and goes to review with no words and no picture check; a refused one is not charged', async () => {
+  // the pure part: the body of the request, the clamp of the length, the check of the status
+  const profile = videoProfileFromEnv({});
+  assert.equal(profile.path, 'kling-video/v3.0/std/image-to-video');
+  assert.deepEqual(videoProfileFromEnv({ HF_VIDEO_MODEL: '/other/model/', HF_VIDEO_IMAGE_PARAM: 'start_image', HF_VIDEO_EXTRA: '{"cfg_scale":0.4}' }), { path: 'other/model', imageParam: 'start_image', extra: { cfg_scale: 0.4 } });
+  assert.deepEqual([clampSeconds(1), clampSeconds(5.4), clampSeconds(99), clampSeconds('x')], [3, 5, 10, 5]);
+  const rq = buildVideoRequest({ prompt: '  slow push-in  ', image: 'https://x/p.png', seconds: 8, sound: true }, profile);
+  assert.deepEqual(rq, { path: profile.path, body: { prompt: 'slow push-in', image_url: 'https://x/p.png', duration: 8, sound: 'on' } });
+  assert.equal(buildVideoRequest({ image: 'https://x/p.png', seconds: 5 }, profile).body.sound, 'off');
+  const env = { HF_API_KEY_ID: 'a', HF_API_KEY_SECRET: 'b' };
+  const net = async (u) => ({ ok: true, json: async () => ({ status: u.includes('r1') ? 'completed' : u.includes('r2') ? 'nsfw' : 'in_progress', video: { url: 'https://cdn/out.mp4' } }) });
+  assert.deepEqual(await checkVideo({ statusUrl: 'https://api.higgsfield.ai/requests/r1/status', env, fetchFn: net }), { state: 'ready', url: 'https://cdn/out.mp4' });
+  assert.match((await checkVideo({ statusUrl: 'https://api.higgsfield.ai/requests/r2/status', env, fetchFn: net })).error, /модерацією/);
+  assert.equal((await checkVideo({ statusUrl: 'https://api.higgsfield.ai/requests/r3/status', env, fetchFn: net })).state, 'pending');
+  assert.equal((await checkVideo({ statusUrl: 'https://evil.example/x', env, fetchFn: net })).state, 'failed'); // only the provider's own addresses are asked
+
+  // the flow
+  const { tables, db, ctx } = creativeWorld();
+  await ensureCreativeDepartment(db, 'a@x.com');
+  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'review', title: 't', brief: {}, materials: [] });
+  tables.ag_creatives.push({ id: 1, request_id: 1, concept_key: 'c1', concept_name: 'Idea one', ratio: '9:16', prompt: 'A bottle', negative_prompt: '', copy: { variants: [{ headline: 'H' }] }, status: 'review', cost_usd: 0.2, generations: 1, asset_url: 'https://x/p.png', hf: {} });
+  tables.ag_creatives.push({ id: 2, request_id: 1, concept_key: 'c2', concept_name: 'No picture', ratio: '1:1', status: 'planned', cost_usd: 0, hf: {} });
+  tables.ag_agents.find((a) => a.role === 'creative_maker').config = { max_usd: '1' };
+  const log = [];
+  let state = { state: 'pending' };
+  ctx.hfVideo = {
+    profile: () => profile,
+    estimate: async ({ request }) => { log.push(['estimate', request.body.duration]); return request.body.duration * 0.1; },
+    submit: async ({ request, key }) => { log.push(['submit', key, request.body.prompt, request.body.image_url, request.body.sound]); return { jobId: `j-${key}`, statusUrl: `https://api.higgsfield.ai/requests/${key}/status` }; },
+    check: async () => state,
+    persist: async ({ url }) => ({ url: `copy:${url}`, path: 'requests/1/video-3.mp4' }),
+  };
+  // the guards
+  assert.deepEqual(await startVideo(ctx, 99, {}), { ok: false, reason: 'no-creative' });
+  assert.deepEqual(await startVideo(ctx, 2, {}), { ok: false, reason: 'no-picture' });
+  // the price first: nothing is made, nothing is written
+  const est = await startVideo(ctx, 1, { seconds: 5, estimateOnly: true });
+  assert.deepEqual([est.ok, est.usd, est.limit, est.spent, est.fits, est.seconds], [true, 0.5, 1, 0.2, true, 5]);
+  assert.equal(tables.ag_creatives.length, 2);
+  assert.equal((await startVideo(ctx, 1, { seconds: 10, estimateOnly: true })).fits, false); // 0.2 + 1.0 > 1
+  assert.deepEqual([(await startVideo(ctx, 1, { seconds: 10 })).reason, tables.ag_creatives.length], ['over-limit', 2]); // over the limit: nothing is made
+  // the run: a new row next to the picture, the default motion, the picture as the first frame, no sound unless asked
+  const run = await startVideo(ctx, 1, { seconds: 5 });
+  assert.deepEqual([run.ok, run.submitted, run.usd, run.seconds], [true, 1, 0.5, 5]);
+  const vid = tables.ag_creatives[2];
+  assert.deepEqual([vid.concept_key, vid.status, vid.cost_usd, vid.hf.kind, vid.hf.source_id, vid.ratio], ['c1~video', 'producing', 0.5, 'video', 1, '9:16']);
+  assert.match(vid.concept_name, /відео 5 с$/);
+  assert.deepEqual(log.at(-1).slice(2), [DEFAULT_MOTION, 'https://x/p.png', 'off']);
+  assert.equal(tables.ag_creative_spend.filter((r) => r.creative_id === vid.id && r.kind === 'generation').length, 1);
+  // a video from a video is not offered
+  assert.deepEqual(await startVideo(ctx, vid.id, {}), { ok: false, reason: 'is-video' });
+  // still being made: nothing changes
+  assert.equal(await pollCreatives(ctx, { requestId: 1 }), 0);
+  assert.equal(vid.status, 'producing');
+  // ready: copied into our storage, goes to the review; no words over it, no quality check
+  state = { state: 'ready', url: 'https://cdn/out.mp4' };
+  assert.equal(await pollCreatives(ctx, { requestId: 1 }), 1);
+  assert.deepEqual([vid.status, vid.asset_url, vid.final_url ?? null, vid.qc ?? null], ['review', 'copy:https://cdn/out.mp4', null, null]);
+  assert.deepEqual(await queueInspection(ctx, vid.id, { force: true }), { queued: false, reason: 'video' });
+  // refused by the provider: marked, the price comes back (not charged)
+  state = { state: 'pending' };
+  tables.ag_creatives[0].cost_usd = 0.2; vid.cost_usd = 0.5;
+  assert.equal((await startVideo(ctx, 1, { seconds: 3 })).ok, true); // 0.2 + 0.5 + 0.3 = 1.0 fits
+  const bad = tables.ag_creatives[3];
+  state = { state: 'failed', error: 'Higgsfield відхилив результат модерацією. Змініть опис руху.' };
+  await pollCreatives(ctx, { requestId: 1 });
+  assert.deepEqual([bad.status, bad.cost_usd, tables.ag_creative_spend.filter((r) => r.creative_id === bad.id).map((r) => r.kind)], ['failed', 0, ['generation', 'refund']]);
+  // no keys on the server: said plainly
+  ctx.hfVideo = null;
+  assert.equal((await startVideo(ctx, 1, { estimateOnly: true })).configured, false);
 });
 
 await ok('picture quality control (3.2): the checker looks at the FINISHED creative against the brand rules; a real problem returns it with the reasons, nothing is spent, a person decides', async () => {

@@ -7,6 +7,7 @@
 //   - the whole run can first be only an estimate (estimateOnly), which the page shows to the person before anything is spent.
 // The generator is handed in (ctx.hfImage; the real one when its keys and model are set on the server), so tests run it with a stand-in.
 import * as hfReal from './hfImage.js';
+import * as hfVideoReal from './hfVideo.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { creativeAutoOf } from '../../src/lib/agents/creativeTeam.js';
 import { LOOKS, LOOK_NEGATIVE, REAL_LOOKS, applyLook, cleanLook } from '../../src/lib/creatives/realism.js';
@@ -19,6 +20,7 @@ const iso = (d) => new Date(d).toISOString();
 const must = (r, what) => { if (r.error) throw new Error(`${what}: ${r.error.message}`); return r.data; };
 const round = (n) => Math.round(n * 10000) / 10000;
 
+const hfVideoOf = (ctx) => (ctx.hfVideo === undefined ? (hfVideoReal.videoConfigured() ? hfVideoReal.real : null) : ctx.hfVideo);
 const hfOf = (ctx) => (ctx.hfImage === undefined ? (hfReal.isConfigured() ? hfReal : null) : ctx.hfImage);
 export const generatorState = (ctx) => (hfOf(ctx) ? { ready: true, missing: [] } : { ready: false, missing: hfReal.missingConfig() });
 
@@ -92,6 +94,49 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
   return out;
 }
 
+// A VIDEO from a finished picture (step 3.5): the picture is the first frame, the motion prompt says what moves; a short clip (3..10 s, 5 by default). The same rules as for pictures: the price is asked first,
+// the limit of the task holds (the video counts in the cost of the request), the cap of the operation holds, a refused or failed one is not charged. The new row sits next to the picture in the same request.
+// → estimateOnly: { ok, usd, limit, spent, fits, seconds } ; otherwise { ok, submitted, id, usd } or { ok: false, reason | capped | configured: false }.
+export async function startVideo(ctx, creativeId, { prompt = '', seconds = hfVideoReal.VIDEO_DEFAULT_S, sound = false, estimateOnly = false } = {}) {
+  const { db } = ctx;
+  const hfv = hfVideoOf(ctx);
+  if (!hfv) return { ok: false, configured: false, error: 'Higgsfield не налаштовано на сервері.' };
+  const c = (await db.from('ag_creatives').select('*').eq('id', creativeId).maybeSingle()).data;
+  if (!c) return { ok: false, reason: 'no-creative' };
+  if (c.hf?.kind === 'video') return { ok: false, reason: 'is-video' };
+  if (!/^https:\/\//i.test(c.asset_url || '')) return { ok: false, reason: 'no-picture' };
+  if (!['review', 'approved', 'rejected'].includes(c.status)) return { ok: false, reason: 'not-ready' };
+  const req = must(await db.from('ag_creative_requests').select('id, campaign_id, brief').eq('id', c.request_id).maybeSingle(), 'request');
+  if (!estimateOnly && (await cappedCampaigns(db)).has(String(req.campaign_id))) return { ok: false, capped: true, error: CAP_MESSAGE };
+  const cycleMax = Number(req.brief?.agent_settings?.creative_maker?.max_usd);
+  const teamMax = creativeAutoOf((await db.from('ag_campaigns').select('config').eq('id', req.campaign_id).maybeSingle()).data).maxUsd;
+  const limit = cycleMax > 0 ? cycleMax : teamMax || limitOf(await makerConfig(db));
+  const rows = must(await db.from('ag_creatives').select('id, cost_usd').eq('request_id', c.request_id), 'creatives') || [];
+  const spent = round(rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0));
+  const secs = hfVideoReal.clampSeconds(seconds);
+  const request = hfVideoReal.buildVideoRequest({ prompt: String(prompt || '').trim() || hfVideoReal.DEFAULT_MOTION, image: c.asset_url, seconds: secs, sound }, hfv.profile());
+  let usd;
+  try { usd = await hfv.estimate({ request }); } catch (e) { return { ok: false, error: String(e?.message || e).replace(/\(оцінка вартості; перевірте HF_IMAGE_MODEL[^)]*\)/, '(оцінка вартості відео; перевірте HF_VIDEO_MODEL і параметри моделі)') }; }
+  usd = round(usd);
+  const fits = spent + usd <= limit + 1e-9;
+  if (estimateOnly) return { ok: true, usd, limit, spent, fits, seconds: secs };
+  if (!fits) return { ok: false, reason: 'over-limit', usd, limit, spent };
+  const now = iso(ctx.now?.() || new Date());
+  const base = String(c.concept_key).split('~')[0];
+  const row = must(await db.from('ag_creatives').insert({ request_id: c.request_id, concept_key: `${base}~video`, concept_name: `${String(c.concept_name || base).split(' · ')[0]} · відео ${secs} с`, ratio: c.ratio, prompt: request.body.prompt, negative_prompt: '', copy: c.copy || {}, status: 'planned', hf: { kind: 'video', source_id: c.id, seconds: secs, sound: !!sound }, updated_at: now }).select().single(), 'creative');
+  const who = { request_id: c.request_id, campaign_id: req.campaign_id, role: 'creative_maker' };
+  try {
+    const job = await hfv.submit({ request, key: `video-${row.id}-g1` });
+    must(await db.from('ag_creatives').update({ status: 'producing', cost_usd: usd, generations: 1, hf: { ...(row.hf || {}), status_url: job.statusUrl, submitted_at: now, estimate_usd: usd, charged_before: 0 }, updated_at: now }).eq('id', row.id), 'creative');
+    await db.from('ag_creative_spend').insert({ creative_id: row.id, request_id: c.request_id, campaign_id: req.campaign_id, usd, kind: 'generation', model: request.path, job_id: job.jobId });
+    await logStep(ctx, who, 'Higgsfield: відео ' + secs + ' с з картинки «' + (c.concept_name || c.concept_key) + '» відправлено, очікую результат', 'running');
+    return { ok: true, submitted: 1, id: row.id, usd, seconds: secs };
+  } catch (e) {
+    must(await db.from('ag_creatives').update({ status: 'failed', note: String(e.message || e).slice(0, 300), updated_at: now }).eq('id', row.id), 'creative');
+    return { ok: false, error: String(e?.message || e) };
+  }
+}
+
 // Compares the realism looks on the SAME scene (step 3.4): for the picture the person points at, one new picture per chosen look is made from the same scene prompt with the cues of that look added, next to
 // the original in the same request. estimateOnly: only the price. → { ok, looks, count, estimateUsd, limit, skipped, submitted, ids } or { ok: false, reason }.
 export async function compareLooks(ctx, creativeId, looks = [], { estimateOnly = false } = {}) {
@@ -126,7 +171,7 @@ export async function compareLooks(ctx, creativeId, looks = [], { estimateOnly =
 // Looks at the pictures that are being made: a ready one is copied into our storage and goes to the person's review, a failed one is marked (and not charged).
 export async function pollCreatives(ctx, { requestId = null } = {}) {
   const hf = hfOf(ctx);
-  if (!hf) return 0;
+  if (!hf && !hfVideoOf(ctx)) return 0;
   const { db } = ctx;
   let q = db.from('ag_creatives').select('*').eq('status', 'producing');
   if (requestId) q = q.eq('request_id', requestId);
@@ -138,9 +183,31 @@ export async function pollCreatives(ctx, { requestId = null } = {}) {
     if (!campaigns.has(rid)) campaigns.set(rid, (await db.from('ag_creative_requests').select('campaign_id').eq('id', rid).maybeSingle()).data?.campaign_id ?? null);
     return campaigns.get(rid);
   };
+  const hfv = hfVideoOf(ctx);
   for (const row of rows) {
     const gen = row.hf || {};
     if (!gen.status_url) continue;
+    if (gen.kind === 'video') { // a video (step 3.5): checked and copied by the video adapter, no words over it, no picture check
+      if (!hfv) continue;
+      const late = gen.submitted_at && new Date(now).getTime() - new Date(gen.submitted_at).getTime() > STALE_MS * 2;
+      let v;
+      try { v = await hfv.check({ statusUrl: gen.status_url }); } catch { v = { state: 'pending' }; }
+      const whoV = { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' };
+      if (v.state === 'ready') {
+        const saved = await hfv.persist({ db, url: v.url, requestId: row.request_id, creativeId: row.id });
+        must(await db.from('ag_creatives').update({ status: 'review', asset_url: saved.url, asset_path: saved.path || null, hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id), 'creative');
+        changed += 1;
+        await logStep(ctx, whoV, 'Higgsfield: відео «' + (row.concept_name || row.concept_key) + '» готове', 'done');
+      } else if (v.state === 'failed' || late) {
+        const refused = v.state === 'failed';
+        must(await db.from('ag_creatives').update({ status: 'failed', cost_usd: refused ? Number(gen.charged_before || 0) : row.cost_usd, note: v.error || 'Higgsfield не відповів вчасно: відео не отримано.', updated_at: now }).eq('id', row.id), 'creative');
+        if (refused && Number(gen.estimate_usd) > 0) await db.from('ag_creative_spend').insert({ creative_id: row.id, request_id: row.request_id, campaign_id: await campaignOf(row.request_id), usd: -Number(gen.estimate_usd), kind: 'refund' });
+        changed += 1;
+        await logStep(ctx, whoV, 'Higgsfield: відео «' + (row.concept_name || row.concept_key) + '» не вдалося: ' + String(v.error || 'довго немає відповіді').slice(0, 120), 'failed');
+      }
+      continue;
+    }
+    if (!hf) continue;
     const timedOut = gen.submitted_at && new Date(now).getTime() - new Date(gen.submitted_at).getTime() > STALE_MS;
     let r;
     try { r = await hf.check({ statusUrl: gen.status_url }); } catch { r = { state: 'pending' }; }

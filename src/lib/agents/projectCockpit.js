@@ -217,7 +217,7 @@ export function buildCockpit(raw) {
         const url = x.final_url || x.asset_url || '';
         const v = x.copy?.variants?.[0] || null;
         const qcv = x.qc && x.qc.source === 'picture' ? { verdict: x.qc.verdict, summary: clip(x.qc.summary, 300), issues: (Array.isArray(x.qc.issues) ? x.qc.issues : []).slice(0, 8).map((i) => ({ aspect: i.aspect, severity: i.severity, comment: clip(i.comment, 400) })), checkedAt: x.qc.checked_at || null } : null;
-        const item = { id: x.id, url, rawUrl: x.asset_url || '', qc: qcv, hasText: !!x.final_url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: 'image', note: clip(x.note, 400),
+        const item = { id: x.id, url, rawUrl: x.asset_url || '', qc: qcv, hasText: !!x.final_url, downloadUrl: url, ratio: x.ratio, conceptName: x.concept_name || x.concept_key || '', status: x.status, kind: x.kind === 'video' ? 'video' : 'image', note: clip(x.note, 400),
           copy: v ? { headline: clip(v.headline, 200), text: clip(v.primary || v.text || v.body, 900), description: clip(v.description, 300), cta: clip(v.cta, 60) } : null };
         return { ...item, fileName: fileNameOf(item, { project: project.name || campaign.name }) };
       });

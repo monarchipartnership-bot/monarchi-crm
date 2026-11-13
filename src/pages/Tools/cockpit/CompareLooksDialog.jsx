@@ -40,7 +40,7 @@ export default function CompareLooksDialog({ item, currentLook = 'std', onAct, o
   return createPortal(
     <div className="ckp ckp-overlay is-night ai-immersive ted-ov" data-ai-safe onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div ref={box} className="ted-win ted-ret" role="dialog" aria-modal="true" aria-label={`Порівняти реалізм: ${item.conceptName}`} tabIndex={-1}>
-        <header className="ted-head"><div><h2>Порівняти реалізм «{item.conceptName}»</h2><small>Та сама сцена в інших виглядах, поруч з оригіналом. До трьох вигладів за раз.</small></div></header>
+        <header className="ted-head"><div><h2>Порівняти реалізм «{item.conceptName}»</h2><small>Та сама сцена в інших виглядах, поруч з оригіналом. До трьох виглядів за раз.</small></div></header>
         {done > 0 ? (
           <>
             <p className="sd-note" role="status">Запущено картинок: {done}. Вони зʼявляться поруч з оригіналом у розділі «Результати» за кілька хвилин.</p>

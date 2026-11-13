@@ -257,6 +257,9 @@
 
 /* the creative on the whole screen (Gallery.jsx, FullView) */
 .ckp-glight { position: fixed; inset: 0; z-index: 1500; display: flex; align-items: center; justify-content: center; padding: 64px 72px 24px; background: rgba(10, 3, 16, .94); color: #F6E9FA; font-family: var(--font-body, 'Onest', system-ui, sans-serif); }
+.ckp-glight video { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 24px 80px #000a; background: #000; }
+.ckp-gim--video { padding: 0; overflow: hidden; background: #1a0a22; } .ckp-gim--video video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.ckp-mt { position: relative; overflow: hidden; } .ckp-mt video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .ckp-glight img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 12px; box-shadow: 0 24px 80px #000a; cursor: zoom-out; }
 .ckp-glight-bar { position: absolute; left: 24px; right: 24px; top: 14px; display: flex; align-items: center; gap: 12px; font-size: 14px; }
 .ckp-glight-bar b { font-size: 16px; font-weight: 800; }

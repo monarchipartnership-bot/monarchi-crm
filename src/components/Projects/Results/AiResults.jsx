@@ -6,6 +6,7 @@ import { RUN_FILTERS, buildRuns, dateTimeText, filterRuns, groupItems, runCounts
 import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
 import StepCards from '../../../pages/Tools/cockpit/StepCards';
 import CompareLooksDialog from '../../../pages/Tools/cockpit/CompareLooksDialog';
+import VideoDialog from '../../../pages/Tools/cockpit/VideoDialog';
 import QcLine from '../../../pages/Tools/cockpit/QcLine';
 import ReturnDialog from '../../../pages/Tools/cockpit/ReturnDialog';
 import TextEditDialog from '../../../pages/Tools/cockpit/TextEditDialog';
@@ -26,6 +27,7 @@ function ResultCard({ item, onOpen, onAct, busy, styleCtx }) {
   const [returning, setReturning] = useState(false);
   const [editing, setEditing] = useState(false);
   const [comparing, setComparing] = useState(false);
+  const [videoing, setVideoing] = useState(false);
   const [err, setErr] = useState('');
   const st = ITEM_STATUS[item.status] || ['', item.status];
   const canEditText = !!styleCtx && !!item.rawUrl && item.kind !== 'video' && ['review', 'approved'].includes(item.status);
@@ -33,11 +35,11 @@ function ResultCard({ item, onOpen, onAct, busy, styleCtx }) {
   return (
     <li className="ar-card" data-st={item.status}>
       <button type="button" className="ar-pic" onClick={() => onOpen(item)} aria-label={`Відкрити: ${item.conceptName}`} style={{ aspectRatio: String(ratioOf(item.ratio)) }}>
-        {item.url ? <img src={item.url} alt={item.conceptName} loading="lazy" /> : <span>{item.status === 'producing' ? 'Генерується…' : 'Немає картинки'}</span>}
+        {item.url ? (item.kind === 'video' ? <video src={item.url} aria-label={item.conceptName} muted playsInline preload="metadata" /> : <img src={item.url} alt={item.conceptName} loading="lazy" />) : <span>{item.status === 'producing' ? 'Генерується…' : 'Немає картинки'}</span>}
         <span className={'ar-st ' + st[0]}>{st[1]}</span>
       </button>
       <div className="ar-cmain">
-        <b>{item.conceptName}</b><small>{item.ratio || '4:5'}</small>
+        <b>{item.conceptName}</b><small>{item.ratio || '4:5'}{item.kind === 'video' ? ' · відео' : ''}</small>
         {item.copy?.headline && <p className="ar-copy"><strong>{item.copy.headline}</strong>{item.copy.text ? ` ${item.copy.text}` : ''}</p>}
         {item.note && <p className="ar-note">{item.note}</p>}
         <QcLine qc={item.qc} />
@@ -47,11 +49,13 @@ function ResultCard({ item, onOpen, onAct, busy, styleCtx }) {
         {canReturn(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => setReturning(true)}>Повернути</button>}
         {canEditText && <button type="button" className="btn" disabled={!!busy} onClick={() => setEditing(true)}>Редагувати текст</button>}
         {!!styleCtx && !!item.rawUrl && item.kind !== 'video' && ['review', 'approved', 'rejected'].includes(item.status) && <button type="button" className="btn" disabled={!!busy} onClick={() => setComparing(true)}>Порівняти реалізм</button>}
+        {!!styleCtx && !!item.rawUrl && item.kind !== 'video' && ['review', 'approved', 'rejected'].includes(item.status) && <button type="button" className="btn" disabled={!!busy} onClick={() => setVideoing(true)}>Створити відео</button>}
         {canEditText && item.status === 'review' && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('inspect')}>{item.qc ? 'Перевірити ще раз' : 'Перевірити якість'}</button>}
         {canDownload(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('download_one')} aria-label={`Завантажити: ${item.conceptName}`}>Завантажити</button>}
       </div>
       {err && <p className="ar-err" role="alert">{err}</p>}
       {returning && <ReturnDialog item={item} canEditText={canEditText} onClose={() => setReturning(false)} onRedo={(comment) => onAct('return', { creativeIds: [item.id], comment })} onText={() => { setReturning(false); setEditing(true); }} />}
+      {videoing && <VideoDialog item={item} onAct={onAct} onClose={() => setVideoing(false)} />}
       {comparing && <CompareLooksDialog item={item} currentLook={styleCtx?.look || 'std'} onAct={onAct} onClose={() => setComparing(false)} />}
       {editing && styleCtx && <TextEditDialog item={item} autoStyle={styleCtx.autoStyle} taskStyle={styleCtx.taskStyle} onClose={() => setEditing(false)} onSave={(edit) => onAct('edit_text', { creativeId: item.id, edit })} />}
     </li>
@@ -72,7 +76,7 @@ function Lightbox({ items, index, onClose, onGo }) {
     <div className="ar-light" role="dialog" aria-modal="true" aria-label={`Креатив: ${item.conceptName}`} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="ar-light-bar"><b>{item.conceptName}</b><span>{item.ratio}</span><button type="button" className="btn" onClick={onClose}>Закрити</button></div>
       {items.length > 1 && <button type="button" className="ar-nav is-prev" onClick={() => onGo(-1)} aria-label="Попередній креатив">‹</button>}
-      <img src={item.url} alt={item.conceptName} />
+      {item.kind === 'video' ? <video src={item.url} aria-label={item.conceptName} controls autoPlay playsInline loop /> : <img src={item.url} alt={item.conceptName} />}
       {items.length > 1 && <button type="button" className="ar-nav is-next" onClick={() => onGo(1)} aria-label="Наступний креатив">›</button>}
       {(item.copy?.headline || item.copy?.text) && <p className="ar-light-copy"><strong>{item.copy.headline}</strong> {item.copy.text} {item.copy.cta ? `· ${item.copy.cta}` : ''}</p>}
     </div>,
@@ -168,7 +172,7 @@ export default function AiResults({ projectId }) {
               <li key={r.id}>
                 <button type="button" className={'ar-row ' + (STATE_CLASS[r.state] || '')} onClick={() => setOpenId(r.id)}>
                   <span className="ar-thumbs" aria-hidden="true">
-                    {r.items.filter((i) => i.url).slice(0, 3).map((i) => <img key={i.id} src={i.url} alt="" loading="lazy" />)}
+                    {r.items.filter((i) => i.url && i.kind !== 'video').slice(0, 3).map((i) => <img key={i.id} src={i.url} alt="" loading="lazy" />)}
                     {!r.items.some((i) => i.url) && <span className="ar-nothumb">{r.state === 'work' ? '…' : '·'}</span>}
                   </span>
                   <span className="ar-rmain">

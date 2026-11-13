@@ -5,6 +5,7 @@ import CompareLooksDialog from './CompareLooksDialog';
 import QcLine from './QcLine';
 import ReturnDialog from './ReturnDialog';
 import TextEditDialog from './TextEditDialog';
+import VideoDialog from './VideoDialog';
 
 // The gallery of the materials of one request (the main zone of the project window, decision 34). Everything happens in place: a click on a thumbnail
 // opens it larger in the same zone (no lightbox over the window), with its note, a comment field and the actions.
@@ -27,9 +28,15 @@ function Picture({ item, index, large = false }) {
     <div className={'ckp-gth' + (large ? ' is-large' : '')} style={large ? { '--gr': r, aspectRatio: String(r) } : undefined}>
       <span className={'ckp-gst ckp-chip ' + (STATUS[item.status]?.[0] || '')}>{item.status === 'producing' && <Spinner />}{STATUS[item.status]?.[1] || item.status}</span>
       <span className="ckp-grt">{item.ratio || '4:5'}{item.kind === 'video' ? ' · відео' : ''}</span>
-      <div className="ckp-gim" style={{ ...bg, aspectRatio: String(r) }} role="img" aria-label={item.conceptName}>
-        {!item.url && <b>{item.conceptName}</b>}
-      </div>
+      {item.kind === 'video' && item.url ? (
+        <div className="ckp-gim ckp-gim--video" style={{ aspectRatio: String(r) }}>
+          <video src={item.url} aria-label={item.conceptName} controls={large} muted playsInline preload="metadata" loop={large} />
+        </div>
+      ) : (
+        <div className="ckp-gim" style={{ ...bg, aspectRatio: String(r) }} role="img" aria-label={item.conceptName}>
+          {!item.url && <b>{item.conceptName}</b>}
+        </div>
+      )}
     </div>
   );
 }
@@ -46,7 +53,7 @@ function FullView({ item, count, onClose, onGo }) {
       <div className="ckp-glight-bar"><b>{item.conceptName}</b><span>{item.ratio || '4:5'}</span><span className={'ckp-chip ' + (STATUS[item.status]?.[0] || '')}>{STATUS[item.status]?.[1] || item.status}</span>
         <button type="button" className="ckp-x ckp-x-lg" onClick={onClose} aria-label="Закрити перегляд"><Ic n="close" size={17} /></button></div>
       {count > 1 && <button type="button" className="ckp-glight-nav is-prev" onClick={() => onGo(-1)} aria-label="Попередній креатив"><Ic n="back" size={22} /></button>}
-      <img src={item.url} alt={item.conceptName} onClick={onClose} />
+      {item.kind === 'video' ? <video src={item.url} aria-label={item.conceptName} controls autoPlay playsInline loop /> : <img src={item.url} alt={item.conceptName} onClick={onClose} />}
       {count > 1 && <button type="button" className="ckp-glight-nav is-next" onClick={() => onGo(1)} aria-label="Наступний креатив"><Ic n="arrow" size={22} /></button>}
     </div>,
     document.body,
@@ -61,6 +68,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
   const [err, setErr] = useState('');
   const [returning, setReturning] = useState(null); // the creative the dialog «Повернути» is open for
   const [editing, setEditing] = useState(null); // the creative whose words are being edited
+  const [videoing, setVideoing] = useState(null); // the creative a video is made of
   const [comparing, setComparing] = useState(null); // the creative whose scene is made again in other realism looks
   const [full, setFull] = useState(false); // the opened creative on the whole screen
   const pred = FILTERS.find((f) => f[0] === filter)[2];
@@ -80,6 +88,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
   const download = (i) => act('download_one', { creativeId: i.id }, 'dl' + i.id);
   const giveBack = (i) => setReturning(i); // the dialog asks what is wrong: the picture or only the words
   const canCompare = (i) => !!textEdit && !!i.rawUrl && i.kind !== 'video' && ['review', 'approved', 'rejected'].includes(i.status);
+  const canVideo = (i) => !!textEdit && !!i.rawUrl && i.kind !== 'video' && ['review', 'approved', 'rejected'].includes(i.status);
   const canEditText = (i) => !!textEdit && !!i.rawUrl && i.kind !== 'video' && ['review', 'approved'].includes(i.status);
   const go = (d) => { if (!shown.length) return; setOpenId(shown[(idx + d + shown.length) % shown.length].id); };
 
@@ -103,12 +112,12 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
         <div className="ckp-gdet gx-scene">
           <div className="gx-stage">
             {shown.length > 1 && <button type="button" className="gx-nv is-prev" onClick={() => go(-1)} aria-label="Попередній матеріал"><Ic n="back" size={20} /></button>}
-            {open.url
+            {open.url && open.kind !== 'video'
               ? <button type="button" className="ckp-gzoom" style={{ '--gr': ratioOf(open.ratio) }} onClick={() => setFull(true)} aria-label={`Відкрити на весь екран: ${open.conceptName}`} title="Відкрити на весь екран"><Picture item={open} index={idx} large /></button>
               : <Picture item={open} index={idx} large />}
             {shown.length > 1 && <button type="button" className="gx-nv is-next" onClick={() => go(1)} aria-label="Наступний матеріал"><Ic n="arrow" size={20} /></button>}
             <div className="ckp-gstrip" role="list">
-              {shown.map((i, k) => <button key={i.id} type="button" role="listitem" className={'ckp-mt' + (i.id === open.id ? ' is-on' : '') + (ratioOf(i.ratio) < 0.7 ? ' is-v' : '')} style={i.url ? { backgroundImage: `url(${i.url})` } : { background: i.gradient || FALLBACK[k % FALLBACK.length] }} onClick={() => setOpenId(i.id)} aria-label={i.conceptName} />)}
+              {shown.map((i, k) => <button key={i.id} type="button" role="listitem" className={'ckp-mt' + (i.id === open.id ? ' is-on' : '') + (ratioOf(i.ratio) < 0.7 ? ' is-v' : '')} style={i.url && i.kind !== 'video' ? { backgroundImage: `url(${i.url})` } : { background: i.gradient || FALLBACK[k % FALLBACK.length] }} onClick={() => setOpenId(i.id)} aria-label={i.conceptName}>{i.kind === 'video' && i.url && <video src={i.url} muted playsInline preload="metadata" tabIndex={-1} aria-hidden="true" />}</button>)}
             </div>
           </div>
           <div className="ckp-ginfo gx-panel">
@@ -121,6 +130,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
               {canReturn(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => giveBack(open)}>{busy === 'rt' + open.id && <Spinner />}Повернути</button>}
               {canEditText(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => setEditing(open)}><Ic n="pen" size={15} />Редагувати текст</button>}
               {canCompare(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => setComparing(open)}>Порівняти реалізм</button>}
+              {canVideo(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => setVideoing(open)}>Створити відео</button>}
               {open.status === 'review' && open.rawUrl && !!textEdit && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => act('inspect', { creativeId: open.id }, 'qc' + open.id)}>{busy === 'qc' + open.id && <Spinner />}{open.qc ? 'Перевірити якість ще раз' : 'Перевірити якість'}</button>}
               {canDownload(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => download(open)}>{busy === 'dl' + open.id ? <Spinner /> : <Ic n="download" size={15} />}Завантажити</button>}
             </div>
@@ -134,6 +144,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
         {full && open.url && <FullView item={open} count={shown.length} onClose={() => setFull(false)} onGo={go} />}
       {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} textOption={!!textEdit} onClose={() => setReturning(null)}
         onRedo={(comment) => act('return', { creativeIds: [returning.id], comment }, 'rt' + returning.id)} onText={() => { setEditing(returning); setReturning(null); }} />}
+      {videoing && <VideoDialog item={videoing} onAct={(key, payload) => onAct?.(key, payload)} onClose={() => setVideoing(null)} />}
       {comparing && <CompareLooksDialog item={comparing} currentLook={textEdit?.look || 'std'} onAct={(key, payload) => onAct?.(key, payload)} onClose={() => setComparing(null)} />}
       {editing && textEdit && <TextEditDialog item={editing} autoStyle={textEdit.autoStyle} taskStyle={textEdit.taskStyle} onClose={() => setEditing(null)} onSave={(edit) => onAct?.('edit_text', { creativeId: editing.id, edit })} />}
       </div>

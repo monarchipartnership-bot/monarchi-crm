@@ -41,8 +41,9 @@ async function enqueue(db, agent, { campaignId, requestId, brief, by }) {
 // The quality checker looks at a FINISHED creative (step 3.2): once per picture, only when the checker takes part in this client's chain and the creative waits for the person. → { queued, reason? }
 export async function queueInspection(ctx, creativeId, { force = false } = {}) {
   const { db } = ctx;
-  const c = (await db.from('ag_creatives').select('id, request_id, status, asset_url, final_url, qc').eq('id', creativeId).maybeSingle()).data;
+  const c = (await db.from('ag_creatives').select('id, request_id, status, asset_url, final_url, qc, hf').eq('id', creativeId).maybeSingle()).data;
   if (!c || c.status !== 'review' || !c.asset_url) return { queued: false, reason: 'not-ready' };
+  if (c.hf?.kind === 'video') return { queued: false, reason: 'video' }; // the checker looks at pictures; a video is judged by the person
   if (!force && c.qc?.picture_url && c.qc.picture_url === (c.final_url || c.asset_url)) return { queued: false, reason: 'checked' };
   const req = (await db.from('ag_creative_requests').select('id, campaign_id').eq('id', c.request_id).maybeSingle()).data;
   if (!req) return { queued: false, reason: 'no-request' };

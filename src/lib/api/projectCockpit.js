@@ -29,7 +29,7 @@ export async function fetchCockpits() {
     projectIds.length ? supabase.from('ag_project_intel').select('*').in('project_id', projectIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const reqs = must(requests) || [];
-  const creatives = reqs.length ? must(await supabase.from('ag_creatives').select('id, request_id, concept_key, concept_name, ratio, status, asset_url, final_url, cost_usd, note, copy, qc').in('request_id', reqs.map((r) => r.id))) || [] : [];
+  const creatives = reqs.length ? must(await supabase.from('ag_creatives').select('id, request_id, concept_key, concept_name, ratio, status, asset_url, final_url, cost_usd, note, copy, qc, kind:hf->>kind').in('request_id', reqs.map((r) => r.id))) || [] : [];
   const projectOf = new Map((must(projects) || []).map((p) => [p.id, p]));
   const assetCount = {};
   (must(assets) || []).forEach((a) => { assetCount[a.project_id] = (assetCount[a.project_id] || 0) + 1; });
@@ -136,6 +136,16 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     if (!r?.submitted) throw new Error('Нічого не запущено: картинки не вміщаються в ліміт витрат на це завдання.');
     kick();
     return { submitted: r.submitted };
+  }
+  if (key === 'video_estimate' || key === 'video_run') { // a short video from a finished picture (step 3.5): the price first, then the video
+    const r = await agentAction('make_video', { creativeId: payload.creativeId, prompt: payload.prompt, seconds: payload.seconds, sound: payload.sound === true, estimateOnly: key === 'video_estimate' });
+    if (r?.configured === false) throw new Error('Higgsfield не налаштовано на сервері.');
+    if (r?.capped) throw new Error(r.error || 'Операція досягла ліміту витрат.');
+    if (r?.reason === 'over-limit') throw new Error(`Відео коштує ~$${Number(r.usd || 0).toFixed(2)} і не вміщається в ліміт завдання ($${Number(r.limit || 0).toFixed(2)}, вже витрачено $${Number(r.spent || 0).toFixed(2)}).`);
+    if (r?.ok === false) throw new Error({ 'no-creative': 'Креатив не знайдено.', 'is-video': 'З відео не можна зробити відео.', 'no-picture': 'У креатива немає картинки.', 'not-ready': 'Креатив ще не готовий.' }[r.reason] || r.error || 'Не вдалося виконати запит на відео.');
+    if (key === 'video_estimate') return { video: { usd: Number(r.usd || 0), limit: Number(r.limit || 0), spent: Number(r.spent || 0), fits: r.fits !== false, seconds: Number(r.seconds || 0) } };
+    kick();
+    return { submitted: r.submitted || 0 };
   }
   if (key === 'inspect') { // the quality checker looks at ONE finished picture now (about a cent)
     const r = await agentAction('inspect_creative', { creativeId: payload.creativeId });

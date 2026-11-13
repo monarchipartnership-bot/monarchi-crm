@@ -19,6 +19,7 @@ export const ACTION_RULES = {
   reject_plan: { level: 'result', label: 'Відхилення плану' },
   cancel_task: { level: 'logged', label: 'Скасування кроку' },
   overlay_creative: { level: 'logged', label: 'Текст на креативі' },
+  make_video: { level: 'paid', label: 'Відео з картинки в Higgsfield' },
   compare_looks: { level: 'paid', label: 'Порівняння реалізму: нові картинки в Higgsfield' },
   inspect_creative: { level: 'paid', label: 'Перевірка якості готового креатива' },
   edit_creative_text: { level: 'logged', label: 'Правка тексту на готовому креативі' },
