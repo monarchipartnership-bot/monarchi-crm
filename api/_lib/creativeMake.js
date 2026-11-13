@@ -214,7 +214,8 @@ export async function pollCreatives(ctx, { requestId = null } = {}) {
       const whoV = { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' };
       if (v.state === 'ready') {
         const saved = await hfv.persist({ db, url: v.url, requestId: row.request_id, creativeId: row.id });
-        must(await db.from('ag_creatives').update({ status: 'review', asset_url: saved.url, asset_path: saved.path || null, hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id), 'creative');
+        const movedV = must(await db.from('ag_creatives').update({ status: 'review', asset_url: saved.url, asset_path: saved.path || null, hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id).eq('status', 'producing').select('id'), 'creative') || [];
+        if (!movedV.length) continue; // another pass already took it
         changed += 1;
         await logStep(ctx, whoV, 'Higgsfield: відео «' + (row.concept_name || row.concept_key) + '» готове', 'done');
       } else if (v.state === 'failed' || late) {
@@ -232,7 +233,10 @@ export async function pollCreatives(ctx, { requestId = null } = {}) {
     try { r = await hf.check({ statusUrl: gen.status_url }); } catch { r = { state: 'pending' }; }
     if (r.state === 'ready') {
       const saved = await hf.persist({ db, url: r.url, requestId: row.request_id, creativeId: row.id });
-      must(await db.from('ag_creatives').update({ status: 'review', asset_url: saved.url, asset_path: saved.path || null, hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id), 'creative');
+      // only the pass that moves the picture from «producing» to «review» goes on: several passes (the cron, the open cabinets) may look at the same picture at the same moment, and every extra one would
+      // start its own video and its own words (a task asked for ONE video and got three, 13.11)
+      const moved = must(await db.from('ag_creatives').update({ status: 'review', asset_url: saved.url, asset_path: saved.path || null, hf: { ...gen, finished_at: now }, updated_at: now }).eq('id', row.id).eq('status', 'producing').select('id'), 'creative') || [];
+      if (!moved.length) continue;
       changed += 1;
       const who = { request_id: row.request_id, campaign_id: await campaignOf(row.request_id), role: 'creative_maker' };
       await logStep(ctx, who, 'Higgsfield: картинка «' + (row.concept_name || row.concept_key) + '», ' + row.ratio + ' готова', 'done');

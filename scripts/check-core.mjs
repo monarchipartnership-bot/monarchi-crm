@@ -2314,6 +2314,11 @@ await ok('task asks for videos (3.8): the settings are cleaned, the first finish
   assert.ok(await pollCreatives(ctx, { requestId: 1 }) >= 2);
   assert.deepEqual([sent, tables.ag_creatives.filter((r) => r.hf?.kind === 'video').map((r) => [r.hf.source_id, r.status])], [['https://x/p1.png'], [[1, 'producing']]]);
   assert.ok(tables.ag_task_steps.some((x) => /задача просила відео/.test(x.text)));
+  // several passes look at the same finished picture at once (the cron and the open cabinets): ONE video, not one per pass (the task asked for one)
+  tables.ag_creative_requests.push({ id: 2, campaign_id: 1, status: 'running', title: 't2', brief: { media: 'both', video_count: 1, video_seconds: 5 }, materials: [] });
+  tables.ag_creatives.push({ ...pic(9, 'c1'), id: 9, request_id: 2 });
+  await Promise.all([1, 2, 3].map(() => pollCreatives(ctx, { requestId: 2 })));
+  assert.equal(tables.ag_creatives.filter((r) => r.request_id === 2 && r.hf?.kind === 'video').length, 1);
 });
 
 await ok('agent question stops the chain (3.7): nothing below starts and nothing is paid until the manager answers; the same agent works again with the answer; «continue without an answer» takes the result as it is', async () => {
