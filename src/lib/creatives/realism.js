@@ -25,7 +25,7 @@ export const LOOKS = [
 ];
 
 // the looks that have an example picture in /public/realism (the same scene in each look)
-export const LOOK_EXAMPLES = ['studio', 'life', 'ugc'];
+export const LOOK_EXAMPLES = ['studio', 'life', 'ugc', 'ed', 'macro', 'env'];
 
 const BY_KEY = Object.fromEntries(LOOKS.map((l) => [l.key, l]));
 export const LOOK_KEYS = LOOKS.map((l) => l.key);
