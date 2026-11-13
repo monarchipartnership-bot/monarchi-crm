@@ -9,6 +9,7 @@
 import * as hfReal from './hfImage.js';
 import { CAP_MESSAGE, cappedCampaigns } from './campaignCycles.js';
 import { creativeAutoOf } from '../../src/lib/agents/creativeTeam.js';
+import { LOOKS, LOOK_NEGATIVE, REAL_LOOKS, applyLook, cleanLook } from '../../src/lib/creatives/realism.js';
 import { logStep } from './taskSteps.js';
 import { applyText, inspectLater } from './creativeText.js';
 
@@ -89,6 +90,37 @@ export async function generateCreatives(ctx, requestId, { ids = null, estimateOn
   }
   out.spent = spent;
   return out;
+}
+
+// Compares the realism looks on the SAME scene (step 3.4): for the picture the person points at, one new picture per chosen look is made from the same scene prompt with the cues of that look added, next to
+// the original in the same request. estimateOnly: only the price. → { ok, looks, count, estimateUsd, limit, skipped, submitted, ids } or { ok: false, reason }.
+export async function compareLooks(ctx, creativeId, looks = [], { estimateOnly = false } = {}) {
+  const { db } = ctx;
+  const c = (await db.from('ag_creatives').select('*').eq('id', creativeId).maybeSingle()).data;
+  if (!c || !c.prompt) return { ok: false, reason: 'no-creative' };
+  const keys = [...new Set((Array.isArray(looks) ? looks : []).map(cleanLook).filter((k) => k && REAL_LOOKS.some((l) => l.key === k)))].slice(0, 3);
+  if (!keys.length) return { ok: false, reason: 'no-looks' };
+  if (estimateOnly) { // the price of ONE picture of this request times the number of looks
+    const one = await generateCreatives(ctx, c.request_id, { ids: [c.id], estimateOnly: true });
+    if (one.ok === false) return one;
+    return { ok: true, looks: keys, count: keys.length, estimateUsd: round(Number(one.estimateUsd || 0) * keys.length), limit: one.limit, spent: one.spent, fits: Number(one.spent || 0) + Number(one.estimateUsd || 0) * keys.length <= Number(one.limit || 0) + 1e-9 };
+  }
+  // the scene of the picture without the cues of a look it may already carry (a task with a look): the cues of the chosen looks are added to the clean scene
+  let scene = String(c.prompt);
+  let negative = String(c.negative_prompt || '');
+  REAL_LOOKS.forEach((l) => { scene = scene.split(l.cues).join(''); });
+  scene = scene.replace(/\s+\./g, '.').replace(/\.\s*\./g, '.').trim();
+  negative = negative.split(LOOK_NEGATIVE).join('').replace(/[\s,;.]+$/, '');
+  const base = String(c.concept_key).split('~')[0];
+  const made = [];
+  for (const key of keys) {
+    const look = LOOKS.find((l) => l.key === key);
+    const done = applyLook({ prompt: scene, negative }, key);
+    const row = must(await db.from('ag_creatives').insert({ request_id: c.request_id, concept_key: `${base}~${key}`, concept_name: `${String(c.concept_name || base).split(' · ')[0]} · ${look.label}`, ratio: c.ratio, prompt: done.prompt, negative_prompt: done.negative, copy: c.copy || {}, hf: { references: c.hf?.references || [], compare_of: c.id, look: key }, status: 'planned', note: null, updated_at: iso(ctx.now?.() || new Date()) }).select().single(), 'creative');
+    made.push(row.id);
+  }
+  const out = await generateCreatives(ctx, c.request_id, { ids: made });
+  return { ...out, looks: keys, ids: made };
 }
 
 // Looks at the pictures that are being made: a ready one is copied into our storage and goes to the person's review, a failed one is marked (and not charged).

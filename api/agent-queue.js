@@ -21,7 +21,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { getModelClient } from './_lib/ai.js';
-import { generateCreatives, generatorState, pollCreatives } from './_lib/creativeMake.js';
+import { compareLooks, generateCreatives, generatorState, pollCreatives } from './_lib/creativeMake.js';
 import { approvePlan, cancelTask, dryRun, generatorReady, launchCampaign, passOnAny, pollAssets, processQueue, redoVisual, rejectPlan, restartAgent, retryTask, runNow } from './_lib/agentEngine.js';
 import { addInstruction, editOutput, removeInstruction, setAgentMode, setAgentSchedule } from './_lib/campaignCycles.js';
 import { cancelRequest, reviseStep, startIntel, startRequest } from './_lib/creativeEngine.js';
@@ -80,6 +80,10 @@ export default async function handler(req, res) {
     else if (action === 'start_request') out = await startRequest(ctx, Number(body.requestId)); // the page then calls `process` until the queue is empty
     else if (action === 'start_intel') out = await startIntel(ctx, Number(body.campaignId), { force: body.force === true }); // the scout studies the site and the cabinet of the client (the page then calls `process`)
     else if (action === 'overlay_creative') out = await applyText(ctx, Number(body.creativeId), { force: true }); // the words over the picture again (free)
+    else if (action === 'compare_looks') { // the same scene in other realism looks (a picture per look; estimateOnly asks the price first)
+      out = await compareLooks(ctx, Number(body.creativeId), body.looks, { estimateOnly: body.estimateOnly === true });
+      if (out.submitted) { const c = (await ctx.db.from('ag_creatives').select('request_id').eq('id', Number(body.creativeId)).maybeSingle()).data; out.polled = await pollCreatives(ctx, { requestId: c?.request_id }); }
+    }
     else if (action === 'inspect_creative') { out = await queueInspection(ctx, Number(body.creativeId), { force: true }); if (out.queued) out.queue = await processQueue(ctx, { maxMs: 60000 }); } // the quality checker looks at this finished picture now (cents)
     else if (action === 'creative_text_info') out = await textInfo(ctx, Number(body.creativeId)); // the words that are on a creative now (the editor of the words)
     else if (action === 'edit_creative_text') out = await saveTextEdit(ctx, Number(body.creativeId), body.edit ?? null); // a person changed the words of a ready creative: put on the same picture again (free)

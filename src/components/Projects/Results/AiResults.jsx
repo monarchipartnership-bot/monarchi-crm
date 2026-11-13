@@ -5,6 +5,7 @@ import { fetchDeliverables } from '../../../lib/api/deliverables';
 import { RUN_FILTERS, buildRuns, dateTimeText, filterRuns, groupItems, runCounts } from '../../../lib/agents/aiResults';
 import Deliverables from '../../../pages/Tools/campaigns/Deliverables';
 import StepCards from '../../../pages/Tools/cockpit/StepCards';
+import CompareLooksDialog from '../../../pages/Tools/cockpit/CompareLooksDialog';
 import QcLine from '../../../pages/Tools/cockpit/QcLine';
 import ReturnDialog from '../../../pages/Tools/cockpit/ReturnDialog';
 import TextEditDialog from '../../../pages/Tools/cockpit/TextEditDialog';
@@ -24,6 +25,7 @@ const canDownload = (i) => ['review', 'approved', 'rejected'].includes(i.status)
 function ResultCard({ item, onOpen, onAct, busy, styleCtx }) {
   const [returning, setReturning] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [comparing, setComparing] = useState(false);
   const [err, setErr] = useState('');
   const st = ITEM_STATUS[item.status] || ['', item.status];
   const canEditText = !!styleCtx && !!item.rawUrl && item.kind !== 'video' && ['review', 'approved'].includes(item.status);
@@ -44,11 +46,13 @@ function ResultCard({ item, onOpen, onAct, busy, styleCtx }) {
         {canApprove(item) && <button type="button" className="btn btn-p" disabled={!!busy} onClick={() => simple('approve_one')}>Схвалити</button>}
         {canReturn(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => setReturning(true)}>Повернути</button>}
         {canEditText && <button type="button" className="btn" disabled={!!busy} onClick={() => setEditing(true)}>Редагувати текст</button>}
+        {!!styleCtx && !!item.rawUrl && item.kind !== 'video' && ['review', 'approved', 'rejected'].includes(item.status) && <button type="button" className="btn" disabled={!!busy} onClick={() => setComparing(true)}>Порівняти реалізм</button>}
         {canEditText && item.status === 'review' && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('inspect')}>{item.qc ? 'Перевірити ще раз' : 'Перевірити якість'}</button>}
         {canDownload(item) && <button type="button" className="btn" disabled={!!busy} onClick={() => simple('download_one')} aria-label={`Завантажити: ${item.conceptName}`}>Завантажити</button>}
       </div>
       {err && <p className="ar-err" role="alert">{err}</p>}
       {returning && <ReturnDialog item={item} canEditText={canEditText} onClose={() => setReturning(false)} onRedo={(comment) => onAct('return', { creativeIds: [item.id], comment })} onText={() => { setReturning(false); setEditing(true); }} />}
+      {comparing && <CompareLooksDialog item={item} currentLook={styleCtx?.look || 'std'} onAct={onAct} onClose={() => setComparing(false)} />}
       {editing && styleCtx && <TextEditDialog item={item} autoStyle={styleCtx.autoStyle} taskStyle={styleCtx.taskStyle} onClose={() => setEditing(false)} onSave={(edit) => onAct('edit_text', { creativeId: item.id, edit })} />}
     </li>
   );
@@ -136,7 +140,7 @@ export default function AiResults({ projectId }) {
   const open = runs.find((r) => r.id === openId) || null;
   useEffect(() => { if (openId && !open && !loading) setOpenId(null); }, [openId, open, loading]);
   // the look of the words: the scout's decision for the client and the style of the task of this run (the editor of the words of a creative starts from both)
-  const styleOf = (r) => { const c = byId[r.campaignId]; if (!c?.intel) return null; return { autoStyle: c.intel.autoStyle, taskStyle: (c.requests || []).find((q) => q.id === r.requestId)?.brief?.style }; };
+  const styleOf = (r) => { const c = byId[r.campaignId]; if (!c?.intel) return null; return { autoStyle: c.intel.autoStyle, taskStyle: (c.requests || []).find((q) => q.id === r.requestId)?.brief?.style, look: (c.requests || []).find((q) => q.id === r.requestId)?.brief?.look }; };
   const onAct = useCallback(async (r, key, payload = {}) => {
     setProblem('');
     try { return await runAction(null, key, { campaignId: r.campaignId, requestId: r.requestId, ...payload }); } catch (e) { setProblem(e?.message || 'Не вдалося виконати дію.'); throw e; }

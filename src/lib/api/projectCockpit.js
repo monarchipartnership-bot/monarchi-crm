@@ -126,6 +126,17 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     return {};
   }
   if (key === 'overlay') { await agentAction('overlay_creative', { creativeId: payload.creativeId }); return {}; } // the headline and the button over the picture, made again
+  if (key === 'compare_estimate' || key === 'compare_run') { // the same scene in other realism looks (step 3.4): the price first, then the pictures
+    const r = await agentAction('compare_looks', { creativeId: payload.creativeId, looks: payload.looks, estimateOnly: key === 'compare_estimate' });
+    if (r?.configured === false) throw new Error('Higgsfield не налаштовано на сервері.');
+    if (r?.capped) throw new Error(r.error || 'Операція досягла ліміту витрат.');
+    if (r?.ok === false) throw new Error({ 'no-looks': 'Оберіть хоча б один вигляд.', 'no-creative': 'Креатив не знайдено.' }[r.reason] || r.error || 'Не вдалося виконати порівняння.');
+    if (key === 'compare_estimate') return { compare: { usd: Number(r.estimateUsd || 0), count: Number(r.count || 0), limit: Number(r.limit || 0), spent: Number(r.spent || 0), fits: r.fits !== false } };
+    if (r?.failed?.length && !r.submitted) throw new Error(r.failed[0].error || 'Не вдалося запустити генерацію.');
+    if (!r?.submitted) throw new Error('Нічого не запущено: картинки не вміщаються в ліміт витрат на це завдання.');
+    kick();
+    return { submitted: r.submitted };
+  }
   if (key === 'inspect') { // the quality checker looks at ONE finished picture now (about a cent)
     const r = await agentAction('inspect_creative', { creativeId: payload.creativeId });
     if (!r?.queued) throw new Error({ off: 'Контроль якості вимкнений у команді цього клієнта.', 'not-ready': 'Креатив має бути на перегляді й мати картинку.', queued: 'Цей креатив уже перевіряється.' }[r?.reason] || 'Не вдалося запустити перевірку.');

@@ -322,7 +322,7 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
                 </div>
               )}
               <section className="ckp-gzone" aria-label={`Креативи завдання ${cycle.id}`}>
-                <Gallery key={cycle.id} minimal items={cycle.items} onAct={(key, payload = {}) => act(null, key, { requestId: cycle.id, ...payload })} loadingHint={loading} textEdit={c?.intel ? { autoStyle: c.intel.autoStyle, taskStyle: cycle.brief?.style } : null} />
+                <Gallery key={cycle.id} minimal items={cycle.items} onAct={(key, payload = {}) => act(null, key, { requestId: cycle.id, ...payload })} loadingHint={loading} textEdit={c?.intel ? { autoStyle: c.intel.autoStyle, taskStyle: cycle.brief?.style, look: cycle.brief?.look } : null} />
               </section>
             </>
           )}

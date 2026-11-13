@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Ic, Spinner } from './parts';
+import CompareLooksDialog from './CompareLooksDialog';
 import QcLine from './QcLine';
 import ReturnDialog from './ReturnDialog';
 import TextEditDialog from './TextEditDialog';
@@ -60,6 +61,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
   const [err, setErr] = useState('');
   const [returning, setReturning] = useState(null); // the creative the dialog «Повернути» is open for
   const [editing, setEditing] = useState(null); // the creative whose words are being edited
+  const [comparing, setComparing] = useState(null); // the creative whose scene is made again in other realism looks
   const [full, setFull] = useState(false); // the opened creative on the whole screen
   const pred = FILTERS.find((f) => f[0] === filter)[2];
   const shown = useMemo(() => items.filter(pred), [items, filter]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -77,6 +79,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
   const approve = (i) => act('approve_one', { creativeId: i.id }, 'ap' + i.id);
   const download = (i) => act('download_one', { creativeId: i.id }, 'dl' + i.id);
   const giveBack = (i) => setReturning(i); // the dialog asks what is wrong: the picture or only the words
+  const canCompare = (i) => !!textEdit && !!i.rawUrl && i.kind !== 'video' && ['review', 'approved', 'rejected'].includes(i.status);
   const canEditText = (i) => !!textEdit && !!i.rawUrl && i.kind !== 'video' && ['review', 'approved'].includes(i.status);
   const go = (d) => { if (!shown.length) return; setOpenId(shown[(idx + d + shown.length) % shown.length].id); };
 
@@ -117,6 +120,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
               {canApprove(open) && <button type="button" className="ckp-btn is-ok" disabled={!!busy} onClick={() => approve(open)}>{busy === 'ap' + open.id ? <Spinner /> : <Ic n="check" size={15} />}Схвалити</button>}
               {canReturn(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => giveBack(open)}>{busy === 'rt' + open.id && <Spinner />}Повернути</button>}
               {canEditText(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => setEditing(open)}><Ic n="pen" size={15} />Редагувати текст</button>}
+              {canCompare(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => setComparing(open)}>Порівняти реалізм</button>}
               {open.status === 'review' && open.rawUrl && !!textEdit && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => act('inspect', { creativeId: open.id }, 'qc' + open.id)}>{busy === 'qc' + open.id && <Spinner />}{open.qc ? 'Перевірити якість ще раз' : 'Перевірити якість'}</button>}
               {canDownload(open) && <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => download(open)}>{busy === 'dl' + open.id ? <Spinner /> : <Ic n="download" size={15} />}Завантажити</button>}
             </div>
@@ -130,6 +134,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
         {full && open.url && <FullView item={open} count={shown.length} onClose={() => setFull(false)} onGo={go} />}
       {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} textOption={!!textEdit} onClose={() => setReturning(null)}
         onRedo={(comment) => act('return', { creativeIds: [returning.id], comment }, 'rt' + returning.id)} onText={() => { setEditing(returning); setReturning(null); }} />}
+      {comparing && <CompareLooksDialog item={comparing} currentLook={textEdit?.look || 'std'} onAct={(key, payload) => onAct?.(key, payload)} onClose={() => setComparing(null)} />}
       {editing && textEdit && <TextEditDialog item={editing} autoStyle={textEdit.autoStyle} taskStyle={textEdit.taskStyle} onClose={() => setEditing(null)} onSave={(edit) => onAct?.('edit_text', { creativeId: editing.id, edit })} />}
       </div>
     );
@@ -159,6 +164,7 @@ export default function Gallery({ items = [], onAct, loadingHint = false, minima
       {err && <p className="ckp-err" role="alert">{err}</p>}
       {returning && <ReturnDialog item={returning} canEditText={canEditText(returning)} textOption={!!textEdit} onClose={() => setReturning(null)}
         onRedo={(comment) => act('return', { creativeIds: [returning.id], comment }, 'rt' + returning.id)} onText={() => { setEditing(returning); setReturning(null); }} />}
+      {comparing && <CompareLooksDialog item={comparing} currentLook={textEdit?.look || 'std'} onAct={(key, payload) => onAct?.(key, payload)} onClose={() => setComparing(null)} />}
       {editing && textEdit && <TextEditDialog item={editing} autoStyle={textEdit.autoStyle} taskStyle={textEdit.taskStyle} onClose={() => setEditing(null)} onSave={(edit) => onAct?.('edit_text', { creativeId: editing.id, edit })} />}
     </div>
   );

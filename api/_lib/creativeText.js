@@ -27,7 +27,8 @@ export function overlayFields(concept, creative) {
 export async function conceptOf(db, creative) {
   const rows = (await db.from('ag_tasks').select('output').eq('request_id', creative.request_id).eq('status', 'done').order('id', { ascending: false })).data || [];
   const brief = rows.find((r) => Array.isArray(r.output?.json?.concepts));
-  return brief?.output?.json?.concepts.find((c) => c.key === creative.concept_key) || null;
+  const base = String(creative.concept_key || '').split('~')[0]; // «c1~ugc»: a picture made to compare looks belongs to the concept «c1»
+  return brief?.output?.json?.concepts.find((c) => c.key === base) || null;
 }
 
 // The project of a request (through its operation).

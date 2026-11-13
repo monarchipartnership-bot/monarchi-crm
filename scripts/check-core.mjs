@@ -39,7 +39,7 @@ import { CREATIVE_REQUIRED, creativeAutoOf, cleanAgentSettings, cleanRequest, co
 import { cleanSettings, defaultRatios, inputState, manualInput, INFO_SECTIONS, addLink, cleanLink, parseLinks, removeLink, sectionFields } from '../src/lib/agents/projectCreative.js';
 import { figmaFileKey, readFigma } from '../api/_lib/figma.js';
 import { COPY_LINES, renderBrief, textRender } from '../api/_lib/creativeRun.js';
-import { generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
+import { compareLooks, generateCreatives, generatorState, pollCreatives, promptOf, reworkNotes } from '../api/_lib/creativeMake.js';
 import { runRegularCycles } from '../api/_lib/regularCycles.js';
 import { applyFill, buildFillPrompt, cardPrefill, parseFill } from '../src/lib/agents/cycleFormFill.js';
 import { reviseStep } from '../api/_lib/creativeEngine.js';
@@ -5535,6 +5535,39 @@ await ok('realism looks (3.4): a look of the task adds its cues and the «looks 
   assert.equal(cleanRequest({ goal: 'Sale', ratios: ['1:1'], look: 'studio' }).brief.look, 'studio');
   assert.equal('look' in cleanRequest({ goal: 'Sale', ratios: ['1:1'], look: 'std' }).brief, false);
   assert.equal('look' in cleanRequest({ goal: 'Sale', ratios: ['1:1'], look: 'bogus' }).brief, false);
+});
+
+await ok('compare realism (3.4): the same scene in other looks, next to the original; the price first, the limit holds, nothing is made for unknown looks', async () => {
+  const { tables, db, ctx } = creativeWorld();
+  await ensureCreativeDepartment(db, 'a@x.com');
+  tables.ag_creative_requests.push({ id: 1, campaign_id: 1, status: 'review', title: 't', brief: {}, materials: [] });
+  const refs = [{ name: 'a.jpg', url: 'https://x/a.jpg', kind: 'product' }];
+  // the original already carries the cues of the look «studio» (its task has one): they are taken off the scene before the cues of the chosen looks are added
+  const studio = LOOKS.find((l) => l.key === 'studio').cues;
+  tables.ag_creatives.push({ id: 1, request_id: 1, concept_key: 'c1', concept_name: 'Idea one', ratio: '4:5', prompt: `A white bottle on a pedestal. ${studio}`, negative_prompt: `text, ${LOOK_NEGATIVE}`, copy: { variants: [{ headline: 'H' }] }, status: 'review', cost_usd: 0.2, generations: 1, hf: { references: refs } });
+  tables.ag_agents.find((a) => a.role === 'creative_maker').config = { max_usd: '0.5' };
+  const log = [];
+  ctx.hfImage = {
+    estimate: async () => 0.1, check: async () => ({ state: 'pending' }), persist: async () => ({ url: 'u', path: 'p' }),
+    submit: async ({ request, key }) => { log.push(['submit', key, request.body.prompt]); return { jobId: `j-${key}`, statusUrl: `https://api.higgsfield.ai/requests/${key}/status` }; },
+  };
+  // unknown looks, «std» and «auto» are not looks to compare
+  assert.deepEqual(await compareLooks(ctx, 1, ['bogus', 'std', 'auto']), { ok: false, reason: 'no-looks' });
+  assert.deepEqual(await compareLooks(ctx, 99, ['ugc']), { ok: false, reason: 'no-creative' });
+  // the price first: nothing is made
+  const est = await compareLooks(ctx, 1, ['ugc', 'ed'], { estimateOnly: true });
+  assert.deepEqual([est.ok, est.count, est.estimateUsd, est.fits], [true, 2, 0.2, true]);
+  assert.equal(tables.ag_creatives.length, 1);
+  assert.equal((await compareLooks(ctx, 1, ['ugc', 'ed', 'macro'], { estimateOnly: true })).fits, false); // 0.2 spent + 0.3 > the limit of 0.5
+  // the run: one new picture per look, the same scene, the copy and the references of the original, linked to it
+  const run = await compareLooks(ctx, 1, ['ugc', 'ed', 'ugc']);
+  assert.deepEqual([run.submitted, run.looks, tables.ag_creatives.length], [2, ['ugc', 'ed'], 3]); // a look chosen twice is made once
+  const made = tables.ag_creatives.slice(1);
+  assert.deepEqual(made.map((r) => [r.concept_key, r.status, r.hf.compare_of, r.hf.look]), [['c1~ugc', 'producing', 1, 'ugc'], ['c1~ed', 'producing', 1, 'ed']]);
+  assert.match(made[0].prompt, /^A white bottle on a pedestal\. Casual smartphone photo look/); assert.ok(!made[0].prompt.includes(studio)); // the old cues are gone, the new ones are in
+  assert.equal(made[0].negative_prompt, `text, ${LOOK_NEGATIVE}`); // the common negatives once
+  assert.deepEqual([made[0].copy, made[0].hf.references, made[0].concept_name], [{ variants: [{ headline: 'H' }] }, refs, 'Idea one · UGC: фото на телефон']);
+  assert.equal(log.length, 2); assert.equal(tables.ag_creatives[0].status, 'review'); // the original is untouched
 });
 
 await ok('picture quality control (3.2): the checker looks at the FINISHED creative against the brand rules; a real problem returns it with the reasons, nothing is spent, a person decides', async () => {
