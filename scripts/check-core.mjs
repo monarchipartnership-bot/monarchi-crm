@@ -5975,4 +5975,12 @@ await ok('project style (3.1c): the scout decides, a person corrects, the manual
   assert.ok(wide.layout.items[0].x > normal.layout.items[0].x && normal.layout.items[0].x > narrow.layout.items[0].x);
 });
 
+await ok('the report agent saves its decks by the same unique key the database has (a stale key broke the Google report run, 13.11)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../api/_lib/agentRepo.js', import.meta.url), 'utf8');
+  const keys = [...src.matchAll(/onConflict: '([^']+)'/g)].map((m) => m[1]);
+  assert.ok(keys.length >= 2);
+  keys.forEach((k) => assert.equal(k, 'project_id,period_type,period_start,period_end,platform')); // project_reports and project_decks both have period_end in their unique keys
+});
+
 console.log(`\n${passed} checks passed`);

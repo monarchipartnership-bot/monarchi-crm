@@ -109,7 +109,7 @@ export function createAgentRepo(db, agentEmail) {
       return must(await db.from('project_decks').upsert({
         project_id: projectId, report_id: reportId || null, period_type: periodType, period_start: period.start, period_end: period.end,
         platform, style, lang, status: 'draft', source: 'agent', deck, created_by: agentEmail, updated_at: nowIso(),
-      }, { onConflict: 'project_id,period_type,period_start,platform' }).select('id').single());
+      }, { onConflict: 'project_id,period_type,period_start,period_end,platform' }).select('id').single()); // the unique key of project_decks has had period_end since the custom decks (migration 20261039)
     },
   };
 }
