@@ -24,6 +24,9 @@ export const LOOKS = [
     cues: 'Product in its real use environment, natural light, believable everyday clutter, correct scale and perspective, a real surface with a little wear.' },
 ];
 
+// the looks that have an example picture in /public/realism (the same scene in each look)
+export const LOOK_EXAMPLES = ['studio', 'life', 'ugc'];
+
 const BY_KEY = Object.fromEntries(LOOKS.map((l) => [l.key, l]));
 export const LOOK_KEYS = LOOKS.map((l) => l.key);
 const clip = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);

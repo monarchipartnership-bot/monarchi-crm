@@ -1,6 +1,7 @@
 import { LOOKS } from '../../../lib/creatives/realism';
 import { MAX_VIDEOS, MEDIA_MODES } from '../../../lib/agents/creativeTeam';
 import Select from '../../common/Select';
+import LookThumb from './LookThumb';
 import '../../../styles/taskExtras.css';
 
 // Everything a task is set up with BEFORE it starts (step 3.8, owner 2026-11-13: «почему я не могу при создании задания сразу выбрать…»): what it makes (pictures, videos or both and how many),
@@ -67,13 +68,21 @@ export default function TaskExtras({ value, onChange, teamLimit = null, regular 
             <Select className="tm-ssel tm-text" value={text.plate || 'auto'} onChange={(v) => setText({ plate: v })} options={opts(PLATES)} ariaLabel="Підкладка під текстом" /></label>
           <label className="tm-fl"><span>Колір тексту</span>
             <Select className="tm-ssel tm-text" value={text.ink || 'auto'} onChange={(v) => setText({ ink: v })} options={opts(INKS)} ariaLabel="Колір тексту" /></label>
-          <label className="tm-fl"><span>Реалізм картинок</span>
-            <Select className="tm-ssel tm-text" value={value.look || 'std'} onChange={(v) => onChange({ look: v })} options={LOOKS.map((l) => ({ value: l.key, label: l.label }))} ariaLabel="Реалізм картинок" /></label>
           <label className="tm-fl tm-w2"><span>Тон картинок (необовʼязково)</span>
             <input className="tm-sel tm-text" type="text" maxLength={300} value={value.style?.image?.tone || ''} onChange={(e) => onChange({ style: { ...(value.style || {}), image: { ...(value.style?.image || {}), tone: e.target.value } } })} placeholder="Наприклад: теплі нейтральні тони, м’яке світло" /></label>
           <label className="tm-fl tm-w2"><span>Тон текстів (необовʼязково)</span>
             <input className="tm-sel tm-text" type="text" maxLength={300} value={value.style?.copy?.tone || ''} onChange={(e) => onChange({ style: { ...(value.style || {}), copy: { ...(value.style?.copy || {}), tone: e.target.value } } })} placeholder="Наприклад: спокійно, без вигуків" /></label>
         </div>
+        <fieldset className="tm-fl tm-w2 tx-looks"><legend>Реалізм картинок <small>ті самі кадри в кожному вигляді: так видно різницю</small></legend>
+          <div className="tx-lgrid" role="radiogroup" aria-label="Реалізм картинок">
+            {LOOKS.map((l) => (
+              <button key={l.key} type="button" role="radio" aria-checked={(value.look || 'std') === l.key} className={'tx-look' + ((value.look || 'std') === l.key ? ' on' : '')} onClick={() => onChange({ look: l.key })}>
+                <LookThumb look={l.key} className="tx-lth" />
+                <b>{l.label}</b><small>{l.desc}</small>
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <p className="tm-hint">Живий перегляд на картинці проєкту (подкладка, розмір, відступи) є в «Налаштуваннях» задачі після створення.</p>
       </details>
 

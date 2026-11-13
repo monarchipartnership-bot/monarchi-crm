@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LOOKS, LOOK_NEGATIVE, cleanLook } from '../../../lib/creatives/realism';
 import { Spinner } from './parts';
+import LookThumb from '../../../components/Projects/Teams/LookThumb';
 import '../../../styles/realism.css';
 
 // «Реалізм картинок» in the settings of a task (owner's pick A, step 3.4, 2026-11-13): the look of the pictures of THIS task. The creative maker writes the scene, the system adds the cues of the chosen look
@@ -26,7 +27,7 @@ export default function RealismPicker({ look, onSave }) {
       <div className="rl-grid" role="radiogroup" aria-label="Вигляд картинок">
         {LOOKS.map((l) => (
           <button key={l.key} type="button" role="radio" aria-checked={pick === l.key} className={'rl-card' + (pick === l.key ? ' is-on' : '')} onClick={() => setPick(l.key)}>
-            <i style={{ background: `linear-gradient(135deg, ${l.color}, #ffffff66)` }} aria-hidden="true" />
+            <LookThumb look={l.key} className="rl-th" />
             <b>{l.label}</b>
             <small>{l.desc}</small>
           </button>

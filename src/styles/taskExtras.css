@@ -6,3 +6,16 @@
 .tx-more > summary { cursor: pointer; font-size: .86rem; font-weight: 700; }
 .tx-more > summary small { display: block; font-weight: 400; opacity: .7; margin-top: 2px; }
 .tx-limit small { font-weight: 400; opacity: .7; }
+
+/* the example picture of a look (LookThumb): the same scene in every look */
+.lkt { position: relative; display: block; overflow: hidden; border-radius: 10px; }
+.lkt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lkt em { position: absolute; inset: auto 6px 6px 6px; font-style: normal; font-size: .68rem; text-align: center; color: #5b4a63; opacity: .85; }
+.tx-looks > legend small { font-weight: 400; opacity: .7; margin-left: 6px; }
+.tx-lgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.tx-look { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1.5px solid var(--border); border-radius: 14px; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.tx-look.on { border-color: #B544B5; background: #FBF0FC; }
+.tx-look:focus-visible { outline: 2px solid #B544B5; outline-offset: 2px; }
+.tx-look b { font-size: .8rem; font-weight: 700; line-height: 1.25; }
+.tx-look small { font-size: .7rem; line-height: 1.35; opacity: .7; }
+.tx-lth { aspect-ratio: 4 / 5; width: 100%; }
