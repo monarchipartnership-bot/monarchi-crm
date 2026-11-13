@@ -461,6 +461,19 @@ await ok('meta columns: only picked columns are shown, and only they can be used
   assert.ok(META_METRIC_LIST.every((m) => META_METRICS[m.key] === m && m.label && m.en && ['number', 'money', 'percent', 'ratio'].includes(m.format)));
   assert.equal(new Set(META_METRIC_LIST.map((m) => m.key)).size, META_METRIC_LIST.length);
 });
+await ok('agent run: a full week after a month-edge stub is compared with the 7 days before it, not with the one-day stub (13.11: 02-08 Nov vs 1 Nov)', async () => {
+  const stub = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] });
+  const r = await runProjectReport({ repo: stub, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-11-13' });
+  assert.equal(r.status, 'ok');
+  const d = stub.log.reports[0].data;
+  assert.equal(d.compare.mode, 'days');
+  assert.deepEqual(d.previous.period, { start: '2026-10-26', end: '2026-11-01' });
+  assert.equal(d.compare.unequal, false);
+  assert.ok(r.notes.some((n) => /попередніми 7 днями/.test(n)));
+  const normal = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] }); // two full weeks: the calendar week before is used as before
+  await runProjectReport({ repo: normal, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-11-17' });
+  assert.equal(normal.log.reports[0].data.compare.mode, 'calendar');
+});
 await ok('agent run: the extra columns picked for the project are asked of the platform', async () => {
   const seen = [];
   const spy = async (path, body) => { if (path === '/api/meta-ads-insights' && body.level) seen.push(body.columns); return post(path, body); };
