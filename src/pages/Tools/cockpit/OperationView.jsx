@@ -414,7 +414,21 @@ export default function OperationView({ campaign, cockpit: cAll, project, loadin
                       <button type="button" className="ckp-btn" disabled={!!busy} onClick={() => guard('reg' + taskReg.id, () => setRegularEnabled(campaign.id, taskReg.id, !taskReg.enabled, email), taskReg.enabled ? 'Регулярне завдання вимкнено.' : 'Регулярне завдання увімкнено.')}><Ic n={taskReg.enabled ? 'stop' : 'play'} size={15} />{taskReg.enabled ? 'Вимкнути завдання' : 'Увімкнути завдання'}</button>
                       <button type="button" className="ckp-btn is-danger" disabled={!!busy} onClick={async () => { if (await dropRegular(taskReg)) onBack?.(); }}>Видалити завдання</button>
                     </div>
-                  ) : <p className="ckp-empty-line">Разове завдання: його можна запустити ще раз кнопкою «Зберегти й запустити ще раз» внизу.</p>}
+                  ) : (
+                    <>
+                      <p className="ckp-empty-line">Разове завдання: його можна запустити ще раз кнопкою «Зберегти й запустити ще раз» внизу.</p>
+                      {taskReq && (
+                        <div className="ckp-acts">
+                          <button type="button" className="ckp-btn is-danger" disabled={!!busy} onClick={async () => {
+                            const made = taskReq.creatives?.total || 0;
+                            if (!(await confirm({ title: 'Видалити завдання?', body: `«${taskReq.title}» зникне зі списку разом із його журналом${made ? ` і креативами (${made})` : ''}. Агенти, що вже працюють, завершать свій крок, але нічого нового не запустять. Уже відправлені в Higgsfield картинки й відео оплачені, ці витрати лишаються в ліміті операції.`, confirmLabel: 'Видалити', danger: true }))) return;
+                            await guard('del' + taskReq.id, () => act(null, 'delete_cycle', { requestId: taskReq.id }), 'Завдання видалено.');
+                            onBack?.();
+                          }}>Видалити завдання</button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </section>
               ) },
             ]} />

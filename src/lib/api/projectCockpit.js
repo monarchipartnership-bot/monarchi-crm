@@ -1,7 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { buildCockpit, isActiveCampaign, sortProjects, stepLabelOf, summaryOf } from '../agents/projectCockpit';
 import { agentAction, kickQueue } from './agents';
-import { estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, setCreativeStatus, startRequest } from './creatives';
+import { cancelRequest, estimateGeneration, generateCreatives, pollCreatives, retryStudioTask, setCreativeStatus, startRequest } from './creatives';
 import { reviewOutcome } from '../agents/operationCycles';
 import { uploadAsset } from './projectCreative';
 import { downloadOne, downloadZip } from '../creatives/download';
@@ -142,6 +142,11 @@ export async function runCockpitAction(item, key, payload = {}, { cockpit = null
     if (!r?.submitted) throw new Error('Нічого не запущено: картинки не вміщаються в ліміт витрат на це завдання.');
     kick();
     return { submitted: r.submitted };
+  }
+  if (key === 'delete_cycle') { // a one-off task is deleted: it leaves the lists (its money stays counted in the limit of the operation)
+    if (!rid) throw new Error('Завдання не знайдено.');
+    await cancelRequest(rid);
+    return {};
   }
   if (key === 'pause' || key === 'resume') { // a task is stopped at any moment / goes on (step 3.7)
     if (!rid) throw new Error('Завдання не знайдено.');
