@@ -82,7 +82,7 @@ import { ALL_INPUT_KEYS, ASSET_GROUPS, ASSET_KINDS, INPUT_FIELDS, INPUT_KEYS, PR
 import { BRAND_MAX_IMAGES, buildBrandPrompt, parseBrand, pickBrandImages } from '../src/lib/agents/brandAnalysis.js';
 import { buildCockpit, hashText, isActiveCampaign, sortProjects, splitNotes, summaryOf as cockpitSummary } from '../src/lib/agents/projectCockpit.js';
 import { LEGACY_CREATIVE_ROLES, MODES, MODE_ORDER, QUARTERS, QUARTER_LINKS, QUARTER_NODES, litNodes, modeEstimate, modeHasDepartment, modeRoles } from '../src/lib/agents/campaignModes.js';
-import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate } from '../api/_lib/hfImage.js';
+import { buildImageRequest, check as imgCheck, estimate as imgEstimate, missingConfig, persist as imgPersist, profileFromEnv, submit as imgSubmit, tokenEstimate, perSecondEstimate } from '../api/_lib/hfImage.js';
 import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
@@ -5580,6 +5580,9 @@ await ok('video from a picture (3.5): the request is built from the picture and 
   const rq = buildVideoRequest({ prompt: '  slow push-in  ', image: 'https://x/p.png', seconds: 8, sound: true }, profile);
   assert.deepEqual(rq, { path: profile.path, body: { prompt: 'slow push-in', image_url: 'https://x/p.png', duration: 8, sound: 'on' } });
   assert.equal(buildVideoRequest({ image: 'https://x/p.png', seconds: 5 }, profile).body.sound, 'off');
+  const D = 'Standard self-serve rates in USD per video second: 720p: $0.0714. Total price = selected rate × output duration in seconds.';
+  assert.equal(perSecondEstimate(D, { duration: 5 }), 0.4106); // 0.0714 × 5 × 1.15
+  assert.ok(Number.isNaN(perSecondEstimate('Per 1M tokens: text input $5', { duration: 5 })) && Number.isNaN(perSecondEstimate(D, {})));
   const env = { HF_API_KEY_ID: 'a', HF_API_KEY_SECRET: 'b' };
   const net = async (u) => ({ ok: true, json: async () => ({ status: u.includes('r1') ? 'completed' : u.includes('r2') ? 'nsfw' : 'in_progress', video: { url: 'https://cdn/out.mp4' } }) });
   assert.deepEqual(await checkVideo({ statusUrl: 'https://api.higgsfield.ai/requests/r1/status', env, fetchFn: net }), { state: 'ready', url: 'https://cdn/out.mp4' });

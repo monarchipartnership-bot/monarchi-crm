@@ -82,6 +82,17 @@ export function tokenEstimate(description, body = {}) {
 }
 
 // → the price in USD of this request, before it is made. Throws a readable Error (a wrong model path or parameter shows here, without any spend).
+// A model billed per second of video («Standard self-serve rates in USD per video second: 720p: $0.0714 ... Total price = selected rate x output duration in seconds»): the highest
+// rate named in the description times the length (the resolution and the sound are not told apart: an upper estimate, the real charge is not above it) plus the margin. → USD or NaN.
+export function perSecondEstimate(description, body) {
+  const text = String(description || '');
+  if (!/per\s+(video\s+)?second/i.test(text)) return NaN;
+  const rates = [...text.matchAll(/\$\s*(\d+(?:\.\d+)?)/g)].map((m) => Number(m[1])).filter((n) => n > 0);
+  const secs = Number(body?.duration);
+  if (!rates.length || !(secs > 0)) return NaN;
+  return Math.round(Math.max(...rates) * secs * MARGIN * 10000) / 10000;
+}
+
 export async function estimate({ request, env = process.env, fetchFn = fetch }) {
   const res = await fetchFn(`${BASE}/estimate/${request.path}`, { method: 'POST', headers: headers(env), body: JSON.stringify(request.body) });
   const json = await res.json().catch(() => ({}));
@@ -90,6 +101,7 @@ export async function estimate({ request, env = process.env, fetchFn = fetch }) 
   // the price is then worked out from those rates (tokenEstimate, an upper estimate). Any other answer is shown as it came (it holds no secret).
   const raw = json.usd ?? json.cost_usd ?? json.price_usd ?? json.estimate?.usd ?? json.cost?.usd;
   let usd = raw == null || raw === '' ? NaN : Number(raw);
+  if (!Number.isFinite(usd) && json.pricing_description) usd = perSecondEstimate(json.pricing_description, request.body);
   if (!Number.isFinite(usd) && json.pricing_description) usd = tokenEstimate(json.pricing_description, request.body);
   if (!Number.isFinite(usd)) throw new Error(`Higgsfield не повернув вартість запиту (модель «${request.path}», відповідь: ${JSON.stringify(json).slice(0, 220)}).`);
   return usd;
