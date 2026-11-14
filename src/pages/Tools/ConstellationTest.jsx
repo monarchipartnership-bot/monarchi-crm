@@ -13,7 +13,6 @@ import DataIntegrityCheck from '../DataIntegrityCheck/DataIntegrityCheck';
 import AccountEnrichment from '../AccountEnrichment/AccountEnrichment';
 import CaseSelector from '../CaseSelector/CaseSelector';
 import QualityController from '../QualityController/QualityController';
-import TaskOrchestrator from '../TaskOrchestrator/TaskOrchestrator';
 import GoogleOptimizationAgent from '../GoogleOptimizationAgent/GoogleOptimizationAgent';
 import MarketingStrategist from '../MarketingStrategist/MarketingStrategist';
 import AiAccountManager from '../AiAccountManager/AiAccountManager';
@@ -56,7 +55,6 @@ const AGENT_TOOLS = {
   'account-enrichment': AccountEnrichment,
   'portfolio-case-selector': CaseSelector,
   'ai-quality-controller': QualityController,
-  'task-orchestrator': TaskOrchestrator,
   'google-optimization-agent': GoogleOptimizationAgent,
   'marketing-strategist': MarketingStrategist,
   'ai-account-manager': AiAccountManager,

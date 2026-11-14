@@ -31,7 +31,6 @@ export const CALLER_LABELS = {
   'performance-copywriter': 'Performance Copywriter',
   'quality-controller': 'AI Quality Controller',
   'reply-analyzer': 'Reply Analyzer',
-  'task-orchestrator': 'Task Orchestrator',
   'ads-insights-analyst': 'Ads Insights Analyst',
   proxy: 'Інші виклики',
 };
