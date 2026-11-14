@@ -15,7 +15,7 @@ export const ROLE_TO_AGENT = {
   // the creative department (the agents with their own page)
   creative_scout: 'creative-scout-agent', creative_strategy: 'creative-strategist', creative_analyst: 'creative-performance-analyst', creative_maker: 'creative-producer-agent', creative_quality: 'ai-quality-controller', creative_copywriter: 'performance-copywriter',
   // the SMM team
-  strategist: 'smm-content-strategist', copywriter: 'smm-copywriter', visual: 'smm-visual-agent', qc: 'smm-quality-control', publisher: 'smm-publisher', social_analyst: 'smm-social-analyst', competitors: 'smm-social-competitors', seo: 'seo-optimizer', site_analyst: 'site-analyst',
+  strategist: 'smm-content-strategist', copywriter: 'smm-copywriter', visual: 'smm-visual-agent', qc: 'smm-quality-control', publisher: 'smm-publisher', social_analyst: 'smm-social-analyst', competitors: 'site-competitors', seo: 'seo-optimizer', site_analyst: 'site-analyst',
 };
 
 export const CARRIER_KINDS = { failed: 0, review: 1, running: 2, queued: 3 }; // the order of importance (a problem is shown first)
