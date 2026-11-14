@@ -9,7 +9,7 @@ export const ROLE_TO_AGENT = {
   business_research: 'business-research-agent', competitor_research: 'competitor-research-agent', audience_research: 'audience-research-agent', marketing_strategist: 'marketing-strategist',
   creative_strategist: 'creative-strategist', creative_performance_analyst: 'creative-performance-analyst', creative_brief: 'creative-brief-agent', performance_copywriter: 'performance-copywriter',
   quality_controller: 'ai-quality-controller', google_analyst: 'google-ads-analyst', google_optimizer: 'google-optimization-agent', meta_analyst: 'meta-ads-analyst', meta_optimizer: 'meta-optimization-agent',
-  tracking_integrity: 'tracking-data-integrity-agent', cross_channel_report: 'cross-channel-reporting-insights-agent', account_manager: 'ai-account-manager',
+  tracking_integrity: 'client-tracking-control', cross_channel_report: 'cross-channel-reporting-insights-agent', account_manager: 'ai-account-manager',
   // the creative studio of a request
   studio_client_analyst: 'creative-performance-analyst', studio_competitor_analyst: 'competitor-research-agent', studio_brief_writer: 'creative-brief-agent', studio_copywriter: 'performance-copywriter', studio_producer: 'creative-producer-agent',
   // the creative department (the agents with their own page)
