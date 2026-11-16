@@ -19,6 +19,8 @@ const metricsOf = (m = {}) => {
 const rank = (a, b) => (Number(b.metrics.roas || 0) > 0) - (Number(a.metrics.roas || 0) > 0) || b.metrics.spend - a.metrics.spend;
 const ytThumb = (id) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
 const unique = (list) => [...new Set(list.filter(Boolean))];
+// «the most effective» = the biggest revenue among those that returned more than they cost: a group with ROAS 34 on one small sale is not the best (16.11, Mellow)
+const byRevenue = (a, b) => (Number(b.metrics.revenue) - Number(a.metrics.revenue)) || (Number(b.metrics.roas) - Number(a.metrics.roas));
 
 export async function googleCreativeCandidates(target, { from, to, limit = 8 } = {}) {
   if (!DATE.test(String(from)) || !DATE.test(String(to))) throw new Error('from і to у форматі YYYY-MM-DD обовʼязкові');
@@ -70,7 +72,7 @@ export async function googleCreativeCandidates(target, { from, to, limit = 8 } =
 const IMAGE_ORDER = ['SQUARE_MARKETING_IMAGE', 'MARKETING_IMAGE', 'PORTRAIT_MARKETING_IMAGE'];
 export const googleExampleMark = (url) => `google-img-${(String(url).match(/(\d{6,})\s*$/) || [])[1] || String(url).replace(/\W+/g, '').slice(-24)}`;
 export function pickGoogleExamples(items, { count = 6, minRoas = 1 } = {}) {
-  const groups = (items || []).filter((i) => i.kind === 'asset_group' && Number(i.metrics?.roas) >= minRoas && i.images?.length).sort((a, b) => b.metrics.roas - a.metrics.roas);
+  const groups = (items || []).filter((i) => i.kind === 'asset_group' && Number(i.metrics?.roas) >= minRoas && i.images?.length).sort(byRevenue);
   const lists = groups.map((g) => ({ g, images: [...g.images].sort((a, b) => (IMAGE_ORDER.indexOf(a.field) + 1 || 99) - (IMAGE_ORDER.indexOf(b.field) + 1 || 99)) }));
   const out = [];
   const seen = new Set();
@@ -116,8 +118,8 @@ export async function collectGoogleCreatives({ db, targets, projectId, period, c
   const pool = [];
   for (const t of targets) pool.push(...(await googleCreativeCandidates(t, { from: period.start, to: period.end, limit: 10 })).items);
   const good = pool.filter((i) => Number(i.metrics?.roas) >= minRoas);
-  const groups = good.filter((i) => i.kind === 'asset_group' && i.images.length).sort((a, b) => b.metrics.roas - a.metrics.roas);
-  const ads = good.filter((i) => i.kind === 'search_ad').sort((a, b) => b.metrics.roas - a.metrics.roas);
+  const groups = good.filter((i) => i.kind === 'asset_group' && i.images.length).sort(byRevenue);
+  const ads = good.filter((i) => i.kind === 'search_ad').sort(byRevenue);
   const chosen = [...groups.slice(0, count), ...(groups.length < count ? ads.slice(0, 1) : [])].slice(0, count);
   const items = [];
   for (const c of chosen) {

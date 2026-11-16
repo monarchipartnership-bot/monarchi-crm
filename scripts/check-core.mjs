@@ -5975,13 +5975,14 @@ await ok('google import (2.16): pictures of the best groups in turn, a group tha
   const { pickGoogleExamples, importGoogleExamples, googleExampleMark } = await import('../api/_lib/googleCreatives.js');
   const img = (n, field = 'SQUARE_MARKETING_IMAGE') => ({ field, url: `https://tpc.googlesyndication.com/simgad/${1000000 + n}` });
   const items = [
-    { kind: 'asset_group', name: 'A', metrics: { roas: 11, spend: 300 }, images: [img(1, 'PORTRAIT_MARKETING_IMAGE'), img(2), img(3, 'MARKETING_IMAGE')] },
-    { kind: 'asset_group', name: 'B', metrics: { roas: 6, spend: 250 }, images: [img(4), img(5)] },
-    { kind: 'asset_group', name: 'Loser', metrics: { roas: 0.11, spend: 155 }, images: [img(6)] },
-    { kind: 'search_ad', name: 'ad', metrics: { roas: 400, spend: 3 }, images: [] },
+    { kind: 'asset_group', name: 'A', metrics: { roas: 11, spend: 300, revenue: 3300 }, images: [img(1, 'PORTRAIT_MARKETING_IMAGE'), img(2), img(3, 'MARKETING_IMAGE')] },
+    { kind: 'asset_group', name: 'B', metrics: { roas: 6, spend: 250, revenue: 1500 }, images: [img(4), img(5)] },
+    { kind: 'asset_group', name: 'Loser', metrics: { roas: 0.11, spend: 155, revenue: 17 }, images: [img(6)] },
+    { kind: 'asset_group', name: 'Tiny', metrics: { roas: 34, spend: 37, revenue: 1275 }, images: [img(7)] }, // a great ROAS on one small sale is not the best
+    { kind: 'search_ad', name: 'ad', metrics: { roas: 400, spend: 3, revenue: 1200 }, images: [] },
   ];
-  const picks = pickGoogleExamples(items, { count: 4 });
-  assert.deepEqual(picks.map((p) => [p.group, p.mark]), [['A', 'google-img-1000002'], ['B', 'google-img-1000004'], ['A', 'google-img-1000003'], ['B', 'google-img-1000005']]); // in turn, the square first
+  const picks = pickGoogleExamples(items, { count: 6 });
+  assert.deepEqual(picks.map((p) => [p.group, p.mark]), [['A', 'google-img-1000002'], ['B', 'google-img-1000004'], ['Tiny', 'google-img-1000007'], ['A', 'google-img-1000003'], ['B', 'google-img-1000005'], ['A', 'google-img-1000001']]); // by revenue, in turn, the square first
   assert.ok(picks.every((p) => p.group !== 'Loser'));
   assert.equal(googleExampleMark('https://x/y/1000002'), 'google-img-1000002');
   // the import over stand-ins: one picture is in the library already, one cannot be fetched
@@ -6019,23 +6020,25 @@ await ok('google report creatives (2.14): the best groups in the shape of a repo
     if (/FROM asset_group WHERE/.test(gaql)) return [
       { asset_group: { id: 1, name: 'MTO' }, campaign: { name: 'PMax MTO' }, metrics: { cost_micros: 300e6, impressions: 20000, clicks: 240, conversions: 5, conversions_value: 3600 } },
       { asset_group: { id: 2, name: 'Loser' }, campaign: { name: 'PMax L' }, metrics: { cost_micros: 150e6, impressions: 13000, clicks: 160, conversions: 0, conversions_value: 15 } },
+      { asset_group: { id: 3, name: 'Tiny' }, campaign: { name: 'PMax T' }, metrics: { cost_micros: 37e6, impressions: 3000, clicks: 30, conversions: 1, conversions_value: 1275 } },
     ];
     if (/FROM asset_group_asset WHERE/.test(gaql)) return [
       { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.SQUARE_MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://g/1' } } } },
       { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://g/2' } } } },
       { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Custom Wigs' } } },
       { asset_group: { id: 2 }, asset_group_asset: { field_type: E.AssetFieldType.SQUARE_MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://g/9' } } } },
+      { asset_group: { id: 3 }, asset_group_asset: { field_type: E.AssetFieldType.SQUARE_MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://g/5' } } } },
     ];
     if (/RESPONSIVE_SEARCH_AD/.test(gaql)) return [{ ad_group_ad: { ad: { id: 7, responsive_search_ad: { headlines: [{ text: 'Buy wigs' }], descriptions: [{ text: 'Free shipping' }] } } }, ad_group: { name: 'Brand' }, campaign: { name: 'Search' }, metrics: { cost_micros: 5e6, impressions: 100, clicks: 20, conversions: 1, conversions_value: 200 } }];
     return [];
   } };
   const items = await collectGoogleCreatives({ db, targets: [target], projectId: 3, period: { start: '2026-11-02', end: '2026-11-08' }, count: 3, fetchFn });
-  assert.deepEqual(items.map((i) => i.adId), ['g-ag-1', 'g-ad-7']); // the group that returned money, then one search ad because there are fewer groups than places; the loser is out
+  assert.deepEqual(items.map((i) => i.adId), ['g-ag-1', 'g-ag-3', 'g-ad-7']); // by revenue: the big group, the small one with the great ROAS, then one search ad because there are fewer groups than places; the loser is out
   assert.equal(items[0].caption, 'MTO · ROAS 12.00');
   assert.deepEqual([items[0].imageUrl, items[0].images.length, items[0].headlines], ['https://store.test/report-creatives/3/2026-11-02_2026-11-08/g-1-0.jpg', 2, ['Custom Wigs']]);
   assert.deepEqual(items[0].metrics, { spend: 300, revenue: 3600, purchases: 5, roas: 12, cpp: 60, ctr: 1.2 });
-  assert.equal(items[1].imageUrl, null); // a search ad has no picture
-  assert.equal(uploads.length, 2); // only the pictures of the shown group are copied
+  assert.equal(items[2].imageUrl, null); // a search ad has no picture
+  assert.equal(uploads.length, 3); // only the pictures of the shown groups are copied
   // the run of the agent: the Google report gets them, the Meta report does not
   const asked = [];
   const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] });
@@ -6045,7 +6048,7 @@ await ok('google report creatives (2.14): the best groups in the shape of a repo
   assert.deepEqual(asked[0].accounts.map((a) => a.platform), ['google']);
   const g = repo.log.reports.find((r) => r.platform === 'google');
   const m = repo.log.reports.find((r) => r.platform === 'meta');
-  assert.equal(g.data.creatives.items.length, 2);
+  assert.equal(g.data.creatives.items.length, 3);
   assert.equal(g.data.creatives.source, 'auto');
   assert.equal(m.data.creatives, undefined);
 });
