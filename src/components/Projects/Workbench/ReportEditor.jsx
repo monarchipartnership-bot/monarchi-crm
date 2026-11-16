@@ -141,18 +141,19 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   const setText = (key, v) => edit((d) => ({ ...d, sections: { ...(d.sections || {}), [key]: v } }));
   const setBlockClient = (key, on) => setTemplate({ blocks: blocks.map((b) => ({ key: b.key, title: b.title, client: b.key === key ? on : b.client })) });
 
-  // ---- creatives (Meta)
+  // ---- creatives (Meta and Google; the choice by hand is Meta only)
   const items = data.creatives?.items || [];
   const count = data.creatives?.count || (row.period_type === 'monthly' ? 4 : 3);
-  const canCreatives = platform === 'meta' || isAll;
+  const canCreatives = platform === 'meta' || platform === 'google' || isAll;
+  const byHand = platform !== 'google'; // «Замінити» and «Додати» pick among Meta ads; a Google report gets the automatic choice only
   const setItems = (next) => edit((d) => ({ ...d, creatives: { count, items: next, source: 'manual', at: new Date().toISOString() } }));
   async function suggest() {
     if (items.length && !(await confirm({ title: 'Підібрати креативи знову?', body: 'Поточні креативи звіту (в тому числі обрані вручну) буде замінено автоматичним добором.', confirmLabel: 'Замінити' }))) return;
     setCbusy(true);
     setCerr('');
     try {
-      const found = await suggestCreatives({ projectId: row.project_id, start: row.period_start, end: row.period_end, count });
-      if (!found.length) setCerr('За цей період у кабінеті Meta не знайдено оголошень.'); else setItems(found);
+      const found = await suggestCreatives({ projectId: row.project_id, start: row.period_start, end: row.period_end, count, platform: platform === 'google' ? 'google' : 'meta' });
+      if (!found.length) setCerr(platform === 'google' ? 'За цей період немає груп активів Google, що принесли більше, ніж коштували.' : 'За цей період у кабінеті Meta не знайдено оголошень.'); else setItems(found);
     } catch (e) { setCerr(e.message || 'Не вдалося підібрати креативи.'); } finally { setCbusy(false); }
   }
 
@@ -272,10 +273,10 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
           {canCreatives && (
             <section className="wbe-block">
               <div className="wbe-bh"><Medal n="images" cls="wbe-md" /><b>Найефективніші креативи</b><span className="wbe-sp" /><span className="wbe-count">{items.length}</span></div>
-              {items.length > 0 ? <CreativeGrid items={items} onReplace={(i) => setPicking(i)} onRemove={(i) => setItems(items.filter((_, j) => j !== i))} /> : <div className="pacc-hint">Креативів у звіті ще немає.</div>}
+              {items.length > 0 ? <CreativeGrid items={items} onReplace={byHand ? (i) => setPicking(i) : undefined} onRemove={(i) => setItems(items.filter((_, j) => j !== i))} /> : <div className="pacc-hint">Креативів у звіті ще немає.</div>}
               <div className="wbe-tools">
                 <button type="button" className="btn" disabled={cbusy} onClick={suggest}>{cbusy ? 'Працюємо…' : items.length ? 'Підібрати знову' : 'Підібрати креативи автоматично'}</button>
-                <button type="button" className="btn" onClick={() => setPicking(items.length)}>+ Додати креатив</button>
+                {byHand && <button type="button" className="btn" onClick={() => setPicking(items.length)}>+ Додати креатив</button>}
                 {cerr && <span className="form-err">{cerr}</span>}
               </div>
             </section>

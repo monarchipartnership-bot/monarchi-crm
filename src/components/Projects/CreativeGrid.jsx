@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import '../../styles/projectHistory.css';
 
-const KIND = { image: 'Зображення', video: 'Відео', carousel: 'Карусель', catalog: 'Каталожне оголошення', unknown: 'Креатив' };
+const KIND = { image: 'Зображення', video: 'Відео', carousel: 'Карусель', catalog: 'Каталожне оголошення', asset_group: 'Група активів', search_ad: 'Пошукове оголошення', unknown: 'Креатив' };
 const money = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : '$' + Number(v).toLocaleString('uk-UA', { maximumFractionDigits: 0 }));
 const roasText = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v).toFixed(2).replace('.', ',') + 'x');
 const sales = (n) => `${n} ${n === 1 ? 'продаж' : n >= 2 && n <= 4 ? 'продажі' : 'продажів'}`;

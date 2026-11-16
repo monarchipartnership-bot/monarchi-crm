@@ -3,7 +3,7 @@
 // ASSET GROUP (Performance Max) or to one search AD, so a candidate is that whole unit with its own pictures, videos and texts. The pictures are public
 // Google URLs, a video is a YouTube id (its thumbnail has a fixed address).
 //   googleCreativeCandidates(target, { from, to, limit }) → { period, items: [{ kind: 'asset_group' | 'search_ad', id, name, campaign, metrics, images, videos, headlines, descriptions }] }
-import { enums } from 'google-ads-api';
+import { GoogleAdsApi, enums } from 'google-ads-api';
 import { enumName } from './googleProbe.js';
 import { copyImage } from './metaCreatives.js';
 
@@ -106,3 +106,47 @@ export async function importGoogleExamples({ db, target, projectId, period, coun
   }
   return out;
 }
+
+// «Найефективніші креативи» of a Google report (plan 2.14, owner 2026-11-16): the best asset groups (and, when nothing else is there, one search ad) of the period in
+// the shape the report keeps for every creative, plus the pictures, videos and texts of the group. The numbers are the group's (Google gives none per picture); a group that
+// returned less than it cost is not «effective» and is not shown. The pictures are copied into our storage (Google's addresses can go away).
+//   targets: Google Ads customers of the project (see googleTargets)  → items
+const reportCaption = (name, roas) => `${name || 'Група'}${roas != null ? ` · ROAS ${Number(roas).toFixed(2)}` : ''}`;
+export async function collectGoogleCreatives({ db, targets, projectId, period, count = 3, minRoas = 1, fetchFn = fetch }) {
+  const pool = [];
+  for (const t of targets) pool.push(...(await googleCreativeCandidates(t, { from: period.start, to: period.end, limit: 10 })).items);
+  const good = pool.filter((i) => Number(i.metrics?.roas) >= minRoas);
+  const groups = good.filter((i) => i.kind === 'asset_group' && i.images.length).sort((a, b) => b.metrics.roas - a.metrics.roas);
+  const ads = good.filter((i) => i.kind === 'search_ad').sort((a, b) => b.metrics.roas - a.metrics.roas);
+  const chosen = [...groups.slice(0, count), ...(groups.length < count ? ads.slice(0, 1) : [])].slice(0, count);
+  const items = [];
+  for (const c of chosen) {
+    const copies = [];
+    for (const [n, im] of c.images.slice(0, 4).entries()) {
+      const url = await copyImage({ db, url: im.url, path: `report-creatives/${projectId}/${period.start}_${period.end}/g-${c.id}-${n}`, fetchFn });
+      if (url) copies.push(url);
+    }
+    const m = c.metrics;
+    items.push({
+      adId: `g-${c.kind === 'asset_group' ? 'ag' : 'ad'}-${c.id}`, adName: c.name, campaign: c.campaign, kind: c.kind, imageUrl: copies[0] || null, images: copies,
+      videos: c.videos, headlines: c.headlines, descriptions: c.descriptions, caption: reportCaption(c.name, m.roas), reason: null,
+      metrics: { spend: m.spend, revenue: m.revenue, purchases: m.conversions, roas: m.roas, cpp: m.conversions > 0 ? round2(m.spend / m.conversions) : null, ctr: m.impressions > 0 ? round2((m.clicks / m.impressions) * 100) : null },
+    });
+  }
+  return items;
+}
+
+// The Google Ads customers of a project's accounts (null without the credentials of the server, then the report simply has no Google creatives).
+export function googleTargets(accounts, env = process.env) {
+  const googles = (accounts || []).filter((a) => a.platform === 'google');
+  if (!googles.length || !['GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_REFRESH_TOKEN', 'GOOGLE_ADS_LOGIN_CUSTOMER_ID'].every((k) => env[k])) return null;
+  const api = new GoogleAdsApi({ client_id: env.GOOGLE_ADS_CLIENT_ID, client_secret: env.GOOGLE_ADS_CLIENT_SECRET, developer_token: env.GOOGLE_ADS_DEVELOPER_TOKEN || 'unused' });
+  const login = env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(/-/g, '');
+  return googles.map((a) => api.Customer({ customer_id: String(a.account_id).replace(/\D/g, ''), login_customer_id: login, refresh_token: env.GOOGLE_ADS_REFRESH_TOKEN }));
+}
+
+// The collector the agent's run is given (the same call as makeCreativesCollector of Meta).
+export const makeGoogleCreativesCollector = (db) => ({ projectId, accounts, period, count }) => {
+  const targets = googleTargets(accounts);
+  return targets ? collectGoogleCreatives({ db, targets, projectId, period, count }) : Promise.resolve([]);
+};

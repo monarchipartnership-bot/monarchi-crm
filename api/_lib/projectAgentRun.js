@@ -37,7 +37,8 @@ const hasDelivery = (t) => Boolean(t) && ((t.spend || 0) > 0 || (t.impressions |
 // → { status: 'ok' | 'problem' | 'skipped', message, runId, reportId?, deckIds?, notes[] }
 // telegram: { send(message) } (or null when the bot is not set up on the server); crmUrl: where the buttons of the message lead.
 // creatives: async ({ projectId, accounts, period, count }) => items, or null: the «Most effective creatives» of the Meta accounts (see api/_lib/metaCreatives.js).
-export async function runProjectReport({ repo, post, projectId, periodType, trigger = 'manual', startedBy = null, today = kyivToday(), telegram = null, crmUrl = 'https://crm.monarchi.agency', creatives = null }) {
+// creativesGoogle: the same for the Google accounts (see api/_lib/googleCreatives.js), or null.
+export async function runProjectReport({ repo, post, projectId, periodType, trigger = 'manual', startedBy = null, today = kyivToday(), telegram = null, crmUrl = 'https://crm.monarchi.agency', creatives = null, creativesGoogle = null }) {
   const run = await repo.startRun({ projectId, trigger, periodType, startedBy });
   const notes = [];
   let locked = false;
@@ -144,7 +145,21 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     // «Most effective creatives»: asked once for the Meta accounts, as many as the Meta layout says. A failure is a note, never a failed run.
     let metaCreatives; // undefined: not asked yet
     let noToken = false;
+    let googleCreatives; // undefined: not asked yet
     const creativesFor = async (scope) => {
+      if (scope === 'google') {
+        if (!layouts.google || !creativesGoogle) return null;
+        const total = creativeCount(layouts.google, periodType);
+        if (!total) return null;
+        if (googleCreatives === undefined) {
+          googleCreatives = null;
+          try {
+            const items = await creativesGoogle({ projectId, accounts: accountsForTab(accounts, 'google'), period, count: total });
+            if (items.length) googleCreatives = items; else notes.push('Креативи Google: за період немає груп активів, що принесли більше, ніж коштували.');
+          } catch (e) { notes.push('Креативи Google: ' + (e?.message || e)); }
+        }
+        return googleCreatives;
+      }
       if (scope !== 'meta' || !layouts.meta) return null;
       const creativeTotal = creativeCount(layouts.meta, periodType);
       if (!creativeTotal) return null;

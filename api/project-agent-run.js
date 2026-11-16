@@ -8,6 +8,7 @@ import { createAgentRepo } from './_lib/agentRepo.js';
 import { makeInternalPost } from './_lib/internalPost.js';
 import { runProjectReport } from './_lib/projectAgentRun.js';
 import { makeCreativesCollector } from './_lib/metaCreatives.js';
+import { makeGoogleCreativesCollector } from './_lib/googleCreatives.js';
 import { hasToken, sendMessage } from './_lib/telegram.js';
 import { buildReportMessage, reportAction, reportLink } from '../src/lib/projectReportMessage.js';
 import { dueReportPeriod } from '../src/lib/reportEngine.js';
@@ -50,7 +51,7 @@ export default async function handler(req, res) {
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + agent.accessToken } }, auth: { persistSession: false, autoRefreshToken: false } });
     const result = await runProjectReport({
       repo: createAgentRepo(db, agent.email), post: makeInternalPost(agent.accessToken),
-      projectId, periodType, trigger: 'manual', startedBy: data.user.email || null, creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN),
+      projectId, periodType, trigger: 'manual', startedBy: data.user.email || null, creativesGoogle: makeGoogleCreativesCollector(db), creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN),
       telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl,
     });
     res.status(200).json(result);

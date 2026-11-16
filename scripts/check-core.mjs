@@ -6008,6 +6008,48 @@ await ok('google import (2.16): pictures of the best groups in turn, a group tha
   assert.match(inserted[0].name, /^Google · B · ROAS 6$/);
 });
 
+await ok('google report creatives (2.14): the best groups in the shape of a report creative, a group that lost money is left out, the agent run puts them in the Google report only', async () => {
+  const { collectGoogleCreatives } = await import('../api/_lib/googleCreatives.js');
+  const { enums } = await import('google-ads-api');
+  const E = enums;
+  const uploads = [];
+  const db = { storage: { from: () => ({ upload: async (path) => { uploads.push(path); return { error: null }; }, getPublicUrl: (path) => ({ data: { publicUrl: `https://store.test/${path}` } }) }) } };
+  const fetchFn = async () => ({ ok: true, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([1, 2]).buffer });
+  const target = { query: async (gaql) => {
+    if (/FROM asset_group WHERE/.test(gaql)) return [
+      { asset_group: { id: 1, name: 'MTO' }, campaign: { name: 'PMax MTO' }, metrics: { cost_micros: 300e6, impressions: 20000, clicks: 240, conversions: 5, conversions_value: 3600 } },
+      { asset_group: { id: 2, name: 'Loser' }, campaign: { name: 'PMax L' }, metrics: { cost_micros: 150e6, impressions: 13000, clicks: 160, conversions: 0, conversions_value: 15 } },
+    ];
+    if (/FROM asset_group_asset WHERE/.test(gaql)) return [
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.SQUARE_MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://g/1' } } } },
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://g/2' } } } },
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Custom Wigs' } } },
+      { asset_group: { id: 2 }, asset_group_asset: { field_type: E.AssetFieldType.SQUARE_MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://g/9' } } } },
+    ];
+    if (/RESPONSIVE_SEARCH_AD/.test(gaql)) return [{ ad_group_ad: { ad: { id: 7, responsive_search_ad: { headlines: [{ text: 'Buy wigs' }], descriptions: [{ text: 'Free shipping' }] } } }, ad_group: { name: 'Brand' }, campaign: { name: 'Search' }, metrics: { cost_micros: 5e6, impressions: 100, clicks: 20, conversions: 1, conversions_value: 200 } }];
+    return [];
+  } };
+  const items = await collectGoogleCreatives({ db, targets: [target], projectId: 3, period: { start: '2026-11-02', end: '2026-11-08' }, count: 3, fetchFn });
+  assert.deepEqual(items.map((i) => i.adId), ['g-ag-1', 'g-ad-7']); // the group that returned money, then one search ad because there are fewer groups than places; the loser is out
+  assert.equal(items[0].caption, 'MTO · ROAS 12.00');
+  assert.deepEqual([items[0].imageUrl, items[0].images.length, items[0].headlines], ['https://store.test/report-creatives/3/2026-11-02_2026-11-08/g-1-0.jpg', 2, ['Custom Wigs']]);
+  assert.deepEqual(items[0].metrics, { spend: 300, revenue: 3600, purchases: 5, roas: 12, cpp: 60, ctr: 1.2 });
+  assert.equal(items[1].imageUrl, null); // a search ad has no picture
+  assert.equal(uploads.length, 2); // only the pictures of the shown group are copied
+  // the run of the agent: the Google report gets them, the Meta report does not
+  const asked = [];
+  const repo = fakeRepo({ projectAccounts: [accounts[0], GOOGLE] });
+  const run = await runProjectReport({ repo, post: postBoth, projectId: 3, periodType: 'weekly', today: '2026-10-15', creativesGoogle: async (arg) => { asked.push(arg); return items; } });
+  assert.equal(run.status, 'ok');
+  assert.equal(asked.length, 1); // asked once, for the Google accounts only
+  assert.deepEqual(asked[0].accounts.map((a) => a.platform), ['google']);
+  const g = repo.log.reports.find((r) => r.platform === 'google');
+  const m = repo.log.reports.find((r) => r.platform === 'meta');
+  assert.equal(g.data.creatives.items.length, 2);
+  assert.equal(g.data.creatives.source, 'auto');
+  assert.equal(m.data.creatives, undefined);
+});
+
 console.log(`\n${passed} checks passed`);
 await ok('google probe: a read-only inventory of an account in counts and short samples; a query the account refuses does not hide the others', async () => {
   const { probeAccount } = await import('../api/_lib/googleProbe.js');
