@@ -5971,6 +5971,43 @@ await ok('google creatives (2.14): the best asset groups and search ads of a per
   await assert.rejects(() => googleCreativeCandidates(target, { from: 'x', to: 'y' }), /YYYY-MM-DD/);
 });
 
+await ok('google import (2.16): pictures of the best groups in turn, a group that lost money gives nothing, a picture already in the library is not added twice', async () => {
+  const { pickGoogleExamples, importGoogleExamples, googleExampleMark } = await import('../api/_lib/googleCreatives.js');
+  const img = (n, field = 'SQUARE_MARKETING_IMAGE') => ({ field, url: `https://tpc.googlesyndication.com/simgad/${1000000 + n}` });
+  const items = [
+    { kind: 'asset_group', name: 'A', metrics: { roas: 11, spend: 300 }, images: [img(1, 'PORTRAIT_MARKETING_IMAGE'), img(2), img(3, 'MARKETING_IMAGE')] },
+    { kind: 'asset_group', name: 'B', metrics: { roas: 6, spend: 250 }, images: [img(4), img(5)] },
+    { kind: 'asset_group', name: 'Loser', metrics: { roas: 0.11, spend: 155 }, images: [img(6)] },
+    { kind: 'search_ad', name: 'ad', metrics: { roas: 400, spend: 3 }, images: [] },
+  ];
+  const picks = pickGoogleExamples(items, { count: 4 });
+  assert.deepEqual(picks.map((p) => [p.group, p.mark]), [['A', 'google-img-1000002'], ['B', 'google-img-1000004'], ['A', 'google-img-1000003'], ['B', 'google-img-1000005']]); // in turn, the square first
+  assert.ok(picks.every((p) => p.group !== 'Loser'));
+  assert.equal(googleExampleMark('https://x/y/1000002'), 'google-img-1000002');
+  // the import over stand-ins: one picture is in the library already, one cannot be fetched
+  const rows = [{ path: 'google-img-1000002' }];
+  const inserted = [];
+  const uploads = [];
+  const db = {
+    storage: { from: () => ({ upload: async (path) => { uploads.push(path); return { error: null }; }, getPublicUrl: (path) => ({ data: { publicUrl: `https://store.test/${path}` } }) }) },
+    from: (table) => { assert.equal(table, 'project_creative_assets'); const q = { select: () => q, eq: () => q, then: (done) => done({ data: rows, error: null }), insert: (row) => ({ select: () => ({ single: async () => { inserted.push(row); return { data: { id: 50 + inserted.length, ...row }, error: null }; } }) }) }; return q; },
+  };
+  const target = { query: async (gaql) => {
+    if (/FROM asset_group WHERE/.test(gaql)) return [{ asset_group: { id: 1, name: 'A' }, campaign: { name: 'P' }, metrics: { cost_micros: 100e6, conversions: 2, conversions_value: 1100 } }, { asset_group: { id: 2, name: 'B' }, campaign: { name: 'P' }, metrics: { cost_micros: 100e6, conversions: 2, conversions_value: 600 } }];
+    if (/FROM asset_group_asset/.test(gaql)) return [{ asset_group: { id: 1 }, asset_group_asset: { field_type: 7 }, asset: { image_asset: { full_size: { url: 'https://tpc.googlesyndication.com/simgad/1000002' } } } }, { asset_group: { id: 2 }, asset_group_asset: { field_type: 7 }, asset: { image_asset: { full_size: { url: 'https://tpc.googlesyndication.com/simgad/1000004' } } } }];
+    return [];
+  } };
+  const fetchFn = async (url) => (/1000004$/.test(url) ? { ok: false } : { ok: true, headers: { get: () => 'image/png' }, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer });
+  const r = await importGoogleExamples({ db, target, projectId: 3, period: { start: '2026-10-18', end: '2026-11-16' }, count: 6, email: 'me@x.com', fetchFn });
+  assert.deepEqual([r.looked, r.already, r.noPicture, r.added.length], [2, 1, 1, 0]); // one is there already, one cannot be fetched
+  assert.equal(uploads.length, 0); // the picture that is already there is not copied, the other could not be fetched
+  const ok2 = await importGoogleExamples({ db, target, projectId: 3, period: { start: '2026-10-18', end: '2026-11-16' }, count: 6, email: 'me@x.com', fetchFn: async () => ({ ok: true, headers: { get: () => 'image/png' }, arrayBuffer: async () => new Uint8Array([1]).buffer }) });
+  assert.equal(ok2.added.length, 1);
+  assert.equal(uploads.length, 1); // only the new picture is copied
+  assert.deepEqual([inserted[0].kind, inserted[0].path, inserted[0].created_by], ['creative', 'google-img-1000004', 'me@x.com']);
+  assert.match(inserted[0].name, /^Google · B · ROAS 6$/);
+});
+
 console.log(`\n${passed} checks passed`);
 await ok('google probe: a read-only inventory of an account in counts and short samples; a query the account refuses does not hide the others', async () => {
   const { probeAccount } = await import('../api/_lib/googleProbe.js');

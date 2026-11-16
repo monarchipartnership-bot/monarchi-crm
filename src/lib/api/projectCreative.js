@@ -60,6 +60,17 @@ export async function analyzeBrand(projectId) {
   return authedPost('/api/project-brand-analyze', { projectId });
 }
 
+// «Підтягнути з Google» (plan 2.16): the pictures of the best asset groups of the last `days` days become files «Готовий креатив». → { added, already, noPicture, looked }
+export async function importGoogleExamples(projectId, { days = 30, count = 6 } = {}) {
+  const { authedPost } = await import('../adAccounts');
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const end = new Date();
+  const start = new Date(end.getTime() - (days - 1) * 86400000);
+  const json = await authedPost('/api/report-creatives', { action: 'import_google_examples', projectId, start: iso(start), end: iso(end), count });
+  if (json.configError) throw new Error('На сервері не задано доступ до Google Ads.');
+  return json;
+}
+
 // «Підтягнути кращі креативи з Meta»: the best ads of the last `days` days become files «Готовий креатив» of the library. → { added, already, noPicture, looked }
 export async function importMetaExamples(projectId, { days = 30, count = 6 } = {}) {
   const { authedPost } = await import('../adAccounts');

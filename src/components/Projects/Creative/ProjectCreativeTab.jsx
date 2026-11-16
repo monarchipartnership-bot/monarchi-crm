@@ -5,7 +5,7 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { useAuth } from '../../../contexts/AuthContext';
 import { FILE_TYPES, MAX_FILE_MB } from '../../../lib/api/creatives';
 import { supabase } from '../../../lib/supabaseClient';
-import { analyzeBrand, deleteAsset, fetchProjectCreative, importMetaExamples, saveInput, saveSettings, uploadAsset } from '../../../lib/api/projectCreative';
+import { analyzeBrand, deleteAsset, fetchProjectCreative, importGoogleExamples, importMetaExamples, saveInput, saveSettings, uploadAsset } from '../../../lib/api/projectCreative';
 import { ASSET_GROUPS, CTA_MAX_VARIANTS, CTA_MODES, FRESH_DAYS, addCtaVariant, addLink, ctaVariants, inputState, parseLinks, removeCtaVariant, removeLink, sectionFields } from '../../../lib/agents/projectCreative';
 import { agentsNeeding, filledFields } from '../../../lib/agents/agentRequirements';
 import { TEAMS, teamReadiness } from '../../../lib/agents/teams';
@@ -51,6 +51,7 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
   const [cta, setCta] = useState(''); // the wording of the button being typed
   const [brandNote, setBrandNote] = useState('');
   const [metaNote, setMetaNote] = useState('');
+  const [googleNote, setGoogleNote] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const notifyMaterials = useCallback((text, isError) => setError(isError ? text : ''), []); // «Готові матеріали»: only a failure is told here, a success is seen in the list
@@ -135,6 +136,19 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
       if (!r.looked) parts[0] = 'За останні 30 днів у кабінеті Meta немає оголошень із витратами';
       setMetaNote(parts.join(' · ') + '.');
     } catch (e) { setError(e.message || 'Не вдалося підтягнути креативи з Meta.'); } finally { setBusy(''); }
+  }
+  // «Підтягнути з Google»: the pictures of the best asset groups of the last 30 days come into the library as ready creatives (plan 2.16)
+  async function pullGoogle() {
+    setError(''); setBrandNote(''); setBusy('google');
+    try {
+      const r = await importGoogleExamples(projectId);
+      if (r.added?.length) setData((d) => ({ ...d, assets: [...d.assets, ...r.added] }));
+      const parts = [r.added?.length ? `Додано з Google: ${r.added.length}` : 'Нових креативів з Google немає'];
+      if (r.already) parts.push(`уже були: ${r.already}`);
+      if (r.noPicture) parts.push(`без картинки: ${r.noPicture}`);
+      if (!r.looked) parts[0] = 'За останні 30 днів немає груп активів Google з доходом більшим за витрату';
+      setGoogleNote(parts.join(' · ') + '.');
+    } catch (e) { setError(e.message || 'Не вдалося підтягнути креативи з Google.'); } finally { setBusy(''); }
   }
   // «Визначити з файлів»: the model's reading opens in the editor of the field; nothing is saved until the person presses «Зберегти»
   async function detectBrand() {
@@ -347,10 +361,13 @@ export default function ProjectCreativeTab({ projectId, showDeliverables = false
                       <div className="pcr-group-btns">
                         <button type="button" className="btn" disabled={!settings || !!busy} onClick={() => fileInputs.current[g.kind]?.click()}>{busy === 'upload:' + g.kind ? 'Завантажуємо…' : 'Додати файли'}</button>
                         {g.kind === 'creative' && accounts.some((x) => x.platform === 'meta') && <button type="button" className="btn btn-p" disabled={!settings || !!busy} onClick={pullMeta}>{busy === 'meta' ? 'Підтягуємо…' : 'Підтягнути з Meta'}</button>}
+                        {g.kind === 'creative' && accounts.some((x) => x.platform === 'google') && <button type="button" className="btn btn-p" disabled={!settings || !!busy} onClick={pullGoogle}>{busy === 'google' ? 'Підтягуємо…' : 'Підтягнути з Google'}</button>}
                       </div>
                     </div>
                     {g.kind === 'creative' && accounts.some((x) => x.platform === 'meta') && <small className="pcr-hint">«Підтягнути з Meta»: до 6 найкращих оголошень за 30 днів (за ROAS і покупками) з їхніми цифрами в назві. У відео береться обкладинка.</small>}
+                    {g.kind === 'creative' && accounts.some((x) => x.platform === 'google') && <small className="pcr-hint">«Підтягнути з Google»: картинки найкращих груп активів за 30 днів (беруться лише групи, що принесли більше, ніж коштували; цифри Google дає на групу, не на картинку). Відео файлом не копіюється.</small>}
                     {g.kind === 'creative' && metaNote && <p className="pcr-brandnote" role="status">{metaNote}</p>}
+                    {g.kind === 'creative' && googleNote && <p className="pcr-brandnote" role="status">{googleNote}</p>}
                     {files.length === 0 ? <div className="pcr-group-empty">Файлів немає</div> : (
                       <ul className="pcr-assets">
                         {files.map((a) => (

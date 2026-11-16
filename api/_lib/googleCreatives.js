@@ -5,6 +5,7 @@
 //   googleCreativeCandidates(target, { from, to, limit }) → { period, items: [{ kind: 'asset_group' | 'search_ad', id, name, campaign, metrics, images, videos, headlines, descriptions }] }
 import { enums } from 'google-ads-api';
 import { enumName } from './googleProbe.js';
+import { copyImage } from './metaCreatives.js';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
@@ -60,4 +61,48 @@ export async function googleCreativeCandidates(target, { from, to, limit = 8 } =
   })).sort(rank).slice(0, limit).forEach((x) => items.push(x));
 
   return { period: { from, to }, items };
+}
+
+// «Підтягнути з Google» (plan 2.16, owner 2026-11-16): the pictures of the best asset groups become files «Готовий креатив» of the client's library, as the
+// button of Meta does for the best ads. Google gives the numbers to a whole group, so the pictures are taken from the best groups in turn (a round per group,
+// not all pictures of one); a group that returned less than it cost is not «the best» and gives nothing. The mark of a file is the id of the picture
+// (`google-img-<id>`), so a picture that is already in the library is not added twice.
+const IMAGE_ORDER = ['SQUARE_MARKETING_IMAGE', 'MARKETING_IMAGE', 'PORTRAIT_MARKETING_IMAGE'];
+export const googleExampleMark = (url) => `google-img-${(String(url).match(/(\d{6,})\s*$/) || [])[1] || String(url).replace(/\W+/g, '').slice(-24)}`;
+export function pickGoogleExamples(items, { count = 6, minRoas = 1 } = {}) {
+  const groups = (items || []).filter((i) => i.kind === 'asset_group' && Number(i.metrics?.roas) >= minRoas && i.images?.length).sort((a, b) => b.metrics.roas - a.metrics.roas);
+  const lists = groups.map((g) => ({ g, images: [...g.images].sort((a, b) => (IMAGE_ORDER.indexOf(a.field) + 1 || 99) - (IMAGE_ORDER.indexOf(b.field) + 1 || 99)) }));
+  const out = [];
+  const seen = new Set();
+  for (let round = 0; out.length < count && lists.some((l) => l.images.length > round); round += 1) {
+    for (const l of lists) {
+      const img = l.images[round];
+      if (!img || out.length >= count) continue;
+      const mark = googleExampleMark(img.url);
+      if (seen.has(mark)) continue;
+      seen.add(mark);
+      out.push({ mark, url: img.url, field: img.field, group: l.g.name, roas: l.g.metrics.roas, spend: l.g.metrics.spend });
+    }
+  }
+  return out;
+}
+// → { added: [rows], already, noPicture, looked }
+export async function importGoogleExamples({ db, target, projectId, period, count = 6, email = null, fetchFn = fetch }) {
+  const { items } = await googleCreativeCandidates(target, { from: period.start, to: period.end, limit: 10 });
+  const picks = pickGoogleExamples(items, { count });
+  const out = { added: [], already: 0, noPicture: 0, looked: picks.length };
+  if (!picks.length) return out;
+  const have = await db.from('project_creative_assets').select('path').eq('project_id', projectId).eq('kind', 'creative');
+  if (have.error) throw new Error(have.error.message);
+  const marks = new Set((have.data || []).map((r) => r.path));
+  for (const p of picks) {
+    if (marks.has(p.mark)) { out.already += 1; continue; }
+    const url = await copyImage({ db, url: p.url, path: `project-examples/${projectId}/${p.mark}`, fetchFn });
+    if (!url) { out.noPicture += 1; continue; }
+    const name = `Google · ${p.group} · ROAS ${p.roas}`.slice(0, 160);
+    const row = await db.from('project_creative_assets').insert({ project_id: projectId, kind: 'creative', name, url, path: p.mark, created_by: email }).select().single();
+    if (row.error) throw new Error(row.error.message);
+    out.added.push(row.data);
+  }
+  return out;
 }
