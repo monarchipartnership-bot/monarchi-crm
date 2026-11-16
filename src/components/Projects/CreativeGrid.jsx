@@ -4,7 +4,8 @@ import '../../styles/projectHistory.css';
 const KIND = { image: 'Зображення', video: 'Відео', carousel: 'Карусель', catalog: 'Каталожне оголошення', asset_group: 'Група активів', search_ad: 'Пошукове оголошення', unknown: 'Креатив' };
 const money = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : '$' + Number(v).toLocaleString('uk-UA', { maximumFractionDigits: 0 }));
 const roasText = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v).toFixed(2).replace('.', ',') + 'x');
-const sales = (n) => `${n} ${n === 1 ? 'продаж' : n >= 2 && n <= 4 ? 'продажі' : 'продажів'}`;
+// Google counts a conversion in parts (2.88): a whole number is «продажів», a part is shown as it is, to one decimal, with «конверсій»
+const sales = (n) => (Number.isInteger(Number(n)) ? `${n} ${n === 1 ? 'продаж' : n >= 2 && n <= 4 ? 'продажі' : 'продажів'}` : `${Number(n).toFixed(1)} конверсій`);
 
 // The «Most effective creatives» of a report as a ranking: a number, the picture (a click enlarges it), the caption with its numbers. With `onReplace` /
 // `onRemove` the owner of the report can change them. The same list is meant for the page the client gets.
