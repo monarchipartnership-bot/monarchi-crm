@@ -536,6 +536,21 @@ await ok('google columns: campaigns add up to the account share correctly and a 
   assert.equal(computeMetric('mx_cost_g_interaction', { spend: 90, x_g_interactions: 30 }), 3);
   assert.ok(computeMetric('mx_g_view_rate', { impressions: 1000, x_g_video_views: 250 }) === 25);
 });
+await ok('google columns (2.13): orders, average order value, units, invalid clicks, viewability and calls come from one campaign row and add up across campaigns', () => {
+  const pmax = { orders: 10, units_sold: 25, invalid_clicks: 4, active_view_impressions: 600, active_view_measurable_impressions: 800, phone_calls: 3 };
+  const picked = ['mx_g_orders', 'mx_cost_g_order', 'mx_g_aov', 'mx_g_units_per_order', 'mx_g_invalid_rate', 'mx_g_viewability', 'mx_cost_g_phone_call'];
+  const a = extractGoogleCounts(pmax, picked);
+  assert.deepEqual(a, { x_g_orders: 10, x_g_units_sold: 25, x_g_invalid_clicks: 4, x_g_viewable_impr: 600, x_g_viewable_meas: 800, x_g_phone_calls: 3 });
+  assert.ok(googleMetricNamesFor(picked).includes('metrics.orders') && googleMetricNamesFor(picked).includes('metrics.active_view_measurable_impressions'));
+  const search = extractGoogleCounts({}, picked); // a campaign without orders adds zeros, never a wrong number
+  const total = sumBase([{ spend: 500, revenue: 3000, clicks: 400, impressions: 20000, ...a }, { spend: 100, revenue: 0, clicks: 100, impressions: 5000, ...search }]);
+  assert.equal(computeMetric('mx_g_aov', total), 300); // 3000 / 10 orders
+  assert.equal(computeMetric('mx_cost_g_order', total), 60); // 600 / 10
+  assert.equal(computeMetric('mx_g_units_per_order', total), 2.5);
+  assert.equal(computeMetric('mx_g_invalid_rate', total), 0.8); // 4 of 500 clicks
+  assert.equal(computeMetric('mx_g_viewability', total), 75); // 600 of 800 measurable
+  assert.equal(computeMetric('mx_g_aov', { revenue: 100, x_g_orders: 0 }), null); // no orders: no average
+});
 await ok('google columns: the catalog is consistent and every platform column has a label, a format and the counts it needs', () => {
   assert.ok(GOOGLE_METRIC_LIST.length >= 20);
   assert.equal(new Set(GOOGLE_METRIC_LIST.map((m) => m.key)).size, GOOGLE_METRIC_LIST.length);
@@ -5916,6 +5931,44 @@ await ok('the report agent saves its decks by the same unique key the database h
   const keys = [...src.matchAll(/onConflict: '([^']+)'/g)].map((m) => m[1]);
   assert.ok(keys.length >= 2);
   keys.forEach((k) => assert.equal(k, 'project_id,period_type,period_start,period_end,platform')); // project_reports and project_decks both have period_end in their unique keys
+});
+
+await ok('google creatives (2.14): the best asset groups and search ads of a period with their pictures, videos and texts; spend belongs to the group, not to a picture', async () => {
+  const { googleCreativeCandidates } = await import('../api/_lib/googleCreatives.js');
+  const { enums } = await import('google-ads-api');
+  const E = enums;
+  const asked = [];
+  const target = { query: async (gaql) => {
+    asked.push(gaql);
+    if (/FROM asset_group WHERE/.test(gaql)) return [
+      { asset_group: { id: 1, name: 'Hybrid' }, campaign: { name: 'PMax A' }, metrics: { cost_micros: 300e6, impressions: 9000, clicks: 400, conversions: 6, conversions_value: 1500 } },
+      { asset_group: { id: 1, name: 'Hybrid' }, campaign: { name: 'PMax A' }, metrics: { cost_micros: 100e6, impressions: 1000, clicks: 50, conversions: 2, conversions_value: 500 } },
+      { asset_group: { id: 2, name: 'Feed only' }, campaign: { name: 'PMax B' }, metrics: { cost_micros: 900e6, impressions: 20000, clicks: 100, conversions: 0, conversions_value: 0 } },
+    ];
+    if (/FROM asset_group_asset WHERE asset_group.id IN/.test(gaql)) return [
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Natural look' } } },
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Natural look' } } },
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.DESCRIPTION }, asset: { text_asset: { text: 'Hand tied hairline' } } },
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.SQUARE_MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://img/sq.jpg' } } } },
+      { asset_group: { id: 1 }, asset_group_asset: { field_type: E.AssetFieldType.YOUTUBE_VIDEO }, asset: { youtube_video_asset: { youtube_video_id: 'vid1' } } },
+      { asset_group: { id: 2 }, asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Other' } } },
+    ];
+    if (/RESPONSIVE_SEARCH_AD/.test(gaql)) return [
+      { ad_group_ad: { ad: { id: 77, responsive_search_ad: { headlines: [{ text: 'Buy wigs' }], descriptions: [{ text: 'Free shipping' }] } } }, ad_group: { name: 'Wigs' }, campaign: { name: 'Search' }, metrics: { cost_micros: 50e6, conversions: 3, conversions_value: 400, impressions: 800, clicks: 60 } },
+    ];
+    return [];
+  } };
+  const r = await googleCreativeCandidates(target, { from: '2026-11-02', to: '2026-11-08' });
+  const pmax = r.items.filter((x) => x.kind === 'asset_group');
+  assert.deepEqual(pmax.map((x) => x.id), ['1', '2']); // the group that returned money first, the big spender with nothing second
+  assert.deepEqual(pmax[0].metrics, { spend: 400, impressions: 10000, clicks: 450, conversions: 8, revenue: 2000, roas: 5 }); // rows of one group add up
+  assert.deepEqual(pmax[0].headlines, ['Natural look']); // a repeated text once
+  assert.deepEqual(pmax[0].images, [{ field: 'SQUARE_MARKETING_IMAGE', url: 'https://img/sq.jpg' }]);
+  assert.deepEqual(pmax[0].videos, [{ youtubeId: 'vid1', thumb: 'https://img.youtube.com/vi/vid1/hqdefault.jpg' }]);
+  const search = r.items.find((x) => x.kind === 'search_ad');
+  assert.deepEqual([search.headlines, search.descriptions, search.metrics.roas], [['Buy wigs'], ['Free shipping'], 8]);
+  assert.ok(asked.every((q) => /^SELECT /.test(q))); // only reads
+  await assert.rejects(() => googleCreativeCandidates(target, { from: 'x', to: 'y' }), /YYYY-MM-DD/);
 });
 
 console.log(`\n${passed} checks passed`);

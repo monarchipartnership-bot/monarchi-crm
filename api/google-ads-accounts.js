@@ -8,11 +8,13 @@
 //   action 'info'     — name / currency / time zone / status of one account
 //   action 'changes'  — the account's change history (change_event, Google keeps ~30 days): body also takes from/to as YYYY-MM-DD
 //   action 'insights' — numbers for a period: a preset (last_7d | last_30d | this_month | last_month) or from/to; level 'account' (default) or 'campaign'
+//   action 'creatives' — READ-ONLY: the best asset groups (Performance Max) and search ads of a period with their pictures, videos and texts: from/to YYYY-MM-DD, limit
 //   action 'probe'    — READ-ONLY inventory of the account: campaign and ad types, conversion actions, Performance Max asset groups and their assets (see _lib/googleProbe.js)
 import { createClient } from '@supabase/supabase-js';
 import { GoogleAdsApi } from 'google-ads-api';
 import { cleanGoogleColumns, extractGoogleCounts, googleMetricNamesFor } from '../src/lib/googleColumns.js';
 import { probeAccount } from './_lib/googleProbe.js';
+import { googleCreativeCandidates } from './_lib/googleCreatives.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -160,6 +162,12 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (action === 'creatives') {
+      const target = client.Customer({ customer_id: digits, login_customer_id: loginId.replace(/-/g, ''), refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN });
+      res.status(200).json({ account: digits, ...(await googleCreativeCandidates(target, { from, to, limit: Math.min(Math.max(Number(req.body?.limit) || 8, 1), 20) })) });
+      return;
+    }
+
     if (action === 'probe') {
       const target = client.Customer({ customer_id: digits, login_customer_id: loginId.replace(/-/g, ''), refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN });
       res.status(200).json({ account: digits, ...(await probeAccount(target)) });
@@ -209,7 +217,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    res.status(400).json({ error: 'action: list | info | changes | insights | probe' });
+    res.status(400).json({ error: 'action: list | info | changes | insights | creatives | probe' });
   } catch (err) {
     res.status(502).json({ error: 'Google Ads API: ' + (err?.errors?.[0]?.message || err?.message || String(err)) });
   }

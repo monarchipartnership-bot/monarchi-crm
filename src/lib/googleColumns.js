@@ -21,6 +21,14 @@ export const G_COUNTS = {
   g_video_views: { metrics: ['video_trueview_views'], calc: (m) => num(m.video_trueview_views) }, // «views» of video campaigns (the API calls them TrueView views)
   g_top_impr: { metrics: ['impressions', 'top_impression_percentage'], calc: (m) => num(m.impressions) * num(m.top_impression_percentage) },
   g_abs_top_impr: { metrics: ['impressions', 'absolute_top_impression_percentage'], calc: (m) => num(m.impressions) * num(m.absolute_top_impression_percentage) },
+  // commerce (Shopping and Performance Max report orders and units; other campaign types give 0)
+  g_orders: { metrics: ['orders'], calc: (m) => num(m.orders) },
+  g_units_sold: { metrics: ['units_sold'], calc: (m) => num(m.units_sold) },
+  // the quality of the traffic and its visibility
+  g_invalid_clicks: { metrics: ['invalid_clicks'], calc: (m) => num(m.invalid_clicks) },
+  g_viewable_impr: { metrics: ['active_view_impressions'], calc: (m) => num(m.active_view_impressions) },
+  g_viewable_meas: { metrics: ['active_view_measurable_impressions'], calc: (m) => num(m.active_view_measurable_impressions) },
+  g_phone_calls: { metrics: ['phone_calls'], calc: (m) => num(m.phone_calls) },
   g_search_eligible: { metrics: ['impressions', 'search_impression_share'], calc: eligible },
   g_search_impr: { metrics: ['impressions', 'search_impression_share'], calc: (m) => (hasShare(m) ? num(m.impressions) : 0) },
   g_lost_budget: { metrics: ['impressions', 'search_impression_share', 'search_budget_lost_impression_share'], calc: (m) => eligible(m) * num(m.search_budget_lost_impression_share) },
@@ -33,7 +41,7 @@ export const G_COUNTS = {
   g_sabs_elig: { metrics: ['impressions', 'absolute_top_impression_percentage', 'search_absolute_top_impression_share'], calc: (m) => (num(m.search_absolute_top_impression_share) > 0 ? (num(m.impressions) * num(m.absolute_top_impression_percentage)) / num(m.search_absolute_top_impression_share) : 0) },
 };
 
-const G = { interaction: 'Взаємодії', conv: 'Конверсії', share: 'Частка показів (пошук)', position: 'Позиція показів', video: 'Відео' };
+const G = { interaction: 'Взаємодії', conv: 'Конверсії', share: 'Частка показів (пошук)', position: 'Позиція показів', video: 'Відео', commerce: 'Замовлення й товари', quality: 'Якість трафіку', view: 'Видимість (Active View)', calls: 'Дзвінки' };
 const down = (m) => ({ ...m, goodWhen: 'down' });
 
 export const GOOGLE_METRIC_LIST = [
@@ -57,6 +65,20 @@ export const GOOGLE_METRIC_LIST = [
 
   rate('g_top_pct', G.position, 'Покази угорі, % від усіх', 'Top impression %', 'g_top_impr'),
   rate('g_abs_top_pct', G.position, 'Покази на 1-й позиції, % від усіх', 'Absolute top impression %', 'g_abs_top_impr'),
+
+  count('g_orders', G.commerce, 'Замовлення', 'Orders'),
+  cost('g_order', G.commerce, 'Ціна за замовлення', 'Cost per order', 'g_orders'),
+  { key: 'mx_g_aov', group: G.commerce, label: 'Середній чек', en: 'Average order value', format: 'money', goodWhen: 'up', needs: ['g_orders'], calc: (b) => ratio(b.revenue, b[X('g_orders')]) },
+  count('g_units_sold', G.commerce, 'Продано одиниць', 'Units sold'),
+  { key: 'mx_g_units_per_order', group: G.commerce, label: 'Одиниць у замовленні', en: 'Units per order', format: 'number', goodWhen: 'up', needs: ['g_orders', 'g_units_sold'], calc: (b) => ratio(b[X('g_units_sold')], b[X('g_orders')]) },
+
+  down(count('g_invalid_clicks', G.quality, 'Недійсні кліки', 'Invalid clicks')),
+  { key: 'mx_g_invalid_rate', group: G.quality, label: 'Частка недійсних кліків', en: 'Invalid click rate', format: 'percent', goodWhen: 'down', needs: ['g_invalid_clicks'], calc: (b) => ratio(b[X('g_invalid_clicks')], b.clicks, 100) },
+  count('g_viewable_impr', G.view, 'Видимі покази', 'Viewable impressions'),
+  rate('g_viewability', G.view, 'Рівень видимості', 'Viewability', 'g_viewable_impr', 'g_viewable_meas'),
+
+  count('g_phone_calls', G.calls, 'Дзвінки', 'Phone calls'),
+  cost('g_phone_call', G.calls, 'Ціна за дзвінок', 'Cost per phone call', 'g_phone_calls'),
 
   count('g_video_views', G.video, 'Перегляди відео', 'Video views'),
   cost('g_video_view', G.video, 'Ціна перегляду відео', 'Cost per video view', 'g_video_views'),
