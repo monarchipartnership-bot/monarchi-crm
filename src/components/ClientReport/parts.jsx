@@ -76,6 +76,35 @@ export function NotesGrid({ view }) {
   );
 }
 
+// A Google asset group as a card (plan 2.14, mockup A of 16.11): several pictures, the videos, the money of the group, the first headlines. Google gives the numbers to a
+// whole group, not to a picture, so the card shows them once. `onBig(url)` opens a picture in the lightbox.
+const money0 = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }));
+function GroupCard({ c, t, onBig }) {
+  const m = c.metrics || {};
+  const heads = (c.headlines || []).slice(0, 3);
+  const moreImgs = (c.images || []).length > 4 ? (c.images || []).length - 3 : 0; // the 4th picture carries «+N» only when there are more than four
+  return (
+    <figure className="cr cr--group">
+      <div className="cg-imgs">
+        {(c.images || []).slice(0, 4).map((u, k) => (
+          <button type="button" key={u} onClick={() => onBig(u)} aria-label={t('Enlarge: {name}', { name: c.caption })}><img src={u} alt="" loading="lazy" />{k === 3 && moreImgs > 0 && <span className="cg-more">+{moreImgs}</span>}</button>
+        ))}
+      </div>
+      {(c.videos || []).length > 0 && (
+        <div className="cg-vids">
+          {(c.videos || []).slice(0, 3).map((v) => <a key={v.youtubeId} href={`https://www.youtube.com/watch?v=${v.youtubeId}`} target="_blank" rel="noopener noreferrer" aria-label="Video"><img src={v.thumb} alt="" loading="lazy" /><i aria-hidden="true">▶</i></a>)}
+        </div>
+      )}
+      <figcaption><b>{c.caption}</b></figcaption>
+      <div className="cg-m">
+        {money0(m.spend) && <span>{t('Spent')} {money0(m.spend)}</span>}
+        {money0(m.revenue) && <span>{t('Revenue')} {money0(m.revenue)}</span>}
+      </div>
+      {heads.length > 0 && <p className="cg-tx">{heads.join(' · ')}</p>}
+    </figure>
+  );
+}
+
 // `heading`: the small title above the grid (the page puts its own section heading instead). `big`: larger cards (the page).
 export function Creatives({ items, heading = true, large = false }) {
   const t = useT();
@@ -93,7 +122,9 @@ export function Creatives({ items, heading = true, large = false }) {
     <>
       {heading && <div className="sh">{t('Most effective creatives')}</div>}
       <div className={'cra' + (large ? ' big' : '')}>
-        {items.map((c, i) => (
+        {items.map((c, i) => (c.images?.length > 1 ? (
+          <GroupCard key={`${c.adId || c.caption}:${i}`} c={c} t={t} onBig={(u) => setBig({ imageUrl: u, caption: c.caption })} />
+        ) : (
           <figure className="cr" key={`${c.imageUrl || c.caption}:${i}`}>
             {large && <span className="cx-rank">{i + 1}</span>}
             {c.imageUrl ? (
@@ -103,7 +134,7 @@ export function Creatives({ items, heading = true, large = false }) {
             )}
             <figcaption><b>{c.caption}</b></figcaption>
           </figure>
-        ))}
+        )))}
       </div>
       {big && (
         <div className="crh-lb" role="dialog" aria-modal="true" aria-label={big.caption} onClick={() => setBig(null)}>
