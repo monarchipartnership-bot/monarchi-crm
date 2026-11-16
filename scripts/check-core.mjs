@@ -5919,3 +5919,38 @@ await ok('the report agent saves its decks by the same unique key the database h
 });
 
 console.log(`\n${passed} checks passed`);
+await ok('google probe: a read-only inventory of an account in counts and short samples; a query the account refuses does not hide the others', async () => {
+  const { probeAccount } = await import('../api/_lib/googleProbe.js');
+  const { enums } = await import('google-ads-api');
+  const E = enums;
+  const asked = [];
+  const target = {
+    query: async (gaql) => {
+      asked.push(gaql);
+      if (/FROM campaign WHERE/.test(gaql)) return [{ campaign: { advertising_channel_type: E.AdvertisingChannelType.PERFORMANCE_MAX, status: E.CampaignStatus.ENABLED } }, { campaign: { advertising_channel_type: E.AdvertisingChannelType.PERFORMANCE_MAX, status: E.CampaignStatus.PAUSED } }, { campaign: { advertising_channel_type: E.AdvertisingChannelType.SEARCH, status: E.CampaignStatus.ENABLED } }];
+      if (/FROM ad_group_ad WHERE ad_group_ad.status/.test(gaql)) throw new Error('ad types are not allowed here');
+      if (/FROM conversion_action/.test(gaql)) return [{ conversion_action: { name: 'Purchase', type: E.ConversionActionType.WEBPAGE, category: E.ConversionActionCategory.PURCHASE, primary_for_goal: true } }];
+      if (/segments.conversion_action_name/.test(gaql)) return [{ segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 10, conversions_value: 1200.456 } }, { segments: { conversion_action_name: 'Add to cart' }, metrics: { conversions: 80, conversions_value: 0 } }, { segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 2, conversions_value: 100 } }];
+      if (/FROM asset_group WHERE/.test(gaql)) return [{ asset_group: { name: 'Hybrid wigs', status: E.AssetGroupStatus.ENABLED, ad_strength: E.AdStrength.EXCELLENT }, campaign: { name: 'PMax Hybrid' } }];
+      if (/FROM asset_group_asset/.test(gaql)) return [
+        { asset_group_asset: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.BEST }, asset: { text_asset: { text: 'Natural look wigs' } } },
+        { asset_group_asset: { field_type: E.AssetFieldType.MARKETING_IMAGE, performance_label: E.AssetPerformanceLabel.LOW }, asset: { image_asset: { full_size: { url: 'https://img/1.jpg' } } } },
+        { asset_group_asset: { field_type: E.AssetFieldType.YOUTUBE_VIDEO, performance_label: E.AssetPerformanceLabel.GOOD }, asset: { youtube_video_asset: { youtube_video_id: 'abc123' } } },
+      ];
+      if (/RESPONSIVE_SEARCH_AD/.test(gaql)) return [{ ad_group_ad: { ad: { responsive_search_ad: { headlines: [{ text: 'Buy wigs' }], descriptions: [{ text: 'Free shipping' }] } } } }];
+      return [];
+    },
+  };
+  const { sections: s } = await probeAccount(target);
+  assert.deepEqual(s.campaigns.byType, { PERFORMANCE_MAX: { ENABLED: 1, PAUSED: 1 }, SEARCH: { ENABLED: 1 } });
+  assert.equal(s.adTypes.ok, false); assert.match(s.adTypes.error, /not allowed/); // one refused query, the others still answer
+  assert.equal(s.conversionActions.items[0].category, 'PURCHASE');
+  assert.deepEqual(s.conversionsByAction.items, [{ name: 'Add to cart', conversions: 80, value: 0 }, { name: 'Purchase', conversions: 12, value: 1300.46 }]); // what the single «conversions» number is made of
+  assert.equal(s.assetGroups.items[0].adStrength, 'EXCELLENT');
+  assert.deepEqual(s.assets.byField, { HEADLINE: 1, MARKETING_IMAGE: 1, YOUTUBE_VIDEO: 1 });
+  assert.equal(s.assets.labels.MARKETING_IMAGE.LOW, 1);
+  assert.deepEqual(s.assets.samples.YOUTUBE_VIDEO, [{ video: 'abc123', label: 'GOOD' }]);
+  assert.deepEqual(s.searchAds.items[0], { headlines: ['Buy wigs'], descriptions: ['Free shipping'] });
+  assert.ok(asked.every((q) => /^SELECT /.test(q))); // only reads
+});
+
