@@ -5932,10 +5932,15 @@ await ok('google probe: a read-only inventory of an account in counts and short 
       if (/FROM conversion_action/.test(gaql)) return [{ conversion_action: { name: 'Purchase', type: E.ConversionActionType.WEBPAGE, category: E.ConversionActionCategory.PURCHASE, primary_for_goal: true } }];
       if (/segments.conversion_action_name/.test(gaql)) return [{ segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 10, conversions_value: 1200.456 } }, { segments: { conversion_action_name: 'Add to cart' }, metrics: { conversions: 80, conversions_value: 0 } }, { segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 2, conversions_value: 100 } }];
       if (/FROM asset_group WHERE/.test(gaql)) return [{ asset_group: { name: 'Hybrid wigs', status: E.AssetGroupStatus.ENABLED, ad_strength: E.AdStrength.EXCELLENT }, campaign: { name: 'PMax Hybrid' } }];
-      if (/FROM asset_group_asset/.test(gaql)) return [
-        { asset_group_asset: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.BEST }, asset: { text_asset: { text: 'Natural look wigs' } } },
-        { asset_group_asset: { field_type: E.AssetFieldType.MARKETING_IMAGE, performance_label: E.AssetPerformanceLabel.LOW }, asset: { image_asset: { full_size: { url: 'https://img/1.jpg' } } } },
-        { asset_group_asset: { field_type: E.AssetFieldType.YOUTUBE_VIDEO, performance_label: E.AssetPerformanceLabel.GOOD }, asset: { youtube_video_asset: { youtube_video_id: 'abc123' } } },
+      if (/FROM asset_group_asset/.test(gaql)) { assert.doesNotMatch(gaql, /performance_label/); return [
+        { asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Natural look wigs' } } },
+        { asset_group_asset: { field_type: E.AssetFieldType.MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://img/1.jpg' } } } },
+        { asset_group_asset: { field_type: E.AssetFieldType.YOUTUBE_VIDEO }, asset: { youtube_video_asset: { youtube_video_id: 'abc123' } } },
+      ]; }
+      if (/FROM ad_group_ad_asset_view/.test(gaql)) return [
+        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.BEST } },
+        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.LOW } },
+        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.MARKETING_IMAGE, performance_label: E.AssetPerformanceLabel.GOOD } },
       ];
       if (/RESPONSIVE_SEARCH_AD/.test(gaql)) return [{ ad_group_ad: { ad: { responsive_search_ad: { headlines: [{ text: 'Buy wigs' }], descriptions: [{ text: 'Free shipping' }] } } } }];
       return [];
@@ -5948,8 +5953,8 @@ await ok('google probe: a read-only inventory of an account in counts and short 
   assert.deepEqual(s.conversionsByAction.items, [{ name: 'Add to cart', conversions: 80, value: 0 }, { name: 'Purchase', conversions: 12, value: 1300.46 }]); // what the single «conversions» number is made of
   assert.equal(s.assetGroups.items[0].adStrength, 'EXCELLENT');
   assert.deepEqual(s.assets.byField, { HEADLINE: 1, MARKETING_IMAGE: 1, YOUTUBE_VIDEO: 1 });
-  assert.equal(s.assets.labels.MARKETING_IMAGE.LOW, 1);
-  assert.deepEqual(s.assets.samples.YOUTUBE_VIDEO, [{ video: 'abc123', label: 'GOOD' }]);
+  assert.deepEqual(s.assets.samples.YOUTUBE_VIDEO, [{ video: 'abc123' }]);
+  assert.deepEqual(s.adAssetLabels.byField, { HEADLINE: { BEST: 1, LOW: 1 }, MARKETING_IMAGE: { GOOD: 1 } }); // the labels live on the assets of ads, not on the asset groups
   assert.deepEqual(s.searchAds.items[0], { headlines: ['Buy wigs'], descriptions: ['Free shipping'] });
   assert.ok(asked.every((q) => /^SELECT /.test(q))); // only reads
 });

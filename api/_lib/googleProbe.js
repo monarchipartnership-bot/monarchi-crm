@@ -1,7 +1,7 @@
 // A READ-ONLY look at what a Google Ads account holds, to decide what the reports can take from it (owner, 2026-11-16: «все метрики як у Meta? а креативи?»).
 // It changes nothing and costs nothing: a handful of small GAQL queries, each in its own try/catch, so one query the account does not allow (a campaign
 // type that is not there, a field the API version lacks) never hides the others. The answer is counts and a few short samples, never the whole account.
-//   probeAccount(target) → { sections: { campaigns, adTypes, conversionActions, conversionsByAction, assetGroups, assets, searchAds } }
+//   probeAccount(target) → { sections: { campaigns, adTypes, conversionActions, conversionsByAction, assetGroups, assets, adAssetLabels, searchAds } }
 //   each section: { ok: true, ... } or { ok: false, error }
 import { enums } from 'google-ads-api';
 
@@ -71,23 +71,33 @@ export async function probeAccount(target) {
     };
   });
 
-  // the creatives of Performance Max: pictures, videos, texts, with Google's own label of each (best / good / low), not spend or ROAS per asset
+  // the creatives of Performance Max: pictures, videos, texts of every asset group. This API version has NO performance label on an asset group asset
+  // (checked 16.11: the label lives only on ad_group_ad_asset_view, i.e. for search, display and Demand Gen ads, see adAssetLabels below)
   const assets = await section(async () => {
-    const rows = await target.query("SELECT asset_group_asset.field_type, asset_group_asset.performance_label, asset.text_asset.text, asset.image_asset.full_size.url, asset.youtube_video_asset.youtube_video_id FROM asset_group_asset WHERE asset_group_asset.status != 'REMOVED' LIMIT 400");
+    const rows = await target.query("SELECT asset_group_asset.field_type, asset_group_asset.status, asset.text_asset.text, asset.image_asset.full_size.url, asset.youtube_video_asset.youtube_video_id FROM asset_group_asset WHERE asset_group_asset.status != 'REMOVED' LIMIT 400");
     const byField = {};
-    const labels = {};
     const samples = {};
     rows.forEach((r) => {
       const field = enumName(enums.AssetFieldType, r.asset_group_asset?.field_type);
-      const label = enumName(enums.AssetPerformanceLabel, r.asset_group_asset?.performance_label);
       bump(byField, field);
-      labels[field] = labels[field] || {};
-      bump(labels[field], label);
       const a = r.asset || {};
       const sample = a.text_asset?.text ? { text: short(a.text_asset.text, 90) } : a.image_asset?.full_size?.url ? { image: short(a.image_asset.full_size.url, 200) } : a.youtube_video_asset?.youtube_video_id ? { video: a.youtube_video_asset.youtube_video_id } : null;
-      if (sample) { samples[field] = samples[field] || []; if (samples[field].length < 3) samples[field].push({ ...sample, label }); }
+      if (sample) { samples[field] = samples[field] || []; if (samples[field].length < 3) samples[field].push(sample); }
     });
-    return { total: rows.length, byField, labels, samples };
+    return { total: rows.length, byField, samples };
+  });
+
+  // Google's own label of each asset (best / good / low) for the assets of search, display and Demand Gen ads
+  const adAssetLabels = await section(async () => {
+    const rows = await target.query('SELECT ad_group_ad_asset_view.field_type, ad_group_ad_asset_view.performance_label FROM ad_group_ad_asset_view WHERE ad_group_ad_asset_view.enabled = TRUE LIMIT 500');
+    const byField = {};
+    rows.forEach((r) => {
+      const field = enumName(enums.AssetFieldType, r.ad_group_ad_asset_view?.field_type);
+      const label = enumName(enums.AssetPerformanceLabel, r.ad_group_ad_asset_view?.performance_label);
+      byField[field] = byField[field] || {};
+      bump(byField[field], label);
+    });
+    return { total: rows.length, byField };
   });
 
   const searchAds = await section(async () => {
@@ -101,5 +111,5 @@ export async function probeAccount(target) {
     };
   });
 
-  return { sections: { campaigns, adTypes, conversionActions, conversionsByAction, assetGroups, assets, searchAds } };
+  return { sections: { campaigns, adTypes, conversionActions, conversionsByAction, assetGroups, assets, adAssetLabels, searchAds } };
 }
