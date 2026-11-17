@@ -13,6 +13,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { GoogleAdsApi } from 'google-ads-api';
 import { cleanGoogleColumns, extractGoogleCounts, googleMetricNamesFor } from '../src/lib/googleColumns.js';
+import { cleanFunnelActions } from '../src/lib/googleFunnel.js';
+import { funnelCounts, listConversionActions } from './_lib/googleFunnelData.js';
 import { probeAccount } from './_lib/googleProbe.js';
 import { googleCreativeCandidates } from './_lib/googleCreatives.js';
 
@@ -174,6 +176,15 @@ export default async function handler(req, res) {
       return;
     }
 
+    // the conversion actions of the account with their counts (default: the last 30 days), for choosing the funnel's stages
+    if (action === 'conversion_actions') {
+      const target = client.Customer({ customer_id: digits, login_customer_id: loginId.replace(/-/g, ''), refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN });
+      const okDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+      const { from_date, to_date } = okDate(from) && okDate(to) ? { from_date: from, to_date: to } : periodBounds('last_30d');
+      res.status(200).json({ account: digits, period: { from_date, to_date }, actions: await listConversionActions(target, { from_date, to_date }) });
+      return;
+    }
+
     if (action === 'insights') {
       const target = client.Customer({ customer_id: digits, login_customer_id: loginId.replace(/-/g, ''), refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN });
       // A preset, or an exact from/to range (YYYY-MM-DD) — the range wins.
@@ -213,11 +224,15 @@ export default async function handler(req, res) {
       }
 
       const rows = await target.report({ entity: 'customer', metrics, from_date, to_date });
-      res.status(200).json({ account: digits, period: { from_date, to_date }, row: shape(rows[0]?.metrics || {}) });
+      // the funnel stages: the count of the conversion action the manager chose for each (a failure here never takes the report's numbers down)
+      let funnel = null;
+      const funnelActions = cleanFunnelActions(req.body?.funnelActions);
+      if (Object.keys(funnelActions).length) { try { funnel = await funnelCounts(target, { from_date, to_date }, funnelActions); } catch (e) { funnel = null; } }
+      res.status(200).json({ account: digits, period: { from_date, to_date }, row: shape(rows[0]?.metrics || {}), ...(funnel ? { funnel } : {}) });
       return;
     }
 
-    res.status(400).json({ error: 'action: list | info | changes | insights | creatives | probe' });
+    res.status(400).json({ error: 'action: list | info | changes | insights | creatives | probe | conversion_actions' });
   } catch (err) {
     res.status(502).json({ error: 'Google Ads API: ' + (err?.errors?.[0]?.message || err?.message || String(err)) });
   }

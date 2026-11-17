@@ -33,6 +33,8 @@ import '../../../styles/automationTasksPage.css';
 import '../../../styles/automationDashboard.css';
 import '../../../styles/ddHub.css';
 import '../../../styles/reportsHub.css';
+import '../../../styles/reportsManagerPlum.generated.css'; // the light Hub styles of the Reports Manager recoloured to the plum palette (made by a script)
+import '../../../styles/reportsManagerPlum.css';
 
 // Same "Ліди vs Cover Letters" split confirmed for Weekly/Annual Report —
 // see the field dictionary. mb/gm/li send real outreach (Cover Letters /
@@ -368,7 +370,7 @@ export default function MonthlyCreate() {
   }
 
   return (
-    <div className="report-page monthly-report-page rpt-hub" data-dd="hub" ref={pageRef}>
+    <div className="report-page monthly-report-page rpt-hub rm-plum is-plum" data-dd="hub" ref={pageRef}>
       {!capturing && <ReportTypeSwitcher />}
       <section className="rpt-hero">
         <div className="rpt-hero-top-row">

@@ -1,0 +1,101 @@
+/* Задачі of sales (/reports/deal-tasks) in the plum look (owner's picks 2026-11-12, artifact PPoDTqjGuZJY9cAkCP6N38): ring-medallion key figures, the quick scopes as text with a glowing line,
+   an open toolbar with a line and a capsule view switcher, groups as a pill with a medallion, the table as pill rows, a calendar of cells with a ring, priority columns tinted by the priority colour,
+   transparent cards with a ring, the window «Нова задача» with medallion steps and an active pill, the window of a task with pill rows.
+   The light colours of dealTasksPage, dealTasksHub and taskDialogsHub are recoloured by a script (dealTasksPlum.generated.css); this is the hand-made part.
+   Scoped to .dtp-hub.dp-plum (the windows: .thd-overlay.dp-plum). */
+.dtp-hub.dp-plum { color: #F6E9FA; color-scheme: dark; --hb-frame: none; }
+.dtp-hub.dp-plum, .thd-overlay.dp-plum { --surface: rgba(255, 255, 255, .06); --surface-2: rgba(255, 255, 255, .08); --border: rgba(235, 156, 239, .3); --ink: #F6E9FA; --ink-soft: #D6AEE0; --muted: #D6AEE0; --purple: #EB9CEF; --purple-hover: #F0C4F5; --purple-deep: #F6E9FA; --purple-tint: rgba(235, 156, 239, .16); --ok: #4BE07F; --warn: #FBBF24; --bad: #FF8A8A; }
+/* the blocks: transparent with a ring */
+.dtp-hub.dp-plum :is(.dtp-metric, .dtp-panel) { border: 0; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.dtp-hub.dp-plum .dtp-metric { border-radius: 28px; }
+.dtp-hub.dp-plum .dtp-empty-title { color: #F6E9FA; }
+.dtp-hub.dp-plum .btn { border: 0; background: rgba(52, 16, 52, .92); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F6E9FA; text-shadow: none; }
+.dtp-hub.dp-plum .btn.btn-p, .dtp-hub.dp-plum .btn.dtp-create { background: linear-gradient(100deg, #B544B5, #661466); box-shadow: 0 0 14px rgba(181, 68, 181, .6); color: #fff; }
+/* the key figures: ring medallions */
+.dtp-hub.dp-plum .dtp-metric-ic { background: radial-gradient(circle closest-side at 50% 50%, #8E2A93 0, #7E2483 60%, #2c0f2c 62%, #2c0f2c 74%, transparent 75%), conic-gradient(var(--c1), var(--c2)); }
+.dtp-hub.dp-plum .dtp-metric--today .dtp-metric-ic { background: radial-gradient(circle closest-side at 50% 50%, #E08A06 0, #D07D00 60%, #2c0f2c 62%, #2c0f2c 74%, transparent 75%), conic-gradient(var(--c1), var(--c2)); }
+.dtp-hub.dp-plum .dtp-metric.overdue .dtp-metric-ic { background: radial-gradient(circle closest-side at 50% 50%, #D92D2D 0, #C42727 60%, #2c0f2c 62%, #2c0f2c 74%, transparent 75%), conic-gradient(var(--c1), var(--c2)); }
+.dtp-hub.dp-plum .dtp-metric.done .dtp-metric-ic { background: radial-gradient(circle closest-side at 50% 50%, #12A144 0, #0F9139 60%, #2c0f2c 62%, #2c0f2c 74%, transparent 75%), conic-gradient(var(--c1), var(--c2)); }
+.dtp-hub.dp-plum .dtp-metric-label { color: #D6AEE0; } .dtp-hub.dp-plum .dtp-metric-value { color: #F6E9FA; }
+/* the quick scopes: text with a glowing line */
+.dtp-hub.dp-plum .dtp-scope-row { align-items: center; gap: 14px; }
+.dtp-hub.dp-plum .dtp-scopes { flex: 1; display: flex; gap: 22px; padding: 0; border: 0; border-bottom: 1.5px solid rgba(235, 156, 239, .2); border-radius: 0; background: none; box-shadow: none; }
+.dtp-hub.dp-plum .dtp-scope { position: relative; height: 42px; padding: 0 2px; border: 0; border-radius: 0; background: none; box-shadow: none; color: #D6AEE0; font: 700 13.5px 'Onest', sans-serif; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.dtp-hub.dp-plum .dtp-scope[aria-pressed="true"] { background: none; color: #fff; box-shadow: none; }
+.dtp-hub.dp-plum .dtp-scope[aria-pressed="true"]::after { content: ""; position: absolute; left: 6%; right: 6%; bottom: -1.5px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 5px rgba(235, 156, 239, .9)); }
+.dtp-hub.dp-plum .dtp-scope-count { background: rgba(235, 156, 239, .18); color: #F6E9FA; }
+/* the toolbar: open with a line */
+.dtp-hub.dp-plum .dtp-toolbar { padding: 0 2px 10px; border: 0; border-bottom: 1.5px solid rgba(235, 156, 239, .2); border-radius: 0; background: none; box-shadow: none; }
+/* the frame belongs to the field itself, the wrapper stays bare */
+.dtp-hub.dp-plum .dtp-search { background: none; box-shadow: none; border: 0; }
+.dtp-hub.dp-plum .dtp-search input { background: rgba(23, 5, 28, .6) !important; color: #F6E9FA; border: 0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3) !important; }
+.dtp-hub.dp-plum .dtp-search input:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF !important; }
+.dtp-hub.dp-plum .dtp-chip { background: rgba(235, 156, 239, .16); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+/* the view switcher: a capsule */
+.dtp-hub.dp-plum .dtp-views { display: inline-flex; gap: 2px; padding: 4px; border: 0; border-radius: 999px; background: rgba(52, 16, 52, .92); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.dtp-hub.dp-plum .dtp-view { border: 0; border-radius: 999px; background: none; box-shadow: none; color: #D6AEE0; }
+.dtp-hub.dp-plum .dtp-view[aria-pressed="true"] { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.dtp-hub.dp-plum .dtp-filter-btn.has-active { box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+/* the group of the list: a pill with a medallion; the table as pill rows */
+.dtp-hub.dp-plum .dtp-group { background: rgba(255, 255, 255, .06); color: #F6E9FA; box-shadow: none; border: 0; }
+.dtp-hub.dp-plum .dtp-group-count, .dtp-hub.dp-plum .dtp-col-count { background: rgba(235, 156, 239, .18); color: #F6E9FA; }
+.dtp-hub.dp-plum .dtp-table-wrap { background: none; }
+.dtp-hub.dp-plum table.dtp-table { border-collapse: separate; border-spacing: 0 6px; background: none; }
+.dtp-hub.dp-plum table.dtp-table thead th { background: none; border: 0; color: #D6AEE0; padding-top: 4px; padding-bottom: 2px; }
+.dtp-hub.dp-plum table.dtp-table tbody tr:not(.dtp-group-row) td { background: rgba(255, 255, 255, .06); border: 0; color: #F6E9FA; }
+.dtp-hub.dp-plum table.dtp-table tbody tr:not(.dtp-group-row) td:first-child { border-radius: 999px 0 0 999px; padding-left: 8px; }
+.dtp-hub.dp-plum table.dtp-table tbody tr:not(.dtp-group-row) td:last-child { border-radius: 0 999px 999px 0; }
+.dtp-hub.dp-plum table.dtp-table tbody tr:not(.dtp-group-row):hover td { background: rgba(235, 156, 239, .12); }
+.dtp-hub.dp-plum table.dtp-table tbody tr.dtp-group-row td { background: none; border: 0; padding-left: 0; }
+.dtp-hub.dp-plum .dtp-page-btn { background: rgba(255, 255, 255, .06); color: #F6E9FA; border: 0; box-shadow: none; }
+.dtp-hub.dp-plum .dtp-page-btn.on { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+/* the calendar: cells with a ring */
+.dtp-hub.dp-plum .dtp-cal-cell { border: 0; border-radius: 18px; background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .2); }
+.dtp-hub.dp-plum .dtp-cal-cell.today { box-shadow: inset 0 0 0 1.5px #EB9CEF; background: rgba(181, 68, 181, .18); }
+.dtp-hub.dp-plum .dtp-cal-cell.out { opacity: .45; }
+.dtp-hub.dp-plum .dtp-cal-dow, .dtp-hub.dp-plum .dtp-cal-more, .dtp-hub.dp-plum .dtp-cal-hint { color: #D6AEE0; }
+.dtp-hub.dp-plum .dtp-cal-daynum, .dtp-hub.dp-plum .dtp-cal-month { color: #F6E9FA; }
+.dtp-hub.dp-plum .dtp-cal-chip { background: rgba(255, 255, 255, .08); color: var(--c); border: 0; box-shadow: none; filter: brightness(1.5) saturate(1.15); }
+.dtp-hub.dp-plum .dtp-icon-btn, .dtp-hub.dp-plum .dtp-cal-today { background: rgba(52, 16, 52, .92); color: #F6E9FA; border: 0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+/* the board: columns tinted by the priority colour, transparent cards with a ring */
+.dtp-hub.dp-plum .dtp-col { border: 0; border-radius: 24px; background: linear-gradient(180deg, color-mix(in srgb, var(--sc) 16%, transparent), color-mix(in srgb, var(--sc) 4%, transparent)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sc) 40%, transparent); }
+.dtp-hub.dp-plum .dtp-col-head { background: none; color: #F6E9FA; border: 0; }
+.dtp-hub.dp-plum .dtp-card { border: 0; border-radius: 20px; background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .22); color: #F6E9FA; }
+.dtp-hub.dp-plum .dtp-card-title { color: #F6E9FA; }
+.dtp-hub.dp-plum .dtp-col-empty { color: #D6AEE0; }
+.dtp-hub.dp-plum .dtp-type { background: rgba(23, 5, 28, .5); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .25); border: 0; }
+.dtp-hub.dp-plum .dtp-deal-link { color: #EB9CEF; }
+/* the badges of priority and status get their colour inline (made for a light page): a dark pill and a lifted colour */
+.dtp-hub.dp-plum .dtp-badge { background: rgba(255, 255, 255, .08) !important; box-shadow: none; filter: brightness(1.4) saturate(1.15); }
+/* the popover of the filters */
+.dtp-hub.dp-plum .dtp-pop { border: 0; background: #2a0c2f; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 18px 40px -12px rgba(0, 0, 0, .6); color: #F6E9FA; }
+.dtp-hub.dp-plum .dtp-field label { color: #D6AEE0; }
+.dtp-hub.dp-plum .dtp-apply { background: linear-gradient(135deg, #4BE07F, #12A144); color: #fff; box-shadow: 0 0 14px rgba(75, 224, 127, .4); }
+/* the windows: solid dark glass; the steps of «Нова задача» as medallions with an active pill */
+.tmodal-overlay.thd-overlay.dp-plum { background: rgba(14, 3, 18, .72); backdrop-filter: blur(3px); color: #F6E9FA; color-scheme: dark; }
+.thd-overlay.dp-plum .tmodal-box.thd-dialog { border: 0; background: rgba(30, 8, 36, .98); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 30px 80px rgba(0, 0, 0, .6); color: #F6E9FA; }
+.thd-overlay.dp-plum .thd-rail { background: none; border-right: 1.5px solid rgba(235, 156, 239, .2); }
+.thd-overlay.dp-plum .thd-rn { background: none; box-shadow: none; color: #D6AEE0; }
+.thd-overlay.dp-plum .thd-rn.on { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.thd-overlay.dp-plum .thd-md::before { background: #2c0f2c; }
+.thd-overlay.dp-plum .thd-rn.on .thd-md::before { background: #fff; }
+.thd-overlay.dp-plum .thd-note { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: none; }
+.thd-overlay.dp-plum .thd-head, .thd-overlay.dp-plum .thd-foot { background: none; border-color: rgba(235, 156, 239, .2); }
+.thd-overlay.dp-plum .dth-types { background: rgba(255, 255, 255, .08); }
+.thd-overlay.dp-plum .dth-type { color: #D6AEE0; background: none; }
+.thd-overlay.dp-plum .dth-type.on { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.thd-overlay.dp-plum .dth-pri-chip { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.thd-overlay.dp-plum .dth-pri-chip.on { background: color-mix(in srgb, var(--c) 20%, transparent); color: var(--c); }
+.thd-overlay.dp-plum .thd-dialog .btn.thd-btn-bad { background: linear-gradient(135deg, #FF8A8A, #D92D2D); color: #fff; box-shadow: 0 0 14px rgba(255, 138, 138, .4); }
+.thd-overlay.dp-plum .thd-dialog .btn.thd-btn-ok { background: linear-gradient(135deg, #4BE07F, #12A144); color: #fff; box-shadow: 0 0 14px rgba(75, 224, 127, .4); }
+.thd-overlay.dp-plum .thd-dialog .btn.thd-btn-ok:disabled { opacity: .45; box-shadow: none; }
+/* the window of a task: the data as pill rows */
+.thd-overlay.dp-plum .thd-text { background: rgba(23, 5, 28, .6); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F6E9FA; }
+.thd-overlay.dp-plum .dtp-detail-tiles { display: flex; flex-direction: column; gap: 6px; }
+.thd-overlay.dp-plum .dtp-detail-tiles .thd-tile { display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .06); box-shadow: none; }
+.thd-overlay.dp-plum .dtp-detail-tiles .thd-tile > div { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 10px; }
+.thd-overlay.dp-plum .dtp-detail-tiles .thd-tile small { color: #D6AEE0; font-weight: 600; }
+.thd-overlay.dp-plum .dtp-detail-deal { background: rgba(255, 255, 255, .06); box-shadow: none; border: 0; }
+.thd-overlay.dp-plum .dtp-detail-deal-text b { color: #F6E9FA; } .thd-overlay.dp-plum .dtp-detail-deal-text small, .thd-overlay.dp-plum .dtp-detail-label { color: #D6AEE0; }
+.thd-overlay.dp-plum .thd-del { color: #FF8A8A; background: none; }
+.thd-overlay.dp-plum .dtp-badge { background: rgba(255, 255, 255, .08) !important; box-shadow: none; filter: brightness(1.4) saturate(1.15); }

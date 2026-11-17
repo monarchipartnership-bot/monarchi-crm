@@ -555,7 +555,7 @@ function ProjectDetailCard() {
         ))}
       </div>
 
-      <div className={'pw-workspace ' + (tab === 'overview' ? 'pw-dark' : tab === 'teams' ? 'pw-flat' : isReport ? 'pw-dark pw-rep' : 'pw-sheet')} data-dd={tab === 'overview' || isReport ? 'night' : 'hub'} id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
+      <div className={'pw-workspace ' + (tab === 'overview' ? 'pw-dark' : (tab === 'teams' || tab === 'creative') ? 'pw-flat' : isReport ? 'pw-dark pw-rep' : 'pw-sheet')} data-dd={tab === 'overview' || isReport ? 'night' : 'hub'} id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
       {isReport && (
         <div className="pcr-tabs pw-sub pw-isub" role="tablist" aria-label="Розділи звітності">
           {REPORT_TABS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={'pcr-tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{k === 'work' && workCount > 0 ? <em>{workCount}</em> : null}</button>)}

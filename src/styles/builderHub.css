@@ -117,3 +117,10 @@
 .prep-table tr.mt-dragging td { background: #fff; }
 .prep-table tr.crh-picked td { background: #FBF4FC; }
 .prep-table .mt-replace { position: relative; z-index: 6; }
+
+/* Google funnel setup: one conversion action of the cabinet per stage */
+.bld-fn-rows { display: grid; gap: 8px; margin: 6px 0 4px; }
+.bld-fn-row { display: grid; grid-template-columns: minmax(130px, 200px) minmax(0, 420px); gap: 10px 14px; align-items: center; }
+.bld-fn-label { font: 700 13px 'Onest', sans-serif; color: #3a1a3a; }
+.bld-fn-fixed { font: 500 13px 'Onest', sans-serif; color: #7a5a7a; }
+@media (max-width: 640px) { .bld-fn-row { grid-template-columns: 1fr; } }

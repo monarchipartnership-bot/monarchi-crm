@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import DeltaBadge from '../../../components/Automation/DeltaBadge';
 import Sparkline from '../../../components/Automation/Sparkline';
 import { HubDonut, HubLine, HubFunnel } from '../../../components/Reports/HubCharts';
@@ -91,24 +92,28 @@ export default function DealsOverviewTab({ deals, stages, onViewDeal }) {
 
       <div className="dash-kpi-row">
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Відкриті угоди</div></div>
           <div className="dash-kpi-value">{cur.open}</div>
           <div className="dash-kpi-sub"><DeltaBadge diff={relPctDelta(cur.open, prev.open)} suffix="%" /> vs минулий період</div>
           <Sparkline values={sparkWeeks.map((w) => w.count)} color="var(--purple)" />
         </div>
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.check }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Виграно</div></div>
           <div className="dash-kpi-value">{cur.won}</div>
           <div className="dash-kpi-sub"><DeltaBadge diff={relPctDelta(cur.won, prev.won)} suffix="%" /> vs минулий період</div>
           <Sparkline values={sparkWonWeeks.map((w) => w.count)} color="var(--ok)" />
         </div>
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.close }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Програно</div></div>
           <div className="dash-kpi-value">{cur.lost}</div>
           <div className="dash-kpi-sub"><DeltaBadge diff={relPctDelta(cur.lost, prev.lost)} suffix="%" /> vs минулий період</div>
           <Sparkline values={sparkLostWeeks.map((w) => w.count)} color="var(--bad)" />
         </div>
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.currency }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Сума виграних угод</div></div>
           <div className="dash-kpi-value">${cur.wonSum.toLocaleString('uk-UA')}</div>
           <div className="dash-kpi-sub"><DeltaBadge diff={relPctDelta(cur.wonSum, prev.wonSum)} suffix="%" /> vs минулий період</div>

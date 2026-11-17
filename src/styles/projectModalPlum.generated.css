@@ -1,0 +1,65 @@
+/* GENERATED dark plum overrides for the create dialog of «Проєкти» (owner's picks 2026-11-12). Made by scratchpad/gen_dark.py from builderHub, composeHub, historyHub, workbenchHub, projectReports and projectHistory: every light colour is mapped to the plum palette; edit by hand below the marker «HAND-MADE». Scoped to .pw-rep. */
+/* ---- projectsPage.css ---- */
+.projects-page.is-plum .proj-modal-folder .proj-search svg { stroke: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .proj-search input { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .proj-tab { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .proj-card { background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .proj-name { color: #F6E9FA; }
+.projects-page.is-plum .proj-modal-folder .status-pill.active { background: rgba(75, 224, 127, .16); }
+.projects-page.is-plum .proj-modal-folder .status-pill.paused { background: rgba(251, 191, 36, .16); }
+.projects-page.is-plum .proj-modal-folder .status-pill.completed { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .proj-meta { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .proj-meta-row svg { stroke: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .proj-meta-row .muted { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .proj-empty { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .modal-box { background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .modal-head h3 { color: #F6E9FA; }
+.projects-page.is-plum .proj-modal-folder .modal-close { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .pf label { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .pf input, .projects-page.is-plum .proj-modal-folder .pf select { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .svc-opt span { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .status-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .status-btn.on.active { background: rgba(75, 224, 127, .16); }
+.projects-page.is-plum .proj-modal-folder .status-btn.on.paused { background: rgba(251, 191, 36, .16); }
+.projects-page.is-plum .proj-modal-folder .status-btn.on.completed { border-color: #D6AEE0; color: #D6AEE0; }
+/* ---- projectsFolder.css ---- */
+.projects-page.is-plum .proj-modal-folder .pf-bad { background: linear-gradient(135deg, #FF8A8A, #D92D2D); box-shadow: 0 5px 12px -2px #D92D2D88, inset 0 0 0 2px #ffffff40, 0 0 0 4px color-mix(in srgb, #FF8A8A 22%, transparent); }
+.projects-page.is-plum .proj-modal-folder .pacc-add { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.projects-page.is-plum .proj-modal-folder .pf-ok:focus-visible, .projects-page.is-plum .proj-modal-folder .pf-bad:focus-visible, .projects-page.is-plum .proj-modal-folder .pacc-add:focus-visible { outline: 3px solid #EB9CEF; }
+.projects-page.is-plum .proj-modal-folder.modal-box.pmh-dialog { box-shadow: 0 24px 80px rgba(0, 0, 0, .5); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.projects-page.is-plum .proj-modal-folder .pmh-md::before { background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .pmh-mi { background: linear-gradient(150deg, rgba(255, 255, 255, .06), rgba(235, 156, 239, .16)); }
+.projects-page.is-plum .proj-modal-folder .pmh-rail { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); }
+.projects-page.is-plum .proj-modal-folder .pmh-brand b { color: #F6E9FA; }
+.projects-page.is-plum .proj-modal-folder .pmh-brand small { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .pmh-rn { color: #F6E9FA; }
+.projects-page.is-plum .proj-modal-folder .pmh-rn.on .pmh-md { background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .pmh-note { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .modal-head { background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .modal-head h3 { color: #F6E9FA; }
+.projects-page.is-plum .proj-modal-folder .modal-head small { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .modal-close { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.projects-page.is-plum .proj-modal-folder .modal-foot { background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder .pf > label { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .pf input:not([type="checkbox"]), .projects-page.is-plum .proj-modal-folder .pacc-manual input { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; color: #F6E9FA; }
+.projects-page.is-plum .proj-modal-folder .pf input:not([type="checkbox"])::placeholder, .projects-page.is-plum .proj-modal-folder .pacc-manual input::placeholder { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .pf input:not([type="checkbox"]):focus, .projects-page.is-plum .proj-modal-folder .pf input:not([type="checkbox"]):focus-visible, .projects-page.is-plum .proj-modal-folder .pacc-manual input:focus, .projects-page.is-plum .proj-modal-folder .pacc-manual input:focus-visible { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.projects-page.is-plum .proj-modal-folder .ui-select-trigger, .projects-page.is-plum .proj-modal-folder .date-picker-trigger { background: rgba(255, 255, 255, .06); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.projects-page.is-plum .proj-modal-folder .ui-select-trigger[aria-expanded="true"], .projects-page.is-plum .proj-modal-folder .ui-select-trigger:focus-visible, .projects-page.is-plum .proj-modal-folder .date-picker-trigger:focus-visible { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.projects-page.is-plum .proj-modal-folder .ui-select-placeholder, .projects-page.is-plum .proj-modal-folder .date-picker-placeholder { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .ui-select-chevron { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .date-picker-ic { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .client-picker-selected { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .client-picker-change { color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .client-picker-list { border: 1.5px solid rgba(235, 156, 239, .3); }
+.projects-page.is-plum .proj-modal-folder .svc-opt span { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .svc-t { background: linear-gradient(150deg, rgba(255, 255, 255, .06), rgba(235, 156, 239, .16)); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .svc-opt input:checked + span { background: rgba(235, 156, 239, .16); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.projects-page.is-plum .proj-modal-folder .svc-opt input:focus-visible + span { outline: 3px solid #EB9CEF; }
+.projects-page.is-plum .proj-modal-folder .pacc-row { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.projects-page.is-plum .proj-modal-folder .pacc-link { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.projects-page.is-plum .proj-modal-folder .pacc-link--danger { color: #FF8A8A; }
+.projects-page.is-plum .proj-modal-folder .pmh-rm-ic { background: rgba(255, 138, 138, .16); }
+.projects-page.is-plum .proj-modal-folder .pacc-manual .btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.projects-page.is-plum .proj-modal-folder .pacc-found { border: 1.5px solid rgba(235, 156, 239, .3); background: rgba(255, 255, 255, .06); }
+.projects-page.is-plum .proj-modal-folder button:focus-visible { outline: 3px solid #EB9CEF; }

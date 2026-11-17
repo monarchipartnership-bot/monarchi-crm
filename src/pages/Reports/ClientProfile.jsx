@@ -47,6 +47,11 @@ import '../../styles/dealsBoard.css';
 import '../../styles/ddHub.css';
 import '../../styles/reportsHub.css';
 import '../../styles/contactsHub.css';
+import '../../styles/reportsManagerPlum.generated.css'; // the shared Hub base of the report pages recoloured to the plum palette (made by a script)
+import '../../styles/reportsManagerPlum.css';
+import '../../styles/contactsPlum.generated.css'; // Контакти recoloured to the plum palette (made by a script)
+import '../../styles/contactsPlum.css';
+import '../../styles/ddNight.css';
 
 const CAMERA_ICON = '<svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.5"/></svg>';
 
@@ -517,7 +522,7 @@ export default function ClientProfile() {
   });
 
   return (
-    <div className="report-page contacts-hub rpt-hub" data-dd="hub">
+    <div className="report-page contacts-hub rpt-hub rm-plum ct-plum is-plum" data-dd="night">
       <div className="client-profile-top-row">
         <button type="button" className="btn client-profile-back" onClick={() => navigate('/reports/clients-directory')}>
           <ActionIcon name="back" size={18} />
@@ -1278,6 +1283,7 @@ export default function ClientProfile() {
 
       {addTaskOpen && (
         <CreateDealTaskModal
+          hub
           deals={deals}
           profiles={profiles}
           myEmail={email}

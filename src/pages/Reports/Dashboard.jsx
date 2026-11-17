@@ -22,6 +22,11 @@ import '../../styles/salesDashboard.css';
 import '../../styles/ddHub.css';
 import '../../styles/reportsHub.css';
 import '../../styles/salesDashboardHub.css';
+import '../../styles/reportsManagerPlum.generated.css'; // the shared Hub base of the report pages recoloured to the plum palette (made by a script)
+import '../../styles/reportsManagerPlum.css';
+import '../../styles/salesDashboardPlum.generated.css'; // the sales dashboard recoloured to the plum palette (made by a script)
+import '../../styles/salesDashboardPlum.css';
+import '../../styles/ddNight.css';
 
 const TREND_UP_ICON = '<svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9M15 7h5v5"/></svg>';
 const KPI_ICON = {
@@ -222,7 +227,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="report-page sales-dashboard-page sdh rpt-hub" data-dd="hub">
+    <div className="report-page sales-dashboard-page sdh rpt-hub rm-plum sd-plum is-plum" data-dd="night">
       {loading ? (
         <div className="empty-hint">Завантаження...</div>
       ) : (

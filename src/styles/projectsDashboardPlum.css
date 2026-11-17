@@ -1,0 +1,61 @@
+/* The dashboard of the projects (/projects/dashboard) in the plum look (owner's picks 2026-11-12, artifact UQmRdrabPQkKgMAFBZ6LwB): the flow of the month's spend, the heat map of the ROAS,
+   the matrix of the weekly reports, the pace of the month, the board with the dynamics. The light colours of projectsDashboardHub are recoloured by a script
+   (projectsDashboardPlum.generated.css); this is the hand-made part. Scoped to .pd.pd-plum. */
+.main:has(.projects-dashboard-page.is-plum) {
+  background: radial-gradient(ellipse 70% 50% at 14% 108%, rgba(181, 68, 181, .24), transparent 70%), radial-gradient(ellipse 55% 40% at 94% -8%, rgba(235, 156, 239, .09), transparent 70%), linear-gradient(180deg, #17051c 0%, #270827 100%);
+}
+.pd.pd-plum { color: #F6E9FA; color-scheme: dark; }
+.pd.pd-plum .pd-box { border-radius: 28px; border: 0; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.pd.pd-plum .pd-box.flat { border-radius: 20px; background: rgba(255, 255, 255, .05); }
+.pd.pd-plum .pd-box.bd { box-shadow: inset 0 0 0 1.5px rgba(255, 138, 138, .45); } .pd.pd-plum .pd-box.wa { box-shadow: inset 0 0 0 1.5px rgba(251, 191, 36, .4); }
+.pd.pd-plum .pd-md::before { background: #2c0f2c; }
+.pd.pd-plum .pd-bh { margin-bottom: 10px; }
+.pd.pd-plum .pd-btn.sec { background: rgba(52, 16, 52, .92); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.pd.pd-plum .pd-btn.pri { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.pd.pd-plum .pd-empty { background: rgba(255, 255, 255, .03); color: #D6AEE0; }
+.pd.pd-plum .pd-an a { color: #F6E9FA; }
+.pd.pd-plum .pd-kt .v { color: #F6E9FA; }
+.pd.pd-plum .pd-in { background: rgba(23, 5, 28, .6); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.pd.pd-plum .pd-sg { background: rgba(52, 16, 52, .92); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.pd.pd-plum .pd-sg button { color: #D6AEE0; } .pd.pd-plum .pd-sg button.on { background: rgba(235, 156, 239, .18); color: #fff; box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+.pd.pd-plum .pd-sg button .n { border-left-color: rgba(235, 156, 239, .4); }
+.pd.pd-plum .pd-ar { background: rgba(255, 255, 255, .04); }
+/* the composition */
+.pdn-g21 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.pdn-g12 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 14px; align-items: stretch; }
+@media (max-width: 1100px) { .pdn-g21, .pdn-g12 { grid-template-columns: minmax(0, 1fr); } }
+.pdn-scroll { overflow-x: auto; scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .45) transparent; }
+.pdn-note { display: block; margin-top: 8px; color: #D6AEE0; font-size: 12.5px; line-height: 1.5; } .pdn-note b { font-weight: 800; }
+.pdn-up { color: #4BE07F; } .pdn-dn { color: #FF8A8A; }
+.pdn-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: #D6AEE0; } .pdn-leg span { display: inline-flex; align-items: center; gap: 6px; } .pdn-leg i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.pdn-flow { display: block; }
+.pdn-att { display: flex; flex-direction: column; }
+.pdn-acards { display: flex; flex-direction: column; gap: 8px; }
+.pdn-link { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pdn-link:hover { color: #EB9CEF; }
+/* the heat map and the matrix */
+.pdn-mx { width: 100%; border-collapse: separate; border-spacing: 3px; }
+.pdn-mx th { font-size: 10.5px; font-weight: 600; color: #D6AEE0; text-align: center; white-space: nowrap; }
+.pdn-mx th.l { text-align: left; font-size: 12.5px; color: #F6E9FA; padding-right: 8px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdn-mx td { text-align: center; height: 30px; min-width: 40px; border-radius: 8px; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pdn-hc.hi { background: rgba(75, 224, 127, .2); color: #4BE07F; } .pdn-hc.mid { background: rgba(251, 191, 36, .2); color: #FBBF24; } .pdn-hc.lo { background: rgba(255, 138, 138, .2); color: #FF8A8A; } .pdn-hc.none { background: rgba(255, 255, 255, .05); color: #8a6a98; }
+.dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; }
+.dot.final { background: #4BE07F; box-shadow: 0 0 8px rgba(75, 224, 127, .6); } .dot.rework { background: #7FB2FF; box-shadow: 0 0 8px rgba(127, 178, 255, .5); } .dot.draft { background: #FBBF24; } .dot.none { background: rgba(255, 255, 255, .12); }
+.pdn-leg .dot { width: 9px; height: 9px; box-shadow: none; }
+/* the board */
+.pdn-tb { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pdn-tb th { padding: 6px 10px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #D6AEE0; text-align: center; }
+.pdn-tb td { padding: 8px 10px; border-top: 1px solid rgba(235, 156, 239, .14); text-align: center; }
+.pdn-tb .n { width: 28px; text-align: left; color: #8a6a98; } .pdn-tb .l { text-align: left; font-weight: 700; } .pdn-tb .r { text-align: right; }
+.pdn-pill { display: inline-block; min-width: 56px; padding: 2px 10px; border-radius: 99px; font-weight: 800; font-size: 12px; text-align: center; }
+.pdn-pill.hi { background: rgba(75, 224, 127, .18); color: #4BE07F; } .pdn-pill.mid { background: rgba(251, 191, 36, .16); color: #FBBF24; } .pdn-pill.lo { background: rgba(255, 138, 138, .16); color: #FF8A8A; } .pdn-pill.none { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.pdn-nospark { color: #8a6a98; }
+/* the registry folded at the bottom */
+.pdn-reghead { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pdn-reghead span:nth-child(2) { flex: 1; } .pdn-reghead b { display: block; font: 750 16px 'Onest', sans-serif; } .pdn-reghead small { color: #D6AEE0; font-size: 12px; }
+.pdn-reghead[aria-expanded="true"] .pd-cv { transform: rotate(180deg); }
+.pdn-reghead + .pd-registry { margin-top: 12px; }
+.pdn-mx.dots td { min-width: 22px; } .pdn-mx.dots th.l { max-width: 112px; }
+/* the switch of the pages under the list of «Потрібна увага» */
+.pdn-attpager { margin-top: auto; padding-top: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+.pdn-attpager .pd-pgn { flex-basis: 100%; text-align: center; color: #D6AEE0; font-size: 12px; }

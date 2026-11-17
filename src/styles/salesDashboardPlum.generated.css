@@ -1,0 +1,184 @@
+/* GENERATED dark plum overrides for the Sales Dashboard (owner's picks 2026-11-12). Made by scratchpad/gen_dark.py from builderHub, composeHub, historyHub, workbenchHub, projectReports and projectHistory: every light colour is mapped to the plum palette; edit by hand below the marker «HAND-MADE». Scoped to .pw-rep. */
+/* ---- reportPage.css ---- */
+.sdh.sd-plum .daily-task-grid .client-grid-row.overdue { background: color-mix(in srgb, var(--bad) 12%, rgba(255, 255, 255, .06)); }
+.sdh.sd-plum .daily-list-row-main { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .report-type-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .report-type-card-label { color: #F6E9FA; }
+.sdh.sd-plum .rpt-hero h1 { color: #F6E9FA; }
+.sdh.sd-plum .rpt-hero p.sub { color: #D6AEE0; }
+.sdh.sd-plum .rpt-sub { color: #D6AEE0; }
+.sdh.sd-plum .rpt-sub b { color: #F6E9FA; }
+.sdh.sd-plum .rpt-sub input { color: #F6E9FA; }
+.sdh.sd-plum .daily-hero { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .daily-hero-title h1 { color: #F6E9FA; }
+.sdh.sd-plum .daily-hero-title p { color: #D6AEE0; }
+.sdh.sd-plum .daily-hero-nav-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.sdh.sd-plum .daily-hero-nav-label { color: #F6E9FA; }
+.sdh.sd-plum .daily-hero-scroll-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.sdh.sd-plum .daily-hero-day-num { color: #F6E9FA; }
+.sdh.sd-plum .daily-hero-day-wd { color: #D6AEE0; }
+.sdh.sd-plum .daily-hero-day.over { background: linear-gradient(135deg, color-mix(in srgb, var(--bad) 45%, rgba(255, 255, 255, .06)), var(--bad)); }
+.sdh.sd-plum .daily-hero-day.done { background: linear-gradient(135deg, color-mix(in srgb, var(--ok) 45%, rgba(255, 255, 255, .06)), var(--ok)); }
+.sdh.sd-plum .daily-hero-day.weekend { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .daily-hero-day.weekend .daily-hero-day-num { color: #D6AEE0; }
+.sdh.sd-plum .wk-step-dot { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.sdh.sd-plum .wk-step-dot.cur { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .wk-step-label { color: #D6AEE0; }
+.sdh.sd-plum .wk-stepper-count { color: #F6E9FA; }
+.sdh.sd-plum .wk-stepper-pct { color: #D6AEE0; }
+.sdh.sd-plum .picker { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .pk-field label { color: #D6AEE0; }
+.sdh.sd-plum .pk-field select { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .save-state { color: #D6AEE0; }
+.sdh.sd-plum .stitle { color: #F6E9FA; }
+.sdh.sd-plum .item-box { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .item-box textarea { color: #F6E9FA; }
+.sdh.sd-plum .item-box textarea::placeholder { color: #D6AEE0; }
+.sdh.sd-plum .capture-text { color: #F6E9FA; }
+.sdh.sd-plum .empty-hint { color: #D6AEE0; }
+.sdh.sd-plum .add-btn:hover { background: rgba(235, 156, 239, .3); }
+.sdh.sd-plum .cf label { color: #D6AEE0; }
+.sdh.sd-plum .cf select, .sdh.sd-plum .cf input { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .cf textarea { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .client-name-suggestions { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .client-name-suggestions button { color: #F6E9FA; }
+.sdh.sd-plum .client-name-suggestions .hint { color: #D6AEE0; }
+.sdh.sd-plum .empty-state p { color: #D6AEE0; }
+.sdh.sd-plum .ro-item { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.sdh.sd-plum .ro-empty { color: #D6AEE0; }
+.sdh.sd-plum .ro-badge { color: #D6AEE0; }
+.sdh.sd-plum .ro-badge.leadtype { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .ro-client-name { color: #F6E9FA; }
+.sdh.sd-plum .ro-client-text { color: #F6E9FA; }
+.sdh.sd-plum .archive-list { color: #D6AEE0; }
+.sdh.sd-plum .chbox-title { color: #F6E9FA; }
+.sdh.sd-plum .kcard { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .kcard-label { color: #D6AEE0; }
+.sdh.sd-plum .weeks-missing { background: rgba(251, 191, 36, .16); color: #D6AEE0; }
+.sdh.sd-plum .kcard-bar-fill { background: #D6AEE0; }
+.sdh.sd-plum .kcard-value { color: #F6E9FA; }
+.sdh.sd-plum .kcard-value-input { color: #F6E9FA; }
+.sdh.sd-plum .kcard-plan-line { color: #D6AEE0; }
+.sdh.sd-plum .kcard-plan-line b { color: #D6AEE0; }
+.sdh.sd-plum .kcard-plan-input { color: #D6AEE0; }
+.sdh.sd-plum .kcard-trend-caption { color: #D6AEE0; }
+.sdh.sd-plum .task-tag-compact { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.sdh.sd-plum .task-tag-compact-icon.none svg { stroke: #D6AEE0; }
+.sdh.sd-plum .dash-kpi-plan { color: #D6AEE0; }
+.sdh.sd-plum .chan-tab { color: #D6AEE0; }
+.sdh.sd-plum .chan-tab:hover { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .mc-client-search svg { stroke: #D6AEE0; }
+.sdh.sd-plum .mc-client-search input { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .export-menu { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .export-menu button { color: #F6E9FA; }
+.sdh.sd-plum .kl { color: #D6AEE0; }
+.sdh.sd-plum .cost-row { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .cost-label { color: #D6AEE0; }
+.sdh.sd-plum .cost-input { color: #F6E9FA; }
+.sdh.sd-plum .cost-dollar { color: #D6AEE0; }
+.sdh.sd-plum .fc { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .fc.pr { background: rgba(75, 224, 127, .16); }
+.sdh.sd-plum .fc.loss { background: rgba(255, 138, 138, .16); }
+.sdh.sd-plum .fl { color: #D6AEE0; }
+.sdh.sd-plum .fv { color: #F6E9FA; }
+.sdh.sd-plum .fin-kpi-row .dash-kpi { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .fin-kpi-icon.green { background: rgba(75, 224, 127, .16); }
+.sdh.sd-plum .fin-kpi-icon.red { background: rgba(255, 138, 138, .16); }
+.sdh.sd-plum .fin-kpi-icon.blue { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.sdh.sd-plum .fin-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .fin-card-title { color: #F6E9FA; }
+.sdh.sd-plum .fin-card-subtitle { color: #D6AEE0; }
+.sdh.sd-plum .fin-card-toggle { color: #D6AEE0; }
+.sdh.sd-plum .fin-income-item { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .fin-income-icon.green { background: rgba(75, 224, 127, .16); }
+.sdh.sd-plum .fin-income-icon.blue { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.sdh.sd-plum .fin-income-label { color: #D6AEE0; }
+.sdh.sd-plum .fin-income-value { color: #F6E9FA; }
+.sdh.sd-plum .fin-income-input { color: #F6E9FA; }
+.sdh.sd-plum .fin-income-chevron { color: #D6AEE0; }
+.sdh.sd-plum .fin-summary-pill { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .fin-summary-pill.profit.pr { background: rgba(75, 224, 127, .16); }
+.sdh.sd-plum .fin-summary-pill.profit.loss { background: rgba(255, 138, 138, .16); }
+.sdh.sd-plum .fin-summary-label { color: #D6AEE0; }
+.sdh.sd-plum .fin-summary-value { color: #F6E9FA; }
+@media print {
+  .sdh.sd-plum.report-page { background: rgba(255, 255, 255, .06) !important; color: #F6E9FA; }
+}
+.sdh.sd-plum .auto-deal-stats { color: #F6E9FA; }
+.sdh.sd-plum .auto-deal-stats-item i { color: #D6AEE0; }
+/* ---- comparePage.css ---- */
+.sdh.sd-plum .compare-type-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .ctc-title { color: #F6E9FA; }
+.sdh.sd-plum .ctc-desc { color: #D6AEE0; }
+.sdh.sd-plum .slot-chip { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.sdh.sd-plum .slot-chip button { color: #D6AEE0; }
+.sdh.sd-plum .cmp-empty p { color: #D6AEE0; }
+.sdh.sd-plum .cmp-block { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .cmp-block-head { color: #F6E9FA; }
+.sdh.sd-plum .cmp-block-head .chev { stroke: #D6AEE0; }
+.sdh.sd-plum .cmp-table th:first-child, .sdh.sd-plum .cmp-table td:first-child { color: #D6AEE0; }
+.sdh.sd-plum .cmp-table thead th { color: #D6AEE0; }
+.sdh.sd-plum .cmp-table td.na { color: #D6AEE0; }
+.sdh.sd-plum .cmp-chart-center b { color: #F6E9FA; }
+.sdh.sd-plum .cmp-chart-caption { color: #D6AEE0; }
+.sdh.sd-plum .cmp-list-col li { color: #F6E9FA; }
+.sdh.sd-plum .cmp-list-col .cmp-tag { color: #D6AEE0; }
+.sdh.sd-plum .cmp-list-col .cmp-empty-line { color: #D6AEE0; }
+/* ---- automationDashboard.css ---- */
+.sdh.sd-plum .dash-kpi-label { color: #D6AEE0; }
+.sdh.sd-plum .dash-kpi-value { color: #F6E9FA; }
+.sdh.sd-plum .dash-kpi-sub { color: #D6AEE0; }
+.sdh.sd-plum .delta-badge.up { background: rgba(75, 224, 127, .16); }
+.sdh.sd-plum .delta-badge.down { background: rgba(255, 138, 138, .16); }
+.sdh.sd-plum .delta-badge.neutral { color: #D6AEE0; }
+.sdh.sd-plum .dash-list-footer { color: #D6AEE0; }
+.sdh.sd-plum .dash-task-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .dash-task-done-ic { background: rgba(75, 224, 127, .16); }
+.sdh.sd-plum .dash-task-title { color: #F6E9FA; }
+.sdh.sd-plum .dash-task-desc { color: #D6AEE0; }
+.sdh.sd-plum .dash-period-select { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.sdh.sd-plum .dash-donut-legend-item { color: #D6AEE0; }
+.sdh.sd-plum .dash-donut-legend-item .value { color: #F6E9FA; }
+/* ---- salesDashboard.css ---- */
+.sdh.sd-plum .sd-client-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .sd-client-name { color: #F6E9FA; }
+.sdh.sd-plum .sd-client-text { color: #D6AEE0; }
+.sdh.sd-plum .sd-note { color: #D6AEE0; }
+.sdh.sd-plum .sd-funnel-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .sd-funnel-title { color: #F6E9FA; }
+.sdh.sd-plum .sd-funnel-label { color: #F6E9FA; }
+.sdh.sd-plum .sd-funnel-bar--4 { background: #EB9CEF; }
+.sdh.sd-plum .sd-funnel-value { color: #F6E9FA; }
+.sdh.sd-plum .sd-funnel-conv em { color: #D6AEE0; }
+.sdh.sd-plum .sd-funnel-foot { color: #D6AEE0; }
+.sdh.sd-plum .sd-funnel-foot b { color: #F6E9FA; }
+.sdh.sd-plum .sd-table-wrap { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .sd-table thead th { color: #D6AEE0; }
+.sdh.sd-plum .sd-neg { color: #FF8A8A; }
+/* ---- salesDashboardHub.css ---- */
+.sdh.sd-plum .sd-note { color: #D6AEE0; }
+.sdh.sd-plum .dash-kpi-icon.ok { --c2: #4BE07F; }
+.sdh.sd-plum .dash-kpi-sub > span { color: #D6AEE0; }
+.sdh.sd-plum .sd-funnel-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .sd-funnel-title { color: #F6E9FA; }
+.sdh.sd-plum .sd-fn--2 { background: linear-gradient(100deg, #7FB2FF, #7FB2FF); }
+.sdh.sd-plum .sd-fn--3 { background: linear-gradient(100deg, #FBBF24, #FBBF24); }
+.sdh.sd-plum .sd-fn--4 { background: linear-gradient(100deg, #4BE07F, #4BE07F); }
+.sdh.sd-plum .sd-funnel-conv { color: #D6AEE0; }
+.sdh.sd-plum .sd-funnel-conv em { color: #D6AEE0; }
+.sdh.sd-plum .sd-funnel-foot { color: #D6AEE0; }
+.sdh.sd-plum .sd-funnel-foot b { color: #EB9CEF; }
+.sdh.sd-plum .sd-table th, .sdh.sd-plum .sd-table td { color: #F6E9FA; }
+.sdh.sd-plum .sd-table thead th { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.sdh.sd-plum .sd-table thead tr:first-child .sd-table-group { background: rgba(235, 156, 239, .16); color: #D6AEE0; }
+.sdh.sd-plum .sd-table thead tr:first-child .sd-table-group + .sd-table-group { border-left: 3px solid rgba(255, 255, 255, .06); }
+.sdh.sd-plum .sd-table .sd-table-total td { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .sd-table td.sd-best span { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.sdh.sd-plum .sd-neg { color: #FF8A8A; }
+.sdh.sd-plum .sdh-sub { color: #D6AEE0; }
+.sdh.sd-plum .sd-client-card { background: rgba(255, 255, 255, .06); }
+.sdh.sd-plum .sd-client-name { color: #F6E9FA; }
+.sdh.sd-plum .sd-client-tag { color: #D6AEE0; }
+.sdh.sd-plum .sd-client-text { color: #D6AEE0; }
+.sdh.sd-plum .sd-client-card .client-avatar { box-shadow: 0 0 0 2px rgba(255, 255, 255, .06), 0 0 0 4px #C25AC4; }
+.sdh.sd-plum .empty-hint { background: rgba(255, 255, 255, .06); color: #D6AEE0; }

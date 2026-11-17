@@ -27,6 +27,11 @@ import '../../../styles/dealsDesign.css';
 import '../../../styles/ddHub.css';
 import '../../../styles/reportsHub.css';
 import '../../../styles/dealsHub.css';
+import '../../../styles/reportsManagerPlum.generated.css'; // the shared Hub base of the report pages recoloured to the plum palette (made by a script)
+import '../../../styles/reportsManagerPlum.css';
+import '../../../styles/dealsPlum.generated.css'; // Угоди recoloured to the plum palette (made by a script)
+import '../../../styles/dealsPlum.css';
+import '../../../styles/ddNight.css';
 
 const TABS = [
   { key: 'kanban', label: 'Канбан', icon: FIELD_ICONS.kanban },
@@ -126,7 +131,7 @@ export default function DealsBoard() {
   }
 
   return (
-    <div className="report-page deals-page deals-hub rpt-hub" data-dd="hub">
+    <div className="report-page deals-page deals-hub rpt-hub rm-plum dl-plum is-plum" data-dd="night">
       <section className="rpt-hero deals-actions-row">
         <div className="deals-header-actions">
           <div className="pipeline-switcher">

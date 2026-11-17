@@ -1,0 +1,78 @@
+/* The Reports Manager (Daily, Weekly, Monthly, Annual, Compare) in the plum look (owner's picks 2026-11-12, artifact Vb1uV87MmA8uYbqyesVcrL): the type switcher as medallions with the
+   active one a gradient pill, the days of the month as capsules with a date, the fill of the month as steps by weeks, translucent blocks with a ring. The light colours of reportsHub,
+   annualPage and comparePage are recoloured by a script (reportsManagerPlum.generated.css); this is the hand-made part. Scoped to .rpt-hub.rm-plum. */
+.main:has(.rm-plum.is-plum) {
+  background: radial-gradient(ellipse 70% 50% at 14% 108%, rgba(181, 68, 181, .24), transparent 70%), radial-gradient(ellipse 55% 40% at 94% -8%, rgba(235, 156, 239, .09), transparent 70%), linear-gradient(180deg, #17051c 0%, #270827 100%);
+}
+.rpt-hub.rm-plum { color: #F6E9FA; color-scheme: dark; }
+.rpt-hub.rm-plum .hub-ring::before { background: #2c0f2c; }
+.rpt-hub.rm-plum .hub-tile { background: linear-gradient(135deg, #C25AC4, #7E2483); color: #fff; }
+.rpt-hub.rm-plum .hub-tile img { filter: none; }
+/* the type switcher */
+.rpt-hub.rm-plum .rpt-sw { color: #D6AEE0; }
+.rpt-hub.rm-plum .rpt-sw.active { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.rpt-hub.rm-plum .rpt-sw.active .hub-ring::before { background: #fff; }
+.rpt-hub.rm-plum .rpt-sw .report-type-card-label { color: inherit; }
+/* the blocks: translucent with a ring */
+.rpt-hub.rm-plum .report-section, .rpt-hub.rm-plum .side-card { border: 0; border-radius: 28px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.rpt-hub.rm-plum .empty-hint { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+/* the days of the month: capsules with a date */
+.rpt-hub.rm-plum .daily-hero { border: 0; border-radius: 28px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.rpt-hub.rm-plum .daily-hero-days { gap: 6px; align-items: center; }
+.rpt-hub.rm-plum .daily-hero-day { flex: none; width: auto; height: 34px; min-height: 0; padding: 0 12px; border: 0; border-radius: 999px; display: inline-flex; flex-direction: row; align-items: center; gap: 8px; background: rgba(255, 255, 255, .06); box-shadow: none; color: #F6E9FA; cursor: pointer; }
+.rpt-hub.rm-plum .daily-hero-day-num { order: 1; font: 700 13px 'Onest', sans-serif; color: inherit; }
+.rpt-hub.rm-plum .daily-hero-day-wd { order: 2; font: 600 10.5px 'Onest', sans-serif; color: #D6AEE0; }
+.rpt-hub.rm-plum .daily-hero-day-dot { order: 0; width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .25); box-shadow: none; display: inline-block; }
+.rpt-hub.rm-plum .daily-hero-day.done .daily-hero-day-dot { background: #4BE07F; box-shadow: 0 0 6px rgba(75, 224, 127, .7); }
+.rpt-hub.rm-plum .daily-hero-day.over .daily-hero-day-dot { background: #FF8A8A; box-shadow: 0 0 6px rgba(255, 138, 138, .6); }
+.rpt-hub.rm-plum .daily-hero-day.weekend { opacity: .6; }
+.rpt-hub.rm-plum .daily-hero-day.cur { background: rgba(181, 68, 181, .3); box-shadow: inset 0 0 0 1.5px #EB9CEF; color: #fff; opacity: 1; }
+.rpt-hub.rm-plum .daily-hero-nav-btn, .rpt-hub.rm-plum .daily-hero-scroll-btn { background: rgba(235, 156, 239, .16); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .4); border: 0; }
+.rpt-hub.rm-plum .daily-hero-nav-label, .rpt-hub.rm-plum .daily-hero-title h1 { color: #F6E9FA; } .rpt-hub.rm-plum .daily-hero-title p { color: #D6AEE0; }
+.rpt-hub.rm-plum .daily-legend li { color: #D6AEE0; }
+/* the fill of the month: steps by weeks (Daily) */
+.rm-steps { display: flex; align-items: flex-start; margin: 8px 0 6px; }
+.rm-steps .n { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 38px; font-size: 10.5px; color: #D6AEE0; text-align: center; }
+.rm-steps .m { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #2c0f2c; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); font-size: 12px; font-weight: 800; color: #F6E9FA; }
+.rm-steps .m svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.rm-steps .n.ok .m { background: rgba(75, 224, 127, .2); box-shadow: inset 0 0 0 1.5px #4BE07F; color: #4BE07F; }
+.rm-steps .n.over .m { background: rgba(255, 138, 138, .18); box-shadow: inset 0 0 0 1.5px #FF8A8A; color: #FF8A8A; }
+.rm-steps .n.on .m { background: linear-gradient(135deg, #C25AC4, #7E2483); box-shadow: 0 0 12px rgba(235, 156, 239, .6); color: #fff; }
+.rm-steps .l { flex: 1; min-width: 6px; margin: 14px 2px 0; border-top: 2px dashed rgba(235, 156, 239, .4); }
+.rm-steps .l.ok { border-top-style: solid; border-top-color: #4BE07F; }
+/* what the older report styles still paint dark */
+.rpt-hub.rm-plum :is(.dash-kpi-value, .wk-stepper-count, .chbox-title, .kcard-value) { color: #F6E9FA; }
+.rpt-hub.rm-plum .dash-kpi-value { color: #EB9CEF; }
+.rpt-hub.rm-plum .auto-deal-stats { background: rgba(255, 255, 255, .06); color: #F6E9FA; border-color: rgba(235, 156, 239, .25); }
+.rpt-hub.rm-plum .auto-deal-stats-label { color: #D6AEE0; }
+.rpt-hub.rm-plum .kcard-plan-line b, .rpt-hub.rm-plum .fin-income-value { color: #F6E9FA; }
+.rpt-hub.rm-plum .weeks-missing { color: #FBBF24; background: rgba(251, 191, 36, .14); border-color: rgba(251, 191, 36, .35); }
+.rpt-hub.rm-plum .dash-kpi .dash-kpi-value { color: #EB9CEF; }
+.rpt-hub.rm-plum .dash-kpi-value[style] { filter: brightness(1.9) saturate(1.15); } /* the colour of the status is set inline: lifted for the dark page */
+/* the «Додати клієнта» dialog opens inside the Daily page: solid dark glass */
+.rpt-hub.rm-plum .modal-box { background: rgba(30, 8, 36, .98); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 30px 80px rgba(0, 0, 0, .6); }
+/* inside the «Додати клієнта» / «Редагувати клієнта» dialog (AddClientModal): solid dark glass, dark pill fields, the red and the green button */
+.rpt-hub.rm-plum .arm-overlay { background: rgba(10, 2, 14, .65); }
+.rpt-hub.rm-plum .arm-dialog { border: 0; background: rgba(30, 8, 36, .98); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 30px 80px rgba(0, 0, 0, .6); color: #F6E9FA; color-scheme: dark; }
+.rpt-hub.rm-plum .arm-dialog .tmodal-head, .rpt-hub.rm-plum .arm-dialog .tmodal-foot { background: none; border-color: rgba(235, 156, 239, .2); }
+.rpt-hub.rm-plum .arm-dialog .tmodal-head h3, .rpt-hub.rm-plum .arm-dialog .modal-field-head label { color: #F6E9FA; }
+.rpt-hub.rm-plum .arm-dialog .tmodal-head-text p, .rpt-hub.rm-plum .arm-dialog .modal-field-head p { color: #D6AEE0; }
+.rpt-hub.rm-plum .arm-dialog .tmodal-close { background: rgba(235, 156, 239, .16); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .4); }
+.rpt-hub.rm-plum .arm-dialog .modal-field-icon { background: linear-gradient(135deg, #C25AC4, #7E2483); box-shadow: none; }
+.rpt-hub.rm-plum .arm-dialog .modal-field-control input:not([type="checkbox"]), .rpt-hub.rm-plum .arm-dialog textarea, .rpt-hub.rm-plum .arm-dialog .client-name-field input { border: 0; background: rgba(23, 5, 28, .6); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); outline: none; }
+.rpt-hub.rm-plum .arm-dialog .modal-field-control input:not([type="checkbox"]):focus, .rpt-hub.rm-plum .arm-dialog textarea:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+.rpt-hub.rm-plum .arm-dialog textarea::placeholder, .rpt-hub.rm-plum .arm-dialog input::placeholder { color: #8a6a98; }
+.rpt-hub.rm-plum .arm-dialog :is(.ui-select-trigger, .platform-picker-trigger) { border: 0; background: rgba(23, 5, 28, .6); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.rpt-hub.rm-plum .arm-dialog :is(.ui-select-trigger, .platform-picker-trigger)[aria-expanded="true"] { box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+.rpt-hub.rm-plum .arm-dialog :is(.ui-select-chevron, .platform-picker-chevron) { background: rgba(235, 156, 239, .16); color: #F6E9FA; }
+.rpt-hub.rm-plum .arm-dialog :is(.ui-select-placeholder) { color: #8a6a98; }
+.rpt-hub.rm-plum .arm-dialog .tmodal-foot .btn { height: 38px; min-height: 0; padding: 0 20px; border: 0; border-radius: 999px; font: 700 13.5px 'Onest', sans-serif; color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, .25); }
+.rpt-hub.rm-plum .arm-dialog .tmodal-foot .pw-btn--bad { background: linear-gradient(135deg, #FF8A8A, #D92D2D); box-shadow: 0 0 14px rgba(255, 138, 138, .4); }
+.rpt-hub.rm-plum .arm-dialog .tmodal-foot .pw-btn--ok { background: linear-gradient(135deg, #4BE07F, #12A144); box-shadow: 0 0 14px rgba(75, 224, 127, .4); }
+.rpt-hub.rm-plum .arm-dialog .tmodal-foot .pw-btn--ok:disabled { opacity: .45; box-shadow: none; }
+/* the platform picker menu (opens inside the dialog and in the filters) */
+.rpt-hub.rm-plum .platform-picker-menu, body:has(.rm-plum) .platform-picker-menu { background: rgba(30, 8, 36, .98); border: 0; border-radius: 22px; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 18px 44px rgba(0, 0, 0, .55); color: #F6E9FA; padding: 8px; scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .45) transparent; }
+.rpt-hub.rm-plum .platform-picker-row, body:has(.rm-plum) .platform-picker-row { border-radius: 999px; color: #F6E9FA; background: none; padding: 8px 14px; font: 500 13.5px 'Onest', sans-serif; }
+.rpt-hub.rm-plum .platform-picker-row:hover, body:has(.rm-plum) .platform-picker-row:hover { background: rgba(235, 156, 239, .12); }
+.rpt-hub.rm-plum .platform-picker-row.active, body:has(.rm-plum) .platform-picker-row.active { background: rgba(181, 68, 181, .3); color: #fff; font-weight: 700; box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+.rpt-hub.rm-plum .arm-dialog .tmodal-body > p, .rpt-hub.rm-plum .arm-dialog .tmodal-body p { color: #D6AEE0; }

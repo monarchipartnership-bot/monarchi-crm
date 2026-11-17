@@ -8,6 +8,7 @@ import { cleanColumns } from '../../../lib/platformColumns';
 import { projectKind } from '../../../lib/reportMetrics';
 import { accountsForTab, reportScope } from '../../../lib/reportScope';
 import { groupsForPlatform } from '../../../lib/campaignGroups';
+import { withFunnelTokens } from '../../../lib/googleFunnel';
 
 // Everything a report screen needs about one project: the project row (its type
 // decides the metric set), linked ad accounts, campaign groups and custom metrics. `tab` (a platform id or 'total') narrows `accounts`
@@ -64,7 +65,7 @@ export function useReportContext(projectId, tab = 'total', version = 0) {
 
   // The extra columns picked for this tab's platform. «Разом» adds up several platforms, so it shows none (they are platform-specific).
   const extraKeys = tab === 'total' ? [] : cleanColumns(tab, columns[tab]);
-  const fetchColumns = tab === 'total' ? {} : { [tab]: extraKeys }; // what to ask the platform for
+  const fetchColumns = tab === 'total' ? {} : { [tab]: tab === 'google' ? withFunnelTokens(extraKeys, layoutState.layout.funnel) : extraKeys }; // what to ask the platform for (Google also: the funnel's chosen conversion actions)
   const reloadColumns = useCallback(async () => { const m = await fetchReportColumns(projectId); setColumns(m); return tab === 'total' ? {} : { [tab]: cleanColumns(tab, m[tab]) }; }, [projectId, tab]);
   const every = accounts || [];
   return {

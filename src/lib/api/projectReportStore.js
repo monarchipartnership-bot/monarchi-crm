@@ -168,6 +168,13 @@ export async function fetchWeeklyReportStatuses(periodStart) {
   return collapseStatuses(data ?? []);
 }
 
+// The status of the weekly reports of every project for a range of weeks (the matrix of the dashboard): rows { project_id, period_start, status }, one per report.
+export async function fetchWeeklyReportStatusesBetween(startIso, endIso) {
+  const { data, error } = await supabase.from('project_reports').select('project_id, period_start, status').eq('period_type', 'weekly').gte('period_start', startIso).lte('period_start', endIso);
+  if (error) { readFailures.count += 1; console.warn('fetchWeeklyReportStatusesBetween failed', error); return []; }
+  return data ?? [];
+}
+
 
 // The dashboard wants one row per project + platform with plain numbers in `data`,
 // so a saved report is flattened to that shape.

@@ -1,0 +1,54 @@
+/* GENERATED dark plum overrides for the main page «Проєкти» (owner's picks 2026-11-12). Made by scratchpad/gen_dark.py from builderHub, composeHub, historyHub, workbenchHub, projectReports and projectHistory: every light colour is mapped to the plum palette; edit by hand below the marker «HAND-MADE». Scoped to .pw-rep. */
+/* ---- projectsPage.css ---- */
+.projects-page.folder-design.is-plum .proj-search svg { stroke: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-search input { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-tab { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-card { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-name { color: #F6E9FA; }
+.projects-page.folder-design.is-plum .status-pill.active { background: rgba(75, 224, 127, .16); }
+.projects-page.folder-design.is-plum .status-pill.paused { background: rgba(251, 191, 36, .16); }
+.projects-page.folder-design.is-plum .status-pill.completed { color: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-meta { color: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-meta-row svg { stroke: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-meta-row .muted { color: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-empty { color: #D6AEE0; }
+/* ---- projectsFolder.css ---- */
+.projects-page.folder-design.is-plum .proj-ptab-ring { background: conic-gradient(#B544B5, #661466 calc(var(--p) * 1%), rgba(235, 156, 239, .16) 0); }
+.projects-page.folder-design.is-plum .proj-ptab-ring::before { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-ptab-ic { background: linear-gradient(150deg, rgba(255, 255, 255, .06), rgba(235, 156, 239, .16)); }
+.projects-page.folder-design.is-plum .proj-ptab .cnt { border: 2.5px solid rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-ptab.on .proj-ptab-ring { background: conic-gradient(rgba(255, 255, 255, .06) calc(var(--p) * 1%), #ffffff55 0); }
+.projects-page.folder-design.is-plum .proj-ptab.on .cnt { background: rgba(255, 255, 255, .06); border-color: #EB9CEF; }
+.projects-page.folder-design.is-plum .proj-ptab:focus-visible { outline: 3px solid #EB9CEF; }
+.projects-page.folder-design.is-plum .proj-folder-body { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); box-shadow: 0 12px 32px rgba(0, 0, 0, .4); }
+.projects-page.folder-design.is-plum .proj-search { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-search input::placeholder { color: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-search.has-val { box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.projects-page.folder-design.is-plum .proj-search:focus-within { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.projects-page.folder-design.is-plum .proj-search.no-res { box-shadow: inset 0 0 0 1.5px rgba(255, 138, 138, .5), 0 0 0 4px #D92D2D1f; }
+.projects-page.folder-design.is-plum .proj-search.no-res svg.proj-search-lp { stroke: #FF8A8A; }
+.projects-page.folder-design.is-plum .proj-search-cnt { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-search.no-res .proj-search-cnt { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.projects-page.folder-design.is-plum .proj-search-clr { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-search-clr:focus-visible { outline: 3px solid #EB9CEF; }
+.projects-page.folder-design.is-plum .proj-tabs { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-tab { color: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-tab:focus-visible { outline: 3px solid #EB9CEF; }
+.projects-page.folder-design.is-plum .proj-tab.on { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 3px 8px rgba(0, 0, 0, .4); }
+.projects-page.folder-design.is-plum .proj-create { box-shadow: 0 5px 12px #66146644, inset 0 0 0 2px #ffffff40, 0 0 0 4px color-mix(in srgb, #EB9CEF 22%, transparent); }
+.projects-page.folder-design.is-plum .proj-apr { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px var(--pf-line, rgba(235, 156, 239, .3)), 0 0 0 4px #AE40AE14; }
+.projects-page.folder-design.is-plum .proj-apr-n { background: linear-gradient(100deg, #FF8A8A, #FF8A8A); box-shadow: 0 0 0 2px rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-apr:focus-visible { outline: 3px solid #EB9CEF; }
+.projects-page.folder-design.is-plum .proj-card { --b1: rgba(235, 156, 239, .3); --b2: rgba(235, 156, 239, .3); --r1: #EB9CEF; --r2: #EB9CEF; background: linear-gradient(rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)) padding-box, linear-gradient(135deg, var(--b1), var(--b2) 55%, var(--b1)) border-box; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.projects-page.folder-design.is-plum .proj-card.st-paused { --b1: rgba(251, 191, 36, .4); }
+.projects-page.folder-design.is-plum .proj-card.st-completed { --b1: rgba(235, 156, 239, .3); --b2: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-card:focus-visible { outline: 3px solid #EB9CEF; }
+.projects-page.folder-design.is-plum .proj-card-ring { background: conic-gradient(var(--r1), var(--r2) calc(var(--p) * 1%), rgba(235, 156, 239, .16) 0); }
+.projects-page.folder-design.is-plum .proj-card-ring::before { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-card-icon { background: linear-gradient(150deg, rgba(255, 255, 255, .06), rgba(235, 156, 239, .16)); }
+.projects-page.folder-design.is-plum .status-pill.active { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.projects-page.folder-design.is-plum .status-pill.paused { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.projects-page.folder-design.is-plum .status-pill.completed { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.projects-page.folder-design.is-plum .proj-meta-ic { background: linear-gradient(150deg, rgba(255, 255, 255, .06), rgba(235, 156, 239, .16)); }
+.projects-page.folder-design.is-plum .svc-tag { background: rgba(255, 255, 255, .06); }
+.projects-page.folder-design.is-plum .proj-skeleton { background: linear-gradient(120deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); border: 2px dashed rgba(235, 156, 239, .3); }

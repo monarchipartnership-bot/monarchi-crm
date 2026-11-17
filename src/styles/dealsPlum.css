@@ -1,0 +1,108 @@
+/* Угоди (board, list, overview, the window of a deal) in the plum look (owner's picks 2026-11-12, artifact 8fLAhArFTBDccx5muNk41g): the header in a ring panel, the tabs as text with a glowing line,
+   the columns tinted by the stage colour, transparent deal cards, the list as pill rows, the key figures as ring medallions with a sparkline, the pill funnel, a ring and waves,
+   the deal window with a medallion header, chevron stages and transparent ring blocks.
+   The light colours of reportPage, automationTasksPage, automationDashboard, clientsDirectory, dealsBoard, dealsDesign and dealsHub are recoloured by a script (dealsPlum.generated.css);
+   this is the hand-made part. Scoped to .deals-hub.dl-plum (the dialogs: .deals-design.dl-plum). */
+.deals-hub.dl-plum { color: #F6E9FA; color-scheme: dark; }
+/* the global light variables of index.css, redefined for the page and for its dialogs */
+.deals-hub.dl-plum, .tmodal-overlay.deals-design.dl-plum { --surface: rgba(255, 255, 255, .06); --surface-2: rgba(255, 255, 255, .08); --border: rgba(235, 156, 239, .3); --ink: #F6E9FA; --ink-soft: #D6AEE0; --muted: #D6AEE0; --purple: #EB9CEF; --purple-hover: #F0C4F5; --purple-deep: #F6E9FA; --purple-tint: rgba(235, 156, 239, .16); --ok: #4BE07F; --warn: #FBBF24; --bad: #FF8A8A; }
+/* the header: one ring panel */
+.deals-hub.dl-plum .rpt-hero.deals-actions-row, .deals-hub.dl-plum .rpt-hero.deal-page-hero { border: 0; border-radius: 28px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.deals-hub.dl-plum .pipeline-switcher { background: rgba(23, 5, 28, .6); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); border: 0; color: #F6E9FA; }
+.deals-hub.dl-plum .pipeline-switcher-label { color: #D6AEE0; }
+.deals-hub.dl-plum .btn { border: 0; background: rgba(52, 16, 52, .92); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F6E9FA; text-shadow: none; }
+.deals-hub.dl-plum .btn:disabled { opacity: .5; }
+.deals-hub.dl-plum .btn.btn-p, .deals-hub.dl-plum .btn.deals-add-btn { background: linear-gradient(100deg, #B544B5, #661466); box-shadow: 0 0 14px rgba(181, 68, 181, .6); color: #fff; }
+/* the tabs: text with a glowing line */
+.deals-hub.dl-plum .chan-tabs.deals-tabs { display: flex; gap: 22px; padding: 0; border: 0; border-bottom: 1.5px solid rgba(235, 156, 239, .2); border-radius: 0; background: none; box-shadow: none; width: 100%; overflow: visible; }
+.deals-hub.dl-plum .chan-tabs.deals-tabs .chan-tab { position: relative; height: 42px; padding: 0 2px; border: 0; border-radius: 0; background: none; box-shadow: none; color: #D6AEE0; font: 700 13.5px 'Onest', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.deals-hub.dl-plum .chan-tabs.deals-tabs .chan-tab.active { background: none; color: #fff; box-shadow: none; }
+.deals-hub.dl-plum .chan-tabs.deals-tabs .chan-tab.active::after { content: ""; position: absolute; left: 6%; right: 6%; bottom: -1.5px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #EB9CEF 25%, #EB9CEF 75%, transparent); filter: drop-shadow(0 0 5px rgba(235, 156, 239, .9)); }
+/* the toolbar */
+.deals-hub.dl-plum .mc-client-search { background: none; box-shadow: none; border: 0; }
+.deals-hub.dl-plum .mc-client-search input { background: rgba(23, 5, 28, .6) !important; color: #F6E9FA; border: 0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3) !important; }
+.deals-hub.dl-plum .mc-client-search input:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF !important; }
+/* the board: columns tinted by the stage colour, transparent cards with a ring */
+.deals-hub.dl-plum .deals-column { --sc: var(--stage-color, #B58CFF); border: 0; border-radius: 24px; background: linear-gradient(180deg, color-mix(in srgb, var(--sc) 16%, transparent), color-mix(in srgb, var(--sc) 4%, transparent)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sc) 40%, transparent); }
+.deals-hub.dl-plum .deals-column.drag-over { box-shadow: inset 0 0 0 2px var(--sc), 0 0 18px color-mix(in srgb, var(--sc) 45%, transparent); }
+.deals-hub.dl-plum .deals-column-head, .deals-hub.dl-plum .deals-column-label { color: #F6E9FA; background: none; }
+.deals-hub.dl-plum .deals-column-dot { box-shadow: 0 0 8px currentColor; }
+.deals-hub.dl-plum .deals-column-count { background: rgba(235, 156, 239, .18); color: #F6E9FA; }
+.deals-hub.dl-plum .deal-card { border: 0; border-radius: 20px; background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .22); }
+.deals-hub.dl-plum .deal-card-name { color: #F6E9FA; } .deals-hub.dl-plum .deal-card-sub, .deals-hub.dl-plum .deal-card-date, .deals-hub.dl-plum .deal-card-manager { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-card-amount, .deals-hub.dl-plum .deal-card-date { background: rgba(23, 5, 28, .5); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .25); color: #F6E9FA; border: 0; }
+.deals-hub.dl-plum .deal-card-footer { border-top-color: rgba(235, 156, 239, .18); }
+.deals-hub.dl-plum .wk-add-task-btn { background: none; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .22); color: #D6AEE0; border: 0; }
+/* the blocks (the list, the overview): transparent with a ring */
+.deals-hub.dl-plum .report-section, .deals-hub.dl-plum .side-card, .deals-hub.dl-plum .deal-section { border: 0; border-radius: 28px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.deals-hub.dl-plum .empty-hint { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .stitle { color: #F6E9FA; }
+/* the table: pill rows */
+.deals-hub.dl-plum .tbl-wrap { background: none; border: 0; box-shadow: none; }
+.deals-hub.dl-plum table.cmp-table { border-collapse: separate; border-spacing: 0 6px; background: none; }
+.deals-hub.dl-plum table.cmp-table thead th { background: none; border: 0; color: #D6AEE0; padding: 4px 12px 2px; }
+.deals-hub.dl-plum table.cmp-table tbody td { background: rgba(255, 255, 255, .06); border: 0; padding-top: 8px; padding-bottom: 8px; color: #F6E9FA; }
+.deals-hub.dl-plum table.cmp-table tbody td:first-child { border-radius: 999px 0 0 999px; padding-left: 8px; }
+.deals-hub.dl-plum table.cmp-table tbody td:last-child { border-radius: 0 999px 999px 0; padding-right: 10px; }
+.deals-hub.dl-plum table.cmp-table tbody tr:hover td { background: rgba(235, 156, 239, .12); }
+.deals-hub.dl-plum .deal-stage-pill { background: rgba(255, 255, 255, .08) !important; border: 0 !important; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sc, #B58CFF) 55%, transparent); color: color-mix(in srgb, var(--sc, #B58CFF) 55%, #fff) !important; }
+.deals-hub.dl-plum .deals-open-btn { height: 28px; font-size: 12px; }
+/* the key figures: ring medallion, label and number, sparkline on the right */
+.deals-hub.dl-plum .dash-kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.deals-hub.dl-plum .dash-kpi { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; min-width: 0; padding: 12px 16px; border: 0; border-radius: 28px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.deals-hub.dl-plum .dash-kpi > .dl-kpi-ring { grid-column: 1; grid-row: 1 / span 3; }
+.deals-hub.dl-plum .dash-kpi > :not(.dl-kpi-ring):not(svg) { grid-column: 2; }
+.deals-hub.dl-plum .dash-kpi > svg { grid-column: 3; grid-row: 1 / span 3; width: 76px; height: 34px; margin: 0; align-self: center; }
+.deals-hub.dl-plum .dash-kpi-head { margin: 0; } .deals-hub.dl-plum .dash-kpi-label { color: #D6AEE0; }
+.deals-hub.dl-plum .dash-kpi-value { color: #F6E9FA; font-size: 1.5rem; }
+.deals-hub.dl-plum .dash-kpi-sub { margin-top: 2px; color: #D6AEE0; }
+@media (max-width: 1100px) { .deals-hub.dl-plum .dash-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .deals-hub.dl-plum .dash-kpi-row { grid-template-columns: 1fr; } }
+/* the deal window: medallion header, won and lost as ring buttons, chevron stages, transparent ring blocks */
+.deals-hub.dl-plum .deal-section-icon { background: linear-gradient(135deg, #C25AC4, #7E2483) !important; box-shadow: none; color: #fff; }
+.deals-hub.dl-plum .deal-title-input { background: none; color: #F6E9FA; box-shadow: none; }
+.deals-hub.dl-plum button.deal-btn-won, .deals-hub.dl-plum button.deal-btn-lost { border: 0; text-shadow: none; background: rgba(52, 16, 52, .92); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); filter: none; }
+.deals-hub.dl-plum button.deal-btn-won { color: #4BE07F; } .deals-hub.dl-plum button.deal-btn-lost { color: #FF8A8A; }
+.deals-hub.dl-plum button.deal-btn-won:hover, .deals-hub.dl-plum button.deal-btn-lost:hover { filter: none; background: rgba(52, 16, 52, .92); }
+.deals-hub.dl-plum .deal-action-ic--ghost { background: none; }
+.deals-hub.dl-plum .deal-stage-days-label { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-stage-bar { display: flex; flex-wrap: nowrap; gap: 0; }
+.deals-hub.dl-plum .deal-stage-seg { --sc: #B58CFF; flex: 1 1 0; min-height: 42px; margin-left: -8px; padding: 0 22px 0 18px; border: 0; border-radius: 0; background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: none; text-shadow: none; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%); }
+.deals-hub.dl-plum .deal-stage-seg:first-child { margin-left: 0; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%); border-radius: 0; }
+.deals-hub.dl-plum .deal-stage-seg:last-child { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 16px 50%); }
+.deals-hub.dl-plum .deal-stage-seg:first-child:last-child { clip-path: none; }
+.deals-hub.dl-plum .deal-stage-seg i { background: rgba(23, 5, 28, .6); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .35); }
+.deals-hub.dl-plum .deal-stage-seg:hover { background: rgba(235, 156, 239, .16); color: #fff; }
+.deals-hub.dl-plum .deal-stage-seg.done { background: rgba(235, 156, 239, .2); color: #F6E9FA; }
+.deals-hub.dl-plum .deal-stage-seg.done i { background: #EB9CEF; color: #2c0f2c; box-shadow: none; }
+.deals-hub.dl-plum .deal-stage-seg.active { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: none; }
+.deals-hub.dl-plum .deal-stage-seg.active i { background: #fff; color: #661466; box-shadow: none; }
+@media (max-width: 700px) { .deals-hub.dl-plum .deal-stage-bar { flex-direction: column; gap: 6px; } .deals-hub.dl-plum .deal-stage-seg, .deals-hub.dl-plum .deal-stage-seg:first-child, .deals-hub.dl-plum .deal-stage-seg:last-child { clip-path: none; margin-left: 0; border-radius: 999px; } }
+.deals-hub.dl-plum .wk-field-box { background: none; }
+.deals-hub.dl-plum .deal-section-text b, .deals-hub.dl-plum .deal-section-title { color: #F6E9FA; }
+/* the portaled dropdown panels of the filter and of the service tags */
+.deals-filter-panel, .service-tags-menu { border: 0; background: #2a0c2f; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 18px 40px -12px rgba(0, 0, 0, .6); color: #F6E9FA; }
+.deals-filter-row.active, .service-tags-row.active { background: rgba(235, 156, 239, .16); color: #fff; }
+.deals-filter-tab { color: #D6AEE0; } .deals-filter-tab.active { color: #fff; border-bottom-color: #EB9CEF; }
+.deals-hub.dl-plum .dash-kpi { align-content: center; row-gap: 0; }
+.deals-hub.dl-plum .dash-kpi-value { line-height: 1.15; }
+.deals-hub.dl-plum table.cmp-table .btn { height: 28px; padding: 0 12px; font-size: 12px; }
+/* the dialogs (Додати угоду, stages, pipelines, imports, the lost reason, the history): solid dark glass like the dialogs of Контакти */
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum { background: rgba(14, 3, 18, .72); backdrop-filter: blur(3px); color: #F6E9FA; color-scheme: dark; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-box { border: 0; border-radius: 30px; background: rgba(30, 8, 36, .98); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 30px 80px rgba(0, 0, 0, .6); color: #F6E9FA; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-head, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-foot { background: none; border-color: rgba(235, 156, 239, .2); }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-head h3, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .modal-field-head label, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body label { color: #F6E9FA; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-head-text p, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .modal-field-head p, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body p, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body small { color: #D6AEE0; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-close { background: rgba(235, 156, 239, .16); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .4); border: 0; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .modal-field-icon { background: linear-gradient(135deg, #C25AC4, #7E2483); box-shadow: none; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body input:not([type="checkbox"]):not([type="radio"]), :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body textarea, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body select { border: 0; background: rgba(23, 5, 28, .6); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); outline: none; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body input:focus, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .tmodal-body textarea:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum textarea::placeholder, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum input::placeholder { color: #8a6a98; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum :is(.ui-select-trigger) { border: 0; background: rgba(23, 5, 28, .6); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum :is(.ui-select-trigger)[aria-expanded="true"] { box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .ui-select-chevron { background: rgba(235, 156, 239, .16); color: #F6E9FA; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .ui-select-placeholder { color: #8a6a98; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .btn { border: 0; background: rgba(52, 16, 52, .92); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F6E9FA; text-shadow: none; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .btn.btn-p { background: linear-gradient(100deg, #B544B5, #661466); box-shadow: 0 0 14px rgba(181, 68, 181, .6); color: #fff; }
+:is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .btn.pw-btn--bad, :is(.deals-hub.dl-plum, body) .tmodal-overlay.deals-design.dl-plum .btn-danger { color: #FF8A8A; }
+.deals-hub.dl-plum .deal-expand-toggle { color: #EB9CEF; background: none; }

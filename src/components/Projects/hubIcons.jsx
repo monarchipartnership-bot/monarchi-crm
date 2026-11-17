@@ -23,6 +23,7 @@ export const HUB_PATHS = {
   roas: <path d="M4 17l5-5 4 4 7-8M15 8h5v5" />,
   alert: <><path d="M12 3.5l9 15.5H3z" /><path d="M12 10v4M12 17h.01" /></>,
   pie: <><path d="M12 3v9h9a9 9 0 1 1-9-9z" /><path d="M15.5 3.5A9 9 0 0 1 20.5 8.5H15.5z" /></>,
+  image: <><rect x="3.5" y="4" width="17" height="16" rx="2.5" /><circle cx="9" cy="9.5" r="1.6" /><path d="M20.5 16l-5-5-8 8.5" /></>,
   users: <><circle cx="9" cy="8" r="3.2" /><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14a6 6 0 0 1 3 6" /></>,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></>,

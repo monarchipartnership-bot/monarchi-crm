@@ -16,7 +16,6 @@ export default function ProjectCard({ project: p, onClick }) {
     p.manager && { key: 'manager', icon: I.manager, value: p.manager, label: 'Менеджер' },
     p.client && { key: 'client', icon: I.client, value: p.client, label: 'Клієнт' },
     p.country && { key: 'country', icon: I.country, value: p.country, label: 'Країна' },
-    dates && { key: 'period', icon: I.period, value: dates, label: 'Період' },
   ].filter(Boolean);
 
   return (
@@ -34,6 +33,12 @@ export default function ProjectCard({ project: p, onClick }) {
           <span className={'status-pill ' + p.status}><i aria-hidden="true" />{STATUS_LABEL[p.status]}</span>
         </div>
       </div>
+      {(p.start_date || p.end_date) && (
+        <div className="proj-period" aria-label={`Період: ${dates}`}>
+          <div className="proj-period-bar"><i style={{ width: `${periodShare(p)}%` }} /></div>
+          <div className="proj-period-l"><span>{fmtIsoDate(p.start_date) || '—'}</span><span>{p.end_date ? fmtIsoDate(p.end_date) : 'без кінця'}</span></div>
+        </div>
+      )}
       <div className="proj-card-body">
       {meta.length > 0 && (
         <div className="proj-meta">

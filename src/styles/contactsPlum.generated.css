@@ -1,0 +1,249 @@
+/* GENERATED dark plum overrides for the Контакти (list and client card) (owner's picks 2026-11-12). Made by scratchpad/gen_dark.py from builderHub, composeHub, historyHub, workbenchHub, projectReports and projectHistory: every light colour is mapped to the plum palette; edit by hand below the marker «HAND-MADE». Scoped to .pw-rep. */
+/* ---- contactsHub.css ---- */
+.contacts-hub.ct-plum .dash-kpi-icon.ok { --c2: #4BE07F; }
+.contacts-hub.ct-plum .mc-client-search > :is(svg, img, span) { color: #D6AEE0; stroke: #D6AEE0; }
+.contacts-hub.ct-plum .task-filter-btn.has-active { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.contacts-hub.ct-plum .task-filter-popover { background: rgba(255, 255, 255, .06); box-shadow: 0 18px 44px rgba(0, 0, 0, .4); }
+.contacts-hub.ct-plum .task-filter-row label { color: #D6AEE0; }
+.contacts-hub.ct-plum .task-filter-reset { color: #FF8A8A; }
+.contacts-hub.ct-plum .placeholder { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-grid-header { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-grid-row:focus-visible { outline: 3px solid #EB9CEF; }
+.contacts-hub.ct-plum .client-grid-name-text .ink { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-grid-subtitle { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-grid-plain, .contacts-hub.ct-plum .client-grid-date { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-grid-date svg { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-grid-country span[class^="fi"] { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .06), 0 0 0 3px rgba(235, 156, 239, .3); }
+.contacts-hub.ct-plum .month-pagination button { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .month-pagination .mp-arrow { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .mp-gap { color: #D6AEE0; }
+.contacts-hub.ct-plum .month-pagination-hint { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-btn-danger { color: #FF8A8A; }
+.contacts-hub.ct-plum .client-profile-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.contacts-hub.ct-plum .client-profile-avatar-wrap .client-avatar { box-shadow: 0 0 0 4px rgba(255, 255, 255, .06), 0 0 0 8px #C25AC4; }
+.contacts-hub.ct-plum .client-profile-avatar-cam { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px var(--hb-line), 0 3px 8px rgba(0, 0, 0, .4); }
+.contacts-hub.ct-plum .client-profile-avatar-menu, .contacts-hub.ct-plum .client-profile-status-menu { background: rgba(255, 255, 255, .06); box-shadow: 0 18px 44px rgba(0, 0, 0, .4); }
+.contacts-hub.ct-plum .client-profile-avatar-menu button { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-name-row h1 { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-name-block .sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-name-block .sub svg { stroke: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-quick-field { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-quick-body > label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-readonly { color: #F6E9FA; }
+.contacts-hub.ct-plum :is(.client-profile-quick-ic, .client-profile-stat-icon, .client-profile-section-ic, .client-profile-row-ic, .client-profile-mini-row-ic) { background: radial-gradient(circle closest-side at 50% 50%, #8E2A93 0, #7E2483 60%, rgba(255, 255, 255, .06) 62%, rgba(255, 255, 255, .06) 74%, transparent 75%), conic-gradient(#B544B5, #661466) !important; }
+.contacts-hub.ct-plum .client-profile-stat-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.contacts-hub.ct-plum .client-profile-stat-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-stat-value { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-stat-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-section { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.contacts-hub.ct-plum .client-profile-section-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-section-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-section-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-section-chevron { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-row-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-row-value { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-row-value:empty::after, .contacts-hub.ct-plum .client-profile-row-value.empty { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-side-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.contacts-hub.ct-plum .client-profile-side-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-side-link { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-history-empty { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-quick-action { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-subtabs { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-subtab { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-subtab.active { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 3px 8px rgba(0, 0, 0, .4); }
+.contacts-hub.ct-plum .client-profile-mini-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-mini-row-go { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-side-empty { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-side-empty-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-side-empty-ic svg { stroke: #EB9CEF; }
+.contacts-hub.ct-plum .deal-note-editor-wrap { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .deal-note-editor { color: #F6E9FA; }
+.contacts-hub.ct-plum .deal-note-toolbar-icons button { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deals-list-card, .contacts-hub.ct-plum .client-profile-deal-detail-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.contacts-hub.ct-plum .client-profile-deals-list-head h3 { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deals-search > span svg { stroke: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-deal-row.active { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.contacts-hub.ct-plum .client-profile-deal-row-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-row-meta { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-row-chevron { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-detail-tags > span { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-stats > div { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-deal-detail-stat-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-stat-value { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-detail-stat-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-owner-role { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-head svg { stroke: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-time { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-text { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-author { color: #D6AEE0; }
+.contacts-hub.ct-plum .pacc-pill--ok { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.contacts-hub.ct-plum .pacc-pill--warn { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.contacts-hub.ct-plum .pacc-pill--bad { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.contacts-hub.ct-plum .pacc-pill--muted { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .pacc-found { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .pacc-found-meta { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-heading p { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-count { background: rgba(235, 156, 239, .16); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-search > span svg { stroke: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-filters { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-activity-filter { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-filter.active { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 3px 8px rgba(0, 0, 0, .4); }
+.contacts-hub.ct-plum .client-profile-activity-sort { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-group-head { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-activity-group-count { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-timeline::before { background: linear-gradient(rgba(235, 156, 239, .3), rgba(255, 255, 255, .06)); }
+.contacts-hub.ct-plum .client-profile-activity-tl-dot { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-activity-tl-dot::after { background: #EB9CEF; }
+.contacts-hub.ct-plum .client-profile-activity-tl-main { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-activity-tl-ic { background: rgba(255, 255, 255, .06) !important; color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-time { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-user { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-diff { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-diff-field { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-mention-text { color: #F6E9FA; }
+.contacts-hub.ct-plum .deal-note-author-field label { color: #D6AEE0; }
+.contacts-hub.ct-plum .deal-history-row, .contacts-hub.ct-plum .client-file-row, .contacts-hub.ct-plum .ai-history-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .ai-history-row.active { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.contacts-hub.ct-plum .deal-history-ic { background: radial-gradient(circle closest-side, #8E2A93 0 60%, rgba(255, 255, 255, .06) 62% 74%, transparent 75%), conic-gradient(#B544B5, #661466) !important; }
+.contacts-hub.ct-plum .client-history-week { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-history-text { color: #F6E9FA; }
+.contacts-hub.ct-plum .deal-history-meta { color: #D6AEE0; }
+.contacts-hub.ct-plum .deal-field-icon-btn, .contacts-hub.ct-plum .client-file-del { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .deal-field-icon-btn.active { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.contacts-hub.ct-plum .deal-history-actions .deal-field-icon-btn:last-child, .contacts-hub.ct-plum .client-file-del { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.contacts-hub.ct-plum .client-file-name { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-file-meta { color: #D6AEE0; }
+.contacts-hub.ct-plum .ai-history-row-agent { color: #D6AEE0; }
+.contacts-hub.ct-plum .ai-history-row-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .ai-history-row-date { color: #D6AEE0; }
+.contacts-hub.ct-plum .ai-history-transcript { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .create-client-deal-toggle { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .import-error { background: rgba(255, 138, 138, .16); }
+.contacts-hub.ct-plum .import-map-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .chip.have { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.contacts-hub.ct-plum .chip.missing { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.contacts-hub.ct-plum .import-progress { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .import-progress-bar { background: linear-gradient(100deg, #4BE07F, #4BE07F); }
+.contacts-hub.ct-plum .import-skip-list { color: #D6AEE0; }
+/* ---- clientsDirectory.css ---- */
+.contacts-hub.ct-plum .client-kpi-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-kpi-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-kpi-value { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-kpi-delta { color: #4BE07F; background: rgba(75, 224, 127, .16); }
+.contacts-hub.ct-plum .client-kpi-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-kpi-donut-center { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-grid-header { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-grid-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-grid-subtitle { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-grid-plain { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-grid-date { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-grid-date svg { color: #D6AEE0; }
+.contacts-hub.ct-plum .tbl-wrap { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .status-dot-wrap { color: #D6AEE0; }
+.contacts-hub.ct-plum .row-menu-btn { color: #D6AEE0; }
+.contacts-hub.ct-plum .row-menu-popover { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .row-menu-popover button { color: #F6E9FA; }
+.contacts-hub.ct-plum .row-menu-popover button.danger:hover { background: rgba(255, 138, 138, .16); }
+.contacts-hub.ct-plum .client-panel-tab { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-panel-tab:hover { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-info .task-filter-row input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-info .task-filter-row input:disabled { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-history-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-history-empty { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-history-text { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-history-author { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-notes-textarea { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-file-meta { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-file-del { color: #D6AEE0; }
+.contacts-hub.ct-plum .ai-history-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .ai-history-row-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .ai-history-row-date { color: #D6AEE0; }
+.contacts-hub.ct-plum .tmodal-body label.create-client-deal-toggle { color: #F6E9FA; }
+/* ---- clientProfile.css ---- */
+.contacts-hub.ct-plum .client-profile-btn-danger { color: #FF8A8A; }
+.contacts-hub.ct-plum .client-profile-btn-danger:hover { color: #FF8A8A; }
+.contacts-hub.ct-plum .client-profile-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-status-trigger { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-quick-field label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-quick-tags .tag-input-chips { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-stat-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-stat-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-stat-value { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-stat-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-avatar-cam { border: 2px solid rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-avatar-menu { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-avatar-menu button { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-tabs .client-panel-tab.active { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-section-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-section-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-section-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-section-chevron { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-row-ic { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-row-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-row-value { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-row-edit input { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-side-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-side-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-activity-text { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-activity-time { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-note-preview-author { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-note-preview-date { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-note-preview-text { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-quick-action { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-subtab { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-subtab.active { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-side-empty-ic { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-side-empty-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-side-empty-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-file-preview-row { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-file-preview-row svg { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-mini-row:hover { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-mini-row-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-mini-row-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-mini-row-go { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-readonly { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deals-list-card, .contacts-hub.ct-plum .client-profile-deal-detail-card { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-deals-list-head h3 { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deals-search svg { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deals-search input { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-row { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-deal-row-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-row-meta span { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-row-chevron { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-detail-tags span { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-tags svg { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-stat-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-stat-value { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-detail-stat-value--sm svg { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-stat-sub { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-detail-owner-name { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-detail-owner-role { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-time { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-text { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-text--bold { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-deal-mini-card-author { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-heading h3 { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-activity-heading p { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-search { background: rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-activity-search svg { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-search input { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-activity-filter { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-sort { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-group-date { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-activity-tl-dot { box-shadow: 0 0 0 3px rgba(255, 255, 255, .06); }
+.contacts-hub.ct-plum .client-profile-activity-tl-time { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-title { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-profile-activity-tl-user { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-diff-field { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-diff-field b { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-diff-label { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-arrow { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-activity-tl-mention-text { color: #D6AEE0; }
+.contacts-hub.ct-plum .client-profile-row-edit textarea { color: #F6E9FA; }
+.contacts-hub.ct-plum .client-channel-chip { background: rgba(255, 255, 255, .06); color: var(--ink-soft, #F6E9FA); }

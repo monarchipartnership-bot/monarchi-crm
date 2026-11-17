@@ -1,3 +1,4 @@
+import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import { useMemo, useState } from 'react';
 import DateRangePicker, { presetRange } from '../../../components/Deals/DateRangePicker';
 
@@ -62,21 +63,25 @@ export default function DealsAnalyticsTab({ deals, stages }) {
 
       <div className="dash-kpi-row">
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.target }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Win rate</div></div>
           <div className="dash-kpi-value">{winRate === null ? '—' : `${winRate}%`}</div>
           <div className="dash-kpi-sub">{won.length} виграно з {won.length + lost.length} закритих</div>
         </div>
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.currency }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Середній розмір угоди</div></div>
           <div className="dash-kpi-value">{avgDealSize === null ? '—' : `$${Math.round(avgDealSize).toLocaleString('uk-UA')}`}</div>
           <div className="dash-kpi-sub">по виграних угодах</div>
         </div>
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.clock }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Середній час закриття</div></div>
           <div className="dash-kpi-value">{avgCloseDays === null ? '—' : `${Math.round(avgCloseDays)} дн.`}</div>
           <div className="dash-kpi-sub">від створення до перемоги</div>
         </div>
         <div className="dash-kpi">
+          <span className="hub-ring dl-kpi-ring"><span className="hub-tile hub-tile--ln" dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} /></span>
           <div className="dash-kpi-head"><div className="dash-kpi-label">Всього угод за період</div></div>
           <div className="dash-kpi-value">{filtered.length}</div>
         </div>

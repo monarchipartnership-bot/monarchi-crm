@@ -22,6 +22,11 @@ import '../../../styles/ddHub.css';
 import '../../../styles/reportsHub.css';
 import '../../../styles/taskDialogsHub.css';
 import '../../../styles/dealTasksHub.css';
+import '../../../styles/reportsManagerPlum.generated.css'; // the shared Hub base of the report pages recoloured to the plum palette (made by a script)
+import '../../../styles/reportsManagerPlum.css';
+import '../../../styles/dealTasksPlum.generated.css'; // Задачі of sales recoloured to the plum palette (made by a script)
+import '../../../styles/dealTasksPlum.css';
+import '../../../styles/ddNight.css';
 // after the stylesheets: the form shares taskDialogsHub.css and must not load it before dealsBoard.css (.tmodal-box)
 import CreateDealTaskModal from '../../../components/Deals/CreateDealTaskModal';
 
@@ -454,7 +459,7 @@ export default function DealTasksPage() {
   ];
 
   return (
-    <div className="dtp-page dtp-hub rpt-hub" data-dd="hub">
+    <div className="dtp-page dtp-hub rpt-hub rm-plum dp-plum is-plum" data-dd="night">
       <section className="dtp-summary" aria-label="Підсумок задач">
         {summary.map((s) => (
           <div className={'dtp-metric dtp-metric--' + s.key + (s.tone ? ' ' + s.tone : '')} key={s.key}>
@@ -802,7 +807,7 @@ export default function DealTasksPage() {
       )}
 
       {taskDetailRow && createPortal(
-        <div className="tmodal-overlay thd-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) closeDetail(); }}>
+        <div className="tmodal-overlay thd-overlay dp-plum" data-dd="night" onClick={(e) => { if (e.target === e.currentTarget) closeDetail(); }}>
           <div className="tmodal-box thd-dialog dtp-detail" role="dialog" aria-modal="true" aria-labelledby="dtp-detail-title" ref={detailRef}>
             <div className="thd-head thd-head--row">
               <span className="thd-md thd-md--lg">

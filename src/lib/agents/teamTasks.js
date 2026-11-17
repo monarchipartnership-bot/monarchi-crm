@@ -3,7 +3,9 @@
 import { buildOperationView, isInWork, kyivToday, pausedBySeason, regularsOf, seasonOver } from './operationCycles.js';
 import { creativeRunState } from './aiResults.js';
 
-export const TASK_KIND = { main: 'Регулярне · основне', extra: 'Регулярне · додаткове', seasonal: 'Сезонне', oneoff: 'Разове' };
+// 2026-11-16 (owner's pick, decision 51): three types by colour - regular (the main one gets a star), seasonal, one-off; `type` is the colour, `isMain` the star
+export const TASK_KIND = { main: 'Регулярне', extra: 'Регулярне', seasonal: 'Сезонне', oneoff: 'Разове' };
+export const TASK_TYPE = { main: 'regular', extra: 'regular', seasonal: 'seasonal', oneoff: 'oneoff' };
 
 const dayMonth = (d) => (d ? `${String(d).slice(8, 10)}.${String(d).slice(5, 7)}` : '');
 
@@ -22,11 +24,11 @@ export function teamTasksOf({ campaign, cockpit = null, now = new Date() } = {})
     if (!r.enabled) { state = 'paused'; stateText = 'зупинено'; } else if (seasonal && r.startDate && today < r.startDate) { state = 'soon'; stateText = `почнеться ${dayMonth(r.startDate)}`; } else if (rest) { state = 'paused'; stateText = `на паузі до ${dayMonth(rest.endDate)}`; }
     const period = seasonal ? `${r.startDate ? `${dayMonth(r.startDate)} – ` : 'до '}${dayMonth(r.endDate)}` : '';
     const line = [period, r.whenText, r.enabled && state !== 'paused' && r.next?.text ? `наступний запуск ${r.next.text}` : ''].filter(Boolean).join(' · ');
-    out.push({ key: `reg:${r.id}`, kind, kindLabel: TASK_KIND[kind], title: r.title || 'Без назви', line, state, stateText, regularId: r.id, enabled: r.enabled });
+    out.push({ key: `reg:${r.id}`, kind, type: TASK_TYPE[kind], isMain: kind === 'main', kindLabel: TASK_KIND[kind], title: r.title || 'Без назви', line, state, stateText, regularId: r.id, enabled: r.enabled });
   });
   (cockpit?.requests || []).filter((r) => r.kind !== 'regular' && (isInWork(r) || (r.creatives?.review || 0) > 0)).slice(0, 6).forEach((r) => {
     const st = creativeRunState(r);
-    out.push({ key: `one:${r.id}`, kind: 'oneoff', kindLabel: TASK_KIND.oneoff, title: r.title || `Завдання №${r.id}`, line: [r.createdAt ? `${dayMonth(String(r.createdAt).slice(0, 10))}` : '', st.text].filter(Boolean).join(' · '), state: st.state === 'ok' ? 'work' : st.state, stateText: st.state === 'wait' ? 'чекає вашого рішення' : 'в роботі', requestId: r.id });
+    const paused = st.state === 'wait' && st.text === 'На паузі', state = paused ? 'paused' : st.state === 'ok' ? 'work' : st.state; out.push({ key: `one:${r.id}`, kind: 'oneoff', type: 'oneoff', isMain: false, kindLabel: TASK_KIND.oneoff, title: r.title || `Завдання №${r.id}`, line: [r.createdAt ? `${dayMonth(String(r.createdAt).slice(0, 10))}` : '', st.text].filter(Boolean).join(' · '), state, stateText: paused ? 'зупинено' : state === 'wait' ? 'чекає вашого рішення' : state === 'stopped' ? 'збій' : 'в роботі', requestId: r.id });
   });
   return out;
 }

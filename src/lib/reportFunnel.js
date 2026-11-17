@@ -1,6 +1,7 @@
 // The funnel of a report (a request of the management, 2026-11-02): product view → cart → checkout → sale as one picture, so the client sees where the stages sag.
 // Pure code over the totals of a report: the stages are metric keys, each stage's number comes from the same calculation the metric table uses.
 import { computeMetric } from './reportMetrics.js';
+import { cleanFunnelActions } from './googleFunnel.js';
 
 // The metrics that can be a stage (a store's path), in the order of the path. `purchases` is the sale; the others are the extra columns of the Meta cabinet.
 export const FUNNEL_CANDIDATES = ['mx_landing_page_views', 'mx_view_content', 'mx_add_to_cart', 'mx_initiate_checkout', 'mx_add_payment_info', 'purchases'];
@@ -9,11 +10,12 @@ export const MAX_FUNNEL_STAGES = 7;
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
-// The layout's funnel setting → { enabled, stages } that is safe to use. Unknown keys and repeats are dropped; fewer than two stages is no funnel.
+// The layout's funnel setting → { enabled, stages, actions? } that is safe to use. Unknown keys and repeats are dropped; fewer than two stages is no funnel.
 export function normalizeFunnel(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const stages = [...new Set((Array.isArray(r.stages) ? r.stages : DEFAULT_FUNNEL_STAGES).map((k) => String(k || '').trim()).filter((k) => /^[A-Za-z0-9_]+$/.test(k)))].slice(0, MAX_FUNNEL_STAGES);
-  return { enabled: r.enabled === true && stages.length >= 2, stages: stages.length >= 2 ? stages : [...DEFAULT_FUNNEL_STAGES] };
+  const actions = cleanFunnelActions(r.actions); // Google only: the conversion action chosen for each stage (see googleFunnel.js)
+  return { enabled: r.enabled === true && stages.length >= 2, stages: stages.length >= 2 ? stages : [...DEFAULT_FUNNEL_STAGES], ...(Object.keys(actions).length ? { actions } : {}) };
 }
 
 // The extra columns the funnel needs from the cabinet (everything but the sale, which is a base field).

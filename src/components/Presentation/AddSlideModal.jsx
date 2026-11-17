@@ -70,7 +70,7 @@ export default function AddSlideModal({ deck, afterId, onAdd, onClose, openerRef
   }, [onClose, openerRef]);
 
   return createPortal(
-    <div className="pb-overlay" data-dd="plum" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="pb-overlay" data-dd="night" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} className="pb-modal" role="dialog" aria-modal="true" aria-labelledby="pb-modal-title">
         <header className="pb-modal-head">
           <h2 id="pb-modal-title">Додати готовий слайд</h2>

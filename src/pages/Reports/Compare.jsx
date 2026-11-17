@@ -14,6 +14,8 @@ import '../../styles/reportPage.css';
 import '../../styles/comparePage.css';
 import '../../styles/ddHub.css';
 import '../../styles/reportsHub.css';
+import '../../styles/reportsManagerPlum.generated.css'; // the light Hub styles of the Reports Manager recoloured to the plum palette (made by a script)
+import '../../styles/reportsManagerPlum.css';
 
 const MAX_SLOTS = 6;
 
@@ -370,7 +372,7 @@ export default function ReportsCompare() {
   }
 
   return (
-    <div className="report-page reports-compare-page rpt-hub" data-dd="hub" ref={pageRef}>
+    <div className="report-page reports-compare-page rpt-hub rm-plum is-plum" data-dd="hub" ref={pageRef}>
       {!exportingJPEG && <ReportTypeSwitcher />}
       <div className="page-actions">
         <button type="button" className="btn" onClick={() => (reportType ? setReportType(null) : navigate(-1))}>

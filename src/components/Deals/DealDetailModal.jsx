@@ -570,7 +570,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
   const stageDays = daysInStage(deal);
 
   return (
-    <div className="report-page deal-page deals-hub rpt-hub" data-dd="hub" ref={dealPageRef}>
+    <div className="report-page deal-page deals-hub rpt-hub rm-plum dl-plum is-plum" data-dd="night" ref={dealPageRef}>
       <section className="rpt-hero deal-page-hero">
         <span className="deal-section-icon deal-detail-head-icon" style={{ background: 'linear-gradient(135deg, #A78BFA, #7C3AED)' }} dangerouslySetInnerHTML={{ __html: FIELD_ICONS.briefcase }} />
         <div className="deal-detail-head-text">
@@ -1030,7 +1030,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
       </div>
 
       {historyDetail && createPortal(
-        <div className="tmodal-overlay deals-design" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) setHistoryDetail(null); }}>
+        <div className="tmodal-overlay deals-design dl-plum" data-dd="night" onClick={(e) => { if (e.target === e.currentTarget) setHistoryDetail(null); }}>
           <div className="tmodal-box task-detail-box">
             <div className="tmodal-head">
               <div className="pipeline-modal-head">
@@ -1075,6 +1075,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
 
       {editTaskOpen && historyDetail && (
         <CreateDealTaskModal
+          hub
           task={historyDetail}
           deal={deal}
           profiles={profiles}
@@ -1089,7 +1090,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
       )}
 
       {lostModalReason && (
-        <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setLostModalReason(null); }}>
+        <div className="tmodal-overlay deals-design dl-plum" data-dd="night" onClick={(e) => { if (e.target === e.currentTarget) setLostModalReason(null); }}>
           <div className="tmodal-box">
             <div className="tmodal-head">
               <h3>Причина програшу</h3>
@@ -1112,7 +1113,7 @@ export default function DealDetailModal({ deal, stages, profiles, onClose, onCha
       )}
 
       {activityModalOpen && createPortal(
-        <div className="tmodal-overlay deals-design" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) closeActivityModal(); }}>
+        <div className="tmodal-overlay deals-design dl-plum" data-dd="night" onClick={(e) => { if (e.target === e.currentTarget) closeActivityModal(); }}>
           <div className="tmodal-box task-modal-box">
             <div className="tmodal-head">
               <div className="pipeline-modal-head">

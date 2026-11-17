@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DailyReportHero from '../../../components/Reports/DailyReportHero';
 import ReportTypeSwitcher from '../../../components/Reports/ReportTypeSwitcher';
@@ -32,9 +32,12 @@ import contactsIcon from '../../../assets/sidebar/contacts.webp';
 import taskManagerIcon from '../../../assets/sidebar/task-manager.webp';
 import { FIELD_ICONS } from '../../../lib/taskFieldIcons';
 import Select from '../../../components/common/Select';
+import { monthWeekSteps } from '../../../lib/monthWeekSteps';
 import '../../../styles/reportPage.css';
 import '../../../styles/ddHub.css';
 import '../../../styles/reportsHub.css';
+import '../../../styles/reportsManagerPlum.generated.css'; // the light Hub styles of the Reports Manager recoloured to the plum palette (made by a script)
+import '../../../styles/reportsManagerPlum.css';
 import '../../../styles/automationTasksPage.css';
 import '../../../styles/automationDashboard.css';
 import '../../../styles/dealsBoard.css';
@@ -44,34 +47,6 @@ import '../../../styles/clientsDirectory.css';
 // Status chip colour: the shared pill style plus the colour itself, which the folder design uses for a pale chip with a coloured dot.
 const chipStyle = (color) => ({ ...stagePillStyle(color), '--chip': color });
 
-
-// Flat completeness ring: a pale track plus arcs for exactly the counts shown in the legend (nothing is drawn for 0).
-function ProgressRing({ stats }) {
-  const R = 48, C = 2 * Math.PI * R;
-  const arcs = [
-    { n: stats.done, color: '#12A144' },
-    { n: stats.over, color: '#D92D2D' },
-  ];
-  let offset = 0;
-  return (
-    <div className="progress-ring" role="img" aria-label={`Заповненість місяця: ${stats.pct}%`}>
-      <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="#EBD0F2" strokeWidth="11" />
-        {stats.total > 0 && arcs.map((a, i) => {
-          if (!a.n) return null;
-          const len = (a.n / stats.total) * C;
-          const el = (
-            <circle key={i} cx="60" cy="60" r={R} fill="none" stroke={a.color} strokeWidth="11"
-              strokeDasharray={`${Math.max(len - 1.5, 0.5)} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)" />
-          );
-          offset += len;
-          return el;
-        })}
-      </svg>
-      <span className="progress-ring-value">{stats.pct}%</span>
-    </div>
-  );
-}
 
 function makeId() {
   return crypto.randomUUID();
@@ -391,6 +366,7 @@ export default function DailyCreate() {
     }
     return { done, over, future, total: dim, pct: dim > 0 ? Math.round((done / dim) * 100) : 0 };
   }, [period.year, period.month, savedDays]);
+  const weekSteps = useMemo(() => monthWeekSteps({ year: period.year, month: period.month, savedDays, today: new Date() }), [period.year, period.month, savedDays]);
   const hasArchive = done.some((d) => d.text?.trim()) || plans.some((p) => p.text?.trim());
 
   const saveTone = /^Помилка/.test(statusLabel) ? 'err' : /^Збережено/.test(statusLabel) ? 'ok' : /^(Завантаження|Зберігається)/.test(statusLabel) ? 'busy' : 'idle';
@@ -420,7 +396,7 @@ export default function DailyCreate() {
   );
 
   return (
-    <div className="report-page daily-report-page rpt-hub" data-dd="hub" ref={pageRef}>
+    <div className="report-page daily-report-page rpt-hub rm-plum is-plum" data-dd="hub" ref={pageRef}>
       {!capturing && <ReportTypeSwitcher />}
       <div className="report-grid">
       <div className="main-sheet">
@@ -703,14 +679,22 @@ export default function DailyCreate() {
             <div className="stat"><span>В очікуванні</span><b>{tasksPendingCount}</b></div>
             <hr className="divider" />
             <h4>Заповненість місяця</h4>
-            <div className="progress-row">
-              <ProgressRing stats={monthFillStats} />
-              <ul className="progress-legend">
-                <li className="done"><span>Внесено</span><b>{monthFillStats.done}</b></li>
-                <li className="over"><span>Прострочено</span><b>{monthFillStats.over}</b></li>
-                <li className="future"><span>Ще не настав</span><b>{monthFillStats.future}</b></li>
-              </ul>
+            <div className="rm-steps" role="img" aria-label={`Заповненість місяця: ${monthFillStats.pct}%`}>
+              {weekSteps.map((w, i) => (
+                <Fragment key={w.n}>
+                  {i > 0 && <span className={'l' + (weekSteps[i - 1].status === 'ok' ? ' ok' : '')} />}
+                  <span className={'n ' + w.status} title={`Тиждень ${w.n}: ${w.from}–${w.to}, внесено ${w.done} з ${w.due || w.total}`}>
+                    <span className="m">{w.status === 'ok' ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : w.status === 'over' ? '!' : w.n}</span>
+                    Тиж. {w.n}
+                  </span>
+                </Fragment>
+              ))}
             </div>
+            <ul className="progress-legend">
+              <li className="done"><span>Внесено</span><b>{monthFillStats.done}</b></li>
+              <li className="over"><span>Прострочено</span><b>{monthFillStats.over}</b></li>
+              <li className="future"><span>Ще не настав</span><b>{monthFillStats.future}</b></li>
+            </ul>
             <p className="progress-total">Всього днів ({MONTH_NAMES[period.month - 1].toLowerCase()}): <b>{monthFillStats.total}</b></p>
           </section>
           {hasArchive && (

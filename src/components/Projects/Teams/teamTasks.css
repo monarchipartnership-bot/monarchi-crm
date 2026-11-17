@@ -2,24 +2,10 @@
 .inm { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .inm-text { margin: 0; font: inherit; color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inm-pen { flex: none; width: 28px; height: 28px; display: inline-grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: currentColor; opacity: .7; cursor: pointer; }
-.inm-pen:focus-visible, .inm-input:focus-visible, .tt-addb:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; opacity: 1; }
+.inm-pen:focus-visible, .inm-input:focus-visible { outline: 2px solid #EB9CEF; outline-offset: 2px; opacity: 1; }
 .inm-input { min-width: 220px; max-width: 100%; height: 38px; padding: 0 12px; border-radius: 12px; border: 1.5px solid rgba(235, 156, 239, .55); background: rgba(255, 255, 255, .08); color: inherit; font: inherit; }
 .inm.is-edit { flex-wrap: wrap; } .inm-err { flex-basis: 100%; color: #FF8A8A; font-size: 12.5px; }
 
-.tt { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(235, 156, 239, .22); display: flex; flex-direction: column; gap: 6px; }
-.tt-h { display: flex; justify-content: space-between; font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #D6AEE0; }
-.tt-empty { margin: 0; font-size: .85rem; color: #D6AEE0; }
-.tt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.tt-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid rgba(235, 156, 239, .14); flex-wrap: wrap; }
-.tt-row:first-child { border-top: 0; }
-.tt-kind { flex: none; padding: 3px 10px; border-radius: 8px; font-size: .74rem; font-weight: 700; background: rgba(181, 68, 181, .28); color: #F6E9FA; white-space: nowrap; }
-.tt-kind.is-seasonal { background: rgba(251, 191, 36, .2); color: #FBD36B; } .tt-kind.is-oneoff { background: transparent; box-shadow: inset 0 0 0 1px rgba(235, 156, 239, .4); color: #E9CDF0; }
-.tt-main { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 2px; }
-.tt-main .inm-text { font-size: .95rem; font-weight: 700; color: #F6E9FA; }
-.tt-main small { color: #D6AEE0; font-size: .8rem; }
-.tt-acts { display: flex; gap: 6px; flex-wrap: wrap; }
-.tt-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-.tt-addb { padding: 7px 14px; border-radius: 999px; border: 1.5px dashed rgba(235, 156, 239, .45); background: transparent; color: #F0D6F5; font: inherit; font-size: .84rem; cursor: pointer; }
 
 
 /* «Підготовка» of a team: the steps before the work, with the live line */

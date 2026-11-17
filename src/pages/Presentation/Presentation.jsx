@@ -20,6 +20,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import '../../styles/presentationSlides.css';
 import '../../styles/presentationBuilder.css';
+import '../../styles/presentationPlum.css';
+import '../../styles/ddNight.css'; // the dark menus of the dropdowns in the panel
 
 function initialSel(params) {
   const now = new Date();
@@ -203,7 +205,7 @@ export default function Presentation() {
   };
 
   return (
-    <div className="pres-page">
+    <div className="pres-page is-plum">
       <Builder
         api={api} dataProps={dataProps} onBack={() => navigate(-1)}
         onSave={save} saveLabel={saveLabel} saveBusy={saveBusy}

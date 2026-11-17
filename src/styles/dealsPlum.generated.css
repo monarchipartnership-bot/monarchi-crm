@@ -1,0 +1,539 @@
+/* GENERATED dark plum overrides for the Угоди (board, list, overview, deal window and dialogs) (owner's picks 2026-11-12). Made by scratchpad/gen_dark.py from builderHub, composeHub, historyHub, workbenchHub, projectReports and projectHistory: every light colour is mapped to the plum palette; edit by hand below the marker «HAND-MADE». Scoped to .pw-rep. */
+/* ---- reportPage.css ---- */
+.deals-hub.dl-plum .daily-task-grid .client-grid-row.overdue, .deals-design.dl-plum .daily-task-grid .client-grid-row.overdue { background: color-mix(in srgb, var(--bad) 12%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .daily-list-row-main, .deals-design.dl-plum .daily-list-row-main { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .report-type-card, .deals-design.dl-plum .report-type-card { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .report-type-card-label, .deals-design.dl-plum .report-type-card-label { color: #F6E9FA; }
+.deals-hub.dl-plum .rpt-hero h1, .deals-design.dl-plum .rpt-hero h1 { color: #F6E9FA; }
+.deals-hub.dl-plum .rpt-hero p.sub, .deals-design.dl-plum .rpt-hero p.sub { color: #D6AEE0; }
+.deals-hub.dl-plum .rpt-sub, .deals-design.dl-plum .rpt-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .rpt-sub b, .deals-design.dl-plum .rpt-sub b { color: #F6E9FA; }
+.deals-hub.dl-plum .rpt-sub input, .deals-design.dl-plum .rpt-sub input { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-hero, .deals-design.dl-plum .daily-hero { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .daily-hero-title h1, .deals-design.dl-plum .daily-hero-title h1 { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-hero-title p, .deals-design.dl-plum .daily-hero-title p { color: #D6AEE0; }
+.deals-hub.dl-plum .daily-hero-nav-btn, .deals-design.dl-plum .daily-hero-nav-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .daily-hero-nav-label, .deals-design.dl-plum .daily-hero-nav-label { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-hero-scroll-btn, .deals-design.dl-plum .daily-hero-scroll-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .daily-hero-day-num, .deals-design.dl-plum .daily-hero-day-num { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-hero-day-wd, .deals-design.dl-plum .daily-hero-day-wd { color: #D6AEE0; }
+.deals-hub.dl-plum .daily-hero-day.over, .deals-design.dl-plum .daily-hero-day.over { background: linear-gradient(135deg, color-mix(in srgb, var(--bad) 45%, rgba(255, 255, 255, .06)), var(--bad)); }
+.deals-hub.dl-plum .daily-hero-day.done, .deals-design.dl-plum .daily-hero-day.done { background: linear-gradient(135deg, color-mix(in srgb, var(--ok) 45%, rgba(255, 255, 255, .06)), var(--ok)); }
+.deals-hub.dl-plum .daily-hero-day.weekend, .deals-design.dl-plum .daily-hero-day.weekend { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .daily-hero-day.weekend .daily-hero-day-num, .deals-design.dl-plum .daily-hero-day.weekend .daily-hero-day-num { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-step-dot, .deals-design.dl-plum .wk-step-dot { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .wk-step-dot.cur, .deals-design.dl-plum .wk-step-dot.cur { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .wk-step-label, .deals-design.dl-plum .wk-step-label { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-stepper-count, .deals-design.dl-plum .wk-stepper-count { color: #F6E9FA; }
+.deals-hub.dl-plum .wk-stepper-pct, .deals-design.dl-plum .wk-stepper-pct { color: #D6AEE0; }
+.deals-hub.dl-plum .picker, .deals-design.dl-plum .picker { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .pk-field label, .deals-design.dl-plum .pk-field label { color: #D6AEE0; }
+.deals-hub.dl-plum .pk-field select, .deals-design.dl-plum .pk-field select { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .save-state, .deals-design.dl-plum .save-state { color: #D6AEE0; }
+.deals-hub.dl-plum .stitle, .deals-design.dl-plum .stitle { color: #F6E9FA; }
+.deals-hub.dl-plum .item-box, .deals-design.dl-plum .item-box { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .item-box textarea, .deals-design.dl-plum .item-box textarea { color: #F6E9FA; }
+.deals-hub.dl-plum .item-box textarea::placeholder, .deals-design.dl-plum .item-box textarea::placeholder { color: #D6AEE0; }
+.deals-hub.dl-plum .capture-text, .deals-design.dl-plum .capture-text { color: #F6E9FA; }
+.deals-hub.dl-plum .empty-hint, .deals-design.dl-plum .empty-hint { color: #D6AEE0; }
+.deals-hub.dl-plum .add-btn:hover, .deals-design.dl-plum .add-btn:hover { background: rgba(235, 156, 239, .3); }
+.deals-hub.dl-plum .cf label, .deals-design.dl-plum .cf label { color: #D6AEE0; }
+.deals-hub.dl-plum .cf select, .deals-design.dl-plum .cf select, .deals-hub.dl-plum .cf input, .deals-design.dl-plum .cf input { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .cf textarea, .deals-design.dl-plum .cf textarea { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .client-name-suggestions, .deals-design.dl-plum .client-name-suggestions { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .client-name-suggestions button, .deals-design.dl-plum .client-name-suggestions button { color: #F6E9FA; }
+.deals-hub.dl-plum .client-name-suggestions .hint, .deals-design.dl-plum .client-name-suggestions .hint { color: #D6AEE0; }
+.deals-hub.dl-plum .empty-state p, .deals-design.dl-plum .empty-state p { color: #D6AEE0; }
+.deals-hub.dl-plum .ro-item, .deals-design.dl-plum .ro-item { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .ro-empty, .deals-design.dl-plum .ro-empty { color: #D6AEE0; }
+.deals-hub.dl-plum .ro-badge, .deals-design.dl-plum .ro-badge { color: #D6AEE0; }
+.deals-hub.dl-plum .ro-badge.leadtype, .deals-design.dl-plum .ro-badge.leadtype { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .ro-client-name, .deals-design.dl-plum .ro-client-name { color: #F6E9FA; }
+.deals-hub.dl-plum .ro-client-text, .deals-design.dl-plum .ro-client-text { color: #F6E9FA; }
+.deals-hub.dl-plum .archive-list, .deals-design.dl-plum .archive-list { color: #D6AEE0; }
+.deals-hub.dl-plum .chbox-title, .deals-design.dl-plum .chbox-title { color: #F6E9FA; }
+.deals-hub.dl-plum .kcard, .deals-design.dl-plum .kcard { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .kcard-label, .deals-design.dl-plum .kcard-label { color: #D6AEE0; }
+.deals-hub.dl-plum .weeks-missing, .deals-design.dl-plum .weeks-missing { background: rgba(251, 191, 36, .16); color: #D6AEE0; }
+.deals-hub.dl-plum .kcard-bar-fill, .deals-design.dl-plum .kcard-bar-fill { background: #D6AEE0; }
+.deals-hub.dl-plum .kcard-value, .deals-design.dl-plum .kcard-value { color: #F6E9FA; }
+.deals-hub.dl-plum .kcard-value-input, .deals-design.dl-plum .kcard-value-input { color: #F6E9FA; }
+.deals-hub.dl-plum .kcard-plan-line, .deals-design.dl-plum .kcard-plan-line { color: #D6AEE0; }
+.deals-hub.dl-plum .kcard-plan-line b, .deals-design.dl-plum .kcard-plan-line b { color: #D6AEE0; }
+.deals-hub.dl-plum .kcard-plan-input, .deals-design.dl-plum .kcard-plan-input { color: #D6AEE0; }
+.deals-hub.dl-plum .kcard-trend-caption, .deals-design.dl-plum .kcard-trend-caption { color: #D6AEE0; }
+.deals-hub.dl-plum .task-tag-compact, .deals-design.dl-plum .task-tag-compact { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .task-tag-compact-icon.none svg, .deals-design.dl-plum .task-tag-compact-icon.none svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .dash-kpi-plan, .deals-design.dl-plum .dash-kpi-plan { color: #D6AEE0; }
+.deals-hub.dl-plum .chan-tab, .deals-design.dl-plum .chan-tab { color: #D6AEE0; }
+.deals-hub.dl-plum .chan-tab:hover, .deals-design.dl-plum .chan-tab:hover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .mc-client-search svg, .deals-design.dl-plum .mc-client-search svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .mc-client-search input, .deals-design.dl-plum .mc-client-search input { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .export-menu, .deals-design.dl-plum .export-menu { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .export-menu button, .deals-design.dl-plum .export-menu button { color: #F6E9FA; }
+.deals-hub.dl-plum .kl, .deals-design.dl-plum .kl { color: #D6AEE0; }
+.deals-hub.dl-plum .cost-row, .deals-design.dl-plum .cost-row { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .cost-label, .deals-design.dl-plum .cost-label { color: #D6AEE0; }
+.deals-hub.dl-plum .cost-input, .deals-design.dl-plum .cost-input { color: #F6E9FA; }
+.deals-hub.dl-plum .cost-dollar, .deals-design.dl-plum .cost-dollar { color: #D6AEE0; }
+.deals-hub.dl-plum .fc, .deals-design.dl-plum .fc { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .fc.pr, .deals-design.dl-plum .fc.pr { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .fc.loss, .deals-design.dl-plum .fc.loss { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .fl, .deals-design.dl-plum .fl { color: #D6AEE0; }
+.deals-hub.dl-plum .fv, .deals-design.dl-plum .fv { color: #F6E9FA; }
+.deals-hub.dl-plum .fin-kpi-row .dash-kpi, .deals-design.dl-plum .fin-kpi-row .dash-kpi { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .fin-kpi-icon.green, .deals-design.dl-plum .fin-kpi-icon.green { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .fin-kpi-icon.red, .deals-design.dl-plum .fin-kpi-icon.red { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .fin-kpi-icon.blue, .deals-design.dl-plum .fin-kpi-icon.blue { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.deals-hub.dl-plum .fin-card, .deals-design.dl-plum .fin-card { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .fin-card-title, .deals-design.dl-plum .fin-card-title { color: #F6E9FA; }
+.deals-hub.dl-plum .fin-card-subtitle, .deals-design.dl-plum .fin-card-subtitle { color: #D6AEE0; }
+.deals-hub.dl-plum .fin-card-toggle, .deals-design.dl-plum .fin-card-toggle { color: #D6AEE0; }
+.deals-hub.dl-plum .fin-income-item, .deals-design.dl-plum .fin-income-item { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .fin-income-icon.green, .deals-design.dl-plum .fin-income-icon.green { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .fin-income-icon.blue, .deals-design.dl-plum .fin-income-icon.blue { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.deals-hub.dl-plum .fin-income-label, .deals-design.dl-plum .fin-income-label { color: #D6AEE0; }
+.deals-hub.dl-plum .fin-income-value, .deals-design.dl-plum .fin-income-value { color: #F6E9FA; }
+.deals-hub.dl-plum .fin-income-input, .deals-design.dl-plum .fin-income-input { color: #F6E9FA; }
+.deals-hub.dl-plum .fin-income-chevron, .deals-design.dl-plum .fin-income-chevron { color: #D6AEE0; }
+.deals-hub.dl-plum .fin-summary-pill, .deals-design.dl-plum .fin-summary-pill { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .fin-summary-pill.profit.pr, .deals-design.dl-plum .fin-summary-pill.profit.pr { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .fin-summary-pill.profit.loss, .deals-design.dl-plum .fin-summary-pill.profit.loss { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .fin-summary-label, .deals-design.dl-plum .fin-summary-label { color: #D6AEE0; }
+.deals-hub.dl-plum .fin-summary-value, .deals-design.dl-plum .fin-summary-value { color: #F6E9FA; }
+@media print {
+  .deals-hub.dl-plum.report-page { background: rgba(255, 255, 255, .06) !important; color: #F6E9FA; }
+}
+.deals-hub.dl-plum .auto-deal-stats, .deals-design.dl-plum .auto-deal-stats { color: #F6E9FA; }
+.deals-hub.dl-plum .auto-deal-stats-item i, .deals-design.dl-plum .auto-deal-stats-item i { color: #D6AEE0; }
+/* ---- automationTasksPage.css ---- */
+.deals-hub.dl-plum .task-row, .deals-design.dl-plum .task-row { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .task-row.done .task-text, .deals-design.dl-plum .task-row.done .task-text { color: #D6AEE0; }
+.deals-hub.dl-plum .task-text, .deals-design.dl-plum .task-text { color: #F6E9FA; }
+.deals-hub.dl-plum .task-move, .deals-design.dl-plum .task-move { color: #D6AEE0; }
+.deals-hub.dl-plum .status-pill.done, .deals-design.dl-plum .status-pill.done { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .status-pill.pending, .deals-design.dl-plum .status-pill.pending { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .status-pill.moved, .deals-design.dl-plum .status-pill.moved { background: rgba(251, 191, 36, .16); }
+.deals-hub.dl-plum .status-pill.carried, .deals-design.dl-plum .status-pill.carried { color: #D6AEE0; }
+.deals-hub.dl-plum .status-pill.cancelled, .deals-design.dl-plum .status-pill.cancelled { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .dt-btn-done, .deals-design.dl-plum .dt-btn-done { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .dt-btn-move, .deals-design.dl-plum .dt-btn-move { background: rgba(251, 191, 36, .16); }
+.deals-hub.dl-plum .dt-btn-cancel, .deals-design.dl-plum .dt-btn-cancel { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .dt-undo, .deals-design.dl-plum .dt-undo { color: #D6AEE0; }
+.deals-hub.dl-plum .dt-menu-btn, .deals-design.dl-plum .dt-menu-btn { color: #D6AEE0; }
+.deals-hub.dl-plum .dt-menu-btn:hover, .deals-design.dl-plum .dt-menu-btn:hover { color: #F6E9FA; }
+.deals-hub.dl-plum .dt-menu-popover, .deals-design.dl-plum .dt-menu-popover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .dt-menu-popover button, .deals-design.dl-plum .dt-menu-popover button { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-task-icon, .deals-design.dl-plum .daily-task-icon { background: #D6AEE0; }
+.deals-hub.dl-plum .daily-task-icon.none svg, .deals-design.dl-plum .daily-task-icon.none svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .daily-task-title, .deals-design.dl-plum .daily-task-title { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-task-row.done .daily-task-title, .deals-design.dl-plum .daily-task-row.done .daily-task-title { color: #D6AEE0; }
+.deals-hub.dl-plum .daily-task-desc, .deals-design.dl-plum .daily-task-desc { color: #D6AEE0; }
+.deals-hub.dl-plum .daily-stat-icon-done, .deals-design.dl-plum .daily-stat-icon-done { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .daily-stat-icon-moved, .deals-design.dl-plum .daily-stat-icon-moved { background: rgba(251, 191, 36, .16); }
+.deals-hub.dl-plum .daily-stat-icon-cancelled, .deals-design.dl-plum .daily-stat-icon-cancelled { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .daily-stat-body > span, .deals-design.dl-plum .daily-stat-body > span { color: #D6AEE0; }
+.deals-hub.dl-plum .daily-stat-body > b, .deals-design.dl-plum .daily-stat-body > b { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-stat-body > em, .deals-design.dl-plum .daily-stat-body > em { color: #D6AEE0; }
+.deals-hub.dl-plum .daily-bottom-icon-done, .deals-design.dl-plum .daily-bottom-icon-done { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .daily-bottom-icon-moved, .deals-design.dl-plum .daily-bottom-icon-moved { background: rgba(251, 191, 36, .16); }
+.deals-hub.dl-plum .daily-empty-state, .deals-design.dl-plum .daily-empty-state { color: #D6AEE0; }
+.deals-hub.dl-plum .daily-empty-icon svg, .deals-design.dl-plum .daily-empty-icon svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .daily-empty-state b, .deals-design.dl-plum .daily-empty-state b { color: #F6E9FA; }
+.deals-hub.dl-plum .daily-empty-state span, .deals-design.dl-plum .daily-empty-state span { color: #D6AEE0; }
+.deals-hub.dl-plum .task-cancel-body .task-text.done, .deals-design.dl-plum .task-cancel-body .task-text.done { color: #D6AEE0; }
+.deals-hub.dl-plum .task-cancel-reason, .deals-design.dl-plum .task-cancel-reason { color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-box, .deals-design.dl-plum .tmodal-box { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tmodal-head h3, .deals-design.dl-plum .tmodal-head h3 { color: #F6E9FA; }
+.deals-hub.dl-plum .tmodal-close, .deals-design.dl-plum .tmodal-close { color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-body p, .deals-design.dl-plum .tmodal-body p { color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-body label, .deals-design.dl-plum .tmodal-body label { color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-body input[type=date], .deals-design.dl-plum .tmodal-body input[type=date], .deals-hub.dl-plum .tmodal-body input[type=text], .deals-design.dl-plum .tmodal-body input[type=text], .deals-hub.dl-plum .tmodal-body input[type=number], .deals-design.dl-plum .tmodal-body input[type=number] { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tmodal-body textarea, .deals-design.dl-plum .tmodal-body textarea { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tmodal-body select, .deals-design.dl-plum .tmodal-body select { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tmodal-head-text p, .deals-design.dl-plum .tmodal-head-text p { color: #D6AEE0; }
+.deals-hub.dl-plum .modal-field-head label, .deals-design.dl-plum .modal-field-head label { color: #F6E9FA; }
+.deals-hub.dl-plum .modal-field-head p, .deals-design.dl-plum .modal-field-head p { color: #D6AEE0; }
+.deals-hub.dl-plum .task-add-row input[type=text], .deals-design.dl-plum .task-add-row input[type=text] { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .task-add-row textarea, .deals-design.dl-plum .task-add-row textarea { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .task-add-row select, .deals-design.dl-plum .task-add-row select { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .task-add-row input[type=datetime-local], .deals-design.dl-plum .task-add-row input[type=datetime-local], .deals-hub.dl-plum .task-add-row input[type=number], .deals-design.dl-plum .task-add-row input[type=number] { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .task-recur-toggle, .deals-design.dl-plum .task-recur-toggle { color: #D6AEE0; }
+.deals-hub.dl-plum .task-filter-row label, .deals-design.dl-plum .task-filter-row label { color: #D6AEE0; }
+.deals-hub.dl-plum .task-filter-row select, .deals-design.dl-plum .task-filter-row select { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .due-badge.done, .deals-design.dl-plum .due-badge.done { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .due-badge.overdue, .deals-design.dl-plum .due-badge.overdue { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .due-badge.due_today, .deals-design.dl-plum .due-badge.due_today { background: rgba(251, 191, 36, .16); }
+.deals-hub.dl-plum .due-badge.no_date, .deals-design.dl-plum .due-badge.no_date, .deals-hub.dl-plum .due-badge.cancelled, .deals-design.dl-plum .due-badge.cancelled { color: #D6AEE0; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .status-legend-item, .deals-design.dl-plum .status-legend-item { color: #D6AEE0; }
+.deals-hub.dl-plum .task-recurring-badge, .deals-design.dl-plum .task-recurring-badge { color: #D6AEE0; }
+.deals-hub.dl-plum .task-subtasks-toggle, .deals-design.dl-plum .task-subtasks-toggle { color: #D6AEE0; }
+.deals-hub.dl-plum .subtask-text, .deals-design.dl-plum .subtask-text { color: #F6E9FA; }
+.deals-hub.dl-plum .subtask-text.done, .deals-design.dl-plum .subtask-text.done { color: #D6AEE0; }
+.deals-hub.dl-plum .subtask-add-row input, .deals-design.dl-plum .subtask-add-row input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .subtask-add-row button, .deals-design.dl-plum .subtask-add-row button { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .task-series-del, .deals-design.dl-plum .task-series-del { color: #D6AEE0; }
+.deals-hub.dl-plum .tag-input-chips, .deals-design.dl-plum .tag-input-chips { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tag-input-chips input, .deals-design.dl-plum .tag-input-chips input { color: #F6E9FA; }
+.deals-hub.dl-plum .tag-input-empty, .deals-design.dl-plum .tag-input-empty { color: #D6AEE0; }
+.deals-hub.dl-plum .tag-suggestion, .deals-design.dl-plum .tag-suggestion { background: color-mix(in srgb, var(--tag-color) 14%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .wk-row-subtask-btn, .deals-design.dl-plum .wk-row-subtask-btn { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-field-box, .deals-design.dl-plum .wk-field-box { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .wk-field-body > label, .deals-design.dl-plum .wk-field-body > label { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-field-body select, .deals-design.dl-plum .wk-field-body select { color: #F6E9FA; }
+.deals-hub.dl-plum .wk-row-recurrence select, .deals-design.dl-plum .wk-row-recurrence select { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .wk-weekday-picker button, .deals-design.dl-plum .wk-weekday-picker button { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .wk-day-of-month, .deals-design.dl-plum .wk-day-of-month { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .task-detail-field-body > span, .deals-design.dl-plum .task-detail-field-body > span { color: #D6AEE0; }
+.deals-hub.dl-plum .task-detail-field-body b, .deals-design.dl-plum .task-detail-field-body b { color: #F6E9FA; }
+.deals-hub.dl-plum .week-add-row input[type=text], .deals-design.dl-plum .week-add-row input[type=text] { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .day-select button, .deals-design.dl-plum .day-select button { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .day-select button .hint, .deals-design.dl-plum .day-select button .hint { color: #D6AEE0; }
+.deals-hub.dl-plum textarea.wk-row-text, .deals-design.dl-plum textarea.wk-row-text { color: #F6E9FA; }
+.deals-hub.dl-plum .wk-row-text::placeholder, .deals-design.dl-plum .wk-row-text::placeholder { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-view-text, .deals-design.dl-plum .wk-view-text { color: #F6E9FA; }
+.deals-hub.dl-plum .btn.btn-move, .deals-design.dl-plum .btn.btn-move { background: rgba(251, 191, 36, .16); }
+.deals-hub.dl-plum .btn.btn-move:hover, .deals-design.dl-plum .btn.btn-move:hover { background: rgba(251, 191, 36, .16); }
+.deals-hub.dl-plum .btn.btn-danger, .deals-design.dl-plum .btn.btn-danger { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .btn.btn-danger:hover, .deals-design.dl-plum .btn.btn-danger:hover { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .wk-side-panel, .deals-design.dl-plum .wk-side-panel { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .wk-side-label, .deals-design.dl-plum .wk-side-label { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-side-range, .deals-design.dl-plum .wk-side-range { color: #F6E9FA; }
+.deals-hub.dl-plum .wk-side-arrow, .deals-design.dl-plum .wk-side-arrow { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .wk-side-today:hover, .deals-design.dl-plum .wk-side-today:hover { background: rgba(235, 156, 239, .3); }
+.deals-hub.dl-plum .wk-side-pick, .deals-design.dl-plum .wk-side-pick { color: #D6AEE0; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .wk-side-stat, .deals-design.dl-plum .wk-side-stat { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-side-stat b, .deals-design.dl-plum .wk-side-stat b { color: #F6E9FA; }
+.deals-hub.dl-plum .wk-view-toggle button, .deals-design.dl-plum .wk-view-toggle button { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-view-toggle button.on, .deals-design.dl-plum .wk-view-toggle button.on { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .task-filter-popover, .deals-design.dl-plum .task-filter-popover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .wk-add-task-btn, .deals-design.dl-plum .wk-add-task-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .wk-inline-add input, .deals-design.dl-plum .wk-inline-add input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .week-cal-sub, .deals-design.dl-plum .week-cal-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .week-day-head, .deals-design.dl-plum .week-day-head { color: #F6E9FA; }
+.deals-hub.dl-plum .week-day-head .hint, .deals-design.dl-plum .week-day-head .hint { color: #D6AEE0; }
+.deals-hub.dl-plum .week-day-count, .deals-design.dl-plum .week-day-count { color: #D6AEE0; }
+.deals-hub.dl-plum .week-day-col .task-row.status-cancelled, .deals-design.dl-plum .week-day-col .task-row.status-cancelled { border-left-color: #D6AEE0; }
+.deals-hub.dl-plum .month-step-label, .deals-design.dl-plum .month-step-label { color: #F6E9FA; }
+.deals-hub.dl-plum .month-step-range, .deals-design.dl-plum .month-step-range { color: #D6AEE0; }
+.deals-hub.dl-plum .month-step-pct, .deals-design.dl-plum .month-step-pct { color: #D6AEE0; }
+.deals-hub.dl-plum .month-week-card-head b, .deals-design.dl-plum .month-week-card-head b { color: #F6E9FA; }
+.deals-hub.dl-plum .month-week-card-head .hint, .deals-design.dl-plum .month-week-card-head .hint { color: #D6AEE0; }
+.deals-hub.dl-plum .month-week-card-stats span, .deals-design.dl-plum .month-week-card-stats span { color: #D6AEE0; }
+.deals-hub.dl-plum .month-task-table th, .deals-design.dl-plum .month-task-table th { color: #D6AEE0; }
+.deals-hub.dl-plum .month-task-table td, .deals-design.dl-plum .month-task-table td { color: #F6E9FA; }
+.deals-hub.dl-plum .month-task-icon, .deals-design.dl-plum .month-task-icon { background: #D6AEE0; }
+.deals-hub.dl-plum .month-task-icon.none svg, .deals-design.dl-plum .month-task-icon.none svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .month-task-date, .deals-design.dl-plum .month-task-date { color: #D6AEE0; }
+.deals-hub.dl-plum .month-pagination-size, .deals-design.dl-plum .month-pagination-size { color: #D6AEE0; }
+.deals-hub.dl-plum .month-pagination-size select, .deals-design.dl-plum .month-pagination-size select { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .month-pagination-hint, .deals-design.dl-plum .month-pagination-hint { color: #D6AEE0; }
+.deals-hub.dl-plum .month-pagination-pages button, .deals-design.dl-plum .month-pagination-pages button { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+/* ---- automationDashboard.css ---- */
+.deals-hub.dl-plum .dash-kpi-label, .deals-design.dl-plum .dash-kpi-label { color: #D6AEE0; }
+.deals-hub.dl-plum .dash-kpi-value, .deals-design.dl-plum .dash-kpi-value { color: #F6E9FA; }
+.deals-hub.dl-plum .dash-kpi-sub, .deals-design.dl-plum .dash-kpi-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .delta-badge.up, .deals-design.dl-plum .delta-badge.up { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .delta-badge.down, .deals-design.dl-plum .delta-badge.down { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .delta-badge.neutral, .deals-design.dl-plum .delta-badge.neutral { color: #D6AEE0; }
+.deals-hub.dl-plum .dash-list-footer, .deals-design.dl-plum .dash-list-footer { color: #D6AEE0; }
+.deals-hub.dl-plum .dash-task-card, .deals-design.dl-plum .dash-task-card { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .dash-task-done-ic, .deals-design.dl-plum .dash-task-done-ic { background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .dash-task-title, .deals-design.dl-plum .dash-task-title { color: #F6E9FA; }
+.deals-hub.dl-plum .dash-task-desc, .deals-design.dl-plum .dash-task-desc { color: #D6AEE0; }
+.deals-hub.dl-plum .dash-period-select, .deals-design.dl-plum .dash-period-select { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .dash-donut-legend-item, .deals-design.dl-plum .dash-donut-legend-item { color: #D6AEE0; }
+.deals-hub.dl-plum .dash-donut-legend-item .value, .deals-design.dl-plum .dash-donut-legend-item .value { color: #F6E9FA; }
+/* ---- clientsDirectory.css ---- */
+.deals-hub.dl-plum .client-kpi-card, .deals-design.dl-plum .client-kpi-card { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .client-kpi-icon.blue, .deals-design.dl-plum .client-kpi-icon.blue { background: rgba(127, 178, 255, .16); color: #7FB2FF; }
+.deals-hub.dl-plum .client-kpi-icon.orange, .deals-design.dl-plum .client-kpi-icon.orange { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.deals-hub.dl-plum .client-kpi-label, .deals-design.dl-plum .client-kpi-label { color: #D6AEE0; }
+.deals-hub.dl-plum .client-kpi-value, .deals-design.dl-plum .client-kpi-value { color: #F6E9FA; }
+.deals-hub.dl-plum .client-kpi-delta, .deals-design.dl-plum .client-kpi-delta { color: #4BE07F; background: rgba(75, 224, 127, .16); }
+.deals-hub.dl-plum .client-kpi-sub, .deals-design.dl-plum .client-kpi-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .client-kpi-donut-center, .deals-design.dl-plum .client-kpi-donut-center { color: #F6E9FA; }
+.deals-hub.dl-plum .client-grid-header, .deals-design.dl-plum .client-grid-header { color: #D6AEE0; }
+.deals-hub.dl-plum .client-grid-row, .deals-design.dl-plum .client-grid-row { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .client-grid-subtitle, .deals-design.dl-plum .client-grid-subtitle { color: #D6AEE0; }
+.deals-hub.dl-plum .client-grid-plain, .deals-design.dl-plum .client-grid-plain { color: #F6E9FA; }
+.deals-hub.dl-plum .client-grid-date, .deals-design.dl-plum .client-grid-date { color: #F6E9FA; }
+.deals-hub.dl-plum .client-grid-date svg, .deals-design.dl-plum .client-grid-date svg { color: #D6AEE0; }
+.deals-hub.dl-plum .tbl-wrap, .deals-design.dl-plum .tbl-wrap { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .status-dot-wrap, .deals-design.dl-plum .status-dot-wrap { color: #D6AEE0; }
+.deals-hub.dl-plum .row-menu-btn, .deals-design.dl-plum .row-menu-btn { color: #D6AEE0; }
+.deals-hub.dl-plum .row-menu-popover, .deals-design.dl-plum .row-menu-popover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .row-menu-popover button, .deals-design.dl-plum .row-menu-popover button { color: #F6E9FA; }
+.deals-hub.dl-plum .row-menu-popover button.danger:hover, .deals-design.dl-plum .row-menu-popover button.danger:hover { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .client-panel-tab, .deals-design.dl-plum .client-panel-tab { color: #D6AEE0; }
+.deals-hub.dl-plum .client-panel-tab:hover, .deals-design.dl-plum .client-panel-tab:hover { color: #F6E9FA; }
+.deals-hub.dl-plum .client-profile-info .task-filter-row input, .deals-design.dl-plum .client-profile-info .task-filter-row input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .client-profile-info .task-filter-row input:disabled, .deals-design.dl-plum .client-profile-info .task-filter-row input:disabled { color: #D6AEE0; }
+.deals-hub.dl-plum .client-history-label, .deals-design.dl-plum .client-history-label { color: #D6AEE0; }
+.deals-hub.dl-plum .client-history-empty, .deals-design.dl-plum .client-history-empty { color: #D6AEE0; }
+.deals-hub.dl-plum .client-history-text, .deals-design.dl-plum .client-history-text { color: #D6AEE0; }
+.deals-hub.dl-plum .client-history-author, .deals-design.dl-plum .client-history-author { color: #D6AEE0; }
+.deals-hub.dl-plum .client-notes-textarea, .deals-design.dl-plum .client-notes-textarea { color: #F6E9FA; }
+.deals-hub.dl-plum .client-file-meta, .deals-design.dl-plum .client-file-meta { color: #D6AEE0; }
+.deals-hub.dl-plum .client-file-del, .deals-design.dl-plum .client-file-del { color: #D6AEE0; }
+.deals-hub.dl-plum .ai-history-row, .deals-design.dl-plum .ai-history-row { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .ai-history-row-title, .deals-design.dl-plum .ai-history-row-title { color: #F6E9FA; }
+.deals-hub.dl-plum .ai-history-row-date, .deals-design.dl-plum .ai-history-row-date { color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-body label.create-client-deal-toggle, .deals-design.dl-plum .tmodal-body label.create-client-deal-toggle { color: #F6E9FA; }
+/* ---- dealsBoard.css ---- */
+.deals-hub.dl-plum .wk-field-body input[type="text"], .deals-design.dl-plum .wk-field-body input[type="text"], .deals-hub.dl-plum .wk-field-body input[type="number"], .deals-design.dl-plum .wk-field-body input[type="number"], .deals-hub.dl-plum .wk-field-body input[type="date"], .deals-design.dl-plum .wk-field-body input[type="date"] { color: #F6E9FA; }
+.deals-hub.dl-plum .add-deal-jobpost-textarea, .deals-design.dl-plum .add-deal-jobpost-textarea { color: #F6E9FA; }
+.deals-hub.dl-plum .add-deal-jobpost-textarea::placeholder, .deals-design.dl-plum .add-deal-jobpost-textarea::placeholder { color: #D6AEE0; }
+.deals-hub.dl-plum .deals-column, .deals-design.dl-plum .deals-column { --tint: color-mix(in srgb, var(--stage-color, var(--purple)) 9%, rgba(255, 255, 255, .06)); --tint-strong: color-mix(in srgb, var(--stage-color, var(--purple)) 22%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deals-column-label, .deals-design.dl-plum .deals-column-label { color: color-mix(in srgb, var(--stage-color, var(--purple)) 80%, #F6E9FA); }
+.deals-hub.dl-plum .deals-column-count, .deals-design.dl-plum .deals-column-count { color: color-mix(in srgb, var(--stage-color, var(--purple)) 85%, #F6E9FA); }
+.deals-hub.dl-plum .deals-column .wk-add-task-btn:hover, .deals-design.dl-plum .deals-column .wk-add-task-btn:hover { color: color-mix(in srgb, var(--stage-color, var(--purple)) 80%, #F6E9FA); }
+.deals-hub.dl-plum .deal-card, .deals-design.dl-plum .deal-card { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-card-name, .deals-design.dl-plum .deal-card-name { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-card-sub, .deals-design.dl-plum .deal-card-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-card-date, .deals-design.dl-plum .deal-card-date { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-card-manager, .deals-design.dl-plum .deal-card-manager { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-title-input, .deals-design.dl-plum .deal-title-input { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-title-input::placeholder, .deals-design.dl-plum .deal-title-input::placeholder { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-title-input:focus, .deals-design.dl-plum .deal-title-input:focus { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum button.deal-btn-won, .deals-design.dl-plum button.deal-btn-won { background: linear-gradient(135deg, #4ADE80, #4BE07F); }
+.deals-hub.dl-plum button.deal-btn-won:hover, .deals-design.dl-plum button.deal-btn-won:hover { background: linear-gradient(135deg, #4ADE80, #4BE07F); }
+.deals-hub.dl-plum button.deal-btn-lost, .deals-design.dl-plum button.deal-btn-lost { background: linear-gradient(135deg, #F87171, #FF8A8A); }
+.deals-hub.dl-plum button.deal-btn-lost:hover, .deals-design.dl-plum button.deal-btn-lost:hover { background: linear-gradient(135deg, #F87171, #FF8A8A); }
+.deals-hub.dl-plum button.deal-btn-reopen, .deals-design.dl-plum button.deal-btn-reopen { background: linear-gradient(135deg, #7FB2FF, #7FB2FF); }
+.deals-hub.dl-plum button.deal-btn-reopen:hover, .deals-design.dl-plum button.deal-btn-reopen:hover { background: linear-gradient(135deg, #7FB2FF, #7FB2FF); }
+.deals-hub.dl-plum .deal-kebab-btn, .deals-design.dl-plum .deal-kebab-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .deal-kebab-menu, .deals-design.dl-plum .deal-kebab-menu { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-kebab-menu button, .deals-design.dl-plum .deal-kebab-menu button { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-kebab-danger, .deals-design.dl-plum .deal-kebab-danger { color: #FF8A8A !important; }
+.deals-hub.dl-plum .deal-stage-days-label, .deals-design.dl-plum .deal-stage-days-label { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-stage-seg, .deals-design.dl-plum .deal-stage-seg { color: #D6AEE0; }
+.deals-hub.dl-plum .service-tags-trigger, .deals-design.dl-plum .service-tags-trigger, .service-tags-trigger { color: #F6E9FA; }
+.deals-hub.dl-plum .service-tags-menu, .deals-design.dl-plum .service-tags-menu, .service-tags-menu { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .service-tags-row, .deals-design.dl-plum .service-tags-row, .service-tags-row { color: #F6E9FA; }
+.deals-hub.dl-plum .service-tags-add-swatch.active, .deals-design.dl-plum .service-tags-add-swatch.active, .service-tags-add-swatch.active { border-color: #F6E9FA; }
+.deals-hub.dl-plum .service-tags-add-row input, .deals-design.dl-plum .service-tags-add-row input, .service-tags-add-row input { color: #F6E9FA; }
+.deals-hub.dl-plum .wk-field-static, .deals-design.dl-plum .wk-field-static { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-section-text h4, .deals-design.dl-plum .deal-section-text h4 { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-section-text p, .deals-design.dl-plum .deal-section-text p { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-field-icon-btn, .deals-design.dl-plum .deal-field-icon-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .deal-client-name, .deals-design.dl-plum .deal-client-name { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-client-mini-row, .deals-design.dl-plum .deal-client-mini-row { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-focus-item, .deals-design.dl-plum .deal-focus-item { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-focus-time, .deals-design.dl-plum .deal-focus-time { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-note-author-field label, .deals-design.dl-plum .deal-note-author-field label { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-note-author-field input, .deals-design.dl-plum .deal-note-author-field input { color: #F6E9FA; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-note-editor, .deals-design.dl-plum .deal-note-editor { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-note-editor:empty::before, .deals-design.dl-plum .deal-note-editor:empty::before { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-note-mention-dropdown, .deals-design.dl-plum .deal-note-mention-dropdown { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-note-mention-dropdown button, .deals-design.dl-plum .deal-note-mention-dropdown button { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-note-toolbar-icons button, .deals-design.dl-plum .deal-note-toolbar-icons button { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-note-author, .deals-design.dl-plum .deal-note-author { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-activity-time, .deals-design.dl-plum .deal-activity-time { color: #D6AEE0; }
+.deals-hub.dl-plum .import-map-header, .deals-design.dl-plum .import-map-header { color: #F6E9FA; }
+.deals-hub.dl-plum .import-preview-more, .deals-design.dl-plum .import-preview-more { color: #D6AEE0; }
+.deals-hub.dl-plum .import-skip-list, .deals-design.dl-plum .import-skip-list { color: #D6AEE0; }
+.deals-hub.dl-plum .chip.have, .deals-design.dl-plum .chip.have { color: #4BE07F; }
+.deals-hub.dl-plum .chip.partial, .deals-design.dl-plum .chip.partial { color: #FBBF24; }
+.deals-hub.dl-plum .chip.missing, .deals-design.dl-plum .chip.missing { color: #FF8A8A; }
+.deals-hub.dl-plum .client-picker input[type="text"], .deals-design.dl-plum .client-picker input[type="text"] { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .client-picker-selected, .deals-design.dl-plum .client-picker-selected { color: #F6E9FA; }
+.deals-hub.dl-plum .client-picker-list, .deals-design.dl-plum .client-picker-list { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .client-picker-item, .deals-design.dl-plum .client-picker-item { color: #F6E9FA; }
+.deals-hub.dl-plum .client-picker-item .hint, .deals-design.dl-plum .client-picker-item .hint { color: #D6AEE0; }
+.deals-hub.dl-plum .client-picker-empty, .deals-design.dl-plum .client-picker-empty { color: #D6AEE0; }
+.deals-hub.dl-plum .client-picker-create-form .task-filter-row select, .deals-design.dl-plum .client-picker-create-form .task-filter-row select, .deals-hub.dl-plum .client-picker-create-form .task-filter-row input, .deals-design.dl-plum .client-picker-create-form .task-filter-row input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .date-range-popover, .deals-design.dl-plum .date-range-popover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .date-range-presets button, .deals-design.dl-plum .date-range-presets button { color: #F6E9FA; }
+.deals-hub.dl-plum .stage-info-banner, .deals-design.dl-plum .stage-info-banner { color: #F6E9FA; }
+.deals-hub.dl-plum .stage-table-head, .deals-design.dl-plum .stage-table-head { color: #D6AEE0; }
+.deals-hub.dl-plum .stage-final-check, .deals-design.dl-plum .stage-final-check { color: #D6AEE0; }
+.deals-hub.dl-plum .stage-final-box, .deals-design.dl-plum .stage-final-box { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .stage-final-check.active-won, .deals-design.dl-plum .stage-final-check.active-won { color: #F6E9FA; }
+.deals-hub.dl-plum .stage-final-check.active-lost, .deals-design.dl-plum .stage-final-check.active-lost { color: #F6E9FA; }
+.deals-hub.dl-plum .stage-add-ic, .deals-design.dl-plum .stage-add-ic { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .pipeline-switcher, .deals-design.dl-plum .pipeline-switcher { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .pipeline-switcher-label, .deals-design.dl-plum .pipeline-switcher-label { color: #F6E9FA; }
+.deals-hub.dl-plum .pipeline-modal-head p, .deals-design.dl-plum .pipeline-modal-head p { color: #D6AEE0; }
+.deals-hub.dl-plum .pipeline-drag-handle, .deals-design.dl-plum .pipeline-drag-handle { color: #D6AEE0; }
+.deals-hub.dl-plum .pipeline-name-input, .deals-design.dl-plum .pipeline-name-input { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .pipeline-color-swatch.active, .deals-design.dl-plum .pipeline-color-swatch.active { border-color: #F6E9FA; }
+.deals-hub.dl-plum .pipeline-custom-btn:hover, .deals-design.dl-plum .pipeline-custom-btn:hover, .deals-hub.dl-plum .pipeline-custom-btn.open, .deals-design.dl-plum .pipeline-custom-btn.open { background: rgba(235, 156, 239, .3); }
+.deals-hub.dl-plum .pipeline-hex-code, .deals-design.dl-plum .pipeline-hex-code { color: #D6AEE0; }
+.deals-hub.dl-plum .pipeline-delete-btn, .deals-design.dl-plum .pipeline-delete-btn { background: rgba(255, 138, 138, .16); }
+.deals-hub.dl-plum .pipeline-add-source:hover, .deals-design.dl-plum .pipeline-add-source:hover { background: rgba(235, 156, 239, .3); }
+.deals-hub.dl-plum .pipeline-add-source-ic, .deals-design.dl-plum .pipeline-add-source-ic { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .pipeline-add-source-sub, .deals-design.dl-plum .pipeline-add-source-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .pipeline-foot-note, .deals-design.dl-plum .pipeline-foot-note { color: #D6AEE0; }
+.deals-hub.dl-plum .color-picker-pop, .deals-design.dl-plum .color-picker-pop { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .color-picker-hint, .deals-design.dl-plum .color-picker-hint { color: #D6AEE0; }
+.deals-hub.dl-plum .color-picker-eyedrop, .deals-design.dl-plum .color-picker-eyedrop { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .color-picker-custom-row input[type="text"], .deals-design.dl-plum .color-picker-custom-row input[type="text"] { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .deals-filter-panel, .deals-design.dl-plum .deals-filter-panel, .deals-filter-panel { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deals-filter-search svg, .deals-design.dl-plum .deals-filter-search svg, .deals-filter-search svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .deals-filter-tab, .deals-design.dl-plum .deals-filter-tab, .deals-filter-tab { color: #D6AEE0; }
+.deals-hub.dl-plum .deals-filter-tab:hover, .deals-design.dl-plum .deals-filter-tab:hover, .deals-filter-tab:hover { color: #F6E9FA; }
+.deals-hub.dl-plum .deals-filter-row, .deals-design.dl-plum .deals-filter-row, .deals-filter-row { color: #F6E9FA; }
+.deals-hub.dl-plum .deals-filter-empty, .deals-design.dl-plum .deals-filter-empty, .deals-filter-empty { color: #D6AEE0; }
+.deals-hub.dl-plum .deals-filter-section-label, .deals-design.dl-plum .deals-filter-section-label, .deals-filter-section-label { color: #D6AEE0; }
+.deals-hub.dl-plum .task-modal-section-title, .deals-design.dl-plum .task-modal-section-title { color: #F6E9FA; }
+.deals-hub.dl-plum .task-modal-section-sub, .deals-design.dl-plum .task-modal-section-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .task-modal-textarea, .deals-design.dl-plum .task-modal-textarea { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .task-priority-chip, .deals-design.dl-plum .task-priority-chip { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .task-priority-chip:hover, .deals-design.dl-plum .task-priority-chip:hover { border-color: #D6AEE0; }
+.deals-hub.dl-plum .task-priority-dot, .deals-design.dl-plum .task-priority-dot { background: #D6AEE0; }
+.deals-hub.dl-plum .deal-history-ic, .deals-design.dl-plum .deal-history-ic { background: linear-gradient(135deg, color-mix(in srgb, var(--history-color, var(--purple)) 45%, rgba(255, 255, 255, .06)), var(--history-color, var(--purple))); }
+.deals-hub.dl-plum .deal-history-meta, .deals-design.dl-plum .deal-history-meta { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-history-status.done, .deals-design.dl-plum .deal-history-status.done { background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(75, 224, 127, .4)); color: #4BE07F; }
+.deals-hub.dl-plum .deal-history-status.cancelled, .deals-design.dl-plum .deal-history-status.cancelled { background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(255, 138, 138, .35)); color: #FF8A8A; }
+.deals-hub.dl-plum .task-detail-text, .deals-design.dl-plum .task-detail-text { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-param-textarea, .deals-design.dl-plum .deal-param-textarea { color: #F6E9FA; }
+/* ---- dealsDesign.css ---- */
+.deals-design.dl-plum { --deals-bg: rgba(255, 255, 255, .06); --deals-surface: linear-gradient(145deg, rgba(255, 255, 255, .06) 0%, rgba(255, 255, 255, .06) 65%, rgba(255, 255, 255, .06) 100%); --deals-text: #F6E9FA; --deals-muted: #D6AEE0; --deals-border: rgba(235, 156, 239, .3); --deals-field: rgba(255, 255, 255, .06); --deals-accent: #EB9CEF; --deals-focus: #EB9CEF; }
+.deals-design.dl-plum .btn { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); color: #EB9CEF; }
+.deals-design.dl-plum .btn:hover { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); border-color: rgba(235, 156, 239, .3); color: #EB9CEF; }
+.deals-design.dl-plum .btn-danger { color: #FF8A8A; border-color: rgba(255, 138, 138, .35); background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .pipeline-switcher { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .chan-tab { color: #D6AEE0; }
+.deals-design.dl-plum .chan-tab:hover:not(.active):not(:disabled) { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .mc-client-search input:focus { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deals-column { --tint: color-mix(in srgb, var(--stage-color, var(--deals-accent)) 12%, rgba(255, 255, 255, .06)); --tint-strong: color-mix(in srgb, var(--stage-color, var(--deals-accent)) 22%, rgba(255, 255, 255, .06)); background: linear-gradient(180deg, var(--tint) 0%, color-mix(in srgb, var(--stage-color, var(--deals-accent)) 5%, rgba(255, 255, 255, .06)) 100%); }
+.deals-design.dl-plum .deals-column-count { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .wk-add-task-btn:hover { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-card:hover { box-shadow: 0 10px 24px -12px rgba(83, 30, 116, .22), inset 0 1px 0 rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .tbl-wrap { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .cmp-table thead th { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .cmp-table td { border-bottom: 1px solid rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .client-row:hover { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .client-row:focus-within { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .placeholder { background: rgba(255, 255, 255, .06); border: 1px dashed rgba(235, 156, 239, .3); }
+.deals-design.dl-plum .month-pagination { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .month-pagination-pages button { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .task-filter-btn.has-active, .deals-design.dl-plum .deals-filter-wrap .has-active { background: rgba(255, 255, 255, .06); color: #EB9CEF; }
+.deals-hub.dl-plum .deals-filter-panel, .deals-design.dl-plum .deals-filter-panel, .deals-filter-panel, .deals-hub.dl-plum .service-tags-menu, .deals-design.dl-plum .service-tags-menu, .service-tags-menu { border-color: rgba(235, 156, 239, .3); background: linear-gradient(145deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); box-shadow: 0 18px 40px -16px rgba(83, 30, 116, .3), inset 0 1px 0 rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deals-filter-row.active, .deals-design.dl-plum .deals-filter-row.active, .deals-filter-row.active, .deals-hub.dl-plum .service-tags-row.active, .deals-design.dl-plum .service-tags-row.active, .service-tags-row.active { background: rgba(255, 255, 255, .06); color: #EB9CEF; }
+.deals-hub.dl-plum .deals-filter-tab.active, .deals-design.dl-plum .deals-filter-tab.active, .deals-filter-tab.active { color: #EB9CEF; border-bottom-color: #EB9CEF; }
+.deals-design.dl-plum .deal-title-input:focus { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum button.deal-btn-won { background: linear-gradient(135deg, rgba(75, 224, 127, .16), rgba(75, 224, 127, .16)); color: #4BE07F; border-color: rgba(75, 224, 127, .4); }
+.deals-design.dl-plum button.deal-btn-won:hover { background: linear-gradient(135deg, rgba(75, 224, 127, .16), rgba(75, 224, 127, .4)); color: #4BE07F; }
+.deals-design.dl-plum button.deal-btn-lost { background: linear-gradient(135deg, rgba(255, 138, 138, .16), rgba(255, 138, 138, .16)); color: #FF8A8A; border-color: rgba(255, 138, 138, .35); }
+.deals-design.dl-plum button.deal-btn-lost:hover { background: linear-gradient(135deg, rgba(255, 138, 138, .16), rgba(255, 138, 138, .16)); color: #FF8A8A; }
+.deals-design.dl-plum .deal-kebab-menu button:hover { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-stage-seg { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); color: #D6AEE0; }
+.deals-design.dl-plum .deal-stage-seg:hover { background: linear-gradient(180deg, rgba(235, 156, 239, .3), rgba(235, 156, 239, .3)); color: #D6AEE0; }
+.deals-design.dl-plum .deal-stage-seg.done { background: linear-gradient(180deg, rgba(235, 156, 239, .3), rgba(235, 156, 239, .3)); color: #D6AEE0; }
+.deals-design.dl-plum .wk-field-box:focus-within { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .wk-field-icon { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-field-icon-btn { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-focus { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-note-editor { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-note-toolbar { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-note-toolbar-icons button:hover { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-note-item.pinned { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .deal-history-row.clickable:hover { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .tmodal-box { background: linear-gradient(145deg, rgba(255, 255, 255, .06) 0%, rgba(255, 255, 255, .06) 70%, rgba(255, 255, 255, .06) 100%); box-shadow: 0 30px 70px -20px rgba(54, 20, 80, .4), inset 0 1px 0 rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .tmodal-close { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .task-modal-section, .deals-design.dl-plum .pipeline-manager-row { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .stage-table-head { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .stage-add-row, .deals-design.dl-plum .pipeline-add-source { background: rgba(255, 255, 255, .06); }
+.deals-design.dl-plum .import-map-row { background: rgba(255, 255, 255, .06); }
+/* ---- dealsHub.css ---- */
+.deals-hub.dl-plum { --hb-frame: linear-gradient(135deg, rgba(235, 156, 239, .3), rgba(235, 156, 239, .3) 55%, rgba(235, 156, 239, .3)); }
+.deals-hub.dl-plum :is(.report-section, .pw-card, .dash-kpi, .deal-section, .deal-page-hero, .deals-actions-row, .deals-kanban-toolbar-box) { background: linear-gradient(rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)) padding-box, var(--hb-frame) border-box; }
+.deals-hub.dl-plum .rpt-hero.deals-actions-row { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: linear-gradient(rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)) padding-box, var(--hb-frame) border-box; }
+.deals-hub.dl-plum .pipeline-switcher { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .pipeline-switcher-icon { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .pipeline-switcher-icon svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .pipeline-switcher-label { color: #D6AEE0; }
+.deals-hub.dl-plum .mc-client-search > :is(svg, img, span) { color: #D6AEE0; stroke: #D6AEE0; }
+.deals-hub.dl-plum .task-filter-btn.has-active, .deals-hub.dl-plum .deals-filter-wrap .has-active { background: rgba(235, 156, 239, .16); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.deals-hub.dl-plum .task-filter-popover { background: rgba(255, 255, 255, .06); box-shadow: 0 18px 44px rgba(0, 0, 0, .4); }
+.deals-hub.dl-plum .task-filter-row label { color: #D6AEE0; }
+.deals-hub.dl-plum .task-filter-reset { color: #FF8A8A; }
+.deals-hub.dl-plum .placeholder { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .placeholder p { color: #D6AEE0; }
+.deals-hub.dl-plum .deals-column { --sc: var(--stage-color, #D6AEE0); background: linear-gradient(180deg, color-mix(in srgb, var(--sc) 9%, rgba(255, 255, 255, .06)), color-mix(in srgb, var(--sc) 3%, rgba(255, 255, 255, .06))); box-shadow: inset 0 3px 0 var(--sc), inset 0 0 0 1px color-mix(in srgb, var(--sc) 16%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deals-column.drag-over { background: color-mix(in srgb, var(--sc) 16%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deals-column-label { color: #F6E9FA; }
+.deals-hub.dl-plum .deals-column-count { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sc) 28%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deals-column .empty-hint { color: #D6AEE0; }
+.deals-hub.dl-plum .wk-add-task-btn { border: 1.5px dashed color-mix(in srgb, var(--sc) 45%, rgba(255, 255, 255, .06)); color: color-mix(in srgb, var(--sc) 65%, #F6E9FA); }
+.deals-hub.dl-plum .wk-add-task-btn:hover { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .deal-card { background: rgba(255, 255, 255, .06); box-shadow: 0 1px 3px rgba(40, 24, 50, .08), inset 0 0 0 1px rgba(235, 156, 239, .3); }
+.deals-hub.dl-plum .deal-card-name { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-card-sub { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-card-amount, .deals-hub.dl-plum .deal-card-date { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .deal-card-date { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .deal-card-manager { color: #D6AEE0; }
+.deals-hub.dl-plum .report-section { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.deals-hub.dl-plum .cmp-table thead th { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .cmp-table td { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-stage-pill { background: color-mix(in srgb, var(--sc, #D6AEE0) 14%, rgba(255, 255, 255, .06)); color: color-mix(in srgb, var(--sc, #D6AEE0) 72%, #000); }
+.deals-hub.dl-plum .month-pagination button, .deals-hub.dl-plum .month-pagination-pages button { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .month-pagination .mp-arrow { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .mp-gap { color: #D6AEE0; }
+.deals-hub.dl-plum .month-pagination-hint { color: #D6AEE0; }
+.deals-hub.dl-plum .dash-kpi-icon.ok { --c2: #4BE07F; }
+.deals-hub.dl-plum .dash-kpi-icon.low { --c2: #FBBF24; }
+.deals-hub.dl-plum .dash-kpi-icon.bad { --c1: #FF8A8A; --c2: #FF8A8A; }
+.deals-hub.dl-plum .deal-page-hero { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.deals-hub.dl-plum .deal-detail-head-icon, .deals-hub.dl-plum .deal-section-icon { background: radial-gradient(circle closest-side at 50% 50%, #8E2A93 0, #7E2483 60%, rgba(255, 255, 255, .06) 62%, rgba(255, 255, 255, .06) 74%, transparent 75%), conic-gradient(#B544B5, #661466) !important; }
+.deals-hub.dl-plum .deal-title-input { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-title-input:hover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-title-input:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum button.deal-btn-won { background: linear-gradient(135deg, #4BE07F, #4BE07F); }
+.deals-hub.dl-plum button.deal-btn-lost { background: linear-gradient(135deg, #FF8A8A, #FF8A8A); box-shadow: 0 5px 12px -2px #D92D2D88, inset 0 0 0 2px #ffffff40, 0 0 0 4px color-mix(in srgb, #FF8A8A 22%, transparent); }
+.deals-hub.dl-plum .deal-kebab-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .deal-kebab-menu { background: rgba(255, 255, 255, .06); box-shadow: 0 18px 44px rgba(0, 0, 0, .4); }
+.deals-hub.dl-plum .deal-kebab-menu button { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-kebab-menu button:hover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-stage-days-label { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-stage-seg { --sc: #D6AEE0; background: color-mix(in srgb, var(--sc) 7%, rgba(255, 255, 255, .06)); color: color-mix(in srgb, var(--sc) 55%, #F6E9FA); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sc) 22%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deal-stage-seg i { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sc) 35%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deal-stage-seg:hover { background: color-mix(in srgb, var(--sc) 12%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deal-stage-seg.done { background: color-mix(in srgb, var(--sc) 16%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deal-stage-seg.done i { background: color-mix(in srgb, var(--sc) 70%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deal-stage-seg.active i { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-section { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.deals-hub.dl-plum .deal-section-text h4 { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-section-text p { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-client-name { color: #F6E9FA; }
+.deals-hub.dl-plum .deal-field-icon-btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .deal-param-textarea { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .wk-field-static, .deals-hub.dl-plum .service-tags-trigger { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.deals-hub.dl-plum .service-tags-trigger .ui-select-placeholder { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-focus { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-note-editor { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-note-editor:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.deals-hub.dl-plum .deal-note-toolbar { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-note-toolbar-icons button { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-note-toolbar-icons button:hover { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-note-item.pinned { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .deal-history-row { background: color-mix(in srgb, var(--history-color, #D6AEE0) 6%, rgba(255, 255, 255, .06)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--history-color, #D6AEE0) 18%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deal-history-row.clickable:hover { background: color-mix(in srgb, var(--history-color, #D6AEE0) 6%, rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .deal-history-ic { background: radial-gradient(circle closest-side, color-mix(in srgb, var(--history-color, #8E2A93) 85%, #000) 0 60%, rgba(255, 255, 255, .06) 62% 74%, transparent 75%), conic-gradient(var(--history-color, #B544B5), color-mix(in srgb, var(--history-color, #661466) 60%, #000)) !important; }
+.deals-hub.dl-plum .deal-history-type { color: color-mix(in srgb, var(--history-color, #D6AEE0) 75%, #000); }
+.deals-hub.dl-plum .client-history-week { color: #D6AEE0; }
+.deals-hub.dl-plum .client-history-text { color: #F6E9FA; }
+.deals-hub.dl-plum .client-history-empty { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .deal-history-meta { color: #D6AEE0; }
+.deals-hub.dl-plum .deal-field-icon-btn.active { background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-box, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-box { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); color: #F6E9FA; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-head, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-head { background: linear-gradient(rgba(255, 255, 255, .06), rgba(255, 255, 255, .06)); }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-head h3, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-head h3 { color: #F6E9FA; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-close, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-close { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-body, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-body { color: #F6E9FA; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-body :is(input[type=text], input[type=number], input[type=date], input[type=email], input[type=tel], select), .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-body :is(input[type=text], input[type=number], input[type=date], input[type=email], input[type=tel], select) { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; color: #F6E9FA; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .ui-select-trigger, .deals-design.dl-plum .tmodal-overlay.deals-design .ui-select-trigger, .deals-hub.dl-plum .tmodal-overlay.deals-design .date-picker-trigger, .deals-design.dl-plum .tmodal-overlay.deals-design .date-picker-trigger { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; color: #F6E9FA; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .ui-select-chevron, .deals-design.dl-plum .tmodal-overlay.deals-design .ui-select-chevron { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .wk-field-box .wk-field-icon, .deals-design.dl-plum .tmodal-overlay.deals-design .wk-field-box .wk-field-icon { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .wk-field-box .wk-field-icon svg, .deals-design.dl-plum .tmodal-overlay.deals-design .wk-field-box .wk-field-icon svg { stroke: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-body textarea, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-body textarea { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; color: #F6E9FA; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-body :is(input, select, textarea):focus, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-body :is(input, select, textarea):focus { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-body label, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-body label { color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .tmodal-foot, .deals-design.dl-plum .tmodal-overlay.deals-design .tmodal-foot { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .btn, .deals-design.dl-plum .tmodal-overlay.deals-design .btn { background: rgba(255, 255, 255, .06); color: #D6AEE0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 0 0 4px #AE40AE14; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .btn-danger, .deals-design.dl-plum .tmodal-overlay.deals-design .btn-danger { background: linear-gradient(135deg, #FF8A8A, #FF8A8A); }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .task-modal-section, .deals-design.dl-plum .tmodal-overlay.deals-design .task-modal-section, .deals-hub.dl-plum .tmodal-overlay.deals-design .pipeline-manager-row, .deals-design.dl-plum .tmodal-overlay.deals-design .pipeline-manager-row, .deals-hub.dl-plum .tmodal-overlay.deals-design .import-map-row, .deals-design.dl-plum .tmodal-overlay.deals-design .import-map-row { background: rgba(255, 255, 255, .06); }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .stage-table-head, .deals-design.dl-plum .tmodal-overlay.deals-design .stage-table-head { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.deals-hub.dl-plum .tmodal-overlay.deals-design .stage-add-row, .deals-design.dl-plum .tmodal-overlay.deals-design .stage-add-row, .deals-hub.dl-plum .tmodal-overlay.deals-design .pipeline-add-source, .deals-design.dl-plum .tmodal-overlay.deals-design .pipeline-add-source { border: 1.5px dashed rgba(235, 156, 239, .3); background: rgba(255, 255, 255, .06); }

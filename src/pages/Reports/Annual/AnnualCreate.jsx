@@ -30,6 +30,8 @@ import '../../../styles/annualPage.css';
 import '../../../styles/automationDashboard.css';
 import '../../../styles/ddHub.css';
 import '../../../styles/reportsHub.css';
+import '../../../styles/reportsManagerPlum.generated.css'; // the light Hub styles of the Reports Manager recoloured to the plum palette (made by a script)
+import '../../../styles/reportsManagerPlum.css';
 import '../../../styles/automationTasksPage.css';
 
 const WALLET_ICON = '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14" r="1.2"/></svg>';
@@ -157,7 +159,7 @@ export default function AnnualCreate() {
   const contractsPerMonth = monthValuesFor(monthsByIndex, (mi, m) => channels.reduce((s, c) => s + (monthSumVal(mi, m, contractsId(c)) || 0), 0));
 
   return (
-    <div className="report-page annual-report-page rpt-hub" data-dd="hub" ref={pageRef}>
+    <div className="report-page annual-report-page rpt-hub rm-plum is-plum" data-dd="hub" ref={pageRef}>
       {!capturing && <ReportTypeSwitcher />}
       <section className="rpt-hero">
         <div className="rpt-hero-top-row">

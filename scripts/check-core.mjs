@@ -85,7 +85,7 @@ import { deptRunState, deptRunStates } from '../src/lib/agents/deptRunState.js';
 import { cancelRequest, passOn, startRequest } from '../api/_lib/creativeEngine.js';
 import { TASK_KIND, prepProgress, teamPhase, teamTasksOf } from '../src/lib/agents/teamTasks.js';
 import { allTasks, calendarRuns, groupByProject, matchesFilter, parseTaskKey, requestsOfTask, scopeCockpit, tasksOfOperation } from '../src/lib/agents/taskScope.js';
-import { RUN_FILTERS, buildRuns, creativeRunState, filterRuns, groupItems, runCounts, runKindOf } from '../src/lib/agents/aiResults.js';
+import { RUN_FILTERS, buildQueue, buildRuns, creativeRunState, filterRuns, groupItems, itemStatus, runCounts, runKindOf, runProgress, runStatus } from '../src/lib/agents/aiResults.js';
 import { INTEL_STALE_DAYS, imagesOf, intelBlock, intelState, intelSummaryLine, parseIntel, pickPhotos, pickShopPages } from '../src/lib/agents/clientIntel.js';
 import { AUTO_TEXT, cleanManual, cleanStyle, composerOptions, draftFromStyle, effectiveStyle, manualFromDraft, mergeManual, styleBlock, styleRows, styleSamplesOf } from '../src/lib/agents/projectStyle.js';
 import { overlayFields, applyText, applyTextForRequest, saveTextEdit, textInfo } from '../api/_lib/creativeText.js';
@@ -115,7 +115,9 @@ import { GOOGLE_METRIC_LIST, extractGoogleCounts, googleMetricNamesFor, cleanGoo
 import { PLATFORM_COLUMNS, cleanColumns as cleanPlatformColumns, missingColumns } from '../src/lib/platformColumns.js';
 import { buildReportMessage, reportAction, reportLink, workLink } from '../src/lib/projectReportMessage.js';
 import { computeMetric, metricOptions, sumBase } from '../src/lib/reportMetrics.js';
-import { visibleKeys } from '../src/lib/periodReport.js';
+import { visibleKeys, fetchPlatformRange } from '../src/lib/periodReport.js';
+import { GOOGLE_FUNNEL_STAGES, cleanFunnelActions, columnsWithFunnels, funnelCountsFromRows, funnelTokens, splitFunnelTokens, withFunnelTokens } from '../src/lib/googleFunnel.js';
+import { conversionRows, funnelCounts, listConversionActions } from '../api/_lib/googleFunnelData.js';
 import { cleanNotices, noticeDraft, noticesChanged, pickList } from '../src/lib/agents/settingsForm.js';
 import { buildCampaignSpend, monthlySpend, periodStart } from '../src/lib/agents/campaignSpend.js';
 import { buildTaskPath, currentStep } from '../src/lib/agents/mapTasks.js';
@@ -126,6 +128,8 @@ import { KB_SEARCH_MAX, buildKbSearchPrompt, kbPrivacyWarnings, parseKbSearch } 
 import { buildCalendar, cleanTemplate, planApply, platformsFor, snapshotOperation } from '../src/lib/agents/campaignTemplates.js';
 import { counts as dlvCounts, decisionEvent, fileNameOf as dlvFileName, groupDeliverables, inputFromDeliverable, inputKeyOf } from '../src/lib/agents/deliverables.js';
 
+import { boardRows, disciplineCounts, heatRows, mondayIso, pacing, roasTone, sankeyData, weekStatusMatrix } from '../src/lib/projectsDashboard.js';
+import { monthWeekSteps } from '../src/lib/monthWeekSteps.js';
 let passed = 0;
 const ok = (name, fn) => Promise.resolve(fn()).then(() => { passed += 1; console.log('ok  ', name); });
 
@@ -5479,6 +5483,14 @@ await ok('«Результати AI команди»: runs with the marks regula
   const g = groupItems([...items(2, 'review'), ...items(1, 'approved'), ...items(1, 'rejected'), ...items(1, 'producing'), ...items(1, 'failed')]);
   assert.deepEqual(g.map((x) => [x.key, x.items.length]), [['review', 2], ['approved', 1], ['rejected', 1], ['other', 2]]);
   assert.deepEqual(groupItems(items(1, 'review')).map((x) => x.key), ['review', 'approved', 'rejected']);
+  // the queue «Потребує вашого рішення» (decision 53): the creatives to review with their runs, the runs with documents, the runs that wait for something else; a paused run is not in it
+  const q = buildQueue(runs);
+  assert.equal(q.entries.every((e) => e.item.status === 'review' && e.run.source === 'creative'), true);
+  assert.equal(q.total, q.entries.length + q.docs.reduce((a, r) => a + r.waiting, 0) + q.asks.length);
+  assert.equal(q.asks.every((r) => runStatus(r) !== 'pause' && r.state === 'wait'), true);
+  assert.deepEqual([itemStatus('review'), itemStatus('approved'), itemStatus('rejected'), itemStatus('producing'), itemStatus('failed')], ['ask', 'done', 'back', 'run', 'bad']);
+  assert.deepEqual(runProgress({ source: 'creative', counts: { total: 6, approved: 2, rejected: 1, review: 3 } }), { total: 6, decided: 3, approved: 2, rejected: 1, review: 3, making: 0 });
+  assert.equal(runStatus({ state: 'wait', stateText: 'На паузі' }), 'pause');
 });
 
 await ok('team tasks: the tasks of a team are listed with names and marks: main regular, additional regular, seasonal, one-off', () => {
@@ -5828,6 +5840,36 @@ await ok('words on a creative (3.1): the text comes from the brief and the copyw
   assert.deepEqual(await applyText(ctx, 1), { ok: false, reason: 'no-headline' }); // no copy yet: it is done when the copy arrives
 });
 
+
+await ok('dashboard of the projects: heat map, flow of the month, pace, matrix of the weekly reports, board', () => {
+  const projects = [{ id: 1, name: 'Alpha' }, { id: 2, name: 'Beta' }, { id: 3, name: 'Gamma' }];
+  const weeks = ['2026-10-26', '2026-11-02', '2026-11-09'];
+  const row = (project_id, platform, week_start, spend, revenue) => ({ project_id, platform, week_start, data: { spend, revenue } });
+  const rows = [row(1, 'meta', '2026-11-02', 100, 350), row(1, 'google', '2026-11-02', 100, 250), row(1, 'meta', '2026-11-09', 200, 200), row(2, 'meta', '2026-10-26', 50, 40), row(3, 'meta', '2026-11-09', 0, 0), row(2, 'meta', '2026-08-03', 999, 1)];
+  const heat = heatRows(rows, projects, weeks);
+  assert.deepEqual(heat.map((h) => h.name), ['Alpha', 'Beta']); // biggest spender first, no spend = not shown, a week out of the window is ignored
+  assert.deepEqual(heat[0].weeks.map((w) => w.roas), [null, 3, 1]);
+  assert.equal(roasTone(3), 'hi'); assert.equal(roasTone(2.4), 'mid'); assert.equal(roasTone(1.2), 'lo'); assert.equal(roasTone(null), 'none');
+  const month = [row(1, 'meta', '', 300, 600), row(1, 'google', '', 100, 400), row(2, 'tiktok', '', 50, 10), row(3, 'meta', '', 0, 5)];
+  const sk = sankeyData(month, projects);
+  assert.deepEqual(sk.left.map((l) => [l.key, l.spend]), [['meta', 300], ['google', 100], ['other', 50]]);
+  assert.deepEqual(sk.right.map((p) => [p.name, p.spend, p.roas]), [['Alpha', 400, 2.5], ['Beta', 50, 0.2]]);
+  assert.equal(sk.links.length, 3); assert.equal(sk.total, 450);
+  const pc = pacing([row(1, 'meta', '', 300, 0)], [row(1, 'meta', '', 600, 0)], '2026-11-10');
+  assert.deepEqual([pc.spent, pc.day, pc.dim, pc.forecast, pc.prev, pc.deltaPct], [300, 10, 30, 900, 600, 50]);
+  assert.equal(pacing([], [row(1, 'meta', '', 600, 0)], '2026-11-10'), null); // no spend yet: no pace
+  assert.equal(mondayIso('2026-11-15'), '2026-11-09'); assert.equal(mondayIso('2026-11-09'), '2026-11-09');
+  const st = weekStatusMatrix([
+    { project_id: 1, period_start: '2026-11-09', status: 'final' }, { project_id: 1, period_start: '2026-11-09', status: 'draft' }, { project_id: 1, period_start: '2026-11-02', status: 'final' },
+    { project_id: 2, period_start: '2026-11-09', status: 'rework' }, { project_id: 2, period_start: '2026-06-01', status: 'final' },
+  ], projects, weeks);
+  assert.deepEqual(st.map((r) => r.weeks), [['none', 'final', 'draft'], ['none', 'none', 'rework'], ['none', 'none', 'none']]); // two reports of a week = the worse one
+  assert.deepEqual(disciplineCounts(st), { final: 0, rework: 1, draft: 1, none: 1 });
+  const board = boardRows(month, projects, heat);
+  assert.deepEqual(board.map((b) => b.name), ['Alpha', 'Beta', 'Gamma']);
+  assert.deepEqual(board[0].spark, [0, 200, 200]);
+});
+
 await ok('team phase (3.1b): a launched creative team prepares while the scout studies the client, then it works; a team without a profile, paused or another kind is not held back', () => {
   const live = { key: 'creative', state: 'running' };
   const steps = [{ id: 9, text: 'Вивчаю сторінку 3 з 8: /shop/rings', state: 'running' }];
@@ -5846,6 +5888,20 @@ await ok('team phase (3.1b): a launched creative team prepares while the scout s
   assert.equal(teamPhase(live, { intel: { status: 'failed' } }).phase, 'running'); // a scout that failed does not hold it either
   assert.equal(teamPhase(live, null).phase, 'running'); // a team from before the scout (no profile at all)
   assert.deepEqual([teamPhase({ key: 'creative', state: 'paused' }, { intel: { status: 'running' } }).phase, teamPhase({ key: 'analytics', state: 'running' }, { intel: { status: 'running' } }).phase, teamPhase({ key: 'reports', state: 'none' }).phase], ['paused', 'running', 'none']);
+});
+
+
+await ok('fill of the month by weeks (Daily): working days, missed days, the week with today, the future', () => {
+  // November 2026: Mondays are the 2nd, 9th, 16th, 23rd, 30th; today is Thursday the 12th
+  const today = new Date(2026, 10, 12, 15, 0);
+  const steps = monthWeekSteps({ year: 2026, month: 11, savedDays: new Set([2, 3, 4, 5, 6, 9, 10, 11]), today });
+  assert.deepEqual(steps.map((w) => w.status), ['ok', 'on', 'future', 'future', 'future']); // week 2: Mon-Wed saved, Thursday (today) still open
+  assert.deepEqual(steps.map((w) => [w.from, w.to, w.total]), [[2, 8, 5], [9, 15, 5], [16, 22, 5], [23, 29, 5], [30, 30, 1]]);
+  const missed = monthWeekSteps({ year: 2026, month: 11, savedDays: new Set([2, 3, 5, 6]), today }); // the 4th is missing
+  assert.equal(missed[0].status, 'over'); assert.equal(missed[1].status, 'over'); // the 9th-11th are missing too
+  const past = monthWeekSteps({ year: 2026, month: 10, savedDays: new Set([1, 2, 5, 6, 7, 8, 9]), today });
+  assert.equal(past.at(-1).status, 'over'); // a month in the past: weeks with a missed day are over
+  assert.equal(monthWeekSteps({ year: 2026, month: 12, savedDays: new Set(), today })[0].status, 'future');
 });
 
 await ok('project style (3.1c): the scout decides, a person corrects, the manual value wins field by field and survives the next profile; the painter and the brief obey it', async () => {
@@ -5931,6 +5987,46 @@ await ok('the report agent saves its decks by the same unique key the database h
   const keys = [...src.matchAll(/onConflict: '([^']+)'/g)].map((m) => m[1]);
   assert.ok(keys.length >= 2);
   keys.forEach((k) => assert.equal(k, 'project_id,period_type,period_start,period_end,platform')); // project_reports and project_decks both have period_end in their unique keys
+});
+
+await ok('google probe: a read-only inventory of an account in counts and short samples; a query the account refuses does not hide the others', async () => {
+  const { probeAccount } = await import('../api/_lib/googleProbe.js');
+  const { enums } = await import('google-ads-api');
+  const E = enums;
+  const asked = [];
+  const target = {
+    query: async (gaql) => {
+      asked.push(gaql);
+      if (/FROM campaign WHERE/.test(gaql)) return [{ campaign: { advertising_channel_type: E.AdvertisingChannelType.PERFORMANCE_MAX, status: E.CampaignStatus.ENABLED } }, { campaign: { advertising_channel_type: E.AdvertisingChannelType.PERFORMANCE_MAX, status: E.CampaignStatus.PAUSED } }, { campaign: { advertising_channel_type: E.AdvertisingChannelType.SEARCH, status: E.CampaignStatus.ENABLED } }];
+      if (/FROM ad_group_ad WHERE ad_group_ad.status/.test(gaql)) throw new Error('ad types are not allowed here');
+      if (/FROM conversion_action/.test(gaql)) return [{ conversion_action: { name: 'Purchase', type: E.ConversionActionType.WEBPAGE, category: E.ConversionActionCategory.PURCHASE, primary_for_goal: true } }];
+      if (/segments.conversion_action_name/.test(gaql)) return [{ segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 10, conversions_value: 1200.456 } }, { segments: { conversion_action_name: 'Add to cart' }, metrics: { conversions: 80, conversions_value: 0 } }, { segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 2, conversions_value: 100 } }];
+      if (/FROM asset_group WHERE/.test(gaql)) return [{ asset_group: { name: 'Hybrid wigs', status: E.AssetGroupStatus.ENABLED, ad_strength: E.AdStrength.EXCELLENT }, campaign: { name: 'PMax Hybrid' } }];
+      if (/FROM asset_group_asset/.test(gaql)) { assert.doesNotMatch(gaql, /performance_label/); return [
+        { asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Natural look wigs' } } },
+        { asset_group_asset: { field_type: E.AssetFieldType.MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://img/1.jpg' } } } },
+        { asset_group_asset: { field_type: E.AssetFieldType.YOUTUBE_VIDEO }, asset: { youtube_video_asset: { youtube_video_id: 'abc123' } } },
+      ]; }
+      if (/FROM ad_group_ad_asset_view/.test(gaql)) return [
+        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.BEST } },
+        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.LOW } },
+        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.MARKETING_IMAGE, performance_label: E.AssetPerformanceLabel.GOOD } },
+      ];
+      if (/RESPONSIVE_SEARCH_AD/.test(gaql)) return [{ ad_group_ad: { ad: { responsive_search_ad: { headlines: [{ text: 'Buy wigs' }], descriptions: [{ text: 'Free shipping' }] } } } }];
+      return [];
+    },
+  };
+  const { sections: s } = await probeAccount(target);
+  assert.deepEqual(s.campaigns.byType, { PERFORMANCE_MAX: { ENABLED: 1, PAUSED: 1 }, SEARCH: { ENABLED: 1 } });
+  assert.equal(s.adTypes.ok, false); assert.match(s.adTypes.error, /not allowed/); // one refused query, the others still answer
+  assert.equal(s.conversionActions.items[0].category, 'PURCHASE');
+  assert.deepEqual(s.conversionsByAction.items, [{ name: 'Add to cart', conversions: 80, value: 0 }, { name: 'Purchase', conversions: 12, value: 1300.46 }]); // what the single «conversions» number is made of
+  assert.equal(s.assetGroups.items[0].adStrength, 'EXCELLENT');
+  assert.deepEqual(s.assets.byField, { HEADLINE: 1, MARKETING_IMAGE: 1, YOUTUBE_VIDEO: 1 });
+  assert.deepEqual(s.assets.samples.YOUTUBE_VIDEO, [{ video: 'abc123' }]);
+  assert.deepEqual(s.adAssetLabels.byField, { HEADLINE: { BEST: 1, LOW: 1 }, MARKETING_IMAGE: { GOOD: 1 } }); // the labels live on the assets of ads, not on the asset groups
+  assert.deepEqual(s.searchAds.items[0], { headlines: ['Buy wigs'], descriptions: ['Free shipping'] });
+  assert.ok(asked.every((q) => /^SELECT /.test(q))); // only reads
 });
 
 await ok('google creatives (2.14): the best asset groups and search ads of a period with their pictures, videos and texts; spend belongs to the group, not to a picture', async () => {
@@ -6053,44 +6149,83 @@ await ok('google report creatives (2.14): the best groups in the shape of a repo
   assert.equal(m.data.creatives, undefined);
 });
 
-console.log(`\n${passed} checks passed`);
-await ok('google probe: a read-only inventory of an account in counts and short samples; a query the account refuses does not hide the others', async () => {
-  const { probeAccount } = await import('../api/_lib/googleProbe.js');
-  const { enums } = await import('google-ads-api');
-  const E = enums;
-  const asked = [];
-  const target = {
-    query: async (gaql) => {
-      asked.push(gaql);
-      if (/FROM campaign WHERE/.test(gaql)) return [{ campaign: { advertising_channel_type: E.AdvertisingChannelType.PERFORMANCE_MAX, status: E.CampaignStatus.ENABLED } }, { campaign: { advertising_channel_type: E.AdvertisingChannelType.PERFORMANCE_MAX, status: E.CampaignStatus.PAUSED } }, { campaign: { advertising_channel_type: E.AdvertisingChannelType.SEARCH, status: E.CampaignStatus.ENABLED } }];
-      if (/FROM ad_group_ad WHERE ad_group_ad.status/.test(gaql)) throw new Error('ad types are not allowed here');
-      if (/FROM conversion_action/.test(gaql)) return [{ conversion_action: { name: 'Purchase', type: E.ConversionActionType.WEBPAGE, category: E.ConversionActionCategory.PURCHASE, primary_for_goal: true } }];
-      if (/segments.conversion_action_name/.test(gaql)) return [{ segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 10, conversions_value: 1200.456 } }, { segments: { conversion_action_name: 'Add to cart' }, metrics: { conversions: 80, conversions_value: 0 } }, { segments: { conversion_action_name: 'Purchase' }, metrics: { conversions: 2, conversions_value: 100 } }];
-      if (/FROM asset_group WHERE/.test(gaql)) return [{ asset_group: { name: 'Hybrid wigs', status: E.AssetGroupStatus.ENABLED, ad_strength: E.AdStrength.EXCELLENT }, campaign: { name: 'PMax Hybrid' } }];
-      if (/FROM asset_group_asset/.test(gaql)) { assert.doesNotMatch(gaql, /performance_label/); return [
-        { asset_group_asset: { field_type: E.AssetFieldType.HEADLINE }, asset: { text_asset: { text: 'Natural look wigs' } } },
-        { asset_group_asset: { field_type: E.AssetFieldType.MARKETING_IMAGE }, asset: { image_asset: { full_size: { url: 'https://img/1.jpg' } } } },
-        { asset_group_asset: { field_type: E.AssetFieldType.YOUTUBE_VIDEO }, asset: { youtube_video_asset: { youtube_video_id: 'abc123' } } },
-      ]; }
-      if (/FROM ad_group_ad_asset_view/.test(gaql)) return [
-        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.BEST } },
-        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.HEADLINE, performance_label: E.AssetPerformanceLabel.LOW } },
-        { ad_group_ad_asset_view: { field_type: E.AssetFieldType.MARKETING_IMAGE, performance_label: E.AssetPerformanceLabel.GOOD } },
-      ];
-      if (/RESPONSIVE_SEARCH_AD/.test(gaql)) return [{ ad_group_ad: { ad: { responsive_search_ad: { headlines: [{ text: 'Buy wigs' }], descriptions: [{ text: 'Free shipping' }] } } } }];
-      return [];
-    },
-  };
-  const { sections: s } = await probeAccount(target);
-  assert.deepEqual(s.campaigns.byType, { PERFORMANCE_MAX: { ENABLED: 1, PAUSED: 1 }, SEARCH: { ENABLED: 1 } });
-  assert.equal(s.adTypes.ok, false); assert.match(s.adTypes.error, /not allowed/); // one refused query, the others still answer
-  assert.equal(s.conversionActions.items[0].category, 'PURCHASE');
-  assert.deepEqual(s.conversionsByAction.items, [{ name: 'Add to cart', conversions: 80, value: 0 }, { name: 'Purchase', conversions: 12, value: 1300.46 }]); // what the single «conversions» number is made of
-  assert.equal(s.assetGroups.items[0].adStrength, 'EXCELLENT');
-  assert.deepEqual(s.assets.byField, { HEADLINE: 1, MARKETING_IMAGE: 1, YOUTUBE_VIDEO: 1 });
-  assert.deepEqual(s.assets.samples.YOUTUBE_VIDEO, [{ video: 'abc123' }]);
-  assert.deepEqual(s.adAssetLabels.byField, { HEADLINE: { BEST: 1, LOW: 1 }, MARKETING_IMAGE: { GOOD: 1 } }); // the labels live on the assets of ads, not on the asset groups
-  assert.deepEqual(s.searchAds.items[0], { headlines: ['Buy wigs'], descriptions: ['Free shipping'] });
-  assert.ok(asked.every((q) => /^SELECT /.test(q))); // only reads
+await ok('Google funnel: one conversion action per stage, tokens, counts, normalize', async () => {
+  // what is stored: only known steps with a non-empty name
+  assert.deepEqual(cleanFunnelActions({ view: ' View item ', cart: '', checkout: 'Begin checkout', zzz: 'x' }), { view: 'View item', checkout: 'Begin checkout' });
+  assert.deepEqual(cleanFunnelActions(null), {});
+  // tokens travel inside the platform's columns list and come back out, a name may hold colons
+  const tokens = funnelTokens({ view: 'View item', cart: 'Add: to cart' });
+  assert.deepEqual(tokens, ['fn:view:View item', 'fn:cart:Add: to cart']);
+  assert.deepEqual(splitFunnelTokens(['mx_g_interactions', ...tokens]), { keys: ['mx_g_interactions'], actions: { view: 'View item', cart: 'Add: to cart' } });
+  assert.deepEqual(splitFunnelTokens(undefined), { keys: [], actions: {} });
+  // only an enabled funnel with actions adds them
+  assert.deepEqual(withFunnelTokens(['a'], { enabled: true, actions: { view: 'V' } }), ['a', 'fn:view:V']);
+  assert.deepEqual(withFunnelTokens(['a'], { enabled: false, actions: { view: 'V' } }), ['a']);
+  assert.deepEqual(withFunnelTokens(['a'], null), ['a']);
+  assert.deepEqual(columnsWithFunnels({ meta: ['m'], google: ['g'] }, { google: { funnel: { enabled: true, actions: { cart: 'C' } } } }), { meta: ['m'], google: ['g', 'fn:cart:C'] });
+  assert.deepEqual(columnsWithFunnels({ meta: ['m'] }, { meta: {} }), { meta: ['m'] }); // Meta's funnel needs no tokens
+  // counts: summed by the action's name, only for the steps that have an action; one action never feeds two steps
+  const rows = [{ name: 'View item', conversions: 10.5 }, { name: 'View item', conversions: 4.5 }, { name: 'Add to cart', conversions: 3 }, { name: 'Purchase', conversions: 1 }];
+  assert.deepEqual(funnelCountsFromRows(rows, { view: 'View item', cart: 'Add to cart' }), { x_g_fn_view: 15, x_g_fn_cart: 3 });
+  assert.deepEqual(funnelCountsFromRows(rows, { checkout: 'Nope' }), { x_g_fn_checkout: 0 });
+  assert.deepEqual(funnelCountsFromRows(rows, {}), {});
+  // the layout keeps the chosen actions
+  const f = normalizeFunnel({ enabled: true, stages: GOOGLE_FUNNEL_STAGES, actions: { view: 'View item', bad: 'x' } });
+  assert.deepEqual([f.enabled, f.stages, f.actions], [true, GOOGLE_FUNNEL_STAGES, { view: 'View item' }]);
+  assert.equal(normalizeFunnel({ enabled: true, stages: GOOGLE_FUNNEL_STAGES }).actions, undefined);
+  // the picture: a stage with no number drops out, the rest is drawn
+  const total = { x_g_fn_view: 1000, x_g_fn_cart: 100, purchases: 10 };
+  const m = funnelModel({ stages: GOOGLE_FUNNEL_STAGES, total, labelOf: (k) => k });
+  assert.deepEqual(m.steps.map((s) => [s.key, s.value]), [['mx_g_fn_view', 1000], ['mx_g_fn_cart', 100], ['purchases', 10]]);
+  assert.deepEqual(m.skipped, ['mx_g_fn_checkout']);
+  assert.equal(m.steps[1].fromPrev, 10);
+  // the Google stages are not a column of the picker
+  assert.deepEqual(cleanPlatformColumns('google', GOOGLE_FUNNEL_STAGES), []);
 });
 
+await ok('Google funnel: the platform call asks for the chosen actions and puts their counts into the total', async () => {
+  const calls = [];
+  const gpost = async (path, body) => {
+    calls.push(body);
+    if (body.level === 'campaign') return { campaigns: [{ name: 'A', spend: 10, impressions: 100, clicks: 5, conversions: 2, revenue: 50 }] };
+    return { row: { spend: 10, impressions: 100, clicks: 5, conversions: 2, revenue: 50 }, ...(body.funnelActions?.view ? { funnel: { x_g_fn_view: 77 } } : {}) };
+  };
+  const withFn = await fetchPlatformRange('google', '123', '2026-11-02', '2026-11-08', 'ecommerce', gpost, ['fn:view:View item']);
+  assert.equal(withFn.total.x_g_fn_view, 77);
+  assert.deepEqual(calls[0].funnelActions, { view: 'View item' }); // the account call
+  assert.deepEqual(calls[1].columns, []); // the campaign call never sees the token
+  assert.equal(withFn.total.purchases, 2);
+  calls.length = 0;
+  const plain = await fetchPlatformRange('google', '123', '2026-11-02', '2026-11-08', 'ecommerce', gpost, []);
+  assert.equal(plain.total.x_g_fn_view, undefined);
+  assert.deepEqual(calls[0].funnelActions, {});
+});
+
+await ok('Google funnel: server reads the account by conversion action (read-only)', async () => {
+  const queries = [];
+  const target = { query: async (gaql) => {
+    queries.push(gaql);
+    if (/FROM conversion_action/.test(gaql)) return [
+      { conversion_action: { name: 'Purchase', type: 7, category: 4, primary_for_goal: true } },
+      { conversion_action: { name: 'View item', type: 7, category: 2, primary_for_goal: false } },
+      { conversion_action: { name: 'Never used', type: 7, category: 2, primary_for_goal: false } },
+    ];
+    return [
+      { segments: { conversion_action_name: 'View item' }, metrics: { all_conversions: 20 } },
+      { segments: { conversion_action_name: 'View item' }, metrics: { all_conversions: 5 } },
+      { segments: { conversion_action_name: 'Purchase' }, metrics: { all_conversions: 2 } },
+    ];
+  } };
+  const range = { from_date: '2026-11-02', to_date: '2026-11-08' };
+  assert.deepEqual(await conversionRows(target, range), [{ name: 'View item', conversions: 25 }, { name: 'Purchase', conversions: 2 }]);
+  assert.ok(/BETWEEN '2026-11-02' AND '2026-11-08'/.test(queries[0]));
+  assert.deepEqual(await funnelCounts(target, range, { view: 'View item' }), { x_g_fn_view: 25 });
+  queries.length = 0;
+  assert.deepEqual(await funnelCounts(target, range, {}), {}); // nothing chosen: Google is not asked at all
+  assert.equal(queries.length, 0);
+  const list = await listConversionActions(target, range);
+  assert.deepEqual(list.map((a) => [a.name, a.count, a.primary]), [['View item', 25, false], ['Purchase', 2, true], ['Never used', 0, false]]);
+  assert.ok(queries.every((q) => /^SELECT/.test(q))); // read-only
+});
+
+console.log(`\n${passed} checks passed`);

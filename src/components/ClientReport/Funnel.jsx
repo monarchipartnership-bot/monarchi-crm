@@ -17,7 +17,7 @@ const mix = (t) => `rgb(${FROM.map((a, i) => Math.round(a + (TO[i] - a) * t)).jo
 const pctIn = (lang) => (n) => `${Number(n).toLocaleString(localeOf(lang), { maximumFractionDigits: 1 })}%`;
 const cut = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
-export const SAMPLE_TOTAL = { x_view_content: 1000, x_add_to_cart: 100, x_initiate_checkout: 80, purchases: 10 };
+export const SAMPLE_TOTAL = { x_view_content: 1000, x_add_to_cart: 100, x_initiate_checkout: 80, x_g_fn_view: 1000, x_g_fn_cart: 100, x_g_fn_checkout: 80, purchases: 10 };
 
 function Layer({ s, i, n, cx, y, wt, wb, layer, big, small, stroke }) {
   const lang = useLang();

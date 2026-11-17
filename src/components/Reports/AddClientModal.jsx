@@ -77,7 +77,7 @@ export default function AddClientModal({ initial, defaultPlatform, defaultStatus
   const missingUpworkChannel = needsUpworkChannel({ platform, upworkChannel });
 
   return (
-    <div className="tmodal-overlay arm-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="tmodal-overlay arm-overlay" data-dd="night" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="tmodal-box arm-dialog" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="add-client-title">
         <div className="tmodal-head">
           <div className="tmodal-head-left">

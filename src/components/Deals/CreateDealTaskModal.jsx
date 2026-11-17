@@ -9,6 +9,9 @@ import TimePicker from '../common/TimePicker';
 import DealPicker from './DealPicker';
 import '../../styles/ddHub.css';
 import '../../styles/taskDialogsHub.css';
+import '../../styles/dealTasksPlum.generated.css'; // the hub form recoloured to the plum palette (made by a script)
+import '../../styles/dealTasksPlum.css';
+import '../../styles/ddNight.css';
 
 const DIAMOND_ICON = '<svg viewBox="0 0 24 24"><path d="M12 2l10 10-10 10L2 12z"/></svg>';
 const CROWN_ICON = '<svg viewBox="0 0 24 24"><path d="M4 8l4 3 4-6 4 6 4-3-1.5 10h-13z"/><path d="M6.5 19h11"/></svg>';
@@ -172,7 +175,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
     );
     const noun = type === 'call' ? 'дзвінок' : 'задача';
     return createPortal(
-      <div className="tmodal-overlay thd-overlay" data-dd="hub" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="tmodal-overlay thd-overlay dp-plum" data-dd="night" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="tmodal-box thd-dialog thd-dialog--side" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="deal-task-form-title">
           <aside className="thd-rail">
             <div className="thd-brand">
@@ -257,7 +260,7 @@ export default function CreateDealTaskModal({ deals, profiles, myEmail, task, de
   }
 
   return createPortal(
-    <div className="tmodal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="tmodal-overlay deals-design dl-plum" data-dd="night" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="tmodal-box task-modal-box" ref={boxRef} role="dialog" aria-modal="true" aria-label={editing ? meta.editTitle : meta.title}>
         <div className="tmodal-head">
           <div className="pipeline-modal-head">

@@ -19,6 +19,7 @@ import { metricKeysOf, reportBlocks, snapshotOf, withFunnel } from '../../../lib
 import { computeMetric, metricMeta, metricOptions } from '../../../lib/reportMetrics';
 import { planMetricChange } from '../../../lib/reportMetricOps';
 import { DEFAULT_FUNNEL_STAGES, FUNNEL_CANDIDATES, normalizeFunnel } from '../../../lib/reportFunnel';
+import { GOOGLE_FUNNEL_STAGES } from '../../../lib/googleFunnel';
 import { normLang } from '../../../lib/clientLang';
 import { rowBlock, sheetNameOf } from '../../../lib/reportWorkbook';
 import { saveReportWorkbook } from '../../../lib/reportWorkbookExport';
@@ -115,16 +116,17 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
   };
   const replaceOptions = (key) => metricOptions(ctx.custom, extraKeys).filter((o) => o.key !== key && !shownKeys.includes(o.key)).map((o) => ({ value: o.key, label: o.label }));
   // the funnel of this report: on / off and its stages (the numbers come from the saved ones: a stage the report has no number for is left out of the picture)
-  const funnelNow = funnel || { enabled: false, stages: DEFAULT_FUNNEL_STAGES };
+  const stageKeys = platform === 'google' ? GOOGLE_FUNNEL_STAGES : FUNNEL_CANDIDATES; // the stages that can be picked: Meta's columns, or Google's chosen conversion actions + the sale
+  const funnelNow = funnel || { enabled: false, stages: platform === 'google' ? GOOGLE_FUNNEL_STAGES : DEFAULT_FUNNEL_STAGES };
   const reportTotal = isAll ? null : data.platforms?.[platform]?.total || null;
   const hasStage = (k) => reportTotal != null && Number.isFinite(computeMetric(k, reportTotal, ctx.custom));
-  const setFunnel = (next) => { const f = normalizeFunnel(next); setTemplate({ funnel: next.enabled ? { enabled: f.enabled, stages: f.stages } : null }); };
+  const setFunnel = (next) => { const f = normalizeFunnel(next); setTemplate({ funnel: next.enabled ? { enabled: f.enabled, stages: f.stages, ...(f.actions ? { actions: f.actions } : {}) } : null }); };
   const toggleStage = (k) => {
     const has = funnelNow.stages.includes(k);
-    const stages = FUNNEL_CANDIDATES.filter((c) => (c === k ? !has : funnelNow.stages.includes(c)));
+    const stages = stageKeys.filter((c) => (c === k ? !has : funnelNow.stages.includes(c)));
     if (stages.length < 2) { setError('У воронці мають бути щонайменше два етапи.'); return; }
     setError('');
-    setFunnel({ enabled: true, stages });
+    setFunnel({ ...funnelNow, enabled: true, stages });
   };
   // the language of this report (the client's page, the Excel, the presentation): its own, else the project's
   const lang = normLang(data.template?.lang || ctx.project?.report_lang);
@@ -298,12 +300,12 @@ export default function ReportEditor({ row, ctx, onBack, onChanged }) {
               <Panel id="funnel" title="Воронка" summary={funnel ? `${funnel.stages.length} етапи` : 'вимкнена'} note="Картинка для клієнта: перегляд товару, кошик, оформлення, продаж, і де людей стає найменше. Тільки для цього звіту.">
                 <Switch on={Boolean(funnel)} onChange={(v) => setFunnel({ ...funnelNow, enabled: v })} label="Показувати воронку в звіті" />
                 <div className="bld-chips" aria-label="Етапи воронки">
-                  {FUNNEL_CANDIDATES.map((k) => {
+                  {stageKeys.map((k) => {
                     const on = funnelNow.stages.includes(k);
                     return <button type="button" key={k} className={'bld-chip' + (on ? ' bld-chip--picked' : '')} aria-pressed={on} title={hasStage(k) ? undefined : 'У збережених цифрах цього звіту немає такого етапу'} onClick={() => toggleStage(k)}>{metricMeta(k, []).label}{hasStage(k) ? '' : ' ·  —'}</button>;
                   })}
                 </div>
-                <div className="pacc-hint">Етапи йдуть у порядку шляху клієнта. Етап без числа в збережених цифрах (позначений «—») у картинку не потрапить: додайте його стовпець у макеті платформи й оновіть звіт.</div>
+                <div className="pacc-hint">Етапи йдуть у порядку шляху клієнта. Етап без числа в збережених цифрах (позначений «—») у картинку не потрапить: {platform === 'google' ? 'оберіть для нього дію конверсії в «Конструкторі звіту» (розділ «Воронка») й оновіть звіт.' : 'додайте його стовпець у макеті платформи й оновіть звіт.'}</div>
               </Panel>
             )}
             {!isAll && <SelectionPanel platform={platform} groups={groupsHere} campaigns={campaigns} problem="" draft={{ campaignSel: sel }} set={setSelection} />}

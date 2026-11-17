@@ -20,6 +20,7 @@ import { buildReportMessage, reportAction, workLink } from '../../src/lib/projec
 import {
   EMPTY_SECTIONS, buildWhatWasDone, comparisonInfo, comparisonPeriod, dueReportPeriod, pullReportData, reportPayload, writeTemplateBlock,
 } from '../../src/lib/reportEngine.js';
+import { columnsWithFunnels } from '../../src/lib/googleFunnel.js';
 
 const DEFAULT_CONFIG = { tasks: { weeklyReport: true, monthlyReport: true, presentation: true }, platforms: [], deck: { style: 'brand-pulse', lang: 'en' }, note: '', notify: true, notifyEmails: [], telegram: { enabled: false, chatId: '', threadId: '' } };
 const PLATFORM_NAMES = Object.fromEntries(PLATFORMS.map((p) => [p.id, p.name]));
@@ -124,7 +125,7 @@ export async function runProjectReport({ repo, post, projectId, periodType, trig
     const errors = {};
     for (const k of [...new Set(scopes.map(kindOf))]) {
       const mine = scopes.filter((sc) => kindOf(sc) === k);
-      const r = await pullReportData({ accounts: accounts.filter((a) => mine.includes(a.platform)), kind: k, groups, period, prev, post, columns, selections: Object.fromEntries(mine.map((p) => [p, layouts[p].campaignSel])) });
+      const r = await pullReportData({ accounts: accounts.filter((a) => mine.includes(a.platform)), kind: k, groups, period, prev, post, columns: columnsWithFunnels(columns, layouts), selections: Object.fromEntries(mine.map((p) => [p, layouts[p].campaignSel])) });
       pulled[k] = r.data;
       Object.assign(errors, r.errors);
     }

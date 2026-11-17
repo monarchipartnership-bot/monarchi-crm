@@ -179,7 +179,7 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
 
   return (
     <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) closeRef.current(); }}>
-      <div ref={boxRef} data-dd="hub" className="modal-box pacc-modal proj-modal-folder pmh-dialog" role="dialog" aria-modal="true" aria-label="Створити проєкт" tabIndex={-1}>
+      <div ref={boxRef} data-dd="night" className="modal-box pacc-modal proj-modal-folder pmh-dialog" role="dialog" aria-modal="true" aria-label="Створити проєкт" tabIndex={-1}>
         <aside className="pmh-rail">
           <div className="pmh-brand">
             <span className="pmh-md pmh-md--lg"><span className="pmh-mi"><img src={PAGE_ICONS['page.projects'].src} alt="" draggable="false" /></span></span>
@@ -287,12 +287,13 @@ export default function ProjectModal({ onClose, onSave, saving, initialClientId 
                     {f.type === 'select' ? (
                       <Select value={form[f.key] || ''} onChange={(v) => setField(f.key, v)} ariaLabel={f.label}
                         options={[{ value: '', label: 'Не вказано' }, ...f.options.map((o) => ({ value: o, label: o }))]} />
+                    ) : f.type === 'date' ? (
+                      <DatePicker value={form[f.key] || ''} onChange={(v) => setField(f.key, v)} />
                     ) : (
                       <input
                         type={f.type === 'url' ? 'text' : f.type} value={form[f.key]} placeholder={f.placeholder}
                         step={f.type === 'number' ? '0.01' : undefined}
                         onChange={(e) => setField(f.key, e.target.value)}
-                        onClick={f.type === 'date' ? (e) => e.currentTarget.showPicker?.() : undefined}
                       />
                     )}
                   </div>

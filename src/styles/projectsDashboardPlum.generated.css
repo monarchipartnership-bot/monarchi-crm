@@ -1,0 +1,62 @@
+/* GENERATED dark plum overrides for the dashboard of the projects (owner's picks 2026-11-12). Made by scratchpad/gen_dark.py from builderHub, composeHub, historyHub, workbenchHub, projectReports and projectHistory: every light colour is mapped to the plum palette; edit by hand below the marker «HAND-MADE». Scoped to .pw-rep. */
+/* ---- projectsDashboardHub.css ---- */
+.pd.pd-plum { --pd-line: rgba(235, 156, 239, .3); --pd-soft: rgba(255, 255, 255, .06); --pd-bg: rgba(255, 255, 255, .06); --pd-plum: #D6AEE0; --pd-mut: #D6AEE0; --pd-ink: #F6E9FA; }
+.pd.pd-plum button:focus-visible, .pd.pd-plum a:focus-visible { outline: 3px solid #EB9CEF; }
+.pd.pd-plum .pd-md { background: conic-gradient(var(--c1), var(--c2) calc(var(--p) * 1%), rgba(235, 156, 239, .16) 0); }
+.pd.pd-plum .pd-md::before { background: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pd-md.st-ok { --c2: #4BE07F; }
+.pd.pd-plum .pd-md.st-bad { --c1: #FF8A8A; --c2: #FF8A8A; }
+.pd.pd-plum .pd-mi { background: linear-gradient(150deg, rgba(255, 255, 255, .06), rgba(235, 156, 239, .16)); }
+.pd.pd-plum .pd-box { box-shadow: 0 4px 14px rgba(0, 0, 0, .4); background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.pd.pd-plum .pd-box.bd { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.pd.pd-plum .pd-box.wa { background: rgba(255, 255, 255, .04); border-color: rgba(235, 156, 239, .28); }
+.pd.pd-plum .pd-pill.active { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.pd.pd-plum .pd-pill.paused { background: rgba(251, 191, 36, .16); color: #FBBF24; }
+.pd.pd-plum .pd-pill.completed { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.pd.pd-plum .pd-pill.bad { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.pd.pd-plum .pd-delta.good { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.pd.pd-plum .pd-delta.bad { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.pd.pd-plum .pd-delta.neu { background: rgba(235, 156, 239, .16); }
+.pd.pd-plum .pd-delta.none { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.pd.pd-plum .pd-rcap { background: rgba(235, 156, 239, .16); }
+.pd.pd-plum .pd-rcap.hi { color: #4BE07F; }
+.pd.pd-plum .pd-rcap.lo { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.pd.pd-plum .pd-btn { background: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pd-in { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.pd.pd-plum .pd-in:focus-within { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px #AE40AE33; }
+.pd.pd-plum .pd-in input::placeholder { color: #D6AEE0; }
+.pd.pd-plum .pd-sg button { color: #D6AEE0; }
+.pd.pd-plum .pd-sg button.on { background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 3px 8px rgba(0, 0, 0, .4); }
+.pd.pd-plum .pd-ab p { color: #D6AEE0; }
+.pd.pd-plum .pd-legsm { color: #D6AEE0; }
+.pd.pd-plum .pd-wk { background: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pd-wt small.ok { color: #4BE07F; }
+.pd.pd-plum .pd-wt small.in { color: #7FB2FF; }
+.pd.pd-plum .pd-wt small.wa { color: #FBBF24; }
+.pd.pd-plum .pd-wt small.mu { color: #D6AEE0; }
+.pd.pd-plum .pd-ar { background: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pd-ar.on { box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.pd.pd-plum .pd-tbl .best { color: #4BE07F; }
+.pd.pd-plum .pd-gl { stroke: rgba(235, 156, 239, .3); }
+.pd.pd-plum .pd-ax { fill: #D6AEE0; }
+.pd.pd-plum .pd-ax.b { fill: #D6AEE0; }
+.pd.pd-plum .pd-ax.sel { fill: #EB9CEF; }
+.pd.pd-plum .pd-trk { stroke: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pd-gv { fill: #F6E9FA; }
+.pd.pd-plum .pd-gl2 { fill: #D6AEE0; }
+.pd.pd-plum .pd-guide { stroke: #EB9CEF; }
+.pd.pd-plum .pd-tip rect { stroke: rgba(235, 156, 239, .3); }
+.pd.pd-plum .pd-tip .tt1 { fill: #F6E9FA; }
+.pd.pd-plum .pd-tip .tt2 { fill: #D6AEE0; }
+.pd.pd-plum .pd-lgd { color: #D6AEE0; }
+.pd.pd-plum .pd-tsum { color: #D6AEE0; }
+.pd.pd-plum .pd-plr { background: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pd-pg { background: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pd-note { color: #D6AEE0; }
+/* ---- projectsDashboard.css ---- */
+.pd.pd-plum .pr-search { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.pd.pd-plum .pr-chip { background: rgba(255, 255, 255, .06); color: #D6AEE0; }
+.pd.pd-plum .pr-table-wrap { background: rgba(255, 255, 255, .06); }
+.pd.pd-plum .pr-table { color: #F6E9FA; }
+.pd.pd-plum .pr-table thead th { color: #D6AEE0; }
+.pd.pd-plum .pr-table th:first-child, .pd.pd-plum .pr-table td:first-child { background: rgba(255, 255, 255, .06); }

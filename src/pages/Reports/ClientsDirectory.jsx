@@ -23,6 +23,11 @@ import '../../styles/dealsBoard.css';
 import '../../styles/ddHub.css';
 import '../../styles/reportsHub.css';
 import '../../styles/contactsHub.css';
+import '../../styles/reportsManagerPlum.generated.css'; // the shared Hub base of the report pages recoloured to the plum palette (made by a script)
+import '../../styles/reportsManagerPlum.css';
+import '../../styles/contactsPlum.generated.css'; // Контакти recoloured to the plum palette (made by a script)
+import '../../styles/contactsPlum.css';
+import '../../styles/ddNight.css';
 
 const FILTER_ICON = '<svg viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8v6l-3 1.5v-7.5z"/></svg>';
 const TREND_UP_ICON = '<svg viewBox="0 0 24 24"><path d="M4 16l6-6 4 4 6-8"/><path d="M15 6h5v5"/></svg>';
@@ -181,7 +186,7 @@ export default function ClientsDirectory() {
   const rangeEnd = Math.min(clampedPage * PAGE_SIZE, filtered.length);
 
   return (
-    <div className="report-page contacts-hub rpt-hub" data-dd="hub">
+    <div className="report-page contacts-hub rpt-hub rm-plum ct-plum is-plum" data-dd="night">
       <div className="dash-kpi-row client-kpi-hub">
         <div className="dash-kpi">
           <div className="dash-kpi-head">

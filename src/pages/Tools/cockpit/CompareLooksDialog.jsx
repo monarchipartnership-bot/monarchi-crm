@@ -1,28 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState } from 'react';
 import { REAL_LOOKS } from '../../../lib/creatives/realism';
 import { fmtUsd } from './format';
 import { Spinner } from './parts';
-import '../../../styles/styleEditor.css';
+import DialogShell, { LeftPicture, PriceBlock } from './DialogShell';
+import LookThumb from '../../../components/Projects/Teams/LookThumb';
 import '../../../styles/textEdit.css';
 
-// «Порівняти реалізм» (step 3.4, 2026-11-13): the SAME scene of a picture in other realism looks, side by side in the results. The price is asked first (about $0.2 a picture), nothing is made until the person
-// confirms; the pictures come next to the original in a few minutes and are judged by eye: which one looks like a real photo.
-//   item: { id, conceptName }   currentLook: the look of the task (not offered again)   onAct(key, payload): Promise   onClose()
+// «Порівняти реалізм» (step 3.4, 2026-11-13; the look of 2026-11-17, decision 55: the original on the left, the looks as cards with an example picture, the price at once): the SAME scene of a picture
+// in other realism looks, side by side in the results. The price is asked first (about $0.2 a picture), nothing is made until the person confirms; the pictures come next to the original in a few
+// minutes and are judged by eye: which one looks like a real photo.
+//   item: { id, conceptName, url?, rawUrl? }   currentLook: the look of the task (not offered again)   onAct(key, payload): Promise   onClose()
 export default function CompareLooksDialog({ item, currentLook = 'std', onAct, onClose }) {
-  const box = useRef(null);
   const [sel, setSel] = useState([]);
   const [est, setEst] = useState(null);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
   const [error, setError] = useState('');
-  useEffect(() => {
-    box.current?.focus();
-    const onKey = (e) => { if (e.key === 'Escape' && !busy) { e.stopPropagation(); onClose(); } };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
-  }, [onClose, busy]);
   // the price for the chosen looks
   useEffect(() => {
     setEst(null); setError('');
@@ -32,42 +26,51 @@ export default function CompareLooksDialog({ item, currentLook = 'std', onAct, o
     return () => { dead = true; };
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggle = (k) => setSel((s) => (s.includes(k) ? s.filter((x) => x !== k) : s.length >= 3 ? s : [...s, k]));
+  const bad = !!est && est.fits === false;
+  const can = !busy && !!sel.length && !!est && !bad;
 
   async function run() {
+    if (!can) return;
     setBusy(true); setError('');
     try { const r = await onAct('compare_run', { creativeId: item.id, looks: sel }); setDone(r?.submitted || sel.length); } catch (e) { setError(e?.message || 'Не вдалося запустити.'); } finally { setBusy(false); }
   }
-  return createPortal(
-    <div className="ckp ckp-overlay is-night ai-immersive ted-ov" data-ai-safe onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div ref={box} className="ted-win ted-ret" role="dialog" aria-modal="true" aria-label={`Порівняти реалізм: ${item.conceptName}`} tabIndex={-1}>
-        <header className="ted-head"><div><h2>Порівняти реалізм «{item.conceptName}»</h2><small>Та сама сцена в інших виглядах, поруч з оригіналом. До трьох виглядів за раз.</small></div></header>
-        {done > 0 ? (
-          <>
-            <p className="sd-note" role="status">Запущено картинок: {done}. Вони зʼявляться поруч з оригіналом у розділі «Результати» за кілька хвилин.</p>
-            <div className="se-acts"><button type="button" className="ckp-btn is-primary" onClick={onClose}>Готово</button></div>
-          </>
-        ) : (
-          <>
-            <div className="ted-opts" role="group" aria-label="Вигляди для порівняння">
-              {REAL_LOOKS.map((l) => (
-                <label key={l.key} className={'ted-opt' + (sel.includes(l.key) ? ' is-on' : '') + (l.key === currentLook ? ' is-off' : '')}>
-                  <input type="checkbox" checked={sel.includes(l.key)} disabled={l.key === currentLook || (!sel.includes(l.key) && sel.length >= 3)} onChange={() => toggle(l.key)} />
-                  <span><b>{l.label}</b><small>{l.key === currentLook ? 'Уже вибрано для цього завдання.' : l.desc}</small></span>
-                </label>
-              ))}
-            </div>
-            {sel.length > 0 && (
-              <p className="sd-note" role="status">{asking ? 'Рахуємо вартість…' : est ? `≈ ${fmtUsd(est.usd)} за ${est.count} ${est.count === 1 ? 'картинку' : 'картинки'}${est.fits === false ? `. Не вміщується в ліміт завдання ($${est.limit}): збільшіть ліміт у налаштуваннях завдання.` : '.'}` : ''}</p>
-            )}
-            {error && <p className="ckp-err" role="alert">{error}</p>}
-            <div className="se-acts">
-              <button type="button" className="ckp-btn is-primary" disabled={busy || !sel.length || !est || est.fits === false} onClick={run}>{busy ? <Spinner /> : null}{est ? `Створити за ${fmtUsd(est.usd)}` : 'Створити'}</button>
-              <button type="button" className="ckp-btn" disabled={busy} onClick={onClose}>Скасувати</button>
-            </div>
-          </>
-        )}
+  const left = <LeftPicture item={item} note="Оригінал. Обрані вигляди зʼявляться поруч." />;
+  if (done > 0) {
+    return (
+      <DialogShell title={`Порівняти реалізм «${item.conceptName}»`} sub="Та сама сцена в інших виглядах" onClose={onClose} left={left} noFoot>
+        <div className="rtd-fin" role="status">
+          <span className="rtd-big">✓</span><h3>Запущено картинок: {done}</h3>
+          <p>Вони зʼявляться поруч з оригіналом у розділі «Результати» за кілька хвилин.</p>
+          <button type="button" className="ckp-btn is-primary" onClick={onClose}>Готово</button>
+        </div>
+      </DialogShell>
+    );
+  }
+  return (
+    <DialogShell wide title={`Порівняти реалізм «${item.conceptName}»`} sub="Та сама сцена в інших виглядах, поруч з оригіналом. До трьох виглядів за раз." label={`Порівняти реалізм: ${item.conceptName}`} busy={busy} onClose={onClose} onSubmit={run} left={left}
+      footer={<>
+        <button type="button" className="ckp-btn" disabled={busy} onClick={onClose}>Скасувати</button>
+        <button type="button" className="ckp-btn rtd-gold" disabled={!can} onClick={run}>{busy ? <Spinner /> : null}{est ? `Створити за ${fmtUsd(est.usd)}` : 'Створити'}</button>
+      </>}>
+      <div>
+        <span className="rtd-lab is-row">Вигляди <b>обрано {sel.length} з 3</b></span>
+        <div className="rtd-looks" role="group" aria-label="Вигляди для порівняння">
+          {REAL_LOOKS.map((l) => {
+            const on = sel.includes(l.key), now = l.key === currentLook;
+            return (
+              <button key={l.key} type="button" aria-pressed={on} className={'rtd-lk' + (on ? ' is-on' : '')} disabled={now || (!on && sel.length >= 3)} onClick={() => toggle(l.key)}>
+                <span className="rtd-tick" aria-hidden="true">✓</span>
+                <LookThumb look={l.key} />
+                <span><b>{l.label}</b><small>{now ? 'Уже вибрано для цього завдання.' : l.desc}</small></span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>,
-    document.body,
+      <PriceBlock hint="Оберіть до трьох виглядів: ціна зʼявиться тут." asking={asking} bad={bad}
+        sum={est ? `≈ ${fmtUsd(est.usd)}` : ''} text={est ? `за ${est.count} ${est.count === 1 ? 'картинку' : 'картинки'}` : ''}
+        note={bad ? `Не вміщується в ліміт завдання ($${est.limit}): збільшіть ліміт у налаштуваннях завдання.` : est ? 'Нічого не створюється, поки ви не натиснете кнопку.' : ''} />
+      {error && <p className="ckp-err" role="alert">{error}</p>}
+    </DialogShell>
   );
 }

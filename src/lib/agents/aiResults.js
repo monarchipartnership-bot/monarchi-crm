@@ -48,8 +48,9 @@ export function buildRuns({ cockpits = [], deliverables = [] } = {}) {
     (c.requests || []).forEach((r) => {
       const kind = runKindOf(r, c.regulars || []);
       const st = creativeRunState(r);
+      const plain = (c.regulars || []).filter((x) => !x.seasonal);
       runs.push({
-        id: `c:${c.id}:${r.id}`, source: 'creative', campaignId: c.id, requestId: r.id, title: r.title || r.goal || `Завдання №${r.id}`, kind, kindLabel: RUN_KIND[kind], team: 'Креативи',
+        id: `c:${c.id}:${r.id}`, source: 'creative', campaignId: c.id, requestId: r.id, title: r.title || r.goal || `Завдання №${r.id}`, kind, kindLabel: RUN_KIND[kind], team: 'Креативи', isMain: kind === 'regular' && plain[0]?.id === (r.regularId || 'r1'),
         date: r.createdAt || r.updatedAt || null, state: st.state, stateText: st.text, counts: r.creatives || {}, items: r.items || [], stages: r.stages || [], goal: r.goal || '',
         cost: (r.cost?.model || 0) + (r.cost?.higgsfield || 0), steps: r.steps || [],
       });
@@ -64,7 +65,7 @@ export function buildRuns({ cockpits = [], deliverables = [] } = {}) {
     const waiting = list.filter((d) => d.status === 'draft').length;
     return {
       id: `d:${list[0].id}`, source: 'deliverable', deliverableIds: list.map((d) => d.id), title, kind, kindLabel: RUN_KIND[kind], team, date: list[list.length - 1].created_at,
-      state: waiting ? 'wait' : 'ok', stateText: waiting ? `Чекають рішення: ${waiting}` : 'Усе перевірено', counts: {}, items: [], stages: [], cost: 0,
+      state: waiting ? 'wait' : 'ok', stateText: waiting ? `Чекають рішення: ${waiting}` : 'Усе перевірено', waiting, total: list.length, counts: {}, items: [], stages: [], cost: 0,
     };
   };
   passes.forEach((list) => runs.push(groupRun(list, 'Аналітика й оптимізація', 'regular', 'Аналітика')));
@@ -89,4 +90,30 @@ export function dateTimeText(iso) {
   if (Number.isNaN(d.getTime())) return '';
   const p = (x) => String(x).padStart(2, '0');
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}, ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// ---- the look of the tab in the plum style (owner's picks 2026-11-16, decision 53): the status of a run and of one creative as the capsules of the page of the teams
+// run: 'ask' (waits for the person), 'run' (works), 'done' (all checked), 'pause', 'bad'
+export const runStatus = (r) => (r.stateText === 'На паузі' ? 'pause' : { wait: 'ask', work: 'run', ok: 'done', stopped: 'bad' }[r.state] || 'run');
+// a creative: review waits for the person, approved is done, rejected is sent back, the pictures that are made or failed
+export const itemStatus = (s) => ({ review: 'ask', approved: 'done', rejected: 'back', producing: 'run', failed: 'bad', planned: 'ask' }[s] || 'pause');
+export const ITEM_TEXT = { review: 'на перегляд', approved: 'підтверджено', rejected: 'повернено', failed: 'не вдалося', producing: 'генерується', planned: 'чекає генерації' };
+// how many of the creatives (or documents) of a run are decided: { total, decided, approved, rejected, review, making }
+export function runProgress(run) {
+  if (run.source !== 'creative') { const total = run.total || 0, review = run.waiting || 0; return { total, decided: total - review, approved: total - review, rejected: 0, review, making: 0 }; }
+  const c = run.counts || {}; const approved = n(c.approved), rejected = n(c.rejected), review = n(c.review), making = n(c.producing) + n(c.planned);
+  return { total: n(c.total) || approved + rejected + review + making, decided: approved + rejected, approved, rejected, review, making };
+}
+// What waits for the person across the project: the creatives to review (each with its run, in the order of the list), the runs with documents to decide, and the runs that wait for
+// something else (an answer to an agent, the confirmation of the pictures). A paused run is not here: the person has stopped it himself.
+export function buildQueue(runs = []) {
+  const entries = [], docs = [], asks = [];
+  runs.forEach((r) => {
+    if (r.source === 'creative') {
+      const rev = (r.items || []).filter((i) => i.status === 'review');
+      rev.forEach((item) => entries.push({ item, run: r }));
+      if (!rev.length && r.state === 'wait' && runStatus(r) !== 'pause') asks.push(r);
+    } else if (r.waiting > 0) docs.push(r);
+  });
+  return { entries, docs, asks, total: entries.length + docs.reduce((a, r) => a + r.waiting, 0) + asks.length };
 }

@@ -28,6 +28,7 @@ import { todayIso } from '../../../lib/dateHelpers';
 import '../../../styles/clientReportHub.css';
 import '../../../styles/projectReports.css';
 import '../../../styles/projectHistory.css';
+import { withFunnelTokens } from '../../../lib/googleFunnel';
 
 // «Конструктор звіту»: the report of a project is set up here, once per ad platform. The layout is shown the way the client will see it (without numbers,
 // or with the numbers of the last week) and changes while you set it up; «Зберегти макет» makes it the base of every report of that platform: the manual
@@ -151,7 +152,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
     try {
       const due = dueReportPeriod(periodType, todayIso());
       const prev = comparisonPeriod(periodType, due.picker, due.period, { mode: 'calendar' });
-      const { data, errors } = await pullReportData({ accounts: platformAccounts, kind, groups: platformGroups, period: due.period, prev, columns: { [platform]: extraKeys }, selections: { [platform]: draft.campaignSel } });
+      const { data, errors } = await pullReportData({ accounts: platformAccounts, kind, groups: platformGroups, period: due.period, prev, columns: { [platform]: platform === 'google' ? withFunnelTokens(extraKeys, draft.funnel) : extraKeys }, selections: { [platform]: draft.campaignSel } });
       if (!data.platforms[platform]) throw new Error(Object.values(errors)[0] || 'Кабінет не повернув даних за цей період.');
       if (mine === realSeq.current) setReal({ data, period: due.period, busy: false, error: '' });
     } catch (e) { if (mine === realSeq.current) setReal({ data: null, period: null, busy: false, error: e.message || 'Не вдалося отримати дані.' }); }
@@ -249,7 +250,7 @@ export default function ReportBuilder({ projectId, onConfigChanged }) {
       <div className="bld-panels">
         <KindPanel draft={draft} set={set} projectKind={projectKind(ctx.project)} />
         <MetricsPanel projectId={projectId} platform={platform} kind={kind} extraKeys={extraKeys} custom={ctx.custom} order={draft.metricOrder} onOrder={(metricOrder) => set({ metricOrder })} baseMetrics={draft.baseMetrics} onBase={(baseMetrics) => set({ baseMetrics })} onOpen={() => setModal('metric')} onChanged={changed} />
-        <FunnelPanel projectId={projectId} platform={platform} draft={draft} set={set} extraKeys={extraKeys} onChanged={changed} />
+        <FunnelPanel projectId={projectId} platform={platform} draft={draft} set={set} extraKeys={extraKeys} onChanged={changed} accounts={platformAccounts} />
         <SelectionPanel platform={platform} groups={platformGroups} campaigns={campaignList} problem={campaignProblem} draft={draft} set={set} />
         <GroupsPanel groups={platformGroups} campaigns={campaignList} onEdit={(id) => { setGroupEdit(id); setModal('groups'); }} onCreate={() => { setGroupEdit('new'); setModal('groups'); }} onChanged={changed} />
         <BlocksPanel draft={draft} set={set} />

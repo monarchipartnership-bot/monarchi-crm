@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import useProjectCockpit from '../../../lib/useProjectCockpit';
 import { fetchCampaignControl } from '../../../lib/api/campaignControl';
@@ -7,19 +7,17 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { TEAMS, teamRoles, teamsOf } from '../../../lib/agents/teams';
 import { describeRegular, kyivToday, pausedBySeason, regularsOf, seasonOver } from '../../../lib/agents/operationCycles';
 import { dayMonthOf } from '../../../lib/agents/scheduleCalendar';
-import { removeRegular, setRegularEnabled } from '../../../lib/api/operationCycles';
+import { removeRegular, renameRegular, renameRequest, setRegularEnabled } from '../../../lib/api/operationCycles';
 import OperationCard from '../../../pages/Tools/cockpit/OperationCard';
 import { fmtDateTime } from '../../../pages/Smm/agentUi';
 import { HubTitle } from '../hubIcons';
 import LaunchTeamWizard from './LaunchTeamWizard';
 import TeamCard from './TeamCard';
-import TeamTasks from './TeamTasks';
-import NewRegularTask from './NewRegularTask';
+import TeamsBoard from './TeamsBoard';
+import NewTaskWizard from './NewTaskWizard';
 import TeamPrep from './TeamPrep';
-import { teamPhase } from '../../../lib/agents/teamTasks';
-import { RoundBtn, TeamRing } from './teamsUi';
-import OneOffDialog from './OneOffDialog';
-import OneOffCreativeDialog from './OneOffCreativeDialog';
+import { teamPhase, teamTasksOf } from '../../../lib/agents/teamTasks';
+import { TeamRing, TypeMedal, toStatus } from './teamsUi';
 import '../../../styles/projectTeams.css';
 import '../../../styles/projectTeamsPlum.css';
 
@@ -37,9 +35,10 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
   const [error, setError] = useState('');
   const [wizard, setWizard] = useState(false);
   const [open, setOpen] = useState(null); // { campaignId, regularFirst }: the operation card (the cycles of creatives)
-  const [oneoff, setOneoff] = useState(false); // the dialog of a one-off task
-  const [newRegular, setNewRegular] = useState(null); // the window of a new regular task: the campaign of the creative team
-  const [creativeTask, setCreativeTask] = useState(null); // the window of a one-off task of creatives: the campaign of the creative team
+  const [oneoff, setOneoff] = useState(false); // the dialog of a new task (the kind may be chosen in the menu already)
+  const [oneoffKind, setOneoffKind] = useState(null); // 'regular' | 'seasonal' | 'oneoff' chosen in the menu «+ Нове завдання»
+  const [menu, setMenu] = useState(false); // the menu «+ Нове завдання»
+  const menuRef = useRef(null);
   const [card, setCard] = useState(null); // the key of the team whose card (agents, schedules, money) is open
   const [control, setControl] = useState({}); // campaign id -> the agents with their last and next runs
   const [busy, setBusy] = useState('');
@@ -50,6 +49,13 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
     try { setData(await fetchTeamsData(projectId)); setError(''); } catch (e) { setError(e?.message || 'Не вдалося завантажити команди.'); }
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!menu) return undefined;
+    const away = (e) => { if (!menuRef.current?.contains(e.target)) setMenu(false); };
+    const esc = (e) => { if (e.key === 'Escape') setMenu(false); };
+    document.addEventListener('mousedown', away); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [menu]);
 
   const view = useMemo(() => (data ? teamsOf({ campaigns: data.campaigns, agent: data.agent }) : null), [data]);
   // the last and the next run of the agents of every running team
@@ -108,19 +114,70 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
     return [ctl ? (t.state === 'paused' ? (t.key === 'creative' ? 'команда на паузі: регулярні завдання не запускаються' : `агентів у команді: ${on.length}, команда на паузі`) : `агентів працює: ${on.length || (t.key === 'creative' ? 'за запитом' : 0)}`) : 'завантажуємо агентів…', [last ? `останній запуск ${fmtDateTime(last)}` : 'ще не запускались', nextAt ? `найближчий ${fmtDateTime(nextAt)}` : ''].filter(Boolean).join(' · ')];
   }
 
-  // the agents of a team as a chain of pills: green = works, grey = paused
-  const chainOf = (t) => {
-    if (t.key === 'reports') return [{ id: 'rep', name: 'Агент звітів', on: t.state === 'running' }];
-    const ctl = control[t.campaign.id];
-    if (!ctl) return [];
-    const roles = new Set(teamRoles(t.key, data?.accounts || []));
-    return ctl.agents.filter((a) => roles.has(a.role)).map((a) => ({ id: a.id, name: a.name, on: a.mode !== 'paused' && t.state === 'running' }));
-  };
-  const nextRuns = runningTeams.filter((t) => t.state === 'running' && t.campaign).flatMap((t) => (control[t.campaign.id]?.agents || []).filter((a) => a.mode !== 'paused').map((a) => a.nextAt)).filter(Boolean).sort();
-  const nRun = runningTeams.filter((t) => t.state === 'running').length;
-  const nPause = runningTeams.filter((t) => t.state === 'paused').length;
-  const newButtons = <div className="tmx-btns"><button type="button" className="btn" onClick={() => setOneoff(true)}>Додаткове завдання</button><button type="button" className="btn btn-p" onClick={() => setWizard(true)}>+ Запустити команду</button></div>;
+  // the tasks of every team as cards (owner's picks 2026-11-16, decision 51): the creative team has its own tasks; for the analytics team every agent with its schedule is a regular task,
+  // for the reports team the weekly and the monthly report are
+  async function renameTask(campaign, task, name) {
+    if (task.regularId) await renameRegular(campaign.id, task.regularId, name); else await renameRequest(task.requestId, name);
+    say(`Завдання названо «${name}».`); await Promise.all([load(), cockpit.reload?.()]);
+  }
+  function tasksOf(t) {
+    if (t.key === 'creative' && t.campaign) {
+      return teamTasksOf({ campaign: t.campaign, cockpit: cockpit.byId?.[t.campaign.id] }).map((k) => ({
+        key: k.key, type: k.type, isMain: k.isMain, title: k.title, line: k.line, status: toStatus(k.state), statusText: k.stateText, hint: k.line, cta: 'Переглянути',
+        onOpen: () => setOpen({ campaignId: t.campaign.id, regularFirst: false, taskKey: k.key }), onRename: (name) => renameTask(t.campaign, k, name),
+        actions: k.type === 'seasonal' ? [
+          { label: k.enabled ? 'Зупинити' : 'Продовжити', disabled: busy === 'season:' + k.regularId, onClick: () => seasonAction({ id: k.regularId, title: k.title, enabled: k.enabled }, k.enabled ? 'stop' : 'resume') },
+          { label: 'Видалити', disabled: busy === 'season:' + k.regularId, onClick: () => seasonAction({ id: k.regularId, title: k.title, enabled: k.enabled }, 'remove') },
+        ] : [],
+      }));
+    }
+    if (t.key === 'analytics' && t.campaign) {
+      const roles = new Set(teamRoles('analytics', data?.accounts || []));
+      return (control[t.campaign.id]?.agents || []).filter((a) => roles.has(a.role)).map((a) => {
+        const off = a.mode === 'paused' || t.state !== 'running';
+        return { key: 'ag:' + a.id, type: 'regular', isMain: false, title: a.name, line: [a.lastRunAt ? `останній запуск ${fmtDateTime(a.lastRunAt)}` : 'ще не запускався', a.nextAt && !off ? `наступний ${fmtDateTime(a.nextAt)}` : ''].filter(Boolean).join(' · '), status: off ? 'pause' : 'run', onOpen: () => setCard('analytics'), actions: [] };
+      });
+    }
+    if (t.key === 'reports') {
+      const cfg = t.agent?.config || {}; const off = t.state !== 'running';
+      const last = t.agent?.last_run_at ? `останній ${fmtDateTime(t.agent.last_run_at)}` : 'ще не запускався';
+      const mk = (key, title, when) => ({ key, type: 'regular', isMain: false, title, line: `${when} · ${last}`, status: off ? 'pause' : 'run', onOpen: () => onOpenReports?.(), actions: [] });
+      return [
+        cfg.tasks?.weeklyReport && mk('rep:w', 'Тижневий звіт', `${WEEKDAYS[(cfg.schedule?.weeklyDay || 1) - 1]} о ${cfg.schedule?.weeklyTime || '09:00'}`),
+        cfg.tasks?.monthlyReport && mk('rep:m', 'Місячний звіт', `${cfg.schedule?.monthlyDay || 1}-го числа о ${cfg.schedule?.monthlyTime || '09:00'}`),
+      ].filter(Boolean);
+    }
+    return [];
+  }
+  const boardTeams = runningTeams.map((t) => {
+    const phase = teamPhase(t, t.campaign ? cockpit.byId?.[t.campaign.id] : null); // a launched team prepares before it works
+    const [stateLabel, tone] = STATE[phase.phase] || STATE[t.state];
+    return {
+      key: t.key, title: t.def.title, stateLabel, tone, running: t.state === 'running', busy: busy === t.key, line: summary(t)[1],
+      prep: t.key === 'creative' ? <TeamPrep phase={phase} /> : null, tasks: tasksOf(t),
+      settingsLabel: t.key === 'reports' ? 'Налаштування й звіти' : 'Налаштування команди',
+      onSettings: () => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false, teamOnly: true })),
+      onToggle: () => toggle(t), onRemove: () => remove(t),
+    };
+  });
   const lead = 'Команди, які працюють для цього клієнта. Усе, що вони читають, береться з розділу «Інформація про проєкт».';
+  const NEW_KINDS = [['regular', 'Регулярне', 'Повторюється за розкладом: кожні N днів або в обрані дні.'], ['seasonal', 'Сезонне', 'На обраний період. Основне регулярне завдання на цей час ставиться на паузу.'], ['oneoff', 'Разове', 'Один раз: результат ви переглядаєте й затверджуєте.']];
+  const newButtons = (
+    <div className="tmx-btns" ref={menuRef}>
+      <button type="button" className="btn" onClick={() => setWizard(true)}>+ Запустити команду</button>
+      <button type="button" className="btn btn-p" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>+ Нове завдання <span aria-hidden="true">▾</span></button>
+      {menu && (
+        <div className="tb-menu" role="menu">
+          {NEW_KINDS.map(([k, title, text]) => (
+            <button key={k} type="button" role="menuitem" className="tb-mi" onClick={() => { setMenu(false); setOneoffKind(k); setOneoff(true); }}>
+              <TypeMedal type={k} size={36} />
+              <span><b>{title}</b><small>{text}</small></span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -130,13 +187,6 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
             <div><HubTitle icon="users">Запуск AI команди</HubTitle><p className="tmx-lead">{lead}</p></div>
             {view && newButtons}
           </div>
-          {view && !empty && (
-            <div className="tmx-sum">
-              <div><b className="is-ok">{nRun}</b><small>{nRun === 1 ? 'команда працює' : 'команди працюють'}</small></div>
-              <div><b className="is-wait">{nPause}</b><small>на паузі</small></div>
-              <div><b>{nextRuns[0] ? fmtDateTime(nextRuns[0]) : '—'}</b><small>найближчий запуск агентів</small></div>
-            </div>
-          )}
         </section>
         {note && <p className={'tm-note' + (note.bad ? ' is-bad' : '')} role="status">{note.text}</p>}
         {error && <p className="pcr-error" role="alert">{error}</p>}
@@ -153,44 +203,7 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
           </section>
         )}
 
-        {!empty && view && (
-          <div className="tmx-list">
-            {runningTeams.map((t) => {
-              const [line1, line2] = summary(t);
-              const phase = teamPhase(t, t.campaign ? cockpit.byId?.[t.campaign.id] : null); // a launched team prepares before it works
-              const [label, tone] = STATE[phase.phase] || STATE[t.state];
-              const run = t.state === 'running';
-              const chain = chainOf(t);
-              return (
-                <article key={t.key} className={'tmx-team is-' + t.state}>
-                  <div className="tmx-row">
-                    <div className="tmx-main">
-                      <div className="tmx-t"><TeamRing name={t.key} size={32} /><b>{t.def.title}</b><span className={'pcr-state ' + tone}>{label}</span></div>
-                      {t.key !== 'creative' && <small>{line1} · {line2}</small>}
-                    </div>
-                    <div className="tmx-btns">
-                      <button type="button" className="btn btn-p" onClick={() => (t.key === 'reports' ? onOpenReports?.() : t.key === 'analytics' ? setCard('analytics') : setOpen({ campaignId: t.campaign.id, regularFirst: false, teamOnly: true }))}>{t.key === 'reports' ? 'Налаштування й звіти' : 'Загальні налаштування'}</button>
-                      <RoundBtn icon={run ? 'pause' : 'play'} label={run ? 'Зупинити' : 'Продовжити'} disabled={busy === t.key} onClick={() => toggle(t)} />
-                      <RoundBtn icon="trash" label="Видалити команду" disabled={busy === t.key} onClick={() => remove(t)} />
-                    </div>
-                  </div>
-                  {chain.length > 0 && (
-                    <div className="tmx-chain" aria-label="Агенти команди">
-                      {chain.map((a, i) => <span key={a.id} className="tmx-chain-i"><span className={'tmx-a' + (a.on ? '' : ' is-off')}><i />{a.name}</span>{i < chain.length - 1 && <span className="tmx-ln" aria-hidden="true" />}</span>)}
-                    </div>
-                  )}
-                  {t.key === 'creative' && <TeamPrep phase={phase} />}
-                  {t.key === 'creative' && t.campaign && (
-                    <TeamTasks campaign={t.campaign} cockpit={cockpit.byId?.[t.campaign.id]} busy={busy} say={say} onSeasonAction={seasonAction}
-                      onOpen={(task) => setOpen({ campaignId: t.campaign.id, regularFirst: false, taskKey: task.key })} onNewRegular={() => setNewRegular(t.campaign)}
-                      onNewSeasonal={() => setCreativeTask({ campaign: t.campaign, seasonal: true })} onNewOneoff={() => setCreativeTask({ campaign: t.campaign, seasonal: false })}
-                      onChanged={() => Promise.all([load(), cockpit.reload?.()])} />
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        )}
+        {!empty && view && <TeamsBoard teams={boardTeams} />}
       </div>
 
       <div className="tm-dialogs" data-dd="hub">
@@ -207,19 +220,10 @@ export default function ProjectTeams({ projectId, onGoFill, onOpenReports, onOpe
           }} />
       )}
       {oneoff && data && view && (
-        <OneOffDialog data={data} view={view} email={email} onClose={() => setOneoff(false)}
-          onNewCreative={({ seasonal }) => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setCreativeTask({ campaign: c, seasonal: !!seasonal }); }}
-          onNewRegular={() => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; setOneoff(false); if (c) setNewRegular(c); }}
-          onOpenReports={() => { setOneoff(false); onOpenReports?.(); }} onOpenMaterials={() => { setOneoff(false); onOpenMaterials?.(); }}
-          onGoFill={(section) => { setOneoff(false); onGoFill?.(section); }} />
-      )}
-      {newRegular && data && (
-        <NewRegularTask data={data} campaign={newRegular} email={email} onClose={() => setNewRegular(null)}
-          onCreated={(text) => { setNewRegular(null); say(text); load(); cockpit.reload?.(); }} />
-      )}
-      {creativeTask && data && (
-        <OneOffCreativeDialog key={creativeTask.seasonal ? 's' : 'o'} data={data} campaign={creativeTask.campaign} seasonal={creativeTask.seasonal} email={email} onClose={() => setCreativeTask(null)}
-          onCreated={(text) => { setCreativeTask(null); say(text); load(); cockpit.reload?.(); }} />
+        <NewTaskWizard key={oneoffKind} data={data} view={view} email={email} initialKind={oneoffKind || 'oneoff'} onClose={() => { setOneoff(false); setOneoffKind(null); }}
+          onCreated={() => { load(); cockpit.reload?.(); }}
+          onOpenTask={(taskKey) => { const c = view.teams.find((t) => t.key === 'creative')?.campaign; if (c) setOpen({ campaignId: c.id, regularFirst: false, taskKey }); }}
+          onOpenReports={() => onOpenReports?.()} onOpenMaterials={() => onOpenMaterials?.()} onGoFill={(section) => onGoFill?.(section)} />
       )}
       {card && data && view?.teams.find((x) => x.key === card && x.campaign) && (
         <TeamCard key={card} team={view.teams.find((x) => x.key === card)} data={data}

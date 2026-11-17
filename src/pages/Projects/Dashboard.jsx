@@ -1,32 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ProjectsRegistry from '../../components/Projects/ProjectsRegistry';
-import { Ico, Medallion, BoxHead, Delta, initials } from '../../components/Projects/dashParts';
-import { G, Legend, Spark, TrendChart, StatusDonut, PlatformRings, money, moneyK } from '../../components/Projects/DashCharts';
+import { Ico, Medallion, BoxHead, Delta } from '../../components/Projects/dashParts';
+import { G, Spark, money } from '../../components/Projects/DashCharts';
+import { Board, FlowChart, HeatMap, PaceArc, RoasLegend, StatusLegend, StatusMatrix } from '../../components/Projects/DashPlum';
 import { lastCompletedWeek } from '../../lib/periodReport';
+import { boardRows, disciplineCounts, heatRows, pacing, sankeyData, weekStatusMatrix } from '../../lib/projectsDashboard';
 import { fetchProjects } from '../../lib/api/projects';
 import { platformInfo } from '../../lib/adAccounts';
-import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatuses, fetchAgentDrafts, readFailures } from '../../lib/api/projectReportStore';
+import { fetchAllWeeklyReportsForWeek, fetchAllMonthlyReportsForMonth, fetchWeeklyReportsBetween, fetchWeeklyReportStatusesBetween, fetchAgentDrafts, readFailures } from '../../lib/api/projectReportStore';
 import { fetchAgentsOverview } from '../../lib/api/projectAgents';
-import { todayIso, addDaysIso, mondayOf, isoDate, fmtDate, MONTH_NAMES } from '../../lib/dateHelpers';
-import { PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
+import { todayIso, addDaysIso, mondayOf, isoDate, MONTH_NAMES } from '../../lib/dateHelpers';
 import '../../styles/reportPage.css';
 import '../../styles/comparePage.css';
 import '../../styles/automationDashboard.css';
 import '../../styles/projectsDashboard.css';
 import '../../styles/projectsDashboardHub.css';
+import '../../styles/projectsDashboardPlum.generated.css';
+import '../../styles/projectsDashboardPlum.css';
 
 const TREND_WEEKS = 8;
-const REPORT_STATUS = { draft: 'Чернетка', reviewed: 'Чернетка', rework: 'Доробка', final: 'Затверджено' };
-// Ring of a weekly-report card: how far the report got.
-const REPORT_RING = { final: { cls: 'ok', ring: 'st-ok', p: 100 }, rework: { cls: 'in', ring: 'st-in', p: 66 }, reviewed: { cls: 'wa', ring: 'st-paused', p: 33 }, draft: { cls: 'wa', ring: 'st-paused', p: 33 }, none: { cls: 'mu', ring: 'st-mu', p: 0 } };
+const ATT_PAGE = 3; // cards of «Потрібна увага» on one page
 
 function toIso(d) {
   return isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 const fmtIso = (s) => s.split('-').reverse().join('.');
-const moneyFmt = money;
-const roasFmt = (v) => (v === null ? '—' : v.toFixed(2).replace('.', ',') + 'x');
+const shortWeek = (iso) => iso.slice(8, 10) + '.' + iso.slice(5, 7);
 function sumField(rows, field) {
   return rows.reduce((s, r) => s + (Number(r.data?.[field]) || 0), 0);
 }
@@ -37,7 +37,10 @@ function aggTotals(rows) {
 }
 const ringOf = (cur, prev) => (prev > 0 ? Math.max(0, Math.min(100, Math.round((cur / prev) * 100))) : cur > 0 ? 100 : 0);
 
+// The dashboard of the projects in the plum look (owner's picks 2026-11-12): the row of the key figures, the flow of the month's spend next to the things that need a person, the
+// heat map of the ROAS and the matrix of the weekly reports, the pace of the month and the board of the projects, the registry at the bottom.
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [projects, setProjects] = useState([]);
@@ -46,9 +49,11 @@ export default function Dashboard() {
   const [thisMonthRows, setThisMonthRows] = useState([]);
   const [prevMonthRows, setPrevMonthRows] = useState([]);
   const [trendRows, setTrendRows] = useState([]);
-  const [lastWeekStatuses, setLastWeekStatuses] = useState([]);
+  const [statusRows, setStatusRows] = useState([]);
   const [agentRows, setAgentRows] = useState([]);
   const [agentDrafts, setAgentDrafts] = useState([]);
+  const [registryOpen, setRegistryOpen] = useState(false);
+  const [attPage, setAttPage] = useState(1);
   const doneWeek = useMemo(() => lastCompletedWeek(todayIso()), []);
 
   const todayI = todayIso();
@@ -60,7 +65,9 @@ export default function Dashboard() {
   const prevM = m === 1 ? 12 : m - 1;
   const prevY = m === 1 ? y - 1 : y;
   const prevMonthStartIso = isoDate(prevY, prevM, 1);
-  const trendRangeStartIso = addDaysIso(thisWeekStartIso, -7 * (TREND_WEEKS - 1));
+  // 8 finished weeks for the heat map and the matrix (the week that is going on is not counted), the 8 weeks up to this one for the sparklines of the key figures
+  const trendRangeStartIso = addDaysIso(thisWeekStartIso, -7 * TREND_WEEKS);
+  const heatWeeks = Array.from({ length: TREND_WEEKS }, (_, i) => addDaysIso(lastWeekStartIso, -7 * (TREND_WEEKS - 1 - i)));
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +81,7 @@ export default function Dashboard() {
       fetchAllMonthlyReportsForMonth(thisMonthStartIso),
       fetchAllMonthlyReportsForMonth(prevMonthStartIso),
       fetchWeeklyReportsBetween(trendRangeStartIso, thisWeekStartIso),
-      doneWeek ? fetchWeeklyReportStatuses(doneWeek.start) : Promise.resolve([]),
+      fetchWeeklyReportStatusesBetween(heatWeeks[0], lastWeekStartIso),
       fetchAgentsOverview(),
       fetchAgentDrafts(),
     ])
@@ -87,7 +94,7 @@ export default function Dashboard() {
         setThisMonthRows(tm);
         setPrevMonthRows(pm);
         setTrendRows(trend);
-        setLastWeekStatuses(statuses);
+        setStatusRows(statuses);
         setAgentRows(agents);
         setAgentDrafts(drafts);
       })
@@ -102,27 +109,10 @@ export default function Dashboard() {
     const lastWeek = aggTotals(lastWeekRows);
     const thisMonth = aggTotals(thisMonthRows);
     const prevMonth = aggTotals(prevMonthRows);
-
     const statusCounts = { active: 0, paused: 0, completed: 0 };
     projects.forEach((p) => { if (statusCounts[p.status] !== undefined) statusCounts[p.status]++; });
-
-    const platformTotals = { meta: 0, google: 0, other: 0 };
-    thisMonthRows.forEach((r) => { platformTotals[r.platform] = (platformTotals[r.platform] || 0) + (Number(r.data?.spend) || 0); });
-
-    const projectNameById = new Map(projects.map((p) => [String(p.id), p.name]));
-    const perProject = new Map();
-    thisMonthRows.forEach((r) => {
-      const key = String(r.project_id);
-      const cur = perProject.get(key) || { spend: 0, revenue: 0 };
-      cur.spend += Number(r.data?.spend) || 0;
-      cur.revenue += Number(r.data?.revenue) || 0;
-      perProject.set(key, cur);
-    });
-    const projectRows = [...perProject.entries()]
-      .map(([pid, v]) => ({ name: projectNameById.get(pid) || `#${pid}`, spend: v.spend, revenue: v.revenue, roas: v.spend ? v.revenue / v.spend : null }))
-      .sort((a, b) => b.spend - a.spend);
-
-    const weekLabels = Array.from({ length: TREND_WEEKS }, (_, i) => addDaysIso(thisWeekStartIso, -7 * (TREND_WEEKS - 1 - i)));
+    // the 8 weeks up to this one, for the sparklines of the key figures
+    const sparkWeeks = Array.from({ length: TREND_WEEKS }, (_, i) => addDaysIso(thisWeekStartIso, -7 * (TREND_WEEKS - 1 - i)));
     const byWeek = new Map();
     trendRows.forEach((r) => {
       const cur = byWeek.get(r.week_start) || { spend: 0, revenue: 0 };
@@ -130,14 +120,26 @@ export default function Dashboard() {
       cur.revenue += Number(r.data?.revenue) || 0;
       byWeek.set(r.week_start, cur);
     });
-    const weeklySpendTrend = weekLabels.map((iso) => byWeek.get(iso)?.spend || 0);
-    const weeklyRevenueTrend = weekLabels.map((iso) => byWeek.get(iso)?.revenue || 0);
-
-    return { thisWeek, lastWeek, thisMonth, prevMonth, statusCounts, platformTotals, projectRows, weekLabels, weeklySpendTrend, weeklyRevenueTrend };
+    const weeklySpendTrend = sparkWeeks.map((iso) => byWeek.get(iso)?.spend || 0);
+    const weeklyRevenueTrend = sparkWeeks.map((iso) => byWeek.get(iso)?.revenue || 0);
+    return { thisWeek, lastWeek, thisMonth, prevMonth, statusCounts, weeklySpendTrend, weeklyRevenueTrend };
   }, [projects, thisWeekRows, lastWeekRows, thisMonthRows, prevMonthRows, trendRows, thisWeekStartIso]);
 
-  const totalProjects = projects.length;
+  const charts = useMemo(() => {
+    const heat = heatRows(trendRows, projects, heatWeeks);
+    const matrix = weekStatusMatrix(statusRows, projects.filter((p) => p.status === 'active'), heatWeeks);
+    return {
+      heat,
+      flow: sankeyData(thisMonthRows, projects),
+      pace: pacing(thisMonthRows, prevMonthRows, todayI),
+      matrix,
+      counts: disciplineCounts(matrix),
+      board: boardRows(thisMonthRows, projects, heat),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendRows, projects, statusRows, thisMonthRows, prevMonthRows, todayI]);
 
+  const totalProjects = projects.length;
   // «Потрібна увага»: where the AI agent hit a problem, and the drafts it made that wait for a person.
   const attention = useMemo(() => {
     const nameOf = (id) => projects.find((p) => String(p.id) === String(id))?.name || `Проєкт ${id}`;
@@ -146,30 +148,13 @@ export default function Dashboard() {
     return [...problems, ...reviews];
   }, [projects, agentRows, agentDrafts]);
 
-  const trendLabels = stats.weekLabels?.map((iso) => {
-    const [wy, wm, wd] = iso.split('-').map(Number);
-    return fmtDate(wy, wm, wd).slice(0, 5);
-  }) ?? [];
-
-  const statusSlices = [
-    { label: 'Поточні', value: stats.statusCounts?.active ?? 0, grad: G.green },
-    { label: 'На паузі', value: stats.statusCounts?.paused ?? 0, grad: G.amber },
-    { label: 'Завершені', value: stats.statusCounts?.completed ?? 0, grad: G.lilac },
-  ];
-  const platformSlices = [
-    { label: 'Meta', key: 'meta', value: Math.round(stats.platformTotals?.meta ?? 0), grad: G.blue },
-    { label: 'Google', key: 'google', value: Math.round(stats.platformTotals?.google ?? 0), grad: G.green },
-    { label: 'Інше', key: 'other', value: Math.round(stats.platformTotals?.other ?? 0), grad: G.amber },
-  ];
-  const platformTotal = platformSlices.reduce((s, p) => s + p.value, 0);
   const monthLabel = MONTH_NAMES[m - 1];
-
   // the week is still going (not Sunday): its total is compared with a whole week, so no «▼» is drawn that would only mean «the week is not over»
   const weekOpen = new Date().getDay() !== 0;
   const kpis = [
     { icon: 'stat', label: 'Поточні проєкти', ring: totalProjects ? Math.round(((stats.statusCounts?.active ?? 0) / totalProjects) * 100) : 0, st: '', value: <>{stats.statusCounts?.active ?? 0} <span className="of">з {totalProjects}</span></>, sub: null, spark: null },
-    { icon: 'wallet', label: 'Витрати цього тижня', ring: ringOf(stats.thisWeek.spend, stats.lastWeek.spend), st: 'st-in', value: moneyFmt(stats.thisWeek.spend), sub: <><span>до минулого тижня ({moneyFmt(stats.lastWeek.spend)})</span>{weekOpen ? <span className="pd-note">тиждень ще триває</span> : <Delta diff={Math.round(stats.thisWeek.spend - stats.lastWeek.spend)} suffix=" $" />}</>, spark: [stats.weeklySpendTrend, G.blue, 'pdk2'] },
-    { icon: 'coin', label: 'Дохід цього тижня', ring: ringOf(stats.thisWeek.revenue, stats.lastWeek.revenue), st: '', value: moneyFmt(stats.thisWeek.revenue), sub: <><span>до минулого тижня ({moneyFmt(stats.lastWeek.revenue)})</span>{weekOpen ? <span className="pd-note">тиждень ще триває</span> : <Delta diff={Math.round(stats.thisWeek.revenue - stats.lastWeek.revenue)} suffix=" $" />}</>, spark: [stats.weeklyRevenueTrend, G.plum, 'pdk3'] },
+    { icon: 'wallet', label: 'Витрати цього тижня', ring: ringOf(stats.thisWeek.spend, stats.lastWeek.spend), st: 'st-in', value: money(stats.thisWeek.spend), sub: <><span>до минулого тижня ({money(stats.lastWeek.spend)})</span>{weekOpen ? <span className="pd-note">тиждень ще триває</span> : <Delta diff={Math.round(stats.thisWeek.spend - stats.lastWeek.spend)} suffix=" $" />}</>, spark: [stats.weeklySpendTrend, G.blue, 'pdk2'] },
+    { icon: 'coin', label: 'Дохід цього тижня', ring: ringOf(stats.thisWeek.revenue, stats.lastWeek.revenue), st: '', value: money(stats.thisWeek.revenue), sub: <><span>до минулого тижня ({money(stats.lastWeek.revenue)})</span>{weekOpen ? <span className="pd-note">тиждень ще триває</span> : <Delta diff={Math.round(stats.thisWeek.revenue - stats.lastWeek.revenue)} suffix=" $" />}</>, spark: [stats.weeklyRevenueTrend, G.plum, 'pdk3'] },
     {
       icon: 'roas', label: 'ROAS цього місяця', ring: stats.thisMonth.roas === null ? 0 : ringOf(stats.thisMonth.roas, stats.prevMonth.roas || stats.thisMonth.roas), st: 'st-ok', value: stats.thisMonth.roas === null ? '—' : stats.thisMonth.roas.toFixed(2) + 'x',
       sub: <><span>до минулого місяця ({stats.prevMonth.roas === null ? '—' : stats.prevMonth.roas.toFixed(2) + 'x'})</span>{stats.thisMonth.roas !== null && stats.prevMonth.roas !== null && <Delta diff={Math.round((stats.thisMonth.roas - stats.prevMonth.roas) * 100) / 100} />}</>,
@@ -177,16 +162,47 @@ export default function Dashboard() {
     },
   ];
 
-  const activeProjects = projects.filter((p) => p.status === 'active');
-  const maxRevenue = Math.max(...stats.projectRows.map((p) => p.revenue), 1);
-  const bestRoas = Math.max(...stats.projectRows.map((p) => p.roas ?? 0), 0);
-  const weekCmp = [
-    { label: 'Витрати', cur: stats.thisWeek.spend, prev: stats.lastWeek.spend, grad: G.blue },
-    { label: 'Дохід', cur: stats.thisWeek.revenue, prev: stats.lastWeek.revenue, grad: G.plum },
-  ];
+  const weekLabels = heatWeeks.map(shortWeek);
+  const openProject = (id) => navigate(`/projects/${id}`);
+  const flowBox = (
+    <section className="pd-box">
+      <BoxHead icon="layers" title="Потік грошей" sub={`${monthLabel}: з платформи в проєкти, колір проєкту це ROAS`} right={<RoasLegend />} />
+      {charts.flow.total ? <FlowChart data={charts.flow} /> : <div className="pd-empty">Немає витрат за цей місяць.</div>}
+    </section>
+  );
+  // three cards at a time, the rest is behind the switch of the pages
+  const attPages = Math.max(1, Math.ceil(attention.length / ATT_PAGE));
+  const attCur = Math.min(attPage, attPages);
+  const attentionBox = attention.length > 0 && (
+    <section className="pd-box pdn-att">
+      <BoxHead icon="alert" title="Потрібна увага" sub="Проблеми агента й чернетки, що чекають людину" right={<span className="pd-pill bad nc">{attention.length}</span>} />
+      <div className="pdn-acards">
+        {attention.slice((attCur - 1) * ATT_PAGE, attCur * ATT_PAGE).map((a) => (
+          <div className={'pd-box flat pd-acard ' + (a.kind === 'problem' ? 'bd' : 'wa')} key={a.key}>
+            <Medallion icon={a.kind === 'problem' ? 'alert' : 'note'} size="sm" st={a.kind === 'problem' ? 'st-bad' : 'st-paused'} />
+            <div className="pd-ab">
+              <div className="pd-an"><Link to={`/projects/${a.projectId}`}>{a.project}</Link>{a.kind === 'problem' ? <span className="pd-pill bad"><i />Проблема</span> : <span className="pd-pill paused"><i />Чернетка</span>}</div>
+              <p>{a.text}</p>
+            </div>
+            <Link className="pd-btn sec sm" to={a.to}><Ico n="arrow" />{a.action}</Link>
+          </div>
+        ))}
+      </div>
+      {attPages > 1 && (
+        <nav className="pd-pager pdn-attpager" aria-label="Сторінки списку «Потрібна увага»">
+          <button type="button" className="pd-pg arr" disabled={attCur === 1} aria-label="Попередня сторінка" onClick={() => setAttPage(attCur - 1)}><Ico n="chev" className="l" /></button>
+          {Array.from({ length: attPages }, (_, i) => i + 1).map((n) => (
+            <button key={n} type="button" className={'pd-pg' + (n === attCur ? ' on' : '')} aria-current={n === attCur ? 'page' : undefined} onClick={() => setAttPage(n)}>{n}</button>
+          ))}
+          <button type="button" className="pd-pg arr" disabled={attCur === attPages} aria-label="Наступна сторінка" onClick={() => setAttPage(attCur + 1)}><Ico n="chev" className="r" /></button>
+          <span className="pd-pgn">{(attCur - 1) * ATT_PAGE + 1}–{Math.min(attCur * ATT_PAGE, attention.length)} з {attention.length}</span>
+        </nav>
+      )}
+    </section>
+  );
 
   return (
-    <div className="report-page projects-dashboard-page pd">
+    <div className="report-page projects-dashboard-page pd pd-plum is-plum">
       {loading ? (
         <div className="pd-empty">Завантаження...</div>
       ) : (
@@ -206,140 +222,43 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {attention.length > 0 && (
+          {attentionBox ? <div className="pdn-g21">{flowBox}{attentionBox}</div> : flowBox}
+
+          <div className="pdn-g21">
             <section className="pd-box">
-              <BoxHead icon="alert" title="Потрібна увага" sub="Де агент натрапив на проблему і які чернетки чекають людину" right={<span className="pd-pill bad nc">{attention.length}</span>} />
-              <div className="pd-acards">
-                {attention.map((a) => (
-                  <div className={'pd-box flat pd-acard ' + (a.kind === 'problem' ? 'bd' : 'wa')} key={a.key}>
-                    <Medallion icon={a.kind === 'problem' ? 'alert' : 'note'} size="sm" st={a.kind === 'problem' ? 'st-bad' : 'st-paused'} />
-                    <div className="pd-ab">
-                      <div className="pd-an"><Link to={`/projects/${a.projectId}`}>{a.project}</Link>{a.kind === 'problem' ? <span className="pd-pill bad"><i />Проблема</span> : <span className="pd-pill paused"><i />Чернетка</span>}</div>
-                      <p>{a.text}</p>
-                    </div>
-                    <Link className="pd-btn sec sm" to={a.to}><Ico n="arrow" />{a.action}</Link>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className="pd-box">
-            <BoxHead
-              icon="file" title="Тижневі звіти" sub={doneWeek ? `за ${fmtIso(doneWeek.start)} – ${fmtIso(doneWeek.end)}` : undefined}
-              right={<span className="pd-legsm"><i style={{ background: '#12A144' }} />Фінал<i style={{ background: '#2F6FED' }} />Доробка<i style={{ background: '#E08A06' }} />Чернетка<i style={{ background: '#A98BB3' }} />Немає</span>}
-            />
-            {activeProjects.length === 0 ? (
-              <div className="pd-empty">Поточних проєктів ще немає.</div>
-            ) : (
-              <div className="pd-wks">
-                {activeProjects.map((p) => {
-                  const st = lastWeekStatuses.find((r) => String(r.project_id) === String(p.id))?.status;
-                  const rg = REPORT_RING[st] || REPORT_RING.none;
-                  return (
-                    <Link className="pd-wk" key={p.id} to={`/projects/${p.id}?tab=weekly`}>
-                      <Medallion tx={initials(p.name)} p={rg.p} st={rg.ring} size="wkm" />
-                      <span className="pd-wt"><b>{p.name}</b><small className={rg.cls}>{st ? (REPORT_STATUS[st] || st) : 'Немає'}</small></span>
-                      <span className={'pd-wgo' + (st ? '' : ' new')}><Ico n={st ? 'arrow' : 'plus'} /></span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="pd-box">
-            <BoxHead icon="users" title="Реєстр проєктів" sub={`${totalProjects} проєктів · рядок розкривається, там усі поля і перехід до картки`} />
-            <ProjectsRegistry projects={projects} />
-          </section>
-
-          <section className="pd-box">
-            <BoxHead icon="wallet" title="Проєкти цього місяця" sub={`${monthLabel} · витрати, дохід і ROAS по проєктах`} />
-            {stats.projectRows.length === 0 ? (
-              <div className="pd-empty">Немає збережених звітів за цей місяць.</div>
-            ) : (
-              <>
-                <div className="pd-pbars">
-                  {stats.projectRows.map((p, i) => (
-                    <div className="pd-pbr" key={`${i}-${p.name}`}>
-                      <span className="pd-pbn"><Medallion tx={initials(p.name)} size="xs" /><b>{p.name}</b></span>
-                      <div className="pd-pbb">
-                        <div className="pd-pb rv" style={{ width: Math.max((p.revenue / maxRevenue) * 100, 4) + '%' }}><em>{moneyK(p.revenue)}</em></div>
-                        <div className="pd-pb sp" style={{ width: Math.max((p.spend / maxRevenue) * 100, 4) + '%' }}><em>{moneyK(p.spend)}</em></div>
-                      </div>
-                      <span className={'pd-rcap' + (p.roas === null ? '' : p.roas >= 3 ? ' hi' : p.roas < 2 ? ' lo' : '')}>{roasFmt(p.roas)}</span>
-                    </div>
-                  ))}
-                </div>
-                <Legend items={[['Дохід', G.plum], ['Витрати', G.blue]]} />
-                <div className="pd-tblw">
-                  <table className="pd-tbl">
-                    <thead><tr><th>Проєкт</th><th className="num">Витрати</th><th className="num">Дохід</th><th className="num">ROAS</th></tr></thead>
-                    <tbody>
-                      {stats.projectRows.map((p, i) => (
-                        <tr key={`${i}-${p.name}`}>
-                          <td className="lbl">{p.name}</td>
-                          <td className="num">{moneyFmt(p.spend)}</td>
-                          <td className="num">{moneyFmt(p.revenue)}</td>
-                          <td className="num"><span className={p.roas !== null && p.roas === bestRoas && stats.projectRows.length > 1 ? 'best' : ''}>{roasFmt(p.roas)}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </section>
-
-          <section className="pd-box">
-            <BoxHead icon="bars" title="Цей тиждень і минулий" sub="Витрати і дохід у порівнянні" />
-            <div className="pd-wc2">
-              {weekCmp.map((c) => {
-                const mx = Math.max(c.cur, c.prev, 1); const dd = Math.round(c.cur - c.prev);
-                return (
-                  <div className="pd-wcb" key={c.label}>
-                    <div className="pd-wch"><b>{c.label}</b><Delta diff={dd} suffix=" $" /></div>
-                    <div className="pd-hp"><span>Цей тиждень</span><div className="pd-hpt"><div className="pd-hpb" style={{ width: Math.max((c.cur / mx) * 100, 14) + '%', background: `linear-gradient(100deg,${c.grad[0]},${c.grad[1]})` }}><em>{moneyFmt(c.cur)}</em></div></div></div>
-                    <div className="pd-hp"><span>Минулий</span><div className="pd-hpt"><div className="pd-hpb old" style={{ width: Math.max((c.prev / mx) * 100, 14) + '%' }}><em>{moneyFmt(c.prev)}</em></div></div></div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <div className="pd-g21">
-            <section className="pd-box">
-              <BoxHead icon="roas" title={`Витрати і дохід за ${TREND_WEEKS} тижнів`} sub="Наведіть або натисніть на тиждень" right={<Legend items={[['Дохід', G.plum], ['Витрати', G.blue]]} />} />
-              <TrendChart labels={trendLabels} spend={stats.weeklySpendTrend ?? []} revenue={stats.weeklyRevenueTrend ?? []} />
+              <BoxHead icon="stat" title="ROAS проєктів за 8 тижнів" sub="Де ефективність росте, а де сповзає; колір це ROAS тижня" right={<RoasLegend />} />
+              {charts.heat.length ? <HeatMap rows={charts.heat} weekLabels={weekLabels} /> : <div className="pd-empty">Немає збережених тижневих звітів з витратами.</div>}
             </section>
             <section className="pd-box">
-              <BoxHead icon="pie" title="Статуси проєктів" sub={`Усього ${totalProjects}`} />
-              <div className="pd-gx"><StatusDonut slices={statusSlices} /></div>
+              <BoxHead icon="file" title="Дисципліна звітів" sub={doneWeek ? `Тижневі звіти, останній за ${fmtIso(doneWeek.start)} – ${fmtIso(doneWeek.end)}` : 'Тижневі звіти за 8 тижнів'} right={<StatusLegend />} />
+              {charts.matrix.length ? <StatusMatrix rows={charts.matrix} weekLabels={weekLabels} onOpen={openProject} /> : <div className="pd-empty">Поточних проєктів ще немає.</div>}
+              {charts.matrix.length > 0 && <small className="pdn-note">Минулий тиждень: {charts.counts.final} з {charts.matrix.length} затверджено{charts.counts.draft + charts.counts.rework ? `, ${charts.counts.draft + charts.counts.rework} у роботі` : ''}{charts.counts.none ? `, ${charts.counts.none} без звіту` : ''}.</small>}
+            </section>
+          </div>
+
+          <div className="pdn-g12">
+            <section className="pd-box">
+              <BoxHead icon="clock" title="Темп місяця" sub={charts.pace ? `Витрати на ${charts.pace.day}-й день із ${charts.pace.dim} і прогноз` : monthLabel} />
+              {charts.pace ? (
+                <>
+                  <PaceArc pace={charts.pace} />
+                  <small className="pdn-note">Біла риска це весь минулий місяць ({money(charts.pace.prev)}){charts.pace.deltaPct === null ? '' : <>: за цим темпом цей місяць вийде на <b className={charts.pace.deltaPct > 0 ? 'pdn-up' : 'pdn-dn'}>{charts.pace.deltaPct > 0 ? '+' : ''}{charts.pace.deltaPct}%</b></>}. Дані з місячних звітів проєктів.</small>
+                </>
+              ) : <div className="pd-empty">Немає витрат за цей місяць.</div>}
+            </section>
+            <section className="pd-box">
+              <BoxHead icon="users" title="Проєкти цього місяця" sub={`${monthLabel}: витрати, дохід, ROAS і динаміка витрат за 8 тижнів`} />
+              {charts.board.length ? <Board rows={charts.board} onOpen={openProject} /> : <div className="pd-empty">Немає збережених звітів за цей місяць.</div>}
             </section>
           </div>
 
           <section className="pd-box">
-            <BoxHead icon="wallet" title="Витрати за платформою" sub={monthLabel} />
-            {platformTotal === 0 ? (
-              <div className="pd-empty">Немає витрат за цей місяць.</div>
-            ) : (
-              <div className="pd-plw">
-                <PlatformRings slices={platformSlices} caption={`Витрати за платформою — ${monthLabel}`} centerLabel={`за ${monthLabel.toLowerCase()}`} />
-                <div className="pd-pl">
-                  {platformSlices.map((p) => {
-                    const sym = PLATFORM_ICONS[PLATFORM_SYMBOL[p.key]];
-                    return (
-                      <div className="pd-plr" key={p.key}>
-                        {sym ? <span className="pd-lg2"><img src={sym.src} alt="" draggable="false" /></span> : <Medallion icon="layers" size="xs" st="st-paused" />}
-                        <span className="pn">{p.label}</span><b>{moneyFmt(p.value)}</b>
-                        <span className="pd-delta neu">{Math.round((p.value / platformTotal) * 100)}%</span>
-                      </div>
-                    );
-                  })}
-                  <div className="pd-plr tot"><span className="pn">Разом</span><b>{moneyFmt(platformTotal)}</b></div>
-                </div>
-              </div>
-            )}
+            <button type="button" className="pdn-reghead" aria-expanded={registryOpen} onClick={() => setRegistryOpen((o) => !o)}>
+              <Medallion icon="users" />
+              <span><b>Реєстр проєктів</b><small>{`${totalProjects} проєктів · рядок розкривається, там усі поля і перехід до картки`}</small></span>
+              <span className="pd-cv"><Ico n="chev" /></span>
+            </button>
+            {registryOpen && <ProjectsRegistry projects={projects} />}
           </section>
         </div>
       )}

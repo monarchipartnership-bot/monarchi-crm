@@ -9,6 +9,8 @@ import { MAX_BLOCKS, MAX_CREATIVES, MAX_PROMPT, MAX_TITLE, PRESETS, newBlockKey 
 import { METRICS, METRIC_SETS, metricMeta } from '../../../lib/reportMetrics';
 import { orderMetricKeys } from '../../../lib/reportTemplate';
 import { FUNNEL_CANDIDATES, funnelColumns } from '../../../lib/reportFunnel';
+import { GOOGLE_FUNNEL_STAGES, GOOGLE_FUNNEL_STEPS, cleanFunnelActions } from '../../../lib/googleFunnel';
+import { fetchConversionActions } from '../../../lib/api/googleFunnel';
 import '../../../styles/projectHistory.css';
 
 // The settings panels under the live layout of the «Конструктор звіту». Every panel changes the DRAFT (`draft`, `set`); the groups and the
@@ -331,7 +333,7 @@ export function GroupsPanel({ groups, campaigns, onEdit, onCreate, onChanged }) 
 
 // The funnel picture for the client: which stages and whether it is shown. Meta gives the counts of the stages as extra columns of the cabinet, so choosing a stage
 // also adds its column to the report (saved at once, like the extra metrics); the switch and the choice of stages are part of the layout («Зберегти макет»).
-export function FunnelPanel({ projectId, platform, draft, set, extraKeys, onChanged }) {
+export function FunnelPanel({ projectId, platform, draft, set, extraKeys, onChanged, accounts = [] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const f = draft.funnel || { enabled: false, stages: [] };
@@ -352,6 +354,7 @@ export function FunnelPanel({ projectId, platform, draft, set, extraKeys, onChan
     change({ ...f, stages });
   };
   const meta = platform === 'meta';
+  if (platform === 'google') return <GoogleFunnelPanel accounts={accounts} funnel={f} set={set} />;
   return (
     <Panel id="funnel" title="Воронка" summary={f.enabled ? `${f.stages.length} ${pluralUk(f.stages.length, ['етап', 'етапи', 'етапів'])}` : 'вимкнена'} note="Картинка для клієнта: перегляд товару, кошик, оформлення, продаж, і де людей стає найменше.">
       <Switch on={!!f.enabled && meta} onChange={(v) => { if (meta) change({ ...f, enabled: v }); }} label="Показувати воронку в звіті" />
@@ -364,6 +367,58 @@ export function FunnelPanel({ projectId, platform, draft, set, extraKeys, onChan
       </div>
       <div className="pacc-hint">Етапи йдуть у порядку шляху клієнта. Вибір етапу додає його стовпець із кабінету; зміни діють після «Зберегти макет».</div>
       {error && <div className="pacc-err">{error}</div>}
+    </Panel>
+  );
+}
+
+// Google has no ready stage columns: for each stage the manager picks ONE conversion action of the account (variant B, so one action never feeds two stages).
+// The stage's number is that action's count for the report's period; the sale is the report's own «conversions».
+function GoogleFunnelPanel({ accounts, funnel, set }) {
+  const [state, setState] = useState({ loading: true, actions: [], error: '' });
+  const customerId = accounts[0]?.account_id;
+  useEffect(() => {
+    let off = false;
+    if (!customerId) { setState({ loading: false, actions: [], error: '' }); return undefined; }
+    setState((st) => ({ ...st, loading: true, error: '' }));
+    fetchConversionActions(customerId)
+      .then((r) => { if (!off) setState({ loading: false, actions: r.actions || [], error: '' }); })
+      .catch((e) => { if (!off) setState({ loading: false, actions: [], error: e.message || 'Не вдалося отримати дії конверсій кабінету.' }); });
+    return () => { off = true; };
+  }, [customerId]);
+  const chosen = cleanFunnelActions(funnel.actions);
+  const taken = (id) => Object.entries(chosen).filter(([k]) => k !== id).map(([, name]) => name);
+  const pick = (id, name) => {
+    const actions = { ...chosen };
+    if (name) actions[id] = name; else delete actions[id];
+    set({ funnel: { ...funnel, stages: GOOGLE_FUNNEL_STAGES, actions } });
+  };
+  const toggle = (enabled) => set({ funnel: { ...funnel, enabled, stages: GOOGLE_FUNNEL_STAGES, actions: chosen } });
+  const count = Object.keys(chosen).length;
+  const optionsFor = (id) => {
+    const used = taken(id);
+    const list = state.actions.filter((a) => !used.includes(a.name)).map((a) => ({ value: a.name, label: `${a.name} · ${a.count.toLocaleString('uk-UA')}${a.primary ? ' · основна' : ''}` }));
+    if (chosen[id] && !state.actions.some((a) => a.name === chosen[id])) list.unshift({ value: chosen[id], label: `${chosen[id]} (немає в кабінеті)` });
+    return [{ value: '', label: '— не обрано —' }, ...list];
+  };
+  return (
+    <Panel id="funnel" title="Воронка" summary={funnel.enabled ? `${count} з ${GOOGLE_FUNNEL_STEPS.length} етапів налаштовано` : 'вимкнена'} note="Картинка для клієнта: перегляд товару, кошик, оформлення, продаж, і де людей стає найменше. Для кожного етапу оберіть одну дію конверсії кабінету Google: її кількість за період і буде числом етапу.">
+      <Switch on={!!funnel.enabled} onChange={toggle} label="Показувати воронку в звіті" />
+      {!customerId && <div className="pacc-hint">До проєкту не підключено кабінет Google Ads.</div>}
+      {state.loading && customerId && <div className="pacc-hint">Читаємо дії конверсій кабінету…</div>}
+      {state.error && <div className="pacc-err">{state.error}</div>}
+      <div className="bld-fn-rows">
+        {GOOGLE_FUNNEL_STEPS.map((s) => (
+          <div className="bld-fn-row" key={s.id}>
+            <span className="bld-fn-label">{s.label}</span>
+            <Select value={chosen[s.id] || ''} placeholder="— не обрано —" ariaLabel={`Дія конверсії для етапу «${s.label}»`} disabled={state.loading || !customerId} options={optionsFor(s.id)} onChange={(name) => pick(s.id, name || '')} />
+          </div>
+        ))}
+        <div className="bld-fn-row">
+          <span className="bld-fn-label">Продаж</span>
+          <span className="bld-fn-fixed">кількість конверсій звіту</span>
+        </div>
+      </div>
+      <div className="pacc-hint">Число біля назви в списку: скільки разів дія спрацювала за останні 30 днів. Одну дію можна обрати лише для одного етапу. Етап без обраної дії в картинку не потрапить. Етапи кошика й перегляду зазвичай не основні дії, їх Google рахує окремо від «Конверсій» звіту. Зміни діють після «Зберегти макет».</div>
     </Panel>
   );
 }

@@ -15,6 +15,11 @@ import '../../styles/projectsPage.css';
 import '../../styles/projectsFolder.css';
 import '../../styles/ddHub.css';
 import '../../styles/projectHistory.css';
+import '../../styles/projectsPlum.generated.css'; // the light page recoloured to the plum palette (made by a script)
+import '../../styles/projectsPlum.css';
+import '../../styles/ddNight.css'; // the dark menus of the dropdowns and the calendar in the create dialog
+import '../../styles/projectModalPlum.generated.css'; // the create dialog recoloured to the plum palette (made by a script)
+import '../../styles/projectModalPlum.css';
 
 // First level (folder tabs): where the project runs. Decided by the linked ad accounts, never by
 // the service tags; a project with accounts on both platforms is in both lists.
@@ -43,7 +48,7 @@ export default function Projects() {
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [platform, setPlatform] = useState('all');
-  const [tab, setTab] = useState('all');
+  const [tab, setTab] = useState('active'); // the page opens on «Поточні» (owner, 2026-11-16)
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(Boolean(newForClient));
   const [saving, setSaving] = useState(false);
@@ -152,7 +157,7 @@ export default function Projects() {
   }
 
   return (
-    <div className="report-page projects-page folder-design">
+    <div className="report-page projects-page folder-design is-plum">
       <div className="proj-ptabs" role="tablist" aria-label="Платформа" onKeyDown={onTabKey}>
         {PLATFORM_TABS.map((t) => {
           const on = platform === t.key;
