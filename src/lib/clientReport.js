@@ -204,7 +204,7 @@ export function metricTable(view, { keys, custom = [], platformLabel = '', showA
   const rows = keys.map((key) => {
     const info = metricInfo(key, custom, platformLabel, view.lang);
     return {
-      key, label: info.label,
+      key, label: info.label, goodWhen: info.goodWhen,
       cells: bases.map((b, i) => {
         const v = computeMetric(key, b);
         const p = prevs[i];
@@ -216,7 +216,7 @@ export function metricTable(view, { keys, custom = [], platformLabel = '', showA
           else if (key === 'cpp' && v === best.cpp) cls = 'best';
           else if (key === 'ctr' && v === best.ctr) cls = 'best';
         }
-        return { text: fmtValue(key, v, info.format, view.currency, view.lang), change: p && p !== 'new' ? change(key, v, computeMetric(key, p), info.goodWhen, view.lang) : null, isNew: p === 'new', cls };
+        return { text: fmtValue(key, v, info.format, view.currency, view.lang), change: p && p !== 'new' ? change(key, v, computeMetric(key, p), info.goodWhen, view.lang) : null, isNew: p === 'new', cls, value: v };
       }),
     };
   });

@@ -11,6 +11,7 @@ import SectionNav from '../../components/ClientReport/SectionNav';
 import { LangProvider } from '../../components/ClientReport/langContext';
 import { daysText, monthNameIn, monthShortIn, normLang, trFor } from '../../lib/clientLang';
 import '../../styles/clientReportHub.css';
+import '../../styles/clientReportDark.css';
 
 // The page a client opens by a link (/r/<token>): no password, outside the CRM. It reads ONLY get_shared_report(token) — approved weeks and the
 // running total of the month, with everything internal stripped by the database. The same link keeps working as new weeks are approved.
@@ -28,8 +29,8 @@ function initials(name) {
   return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)).toUpperCase();
 }
 
-function Frame({ children }) {
-  return (<div className="crh"><div className="wrap">{children}</div></div>);
+function Frame({ bar = null, children }) {
+  return (<div className="crh crp">{bar}<div className="wrap">{children}</div></div>);
 }
 
 export default function ClientReportPage() {
@@ -80,59 +81,78 @@ export default function ClientReportPage() {
   const current = tab || (months.length ? months[months.length - 1].key : 'all');
   const month = months.find((m) => m.key === current) || months[months.length - 1] || null;
   const asOf = (iso) => (iso ? dmy(String(iso).slice(0, 10)) : '—');
-  let chips = [];
+  // the compact bar keeps what is true of the whole page; what is true of the month that is open sits in the month card under it
+  let barChips = [];
   if (model.isSingle && model.single) {
     const v = model.single;
     const days = Math.round((new Date(v.end) - new Date(v.start)) / 86400000) + 1;
-    chips = [
+    barChips = [
       { icon: 'cal', node: <>{t('Period')} <b>{dmy(v.start)} – {dmy(v.end)}</b> · {daysText(days, lang)}</> },
       { icon: 'check', tone: 'ok', node: <b>{t('Final')}</b> },
       { icon: 'clock', node: <>{t('Data as of')} <b>{asOf(v.updatedAt)}</b></> },
     ];
   } else if (!model.isSingle && month && current !== 'all') {
-    const complete = month.weeksApproved === month.weeksTotal;
-    chips = [
-      { icon: 'cal', node: <>{t('Month')} <b>{monthNameIn(month.key, lang)}</b></> },
-      { icon: 'check', tone: complete ? 'ok' : 'warn', node: <>{t('Weeks approved')} <b>{t('{a} of {b}', { a: month.weeksApproved, b: month.weeksTotal })}</b></> },
-      { icon: 'file', tone: month.running ? 'warn' : '', node: <>{t('Month report')} <b>{!month.monthly ? t('not ready') : month.running ? t('to date') : t('final')}</b></> },
-      { icon: 'clock', node: <>{t('Data as of')} <b>{asOf(month.asOf)}</b></> },
-    ];
+    barChips = [{ icon: 'clock', node: <>{t('Data as of')} <b>{asOf(month.asOf)}</b></> }];
   }
   const pf = PLATFORM[model.platform] || { label: 'Advertising report', logo: null, style: { background: '#F3E3F7', color: '#682768' } };
+  // the months as steps: «All months» first, then the months in time order; the arrows walk this line
+  const steps = months.length > 1 ? ['all', ...months.map((m) => m.key)] : months.map((m) => m.key);
+  const at = Math.max(0, steps.indexOf(current));
+  const go = (d) => { const k = steps[at + d]; if (k) setTab(k); };
+  const title = current === 'all' && months.length > 1 ? t('All months') : month ? `${monthNameIn(month.key, lang)} ${month.key.slice(0, 4)}` : '';
+
+  const pill = <span className={`plb plb-${model.platform || 'x'}`}>{pf.logo ? <span className={`ic ${pf.logo}`} style={{ width: 16, height: 16, borderRadius: '50%' }} /> : null}{t(pf.label)}</span>;
+  const chipRow = barChips.map((c) => <Chip key={c.icon} icon={c.icon} tone={c.tone}>{c.node}</Chip>);
 
   return (
     <LangProvider lang={lang}>
-    <Frame>
-      <header className="cx-head">
-        <Medallion text={initials(model.project.name)} cls="lg" />
-        <div className="cx-hm">
+    <Frame bar={(
+      <header className="crp-bar">
+        <div className="crp-barin">
+          <Medallion text={initials(model.project.name)} cls="sm" />
           <h1>{model.project.name}</h1>
-          <div className="cx-chips">
-            <span className="plb" style={pf.style}>{pf.logo ? <span className={`ic ${pf.logo}`} style={{ width: 18, height: 18, borderRadius: '50%' }} /> : null}{t(pf.label)}</span>
-            {chips.map((c) => <Chip key={c.icon} icon={c.icon} tone={c.tone}>{c.node}</Chip>)}
-          </div>
+          <div className="cx-chips crp-bc">{pill}{chipRow}</div>
+          <span className="cx-grow" />
+          <MonarchiLogo />
         </div>
-        <MonarchiLogo />
       </header>
-      <SectionNav watch={model.isSingle ? 'single' : current} />
+    )}
+    >
+      <div className="cx-chips crp-sub">{pill}{chipRow}</div>
 
       {model.isSingle ? (
-        model.single ? <PeriodView view={model.single} model={model} /> : <div className="emp crh-state">{t("This report is not available any more. Please ask your Mon'Archi manager for a new link.")}</div>
+        <>
+          <SectionNav watch="single" />
+          {model.single ? <PeriodView view={model.single} model={model} /> : <div className="emp crh-state">{t("This report is not available any more. Please ask your Mon'Archi manager for a new link.")}</div>}
+        </>
       ) : months.length === 0 ? (
         <div className="emp crh-state">{t('The first report will appear here as soon as it is approved. This page updates itself — you can keep the link.')}</div>
       ) : (
         <>
-          <div className="pl-list six ms7" role="group" aria-label={t('Months')}>
-            {months.length > 1 && (
-              <button type="button" className={`pt${current === 'all' ? ' on' : ''}`} aria-pressed={current === 'all'} onClick={() => setTab('all')}><Medallion icon="chart" /><b>{t('All months')}</b></button>
-            )}
-            {months.map((m) => (
-              <button type="button" key={m.key} className={`pt${current === m.key ? ' on' : ''}`} aria-pressed={current === m.key} onClick={() => setTab(m.key)}>
-                <Medallion icon="cal" p={Math.round((m.weeksApproved / Math.max(m.weeksTotal, 1)) * 100)} st={m.running ? 'st-paused' : ''} /><b>{monthNameIn(m.key, lang)}</b>
-              </button>
-            ))}
+          <div className="crp-ms">
+            <button type="button" className="ar" onClick={() => go(-1)} disabled={at <= 0} aria-label={t('Previous month')}>&#8249;</button>
+            <div className="mid">
+              <div className="mt">
+                <h2>{title}</h2>
+              </div>
+              {steps.length > 2 && (
+                <div className="tl" role="group" aria-label={t('Months')}>
+                  {months.length > 1 && (
+                    <button type="button" className={`all${current === 'all' ? ' on' : ''}`} aria-pressed={current === 'all'} onClick={() => setTab('all')} title={t('All months')}><Icon name="roas" /></button>
+                  )}
+                  {months.map((m) => {
+                    const done = !m.running && m.weeksApproved === m.weeksTotal;
+                    return (
+                      <button type="button" key={m.key} className={`${current === m.key ? 'on' : done ? 'fin' : m.running ? 'run' : ''}`.trim()} aria-pressed={current === m.key} onClick={() => setTab(m.key)} title={`${monthNameIn(m.key, lang)} ${m.key.slice(0, 4)}`}>{monthShortIn(m.key, lang)}</button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <button type="button" className="ar nx" onClick={() => go(1)} disabled={at >= steps.length - 1} aria-label={t('Next month')}>&#8250;</button>
           </div>
-          <div id="view">{current === 'all' && months.length > 1 ? <AllMonths model={model} /> : month ? <MonthView month={month} model={model} /> : null}</div>
+          <SectionNav watch={current} />
+          <div id="view">{current === 'all' && months.length > 1 ? <AllMonths model={model} /> : month ? <MonthView key={month.key} month={month} model={model} /> : null}</div>
         </>
       )}
     </Frame>

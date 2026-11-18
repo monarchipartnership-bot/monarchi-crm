@@ -3,7 +3,7 @@ import { exportCsv, exportXlsx, exportPng, exportPdf, safeFileName } from '../..
 
 // "Завантажити" menu: CSV and XLSX come from the data model, PNG and PDF from a
 // picture of the element that holds the tables (`targetRef`).
-export default function ExportMenu({ model, targetRef, fileBase, disabled, formats, onXlsx = null }) {
+export default function ExportMenu({ model, targetRef, fileBase, disabled, formats, onXlsx = null, onPdf = null }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -26,7 +26,7 @@ export default function ExportMenu({ model, targetRef, fileBase, disabled, forma
       if (kind === 'csv') exportCsv(model, name);
       else if (kind === 'xlsx') { if (onXlsx) await onXlsx(); else exportXlsx(model, name); } // a report of the history has its own one-sheet file
       else if (kind === 'png') await exportPng(targetRef.current, name);
-      else if (kind === 'pdf') await exportPdf(targetRef.current, name);
+      else if (kind === 'pdf') { if (onPdf) await onPdf(); else await exportPdf(targetRef.current, name); } // a saved report has its own multi-page PDF
       setOpen(false);
     } catch (e) {
       console.warn('export failed', e);

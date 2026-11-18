@@ -1,0 +1,57 @@
+/* The pages of the downloaded PDF (components/ClientReport/PdfDocument.jsx, lib/reportPdf.js): dark plum A4 sheets at 96 dpi, 794 x 1123 px, the table page landscape. Built on the client
+   page's dark layer (.crh.crp), so the tables, charts and cards are the same parts; everything here is scoped to .pdfd and nothing reaches the CRM. */
+.crh.crp.pdfd { min-height: 0; padding: 0; background: none; display: flex; flex-direction: column; gap: 0; width: max-content; }
+.pdfd .pdfp { position: relative; width: 794px; min-height: 1123px; padding: 40px 46px 64px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; color: var(--ink); font-family: 'Onest', system-ui, sans-serif; background: radial-gradient(ellipse 70% 40% at 10% -4%, rgba(181, 68, 181, .32), transparent 70%), linear-gradient(180deg, #17051c, #270827); }
+.pdfd .pdfp.land { width: 1123px; min-height: 794px; padding: 34px 44px 56px; }
+.pdfd .pdf-hdr { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1.5px solid var(--line); }
+.pdfd .pdf-hdr .nm b { display: block; font: 800 16px/1.2 'Onest', sans-serif; }
+.pdfd .pdf-hdr .nm small { display: block; margin-top: 2px; font-size: 11px; color: var(--mut); }
+.pdfd .pdf-hdr .grow { flex: 1; }
+.pdfd .pdf-hdr .plb { height: 24px; padding: 0 11px; font-size: 11px; }
+.pdfd .logo svg { height: 24px; }
+.pdfd .logo svg g[style] { --card: #1c0722; }
+.pdfd .pdf-ft { position: absolute; left: 46px; right: 46px; bottom: 20px; display: flex; justify-content: space-between; gap: 16px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 10px; color: var(--mut); }
+.pdfd .pdfp.land .pdf-ft { left: 44px; right: 44px; bottom: 16px; }
+.pdfd .pdf-ft b { font-weight: 600; color: var(--sec); }
+.pdfd .pdf-sh h2 { font-size: 17px; }
+.pdfd .pdf-sh small { font-size: 11.5px; }
+
+/* six equal tiles */
+.pdfd .pdf-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pdfd .pdf-tile { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 18px; background: var(--card); box-shadow: inset 0 0 0 1.2px var(--ln); min-width: 0; }
+.pdfd .pdf-tile .lb { font-size: 11px; font-weight: 600; color: var(--sec); }
+.pdfd .pdf-tile .v { font: 800 24px/1.1 'Onest', sans-serif; font-variant-numeric: tabular-nums; }
+.pdfd .pdf-tile .dd { display: flex; align-items: center; gap: 6px; min-height: 22px; font-size: 10px; color: var(--mut); }
+.pdfd .pdf-tile .delta { height: 18px; padding: 0 7px; font-size: 10px; }
+.pdfd .pdf-tile .cmp { display: grid; gap: 3px; margin-top: 4px; }
+.pdfd .pdf-tile .cmp i { display: block; height: 5px; border-radius: 3px; }
+.pdfd .pdf-tile .cmp .was { background: var(--track); }
+.pdfd .pdf-tile .cmp .now { background: linear-gradient(90deg, #B544B5, #EB9CEF); }
+
+.pdfd .pdf-two { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.pdfd .pdf-card { padding: 14px 16px; border-radius: 18px; }
+.pdfd .pdf-card .ct { margin: 0 0 6px; font: 800 12.5px 'Onest', sans-serif; }
+.pdfd .srl li { font-size: 11px; grid-template-columns: 22px minmax(0, 1fr) auto 34px; }
+.pdfd .srl .rk { width: 20px; height: 20px; font-size: 10px; }
+.pdfd .hbr { grid-template-columns: 96px minmax(0, 1fr); }
+.pdfd .rf { box-shadow: inset 0 0 0 1.2px var(--ln); }
+
+/* the table page */
+.pdfd .pdf-table { padding: 8px 6px 10px; }
+.pdfd .pdf-table .cx-tw { overflow: visible; }
+.pdfd .pdf-table table.hubt.full { table-layout: fixed; width: 100%; min-width: 0; }
+.pdfd .pdf-table .hubt.full th { min-width: 0; font-size: 10px; padding: 8px 4px; }
+.pdfd .pdf-table .hubt.full td { font-size: 11.5px; padding: 6px 4px; }
+.pdfd .pdf-table .hubt.full td:first-child { font-size: 11px; }
+.pdfd .pdf-table .hubt.full tr.cx-secrow td { padding: 12px 18px 4px; }
+.pdfd .pdf-table .crh-more { display: none; }
+.pdfd .pdf-table .hint { margin: 6px 14px 0; font-size: 9.5px; }
+
+/* creatives and notes */
+.pdfd .cra.big { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pdfd .cx-rank { width: 24px; height: 24px; font-size: 11px; }
+.pdfd .pdf-notes { display: grid; gap: 10px; }
+.pdfd .tcard { padding: 13px 16px; }
+.pdfd .tcard p { font-size: 12px; line-height: 1.55; }
+.pdfd .cx-list li { font-size: 12px; }
+.pdfd .crh-lb { display: none; }

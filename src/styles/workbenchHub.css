@@ -60,7 +60,7 @@
 /* ======== the workspace of one report (ReportEditor): sticky bar A, main column + side column of settings B ======== */
 .project-detail-page.pw .wbe { display: flex; flex-direction: column; gap: 14px; font-family: 'Onest', system-ui, sans-serif; color: #270827; }
 .project-detail-page.pw .wbe * { box-sizing: border-box; }
-.project-detail-page.pw .wbe-bar { position: sticky; top: 8px; z-index: 6; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px 14px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 6px 18px #6827681c; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
+.project-detail-page.pw .wbe-bar { position: sticky; top: 76px; z-index: 6; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px 14px; border: 1.5px solid transparent; border-radius: 24px; box-shadow: 0 6px 18px #6827681c; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #F0DDF0, #D9A6DF 55%, #F0DDF0) border-box; }
 .project-detail-page.pw .wbe-back { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #fff; color: #682768; cursor: pointer; box-shadow: inset 0 0 0 1.5px #EBC6EB, 0 0 0 4px #AE40AE14; }
 .project-detail-page.pw .wbe-back svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .project-detail-page.pw .wbe-title { flex: 1 1 300px; min-width: 0; }

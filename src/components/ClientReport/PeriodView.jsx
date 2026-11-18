@@ -1,4 +1,4 @@
-import { Box, HBars, Pill, PALETTE, Donut, Sec } from './kit';
+import { Box, HBars, Pill, PALETTE, SpendRank, Sec } from './kit';
 import { Creatives, MetricTable, NotesGrid } from './parts';
 import FunnelBox from './Funnel';
 import { Kpis } from './MonthView';
@@ -26,7 +26,7 @@ export default function PeriodView({ view, model }) {
       {(slices.length > 0 || bars.length > 0) && (
         <Sec id="spend" icon="pie" title={t('Spend & ROAS')} sub={t('Where the budget went and what it returned')}>
           <div className="g2">
-            {slices.length > 0 && <Box icon="pie" title={t('Spend by campaign group')}><div className="gx"><Donut slices={slices} center={fmtValue('spend', spent, 'money', view.currency, view.lang)} caption={t('ad spend')} fmt={(v) => fmtValue('spend', v, 'money', view.currency, view.lang)} /></div></Box>}
+            {slices.length > 0 && <Box icon="pie" title={t('Spend by campaign group')} sub={`${t('ad spend')} · ${fmtValue('spend', spent, 'money', view.currency, view.lang)}`}><div className="gx"><SpendRank slices={slices} fmt={(v) => fmtValue('spend', v, 'money', view.currency, view.lang)} /></div></Box>}
             {bars.length > 0 && <Box icon="bars" title={t('ROAS by campaign group')}><div className="gx"><HBars items={bars} /></div></Box>}
           </div>
         </Sec>

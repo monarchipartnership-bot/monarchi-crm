@@ -26,6 +26,7 @@ export default function SectionNav({ watch }) {
     const onScroll = () => {
       let cur = items[0]?.id || '';
       items.forEach((x) => { const el = document.getElementById(x.id); if (el && el.getBoundingClientRect().top <= 140) cur = x.id; });
+      if (items.length && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 6) cur = items[items.length - 1].id; // the end of the page: the last section, even when it is too short to reach the top
       setActive(cur);
     };
     onScroll();

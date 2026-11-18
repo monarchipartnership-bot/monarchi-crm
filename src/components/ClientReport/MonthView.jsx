@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, DeltaPill, GB, GP, HBars, Icon, Legend, Medallion, Pill, PALETTE, Wave, Donut, Sec } from './kit';
+import { Box, DeltaPill, GB, GP, HBars, Icon, Legend, Medallion, Pill, PALETTE, Spark, SpendRank, Wave, Sec } from './kit';
 import { Creatives, MetricTable, NotesGrid } from './parts';
 import FunnelBox from './Funnel';
 import { LangProvider } from './langContext';
@@ -8,7 +8,7 @@ import { monthNameIn, normLang, trFor } from '../../lib/clientLang';
 import { computeMetric } from '../../lib/reportMetrics';
 
 // The six numbers of a report: the main one on a plum card (revenue, for lead projects the leads) with the two that explain it, the rest in tiles. `all`: the team's view (nothing hidden).
-export function Kpis({ view, all = false }) {
+export function Kpis({ view, all = false, series = null }) {
   const t = trFor(view.lang);
   const vs = prevName(view);
   const cards = kpiCards(view, { all });
@@ -23,6 +23,7 @@ export function Kpis({ view, all = false }) {
         <small>{hero.label}</small>
         <b className="v">{hero.value}</b>
         {hero.change && <div className="cx-bd"><DeltaPill change={hero.change} /><span>{t('vs')} {vs}</span></div>}
+        {series?.[hero.key] && <Spark values={series[hero.key]} g={['#FFFFFF', '#F3C6F7']} w={300} h={64} className="spk cx-hspk" />}
         {subs.length > 0 && (
           <div className="cx-sub">
             {subs.map((k) => (
@@ -36,6 +37,7 @@ export function Kpis({ view, all = false }) {
           {rest.map((k) => (
             <div className="rf mc" key={k.key}>
               <div className="mch"><Medallion icon={k.icon} cls="sm" /><div className="mct"><small>{k.label}</small><b className="v">{k.value}</b></div></div>
+              {series?.[k.key] && <Spark values={series[k.key]} g={['#F6C5FA', '#C25AC4']} w={240} h={52} className="spk cx-kspk" />}
               <div className="mcf">{k.change && <><DeltaPill change={k.change} /><span className="sub">{t('vs')} {vs}</span></>}</div>
             </div>
           ))}
@@ -45,9 +47,8 @@ export function Kpis({ view, all = false }) {
   );
 }
 
-// One approved week: a row that opens. It is drawn in its own report's language. The latest week is open.
-function Week({ week, ctx, model, open: initial }) {
-  const [open, setOpen] = useState(initial);
+// One approved week as a card: its three numbers, a little bar chart of the month's weeks with this one lit, and the button that opens its full report below the cards.
+function WeekCard({ week, weeks, on, onPick }) {
   const v = week.view;
   const t = trFor(v.lang);
   const hide = (key) => (v.hiddenMetrics || []).includes(key);
@@ -56,26 +57,46 @@ function Week({ week, ctx, model, open: initial }) {
     const val = computeMetric(k, v.total);
     return val == null ? null : { key: k, label: k === 'purchases' ? t('Sales') : k === 'spend' ? t('Spent') : k === 'roas' ? 'ROAS' : k === 'leads' ? t('Leads') : 'CPL', value: fmtValue(k, val, k === 'roas' ? 'ratio' : k === 'purchases' || k === 'leads' ? 'number' : 'money', v.currency, v.lang) };
   }).filter(Boolean);
+  const pk = lead ? 'leads' : 'revenue';
+  const vals = weeks.map((w) => Number(w.view.total[pk]) || 0);
+  const mx = Math.max(...vals, 1);
+  return (
+    <section className={'cx-wc' + (on ? ' on' : '')}>
+      <div className="cx-wch">
+        <Medallion icon="cal" cls="sm" />
+        <span className="cx-wkt"><b>{t('Week {n}', { n: week.n })}</b><small>{week.label}</small></span>
+        <span className="cx-grow" />
+        <Pill tone="ok">{t('Approved')}</Pill>
+      </div>
+      {figs.length > 0 && <div className="cx-wn">{figs.map((f) => <div key={f.key}><b>{f.value}</b><span>{f.label}</span></div>)}</div>}
+      {weeks.length > 1 && !hide(pk) && (
+        <div className="cx-wb" aria-hidden="true">{weeks.map((w, i) => <i key={w.n} className={w.n === week.n ? 'me' : ''} style={{ height: `${Math.max(10, (vals[i] / mx) * 100)}%` }} />)}</div>
+      )}
+      <button type="button" className="cx-wo" aria-expanded={on} aria-controls="cx-wdetail" onClick={onPick}>{on ? t('Hide the week') : t('Open the week')}<Icon name="down" /></button>
+    </section>
+  );
+}
+
+// The full report of the chosen week (the same table, funnel, notes and creatives a month has), drawn in the week's own language.
+function WeekDetail({ week, ctx, model, onClose }) {
+  const v = week.view;
+  const t = trFor(v.lang);
   const hasTexts = v.blocks.some((b) => String(v.sections?.[b.key] || '').trim());
   return (
     <LangProvider lang={v.lang}>
-      <section className={'rf cx-wk' + (open ? ' op' : '')}>
-        <button type="button" className="cx-wkh" aria-expanded={open} aria-controls={`wk-${week.n}`} onClick={() => setOpen((o) => !o)}>
+      <section className="rf cx-wd" id="cx-wdetail">
+        <div className="cx-wdh">
           <Medallion icon="cal" cls="sm" />
           <span className="cx-wkt"><b>{t('Week {n}', { n: week.n })}</b><small>{week.label}</small></span>
           <span className="cx-grow" />
-          <span className="cx-figs">{figs.map((f) => <span className="cx-fg" key={f.key}><em>{f.label}</em><b>{f.value}</b></span>)}</span>
-          <Pill tone="ok">{t('Approved')}</Pill>
-          <span className="cx-chv"><Icon name="down" /></span>
-        </button>
-        {open && (
-          <div className="cx-wkb" id={`wk-${week.n}`}>
-            <MetricTable full view={v} keys={viewKeys(v, model)} {...ctx} />
-            <FunnelBox view={v} custom={model.custom} />
-            {hasTexts && <NotesGrid view={v} />}
-            <Creatives items={v.creatives} large />
-          </div>
-        )}
+          <button type="button" className="cx-x" onClick={onClose} aria-label={t('Close')}>&times;</button>
+        </div>
+        <div className="cx-wkb">
+          <MetricTable full view={v} keys={viewKeys(v, model)} {...ctx} />
+          <FunnelBox view={v} custom={model.custom} />
+          {hasTexts && <NotesGrid view={v} />}
+          <Creatives items={v.creatives} large />
+        </div>
       </section>
     </LangProvider>
   );
@@ -83,6 +104,7 @@ function Week({ week, ctx, model, open: initial }) {
 
 // A month: the six numbers, the charts, the weeks (each one opens) and the summary of the month with its notes and creatives.
 export default function MonthView({ month, model }) {
+  const [openWeek, setOpenWeek] = useState(() => (month.monthly || !month.weeks.length ? null : month.weeks[month.weeks.length - 1].n));
   const kind = model.kind;
   const platformLabel = model.platform === 'meta' ? 'Meta' : model.platform === 'google' ? 'Google' : '';
   const ctx = { custom: model.custom, platformLabel };
@@ -115,6 +137,13 @@ export default function MonthView({ month, model }) {
       </div>
     </Box>
   ) : null;
+  const sparks = {};
+  if (total && month.weeks.length > 1) {
+    kpiCards(total).forEach((c) => {
+      const vals = month.weeks.map((w) => computeMetric(c.key, w.view.total));
+      if (vals.filter((x) => x != null && Number.isFinite(x)).length > 1) sparks[c.key] = vals.map((x) => (Number.isFinite(x) ? x : 0));
+    });
+  }
   const slices = total ? spendSlices(total).map((s, i) => ({ ...s, g: PALETTE[i % PALETTE.length] })) : [];
   const bars = total && showRoas ? roasBars(total).map((b, i) => ({ label: b.label, short: b.short, stage: b.stage, full: b.full, value: b.value, text: fmtValue('roas', b.value, 'ratio', undefined, lang), g: PALETTE[i % PALETTE.length] })) : [];
   const spent = slices.reduce((a, s) => a + s.value, 0);
@@ -126,14 +155,14 @@ export default function MonthView({ month, model }) {
     <LangProvider lang={lang}>
       {total && (
         <Sec id="overview" icon="spark" title={t('Overview')} sub={t('The result of the period at a glance')}>
-          <Kpis view={total} />
+          <Kpis view={total} series={Object.keys(sparks).length ? sparks : null} />
         </Sec>
       )}
       {total && (wave || slices.length > 0) && (
         <Sec id="spend" icon="pie" title={t('Spend & ROAS')} sub={t('Where the budget went and what it returned')}>
           <div className={wave ? 'g3' : 'g2'}>
             {wave}
-            {slices.length > 0 && <Box icon="pie" title={t('Spend by campaign group')}><div className="gx"><Donut slices={slices} center={fmtValue('spend', spent, 'money', total.currency, lang)} caption={t('ad spend')} fmt={(v) => fmtValue('spend', v, 'money', total.currency, lang)} /></div></Box>}
+            {slices.length > 0 && <Box icon="pie" title={t('Spend by campaign group')} sub={`${t('ad spend')} · ${fmtValue('spend', spent, 'money', total.currency, lang)}`}><div className="gx"><SpendRank slices={slices} fmt={(v) => fmtValue('spend', v, 'money', total.currency, lang)} /></div></Box>}
             {bars.length > 0 && <Box icon="bars" title={t('ROAS by campaign group')}><div className="gx"><HBars items={bars} /></div></Box>}
           </div>
         </Sec>
@@ -142,8 +171,9 @@ export default function MonthView({ month, model }) {
       {month.weeks.length > 0 && (
         <Sec id="weeks" icon="cal" title={t('Weeks of {month}', { month: monthName })} nav={t('Weeks')} sub={t('Each approved week with its own numbers')}>
           <div className="cx-weeks">
-            {month.weeks.map((w, i) => <Week key={w.n} week={w} ctx={ctx} model={model} open={i === month.weeks.length - 1 && !total} />)}
+            {month.weeks.map((w) => <WeekCard key={w.n} week={w} weeks={month.weeks} on={openWeek === w.n} onPick={() => setOpenWeek((cur) => (cur === w.n ? null : w.n))} />)}
           </div>
+          {month.weeks.filter((w) => w.n === openWeek).map((w) => <WeekDetail key={w.n} week={w} ctx={ctx} model={model} onClose={() => setOpenWeek(null)} />)}
         </Sec>
       )}
       {total ? (

@@ -155,12 +155,30 @@ function hintText(view, folded) {
   return `${text}${t('Green cell is the best campaign group (ROAS, CPP, CTR), red is the weakest ROAS.')}${folded ? t(' Small groups are folded into «Other».') : ''}`;
 }
 
+// The heat of a cell: among the campaign columns of one row the best value is the greenest and the weakest the reddest (for costs the other way round); a row with no
+// better or worse (money spent, reach) is only tinted by size. → { cls, strength 0..1 } or null. Needs three numbers to mean anything.
+function heatOf(row, columns, i) {
+  const col = columns[i];
+  if (i === 0 || col.kind === 'sum' || col.kind === 'general' || col.kind === 'other') return null;
+  const vals = row.cells.map((c, k) => (k === 0 || columns[k].kind === 'sum' || columns[k].kind === 'general' || columns[k].kind === 'other' ? null : c.value)).filter((v) => v != null && Number.isFinite(v) && v > 0);
+  const v = row.cells[i].value;
+  if (vals.length < 3 || v == null || !Number.isFinite(v) || v <= 0) return null;
+  const lo = Math.min(...vals); const hi = Math.max(...vals);
+  if (hi === lo) return null;
+  const t = (v - lo) / (hi - lo);
+  if (row.goodWhen === 'up' || row.goodWhen === 'down') {
+    const good = row.goodWhen === 'up' ? t : 1 - t; // 1 = the best
+    return good >= 0.5 ? { cls: 'heat-g', s: (good - 0.5) * 2 } : { cls: 'heat-r', s: (0.5 - good) * 2 };
+  }
+  return { cls: 'heat-n', s: t };
+}
+
 // The numbers of one report: «General» + a column per campaign group. With many groups the top ones are shown by name and the client opens the rest.
 // `builder`: { hidden: [keys], onToggle(key) } puts an eye on every row (the metric is shown to the client or not).
 //   builder.tools = { onChange(action, key, toKey, toIndex), options(key) } lets a person drag a metric row up or down (smoothly, the other rows make room) and click it to replace or
 //   remove it: the buttons appear to the left of the metric. Alt + ↑ / ↓ on the focused metric moves it for the keyboard.
 export function MetricTable({ view, keys, custom, platformLabel, builder = null, full = false }) {
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(full && !builder); // the client's page opens with every group by name; the builder keeps the folded view
   const rt = useRowTools(builder?.tools || null);
   const tr = trFor(view.lang);
   const t = metricTable(view, { keys, custom, platformLabel, showAll });
@@ -192,15 +210,20 @@ export function MetricTable({ view, keys, custom, platformLabel, builder = null,
                 const rows = [];
                 if (sections.size > 1 && sec !== last) rows.push(<tr className="cx-secrow" key={`s${sec}`}><td colSpan={t.columns.length + 1}>{tr(SECTION_NAMES[sec])}</td></tr>);
                 last = sec;
+                const row = t.rows.find((x) => x.key === r.key);
                 rows.push(
                   <tr key={r.key}>
                     <td>{r.label}</td>
-                    {r.cells.map((c, i) => (
-                      <td key={t.columns[i].id} className={i === 0 || t.columns[i].kind === 'sum' ? 'gen' : c.cls}>
-                        <span className="cx-v">{c.text}</span>
-                        {c.isNew ? <span className="dm none">{tr('new')}</span> : view.prev || c.change ? <Mark change={c.change} /> : null}
-                      </td>
-                    ))}
+                    {r.cells.map((c, i) => {
+                      const gen = i === 0 || t.columns[i].kind === 'sum';
+                      const heat = gen ? null : heatOf(row, t.columns, i);
+                      return (
+                        <td key={t.columns[i].id} className={gen ? 'gen' : `${c.cls}${heat ? ` heat ${heat.cls}` : ''}`.trim()} style={heat ? { '--hs': heat.s.toFixed(2) } : undefined}>
+                          <span className="cx-v">{c.text}</span>
+                          {c.isNew ? <span className="dm none">{tr('new')}</span> : view.prev || c.change ? <Mark change={c.change} /> : null}
+                        </td>
+                      );
+                    })}
                   </tr>,
                 );
                 return rows;

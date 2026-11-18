@@ -896,3 +896,6 @@
   .crh .cx-nav button { flex: none; }
   .crh .cx-sh h2 { font-size: 18px; }
 }
+/* 2026-11-18: the legend of a donut was squeezed to 116px (the later `.sl{min-width:0}` removed its 150px floor, so in a 320px card the words broke letter by letter and the card grew to 1800px). The legend gets its floor back and drops under the donut when the card is narrow. */
+.crh .stw .sl { flex: 1 1 150px; min-width: min(150px, 100%); }
+.crh .slr span { overflow-wrap: anywhere; }

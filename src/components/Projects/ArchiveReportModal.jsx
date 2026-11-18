@@ -8,6 +8,7 @@ import { REPORT_STATUS } from '../../lib/projectHistory';
 import CreativeGrid from './CreativeGrid';
 import { rowBlock, sheetNameOf } from '../../lib/reportWorkbook';
 import { saveReportWorkbook } from '../../lib/reportWorkbookExport';
+import { exportReportPdf } from '../../lib/reportPdf';
 import { reportBlocks } from '../../lib/reportTemplate';
 import CreativePickerDialog from './CreativePickerDialog';
 import { saveReportCreatives, suggestCreatives } from '../../lib/api/reportCreatives';
@@ -105,6 +106,8 @@ export default function ArchiveReportModal({ row, projectName, custom, extraKeys
 export function ReportBody({ row, projectName, custom, extraKeys, slot = null, edit = null, noExport = false, exportApi = null, lang = null }) {
   // Excel of a report of the history: one sheet with the table, the texts and the creatives (reportWorkbook.js)
   const onXlsx = () => saveReportWorkbook([rowBlock(row, { custom, extraKeys, lang: row.data?.template?.lang || lang })], { filename: `${projectName}_${row.period_type}_${row.period_start}_${row.platform}`, sheetName: sheetNameOf(row) });
+  // PDF of a report of the history: the multi-page document with every figure (lib/reportPdf.js), not a picture of the table
+  const onPdf = () => exportReportPdf(row, { projectName, custom, extraKeys, lang: row.data?.template?.lang || lang });
   const data = row.data || {};
   const platforms = Object.keys(data.platforms || {});
   const isCombined = row.platform === 'all';
@@ -121,7 +124,7 @@ export function ReportBody({ row, projectName, custom, extraKeys, slot = null, e
           campaignMode="selected" selection={data.selection || []} options={{ groups: true, ...(data.options || {}) }}
           curLabel={reportPeriodText(row)}
           prevLabel={data.previous?.period ? `${fmt(data.previous.period.start)} – ${fmt(data.previous.period.end)}` : 'Попередній'}
-          exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} noExport={noExport} exportApi={exportApi} onXlsx={onXlsx}
+          exportPortal={slot} exportFormats={['xlsx', 'csv', 'pdf']} noExport={noExport} exportApi={exportApi} onXlsx={onXlsx} onPdf={onPdf}
         />
       )}
       {(data.creatives?.items?.length > 0 || edit) && (

@@ -194,19 +194,41 @@ export function HBars({ items }) {
 }
 
 // A tiny wave for a mini card.
-export function Spark({ values, g }) {
+export function Spark({ values, g, w = 96, h = 44, className = 'spk' }) {
   const uid = useId().replace(/:/g, '');
-  const w = 96; const h = 44;
   const mx = Math.max(...values); const mn = Math.min(...values);
   const pts = values.map((v, i) => [values.length === 1 ? w / 2 : 3 + ((w - 6) * i) / (values.length - 1), h - 6 - ((h - 12) * (v - mn)) / ((mx - mn) || 1)]);
   const last = pts[pts.length - 1];
   const d = pts.length > 1 ? smooth(pts) : `M${pts[0][0]} ${pts[0][1]}`;
   return (
-    <svg className="spk" viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+    <svg className={className} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
       <defs><Grad id={`${uid}s`} g={g} vertical /><linearGradient id={`${uid}f`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={g[0]} stopOpacity=".35" /><stop offset="1" stopColor={g[0]} stopOpacity="0" /></linearGradient></defs>
       {pts.length > 1 && <path d={`${d} L${w - 3} ${h} L3 ${h}Z`} fill={`url(#${uid}f)`} />}
       <path d={d} fill="none" stroke={`url(#${uid}s)`} strokeWidth="3" strokeLinecap="round" />
       <circle cx={f2(last[0])} cy={f2(last[1])} r="4" fill="#fff" stroke={g[1]} strokeWidth="2.5" />
     </svg>
+  );
+}
+
+// The spend of a campaign group as a ranking: one stacked bar (every group's share of the money) and under it the list, the biggest first — number, name with the funnel stage,
+// money, share. `slices`: [{ label, short, stage, full, value, g }] (see clientReport.spendSlices).
+export function SpendRank({ slices, fmt }) {
+  const tot = slices.reduce((a, x) => a + x.value, 0) || 1;
+  return (
+    <div className="srk">
+      <div className="stk" role="img" aria-label={slices.map((x) => `${x.short || x.label} ${Math.round((x.value / tot) * 100)}%`).join(', ')}>
+        {slices.map((x) => <i key={x.label} style={{ flex: `${x.value} 1 0`, background: `linear-gradient(135deg,${x.g[0]},${x.g[1]})` }} title={`${x.full || x.label}: ${fmt(x.value)}`} />)}
+      </div>
+      <ol className="srl">
+        {slices.map((x, i) => (
+          <li key={x.label}>
+            <span className="rk" style={{ background: `linear-gradient(135deg,${x.g[0]},${x.g[1]})` }}>{i + 1}</span>
+            <span className="nm" title={x.full || x.label}>{x.short || x.label}{x.stage && <small className="cx-stg">{x.stage}</small>}</span>
+            <b>{fmt(x.value)}</b>
+            <em>{Math.round((x.value / tot) * 100)}%</em>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

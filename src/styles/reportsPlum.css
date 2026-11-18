@@ -18,3 +18,139 @@
 .project-detail-page.pw.is-plum .pw-rep .prep-table--wide td.lbl, .project-detail-page.pw.is-plum .pw-rep .prep-table--wide th:first-child { background: #2a0c2f; }
 /* the sticky panels hold the page behind them: dark glass */
 .project-detail-page.pw.is-plum .pw-rep .bld-bar, .project-detail-page.pw.is-plum .pw-rep .wbe-bar { background: rgba(30, 8, 36, .94); border-color: rgba(235, 156, 239, .3); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); backdrop-filter: blur(6px); }
+
+/* the windows of the tab (compare, groups, own metric): the plum glass like the other dark windows. The page keeps the dark control styles inside them, so the window itself must be dark too (2026-11-18: the light window made the buttons unreadable) */
+.project-detail-page.pw.is-plum .pw-rep .modal-overlay.show { background: rgba(12, 2, 16, .72); }
+.project-detail-page.pw.is-plum .pw-rep .modal-box { border: 0; border-radius: 28px; background: linear-gradient(180deg, #2a0d30, #1a0620); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 30px 80px rgba(0, 0, 0, .6); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .modal-head { background: none; border-bottom: 1.5px solid rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .modal-head h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .modal-body { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .modal-foot { background: none; border-top: 1.5px solid rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .modal-close { background: rgba(235, 156, 239, .14); color: #F6E9FA; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-rep .modal-close:hover { background: rgba(235, 156, 239, .26); }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt { border-color: rgba(235, 156, 239, .3); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt.on { background: rgba(235, 156, 239, .16); border-color: #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .prep-cmp-opt small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .modal-foot .btn.pw-btn--ok { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .6); }
+.project-detail-page.pw.is-plum .pw-rep .modal-foot .btn.pw-btn--ok:disabled { background: rgba(52, 16, 52, .92); color: #D6AEE0; box-shadow: none; opacity: .6; }
+
+/* «Оберіть креатив» (CreativePickerDialog, rw-*): the window of the picker on the dark tab in the same plum glass as the other windows (2026-11-18). */
+.project-detail-page.pw.is-plum .pw-rep .rw-overlay { background: rgba(12, 2, 16, .72); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .rw-dialog { border: 0; background: linear-gradient(180deg, #2a0d30, #1a0620); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 30px 80px rgba(0, 0, 0, .6); }
+.project-detail-page.pw.is-plum .pw-rep .rw-dh { background: none; border-bottom: 1.5px solid rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .rw-md::before { background: #2a0c2f; }
+.project-detail-page.pw.is-plum .pw-rep .rw-dt h3 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .rw-dt small, .project-detail-page.pw.is-plum .pw-rep .rw-cnt, .project-detail-page.pw.is-plum .pw-rep .rw-quick, .project-detail-page.pw.is-plum .pw-rep .rw-hint, .project-detail-page.pw.is-plum .pw-rep .rw-pim-empty, .project-detail-page.pw.is-plum .pw-rep .rw-empty p { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .rw-lab, .project-detail-page.pw.is-plum .pw-rep .rw-empty h4 { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .rw-x { background: rgba(235, 156, 239, .14); color: #F6E9FA; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-rep .rw-db textarea { background: rgba(255, 255, 255, .06); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .rw-db textarea:focus { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 0 4px rgba(181, 68, 181, .3); }
+.project-detail-page.pw.is-plum .pw-rep .rw-db textarea::placeholder { color: #9E7FAB; }
+.project-detail-page.pw.is-plum .pw-rep .rw-qc { background: rgba(255, 255, 255, .08); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .rw-qc:hover { background: rgba(235, 156, 239, .2); }
+.project-detail-page.pw.is-plum .pw-rep .rw-err { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .rw-df { border-top: 1.5px solid rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .rw-seg { background: rgba(255, 255, 255, .08); }
+.project-detail-page.pw.is-plum .pw-rep .rw-seg button { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .rw-seg button span { border-left-color: rgba(235, 156, 239, .4); }
+.project-detail-page.pw.is-plum .pw-rep .rw-seg button.on { background: linear-gradient(100deg, #B544B5, #661466); color: #fff; box-shadow: 0 0 14px rgba(181, 68, 181, .5); }
+.project-detail-page.pw.is-plum .pw-rep .rw-pc { background: rgba(255, 255, 255, .05); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .22); }
+.project-detail-page.pw.is-plum .pw-rep .rw-pc:hover:not(:disabled) { box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .rw-pc.busy { box-shadow: inset 0 0 0 2px #FFD23F; }
+.project-detail-page.pw.is-plum .pw-rep .rw-pim { background: #2a0c2f; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .rw-pim-empty svg { stroke: #EB9CEF; }
+.project-detail-page.pw.is-plum .pw-rep .rw-ub { background: rgba(26, 6, 32, .88); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .rw-ub--busy { background: rgba(26, 6, 32, .88); color: #FFD23F; }
+.project-detail-page.pw.is-plum .pw-rep .rw-rc { background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .rw-rc--ro { background: rgba(75, 224, 127, .16); color: #4BE07F; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-rep .rw-rc--rs { background: rgba(235, 156, 239, .18); color: #EB9CEF; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-rep .rw-sk { background: linear-gradient(90deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .12), rgba(255, 255, 255, .05)); background-size: 200% 100%; }
+.project-detail-page.pw.is-plum .pw-rep .rw-db { color-scheme: dark; scrollbar-color: rgba(235, 156, 239, .4) transparent; }
+
+/* «Історія проекту» on the dark page (owner's picks of 2026-11-18, decision 58): the tab wears the same dark wrapper as «Звітність» (.pw-dark.pw-rep), so the generated skin covers the tiles, the link box and the tables;
+   below are the parts that are new: the status capsules by colour, the week cards, the «⋯» menu and the report windows over the whole work area. */
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--final { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--draft, .project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--reviewed { background: rgba(255, 255, 255, .1); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--rework { background: rgba(255, 155, 210, .16); color: #FF9BD2; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--todate { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--todate::before { animation: ph-pulse 1.6s infinite; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--none { background: none; color: #9E7FAB; }
+@keyframes ph-pulse { 0% { box-shadow: 0 0 0 0 rgba(75, 224, 127, .6); } 70% { box-shadow: 0 0 0 6px rgba(75, 224, 127, 0); } 100% { box-shadow: 0 0 0 0 rgba(75, 224, 127, 0); } }
+@media (prefers-reduced-motion: reduce) { .project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-chip--todate::before { animation: none; } }
+
+/* the week cards */
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-month { background: rgba(255, 255, 255, .05); border: 0; border-radius: 28px; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28), 0 20px 50px rgba(0, 0, 0, .3); }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-month-body { padding: 14px 18px 18px; border-top: 1.5px solid rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wcs > li.ph-wc { display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-width: 0; padding: 14px 16px; border: 0; border-radius: 24px; background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wcs > li.ph-wc--rework { box-shadow: inset 0 0 0 1.5px rgba(255, 155, 210, .55); }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wcs > li.ph-wc--none { background: none; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wch { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wch b { font: 800 15px 'Onest', sans-serif; color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wc .ph-dates { margin-top: -4px; font: 500 12.5px 'Onest', sans-serif; color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wc .ph-note { display: block; padding: 0; background: none; color: #FF9BD2; font: 500 12.5px/1.45 'Onest', sans-serif; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wc .ph-missing { font: 500 12px/1.45 'Onest', sans-serif; color: #9E7FAB; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wc .ph-act { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wc .ph-act > .btn { flex: 1 1 auto; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wc .rdl { flex: 1 1 auto; display: inline-flex; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-wc .rdl > .btn { flex: 1; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-kb { position: relative; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-kbb { width: 34px; padding: 0; display: inline-grid; place-items: center; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-kbb svg { width: 15px; height: 15px; fill: currentColor; stroke: none; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-kbm { position: absolute; right: 0; top: 40px; z-index: 30; min-width: 240px; padding: 6px; border-radius: 20px; background: #2a0d30; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 18px 40px rgba(0, 0, 0, .6); }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-kbm button { display: flex; width: 100%; align-items: center; height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: #F6E9FA; font: 600 13px 'Onest', sans-serif; text-align: left; cursor: pointer; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-kbm button:hover:not(:disabled) { background: rgba(235, 156, 239, .16); }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-kbm button.warn { color: #FF9BD2; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-month > header .ph-chev { background: rgba(255, 255, 255, .1); color: #F6E9FA; }
+
+/* the report window and the month document: the whole work area, no frame (pick B) */
+.project-detail-page.pw.is-plum .pw-rep .arc-overlay { padding: 0; background: #150419; backdrop-filter: none; }
+.project-detail-page.pw.is-plum .pw-rep .arc-overlay .arc-win { border: 0; border-radius: 0; box-shadow: none; background: linear-gradient(180deg, #1c0722, #150419); }
+.project-detail-page.pw.is-plum .pw-rep .arc-win .arc-head { position: sticky; top: 0; z-index: 5; background: rgba(30, 8, 36, .94); backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(235, 156, 239, .3); padding-inline: max(22px, calc((100% - 1180px) / 2)); }
+.project-detail-page.pw.is-plum .pw-rep .arc-win .arc-body { padding-inline: max(24px, calc((100% - 1180px) / 2)); }
+.project-detail-page.pw.is-plum .pw-rep .arc-md::before { background: #2a0c2f; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .arc-plt, .project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-plt { background: rgba(255, 255, 255, .1); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .arc-plt--meta, .project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-plt--meta { background: rgba(80, 130, 240, .2); color: #9DB8FF; }
+.project-detail-page.pw.is-plum .pw-rep.pw-dark .arc-plt--google, .project-detail-page.pw.is-plum .pw-rep.pw-dark .ph-plt--google { background: rgba(251, 188, 5, .16); color: #FFD27A; }
+.project-detail-page.pw.is-plum .pw-rep .arc-chip--final { background: rgba(75, 224, 127, .16); color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .arc-chip--reviewed { background: rgba(255, 255, 255, .1); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .arc-upd, .project-detail-page.pw.is-plum .pw-rep .arc-pc { color: #D6AEE0; }
+
+/* the ranking of creatives (crx-*) and the close button of the report window: the light pieces that the generated skin did not reach (checked live 2026-11-18) */
+.project-detail-page.pw.is-plum .pw-rep .crx-row { background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .22); }
+.project-detail-page.pw.is-plum .pw-rep .crx-thumb { background: #2a0c2f; box-shadow: 0 0 0 2px #2a0c2f, 0 0 0 3.5px rgba(235, 156, 239, .5); }
+.project-detail-page.pw.is-plum .pw-rep .crx-thumb--empty { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crx-body b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .crx-chip { background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .crx-chip--roas { background: rgba(75, 224, 127, .16); box-shadow: none; color: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .crx-btn { background: rgba(255, 255, 255, .08); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .crx-btn--bad { background: none; box-shadow: none; color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .arc-x { background: rgba(235, 156, 239, .14); color: #F6E9FA; box-shadow: none; }
+
+/* the month document («Загальний документ», md-*): contents bar, accordion of reports, download menu */
+.project-detail-page.pw.is-plum .pw-rep .md-lbl, .project-detail-page.pw.is-plum .pw-rep .md-tc span, .project-detail-page.pw.is-plum .pw-rep .md-act span, .project-detail-page.pw.is-plum .pw-rep .md-nom div span, .project-detail-page.pw.is-plum .pw-rep .md-fg em, .project-detail-page.pw.is-plum .pw-rep .md-dmh, .project-detail-page.pw.is-plum .pw-rep .md-dmt small { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .md-win .arc-chip:not(.arc-chip--reviewed):not(.arc-chip--final) { background: rgba(255, 255, 255, .1); color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .md-toc { background: rgba(30, 8, 36, .6); border-bottom: 1.5px solid rgba(235, 156, 239, .3); padding-inline: max(22px, calc((100% - 1180px) / 2)); }
+.project-detail-page.pw.is-plum .pw-rep .md-tc { background: rgba(255, 255, 255, .08); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .md-tc b, .project-detail-page.pw.is-plum .pw-rep .md-act b, .project-detail-page.pw.is-plum .pw-rep .md-fg b, .project-detail-page.pw.is-plum .pw-rep .md-dmt b, .project-detail-page.pw.is-plum .pw-rep .md-nom b { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .md-tc.is-on { background: linear-gradient(100deg, #B544B5, #661466); box-shadow: 0 0 14px rgba(181, 68, 181, .5); }
+.project-detail-page.pw.is-plum .pw-rep .md-dot { background: #9E7FAB; } .project-detail-page.pw.is-plum .pw-rep .md-dot--reviewed { background: #FFD23F; } .project-detail-page.pw.is-plum .pw-rep .md-dot--final { background: #4BE07F; }
+.project-detail-page.pw.is-plum .pw-rep .md-body { padding-inline: max(22px, calc((100% - 1180px) / 2)); }
+.project-detail-page.pw.is-plum .pw-rep .md-acc { background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .28); }
+.project-detail-page.pw.is-plum .pw-rep .md-acc.is-open { box-shadow: inset 0 0 0 1.5px #EB9CEF, 0 0 18px rgba(181, 68, 181, .3); }
+.project-detail-page.pw.is-plum .pw-rep .md-ach { color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .md-mini::before { background: #2a0c2f; }
+.project-detail-page.pw.is-plum .pw-rep .md-fg { background: rgba(255, 255, 255, .08); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .md-chv { background: rgba(255, 255, 255, .1); color: #F6E9FA; box-shadow: none; }
+.project-detail-page.pw.is-plum .pw-rep .md-nom { background: rgba(255, 255, 255, .06); color: #F6E9FA; }
+.project-detail-page.pw.is-plum .pw-rep .md-empty p { color: #D6AEE0; }
+.project-detail-page.pw.is-plum .pw-rep .md-dmenu { background: #2a0d30; border: 0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 18px 44px rgba(0, 0, 0, .6); }
+.project-detail-page.pw.is-plum .pw-rep .md-dmr:nth-child(odd of .md-dmr) { background: rgba(255, 255, 255, .06); }
+.project-detail-page.pw.is-plum .pw-rep .md-fp { background: rgba(255, 255, 255, .08); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); }
+.project-detail-page.pw.is-plum .pw-rep .md-dlerr { background: rgba(255, 138, 138, .16); color: #FF8A8A; }
+.project-detail-page.pw.is-plum .pw-rep .arc-chip--draft { background: rgba(255, 255, 255, .1); color: #D6AEE0; }
+
+/* the download menus (ReportDownload, the report window, the editor) were translucent after the colour conversion and the text under them showed through (owner, 2026-11-18): solid plum glass */
+.project-detail-page.pw.is-plum .pw-rep .prep-export-menu { background: #2a0d30; border: 0; border-radius: 20px; padding: 6px; z-index: 60; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 18px 44px rgba(0, 0, 0, .6); }
+.project-detail-page.pw.is-plum .pw-rep .prep-export-menu button { color: #F6E9FA; border-radius: 999px; }
+.project-detail-page.pw.is-plum .pw-rep .prep-export-menu button:hover:not(:disabled) { background: rgba(235, 156, 239, .16); }

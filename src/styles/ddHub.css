@@ -1,5 +1,5 @@
 /* ---- Hub-style dropdown menus (calendar, lists): the menus are portaled to <body>, so they are themed by the data-dd="hub" of the dialog (class dd-hub) ---- */
-.dd-hub { border: 1.5px solid #EBC6EB; border-radius: 24px; background: #fff; box-shadow: 0 18px 44px #68276833; z-index: 1300; font-family: 'Onest', var(--font-body), sans-serif; }
+.dd-hub.dd-hub { border: 1.5px solid #EBC6EB; border-radius: 24px; background: #fff; box-shadow: 0 18px 44px #68276833; z-index: 1300; font-family: 'Onest', var(--font-body), sans-serif; }
 .dd-hub.ui-select-menu { padding: 8px; gap: 2px; min-width: 180px; }
 .dd-hub .ui-select-row { padding: 9px 14px; border-radius: 999px; font: 500 13.5px 'Onest', sans-serif; color: #270827; }
 .dd-hub .ui-select-row:hover { background: #F6EDF8; }

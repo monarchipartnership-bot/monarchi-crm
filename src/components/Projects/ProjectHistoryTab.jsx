@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,6 +36,32 @@ const Medal = ({ n, cls = '' }) => <span className={'hub-ring ph-md ' + cls} ari
 
 const Chip = ({ status, toDate }) => (toDate ? <i className="ph-chip ph-chip--todate">Оновлюється</i> : status ? <i className={'ph-chip ph-chip--' + status}>{REPORT_STATUS[status] || status}</i> : <i className="ph-chip ph-chip--none">ще не створено</i>);
 
+
+// The «⋯» of a card: a small menu of the actions that are not the main one (for a report: the return for rework). Closes on an outside click and on Escape.
+function KebabMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  return (
+    <span className="ph-kb" ref={wrap}>
+      <button type="button" className="btn ph-kbb" aria-haspopup="menu" aria-expanded={open} aria-label="Ще дії" onClick={() => setOpen((o) => !o)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="12" cy="19" r="1.4" /></svg>
+      </button>
+      {open && (
+        <div className="ph-kbm" role="menu">
+          {items.map((it) => <button key={it.label} type="button" role="menuitem" className={it.warn ? 'warn' : ''} disabled={it.disabled} onClick={() => { setOpen(false); it.onPick(); }}>{it.label}</button>)}
+        </div>
+      )}
+    </span>
+  );
+}
 
 // «Історія проекту» has two categories. «Перебіг проекту»: month cards, one scope (platform) at a time like the report pages. A card holds the weeks of the
 // month, the monthly report and the combined document. A report is a draft, in rework or approved; only the approved ones reach the client, the others are
@@ -151,21 +177,26 @@ export default function ProjectHistoryTab({ projectId }) {
   }
   const presentation = (r, platform) => navigate(`/clients?project=${projectId}&type=${r.period_type}&start=${r.period_start}&end=${r.period_end}&platform=${platform}`);
 
-  const rowLine = (row, name, dates, key) => (
-    <li key={key}>
-      <span className="ph-name">{row?.data?.toDate ? `${name} · на сьогодні` : name}</span>
-      <span className="ph-dates">{row?.data?.toDate ? `${fmt(row.period_start)} – ${fmt(row.period_end)}` : dates}</span>
-      {row ? <Chip status={row.status} toDate={isRunning(row, today())} /> : <Chip />}
-      {row ? (
-        <span className="ph-act">
-          {(isRunning(row, today()) ? [] : reportActions(row.status, approver)).map((a) => <button key={a.action} type="button" className={'btn' + (a.primary ? ' btn-p' : '')} disabled={busy} onClick={() => onAction(row, a.action)}>{a.label}</button>)}
-          {Object.keys(row.data?.platforms || {}).length > 0 && <ReportDownload row={row} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, row)} lang={ctx.project?.report_lang} />}
-          <button type="button" className="btn" onClick={() => (row.status === 'final' ? setOpenId(row.id) : navigate(`/projects/${projectId}?tab=work&report=${row.id}&platform=${row.platform}`))}>Відкрити</button>
-        </span>
-      ) : <span className="ph-missing">Зʼявиться, коли агент або менеджер створить звіт за цей період.</span>}
-      {row?.data?.review?.returnedNote && row.status === 'rework' && <span className="ph-note">Повернуто на доопрацювання: {row.data.review.returnedNote}</span>}
-    </li>
-  );
+  // One report as a card (owner's pick B, 2026-11-18): the name and the status, the dates, the note of a return, then «Відкрити», the download and, for an approver, the «⋯» menu with the return.
+  const rowLine = (row, name, dates, key) => {
+    const running = row ? isRunning(row, today()) : false;
+    const actions = row && !running ? reportActions(row.status, approver) : [];
+    const returned = row?.data?.review?.returnedNote && row.status === 'rework';
+    return (
+      <li key={key} className={'ph-wc' + (row ? ' ph-wc--' + (running ? 'todate' : row.status) : ' ph-wc--none')}>
+        <div className="ph-wch"><b>{row?.data?.toDate ? `${name} · на сьогодні` : name}</b>{row ? <Chip status={row.status} toDate={running} /> : <Chip />}</div>
+        <span className="ph-dates">{row?.data?.toDate ? `${fmt(row.period_start)} – ${fmt(row.period_end)}` : dates}</span>
+        {returned && <span className="ph-note">Повернуто: {row.data.review.returnedNote}</span>}
+        {row ? (
+          <span className="ph-act">
+            <button type="button" className="btn" onClick={() => (row.status === 'final' ? setOpenId(row.id) : navigate(`/projects/${projectId}?tab=work&report=${row.id}&platform=${row.platform}`))}>Відкрити</button>
+            {Object.keys(row.data?.platforms || {}).length > 0 && <ReportDownload row={row} projectName={projectName} custom={ctx.custom} extraKeys={extraKeysOf(ctx.columns, row)} lang={ctx.project?.report_lang} />}
+            {actions.length > 0 && <KebabMenu items={actions.map((a) => ({ label: a.label, warn: a.action === 'return', disabled: busy, onPick: () => onAction(row, a.action) }))} />}
+          </span>
+        ) : <span className="ph-missing">Зʼявиться, коли агент або менеджер створить звіт за цей період.</span>}
+      </li>
+    );
+  };
 
   return (
     <section className="report-section">
@@ -244,7 +275,7 @@ export default function ProjectHistoryTab({ projectId }) {
                 </header>
                 {isOpen && (
                   <div className="ph-month-body">
-                    <ul className="ph-rows">
+                    <ul className="ph-rows ph-wcs">
                       {m.weeks.map((w) => rowLine(w.row, `Тиждень ${w.n}`, `${fmt(w.start)} – ${fmt(w.end)}`, w.start))}
                       {rowLine(m.monthly, 'Місяць', `${fmt(m.start)} – ${fmt(m.end)}`, 'month')}
                       {m.others.map((r) => rowLine(r, r.period_type === 'weekly' ? 'Тиждень (інший період)' : 'Місяць (інший період)', reportPeriodText(r), 'o' + r.id))}

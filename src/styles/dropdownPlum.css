@@ -14,7 +14,7 @@
 [data-dd=plum] .ui-select--disabled .ui-select-trigger { opacity: .55; }
 [data-dd=plum] .ui-select-placeholder, [data-dd=plum] .date-picker-placeholder, [data-dd=plum] .time-picker-placeholder { color: #A592AD; }
 
-.dd-plum {
+.dd-plum.dd-plum {
   border: 1px solid #E5D6EC; border-radius: 16px; background: #fff; box-shadow: 0 18px 44px #68276826; z-index: 1300;
   font-family: 'Onest', var(--font-body), sans-serif;
 }
