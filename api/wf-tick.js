@@ -7,6 +7,8 @@ import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { createRealHandlers } from './_lib/wf/agents.js';
 import { createWfRepo } from './_lib/wf/repo.js';
 import { processTick } from './_lib/wf/tick.js';
+import { getModelClient } from './_lib/ai.js';
+import { speedKeyFromEnv } from './_lib/pageSpeed.js';
 import { fetchMetaCampaigns, fetchMetaInsights, fetchMetaPixels } from './_lib/metaAdsData.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
@@ -27,7 +29,13 @@ export default async function handler(req, res) {
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
     const metaToken = process.env.META_ACCESS_TOKEN;
     const meta = metaToken ? { insights: (o) => fetchMetaInsights({ ...o, token: metaToken }), campaigns: (o) => fetchMetaCampaigns({ ...o, token: metaToken }), pixels: (o) => fetchMetaPixels({ ...o, token: metaToken }) } : null; // the Meta reader for the agents; its token never leaves the server
-    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers(), meta });
+    // the model for the skills that write text (site, audience, ...): every call is logged and held to the budgets by the shared client
+    const trigger = isCronRequest(req) ? 'cron' : 'user';
+    const ask = process.env.ANTHROPIC_API_KEY ? async ({ projectId = null, runId = null, system, user, maxTokens = 4000 }) => {
+      const r = await getModelClient(token).callModel({ agentKey: 'wf-researcher', projectId, runId, trigger, params: { model: 'claude-sonnet-5', max_tokens: maxTokens, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: user }] } });
+      return { text: r.text, costUsd: r.costUsd };
+    } : null;
+    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv() });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);

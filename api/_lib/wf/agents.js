@@ -9,6 +9,7 @@
 import { unitEconomy } from './skills/unitEconomyAgent.js';
 import { intake } from './skills/intake.js';
 import { audit } from './skills/auditAgent.js';
+import { site } from './skills/siteAgent.js';
 const w = (key, body) => ({ key, body: `[заглушка] ${body}`, content: { stub: true }, sources: [] });
 const done = (extra = {}) => async () => ({ output: { stub: true }, steps: [{ title: 'Виконано (заглушка)' }], ...extra });
 
@@ -40,7 +41,7 @@ export const STUBS = {
 };
 
 // The real agents built so far. The cron door (api/wf-tick.js) uses them; the tests of the orchestrator use the stand-ins only.
-export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit } };
+export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site } };
 export function createRealHandlers(overrides = {}) { return createHandlers({ ...REAL, researcher: { ...REAL.researcher, ...(overrides.researcher || {}) }, ...Object.fromEntries(Object.entries(overrides).filter(([k]) => k !== 'researcher')) }); }
 
 export function createHandlers(overrides = {}) {

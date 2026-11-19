@@ -74,6 +74,8 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       const v = T.versions.find((x) => x.id === sec.current_version_id);
       return { status: sec.status, version: v ? { version: v.version, body: v.body, content: v.content, author_kind: v.author_kind, created_at: v.created_at } : null };
     },
+    async readProject(projectId) { return { id: projectId, website: T.websites?.get(projectId) ?? null, client_language: null }; },
+    setWebsite(projectId, url) { (T.websites ||= new Map()).set(projectId, url); },
     async listAdAccounts(projectId) { return (T.accounts.get(projectId) || []).map((a) => ({ ...a })); },
     addAccount(projectId, a) { T.accounts.set(projectId, [...(T.accounts.get(projectId) || []), a]); },
     async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high' }) {
@@ -88,7 +90,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
         const key = r.state?.blocked_on; if (!key) continue;
         const isAcc = key.startsWith('accounts:');
         const sec = isAcc ? null : await this.readSection(projectId, key);
-        const woke = isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : key === 'unit_economy' ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
+        const woke = key === 'site_url' ? !!String(T.websites?.get(projectId) || '').trim() : isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : key === 'unit_economy' ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
         if (woke) { Object.assign(r, { status: 'queued', attempt: 0, lease_until: null, error: null }); resumed += 1; }
       }
       return resumed;

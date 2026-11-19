@@ -64,6 +64,10 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       const v = must(await db.from('wf_section_versions').select('version, body, content, author_kind, created_at').eq('id', sec.current_version_id).single(), 'version');
       return { status: sec.status, version: v };
     },
+    // what the skills need to know about the project itself: its website and the language of the client
+    async readProject(projectId) {
+      return must(await db.from('projects').select('id, website, client_language').eq('id', projectId).maybeSingle(), 'project');
+    },
     async listAdAccounts(projectId) {
       return must(await db.from('project_ad_accounts').select('platform, account_id, account_name, currency').eq('project_id', projectId), 'ad accounts') || [];
     },
@@ -79,7 +83,9 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       let resumed = 0;
       for (const r of waiting) {
         const key = r.state?.blocked_on; if (!key) continue;
-        const woke = key.startsWith('accounts:') // the run waits for an ad account of a platform to be linked (accounts:meta); the others wait for a newer version of a section
+        const woke = key === 'site_url' // the run waits for the website to be written in the project card
+          ? !!String((await this.readProject(projectId))?.website || '').trim()
+          : key.startsWith('accounts:') // the run waits for an ad account of a platform to be linked (accounts:meta); the others wait for a newer version of a section
           ? (await this.listAdAccounts(projectId)).some((a) => a.platform === key.split(':')[1])
           : key === 'unit_economy' // the audit waits for the Unit Economy to be written, or for that skill to stop working (it may itself be waiting for the brief)
             ? ((await this.readSection(projectId, key))?.version != null || !must(await db.from('wf_runs').select('id').eq('project_id', projectId).eq('agent', 'researcher').eq('skill', key).in('status', ['queued', 'running']).limit(1), 'runs').length)

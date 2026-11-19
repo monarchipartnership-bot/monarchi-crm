@@ -3,6 +3,10 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { collectSiteData, pageSignals, pickCroPages, pickProductLink } from '../api/_lib/wf/skills/siteData.js';
+import { AREAS, buildSitePrompt, checkFindings, parseSiteAnswer, renderSiteText, tasksFromFindings } from '../api/_lib/wf/skills/siteEngine.js';
+import { site } from '../api/_lib/wf/skills/siteAgent.js';
+import { readHtml } from '../api/_lib/siteReader.js';
 import { computeAudit, renderAuditText, testCurve } from '../api/_lib/wf/skills/auditEngine.js';
 import { audit } from '../api/_lib/wf/skills/auditAgent.js';
 import { createHandlers } from '../api/_lib/wf/agents.js';
@@ -571,4 +575,153 @@ await test('audit: the audit does not read the clock: stale pixels are judged ag
   assert.deepEqual(computeAudit(AUDIT_DATA, TH), computeAudit(AUDIT_DATA, TH), 'same data, same audit');
 });
 
+// ---------------------------------------------------------------- A4: the site skill (a CRO review of the client's website)
+const HOME_HTML = `<html><head><title>Меблі Лоза: стільці й столи</title><meta name="description" content="Стільці та столи з дерева"><meta name="viewport" content="width=device-width">
+<script type="application/ld+json">{"@graph":[{"@type":"Organization"},{"@type":["Product","Thing"]}]}</script></head>
+<body><nav><a href="/catalog/">Каталог</a><a href="/delivery">Доставка й оплата</a><a href="/contacts">Контакти</a><a href="/blog/post-1">Блог</a><a href="https://other.example/catalog">Партнер</a><a href="/files/price.pdf">Прайс</a></nav>
+<h1>Стільці з дубу ручної роботи</h1><h2>Безкоштовна доставка від 5000 грн</h2><p>Виготовляємо меблі з натурального дерева. Стілець Лоза коштує 3200 грн.</p>
+<a class="btn" href="/catalog/">Дивитись каталог</a><button>Купити в 1 клік</button><a href="tel:+380501112233">Подзвонити</a><a href="https://t.me/lozashop">Telegram</a>
+<form><input type="email" name="email"><button>Підписатись</button></form><footer>© Лоза, Київ, вул. Дубова 1</footer></body></html>`;
+const CATALOG_HTML = `<html><head><title>Каталог</title></head><body><h1>Каталог</h1><a href="/catalog/chair-oak">Стілець Дуб</a><a href="/catalog/page/2">Далі</a><p>Ціни від 2900 грн</p></body></html>`;
+const PRODUCT_HTML = `<html><head><title>Стілець Дуб</title><meta name="viewport" content="width=device-width"></head><body><h1>Стілець Дуб</h1><p>Ціна 3200 грн. В наявності. Є відгуки покупців.</p><button>Додати в кошик</button></body></html>`;
+const DELIVERY_HTML = `<html><head><title>Доставка й оплата</title></head><body><h1>Доставка</h1><p>Нова пошта 2-3 дні. Оплата карткою Visa або післяплатою.</p></body></html>`;
+const CONTACTS_HTML = `<html><head><title>Контакти</title></head><body><h1>Контакти</h1><p>Київ, вул. Дубова 1. Щодня з 9 до 18.</p></body></html>`;
+const SITE = { 'https://loza.example/': HOME_HTML, 'https://loza.example/catalog/': CATALOG_HTML, 'https://loza.example/catalog/chair-oak': PRODUCT_HTML, 'https://loza.example/delivery': DELIVERY_HTML, 'https://loza.example/contacts': CONTACTS_HTML };
+const fakeNet = (pages = SITE, robots = '') => {
+  const hits = [];
+  const fetchFn = async (url) => {
+    hits.push(url);
+    if (url.endsWith('/robots.txt')) return robots ? new Response(robots, { status: 200, headers: { 'content-type': 'text/plain' } }) : new Response('', { status: 404 });
+    return pages[url] != null ? new Response(pages[url], { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } }) : new Response('nope', { status: 404, headers: { 'content-type': 'text/html' } });
+  };
+  return { fetchFn, hits, lookup: async () => [{ address: '93.184.216.34' }] };
+};
+await test('site: the pages worth reading are chosen by kind, one each, only on the same site and never files', () => {
+  const links = [['https://loza.example/catalog/', 'Каталог'], ['https://loza.example/catalog/sofas', 'Дивани'], ['https://loza.example/delivery', 'Доставка'], ['https://other.example/contacts', 'Контакти'], ['https://loza.example/files/x.pdf', 'Прайс'], ['https://loza.example/contacts', 'Контакти'], ['https://loza.example/zzz', 'Різне']].map(([url, label]) => ({ url, label }));
+  const picked = pickCroPages(links, 'https://loza.example/');
+  assert.deepEqual(picked.map((p) => p.kind), ['catalog', 'delivery', 'contacts']);
+  assert.equal(picked.find((p) => p.kind === 'catalog').url, 'https://loza.example/catalog/');
+  assert.equal(pickProductLink([{ url: 'https://loza.example/catalog/chair-oak', label: 'x' }, { url: 'https://loza.example/catalog/page/2', label: 'p' }], 'https://loza.example/catalog/', 'https://loza.example/'), 'https://loza.example/catalog/chair-oak');
+});
+await test('site: signals are hard facts counted from the HTML', () => {
+  const home = readHtml(HOME_HTML, 'https://loza.example/');
+  const s = pageSignals(HOME_HTML, home.text);
+  assert.equal(s.viewport, true); assert.deepEqual(s.h1, ['Стільці з дубу ручної роботи']);
+  assert.deepEqual(s.structured.sort(), ['Organization', 'Product', 'Thing']);
+  assert.equal(s.phone_link, true); assert.deepEqual(s.messengers, ['t.me']); assert.equal(s.forms, 1); assert.equal(s.email_inputs, 1);
+  assert.ok(s.buttons.includes('Купити в 1 клік') && s.buttons.includes('Дивитись каталог'));
+  assert.ok(s.price_samples.some((p) => /3200 грн/.test(p))); assert.equal(s.search, false);
+  assert.deepEqual(pageSignals('<html><body><input type="search"></body></html>', '').search, true);
+  assert.ok(s.delivery_words.includes('безкоштовна доставка'));
+});
+await test('site: the collector reads the home page, the key pages and a product from the catalog; a missing page is a fact, robots.txt is obeyed', async () => {
+  const net = fakeNet();
+  const d = await collectSiteData({ website: 'loza.example', ...net });
+  assert.deepEqual(d.pages.map((p) => p.kind), ['home', 'catalog', 'delivery', 'contacts', 'product']);
+  assert.ok(d.pages.every((p) => p.ok)); assert.equal(d.pages[0].signals.https, true);
+  assert.ok(d.pages.find((p) => p.kind === 'product').url.endsWith('/catalog/chair-oak'));
+  const withGap = await collectSiteData({ website: 'loza.example', ...fakeNet({ ...SITE, 'https://loza.example/delivery': undefined }) });
+  assert.equal(withGap.pages.find((p) => p.kind === 'delivery').ok, false); assert.equal(withGap.pages.find((p) => p.kind === 'delivery').error, 'HTTP 404');
+  const closed = await collectSiteData({ website: 'loza.example', ...fakeNet(SITE, 'User-agent: *\nDisallow: /') });
+  assert.equal(closed.blockedByRobots, true); assert.equal(closed.pages.length, 0);
+  const some = await collectSiteData({ website: 'loza.example', ...fakeNet(SITE, 'User-agent: *\nDisallow: /delivery') });
+  assert.equal(some.pages.find((p) => p.kind === 'delivery').error, 'Заборонено robots.txt');
+  await assert.rejects(() => collectSiteData({ website: 'http://localhost/', ...net }), /Внутрішні/);
+});
+await test('site: the prompt carries the facts, the rules and no competitors', async () => {
+  const d = await collectSiteData({ website: 'loza.example', ...fakeNet() });
+  const p = buildSitePrompt({ data: d, speed: null, brief: { content: { general: { goal: 'Продаж стільців', geo: 'Україна' }, economics: { products: ['Стілець Дуб'] } } } });
+  assert.match(p.system, /ALONE/); assert.match(p.system, /Never invent numbers/);
+  assert.match(p.user, /Продаж стільців/); assert.match(p.user, /Безкоштовна доставка від 5000 грн/); assert.match(p.user, /Put "speed" in not_checked/);
+  assert.ok(AREAS.length === 11 && AREAS.every((a) => p.user.includes(a.key)));
+});
+await test('site: a finding is trusted only when its quote and numbers stand in what was read', async () => {
+  const d = await collectSiteData({ website: 'loza.example', ...fakeNet() });
+  const f = (o) => ({ area: 'first_screen', severity: 'high', page: 'https://loza.example/', seen: 'Є заголовок.', why: 'Бо так.', change: 'Змінити.', acceptance: 'Перевірити.', evidence: { kind: 'quote', quote: 'Безкоштовна доставка від 5000 грн' }, ...o });
+  const raw = { findings: [
+    f({}),
+    f({ evidence: { kind: 'quote', quote: 'Знижка 50% лише сьогодні' } }),
+    f({ seen: 'Поріг безкоштовної доставки 5000 грн, а конверсія 4,7%.' }),
+    f({ area: 'terms', evidence: { kind: 'absence' }, seen: 'Умов повернення на прочитаних сторінках немає.', severity: 'medium' }),
+    f({ area: 'mobile', evidence: { kind: 'signal', signal: 'viewport' }, severity: 'low' }),
+    f({ area: 'mobile', evidence: { kind: 'signal', signal: 'nonexistent' } }),
+    f({ area: 'weather' }), f({ change: '' }),
+  ], ok_areas: [{ area: 'contact', note: 'Є телефон і Telegram.' }, { area: 'bogus', note: 'x' }], not_checked: [{ area: 'speed', reason: 'Немає PageSpeed.' }] };
+  const r = checkFindings(raw, d, null);
+  assert.equal(r.dropped, 2, 'unknown area and a missing field');
+  assert.equal(r.findings.filter((x) => x.verified).length, 3);
+  const bad = r.findings.filter((x) => !x.verified).map((x) => x.problem);
+  assert.ok(bad.some((p) => /цитати немає/.test(p)) && bad.some((p) => /число без джерела: 4,7/.test(p)) && bad.some((p) => /такого показника/.test(p)));
+  assert.equal(r.findings[0].verified, true, 'verified first'); assert.equal(r.ok_areas.length, 1); assert.equal(r.not_checked[0].area_name, 'Швидкість');
+  const tasks = tasksFromFindings(r.findings);
+  assert.equal(tasks.length, 2, 'only verified, and the low one stays in the section'); assert.ok(tasks.every((t) => t.type === 'site' && t.owner === 'client_dev'));
+  const text = renderSiteText(r, { url: d.url, pages: d.pages, speedChecked: false });
+  assert.match(text, /Не підтверджено \(3\)/); assert.match(text, /Критерій приймання/); assert.match(text, /Швидкість не перевірялась/);
+});
+await test('site: the answer of the model is read from JSON, a fence is tolerated, garbage is a clear error', () => {
+  assert.equal(parseSiteAnswer('```json\n{"findings":[]}\n```').findings.length, 0);
+  assert.equal(parseSiteAnswer('Ось: {"findings":[{"area":"trust"}]} Готово').findings.length, 1);
+  assert.throws(() => parseSiteAnswer('Вибачте, не можу'), /не у форматі JSON/);
+  assert.throws(() => parseSiteAnswer('{"findings": "x"}'), /немає списку/);
+});
+await test('site: the skill waits for the website address, then reads the site, asks the model, writes the section and the tasks', async () => {
+  const handlers = createHandlers({ researcher: { site } });
+  const { repo, ctx } = await setup({ handlers });
+  const net = fakeNet(); Object.assign(ctx, net);
+  const asked = [];
+  ctx.ask = async (o) => { asked.push(o); return { costUsd: 0.04, text: JSON.stringify({ findings: [
+    { area: 'terms', severity: 'high', page: 'https://loza.example/delivery', seen: 'Нова пошта 2-3 дні, умов повернення немає.', evidence: { kind: 'absence' }, why: 'Покупець боїться купити без повернення.', change: 'Додати сторінку «Повернення».', acceptance: 'Є сторінка і посилання в підвалі.' },
+    { area: 'first_screen', severity: 'medium', page: 'https://loza.example/', seen: 'Головна кнопка веде в каталог.', evidence: { kind: 'quote', quote: 'Безкоштовна доставка від 5000 грн' }, why: 'Оффер не на першому плані.', change: 'Винести оффер у заголовок.', acceptance: 'Оффер видно без прокрутки.' },
+    { area: 'upsell', severity: 'high', page: '', seen: 'Допродажів не видно.', evidence: { kind: 'quote', quote: 'Купуйте разом зі знижкою 30%' }, why: 'x', change: 'Додати блок.', acceptance: 'Є блок.' }], ok_areas: [{ area: 'contact', note: 'Телефон і Telegram є.' }], not_checked: [{ area: 'speed', reason: 'Немає PageSpeed.' }] }) }; };
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'waiting'); assert.equal(repo.T.runs[0].state.blocked_on, 'site_url');
+  assert.equal(repo.T.tasks[0].title, 'Вказати сайт клієнта в картці проєкту'); assert.equal(asked.length, 0, 'no site, no model call');
+  repo.setWebsite(1, 'https://loza.example');
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'done', repo.T.runs[0].error);
+  assert.equal(asked.length, 1); assert.match(asked[0].user, /Стільці з дубу ручної роботи/); assert.equal(asked[0].projectId, 1);
+  const sec = await repo.readSection(1, 'site');
+  const c = sec.version.content;
+  assert.equal(c.findings.length, 3); assert.equal(c.findings.filter((f) => f.verified).length, 2); assert.equal(c.speed, null);
+  assert.ok(c.open.some((o) => /ключ PageSpeed не додано/.test(o)));
+  assert.match(sec.version.body, /Не підтверджено \(1\)/); assert.match(sec.version.body, /без порівняння з конкурентами/);
+  const siteTasks = repo.T.tasks.filter((t) => t.type === 'site');
+  assert.equal(siteTasks.length, 2); assert.equal(siteTasks[0].priority, 'high'); assert.equal(siteTasks[0].owner, 'client_dev');
+  assert.equal(repo.T.runs[0].cost_usd, 0.04, 'the cost of the model call is written to the run (the project cost cap counts it)');
+  assert.equal(repo.T.runs[0].output.verified, 2);
+});
+await test('site: speed is added when a key is set, and a PageSpeed failure is a note, not a failure of the skill', async () => {
+  const handlers = createHandlers({ researcher: { site } });
+  const lh = { lighthouseResult: { categories: { performance: { score: 0.42 }, seo: { score: 0.9 } }, audits: { 'largest-contentful-paint': { numericValue: 5200 } } } };
+  for (const [ok, expectSpeed] of [[true, true], [false, false]]) {
+    const { repo, ctx } = await setup({ handlers });
+    const net = fakeNet(); repo.setWebsite(1, 'loza.example');
+    const fetchFn = async (url, init) => (String(url).includes('pagespeedonline') ? (ok ? new Response(JSON.stringify(lh), { status: 200 }) : new Response(JSON.stringify({ error: { message: 'quota' } }), { status: 429 })) : net.fetchFn(url, init));
+    Object.assign(ctx, { fetchFn, lookup: net.lookup, speedKey: 'k' });
+    let prompt = ''; ctx.ask = async (o) => { prompt = o.user; return { text: '{"findings":[],"ok_areas":[],"not_checked":[]}' }; };
+    await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' });
+    await processTick(ctx);
+    assert.equal(repo.T.runs[0].status, 'done', repo.T.runs[0].error);
+    const c = (await repo.readSection(1, 'site')).version.content;
+    assert.equal(!!c.speed, expectSpeed); assert.match(prompt, expectSpeed ? /PAGESPEED \(Google lab test/ : /PAGESPEED: not available/);
+    if (!expectSpeed) assert.ok(c.open.some((o) => /Швидкість не перевірено/.test(o)));
+  }
+});
+await test('site: no model, a closed site and an unreadable site are told apart', async () => {
+  const handlers = createHandlers({ researcher: { site } });
+  const a = await setup({ handlers }); a.repo.setWebsite(1, 'loza.example'); Object.assign(a.ctx, fakeNet());
+  await a.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' }); await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].status, 'failed'); assert.match(a.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const b = await setup({ handlers }); b.repo.setWebsite(1, 'loza.example'); Object.assign(b.ctx, fakeNet(SITE, 'User-agent: *\nDisallow: /')); b.ctx.ask = async () => { throw new Error('must not be called'); };
+  await b.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' }); await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].status, 'done'); assert.equal(b.repo.T.runs[0].output.blocked_by_robots, true); assert.match(b.repo.T.tasks[0].title, /robots\.txt/);
+  const c = await setup({ handlers }); c.repo.setWebsite(1, 'loza.example'); Object.assign(c.ctx, fakeNet({})); c.ctx.ask = async () => { throw new Error('must not be called'); };
+  await c.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' }); await processTick(c.ctx);
+  assert.equal(c.repo.T.runs[0].status, 'failed'); assert.match(c.repo.T.runs[0].error, /Сайт не прочитано/);
+  const d = await setup({ handlers }); d.repo.setWebsite(1, 'loza.example'); Object.assign(d.ctx, fakeNet()); d.ctx.ask = async () => ({ text: 'Вибачте, не можу' });
+  await d.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' }); await processTick(d.ctx);
+  assert.equal(d.repo.T.runs[0].status, 'failed'); assert.match(d.repo.T.runs[0].error, /не у форматі JSON/);
+  assert.equal(await d.repo.readSection(1, 'site').then((s) => s?.version ?? null), null, 'nothing is written from a bad answer');
+});
 console.log(`\n${passed} workflow checks passed`);
