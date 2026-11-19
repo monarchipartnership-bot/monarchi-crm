@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { allocate, budgetPlan, checkStrategy, gatherStrategyFacts, marginInfo, neededFromClient, optimisationRules, prioritySource } from '../api/_lib/wf/skills/strategyEngine.js';
+import { strategy } from '../api/_lib/wf/skills/strategyAgent.js';
 import { checkCards, gatherCreativeFacts, goalsOf, referencePool, tagOf } from '../api/_lib/wf/skills/creativesEngine.js';
 import { firstCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { checkIdeas, checkMaterials, gatherIdeaFacts, inventoryOf, offerEconomics, renderIdeasText } from '../api/_lib/wf/skills/ideasEngine.js';
@@ -1300,5 +1302,117 @@ await test('brief: the goals of the first creatives are part of the brief sheet 
   assert.deepEqual(form.goals, [{ goal: 'Продати хіт', product: 'AirPlug' }, { goal: 'Розпродаж літа', product: '' }]);
   assert.deepEqual(contentFromForm({ ...form, goals: [...form.goals, { goal: '  ', product: 'x' }] }).creative_goals, CR_BRIEF.content.creative_goals, 'an empty goal is dropped');
   assert.deepEqual(formFromContent({}).goals, []);
+});
+// ---------------------------------------------------------------- A7.1: the Strategist's skill «strategy» (the budget by code, the structure by the model inside the limits)
+const ST_ECON = { ...LELIOR, products: [{ name: 'AirPlug', price: 150 }, { name: 'Extrait 30 ml', price: 200 }, { name: 'Cheap', price: 20, cogs: 19 }], offers: [] };
+const ST_UE = computeUnitEconomy(ST_ECON);
+const ST_BRIEF = { content: { general: { goal: '60 замовлень на місяць', geo: 'США', priority: '' }, economics: ST_ECON, creative_goals: [{ goal: 'Продати хіт', product: 'AirPlug' }] } };
+const ST_CREATIVES = { branch: 'A', items: [{ id: 'c1', tag: 'Продати хіт · AirPlug · Молоді родини · подарунок · картинка 4:5 · без оффера · v1', product: 'AirPlug', segment: 'Молоді родини', goal: 'Продати хіт', status: 'ready' }, { id: 'c2', tag: 'Розпродаж · Extrait 30 ml · усі · економія · картинка 9:16 · без оффера · v1', product: 'Extrait 30 ml', segment: '', goal: 'Розпродаж', status: 'ready' }] };
+const ST_ANSWER = (o = {}) => JSON.stringify({ summary: 'У першому місяці продаємо AirPlug молодим родинам і перевіряємо другий товар.', priorities: [{ product: 'AirPlug', reason: 'Найкраща маржа.' }, { product: 'Cheap', reason: 'Дешевий товар.' }], campaigns: [
+  { name: 'Холодна: молоді родини', segments: ['Молоді родини'], products: ['AirPlug'], share_pct: 60, why: 'Основний сегмент.', ad_groups: [{ name: 'Молоді родини', segment: 'Молоді родини', creative_ids: ['c1'] }] },
+  { name: 'Холодна: широка', segments: [], products: ['Extrait 30 ml'], share_pct: 40, why: 'Перевірка другого товару.', ad_groups: [{ name: 'Широка аудиторія', segment: '', creative_ids: ['c2', 'c9'] }] }],
+  remarketing: { visitors: 'Нагадуємо про товар.', cart: 'Нагадуємо про кошик.', checkout: 'Допомагаємо завершити замовлення.', note: 'Лише від відповідного бюджету.' }, seasonal: [{ what: 'Чорна п’ятниця', when: '29 листопада' }, { what: 'Вигадана акція', when: '12 березня' }], ...o });
+await test('strategy: the budget is counted by code: the daily budget, how many campaigns it allows, the shares become budgets that reach the minimum', () => {
+  const plan = budgetPlan({ economics: ST_ECON, unitEconomy: ST_UE });
+  assert.equal(plan.daily, 150); assert.equal(plan.max_campaigns, 10); assert.equal(plan.remarketing_from_daily, 60); assert.equal(plan.scenarios.length, 3);
+  const tiny = budgetPlan({ economics: { ...ST_ECON, budget_monthly: 300 }, unitEconomy: ST_UE });
+  assert.equal(tiny.daily, 10); assert.equal(tiny.max_campaigns, 1); assert.equal(tiny.below_minimum, true);
+  assert.equal(budgetPlan({ economics: { currency: 'USD' }, unitEconomy: null }), null);
+  const a = allocate([{ name: 'A', share_pct: 50 }, { name: 'B', share_pct: 30 }, { name: 'C', share_pct: 20 }], plan);
+  assert.deepEqual(a.campaigns.map((c) => c.daily_budget), [75, 45, 30]); assert.equal(a.campaigns.reduce((s, c) => s + c.daily_budget, 0), 150);
+  const two = allocate([{ name: 'A', share_pct: 90 }, { name: 'B', share_pct: 5 }, { name: 'C', share_pct: 5 }], { daily: 100, min_daily: 30, max_campaigns: 3 });
+  assert.deepEqual(two.campaigns.map((c) => [c.name, c.daily_budget]), [['A', 100]]); assert.deepEqual(two.dropped.sort(), ['B', 'C'], 'the weakest are dropped until each campaign reaches the minimum');
+  const cap = allocate([{ name: 'A', share_pct: 1 }, { name: 'B', share_pct: 1 }, { name: 'C', share_pct: 1 }], { daily: 90, min_daily: 15, max_campaigns: 2 });
+  assert.equal(cap.campaigns.length, 2); assert.deepEqual(cap.dropped, ['C']);
+});
+await test('strategy: margins, the source of the priorities, what the client owes us with dates, the rules of the optimisation with the numbers of the Unit Economy', () => {
+  const m = marginInfo(ST_UE.lines ? { lines: ST_UE.lines } : {});
+  assert.equal(m.airplug.low, false); assert.equal(m.cheap.low, true, 'a product that cannot be sold alone is a low margin one');
+  assert.equal(prioritySource({ content: { general: { priority: 'Лише AirPlug' } } }).source, 'client'); assert.equal(prioritySource({ content: { general: { priority: 'Усі' } } }).source, 'margin'); assert.equal(prioritySource(null).source, 'margin');
+  const now = new Date('2026-11-19T10:00:00Z');
+  const need = neededFromClient({ audit: { tracking: { pixels: [{ name: 'P' }], stale: ['P'], never: [] } }, materials: { verdict: 'not_enough', shoot_list: [{}, {}] }, tasks: [{ type: 'site', priority: 'high', status: 'proposed', title: 'Сайт: Додати сторінку Повернення' }, { type: 'site', priority: 'low', status: 'proposed', title: 'Сайт: дрібниця' }], now });
+  assert.deepEqual(need.map((x) => [x.due, /піксель|матеріали|сайту/.exec(x.what)[0]]), [['2026-11-22', 'піксель'], ['2026-11-26', 'матеріали'], ['2026-11-29', 'сайту']]);
+  assert.deepEqual(neededFromClient({ audit: { tracking: { pixels: [{ name: 'P' }], stale: [], never: [] } }, materials: { verdict: 'enough' }, tasks: [], now }), [], 'a working pixel and enough materials: nothing is owed');
+  const o = optimisationRules({ breakeven_roas: 1.75, target_roas: 2.5, breakeven_cpa: 100, target_cpa: 70 });
+  assert.equal(o.thresholds.min_spend_for_verdict, 105); assert.ok(o.rules.some((r) => /не менше 105/.test(r)) && o.rules.some((r) => /Апрува 3/.test(r)) && o.rules.some((r) => /беззбиткової \(1\.75\)/.test(r)));
+});
+await test('strategy: the structure of the model is checked: segments, products, creatives, shares; low margin and the client\'s wish; a made-up number or date', () => {
+  const plan = budgetPlan({ economics: ST_ECON, unitEconomy: ST_UE }), margins = marginInfo({ lines: ST_UE.lines });
+  const audience = { segments: [{ name: 'Молоді родини', who: 'Пари', status: 'confirmed' }] };
+  const facts = gatherStrategyFacts({ brief: ST_BRIEF, plan, margins, priority: { source: 'margin', instruction: '' }, ue: ST_UE, audience, ideas: null, creatives: ST_CREATIVES, materials: { verdict: 'enough' }, audit: null, rework: null });
+  const byMargin = checkStrategy(JSON.parse(ST_ANSWER()), { facts, plan, margins, priority: { source: 'margin', instruction: '' } });
+  assert.deepEqual(byMargin.priorities.map((p) => p.product), ['AirPlug'], 'a low margin product is not pushed on its own when the client gave no wish');
+  assert.ok(byMargin.notes.some((n) => /«Cheap»: низька маржа/.test(n)));
+  assert.deepEqual(byMargin.campaigns.map((c) => c.daily_budget), [90, 60]); assert.deepEqual(byMargin.campaigns[1].ad_groups[0].creatives.map((x) => x.id), ['c2'], 'c9 does not exist: dropped');
+  assert.equal(byMargin.remarketing.enabled, true, '150 a day is above 60'); assert.deepEqual(byMargin.seasonal.map((s) => s.when), ['29 листопада'].filter(() => false), 'a date that is not in the input is not accepted');
+  const wish = checkStrategy(JSON.parse(ST_ANSWER()), { facts, plan, margins, priority: { source: 'client', instruction: 'Cheap і AirPlug' } });
+  assert.deepEqual(wish.priorities.map((p) => p.product), ['AirPlug', 'Cheap']); assert.match(wish.priorities[1].warning, /маржа товару низька/); assert.ok(wish.warnings.some((w) => /«Cheap»/.test(w)), 'the client may insist, but is warned');
+  const ghost = checkStrategy({ summary: 'Ціна 777 для всіх.', campaigns: [{ name: 'X', segments: ['Невідомий', 'Молоді родини'], products: ['Нічого', 'AirPlug'], share_pct: 100, why: 'Знижка 83%', ad_groups: [] }], priorities: [{ product: 'Привид' }] }, { facts, plan, margins, priority: { source: 'margin', instruction: '' } });
+  assert.deepEqual(ghost.campaigns[0].segments, ['Молоді родини']); assert.deepEqual(ghost.campaigns[0].products, ['AirPlug']); assert.equal(ghost.campaigns[0].ad_groups[0].name, 'Широка аудиторія', 'a campaign always has a group');
+  assert.ok(ghost.warnings.some((w) => /числа, яких немає у вхідних даних: .*777/.test(w) && /83/.test(w)) && ghost.warnings.some((w) => /Пріоритетні товари не визначено/.test(w)));
+  assert.ok(byMargin.notes.some((n) => /Креативи без групи/.test(n)) === false);
+  const unplaced = checkStrategy({ campaigns: [{ name: 'Y', share_pct: 1, ad_groups: [{ name: 'g', creative_ids: ['c1'] }] }] }, { facts, plan, margins, priority: { source: 'margin', instruction: '' } });
+  assert.ok(unplaced.notes.some((n) => /Креативи без групи: c2/.test(n)));
+  assert.throws(() => checkStrategy({ campaigns: [{ name: '' }] }, { facts, plan, margins, priority: { source: 'margin', instruction: '' } }), /жодної придатної кампанії/);
+  const tinyPlan = budgetPlan({ economics: { ...ST_ECON, budget_monthly: 300 }, unitEconomy: ST_UE });
+  assert.ok(checkStrategy(JSON.parse(ST_ANSWER()), { facts: { ...facts, budget: null }, plan: tinyPlan, margins, priority: { source: 'margin', instruction: '' } }).warnings.some((w) => /нижчий за мінімальний бюджет кампанії/.test(w)));
+});
+await test('strategy: the skill waits for the brief, the Unit Economy and the budget, then writes a strategy that the check accepts; a return makes version 2 with the comment', async () => {
+  const handlers = createHandlers({ strategist: { strategy } });
+  const UE_CONTENT = { lines: ST_UE.lines, scenarios: ST_UE.scenarios, thresholds: ST_UE.thresholds, inputs: ST_ECON };
+  const fresh = async ({ brief = ST_BRIEF.content, ue = true, extra = true } = {}) => {
+    const s = await setup({ handlers }); s.asked = []; s.ctx.ask = async (o) => { s.asked.push(o); return { costUsd: 0.3, text: ST_ANSWER() }; };
+    if (brief) await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: brief });
+    if (ue) await s.repo.writeSectionVersion(1, 'unit_economy', { author_kind: 'agent', author: 'researcher', body: 'ue', content: UE_CONTENT });
+    if (extra) {
+      for (const [k, c] of [['audience', { segments: [{ name: 'Молоді родини', who: 'Пари', status: 'confirmed' }] }], ['creatives', ST_CREATIVES], ['materials', { verdict: 'enough' }]]) await s.repo.writeSectionVersion(1, k, { author_kind: 'agent', author: 'x', body: 'x', content: c });
+      await s.repo.writeSectionVersion(1, 'audit', { author_kind: 'agent', author: 'x', body: 'a', content: { tracking: { pixels: [{ name: 'P' }], stale: [], never: ['P'] } } });
+    }
+    await s.repo.enqueueRun({ project_id: 1, agent: 'strategist', skill: 'strategy' });
+    return s;
+  };
+  const a = await fresh({ brief: null, ue: false, extra: false }); await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].state.blocked_on, 'brief'); assert.equal(a.asked.length, 0);
+  const b = await fresh({ ue: false, extra: false }); await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].state.blocked_on, 'unit_economy');
+  const c = await fresh({ brief: { ...ST_BRIEF.content, economics: { currency: 'USD' } }, extra: false }); await processTick(c.ctx);
+  assert.equal(c.repo.T.runs[0].state.blocked_on, 'brief'); assert.ok(c.repo.T.tasks.some((t) => /місячний бюджет/.test(t.title))); assert.equal(c.asked.length, 0);
+  const { repo, ctx, asked } = await fresh();
+  await processTick(ctx);
+  const run = repo.T.runs[0];
+  assert.equal(run.status, 'done', run.error);
+  const v1 = (await repo.readSection(1, 'strategy')).version;
+  assert.equal(v1.content.version, 1); assert.equal(v1.content.budget_monthly, 4500); assert.equal(v1.content.geo, 'США'); assert.equal(v1.content.campaigns.reduce((s, x) => s + x.daily_budget, 0), 150);
+  assert.match(v1.body, /Схема першого місяця/); assert.match(v1.body, /за маржею з Unit Economy/); assert.match(v1.body, /Як оптимізуємо/); assert.equal(run.cost_usd, 0.3);
+  assert.ok(repo.T.tasks.some((t) => t.type === 'tracking' && /піксель/i.test(t.title) && t.owner === 'client'));
+  assert.deepEqual((await validateProject({ repo, projectId: 1 })).problems.filter((p) => /Бюджет у стратегії|Географія/.test(p)), [], 'the automatic check agrees with the budget and the geo of the strategy');
+  // a return: the same skill with the comment of the manager
+  advance(1000);
+  await repo.enqueueRun({ project_id: 1, agent: 'strategist', skill: 'strategy', input: { rework_of: 5, comment: 'Зменшити частку другого товару' } });
+  await processTick(ctx);
+  const v2 = (await repo.readSection(1, 'strategy')).version;
+  assert.equal(v2.content.version, 2); assert.equal(v2.content.rework.comment, 'Зменшити частку другого товару'); assert.match(v2.body, /доопрацювання за коментарем/);
+  assert.match(asked.at(-1).user, /Зменшити частку другого товару/); assert.match(asked.at(-1).user, /"previous"/);
+});
+await test('strategy: no model and a useless answer fail clearly and write nothing', async () => {
+  const handlers = createHandlers({ strategist: { strategy } });
+  const mk = async () => { const s = await setup({ handlers }); await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: ST_BRIEF.content }); await s.repo.writeSectionVersion(1, 'unit_economy', { author_kind: 'agent', author: 'r', body: 'ue', content: { lines: ST_UE.lines, scenarios: ST_UE.scenarios, thresholds: ST_UE.thresholds } }); await s.repo.enqueueRun({ project_id: 1, agent: 'strategist', skill: 'strategy' }); return s; };
+  const a = await mk(); await processTick(a.ctx); assert.equal(a.repo.T.runs[0].status, 'failed'); assert.match(a.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const b = await mk(); b.ctx.ask = async () => ({ text: 'Вибачте' }); await processTick(b.ctx); assert.match(b.repo.T.runs[0].error, /не у форматі JSON/);
+  const c = await mk(); c.ctx.ask = async () => ({ text: JSON.stringify({ campaigns: [{ name: '' }] }) }); await processTick(c.ctx); assert.match(c.repo.T.runs[0].error, /жодної придатної кампанії/);
+  assert.equal((await c.repo.readSection(1, 'strategy'))?.version ?? null, null);
+});
+await test('machine: the creatives are made first, the strategist follows; the automatic check stands before Апрув 1 and its warnings go with the approval', () => {
+  const base = { now: new Date('2026-11-19T10:00:00Z'), state: { stage: 2, paused: false } };
+  const run = (agent, skill, status = 'done') => ({ id: 1, agent, skill, status, input: {} });
+  const acts = (o) => planNext({ ...base, ...o });
+  assert.deepEqual(acts({ sections: {}, runs: [] }).filter((a) => a.type === 'enqueue').map((a) => `${a.agent}/${a.skill}`), ['creator/first_creatives']);
+  assert.deepEqual(acts({ sections: {}, runs: [run('creator', 'first_creatives', 'waiting')] }).filter((a) => a.type === 'enqueue'), [], 'waiting for the goals of the manager: nothing else starts');
+  assert.deepEqual(acts({ sections: {}, runs: [run('creator', 'first_creatives')] }).filter((a) => a.type === 'enqueue').map((a) => `${a.agent}/${a.skill}`), ['strategist/strategy']);
+  const draft = { sections: { strategy: { status: 'draft', hasCurrent: true } }, runs: [run('creator', 'first_creatives'), run('strategist', 'strategy')] };
+  const held = acts({ ...draft, checks: { ok: false, problems: ['Бюджет у стратегії (5000) не збігається'], rerun: [{ agent: 'strategist', skill: 'strategy' }] } });
+  assert.ok(!held.some((a) => a.type === 'approval'), 'no approval while the check finds problems'); assert.ok(held.some((a) => a.action === 'check_failed' && a.once)); assert.ok(held.some((a) => a.type === 'enqueue' && a.skill === 'strategy'));
+  const ok = acts({ ...draft, checks: { ok: true, problems: [], warnings: ['Сайт: непідтверджених знахідок 1.'] } });
+  assert.deepEqual(ok.find((a) => a.type === 'approval').subject, { section: 'strategy', warnings: ['Сайт: непідтверджених знахідок 1.'] });
 });
 console.log(`\n${passed} workflow checks passed`);

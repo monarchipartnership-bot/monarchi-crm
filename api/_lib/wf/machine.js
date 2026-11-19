@@ -55,7 +55,7 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     }
     acts.push({ type: 'set_stage', stage: STAGE.STRATEGY });
     journal('stage', 'Дослідження завершено. Стратег складає стратегію.' + ((checks.warnings || []).length ? ' Перед апрувом варто глянути: ' + checks.warnings.join(' ') : ''));
-    enqueue('strategist', 'strategy');
+    enqueue('creator', 'first_creatives'); // the creatives come first: the scheme of the first month puts them into the ad groups
     return acts;
   }
 
@@ -70,6 +70,12 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
       journal('returned', `Повернуто на доопрацювання (${returned.kind}): ${returned.comment || ''}`);
       return acts;
     }
+    if (!has('strategy')) {
+      const cr = lastRun(runs, 'creator', 'first_creatives');
+      if (!cr) { enqueue('creator', 'first_creatives'); return acts; }
+      if (isDone(cr) && !open(runs, 'strategist', 'strategy')) enqueue('strategist', 'strategy');
+      return acts;
+    }
     let status = sections.strategy?.status || 'empty';
     const rework = reworkRuns(runs).sort(byIdDesc)[0];
     if (status === 'needs_rework' && isDone(rework) && !open(runs, 'strategist', 'strategy')) { acts.push({ type: 'section_status', key: 'strategy', status: 'draft' }); status = 'draft'; }
@@ -78,7 +84,12 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
       const creatives = lastRun(runs, 'creator', 'first_creatives');
       if (!creatives) { enqueue('creator', 'first_creatives'); return acts; }
       if (isDone(creatives) && !openOf(runs, ['strategist', 'creator']) && (!sApp || sApp.status !== 'pending')) {
-        acts.push({ type: 'approval', kind: 'strategy', subject: { section: 'strategy' } });
+        if (!checks.ok) {
+          acts.push({ type: 'journal', action: 'check_failed', summary: 'Автоматична перевірка перед Апрувом 1 знайшла проблеми: ' + (checks.problems || []).join(' '), meta: {}, once: true });
+          for (const r of checks.rerun || []) enqueue(r.agent, r.skill);
+          return acts;
+        }
+        acts.push({ type: 'approval', kind: 'strategy', subject: { section: 'strategy', warnings: checks.warnings || [] } });
         acts.push({ type: 'section_status', key: 'strategy', status: 'on_approval' });
         journal('approval', 'Стратегія й перші креативи чекають на Апрув 1.');
       }
