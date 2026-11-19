@@ -4,7 +4,7 @@
 // real agents of the steps A4-A10 are connected the handlers are stand-ins (api/_lib/wf/agents.js).
 import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
-import { createHandlers } from './_lib/wf/agents.js';
+import { createRealHandlers } from './_lib/wf/agents.js';
 import { createWfRepo } from './_lib/wf/repo.js';
 import { processTick } from './_lib/wf/tick.js';
 
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       if (error || !data?.user) { bad(res, 401, 'Сесія недійсна'); return; }
     }
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
-    const stats = await processTick({ repo: createWfRepo(db), handlers: createHandlers() });
+    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers() });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);

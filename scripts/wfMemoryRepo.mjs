@@ -3,7 +3,7 @@
 // project+agent+skill, one pending strategy or launch approval, the lease of a claimed run and the pause of a project.
 export function createMemoryWfRepo({ now = () => new Date() } = {}) {
   let seq = { run: 0, approval: 0, version: 0, section: 0 };
-  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [] };
+  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [], tasks: [] };
   const iso = () => now().toISOString();
   const OPEN = ['queued', 'running', 'waiting'];
 
@@ -45,9 +45,10 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       picked.forEach((r) => { r.status = 'running'; r.attempt += 1; r.lease_until = new Date(t.getTime() + leaseMinutes * 60000).toISOString(); r.started_at = r.started_at || iso(); });
       return picked.map((r) => ({ ...r }));
     },
-    async finishRun(id, { status, output = null, error = null, costUsd = 0 }) {
+    async finishRun(id, { status, output = null, error = null, costUsd = 0, state = null }) {
       const r = T.runs.find((x) => x.id === id);
       Object.assign(r, { status, output, error, cost_usd: costUsd, finished_at: ['done', 'failed', 'cancelled'].includes(status) ? iso() : null, lease_until: null });
+      if (state) r.state = state;
     },
     async addSteps(runId, steps) { (steps || []).forEach((s, i) => T.steps.push({ run_id: runId, n: s.n ?? i + 1, title: s.title, status: s.status || 'done', detail: s.detail || {} })); },
     async writeSectionVersion(projectId, key, { body = '', content = {}, author_kind, author, is_proposal = false, run_id = null, sources = [], note = null }) {
@@ -57,7 +58,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
         if (['approved', 'on_approval'].includes(sec.status) || human) throw new Error(`wf: an agent may not replace a human or approved version of section ${sec.id}; send a proposal instead`);
       }
       const version = Math.max(0, ...T.versions.filter((v) => v.section_id === sec.id).map((v) => v.version)) + 1;
-      const v = { id: ++seq.version, section_id: sec.id, version, body, content, author_kind, author, is_proposal, run_id, sources, note };
+      const v = { id: ++seq.version, section_id: sec.id, version, body, content, author_kind, author, is_proposal, run_id, sources, note, created_at: iso() };
       T.versions.push(v);
       if (!is_proposal) {
         const humanOnApproved = author_kind === 'human' && sec.status === 'approved';
@@ -66,6 +67,27 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
         sec.status = humanOnApproved ? 'draft' : sec.status === 'empty' ? 'draft' : sec.status;
       }
       return { ...v };
+    },
+    async readSection(projectId, key) {
+      const sec = T.sections.find((x) => x.project_id === projectId && x.key === key);
+      if (!sec) return null;
+      const v = T.versions.find((x) => x.id === sec.current_version_id);
+      return { status: sec.status, version: v ? { version: v.version, body: v.body, content: v.content, author_kind: v.author_kind, created_at: v.created_at } : null };
+    },
+    async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high' }) {
+      if (T.tasks.some((t) => t.project_id === projectId && t.title === title && ['proposed', 'approved', 'in_progress'].includes(t.status))) return null;
+      const t = { id: T.tasks.length + 1, project_id: projectId, type, title, evidence, owner, priority, status: 'proposed' };
+      T.tasks.push(t);
+      return { ...t };
+    },
+    async resumeBlocked(projectId) {
+      let resumed = 0;
+      for (const r of T.runs.filter((x) => x.project_id === projectId && x.status === 'waiting')) {
+        const key = r.state?.blocked_on; if (!key) continue;
+        const sec = await this.readSection(projectId, key);
+        if (sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at)) { Object.assign(r, { status: 'queued', attempt: 0, lease_until: null, error: null }); resumed += 1; }
+      }
+      return resumed;
     },
     async setSectionStatus(projectId, key, status) { section(projectId, key).status = status; },
     async createApproval(projectId, kind, subject, requestedBy = 'orchestrator') {

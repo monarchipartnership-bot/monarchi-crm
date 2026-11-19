@@ -6,6 +6,8 @@ import { planNext, STAGE } from '../api/_lib/wf/machine.js';
 import { createHandlers } from '../api/_lib/wf/agents.js';
 import { planProject, processTick } from '../api/_lib/wf/tick.js';
 import { createMemoryWfRepo } from './wfMemoryRepo.mjs';
+import { computeUnitEconomy, renderUnitEconomy } from '../api/_lib/wf/skills/economics.js';
+import { unitEconomy } from '../api/_lib/wf/skills/unitEconomyAgent.js';
 import { agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
 
 let passed = 0;
@@ -312,6 +314,73 @@ await test('screens: five agents, the dossier has ten sections, proposals not ye
   assert.equal(rows[0].label, 'Затверджено'); assert.equal(rows[0].needsReapproval, true); assert.equal(rows[1].status, 'empty');
   const vs = [{ id: 1, version: 1, is_proposal: false }, { id: 2, version: 2, is_proposal: true }, { id: 3, version: 3, is_proposal: true }];
   assert.deepEqual(openProposals(vs, new Set([2])).map((v) => v.id), [3]);
+});
+
+// ---------------------------------------------------------------- A4: Unit Economy (numbers checked against the reference page of Lelior)
+const LELIOR = { currency: 'USD', avg_order: 175, cogs_pct: 30, shipping_cost: 12, fee_pct: 3, returns_pct: 3, target_roas: 2.5, budget_monthly: 4500, min_campaign_daily: 15, site_cvr: 0.02,
+  products: [{ name: 'AirPlug', price: 150 }, { name: 'Extrait 30 ml', price: 200 }],
+  offers: [{ name: 'AirPlug + free 50 ml oil', pays: 150, list_value: 150, extra_cost: 18 }, { name: 'AirPlug + two oils, set $280', pays: 280, list_value: 350, approved: false }] };
+await test('economics: the numbers of the Lelior page come out the same', () => {
+  const r = computeUnitEconomy(LELIOR);
+  const by = (name) => r.lines.find((l) => l.name === name);
+  assert.equal(by('Середнє замовлення').contribution, 100); assert.equal(by('Середнє замовлення').breakeven_roas, 1.75); assert.equal(by('Середнє замовлення').target_cpa, 70);
+  assert.equal(by('AirPlug').breakeven_cpa, 84); assert.equal(by('Extrait 30 ml').breakeven_cpa, 116);
+  assert.equal(by('AirPlug + free 50 ml oil').breakeven_cpa, 66);
+  assert.equal(by('AirPlug + two oils, set $280').breakeven_cpa, 146.2);
+  assert.equal(by('Середнє замовлення').max_cpc_at_breakeven, 2);
+  assert.equal(r.provisional, false); assert.equal(r.thresholds.breakeven_cpa, 100); assert.equal(r.thresholds.target_cpa, 70);
+});
+await test('economics: three budget scenarios (45 orders to break even and 64 at target on 4 500)', () => {
+  const r = computeUnitEconomy(LELIOR);
+  assert.deepEqual(r.scenarios.map((s) => s.name), ['Мінімальний', 'Базовий', 'Росту']);
+  const base = r.scenarios[1];
+  assert.equal(base.orders_to_break_even, 45); assert.equal(base.orders_at_target, 64); assert.equal(base.profit_after_ads_at_target, 1929);
+  assert.equal(r.scenarios[0].monthly_budget, 450); assert.equal(r.scenarios[2].monthly_budget, 6750);
+});
+await test('economics: nothing is invented, missing parts are named, a loss-making line is flagged', () => {
+  const none = computeUnitEconomy({});
+  assert.equal(none.blocked, true); assert.ok(none.missing.length > 0);
+  assert.match(renderUnitEconomy(none), /Потрібно від клієнта/);
+  const part = computeUnitEconomy({ avg_order: 100, cogs_pct: 40 });
+  assert.equal(part.blocked, false); assert.equal(part.provisional, true);
+  assert.ok(part.assumptions.some((a) => /Доставка/.test(a))); assert.ok(part.missing.some((m) => /бюджет/.test(m)));
+  assert.equal(part.scenarios.length, 0, 'no budget, no scenarios');
+  const loss = computeUnitEconomy({ avg_order: 50, cogs_pct: 70, shipping_cost: 15, budget_monthly: 1000 });
+  assert.equal(loss.lines[0].sellable_alone, false); assert.equal(loss.scenarios.length, 0);
+  assert.match(renderUnitEconomy(loss), /ЗБИТКОВА/);
+  const noCogs = computeUnitEconomy({ avg_order: 100 });
+  assert.equal(noCogs.blocked, true, 'a price without a product cost cannot be counted');
+  const text = renderUnitEconomy(computeUnitEconomy(LELIOR));
+  assert.match(text, /беззбитковий CPA 100 USD/); assert.match(text, /Три сценарії бюджету/);
+});
+await test('economics: without the brief numbers the run waits, a task is made, a new brief wakes it up', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { unit_economy: unitEconomy } }) });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'unit_economy' });
+  let st = await processTick(ctx);
+  assert.equal(st.waiting, 1);
+  const run = repo.T.runs[0];
+  assert.equal(run.status, 'waiting'); assert.equal(run.state.blocked_on, 'brief');
+  assert.equal(repo.T.tasks.length, 1); assert.equal(repo.T.tasks[0].owner, 'client');
+  await processTick(ctx); assert.equal(repo.T.runs[0].status, 'waiting', 'nothing changed, still waiting'); assert.equal(repo.T.tasks.length, 1, 'the task is not added twice');
+  assert.equal(repo.T.journal.filter((j) => j.action === 'blocked').length, 1, 'written once');
+  advance(60000);
+  await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: 'Бриф', content: { economics: LELIOR } });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'done');
+  const ue = await repo.readSection(1, 'unit_economy');
+  assert.equal(ue.version.content.thresholds.breakeven_cpa, 100); assert.equal(ue.version.author_kind, 'agent');
+});
+await test('economics: when the brief changes later, the agent proposes, the person keeps the text', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { unit_economy: unitEconomy } }) });
+  await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: 'Бриф', content: { economics: LELIOR } });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'unit_economy' });
+  await processTick(ctx);
+  await repo.writeSectionVersion(1, 'unit_economy', { author_kind: 'human', author: 'm@x', body: 'Моя правка', content: {} });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'unit_economy' });
+  await processTick(ctx);
+  const ue = await repo.readSection(1, 'unit_economy');
+  assert.equal(ue.version.body, 'Моя правка');
+  assert.ok(repo.T.versions.some((v) => v.is_proposal && v.author === 'researcher'));
 });
 
 console.log(`\n${passed} workflow checks passed`);

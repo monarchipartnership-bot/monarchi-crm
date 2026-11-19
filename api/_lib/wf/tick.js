@@ -20,6 +20,7 @@ async function applyActions(ctx, projectId, actions, stats) {
 // Plans one project. → the number of actions applied
 export async function planProject(ctx, projectId, stats = { enqueued: 0, approvals: 0 }) {
   const now = (ctx.now || (() => new Date()))();
+  if (ctx.repo.resumeBlocked) await ctx.repo.resumeBlocked(projectId); // a run that waited for a section goes back to the queue when the section changed
   const snap = await ctx.repo.loadSnapshot(projectId);
   if (!snap.state) return 0;
   const checks = ctx.validate ? await ctx.validate({ projectId, ...snap }) : { ok: true, problems: [] };
@@ -55,6 +56,14 @@ async function runOne(ctx, run, stats) {
         await repo.writeSectionVersion(run.project_id, wr.key, { ...base, is_proposal: true, note: 'Пропозиція: людська або затверджена версія не замінюється.' });
         await repo.journal(run.project_id, { actor_kind: 'agent', actor: run.agent, action: 'proposal', subject: wr.key, summary: 'Агент надіслав пропозицію замість заміни версії.' });
       }
+    }
+    for (const t of result.tasks || []) if (repo.addTask) await repo.addTask(run.project_id, { ...t, created_by: run.agent });
+    if (result.blocked) { // the run cannot go on without something from a person: it waits, a task says what is needed, and a new version of the section wakes it up
+      await repo.addSteps(run.id, result.steps || []);
+      await repo.finishRun(run.id, { status: 'waiting', error: result.blocked.reason || null, state: { blocked_on: result.blocked.on, blocked_at: (ctx.now ? ctx.now() : new Date()).toISOString() } });
+      await repo.journalOnce(run.project_id, { actor_kind: 'agent', actor: run.agent, action: 'blocked', subject: run.skill, summary: result.blocked.reason || 'Крок чекає на дані від людини.' });
+      stats.waiting += 1;
+      return;
     }
     if (result.stateUpdate) await repo.setProjectFlag(run.project_id, result.stateUpdate);
     for (const ap of result.approvals || []) await repo.createApproval(run.project_id, ap.kind, ap.subject, run.agent);

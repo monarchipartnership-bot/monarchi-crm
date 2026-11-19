@@ -57,6 +57,33 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       const sec = await sectionRow(projectId, key);
       return must(await db.from('wf_section_versions').insert({ section_id: sec.id, body, content, author_kind, author, is_proposal, run_id, sources, note }).select().single(), 'version');
     },
+    // The current version of a section (what the agents read): { status, version: { version, body, content, author_kind, created_at } } or null.
+    async readSection(projectId, key) {
+      const sec = must(await db.from('wf_sections').select('id, status, current_version_id').eq('project_id', projectId).eq('key', key).maybeSingle(), 'section');
+      if (!sec || sec.current_version_id == null) return sec ? { status: sec.status, version: null } : null;
+      const v = must(await db.from('wf_section_versions').select('version, body, content, author_kind, created_at').eq('id', sec.current_version_id).single(), 'version');
+      return { status: sec.status, version: v };
+    },
+    // A task for people (for example «Потрібно від клієнта»). The same open task is not added twice.
+    async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high', created_by = 'agent' }) {
+      const same = must(await db.from('wf_tasks').select('id').eq('project_id', projectId).eq('title', title).in('status', ['proposed', 'approved', 'in_progress']).limit(1), 'task') || [];
+      if (same.length) return null;
+      return must(await db.from('wf_tasks').insert({ project_id: projectId, type, title, evidence, owner, priority, created_by_kind: 'agent', created_by }).select().single(), 'task');
+    },
+    // A run that waits for a section (state.blocked_on) goes back to the queue when a newer version of that section appeared after it stopped.
+    async resumeBlocked(projectId) {
+      const waiting = must(await db.from('wf_runs').select('id, state').eq('project_id', projectId).eq('status', 'waiting'), 'runs') || [];
+      let resumed = 0;
+      for (const r of waiting) {
+        const key = r.state?.blocked_on; if (!key) continue;
+        const sec = await this.readSection(projectId, key);
+        if (sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at)) {
+          must(await db.from('wf_runs').update({ status: 'queued', attempt: 0, lease_until: null, error: null }).eq('id', r.id).eq('status', 'waiting'), 'resume');
+          resumed += 1;
+        }
+      }
+      return resumed;
+    },
     async setSectionStatus(projectId, key, status) {
       const sec = await sectionRow(projectId, key);
       must(await db.from('wf_sections').update({ status, updated_at: iso(now()) }).eq('id', sec.id), 'section status');
