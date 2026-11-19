@@ -6,6 +6,7 @@ import { planNext, STAGE } from '../api/_lib/wf/machine.js';
 import { createHandlers } from '../api/_lib/wf/agents.js';
 import { planProject, processTick } from '../api/_lib/wf/tick.js';
 import { createMemoryWfRepo } from './wfMemoryRepo.mjs';
+import { agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
 
 let passed = 0;
 const test = async (name, fn) => { try { await fn(); passed += 1; console.log('ok  ', name); } catch (e) { console.error('FAIL', name, '\n', e); process.exitCode = 1; } };
@@ -268,6 +269,49 @@ await test('operation: the optimiser may ask for Апрув 3 for a significant 
   const { repo, ctx } = await setup({ handlers });
   await toOperating(repo, ctx);
   assert.ok(repo.T.approvals.some((a) => a.kind === 'changes' && a.subject.action === 'raise budget 15%' && a.status === 'pending'));
+});
+
+// ---------------------------------------------------------------- the screens (step A3): what the overview, the dossier and the queue show
+const ap = (id, kind, status, extra = {}) => ({ id, project_id: 1, kind, status, requested_at: '2026-11-19T08:00:00Z', decided_at: status === 'pending' ? null : '2026-11-19T08:30:00Z', subject: {}, ...extra });
+await test('screens: the client sign-off is wanted only after an approved Апрув 1 at the stage «Стратегія»', () => {
+  const st = { project_id: 1, stage: 2, paused: false };
+  assert.equal(signoffWanted(st, [ap(1, 'strategy', 'pending')]), null);
+  assert.equal(signoffWanted(st, [ap(1, 'strategy', 'approved')])?.id, 1);
+  assert.equal(signoffWanted(st, [ap(1, 'strategy', 'approved'), ap(2, 'client', 'approved')]), null, 'answered');
+  assert.equal(signoffWanted(st, [ap(1, 'strategy', 'approved'), ap(2, 'client', 'returned', { comment: 'x' }), ap(3, 'strategy', 'approved')])?.id, 3, 'a new Апрув 1 asks for a new answer');
+  assert.equal(signoffWanted({ ...st, stage: 1 }, [ap(1, 'strategy', 'approved')]), null);
+  assert.equal(signoffWanted({ ...st, paused: true }, [ap(1, 'strategy', 'approved')]), null);
+});
+await test('screens: the queue holds pending approvals and sign-offs of all projects, oldest first', () => {
+  const q = buildQueue({
+    projects: { 1: { name: 'Oxygen' }, 2: { name: 'Lelior' } },
+    states: [{ project_id: 1, stage: 2, paused: false }, { project_id: 2, stage: 2, paused: false }],
+    approvals: [ap(5, 'launch', 'pending', { project_id: 1, requested_at: '2026-11-19T10:00:00Z' }), ap(6, 'strategy', 'approved', { project_id: 2, decided_at: '2026-11-19T07:00:00Z' }), ap(7, 'strategy', 'approved', { project_id: 1 })],
+  });
+  assert.deepEqual(q.map((x) => [x.projectId, x.kind, x.virtual]), [[2, 'client', true], [1, 'client', true], [1, 'launch', false]]);
+  assert.equal(q[0].project, 'Lelior');
+});
+await test('screens: the card «Зараз» tells what is next', () => {
+  assert.equal(nowCard({ state: null }).action, 'start');
+  assert.equal(nowCard({ state: { stage: 1, paused: true } }).action, 'resume');
+  assert.equal(nowCard({ state: { stage: 2 }, approvals: [ap(1, 'strategy', 'pending')] }).action, 'decide');
+  assert.equal(nowCard({ state: { stage: 2 }, approvals: [ap(1, 'strategy', 'approved')] }).action, 'signoff');
+  const s0 = nowCard({ state: { stage: 0 }, hasBrief: false });
+  assert.match(s0.text, /бриф/); assert.match(s0.text, /оплат/); assert.match(s0.text, /договор/);
+  assert.equal(nowCard({ state: { stage: 0, paid_at: 'x', contracts_signed_at: 'x' }, hasBrief: true, runs: [{ id: 1, agent: 'researcher', skill: 'intake', status: 'running' }] }).tone, 'info');
+  assert.equal(nowCard({ state: { stage: 1 }, runs: [{ id: 3, agent: 'creator', skill: 'strategy', status: 'failed', error: 'boom' }] }).tone, 'bad');
+  assert.equal(nowCard({ state: { stage: 1 }, runs: [{ id: 3, agent: 'creator', skill: 'strategy', status: 'failed' }, { id: 4, agent: 'creator', skill: 'strategy', status: 'done' }] }).tone, 'ok', 'a later run of the same step clears the error');
+});
+await test('screens: five agents, the dossier has ten sections, proposals not yet answered are open', () => {
+  const cards = agentCards([{ id: 1, agent: 'researcher', skill: 'site', status: 'done' }, { id: 2, agent: 'creator', skill: 'materials_ideas', status: 'running' }]);
+  assert.equal(cards.length, 5);
+  assert.equal(cards.find((c) => c.key === 'creator').active, true);
+  assert.equal(cards.find((c) => c.key === 'mediabuyer').status, 'Не активний');
+  const rows = sectionRows([{ id: 9, key: 'brief', status: 'approved', current_version_id: 4, needs_reapproval: true }]);
+  assert.equal(rows.length, 10);
+  assert.equal(rows[0].label, 'Затверджено'); assert.equal(rows[0].needsReapproval, true); assert.equal(rows[1].status, 'empty');
+  const vs = [{ id: 1, version: 1, is_proposal: false }, { id: 2, version: 2, is_proposal: true }, { id: 3, version: 3, is_proposal: true }];
+  assert.deepEqual(openProposals(vs, new Set([2])).map((v) => v.id), [3]);
 });
 
 console.log(`\n${passed} workflow checks passed`);

@@ -35,6 +35,7 @@ export const DEPTS = {
     items: [
       { key: 'dashboard', name: 'Dashboard', desc: 'Загальна картина по всіх проєктах: витрати, дохід, ROAS, статуси та тренди.', icon: SI.projectsDashboard, type: 'link', to: '/projects/dashboard' },
       { key: 'projects', name: 'Проєкти', desc: 'База всіх проєктів агенції: кабінети, клієнт, звіти та презентації.', icon: SI.projects, type: 'link', to: '/projects' },
+      { key: 'approvals', name: 'Апруви', desc: 'Рішення, що чекають на менеджера: стратегія, підпис клієнта, запуск, зміни.', icon: SI.dealTasks, type: 'link', to: '/projects/approvals' },
       { key: 'clients', name: 'Презентація', desc: 'Презентація для клієнта з цифрами та текстом звіту.', icon: SI.clientsReport, type: 'link', to: '/clients' },
       // Daily/Weekly/Monthly project reports no longer have their own
       // entries — they're reached from buttons on the Проєкти page (their
