@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { checkIdeas, checkMaterials, gatherIdeaFacts, inventoryOf, offerEconomics, renderIdeasText } from '../api/_lib/wf/skills/ideasEngine.js';
+import { materialsIdeas } from '../api/_lib/wf/skills/materialsAgent.js';
 import { checkSources, compareNumbers, createValidator, findDuplicateTasks, validateProject } from '../api/_lib/wf/check.js';
 import { competitorCards, competitorHosts, siteAreaRows, siteCounts } from '../src/lib/workflow/sections.js';
 import { adProblems } from '../src/lib/workflow/ads.js';
@@ -1081,5 +1083,100 @@ await test('check: the stage message carries the warnings, the check does not ho
   assert.equal(r.merged, 1); assert.equal(repo.T.tasks.filter((t) => t.status === 'proposed').length, 1); assert.equal(repo.T.tasks.find((t) => t.status === 'rejected').result, 'Дубль задачі #2');
   assert.ok(repo.T.journal.some((j) => j.action === 'tasks_merged'));
   assert.deepEqual(await createValidator(repo)({ projectId: 1, state: { stage: 4 } }), { ok: true, problems: [], warnings: [], rerun: [], merged: 0 });
+});
+// ---------------------------------------------------------------- A6.1: the Creator's skill «materials_ideas» (materials of the client, shoot brief, bank of ideas)
+const MAT_BRIEF = { content: { general: { goal: 'Продаж AirPlug', geo: 'США' }, economics: { ...LELIOR, offers: [{ name: 'AirPlug + free 50 ml oil', pays: 150, list_value: 150, extra_cost: 18, approved: true }, { name: 'Set $280', pays: 280, list_value: 350, approved: false }] } } };
+const MAT_COMP = { table: [{ competitor: 'rival.example', approach: 'Прямий виробник', angles: 'Виробник', offers: 'Подарунок до замовлення', verified: true }, { competitor: 'shaky.example', approach: 'x', verified: false }], ads_analysis: [{ label: 'Конкурент: rival.example', angle: 'Прямий виробник', offer: 'Подарунок', format: 'відео', idea: 'Показати цех' }] };
+const MAT_AUD = { segments: [{ name: 'Молоді родини', who: 'Пари', situation: 'Переїзд', message: 'Меблі на роки', formats: 'Відео', angles: ['Переїзд'], status: 'confirmed' }] };
+const MAT_AUDIT = { recent: { ads: { best: [{ name: 'Відео цеху', roas: 2.4, results: 30 }], worst: [{ name: 'Статика знижка', roas: 0.8 }] } } };
+const PHOTO = (n) => Array.from({ length: n }, (_, i) => ({ kind: 'product', name: `p${i}.jpg`, url: `https://f.example/p${i}.jpg` }));
+const IDEA = (o) => ({ hook: 'Подарунок до першого замовлення', angle: 'подарунок', format: 'відео 9:16', segment: 'Молоді родини', source: 'competitor', reference: 'rival.example', example: 'Розпаковка подарунка', offer: null, ...o });
+const ANSWER = (o = {}) => JSON.stringify({ materials: { verdict: 'enough', reason: 'Є фото продукту й приклади.', have: ['Фото продукту'], missing: [], shoot_list: [] }, ideas: [IDEA({}), IDEA({ hook: 'Безкоштовна олія в подарунок', angle: 'подарунок', format: 'статика', source: 'own', reference: '', segment: '', offer: { name: 'AirPlug + free 50 ml oil', pays: 150, list_value: 150, extra_cost: 18 } })], ...o });
+await test('materials: the inventory is counted from the project card; no product photo is a basic gap; notes and brand are named', () => {
+  const inv = inventoryOf({ settings: { figma_url: 'https://figma.com/x', cta_text: 'Купити', inputs: { tone: { body: 'Тепло' }, brand: { body: '#112233' } } }, assets: [...PHOTO(2), { kind: 'logo', name: 'l.png', url: 'u' }] });
+  assert.deepEqual(inv.count, { logo: 1, product: 2, style: 0, creative: 0, other: 0 }); assert.equal(inv.brand.figma, true); assert.equal(inv.brand.tone, true); assert.equal(inv.brand.copy_rules, false); assert.deepEqual(inv.hard_gaps, []);
+  assert.match(inventoryOf({}).hard_gaps[0], /Немає жодного фото продукту/); assert.equal(inventoryOf(null).count.product, 0);
+});
+await test('materials: the verdict cannot be «enough» without the basics; a shoot brief only when not enough; the hard gaps come first in «missing»', () => {
+  const gap = inventoryOf({ assets: [] });
+  const forced = checkMaterials({ materials: { verdict: 'enough', reason: 'Так', have: [], missing: ['Відео'], shoot_list: [{ what: 'Товар', format: 'фото' }] } }, gap);
+  assert.equal(forced.verdict, 'not_enough'); assert.equal(forced.forced, true); assert.match(forced.reason, /Немає жодного фото продукту/); assert.equal(forced.missing[0], gap.hard_gaps[0]); assert.equal(forced.shoot_list.length, 1);
+  const ok = checkMaterials({ materials: { verdict: 'enough', shoot_list: [{ what: 'Зайве', format: 'відео' }] } }, inventoryOf({ assets: PHOTO(1) }));
+  assert.equal(ok.verdict, 'enough'); assert.equal(ok.forced, false); assert.deepEqual(ok.shoot_list, [], 'nothing to shoot when the materials are enough');
+  const bad = checkMaterials({ materials: { verdict: 'not_enough', shoot_list: [{ what: '', format: 'x' }, { what: 'Y', format: '' }, { what: 'Z', format: 'відео', why: 'бо', reference: 'rival.example' }] } }, inventoryOf({ assets: PHOTO(1) }));
+  assert.equal(bad.shoot_list.length, 1);
+});
+await test('materials: what we earn or lose on an offer is counted by the code from the Unit Economy', () => {
+  const e = offerEconomics(MAT_BRIEF.content.economics, { name: 'x', pays: 150, list_value: 150, extra_cost: 18 });
+  assert.equal(e.breakeven_cpa, 66, 'the same as the line «AirPlug + free 50 ml oil» of the Unit Economy'); assert.equal(e.contribution, 66); assert.equal(e.vs_average, -34, 'against the average order (100 before ads)');
+  assert.equal(offerEconomics(MAT_BRIEF.content.economics, { name: 'x', pays: 150 }), null, 'no list value: nothing is counted');
+  assert.equal(offerEconomics({ currency: 'USD' }, { name: 'x', pays: 150, list_value: 150 }), null, 'no product cost in the brief: nothing is counted');
+});
+await test('materials: an idea names its source or becomes our own; an offer of ours is a recommendation until the client approves it; a number without a source is flagged', () => {
+  const facts = gatherIdeaFacts({ brief: MAT_BRIEF, materials: { assets: PHOTO(1) }, audit: MAT_AUDIT, competitors: MAT_COMP, audience: MAT_AUD, unitEconomy: { thresholds: { breakeven_cpa: 100, target_cpa: 70, breakeven_roas: 1.75 } } });
+  assert.deepEqual(facts.approved_offers, ['AirPlug + free 50 ml oil']); assert.equal(facts.competitors.approaches.length, 1, 'only verified rows of the competitors are given'); assert.equal(facts.past_creatives.best[0].name, 'Відео цеху');
+  const raw = { ideas: [
+    IDEA({}),
+    IDEA({ source: 'competitor', reference: 'ghost.example', hook: 'Від привидів' }),
+    IDEA({ source: 'competitor', reference: 'Конкурент: rival.example', hook: 'З реклами конкурента' }),
+    IDEA({ source: 'audience', segment: 'Невідомі', reference: '', hook: 'Для нікого' }),
+    IDEA({ source: 'own', reference: '', hook: 'Знижка 83% тільки сьогодні' }),
+    IDEA({ source: 'own', hook: 'Схвалений оффер', offer: { name: 'AirPlug + free 50 ml oil', pays: 150, list_value: 150, extra_cost: 18 } }),
+    IDEA({ source: 'own', hook: 'Новий сет', offer: { name: 'Set $280', pays: 280, list_value: 350 } }),
+    IDEA({ hook: '' }), IDEA({ format: '' }),
+  ] };
+  const r = checkIdeas(raw, { facts, economics: MAT_BRIEF.content.economics });
+  assert.equal(r.dropped, 2); assert.equal(r.items.length, 7);
+  const by = (h) => r.items.find((i) => i.hook === h);
+  assert.equal(by('Подарунок до першого замовлення').source, 'competitor'); assert.equal(by('Від привидів').source, 'own'); assert.match(by('Від привидів').note, /Конкурента з такою назвою немає/);
+  assert.equal(by('З реклами конкурента').source, 'competitor'); assert.equal(by('Для нікого').source, 'own');
+  assert.equal(by('Знижка 83% тільки сьогодні').status, 'unverified'); assert.match(by('Знижка 83% тільки сьогодні').problem, /число без джерела: 83/);
+  const ok = by('Схвалений оффер'), set = by('Новий сет');
+  assert.equal(ok.offer.approved, true); assert.equal(ok.recommendation, false); assert.equal(ok.offer.economics.breakeven_cpa, 66);
+  assert.equal(set.offer.approved, false); assert.equal(set.recommendation, true); assert.equal(set.offer.economics.breakeven_cpa, 146.2, 'counted even though not approved: the manager sees what the recommendation would earn');
+  const text = renderIdeasText(r.items, { notCovered: ['x'] });
+  assert.match(text, /Рекомендація, потрібне погодження клієнта/); assert.match(text, /Погоджено клієнтом/); assert.match(text, /\(-34 проти середнього замовлення\)/);
+});
+await test('materials: the skill reads the card, waits for the research, writes both sections, a shoot brief and tasks; the basics are forced by the code', async () => {
+  const slow = async () => { await new Promise((r) => setTimeout(r, 30)); return { writes: [{ key: 'competitors', body: 'c', content: MAT_COMP }] }; };
+  const handlers = createHandlers({ researcher: { competitors: slow }, creator: { materials_ideas: materialsIdeas } });
+  const { repo, ctx } = await setup({ handlers });
+  repo.setMaterials(1, { settings: { inputs: { tone: { body: 'Тепло' } } }, assets: [] });
+  const asked = [];
+  ctx.ask = async (o) => { asked.push(o); return { costUsd: 0.2, text: ANSWER({ materials: { verdict: 'enough', reason: 'Все є.', have: [], missing: [], shoot_list: [{ what: 'Товар на білому тлі', format: 'фото', why: 'для візуалів', reference: 'rival.example' }] } }) }; };
+  await repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'materials_ideas' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].state.blocked_on, 'brief'); assert.equal(asked.length, 0);
+  advance(1000);
+  await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: MAT_BRIEF.content });
+  await repo.writeSectionVersion(1, 'audience', { author_kind: 'agent', author: 'researcher', body: 'a', content: MAT_AUD });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'competitors' }); // still working: the Creator waits
+  await processTick(ctx);
+  assert.equal(asked.length, 0, 'not before the competitors are there');
+  await processTick(ctx);
+  const run = repo.T.runs.find((r) => r.skill === 'materials_ideas');
+  assert.equal(run.status, 'done', run.error);
+  assert.equal(asked.length, 1); assert.match(asked[0].user, /"hard_gaps"/); assert.match(asked[0].user, /Прямий виробник/); assert.doesNotMatch(asked[0].user, /shaky/);
+  const m = (await repo.readSection(1, 'materials')).version, i = (await repo.readSection(1, 'ideas')).version;
+  assert.equal(m.content.verdict, 'not_enough'); assert.equal(m.content.forced, true); assert.equal(m.content.shoot_list.length, 1);
+  assert.match(m.body, /ТЗ на зйомку/); assert.match(m.body, /Відео клієнта в системі не зберігаються/);
+  assert.equal(i.content.items.length, 2); assert.match(i.body, /Банк ідей/); assert.match(i.body, /Звідки: від конкурента \(rival\.example\)/);
+  assert.ok(repo.T.tasks.some((t) => t.title === 'Надати фото продукту' && t.owner === 'client' && t.type === 'creatives'));
+  assert.ok(repo.T.tasks.some((t) => t.title === 'Відзняти матеріали за ТЗ'));
+  assert.equal(run.cost_usd, 0.2);
+});
+await test('materials: materials that are enough give ideas and no shoot brief; no model, no shoot brief when it is needed, and no ideas fail clearly and write nothing', async () => {
+  const handlers = createHandlers({ creator: { materials_ideas: materialsIdeas } });
+  const mk = async () => { const s = await setup({ handlers }); s.repo.setMaterials(1, { settings: {}, assets: PHOTO(2) }); await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: MAT_BRIEF.content }); await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'materials_ideas' }); return s; };
+  const a = await mk(); a.ctx.ask = async () => ({ text: ANSWER() }); await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].status, 'done', a.repo.T.runs[0].error);
+  assert.equal((await a.repo.readSection(1, 'materials')).version.content.verdict, 'enough'); assert.equal(a.repo.T.tasks.length, 0);
+  const b = await mk(); await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].status, 'failed'); assert.match(b.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const c = await mk(); c.ctx.ask = async () => ({ text: ANSWER({ materials: { verdict: 'not_enough', reason: 'мало', shoot_list: [] } }) }); await processTick(c.ctx);
+  assert.equal(c.repo.T.runs[0].status, 'failed'); assert.match(c.repo.T.runs[0].error, /не склала ТЗ/);
+  const d = await mk(); d.ctx.ask = async () => ({ text: ANSWER({ ideas: [{ hook: 'x' }] }) }); await processTick(d.ctx);
+  assert.equal(d.repo.T.runs[0].status, 'failed'); assert.match(d.repo.T.runs[0].error, /жодної придатної ідеї/);
+  assert.equal((await d.repo.readSection(1, 'ideas'))?.version ?? null, null);
 });
 console.log(`\n${passed} workflow checks passed`);

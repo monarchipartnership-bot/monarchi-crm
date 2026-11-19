@@ -76,6 +76,8 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
     },
     async readProject(projectId) { return { id: projectId, website: T.websites?.get(projectId) ?? null, client_language: null }; },
     setWebsite(projectId, url) { (T.websites ||= new Map()).set(projectId, url); },
+    async readCreativeMaterials(projectId) { return T.materials?.get(projectId) || { settings: {}, assets: [] }; },
+    setMaterials(projectId, m) { (T.materials ||= new Map()).set(projectId, m); },
     async listAdAccounts(projectId) { return (T.accounts.get(projectId) || []).map((a) => ({ ...a })); },
     addAccount(projectId, a) { T.accounts.set(projectId, [...(T.accounts.get(projectId) || []), a]); },
     async listTasks(projectId) { return T.tasks.filter((t) => t.project_id === projectId && ['proposed', 'approved', 'in_progress'].includes(t.status)).map((t) => ({ created_by_kind: 'agent', ...t })); },
@@ -95,7 +97,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
         const key = r.state?.blocked_on; if (!key) continue;
         const isAcc = key.startsWith('accounts:');
         const sec = isAcc ? null : await this.readSection(projectId, key);
-        const woke = key === 'site_url' ? !!String(T.websites?.get(projectId) || '').trim() : isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : ['unit_economy', 'audit', 'site'].includes(key) ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
+        const woke = key === 'site_url' ? !!String(T.websites?.get(projectId) || '').trim() : isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : ['unit_economy', 'audit', 'site', 'audience', 'competitors'].includes(key) ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
         if (woke) { Object.assign(r, { status: 'queued', attempt: 0, lease_until: null, error: null }); resumed += 1; }
       }
       return resumed;

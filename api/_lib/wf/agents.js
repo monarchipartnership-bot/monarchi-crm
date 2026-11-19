@@ -12,6 +12,7 @@ import { audit } from './skills/auditAgent.js';
 import { site } from './skills/siteAgent.js';
 import { audience } from './skills/audienceAgent.js';
 import { competitors } from './skills/competitorsAgent.js';
+import { materialsIdeas } from './skills/materialsAgent.js';
 const w = (key, body) => ({ key, body: `[заглушка] ${body}`, content: { stub: true }, sources: [] });
 const done = (extra = {}) => async () => ({ output: { stub: true }, steps: [{ title: 'Виконано (заглушка)' }], ...extra });
 
@@ -43,8 +44,8 @@ export const STUBS = {
 };
 
 // The real agents built so far. The cron door (api/wf-tick.js) uses them; the tests of the orchestrator use the stand-ins only.
-export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors } };
-export function createRealHandlers(overrides = {}) { return createHandlers({ ...REAL, researcher: { ...REAL.researcher, ...(overrides.researcher || {}) }, ...Object.fromEntries(Object.entries(overrides).filter(([k]) => k !== 'researcher')) }); }
+export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors }, creator: { materials_ideas: materialsIdeas } };
+export function createRealHandlers(overrides = {}) { return createHandlers({ ...REAL, researcher: { ...REAL.researcher, ...(overrides.researcher || {}) }, creator: { ...REAL.creator, ...(overrides.creator || {}) }, ...Object.fromEntries(Object.entries(overrides).filter(([k]) => !['researcher', 'creator'].includes(k))) }); }
 
 export function createHandlers(overrides = {}) {
   const out = {};
