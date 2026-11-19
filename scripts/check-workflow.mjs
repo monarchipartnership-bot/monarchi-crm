@@ -3,6 +3,7 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { checkSources, compareNumbers, createValidator, findDuplicateTasks, validateProject } from '../api/_lib/wf/check.js';
 import { competitorCards, competitorHosts, siteAreaRows, siteCounts } from '../src/lib/workflow/sections.js';
 import { adProblems } from '../src/lib/workflow/ads.js';
 import { buildCompetitorsPrompt, checkCompetitors, compactSite, comparisonTasks, parseCompetitors, verifiedAds, withSiteAppendix } from '../api/_lib/wf/skills/competitorsEngine.js';
@@ -985,5 +986,100 @@ await test('screens: competitor cards carry their comparisons; the ad rule is on
   assert.deepEqual(adProblems({ ...ok, screenshot_url: '' }), ['немає скриншота']);
   assert.equal(adProblems({}).length, 5);
   assert.equal(verifiedAds({ ads: [ok, { ...ok, screenshot_url: '' }] }).ads.length, 1, 'the agent and the screen agree on what counts');
+});
+// ---------------------------------------------------------------- A5: the automatic check before an approval
+const V = (content, o = {}) => ({ version: { content, created_at: '2026-11-19T09:00:00Z', author_kind: 'agent', ...o } });
+const UE_OF = (e, extra = {}) => V({ inputs: e, thresholds: { breakeven_roas: 1.75, target_roas: 2.5, breakeven_cpa: 100, target_cpa: 70 }, ...extra });
+await test('check: the numbers of the brief and of the Unit Economy must be the same; a stale agent section is asked to be redone, a person\'s is not', () => {
+  const brief = V({ economics: LELIOR, general: { geo: 'Україна' } }, { created_at: '2026-11-19T10:00:00Z', author_kind: 'human' });
+  const ok = compareNumbers({ brief, unit_economy: UE_OF(LELIOR, {}) });
+  assert.deepEqual(ok, { problems: [], rerun: [] });
+  const stale = compareNumbers({ brief: V({ economics: { ...LELIOR, budget_monthly: 6000 } }, { created_at: '2026-11-19T10:00:00Z', author_kind: 'human' }), unit_economy: UE_OF(LELIOR) });
+  assert.match(stale.problems[0], /місячний бюджет: у брифі 6000, в Unit Economy 4500/); assert.deepEqual(stale.rerun, [{ agent: 'researcher', skill: 'unit_economy' }]);
+  const human = compareNumbers({ brief: V({ economics: { ...LELIOR, budget_monthly: 6000 } }, { created_at: '2026-11-19T10:00:00Z' }), unit_economy: { version: { ...UE_OF(LELIOR).version, author_kind: 'human' } } });
+  assert.equal(human.problems.length, 1); assert.deepEqual(human.rerun, [], 'a person\'s section is not redone by an agent');
+  const old = compareNumbers({ brief: V({ economics: { ...LELIOR, budget_monthly: 6000 } }, { created_at: '2026-11-19T08:00:00Z' }), unit_economy: UE_OF(LELIOR) });
+  assert.equal(old.problems.length, 1); assert.deepEqual(old.rerun, [], 'the Unit Economy is newer than the brief: a rerun would change nothing, so no loop');
+  const prod = compareNumbers({ brief: V({ economics: { ...LELIOR, products: [{ name: 'AirPlug', price: 160 }, { name: 'Extrait 30 ml', price: 200 }] } }, { created_at: '2026-11-19T10:00:00Z' }), unit_economy: UE_OF(LELIOR) });
+  assert.match(prod.problems[0], /товари або офери/);
+  assert.deepEqual(compareNumbers({}), { problems: [], rerun: [] }, 'nothing to compare is not a problem');
+});
+await test('check: the audit is judged by the thresholds of the current Unit Economy, the currency is one, the strategy repeats the budget and the geo of the brief', () => {
+  const brief = V({ economics: LELIOR, general: { geo: 'Україна' } });
+  const th = { breakeven_roas: 1.75, target_roas: 2.5, breakeven_cpa: 100, target_cpa: 70 };
+  const ue = UE_OF(LELIOR, {}); ue.version.created_at = '2026-11-19T10:00:00Z';
+  const au = (t, extra = {}) => V({ thresholds: t, currency: 'USD', ...extra }, { created_at: '2026-11-19T09:00:00Z' });
+  assert.deepEqual(compareNumbers({ brief, unit_economy: ue, audit: au(th) }).problems, []);
+  const wrong = compareNumbers({ brief, unit_economy: ue, audit: au({ ...th, breakeven_roas: 2 }) });
+  assert.match(wrong.problems[0], /за іншими порогами/); assert.deepEqual(wrong.rerun, [{ agent: 'researcher', skill: 'audit' }]);
+  const none = compareNumbers({ brief, unit_economy: ue, audit: au(null) });
+  assert.match(none.problems[0], /без порогів/);
+  assert.match(compareNumbers({ brief, audit: au(th, { currency: 'EUR' }) }).problems[0], /Валюта брифу USD, а кабінету EUR/);
+  const strat = compareNumbers({ brief, strategy: V({ budget_monthly: 5000, geo: 'Польща' }) });
+  assert.equal(strat.problems.length, 2); assert.match(strat.problems[0], /Бюджет у стратегії \(5000\).*\(4500\)/); assert.match(strat.problems[1], /Географія.*Польща.*Україна/);
+  assert.deepEqual(compareNumbers({ brief, strategy: V({ budget_monthly: 4500, geo: ' україна ' }) }).problems, []);
+});
+await test('check: nothing is «підтверджено» without a proof (a problem); what is unproven but marked goes to the warnings the manager sees before approving', () => {
+  const sections = {
+    site: V({ findings: [{ verified: true, evidence: { kind: 'quote', quote: '' } }, { verified: true, evidence: { kind: 'absence' } }, { verified: false }] }),
+    audience: V({ segments: [{ status: 'confirmed', confirmed_by: [] }, { status: 'hypothesis' }, { status: 'unverified' }, { status: 'confirmed', confirmed_by: [{ source: 'brief' }] }] }),
+    competitors: V({ table: [{ verified: true, evidence: { quote: '' } }, { verified: false }], ads_skipped: [{}, {}], ads_analysis: [{ library_url: '', active_since: '2026-10-01' }] }),
+    unit_economy: V({ provisional: true }),
+  };
+  const r = checkSources(sections);
+  assert.equal(r.problems.length, 4);
+  assert.ok(r.problems.some((p) => /Сайт: 1 знахідок позначено підтвердженими без доказу/.test(p)) && r.problems.some((p) => /Аудиторія: 1 сегментів/.test(p)) && r.problems.some((p) => /Конкуренти: 1 рядків/.test(p)) && r.problems.some((p) => /без посилання на Бібліотеку/.test(p)));
+  assert.ok(r.warnings.some((w) => /Сайт: непідтверджених знахідок 1/.test(w)) && r.warnings.some((w) => /гіпотезою, 1/.test(w)) && r.warnings.some((w) => /2 оголошень/.test(w)) && r.warnings.some((w) => /Unit Economy попередній/.test(w)));
+  assert.deepEqual(checkSources({}), { problems: [], warnings: [] });
+});
+await test('check: one list of tasks: the same problem found by two agents is one task with the higher priority and both pieces of evidence; a person\'s or approved task is never touched', () => {
+  const T = (id, title, o = {}) => ({ id, type: 'site', title, evidence: 'доказ ' + id, priority: 'medium', status: 'proposed', created_by_kind: 'agent', ...o });
+  const tasks = [
+    T(1, 'Сайт: Додати сторінку «Повернення» і посилання в підвалі', { priority: 'medium' }),
+    T(2, 'Сайт: перейняти в rival.example: сторінка повернення товару з посиланням у підвалі', { priority: 'high' }),
+    T(3, 'Сайт: Винести оффер у заголовок першого екрана'),
+    T(4, 'Сайт: Додати сторінку Повернення і посилання в підвалі', { created_by_kind: 'human' }),
+    T(5, 'Сайт: Додати сторінку Повернення і посилання в підвалі', { status: 'approved' }),
+    T(6, 'Додати сторінку Повернення і посилання в підвалі', { type: 'creatives' }),
+  ];
+  const g = findDuplicateTasks(tasks);
+  assert.equal(g.length, 1); assert.equal(g[0].keep, 2, 'the higher priority wins'); assert.deepEqual(g[0].drop, [1]); assert.equal(g[0].priority, 'high');
+  assert.match(g[0].evidence, /доказ 2/); assert.match(g[0].evidence, /Те саме знайшов інший агент: доказ 1/);
+  assert.deepEqual(findDuplicateTasks([T(1, 'Сайт: Винести оффер у заголовок'), T(2, 'Сайт: Додати блок допродажів у картку')]), [], 'different problems stay two tasks');
+});
+await test('check: a stale Unit Economy holds the research, is made again once, and the stage moves on; a person\'s Unit Economy holds it and is not touched', async () => {
+  for (const humanUe of [false, true]) {
+    const handlers = createHandlers({ researcher: { unit_economy: unitEconomy } });
+    const { repo, ctx } = await setup({ handlers });
+    ctx.validate = createValidator(repo);
+    await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: 'Бриф', content: { economics: LELIOR } });
+    await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'unit_economy' });
+    await processTick(ctx);
+    if (humanUe) { const s = await repo.readSection(1, 'unit_economy'); advance(1000); await repo.writeSectionVersion(1, 'unit_economy', { author_kind: 'human', author: 'm@x', body: s.version.body, content: s.version.content }); }
+    for (const k of ['site', 'audience', 'competitors', 'materials', 'ideas']) await repo.writeSectionVersion(1, k, { author_kind: 'agent', author: 'x', body: 'x', content: { stub: true } });
+    await repo.setProjectFlag(1, { has_data: false }); await repo.setStage(1, 1);
+    advance(1000);
+    await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: 'Бриф', content: { economics: { ...LELIOR, budget_monthly: 6000 } } });
+    for (let i = 0; i < 4; i += 1) { await processTick(ctx); advance(1000); }
+    const ueRuns = repo.T.runs.filter((r) => r.skill === 'unit_economy');
+    const failed = repo.T.journal.filter((j) => j.action === 'check_failed');
+    assert.equal(failed.length, 1, 'the failure is written once'); assert.match(failed[0].summary, /місячний бюджет: у брифі 6000, в Unit Economy 4500/);
+    if (!humanUe) {
+      assert.equal(ueRuns.length, 2, 'the Unit Economy was made again, once'); assert.equal((await repo.readSection(1, 'unit_economy')).version.content.inputs.budget_monthly, 6000);
+      assert.equal(repo.T.states.get(1).stage, 2, 'with the numbers in agreement the research is finished');
+    } else {
+      assert.equal(ueRuns.length, 1, 'a person\'s section is not redone by an agent'); assert.equal(repo.T.states.get(1).stage, 1, 'the stage waits for the manager');
+    }
+  }
+});
+await test('check: the stage message carries the warnings, the check does not hold stages after the approvals, and duplicate tasks are merged on the way', async () => {
+  const { repo, ctx } = await setup();
+  ctx.validate = createValidator(repo);
+  await repo.addTask(1, { type: 'site', title: 'Сайт: Додати сторінку «Повернення» і посилання в підвалі', priority: 'medium', evidence: 'агент 1' });
+  await repo.addTask(1, { type: 'site', title: 'Сайт: перейняти сторінка повернення товару з посиланням у підвалі', priority: 'high', evidence: 'агент 2' });
+  const r = await validateProject({ repo, projectId: 1 });
+  assert.equal(r.merged, 1); assert.equal(repo.T.tasks.filter((t) => t.status === 'proposed').length, 1); assert.equal(repo.T.tasks.find((t) => t.status === 'rejected').result, 'Дубль задачі #2');
+  assert.ok(repo.T.journal.some((j) => j.action === 'tasks_merged'));
+  assert.deepEqual(await createValidator(repo)({ projectId: 1, state: { stage: 4 } }), { ok: true, problems: [], warnings: [], rerun: [], merged: 0 });
 });
 console.log(`\n${passed} workflow checks passed`);

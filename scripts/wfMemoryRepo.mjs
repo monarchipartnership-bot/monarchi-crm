@@ -78,6 +78,11 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
     setWebsite(projectId, url) { (T.websites ||= new Map()).set(projectId, url); },
     async listAdAccounts(projectId) { return (T.accounts.get(projectId) || []).map((a) => ({ ...a })); },
     addAccount(projectId, a) { T.accounts.set(projectId, [...(T.accounts.get(projectId) || []), a]); },
+    async listTasks(projectId) { return T.tasks.filter((t) => t.project_id === projectId && ['proposed', 'approved', 'in_progress'].includes(t.status)).map((t) => ({ created_by_kind: 'agent', ...t })); },
+    async mergeTasks(projectId, keepId, patch, dropIds) {
+      Object.assign(T.tasks.find((t) => t.id === keepId), { priority: patch.priority, evidence: patch.evidence });
+      for (const id of dropIds) Object.assign(T.tasks.find((t) => t.id === id), { status: 'rejected', result: `Дубль задачі #${keepId}` });
+    },
     async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high' }) {
       if (T.tasks.some((t) => t.project_id === projectId && t.title === title && ['proposed', 'approved', 'in_progress'].includes(t.status))) return null;
       const t = { id: T.tasks.length + 1, project_id: projectId, type, title, evidence, owner, priority, status: 'proposed' };

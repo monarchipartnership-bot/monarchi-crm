@@ -48,9 +48,13 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     const need = [...RESEARCH_SKILLS, 'materials', 'ideas', ...(state.has_data ? ['audit'] : [])];
     const missing = need.filter((k) => !has(k));
     if (missing.length || openOf(runs, ['researcher', 'creator'])) return acts;
-    if (!checks.ok) { acts.push({ type: 'journal', action: 'check_failed', summary: 'Автоматична перевірка знайшла проблеми: ' + (checks.problems || []).join('; '), meta: {}, once: true }); return acts; } // written once, not on every pass
+    if (!checks.ok) {
+      acts.push({ type: 'journal', action: 'check_failed', summary: 'Автоматична перевірка знайшла проблеми: ' + (checks.problems || []).join(' '), meta: {}, once: true }); // written once, not on every pass
+      for (const r of checks.rerun || []) enqueue(r.agent, r.skill); // a section that is older than its source is made again (the check asks for it only then, so there is no loop)
+      return acts;
+    }
     acts.push({ type: 'set_stage', stage: STAGE.STRATEGY });
-    journal('stage', 'Дослідження завершено. Стратег складає стратегію.');
+    journal('stage', 'Дослідження завершено. Стратег складає стратегію.' + ((checks.warnings || []).length ? ' Перед апрувом варто глянути: ' + checks.warnings.join(' ') : ''));
     enqueue('strategist', 'strategy');
     return acts;
   }

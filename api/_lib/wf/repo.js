@@ -71,6 +71,15 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
     async listAdAccounts(projectId) {
       return must(await db.from('project_ad_accounts').select('platform, account_id, account_name, currency').eq('project_id', projectId), 'ad accounts') || [];
     },
+    // the pool of a project, for the check that keeps ONE list of tasks
+    async listTasks(projectId) {
+      return must(await db.from('wf_tasks').select('id, type, title, evidence, priority, owner, status, created_by_kind').eq('project_id', projectId).in('status', ['proposed', 'approved', 'in_progress']), 'tasks') || [];
+    },
+    // two agents found the same problem: the kept task takes the higher priority and both pieces of evidence, the others are closed as duplicates (nothing is deleted)
+    async mergeTasks(projectId, keepId, patch, dropIds) {
+      must(await db.from('wf_tasks').update({ priority: patch.priority, evidence: patch.evidence, updated_at: iso(now()) }).eq('id', keepId).eq('project_id', projectId), 'task merge');
+      if (dropIds.length) must(await db.from('wf_tasks').update({ status: 'rejected', result: `Дубль задачі #${keepId}`, updated_at: iso(now()) }).in('id', dropIds).eq('project_id', projectId), 'task merge');
+    },
     // A task for people (for example «Потрібно від клієнта»). The same open task is not added twice.
     async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high', created_by = 'agent' }) {
       const same = must(await db.from('wf_tasks').select('id').eq('project_id', projectId).eq('title', title).in('status', ['proposed', 'approved', 'in_progress']).limit(1), 'task') || [];

@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { createRealHandlers } from './_lib/wf/agents.js';
 import { createWfRepo } from './_lib/wf/repo.js';
+import { createValidator } from './_lib/wf/check.js';
 import { processTick } from './_lib/wf/tick.js';
 import { getModelClient } from './_lib/ai.js';
 import { createGa4Reader } from './_lib/ga4Client.js';
@@ -36,7 +37,8 @@ export default async function handler(req, res) {
       const r = await getModelClient(token).callModel({ agentKey: 'wf-researcher', projectId, runId, trigger, params: { model: 'claude-sonnet-5', max_tokens: maxTokens, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: images.length ? [{ type: 'text', text: user }, ...images.flatMap((im) => [{ type: 'text', text: `[${im.id}]` }, { type: 'image', source: { type: 'url', url: im.url } }])] : user }] } });
       return { text: r.text, costUsd: r.costUsd };
     } : null;
-    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader() });
+    const repo = createWfRepo(db);
+    const stats = await processTick({ repo, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader() });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);
