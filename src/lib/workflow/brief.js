@@ -7,6 +7,7 @@ export const GENERAL = [
   { key: 'goal', label: 'Ціль у цифрах' },
   { key: 'priority', label: 'Акцент на товари (на певні чи на всі)' },
   { key: 'audience', label: 'Цільова аудиторія (як її описує клієнт)' },
+  { key: 'competitors', label: 'Конкуренти (сайти, по одному в рядку)' },
   { key: 'ga4_property', label: 'GA4 Property ID клієнта (лише цифри)' },
 ];
 export const PARAMS = [

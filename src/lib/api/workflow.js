@@ -68,7 +68,7 @@ export async function saveHumanVersion(projectId, key, body, email, note = null,
   return row;
 }
 export async function acceptProposal(projectId, key, proposal, email) {
-  const row = await saveHumanVersion(projectId, key, proposal.body, email, `Прийнято пропозицію агента (версія ${proposal.version})`);
+  const row = await saveHumanVersion(projectId, key, proposal.body, email, `Прийнято пропозицію агента (версія ${proposal.version})`, proposal.content || {}); // the structured part travels too: the ads a manager confirmed live in it
   await journal(projectId, email, { action: 'proposal_accepted', subject: key, summary: `Пропозицію версії ${proposal.version} прийнято.`, meta: { version_id: proposal.id } });
   return row;
 }

@@ -32,8 +32,8 @@ export default async function handler(req, res) {
     const meta = metaToken ? { insights: (o) => fetchMetaInsights({ ...o, token: metaToken }), campaigns: (o) => fetchMetaCampaigns({ ...o, token: metaToken }), pixels: (o) => fetchMetaPixels({ ...o, token: metaToken }) } : null; // the Meta reader for the agents; its token never leaves the server
     // the model for the skills that write text (site, audience, ...): every call is logged and held to the budgets by the shared client
     const trigger = isCronRequest(req) ? 'cron' : 'user';
-    const ask = process.env.ANTHROPIC_API_KEY ? async ({ projectId = null, runId = null, system, user, maxTokens = 4000 }) => {
-      const r = await getModelClient(token).callModel({ agentKey: 'wf-researcher', projectId, runId, trigger, params: { model: 'claude-sonnet-5', max_tokens: maxTokens, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: user }] } });
+    const ask = process.env.ANTHROPIC_API_KEY ? async ({ projectId = null, runId = null, system, user, images = [], maxTokens = 4000 }) => {
+      const r = await getModelClient(token).callModel({ agentKey: 'wf-researcher', projectId, runId, trigger, params: { model: 'claude-sonnet-5', max_tokens: maxTokens, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: images.length ? [{ type: 'text', text: user }, ...images.flatMap((im) => [{ type: 'text', text: `[${im.id}]` }, { type: 'image', source: { type: 'url', url: im.url } }])] : user }] } });
       return { text: r.text, costUsd: r.costUsd };
     } : null;
     const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader() });

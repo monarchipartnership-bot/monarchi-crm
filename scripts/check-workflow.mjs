@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { buildCompetitorsPrompt, checkCompetitors, compactSite, comparisonTasks, parseCompetitors, verifiedAds, withSiteAppendix } from '../api/_lib/wf/skills/competitorsEngine.js';
+import { competitors } from '../api/_lib/wf/skills/competitorsAgent.js';
 import { collectGa4Audience } from '../api/_lib/wf/skills/ga4Audience.js';
 import { buildAudiencePrompt, checkSegments, gatherFacts, sourceNotes } from '../api/_lib/wf/skills/audienceEngine.js';
 import { audience } from '../api/_lib/wf/skills/audienceAgent.js';
@@ -847,5 +849,116 @@ await test('audience: no model and a useless answer fail clearly and write nothi
     assert.equal(b.repo.T.runs[0].status, 'failed'); assert.match(b.repo.T.runs[0].error, re);
     assert.equal((await b.repo.readSection(1, 'audience'))?.version ?? null, null);
   }
+});
+// ---------------------------------------------------------------- A4: the competitors skill (sites read by the agent, ads confirmed by the manager)
+const RIVAL_HOME = `<html><head><title>Дуб і Ко: меблі</title><meta name="viewport" content="width=device-width"></head><body><h1>Меблі з дуба від виробника</h1><nav><a href="/catalog/">Каталог</a><a href="/delivery">Доставка</a></nav><p>Стілець Класик від 2500 грн. Подарунок до кожного замовлення.</p><button>Замовити</button></body></html>`;
+const RIVAL_CATALOG = `<html><head><title>Каталог</title></head><body><h1>Каталог</h1><p>Відгуки покупців: 4,8 з 5. Гарантія 5 років.</p></body></html>`;
+const RIVAL_DELIVERY = `<html><head><title>Доставка</title></head><body><p>Безкоштовна доставка по Україні, оплата при отриманні.</p></body></html>`;
+const WORLD = { ...SITE, 'https://rival.example/': RIVAL_HOME, 'https://rival.example/catalog/': RIVAL_CATALOG, 'https://rival.example/delivery': RIVAL_DELIVERY };
+const COMP_BRIEF = { general: { goal: 'Продаж стільців', competitors: 'rival.example\nhttps://www.loza.example/, rival.example; not a site, https://closed.example' }, economics: {} };
+const LIB = 'https://www.facebook.com/ads/library/?id=111';
+await test('competitors: the brief list is cleaned: own site and repeats are dropped, junk is ignored, at most four', () => {
+  assert.deepEqual(parseCompetitors(COMP_BRIEF.general.competitors, 'https://loza.example').map((c) => c.host), ['rival.example', 'closed.example']);
+  assert.equal(parseCompetitors('a.com b.com c.com d.com e.com f.com').length, 4);
+  assert.deepEqual(parseCompetitors('', 'x.com'), []);
+});
+await test('competitors: an ad counts only with a Library link, an «active since» date and the name of the person who checked it', () => {
+  const { ads, skipped } = verifiedAds({ ads: [
+    { competitor: 'Дуб і Ко', library_url: LIB, active_since: '2026-10-01', verified_by: 'm@x', screenshot_url: 'https://img.example/a.png', note: 'відео' },
+    { competitor: 'Дуб і Ко', library_url: 'https://example.com/ad', active_since: '2026-10-01', verified_by: 'm@x' },
+    { competitor: 'Дуб і Ко', library_url: LIB, active_since: 'вчора', verified_by: 'm@x' },
+    { competitor: 'Дуб і Ко', library_url: LIB, active_since: '2026-10-01', verified_by: '' },
+    { library_url: LIB, active_since: '2026-10-01', verified_by: 'm@x' }] });
+  assert.equal(ads.length, 1); assert.equal(ads[0].id, 'ad1'); assert.equal(skipped.length, 4);
+  assert.ok(skipped[0].problems.includes('немає посилання на Бібліотеку реклами') && skipped[1].problems.includes('немає дати «активно з»'));
+  assert.deepEqual(verifiedAds(null), { ads: [], skipped: [] });
+});
+await test('competitors: rows are trusted only when the quote is from THAT competitor and numbers stand in its text; comparison needs both quotes; ads need a known id', async () => {
+  const rd = await collectSiteData({ website: 'rival.example', ...fakeNet(WORLD) });
+  const ld = await collectSiteData({ website: 'loza.example', ...fakeNet(WORLD) });
+  const competitors = [{ host: 'rival.example', pages: compactSite(rd) }], client = compactSite(ld);
+  const ads = [{ id: 'ad1', competitor: 'Дуб і Ко', library_url: LIB, active_since: '2026-10-01', verified_by: 'm@x', screenshot_url: 'https://img.example/a.png', note: '' }, { id: 'ad2', competitor: 'Х', library_url: LIB, active_since: '2026-10-01', verified_by: 'm@x', screenshot_url: '', note: '' }];
+  const row = (o) => ({ competitor: 'https://www.rival.example/', products: 'Стільці', prices: 'Від 2500 грн', offers: 'Подарунок до кожного замовлення', angles: 'Виробник', approach: 'Прямий виробник', evidence: { quote: 'Подарунок до кожного замовлення' }, ...o });
+  const raw = { table: [row({}), row({ evidence: { quote: 'Знижка 70%' } }), row({ prices: 'Від 1900 грн' }), row({ competitor: 'ghost.example' }), row({ evidence: { quote: 'Безкоштовна доставка від 5000 грн' } })],
+    site_comparison: [
+      { area: 'terms', competitor: 'rival.example', better_theirs: 'Безкоштовна доставка без порога', worse_theirs: '', competitor_quote: 'Безкоштовна доставка по Україні', client_quote: 'Безкоштовна доставка від 5000 грн' },
+      { area: 'trust', competitor: 'rival.example', better_theirs: 'Гарантія 5 років', worse_theirs: '', competitor_quote: 'Гарантія 5 років', client_quote: 'Гарантія 10 років' },
+      { area: 'trust', competitor: 'rival.example', better_theirs: 'Рейтинг 4,8', worse_theirs: '', competitor_quote: 'вигадана цитата', client_quote: '' },
+      { area: 'nonsense', competitor: 'rival.example', better_theirs: 'x', competitor_quote: 'x' }, { area: 'terms', competitor: 'rival.example', competitor_quote: 'x' }],
+    ads: [{ id: 'ad1', angle: 'Прямий виробник', offer: 'Подарунок', format: 'відео', idea: 'Показати цех' }, { id: 'ad2', angle: 'x' }, { id: 'ad9', angle: 'x' }],
+    ideas: [{ approach: 'Виробник', idea: 'Відео з цеху' }, { approach: '', idea: 'x' }] };
+  const r = checkCompetitors(raw, { competitors, client, ads });
+  assert.equal(r.table.length, 4, 'the unknown competitor is dropped'); assert.deepEqual(r.table.map((x) => x.verified), [true, false, false, false]);
+  assert.match(r.table[1].problem, /цитати немає/); assert.match(r.table[2].problem, /число без джерела: 1900/);
+  assert.equal(r.table[3].verified, false, 'a quote from the CLIENT site is not a quote from the competitor');
+  assert.deepEqual(r.comparison.map((c) => c.verified), [true, false, false]); assert.match(r.comparison[1].problem, /клієнта/); assert.match(r.comparison[2].problem, /конкурента/);
+  assert.equal(r.dropped, 1 + 2 + 2, 'the ghost row, two comparisons without an area or text, two ads without a screenshot or a known id');
+  assert.equal(r.ads.length, 1); assert.equal(r.ads[0].label, 'Конкурент: Дуб і Ко'); assert.equal(r.ideas.length, 1);
+  const tasks = comparisonTasks(r.comparison); assert.equal(tasks.length, 1); assert.equal(tasks[0].owner, 'client_dev');
+  const once = withSiteAppendix('Рекомендації.', r.comparison), twice = withSiteAppendix(once, r.comparison);
+  assert.equal(once, twice, 'the appendix is replaced, not repeated'); assert.match(once, /Порівняння з сайтами конкурентів/); assert.equal(withSiteAppendix('Рекомендації.', []), 'Рекомендації.');
+  const p = buildCompetitorsPrompt({ client, competitors, ads: ads.slice(0, 2), goal: 'Продаж стільців' });
+  assert.deepEqual(p.images, [{ id: 'ad1', url: 'https://img.example/a.png' }]); assert.match(p.user, /Безкоштовна доставка/);
+});
+await test('competitors: the skill needs the brief list, waits for the site review, reads sites and ads, writes the section, the appendix to «Сайт», ideas and tasks', async () => {
+  const slowSite = async () => { await new Promise((r) => setTimeout(r, 30)); return { writes: [{ key: 'site', body: 'Рекомендації по сайту.', content: { findings: [] } }] }; };
+  const handlers = createHandlers({ researcher: { competitors, site: slowSite } });
+  const { repo, ctx } = await setup({ handlers });
+  const net = fakeNet(WORLD, ''); Object.assign(ctx, net);
+  repo.setWebsite(1, 'https://loza.example');
+  const asked = [];
+  ctx.ask = async (o) => { asked.push(o); return { costUsd: 0.12, text: JSON.stringify({
+    table: [{ competitor: 'rival.example', products: 'Стільці', prices: 'Від 2500 грн', offers: 'Подарунок до кожного замовлення', angles: 'Виробник', approach: 'Прямий виробник', evidence: { quote: 'Подарунок до кожного замовлення' } }],
+    site_comparison: [{ area: 'terms', competitor: 'rival.example', better_theirs: 'Безкоштовна доставка без порога', worse_theirs: '', competitor_quote: 'Безкоштовна доставка по Україні', client_quote: 'Безкоштовна доставка від 5000 грн' }],
+    ads: (o.images || []).map((im) => ({ id: im.id, angle: 'Виробник', offer: 'Подарунок', format: 'відео', idea: 'Показати цех' })), ideas: [{ approach: 'Прямий виробник', idea: 'Відео з цеху' }] }) }; };
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'competitors' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].state.blocked_on, 'brief'); assert.equal(asked.length, 0);
+  advance(1000);
+  await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general: { goal: 'Продаж стільців' }, economics: {} } });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].state.blocked_on, 'brief', 'the brief has no competitors yet'); assert.ok(repo.T.tasks.some((t) => /сайти конкурентів/.test(t.title)));
+  advance(1000);
+  await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: COMP_BRIEF });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' }); // the site review is working: competitors must wait for it
+  await processTick(ctx);
+  assert.equal(repo.T.runs.find((r) => r.skill === 'site').status, 'done'); assert.equal(asked.length, 0);
+  await processTick(ctx);
+  const run = repo.T.runs.find((r) => r.skill === 'competitors');
+  assert.equal(run.status, 'done', run.error);
+  assert.equal(asked.length, 1); assert.deepEqual(asked[0].images, [], 'no ad is confirmed yet');
+  const sec = await repo.readSection(1, 'competitors');
+  assert.equal(sec.version.content.table.length, 1); assert.equal(sec.version.content.table[0].verified, true);
+  assert.deepEqual(sec.version.content.competitors.map((c) => c.host), ['rival.example', 'closed.example'].filter((h) => h === 'rival.example'), 'closed.example does not exist in the fake world');
+  assert.equal(sec.version.content.failed[0].host, 'closed.example');
+  assert.match(sec.version.body, /немає підтверджених менеджером оголошень/);
+  const site = await repo.readSection(1, 'site');
+  assert.match(site.version.body, /Рекомендації по сайту\./); assert.match(site.version.body, /Порівняння з сайтами конкурентів/); assert.equal(site.version.content.competitors_compare.length, 1);
+  assert.equal(repo.T.tasks.filter((t) => t.type === 'site').length, 1); assert.equal(run.cost_usd, 0.12);
+
+  // the manager confirms one ad (a human version of the section), the agent runs again and reads its screenshot
+  advance(1000);
+  await repo.writeSectionVersion(1, 'competitors', { author_kind: 'human', author: 'm@x', body: sec.version.body, content: { ...sec.version.content, ads: [{ competitor: 'Дуб і Ко', library_url: LIB, active_since: '2026-10-01', verified_by: 'm@x', screenshot_url: 'https://img.example/a.png' }, { competitor: 'Дуб і Ко', library_url: 'https://example.com/x', active_since: '2026-10-01', verified_by: 'm@x', screenshot_url: 'https://img.example/b.png' }] } });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'competitors' });
+  await processTick(ctx);
+  const run2 = repo.T.runs.filter((r) => r.skill === 'competitors')[1];
+  assert.equal(run2.status, 'done', run2.error);
+  assert.deepEqual(asked[1].images, [{ id: 'ad1', url: 'https://img.example/a.png' }], 'only the confirmed ad is read');
+  const cur = await repo.readSection(1, 'competitors');
+  assert.equal(cur.version.author_kind, 'human', 'a person\'s version is not replaced by the agent');
+  const prop = repo.T.versions.filter((v) => v.is_proposal).pop();
+  assert.ok(prop, 'the new analysis comes as a proposal'); assert.equal(prop.content.ads_analysis[0].label, 'Конкурент: Дуб і Ко'); assert.equal(prop.content.ads.length, 2, 'the manager\'s entries travel with the proposal'); assert.equal(prop.content.ads_skipped.length, 1);
+  assert.match(prop.body, /Реклама конкурентів, підтверджена менеджером \(1\)/); assert.match(prop.body, /Конкурент: Дуб і Ко · активно з 2026-10-01/);
+});
+await test('competitors: no model, no readable competitor site and a useless answer fail clearly and write nothing', async () => {
+  const handlers = createHandlers({ researcher: { competitors } });
+  const mk = async (briefContent = COMP_BRIEF, world = WORLD) => { const s = await setup({ handlers }); Object.assign(s.ctx, fakeNet(world)); await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: briefContent }); await s.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'competitors' }); return s; };
+  const a = await mk(); await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].status, 'failed'); assert.match(a.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const b = await mk(COMP_BRIEF, {}); b.ctx.ask = async () => { throw new Error('must not be called'); }; await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].status, 'failed'); assert.match(b.repo.T.runs[0].error, /Жодного сайту конкурента не прочитано/);
+  const c = await mk(); c.ctx.ask = async () => ({ text: 'Вибачте' }); await processTick(c.ctx);
+  assert.equal(c.repo.T.runs[0].status, 'failed'); assert.match(c.repo.T.runs[0].error, /не у форматі JSON/);
+  assert.equal((await c.repo.readSection(1, 'competitors'))?.version ?? null, null);
 });
 console.log(`\n${passed} workflow checks passed`);
