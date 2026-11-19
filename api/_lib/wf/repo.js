@@ -76,6 +76,20 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       ]);
       return { settings: must(row, 'creative settings') || {}, assets: must(assets, 'creative assets') || [] };
     },
+    // a finished picture is copied into our storage (the provider keeps it only 7 days). → { url, path } (the original address and an empty path if the copy fails)
+    async persistProjectImage(projectId, { url, name }) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return { url, path: '' };
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        const type = res.headers?.get?.('content-type') || 'image/png';
+        const ext = type.includes('jpeg') ? 'jpg' : type.includes('webp') ? 'webp' : 'png';
+        const path = `projects/${projectId}/creatives/${String(name).replace(/[^\w.-]+/g, '_')}-${Date.now()}.${ext}`;
+        const up = await db.storage.from('creative-assets').upload(path, bytes, { contentType: type, upsert: true });
+        if (up.error) return { url, path: '' };
+        return { url: db.storage.from('creative-assets').getPublicUrl(path).data.publicUrl || url, path };
+      } catch { return { url, path: '' }; }
+    },
     async listAdAccounts(projectId) {
       return must(await db.from('project_ad_accounts').select('platform, account_id, account_name, currency').eq('project_id', projectId), 'ad accounts') || [];
     },

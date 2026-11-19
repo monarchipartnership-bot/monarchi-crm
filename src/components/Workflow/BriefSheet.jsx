@@ -11,6 +11,7 @@ export default function BriefSheet({ version, busy, onSave, onCancel, readOnly }
   const setList = (name, i, patch) => setForm((f) => ({ ...f, [name]: f[name].map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
   const addProduct = () => setForm((f) => ({ ...f, products: [...f.products, { name: '', price: '', cogs: '', status: 'assumption', source: '' }] }));
   const addOffer = () => setForm((f) => ({ ...f, offers: [...f.offers, { name: '', pays: '', list_value: '', extra_cost: '', approved: false, status: 'assumption', source: '' }] }));
+  const addGoal = () => setForm((f) => ({ ...f, goals: [...(f.goals || []), { goal: '', product: '' }] }));
   const del = (name, i) => setForm((f) => ({ ...f, [name]: f[name].filter((_, j) => j !== i) }));
 
   const Pill = ({ status, onClick }) => (onClick && status !== 'empty'
@@ -79,6 +80,29 @@ export default function BriefSheet({ version, busy, onSave, onCancel, readOnly }
           </table></div>
         )}
         {!readOnly && <button type="button" className="wf-btn sm" onClick={addOffer}>+ Офер</button>}
+      </div>
+
+      <div>
+        <div className="wf-h">Цілі перших креативів</div>
+        {(form.goals || []).length === 0 && <div className="wf-muted" style={{ marginBottom: 6 }}>Цілей немає: Креатор не створюватиме креативи, поки не буде хоча б однієї. Ціль каже, що рекламуємо і що хочемо отримати (наприклад: «продати хіт», «розпродаж», «повернути відвідувачів сайту»). Для кого, ідею, оффер і формат агент бере з досьє.</div>}
+        {(form.goals || []).length > 0 && (
+          <div style={{ overflowX: 'auto' }}><table className="wf-sheet">
+            <thead><tr><th>Ціль креатива</th><th>Товар</th>{!readOnly && <th />}</tr></thead>
+            <tbody>{form.goals.map((g, i) => (
+              <tr key={i}>
+                <td className={readOnly ? 'ro' : ''}>{readOnly ? g.goal : <input className="wf-inp" aria-label="Ціль креатива" value={g.goal} onChange={(e) => setList('goals', i, { goal: e.target.value })} placeholder="Що рекламуємо і що хочемо отримати" />}</td>
+                <td className={readOnly ? 'ro' : ''}>{readOnly ? (g.product || 'агент обере') : (
+                  <select className="wf-inp" aria-label="Товар для креатива" value={g.product} onChange={(e) => setList('goals', i, { product: e.target.value })}>
+                    <option value="">Агент обере з брифу</option>
+                    {form.products.filter((p) => p.name.trim()).map((p) => <option key={p.name} value={p.name.trim()}>{p.name.trim()}</option>)}
+                  </select>
+                )}</td>
+                {!readOnly && <td><button type="button" className="wf-btn sm d" onClick={() => del('goals', i)} aria-label="Прибрати ціль">×</button></td>}
+              </tr>))}</tbody>
+          </table></div>
+        )}
+        {!readOnly && <button type="button" className="wf-btn sm" onClick={addGoal}>+ Ціль креатива</button>}
+        {!readOnly && <div className="wf-muted" style={{ marginTop: 6, fontSize: 12.5 }}>Файли клієнта (логотип, фото товару, приклади) вантажаться в картці проєкту, на сторінці «Креативи»: Креатор бере їх звідти.</div>}
       </div>
 
       <div>

@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { checkCards, gatherCreativeFacts, goalsOf, referencePool, tagOf } from '../api/_lib/wf/skills/creativesEngine.js';
+import { firstCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { checkIdeas, checkMaterials, gatherIdeaFacts, inventoryOf, offerEconomics, renderIdeasText } from '../api/_lib/wf/skills/ideasEngine.js';
 import { materialsIdeas } from '../api/_lib/wf/skills/materialsAgent.js';
 import { checkSources, compareNumbers, createValidator, findDuplicateTasks, validateProject } from '../api/_lib/wf/check.js';
@@ -1178,5 +1180,125 @@ await test('materials: materials that are enough give ideas and no shoot brief; 
   const d = await mk(); d.ctx.ask = async () => ({ text: ANSWER({ ideas: [{ hook: 'x' }] }) }); await processTick(d.ctx);
   assert.equal(d.repo.T.runs[0].status, 'failed'); assert.match(d.repo.T.runs[0].error, /жодної придатної ідеї/);
   assert.equal((await d.repo.readSection(1, 'ideas'))?.version ?? null, null);
+});
+// ---------------------------------------------------------------- A6.2: the Creator's skill «first_creatives» (cards from the goals of the manager, pictures within the limit of the project)
+const CR_BRIEF = { content: { general: { goal: 'Продаж AirPlug' }, economics: { ...LELIOR, offers: [{ name: 'AirPlug + free 50 ml oil', pays: 150, list_value: 150, extra_cost: 18, approved: true }, { name: 'Set $280', pays: 280, list_value: 350, approved: false }] }, creative_goals: [{ goal: 'Продати хіт', product: 'AirPlug' }, { goal: 'Розпродаж літа', product: '' }] } };
+const CR_MATERIALS = { settings: { cta_mode: 'always', cta_text: 'Купити\nДізнатись більше', inputs: { tone: { body: 'Тепло, на «ви»' } } }, assets: [{ kind: 'logo', name: 'l.png', url: 'https://f.example/l.png' }, ...PHOTO(2)] };
+const CR_IDEAS = { items: [{ id: 'i1', hook: 'Подарунок до замовлення', angle: 'подарунок', format: 'статика', segment: 'Молоді родини', status: 'ok', offer: { name: 'AirPlug + free 50 ml oil', approved: true } }, { id: 'i2', hook: 'Дивна', angle: 'х', status: 'unverified' }] };
+const CARD = (o) => ({ goal_index: 1, product: 'AirPlug', segment: 'Молоді родини', idea_id: 'i1', angle: 'подарунок', format: '4:5', offer: 'AirPlug + free 50 ml oil', headline: 'AirPlug і олія в подарунок', primary_text: 'Тихий сон за 150: дарунок до замовлення.', cta: 'Купити', visual_prompt: 'A calm bedroom, the earplug case on a night table', references: [1], ...o });
+const CR_ANSWER = (cards) => JSON.stringify({ cards: cards || [CARD({}), CARD({ goal_index: 2, product: '', idea_id: '', segment: '', offer: '', headline: 'Літній розпродаж', primary_text: 'Спокійний сон у спеку.', cta: 'Дізнатись більше', angle: 'економія', format: '9:16', references: [2] })] });
+const fakeHf = ({ price = 0.5, states = {}, submitFail = false } = {}) => {
+  const calls = { estimate: 0, submit: [], check: [] };
+  return { calls, buildImageRequest: (c) => ({ path: 'fake/model', body: { prompt: c.prompt, ratio: c.ratio, refs: c.references } }), profile: () => ({}),
+    estimate: async () => { calls.estimate += 1; return price; },
+    submit: async ({ request, key }) => { if (submitFail) throw new Error('Higgsfield: rejected'); calls.submit.push({ request, key }); return { jobId: 'job' + calls.submit.length, statusUrl: 'https://api.higgsfield.ai/requests/job' + calls.submit.length + '/status' }; },
+    check: async ({ statusUrl }) => { calls.check.push(statusUrl); return states[statusUrl] || { state: 'ready', url: 'https://cdn.hf.example/' + statusUrl.split('/').slice(-2)[0] + '.png' }; } };
+};
+const crSetup = async (opts = {}) => {
+  const s = await setup({ handlers: createHandlers({ creator: { first_creatives: firstCreatives } }) });
+  s.repo.setMaterials(1, opts.materials || CR_MATERIALS);
+  await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: opts.brief || CR_BRIEF.content });
+  await s.repo.writeSectionVersion(1, 'ideas', { author_kind: 'agent', author: 'creator', body: 'i', content: CR_IDEAS });
+  await s.repo.writeSectionVersion(1, 'audience', { author_kind: 'agent', author: 'researcher', body: 'a', content: MAT_AUD });
+  await s.repo.writeSectionVersion(1, 'materials', { author_kind: 'agent', author: 'creator', body: 'm', content: { verdict: opts.verdict || 'enough' } });
+  s.ctx.ask = opts.ask === undefined ? async (o) => { s.asked.push(o); return { costUsd: 0.1, text: CR_ANSWER() }; } : opts.ask;
+  s.asked = []; s.ctx.hf = opts.hf === undefined ? fakeHf() : opts.hf; s.ctx.imageWaitMs = 0;
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'first_creatives' });
+  return s;
+};
+await test('creatives: the goals come from the brief, the pictures only from the files of the client, the tag has the seven parts of the document', () => {
+  assert.deepEqual(goalsOf(CR_BRIEF), [{ goal: 'Продати хіт', product: 'AirPlug' }, { goal: 'Розпродаж літа', product: '' }]); assert.deepEqual(goalsOf(null), []);
+  const pool = referencePool(CR_MATERIALS);
+  assert.deepEqual(pool.map((p) => [p.n, p.kind]), [[1, 'product'], [2, 'product'], [3, 'logo']], 'product photos first, then the logo');
+  assert.equal(tagOf({ goal: 'Продати хіт', product: 'AirPlug', segment: 'Молоді родини', angle: 'подарунок', format_label: 'картинка 4:5', offer: 'AirPlug + free 50 ml oil', version: 1 }), 'Продати хіт · AirPlug · Молоді родини · подарунок · картинка 4:5 · AirPlug + free 50 ml oil · v1');
+  assert.equal(tagOf({ goal: 'x', format_label: 'картинка 1:1' }), 'x · без товару · усі · — · картинка 1:1 · без оффера · v1');
+});
+await test('creatives: the checks of a card: an offer only if approved, the button of the client, numbers from the brief, the product of the brief, files of the client, the format', () => {
+  const goals = goalsOf(CR_BRIEF);
+  const facts = gatherCreativeFacts({ brief: CR_BRIEF, materials: CR_MATERIALS, ideas: CR_IDEAS, audience: MAT_AUD, goals });
+  assert.deepEqual(facts.ideas.map((i) => i.id), ['i1'], 'an unverified idea is not offered to the maker'); assert.deepEqual(facts.approved_offers.map((o) => o.name), ['AirPlug + free 50 ml oil']); assert.deepEqual(facts.brand.cta_wordings, ['Купити', 'Дізнатись більше']);
+  const pool = referencePool(CR_MATERIALS);
+  const ok = checkCards([CARD({})], { facts, pool }).cards[0];
+  assert.equal(ok.status, 'planned'); assert.equal(ok.offer, 'AirPlug + free 50 ml oil'); assert.equal(ok.tag, 'Продати хіт · AirPlug · Молоді родини · подарунок · картинка 4:5 · AirPlug + free 50 ml oil · v1'); assert.deepEqual(ok.references.map((r) => r.n), [1]);
+  const bad = checkCards([CARD({ offer: 'Set $280', cta: 'Замовити зараз', product: 'Нічого', segment: 'Привиди', idea_id: 'i9', format: '3:1', headline: 'Знижка 83%', references: [99, 3] })], { facts, pool }).cards[0];
+  assert.equal(bad.offer, '', 'an offer the client did not approve is not used'); assert.equal(bad.cta, 'Купити', 'the button is one of the wordings of the client'); assert.equal(bad.product, 'AirPlug', 'the manager\'s product wins over the model');
+  assert.equal(bad.segment, ''); assert.equal(bad.idea_id, ''); assert.equal(bad.ratio, '4:5'); assert.equal(bad.status, 'needs_check'); assert.match(bad.problems[0], /число без джерела: 83/);
+  assert.deepEqual(bad.references.map((r) => r.n), [1, 3], 'a made-up number is dropped, a product photo is added first');
+  assert.ok(bad.notes.some((n) => /не погоджений клієнтом/.test(n)) && bad.notes.some((n) => /не з варіантів клієнта/.test(n)) && bad.notes.some((n) => /Формат не з дозволених/.test(n)));
+  const r = checkCards([CARD({}), CARD({ headline: 'Дубль' }), CARD({ goal_index: 7 })], { facts, pool });
+  assert.equal(r.cards.length, 1, 'one card per goal, unknown goals ignored'); assert.deepEqual(r.missing, ['Розпродаж літа']);
+  const noBtn = gatherCreativeFacts({ brief: CR_BRIEF, materials: { ...CR_MATERIALS, settings: { cta_mode: 'none' } }, ideas: CR_IDEAS, audience: MAT_AUD, goals });
+  assert.equal(checkCards([CARD({})], { facts: noBtn, pool }).cards[0].cta, '', 'the client wants no button');
+  assert.equal(checkCards([CARD({})], { facts, pool: [] }).cards[0].problems.includes('немає жодної картинки клієнта для референсу'), true);
+});
+await test('creatives: not enough materials is branch B (nothing is made, no model, no money); no goals wait for the manager with a task, and the goal wakes the run', async () => {
+  const b = await crSetup({ verdict: 'not_enough', ask: async () => { throw new Error('must not be called'); } });
+  await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].status, 'done'); const sec = (await b.repo.readSection(1, 'creatives')).version;
+  assert.equal(sec.content.branch, 'B'); assert.deepEqual(sec.content.items, []); assert.match(sec.body, /матеріалів недостатньо/); assert.equal(b.repo.T.runs[0].cost_usd, 0);
+  const n = await crSetup({ brief: { ...CR_BRIEF.content, creative_goals: [] } });
+  await processTick(n.ctx);
+  assert.equal(n.repo.T.runs[0].status, 'waiting'); assert.equal(n.repo.T.runs[0].state.blocked_on, 'brief'); assert.equal(n.repo.T.tasks[0].title, 'Вказати цілі перших креативів у брифі'); assert.equal(n.asked.length, 0);
+  advance(1000);
+  await n.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: CR_BRIEF.content });
+  await processTick(n.ctx);
+  assert.equal(n.repo.T.runs[0].status, 'done', n.repo.T.runs[0].error);
+});
+await test('creatives: branch A makes a card per goal, the pictures through Higgsfield inside the limit, copies them to our storage and counts the cost', async () => {
+  const s = await crSetup();
+  await processTick(s.ctx);
+  const run = s.repo.T.runs[0];
+  assert.equal(run.status, 'done', run.error);
+  const c = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.branch, 'A'); assert.equal(c.items.length, 2); assert.deepEqual(c.items.map((x) => x.status), ['ready', 'ready']);
+  assert.match(c.items[0].image_url, /^https:\/\/store\.example\//, 'the picture is our copy, not the address of the provider'); assert.ok(c.items[0].path.startsWith('projects/1/creatives/'));
+  assert.equal(c.spent_usd, 1); assert.equal(c.limit_usd, 5, 'no cap on the project: the default limit'); assert.equal(run.cost_usd, 1.1, 'the model 0.1 and two pictures 0.5');
+  assert.equal(s.ctx.hf.calls.submit.length, 2); assert.match(s.ctx.hf.calls.submit[0].key, /^wf-1-/); assert.deepEqual(s.ctx.hf.calls.submit[0].request.body.refs, ['https://f.example/p0.jpg'], 'the reference is the product photo of the client');
+  assert.equal(s.asked.length, 1); assert.match(s.asked[0].user, /"goal_index": 2/); assert.match((await s.repo.readSection(1, 'creatives')).version.body, /Продати хіт · AirPlug/);
+  // a second run changes nothing: no new cards, no new pictures, no new questions to the model
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'first_creatives' });
+  await processTick(s.ctx);
+  assert.equal(s.asked.length, 1); assert.equal(s.ctx.hf.calls.submit.length, 2); assert.equal(s.repo.T.runs[1].cost_usd, 0);
+});
+await test('creatives: the limit is the cost cap of the PROJECT: what does not fit stays planned with the reason; a picture still producing is followed on the next run; a failed one is not charged', async () => {
+  const s = await crSetup({ hf: fakeHf({ price: 0.5 }) });
+  await s.repo.setProjectFlag(1, { cost_cap_usd: 0.7 });
+  await processTick(s.ctx);
+  let c = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.deepEqual(c.items.map((x) => x.status), ['ready', 'planned']); assert.match(c.items[1].note, /не вміщується в ліміт проєкту/); assert.equal(c.limit_usd, 0.7); assert.equal(s.ctx.hf.calls.submit.length, 1);
+  // a slow picture and a failed one
+  const slow = fakeHf({ price: 0.4, states: { 'https://api.higgsfield.ai/requests/job1/status': { state: 'pending' }, 'https://api.higgsfield.ai/requests/job2/status': { state: 'failed', error: 'Higgsfield: moderated' } } });
+  const t = await crSetup({ hf: slow });
+  await processTick(t.ctx);
+  c = (await t.repo.readSection(1, 'creatives')).version.content;
+  assert.deepEqual(c.items.map((x) => x.status), ['producing', 'failed']); assert.equal(c.items[1].note, 'Higgsfield: moderated'); assert.equal(c.items[1].cost_usd, 0, 'a moderated picture is not charged'); assert.equal(t.repo.T.runs[0].cost_usd, 0.5, 'the model 0.1 and the one picture that is still in work 0.4');
+  assert.ok(c.open.some((o) => /ще генерується/.test(o)));
+  slow.check = async () => ({ state: 'ready', url: 'https://cdn.hf.example/late.png' }); // the next run follows the job, does not pay again
+  await t.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'first_creatives' });
+  await processTick(t.ctx);
+  c = (await t.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.items[0].status, 'ready'); assert.equal(t.asked.length, 1, 'the model is not asked again');
+});
+await test('creatives: without Higgsfield the texts are made and the picture is told as missing; a failing submit is a note on the card; no model fails clearly', async () => {
+  const a = await crSetup({ hf: null });
+  await processTick(a.ctx);
+  const c = (await a.repo.readSection(1, 'creatives')).version.content;
+  assert.deepEqual(c.items.map((x) => x.status), ['planned', 'planned']); assert.ok(c.open.some((o) => /Higgsfield не налаштовано/.test(o))); assert.equal(a.repo.T.runs[0].cost_usd, 0.1);
+  const b = await crSetup({ hf: fakeHf({ submitFail: true }) });
+  await processTick(b.ctx);
+  const cb = (await b.repo.readSection(1, 'creatives')).version.content;
+  assert.deepEqual(cb.items.map((x) => x.status), ['failed', 'failed']); assert.match(cb.items[0].note, /rejected/); assert.equal(b.repo.T.runs[0].cost_usd, 0.1, 'nothing was submitted, nothing is spent');
+  const d = await crSetup({ ask: null }); await processTick(d.ctx);
+  assert.equal(d.repo.T.runs[0].status, 'failed'); assert.match(d.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const e = await crSetup({ ask: async () => ({ text: 'Вибачте' }) }); await processTick(e.ctx);
+  assert.equal(e.repo.T.runs[0].status, 'failed'); assert.match(e.repo.T.runs[0].error, /не у форматі JSON/);
+  const f = await crSetup({ ask: async () => ({ text: JSON.stringify({ cards: [{ goal_index: 9 }] }) }) }); await processTick(f.ctx);
+  assert.equal(f.repo.T.runs[0].status, 'failed'); assert.match(f.repo.T.runs[0].error, /жодного придатного креатива/);
+});
+await test('brief: the goals of the first creatives are part of the brief sheet and come back unchanged', () => {
+  const form = formFromContent(CR_BRIEF.content);
+  assert.deepEqual(form.goals, [{ goal: 'Продати хіт', product: 'AirPlug' }, { goal: 'Розпродаж літа', product: '' }]);
+  assert.deepEqual(contentFromForm({ ...form, goals: [...form.goals, { goal: '  ', product: 'x' }] }).creative_goals, CR_BRIEF.content.creative_goals, 'an empty goal is dropped');
+  assert.deepEqual(formFromContent({}).goals, []);
 });
 console.log(`\n${passed} workflow checks passed`);

@@ -29,7 +29,7 @@ export const STATUS_TONE = { confirmed: 'ok', assumption: 'warn', empty: 'mute' 
 const blank = (v) => v == null || String(v).trim() === '';
 const numOrNull = (v) => { if (blank(v)) return null; const x = Number(String(v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(x) ? x : null; };
 
-export const emptyForm = () => ({ values: { currency: 'USD' }, meta: {}, products: [], offers: [], text: '' });
+export const emptyForm = () => ({ values: { currency: 'USD' }, meta: {}, products: [], offers: [], goals: [], text: '' });
 
 // The status that is drawn: no value = «Порожньо»; a value without a mark is a assumption until a person confirms it.
 export const rowStatus = (value, meta) => (blank(value) ? 'empty' : meta?.status === 'confirmed' ? 'confirmed' : 'assumption');
@@ -48,6 +48,7 @@ export function formFromContent(content = {}, body = '') {
     values, meta: { ...(c.economics_meta || {}) },
     products: (e.products || []).map((p) => ({ name: p.name || '', price: p.price ?? '', cogs: p.cogs ?? '', status: (c.economics_meta?.['product:' + p.name]?.status) || 'assumption', source: c.economics_meta?.['product:' + p.name]?.source || '' })),
     offers: (e.offers || []).map((o) => ({ name: o.name || '', pays: o.pays ?? '', list_value: o.list_value ?? '', extra_cost: o.extra_cost ?? '', approved: o.approved === true, status: (c.economics_meta?.['offer:' + o.name]?.status) || 'assumption', source: c.economics_meta?.['offer:' + o.name]?.source || '' })),
+    goals: (c.creative_goals || []).map((g) => ({ goal: g.goal || '', product: g.product || '' })),
     text: body || '',
   };
 }
@@ -69,7 +70,9 @@ export function contentFromForm(form) {
   for (const r of ROWS) if (!blank(v[r.key])) meta[r.key] = { status: form.meta?.[r.key]?.status === 'confirmed' ? 'confirmed' : 'assumption', source: (form.meta?.[r.key]?.source || '').trim() };
   for (const p of economics.products) { const f = form.products.find((x) => x.name.trim() === p.name); meta['product:' + p.name] = { status: f?.status === 'confirmed' ? 'confirmed' : 'assumption', source: (f?.source || '').trim() }; }
   for (const o of economics.offers) { const f = form.offers.find((x) => x.name.trim() === o.name); meta['offer:' + o.name] = { status: f?.status === 'confirmed' ? 'confirmed' : 'assumption', source: (f?.source || '').trim() }; }
-  return { schema: 1, general, economics, economics_meta: meta };
+  // the goals of the first creatives are entered here too (document: «ціль кожного креатива вказує менеджер»): everything the manager fills in about the project is in one sheet
+  const creative_goals = (form.goals || []).filter((g) => !blank(g.goal)).map((g) => ({ goal: g.goal.trim().slice(0, 200), product: blank(g.product) ? '' : String(g.product).trim() }));
+  return { schema: 1, general, economics, economics_meta: meta, creative_goals };
 }
 
 // What the researcher still has to ask: the rows that are empty and the numbers that are only assumptions.
