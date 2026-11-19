@@ -4,6 +4,8 @@
 // and uses only ads that carry that confirmation («якщо його там немає, як приклад не беремо»). The sites of the competitors it reads and compares itself.
 // Competitors come from the brief only in this version (finding more in the same niche needs a search source we do not have yet).
 
+import { adProblems } from '../../../../src/lib/workflow/ads.js';
+
 const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const norm = (s) => String(s || '').toLowerCase().replace(/[«»"“”„'’`]/g, '').replace(/\s+/g, ' ').trim();
 const numbersOf = (s) => (String(s || '').match(/\d[\d.,]*\d|\d/g) || []).map((n) => n.replace(/[.,]$/, ''));
@@ -31,15 +33,9 @@ export function parseCompetitors(text, ownSite = '') {
 export function verifiedAds(content) {
   const ok = [], skipped = [];
   for (const a of (Array.isArray(content?.ads) ? content.ads : []).slice(0, 30)) {
-    const link = String(a?.library_url || '').trim();
-    const date = String(a?.active_since || '').trim();
-    const who = String(a?.verified_by || '').trim();
     const shot = String(a?.screenshot_url || '').trim();
-    const problems = [];
-    if (!/^https:\/\/(www\.)?facebook\.com\/ads\/library\//i.test(link)) problems.push('немає посилання на Бібліотеку реклами');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) problems.push('немає дати «активно з»');
-    if (!who) problems.push('не вказано, хто перевірив');
-    if (!clip(a?.competitor, 80)) problems.push('не вказано конкурента');
+    const problems = adProblems(a);
+    const link = String(a?.library_url || '').trim(), date = String(a?.active_since || '').trim(), who = String(a?.verified_by || '').trim();
     if (problems.length) { skipped.push({ competitor: clip(a?.competitor, 80) || '?', problems }); continue; }
     ok.push({ id: `ad${ok.length + 1}`, competitor: clip(a.competitor, 80), library_url: link, active_since: date, verified_by: who, screenshot_url: /^https:\/\//i.test(shot) ? shot : '', note: clip(a.note, 300) });
     if (ok.length >= MAX_ADS) break;

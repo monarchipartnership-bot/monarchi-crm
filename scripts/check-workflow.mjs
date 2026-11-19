@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { competitorCards, competitorHosts, siteAreaRows, siteCounts } from '../src/lib/workflow/sections.js';
+import { adProblems } from '../src/lib/workflow/ads.js';
 import { buildCompetitorsPrompt, checkCompetitors, compactSite, comparisonTasks, parseCompetitors, verifiedAds, withSiteAppendix } from '../api/_lib/wf/skills/competitorsEngine.js';
 import { competitors } from '../api/_lib/wf/skills/competitorsAgent.js';
 import { collectGa4Audience } from '../api/_lib/wf/skills/ga4Audience.js';
@@ -960,5 +962,28 @@ await test('competitors: no model, no readable competitor site and a useless ans
   const c = await mk(); c.ctx.ask = async () => ({ text: 'Вибачте' }); await processTick(c.ctx);
   assert.equal(c.repo.T.runs[0].status, 'failed'); assert.match(c.repo.T.runs[0].error, /не у форматі JSON/);
   assert.equal((await c.repo.readSection(1, 'competitors'))?.version ?? null, null);
+});
+// ---------------------------------------------------------------- A4: the pages of the Researcher's sections (pure helpers behind them)
+await test('screens: the 11 areas of the site come worst first; a state follows the verified findings, then the notes of the agent', () => {
+  const f = (area, severity, verified = true) => ({ area, severity, verified });
+  const rows = siteAreaRows({ findings: [f('terms', 'high'), f('first_screen', 'medium'), f('upsell', 'low'), f('contact', 'high', false)], ok_areas: [{ area: 'mobile', note: 'viewport є' }, { area: 'terms', note: 'ignored: a finding wins' }], not_checked: [{ area: 'speed', reason: 'немає ключа' }], competitors_compare: [{ area: 'trust', competitor: 'r.example', verified: true }] });
+  assert.equal(rows.length, 11);
+  assert.deepEqual(rows.slice(0, 4).map((r) => [r.key, r.state]), [['terms', 'bad'], ['first_screen', 'warn'], ['upsell', 'warn'], ['contact', 'warn']]);
+  assert.equal(rows.find((r) => r.key === 'contact').label, 'Не підтверджено', 'only an unverified finding: not a problem yet');
+  assert.equal(rows.find((r) => r.key === 'mobile').state, 'ok'); assert.equal(rows.find((r) => r.key === 'speed').label, 'Не перевірено'); assert.equal(rows.find((r) => r.key === 'speed').note, 'немає ключа');
+  assert.equal(rows.find((r) => r.key === 'checkout').label, 'Не оцінено');
+  assert.equal(rows.find((r) => r.key === 'trust').comparisons.length, 1);
+  assert.deepEqual(siteCounts({ findings: [f('a', 'high'), f('b', 'low', false)], not_checked: [1, 2] }), { verified: 1, unverified: 1, notChecked: 2 });
+  assert.equal(siteAreaRows(null).length, 11, 'an empty content does not break the page');
+});
+await test('screens: competitor cards carry their comparisons; the ad rule is one for the agent and the screen', () => {
+  const cards = competitorCards({ table: [{ competitor: 'a.example' }, { competitor: 'b.example' }], comparison: [{ competitor: 'a.example', area: 'terms' }] });
+  assert.deepEqual(cards.map((c) => c.comparisons.length), [1, 0]);
+  assert.deepEqual(competitorHosts({ competitors: [{ host: 'a.example' }], failed: [{ host: 'z.example' }, { host: 'a.example' }] }), ['a.example', 'z.example']);
+  const ok = { competitor: 'a.example', library_url: 'https://www.facebook.com/ads/library/?id=1', screenshot_url: 'https://img.example/a.png', active_since: '2026-10-01', verified_by: 'm@x' };
+  assert.deepEqual(adProblems(ok), []);
+  assert.deepEqual(adProblems({ ...ok, screenshot_url: '' }), ['немає скриншота']);
+  assert.equal(adProblems({}).length, 5);
+  assert.equal(verifiedAds({ ads: [ok, { ...ok, screenshot_url: '' }] }).ads.length, 1, 'the agent and the screen agree on what counts');
 });
 console.log(`\n${passed} workflow checks passed`);

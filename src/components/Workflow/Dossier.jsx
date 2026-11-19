@@ -6,6 +6,9 @@ import { Pill } from './parts';
 import BriefSheet from './BriefSheet';
 import UnitEconomyView from './UnitEconomyView';
 import AuditView from './AuditView';
+import SiteView from './SiteView';
+import AudienceView from './AudienceView';
+import CompetitorsView from './CompetitorsView';
 
 // «Досьє» of a project (screen 2 of step A3, the variant A of the mockup): the 10 sections on the left, the chosen one on the right with its versions
 // and the proposals of the agents. A person's version is never replaced by an agent: the agent can only propose.
@@ -18,6 +21,7 @@ export default function Dossier({ projectId, initialKey }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [viewId, setViewId] = useState(null); // an older version that is being looked at
+  const [asText, setAsText] = useState(false); // a structured section can also be read as its text
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -33,7 +37,7 @@ export default function Dossier({ projectId, initialKey }) {
       setVersions(v); setAnswered(a); setErr('');
     } catch (e) { setErr(e.message || String(e)); }
   }, [sec?.id, sec?.key, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setEditing(false); setViewId(null); setVersions([]); if (rows) loadSection(); }, [sec?.key, sec?.id, rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setEditing(false); setViewId(null); setAsText(false); setVersions([]); if (rows) loadSection(); }, [sec?.key, sec?.id, rows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rows) return <div className="wf wf-page">{err ? <div className="wf-err" role="alert">{err}</div> : <div className="wf-load">Завантаження…</div>}</div>;
 
@@ -45,10 +49,18 @@ export default function Dossier({ projectId, initialKey }) {
 
   async function run(fn) { setBusy(true); setErr(''); try { await fn(); await loadRows(); await loadSection(); } catch (e) { setErr(e.message || String(e)); } finally { setBusy(false); } }
   const startEdit = () => { setDraft(current?.body || ''); setEditing(true); setViewId(null); };
-  const save = () => run(async () => { await saveHumanVersion(projectId, sec.key, draft, email); setEditing(false); });
+  const save = () => run(async () => { await saveHumanVersion(projectId, sec.key, draft, email, null, sec.key === 'competitors' ? current?.content || {} : {}); setEditing(false); });
   const restore = (v) => run(() => saveHumanVersion(projectId, sec.key, v.body, email, `Відновлено версію ${v.version}`, v.content || {}));
   const saveBrief = (text, content) => run(async () => { await saveHumanVersion(projectId, 'brief', text, email, null, content); setEditing(false); });
   const isBrief = sec.key === 'brief';
+  // the sections of the Researcher have their own pages (step A4, variants B of the mockup); anything else is shown as the text
+  const c = shown?.content || {};
+  const kind = sec.key === 'site' && c.schema && c.findings ? 'site' : sec.key === 'audience' && c.segments ? 'audience' : sec.key === 'competitors' && c.table ? 'competitors' : null;
+  // the ads a manager confirmed live in the structured part of the section: a new human version carries them
+  const saveAds = async (ads) => {
+    setBusy(true);
+    try { await saveHumanVersion(projectId, 'competitors', current?.body || '', email, 'Підтверджено рекламу конкурента', { ...(current?.content || {}), ads }); await loadRows(); await loadSection(); } finally { setBusy(false); }
+  };
 
   return (
     <div className="wf wf-page wf-dos">
@@ -90,7 +102,9 @@ export default function Dossier({ projectId, initialKey }) {
           ) : shown ? (
             <>
               <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}{shown.sources?.length ? ` · джерела: ${shown.sources.map((s) => (typeof s === 'string' ? s : s.title || s.url || '')).filter(Boolean).join(', ')}` : ''}</div>
-              {shown.content?.lines ? <UnitEconomyView content={shown.content} /> : shown.content?.years && shown.content?.findings ? <AuditView content={shown.content} /> : <div className="wf-doc">{shown.body || '(порожньо)'}</div>}
+              {kind && <div className="wf-row" style={{ marginBottom: 10 }}><button type="button" className={'wf-btn sm' + (!asText ? ' p' : '')} onClick={() => setAsText(false)}>Огляд</button><button type="button" className={'wf-btn sm' + (asText ? ' p' : '')} onClick={() => setAsText(true)}>Текст</button></div>}
+              {kind && !asText ? (kind === 'site' ? <SiteView key={shown.id} content={shown.content} /> : kind === 'audience' ? <AudienceView key={shown.id} content={shown.content} /> : <CompetitorsView key={shown.id} content={shown.content} projectId={projectId} email={email} busy={busy || shown.id !== current?.id} onSaveAds={saveAds} />) :
+              shown.content?.lines ? <UnitEconomyView content={shown.content} /> : shown.content?.years && shown.content?.findings ? <AuditView content={shown.content} /> : <div className="wf-doc">{shown.body || '(порожньо)'}</div>}
             </>
           ) : <div className="wf-doc wf-muted">Розділ ще порожній. {sec.who === 'Менеджер' ? 'Натисніть «Редагувати» і заповніть його.' : `Його заповнить ${sec.who}, або ви можете написати самі.`}</div>}
           {humanEdited && !editing && <div className="wf-lock">Цей розділ редагувала людина. Агент надалі лише пропонує правки й не перезаписує їх.</div>}

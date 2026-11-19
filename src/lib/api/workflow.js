@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { BUCKET, FILE_TYPES, MAX_FILE_MB, safeName } from './creatives';
 
 // The tables of the new agent system (migrations 20261068, 20261069): the state of a project, the dossier with its versions, the approvals, the journal.
 // A person never changes versions or the journal rows: they only add new ones (the tables are append-only for versions and journal).
@@ -102,4 +103,23 @@ export async function recordClientAnswer(projectId, status, comment, email) {
   if (status === 'returned' && !text) throw new Error('Щоб повернути, напишіть, що клієнт просить виправити.');
   must(await supabase.from('wf_approvals').insert({ project_id: projectId, kind: 'client', subject: { section: 'strategy' }, status, requested_by: email || 'manager', decided_by: email || 'manager', decided_at: nowIso(), comment: text || null }), 'client answer');
   await journal(projectId, email, { action: status === 'approved' ? 'approved' : 'returned', subject: 'client', summary: `Відповідь клієнта: ${status === 'approved' ? 'погодив' : 'повернув. ' + text}` });
+}
+
+// ----------------------------------------------------------------------- competitor ads confirmed by the manager
+// The screenshot of an ad goes to the public bucket of the project's files (the model reads it by address); no row is made in the creative materials.
+export async function uploadCompetitorShot(projectId, file) {
+  if (!FILE_TYPES.includes(file.type)) throw new Error('Підходять лише картинки PNG, JPG або WebP.');
+  if (file.size > MAX_FILE_MB * 1024 * 1024) throw new Error(`Файл більший за ${MAX_FILE_MB} МБ.`);
+  const path = `projects/${projectId}/competitor-ads/${crypto.randomUUID()}-${safeName(file.name)}`;
+  const up = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+  if (up.error) throw new Error(up.error.message || 'Не вдалося завантажити файл.');
+  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+// Asks the orchestrator for one more run of a skill (the same open run is not queued twice). → true if queued, false if one is already open.
+export async function requestRun(projectId, agent, skill, email) {
+  const r = await supabase.from('wf_runs').insert({ project_id: projectId, agent, skill, trigger: 'manual', priority: 50, created_by: email || 'manager' });
+  if (r.error) { if (r.error.code === UNIQUE) return false; throw new Error('run: ' + r.error.message); }
+  await journal(projectId, email, { action: 'run_requested', subject: skill, summary: `Менеджер попросив ще один запуск: ${agent} / ${skill}.` });
+  return true;
 }

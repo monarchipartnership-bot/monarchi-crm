@@ -123,3 +123,25 @@
 .wf-ad { display:grid; grid-template-columns:72px minmax(0,1fr); gap:12px; align-items:center; }
 .wf-ad .im { aspect-ratio:1; border-radius:12px; background:linear-gradient(135deg,var(--wf-soft),var(--wf-border)); display:grid; place-items:center; color:var(--wf-muted); font-size:11px; box-shadow:0 0 0 2px var(--wf-ok); }
 .wf-ad .im.r { box-shadow:0 0 0 2px var(--wf-bad); }
+
+/* the pages of the Researcher's sections: Сайт, Аудиторія, Ринок і конкуренти (step A4, variants B) */
+.wf-kv { display:grid; grid-template-columns:150px minmax(0,1fr); gap:6px 12px; margin:0; }
+.wf-kv dt { color:var(--wf-muted); font-size:12.5px; font-weight:600; } .wf-kv dd { margin:0; overflow-wrap:anywhere; }
+@media (max-width:620px) { .wf-kv { grid-template-columns:minmax(0,1fr); } }
+.wf-doc q, .wf-card q, .wf-kv q { quotes:"«" "»"; background:var(--wf-soft); border-radius:8px; padding:1px 6px; }
+.wf-find { border-radius:14px; background:var(--wf-bg); box-shadow:0 0 0 1px var(--wf-border); padding:12px 14px; margin-bottom:10px; }
+.wf-find.un { box-shadow:0 0 0 1px var(--wf-border), 0 0 0 4px var(--wf-warn-bg); }
+.wf-cmp { display:grid; gap:6px; } .wf-cmp .b { background:var(--wf-ok-bg); color:var(--wf-ok); border-radius:10px; padding:5px 10px; font-size:13px; } .wf-cmp .w { background:var(--wf-warn-bg); color:var(--wf-warn); border-radius:10px; padding:5px 10px; font-size:13px; }
+.wf-g2seg { grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr); align-items:start; }
+@media (max-width:820px) { .wf-g2seg { grid-template-columns:minmax(0,1fr); } }
+.wf-seg { display:grid; gap:6px; text-align:left; font:inherit; color:inherit; background:var(--wf-surface); border:0; border-radius:16px; box-shadow:0 0 0 1px var(--wf-border); padding:12px 14px; cursor:pointer; width:100%; }
+.wf-seg.on { box-shadow:0 0 0 2px var(--wf-orchid), 0 0 0 6px var(--wf-halo); }
+.wf-seg:focus-visible { outline:2px solid var(--wf-orchid); outline-offset:2px; }
+.wf-chip { background:var(--wf-soft); color:var(--wf-plum); border-radius:999px; padding:2px 10px; font-size:12px; font-weight:600; }
+.wf-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
+.wf-adc { display:grid; grid-template-columns:110px minmax(0,1fr); gap:12px; background:var(--wf-surface); border-radius:16px; box-shadow:0 0 0 1px var(--wf-border); padding:12px; min-width:0; }
+.wf-adc img, .wf-adc .im { width:100%; aspect-ratio:4/5; object-fit:cover; border-radius:12px; background:var(--wf-soft); display:grid; place-items:center; color:var(--wf-muted); font-size:11px; }
+@media (max-width:480px) { .wf-adc { grid-template-columns:minmax(0,1fr); } }
+.wf-addrow td { background:var(--wf-bg); }
+.wf-tbl select.wf-inp { min-width:150px; }
+.wf-tbl td a { color:var(--wf-plum); font-weight:600; }
