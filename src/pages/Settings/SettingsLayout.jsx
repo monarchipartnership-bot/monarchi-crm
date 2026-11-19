@@ -5,7 +5,6 @@ import '../../styles/settingsLayout.css';
 // pages of the side menu. A new settings page = one more entry in SECTIONS + one route under /settings in App.jsx.
 const SECTIONS = [
   { to: '/settings/account', label: 'Мій кабінет', hint: 'Профіль, відпустки, погодження' },
-  { to: '/settings/site-leads', label: 'Заявки з сайту', hint: 'Форма сайту, Telegram, журнал' },
 ];
 
 export default function SettingsLayout() {

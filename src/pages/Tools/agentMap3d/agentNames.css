@@ -1,5 +1,0 @@
-/* the name of a robot, shown when the camera is at its island (agentNames.js) */
-.am3-name { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 8px; border-radius: 999px; border: 1px solid rgba(235, 156, 239, .45); background: rgba(52, 16, 52, .86); color: #F6E9FA; font: 600 12px Onest, system-ui, sans-serif; white-space: nowrap; cursor: pointer; backdrop-filter: blur(8px); box-shadow: 0 6px 16px rgba(10, 4, 24, .4); z-index: 1; }
-.am3-name i { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
-/* the whole name is always shown (owner 2026-11-11): no cut, one line */
-.am3-name:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }

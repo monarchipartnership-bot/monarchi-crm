@@ -46,10 +46,7 @@ export const DEPTS = {
     label: 'Automation Department',
     items: [
       { key: 'dashboard', name: 'Dashboard', desc: 'Загальна картина по задачах: сьогодні, вчора, тижні та місяці.', icon: SI.automationDashboard, type: 'link', to: '/automation/dashboard' },
-      { key: 'constellation', name: 'AI Agents', desc: 'Карта реальних AI-агентів CRM за відділами — від живих (Follow-up Generator) до запланованих.', icon: SI.aiAgents, type: 'link', to: '/tools/constellation-test' },
-      // Placeholder page for now. The icon is a stand-in (Image Studio's) —
-      // the icon atlas has no SMM glyph yet.
-      { key: 'smm', name: "Mon'Archi SMM", desc: 'Контент-план і черга схвалення постів для соцмереж Monarchi, бренд-профіль, конкуренти.', icon: SI.imageStudio, type: 'link', to: '/automation/smm' },
+      { key: 'aiAgents', name: 'AI Agents', desc: 'Агенти CRM: налаштування, прогони й огляд проєктів (розділ будується).', icon: SI.aiAgents, type: 'link', to: '/ai-agents' },
     ],
   },
   team: {

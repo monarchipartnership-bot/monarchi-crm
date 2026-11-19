@@ -29,11 +29,9 @@ import Account from './pages/Account/Account';
 import Calculator from './pages/Tools/Calculator';
 import ImageStudio from './pages/Tools/ImageStudio';
 import FollowupGenerator from './pages/Tools/FollowupGenerator';
-import ConstellationTest from './pages/Tools/ConstellationTest';
 import Presentation from './pages/Presentation/Presentation';
 import AutomationDashboard from './pages/Automation/Dashboard';
-import SmmHome from './pages/Smm/SmmHome';
-import SiteLeads from './pages/SiteLeads/SiteLeads';
+import AiAgentsHome from './pages/AiAgents/AiAgentsHome';
 import SettingsLayout from './pages/Settings/SettingsLayout';
 import './styles/pages.css';
 import './styles/motion.css';
@@ -85,16 +83,14 @@ function AuthGate() {
         <Route path="/settings" element={<SettingsLayout />}>
           <Route index element={<Navigate to="/settings/account" replace />} />
           <Route path="account" element={<Account />} />
-          <Route path="site-leads" element={<SiteLeads />} />
         </Route>
         <Route path="/tools/calculator" element={<Calculator />} />
         <Route path="/tools/image-studio" element={<ImageStudio />} />
         <Route path="/tools/followup" element={<FollowupGenerator />} />
-        <Route path="/tools/constellation-test" element={<ConstellationTest />} />
+        <Route path="/tools/constellation-test" element={<Navigate to="/ai-agents" replace />} /> {/* the old address of the AI Agents section */}
+        <Route path="/ai-agents" element={<AiAgentsHome />} />
         <Route path="/clients" element={<Presentation />} />
         <Route path="/automation/dashboard" element={<AutomationDashboard />} />
-        <Route path="/automation/smm" element={<SmmHome />} />
-        <Route path="/automation/site-leads" element={<Navigate to="/settings/site-leads" replace />} />
         <Route path="/tasks" element={<TaskManagerPage />} />
         <Route path="/tasks/analytics" element={<TaskAnalyticsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -22,8 +22,6 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
 import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
 import ProjectCreativeTab from '../../components/Projects/Creative/ProjectCreativeTab';
-import AiResults from '../../components/Projects/Results/AiResults';
-import ProjectTeams from '../../components/Projects/Teams/ProjectTeams';
 import { fetchAgent } from '../../lib/api/projectAgents';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
@@ -48,13 +46,11 @@ import { infoProgress } from '../../lib/agents/infoProgress';
 
 const TABS = [
   { key: 'overview', label: 'Інформація про проєкт', icon: PAGE_ICONS['page.projects'].src },
-  { key: 'teams', label: 'Запуск AI команди', icon: PAGE_ICONS['page.ai-agents'].src },
   { key: 'builder', label: 'Конструктор звіту', icon: null, line: <path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z" /> },
   { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'Агент звітів', icon: PAGE_ICONS['page.ai-agents'].src },
-  { key: 'creative', label: 'Результати AI команди', icon: null, line: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" /> },
 ];
 
 // «Звітність» (owner, 2026-11-11): the four report tabs are one tab of the card with four sections inside. Their keys and addresses stay (?tab=builder, compose, work, decks),
@@ -63,18 +59,14 @@ const REPORT_TABS = [['builder', 'Конструктор звіту'], ['compose
 const REPORT_KEYS = REPORT_TABS.map(([k]) => k);
 const STRIP = [
   TABS.find((x) => x.key === 'overview'),
-  TABS.find((x) => x.key === 'teams'),
   { key: 'reports', label: 'Звітність', icon: PAGE_ICONS['page.weekly-report'].src },
   TABS.find((x) => x.key === 'agent'),
-  TABS.find((x) => x.key === 'creative'),
 ];
 // the line icons of the menu of the card (the menu is the one of the AI Agents section: a round medallion with a line icon)
 const STRIP_LINE = {
   overview: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
-  teams: <><rect x="5" y="8" width="14" height="11" rx="4" /><path d="M12 8V4M9.5 13h.01M14.5 13h.01" /></>,
   reports: <path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" />,
   agent: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></>,
-  creative: <path d="M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9.5h.01" />,
 };
 const STATUSES = ['active', 'paused', 'completed'];
 
@@ -555,7 +547,7 @@ function ProjectDetailCard() {
         ))}
       </div>
 
-      <div className={'pw-workspace ' + (tab === 'overview' ? 'pw-dark' : (tab === 'teams' || tab === 'creative') ? 'pw-flat' : isReport ? 'pw-dark pw-rep' : 'pw-sheet')} data-dd={tab === 'overview' || isReport ? 'night' : 'hub'} id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
+      <div className={'pw-workspace ' + (tab === 'overview' ? 'pw-dark' : isReport ? 'pw-dark pw-rep' : 'pw-sheet')} data-dd={tab === 'overview' || isReport ? 'night' : 'hub'} id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
       {isReport && (
         <div className="pcr-tabs pw-sub pw-isub" role="tablist" aria-label="Розділи звітності">
           {REPORT_TABS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={'pcr-tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{k === 'work' && workCount > 0 ? <em>{workCount}</em> : null}</button>)}
@@ -659,9 +651,7 @@ function ProjectDetailCard() {
         </div>
       ))}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
-      {tab === 'teams' && <ProjectTeams key={'teams-' + id} projectId={id} onGoFill={(section) => { setTab('overview'); setInfo(section); }} onOpenReports={() => setTab('agent')} onOpenMaterials={() => setTab('creative')} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
-      {tab === 'creative' && <AiResults key={'results-' + id} projectId={id} />}
       </div>
       {confirmDialog}
     </div>
