@@ -5,6 +5,7 @@ import { agoText, openProposals, sectionRows } from '../../lib/workflow/view';
 import { Pill } from './parts';
 import BriefSheet from './BriefSheet';
 import UnitEconomyView from './UnitEconomyView';
+import AuditView from './AuditView';
 
 // «Досьє» of a project (screen 2 of step A3, the variant A of the mockup): the 10 sections on the left, the chosen one on the right with its versions
 // and the proposals of the agents. A person's version is never replaced by an agent: the agent can only propose.
@@ -89,7 +90,7 @@ export default function Dossier({ projectId, initialKey }) {
           ) : shown ? (
             <>
               <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}{shown.sources?.length ? ` · джерела: ${shown.sources.map((s) => (typeof s === 'string' ? s : s.title || s.url || '')).filter(Boolean).join(', ')}` : ''}</div>
-              {shown.content?.lines ? <UnitEconomyView content={shown.content} /> : <div className="wf-doc">{shown.body || '(порожньо)'}</div>}
+              {shown.content?.lines ? <UnitEconomyView content={shown.content} /> : shown.content?.years && shown.content?.findings ? <AuditView content={shown.content} /> : <div className="wf-doc">{shown.body || '(порожньо)'}</div>}
             </>
           ) : <div className="wf-doc wf-muted">Розділ ще порожній. {sec.who === 'Менеджер' ? 'Натисніть «Редагувати» і заповніть його.' : `Його заповнить ${sec.who}, або ви можете написати самі.`}</div>}
           {humanEdited && !editing && <div className="wf-lock">Цей розділ редагувала людина. Агент надалі лише пропонує правки й не перезаписує їх.</div>}

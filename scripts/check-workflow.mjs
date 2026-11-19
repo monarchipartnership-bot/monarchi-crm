@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { computeAudit, renderAuditText, testCurve } from '../api/_lib/wf/skills/auditEngine.js';
+import { audit } from '../api/_lib/wf/skills/auditAgent.js';
 import { createHandlers } from '../api/_lib/wf/agents.js';
 import { planProject, processTick } from '../api/_lib/wf/tick.js';
 import { createMemoryWfRepo } from './wfMemoryRepo.mjs';
@@ -454,6 +456,119 @@ await test('intake: without the Meta reader (no token) the run fails with a read
   await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
   await processTick(ctx);
   assert.equal(repo.T.runs[0].status, 'failed'); assert.match(repo.T.runs[0].error, /META_ACCESS_TOKEN/);
+});
+
+// ---------------------------------------------------------------- A4: the audit of a Meta account
+const mrow = (month, spend, purchases, revenue, extra = {}) => ({ spend, impressions: spend * 40, clicks: spend, purchases, leads: 0, messages: 0, revenue, period: { from_date: month + '-01', to_date: month + '-28' }, ...extra });
+const TH = { breakeven_roas: 1.75, target_roas: 2.5, breakeven_cpa: 100, target_cpa: 70 };
+const AUDIT_DATA = {
+  currency: 'USD',
+  monthly: [mrow('2024-04', 3000, 100, 6000), mrow('2025-03', 0, 0, 0), mrow('2025-04', 36700, 871, 25300), mrow('2025-05', 75000, 800, 80000), mrow('2026-05', 1000, 10, 900)],
+  campaigns: [{ campaign_id: '1', name: 'Sales A', spend: 90000, purchases: 1500, revenue: 70000 }, { campaign_id: '2', name: 'Reach B', spend: 10000, purchases: 0, revenue: 0 }],
+  campaignMeta: [{ id: '1', name: 'Sales A', objective: 'OUTCOME_SALES' }, { id: '2', name: 'Reach B', objective: 'OUTCOME_AWARENESS' }],
+  windowAds: [{ ad_id: 'a1', name: 'Good ad', spend: 500, purchases: 10, revenue: 1500 }, { ad_id: 'a2', name: 'Bad ad', spend: 400, purchases: 1, revenue: 100 }, { ad_id: 'a3', name: 'Tiny', spend: 5, purchases: 0, revenue: 0 }],
+  windowAdsets: [], windowCampaigns: [{ campaign_id: '1', name: 'Sales A', spend: 900, purchases: 11, revenue: 1600 }],
+  breakdowns: { age: { life: [{ age: '25-34', spend: 6000, purchases: 120, revenue: 15600 }, { age: '55-64', spend: 4000, purchases: 20, revenue: 2000 }], recent: [] } },
+  pixels: [{ id: '1', name: 'Pixel A', lastFired: '2026-05-30' }, { id: '2', name: 'Pixel B', lastFired: null }],
+};
+await test('audit: years, months, concentration and break-even come out right', () => {
+  const a = computeAudit(AUDIT_DATA, TH);
+  assert.equal(a.resultKind, 'purchases');
+  assert.deepEqual(a.years.map((y) => [y.year, y.spend]), [['2024', 3000], ['2025', 111700], ['2026', 1000]]);
+  assert.equal(a.overview.spend, 115700); assert.equal(a.overview.results, 1781);
+  assert.deepEqual(a.above_breakeven, ['2024-04'], 'only the month at ROAS 2.0 is above 1.75');
+  assert.equal(a.months.find((m) => m.month === '2024-04').verdict, 'ok'); assert.equal(a.months.find((m) => m.month === '2025-04').verdict, 'bad');
+  assert.equal(a.months.find((m) => m.month === '2025-03').verdict, 'few');
+  assert.deepEqual(a.concentration.top.map((t) => t.month), ['2025-05', '2025-04']); assert.ok(a.concentration.share > 0.9);
+  assert.ok(a.findings.dynamics.some((f) => f.tone === 'r' && /сплесками/.test(f.text)));
+  assert.ok(a.findings.dynamics.some((f) => f.tone === 'r' && /Жоден місяць із витратою/.test(f.text)));
+});
+await test('audit: objectives, best and worst ads (tiny spend is not judged), breakdowns, pixels', () => {
+  const a = computeAudit(AUDIT_DATA, TH);
+  const sales = a.objectives.find((o) => o.objective === 'OUTCOME_SALES');
+  assert.equal(sales.spend, 90000); assert.equal(sales.share, 0.9);
+  assert.equal(a.recent.ads.best[0].name, 'Good ad'); assert.equal(a.recent.ads.worst[0].name, 'Bad ad');
+  assert.ok(![...a.recent.ads.best, ...a.recent.ads.worst].some((l) => l.name === 'Tiny'), 'below the minimum spend: no verdict');
+  const age = a.breakdowns.age.life; assert.equal(age[0].key, '25-34'); assert.equal(age[0].verdict, 'good'); assert.equal(age[1].verdict, 'bad');
+  assert.ok(a.findings.audiences.some((f) => f.tone === 'r' && /55-64/.test(f.text)));
+  assert.equal(a.tracking.multiple, true); assert.deepEqual(a.tracking.never, ['Pixel B']);
+  assert.ok(a.findings.tracking.some((f) => /кілька піксельних/.test(f.text)));
+});
+await test('audit: the test curve counts spend until the first results and ignores ads that started before the window', () => {
+  const day = (ad, d, spend, purchases) => ({ ad_id: ad, spend, purchases, period: { from_date: d, to_date: d } });
+  const w = { since: '2026-03-02', until: '2026-05-31' };
+  const rows = [day('old', '2026-03-01', 50, 5),
+    day('x', '2026-03-10', 40, 0), day('x', '2026-03-11', 40, 0), day('x', '2026-03-12', 40, 2), day('x', '2026-03-13', 40, 3),
+    day('y', '2026-04-01', 60, 1), day('z', '2026-04-02', 30, 0), day('z', '2026-04-03', 90, 0)];
+  const t = testCurve(rows, w, 'purchases');
+  assert.equal(t.launched, 3, 'the ad that started before the window is skipped');
+  assert.equal(t.with_result, 2); assert.equal(t.share_with_result, 0.67);
+  assert.equal(t.reached5.count, 1); assert.equal(t.reached5.max_first_spend, 120, 'ad x: first purchase after 40+40+40 = 120');
+  assert.equal(t.never.count, 1); assert.equal(t.never.spend, 120); assert.equal(t.never.over100, 1);
+  assert.equal(testCurve([], w, 'purchases'), null);
+});
+await test('audit: without the thresholds nothing is called loss-making, and the text says why', () => {
+  const a = computeAudit(AUDIT_DATA, null);
+  assert.ok(a.months.every((m) => ['none', 'few'].includes(m.verdict)));
+  assert.ok(a.open.some((o) => /Unit Economy ще не пораховано/.test(o)));
+  assert.match(renderAuditText(a), /Аудит кабінету Meta/);
+});
+await test('audit: a cabinet with messages only is read by the cost of a message and says sales are unknown', () => {
+  const a = computeAudit({ currency: 'UAH', monthly: [{ spend: 12789, impressions: 90000, clicks: 1300, purchases: 0, leads: 0, messages: 121, revenue: 0, period: { from_date: '2026-03-01', to_date: '2026-05-31' } }], campaigns: [], breakdowns: {} }, null);
+  assert.equal(a.resultKind, 'messages'); assert.equal(a.overview.cpr, 105.69);
+  assert.ok(a.open.some((o) => /лише звернень/.test(o)));
+});
+await test('audit: the skill reads Meta, judges against the Unit Economy and writes the section; without an account or a reader it waits or fails clearly', async () => {
+  const handlers = createHandlers({ researcher: { audit } });
+  const { repo, ctx } = await setup({ handlers });
+  const calls = [];
+  ctx.meta = {
+    insights: async (o) => { calls.push(o.level + (o.breakdowns ? ':' + o.breakdowns.join('+') : '') + (o.increment ? ':inc' + o.increment : '')); return { account: 'act_1', rows: o.level === 'account' && !o.breakdowns && o.increment === 'monthly' ? AUDIT_DATA.monthly : [], truncated: false }; },
+    campaigns: async () => AUDIT_DATA.campaignMeta, pixels: async () => AUDIT_DATA.pixels,
+  };
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audit' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'waiting', 'no account yet'); assert.equal(repo.T.tasks[0].title, 'Підключити рекламний кабінет Meta до проєкту');
+  repo.addAccount(1, { platform: 'meta', account_id: '1', currency: 'USD' });
+  await repo.writeSectionVersion(1, 'unit_economy', { author_kind: 'agent', author: 'researcher', body: 'ue', content: { thresholds: { breakeven_roas: 1.75, target_roas: 2.5, breakeven_cpa: 100, target_cpa: 70 } } });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'done');
+  const sec = await repo.readSection(1, 'audit');
+  assert.equal(sec.version.content.thresholds.breakeven_roas, 1.75); assert.match(sec.version.body, /Аудит кабінету Meta/);
+  assert.ok(calls.some((c) => c.includes('inc')), 'the monthly history was read');
+  assert.ok(calls.includes('account:age'), 'breakdowns were read');
+  const bad = await setup({ handlers });
+  bad.repo.addAccount(1, { platform: 'meta', account_id: '1' });
+  await bad.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audit' });
+  await processTick(bad.ctx);
+  assert.equal(bad.repo.T.runs[0].status, 'failed'); assert.match(bad.repo.T.runs[0].error, /META_ACCESS_TOKEN/);
+});
+await test('audit: a part of Meta that cannot be read is named in the audit, the rest is kept', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { audit } }) });
+  repo.addAccount(1, { platform: 'meta', account_id: '1' });
+  ctx.meta = { insights: async (o) => { if (o.breakdowns) throw new Error('(#100) breakdown not allowed'); return { rows: o.increment === 'monthly' ? AUDIT_DATA.monthly : [] }; }, campaigns: async () => { throw new Error('nope'); }, pixels: async () => [] };
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audit' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'done');
+  const sec = await repo.readSection(1, 'audit');
+  assert.ok(sec.version.content.open.some((o) => /не вдалося прочитати/i.test(o) && /розбивка/.test(o)));
+});
+
+await test('audit: an ad is never both best and worst; with thresholds best = above break-even, worst = below it', () => {
+  const ad = (id, spend, purchases, revenue) => ({ ad_id: id, name: id, spend, purchases, revenue });
+  const a = computeAudit({ ...AUDIT_DATA, windowAds: [ad('A', 500, 10, 1000), ad('B', 500, 8, 600), ad('C', 500, 5, 400), ad('D', 500, 3, 250), ad('E', 900, 20, 1800)] }, TH);
+  const best = a.recent.ads.best.map((l) => l.name), worst = a.recent.ads.worst.map((l) => l.name);
+  assert.ok(best.every((n) => ['A', 'E'].includes(n)) && best.length === 2, 'only ROAS 2.0 is above 1.75');
+  assert.ok(worst.every((n) => ['B', 'C', 'D'].includes(n)) && worst.length === 3);
+  assert.equal(best.filter((n) => worst.includes(n)).length, 0);
+  assert.equal(worst[0], 'D', 'the worst first');
+});
+await test('audit: the audit does not read the clock: stale pixels are judged against the date of the data', () => {
+  const a = computeAudit({ ...AUDIT_DATA, now: '2026-06-10T00:00:00Z' }, TH);
+  assert.deepEqual(a.tracking.stale, [], 'Pixel A fired on 30 May, 11 days before the given date');
+  const b = computeAudit({ ...AUDIT_DATA, now: '2026-09-10T00:00:00Z' }, TH);
+  assert.deepEqual(b.tracking.stale, ['Pixel A']);
+  assert.deepEqual(computeAudit(AUDIT_DATA, TH), computeAudit(AUDIT_DATA, TH), 'same data, same audit');
 });
 
 console.log(`\n${passed} workflow checks passed`);

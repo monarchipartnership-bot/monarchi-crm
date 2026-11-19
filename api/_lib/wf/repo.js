@@ -81,7 +81,9 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
         const key = r.state?.blocked_on; if (!key) continue;
         const woke = key.startsWith('accounts:') // the run waits for an ad account of a platform to be linked (accounts:meta); the others wait for a newer version of a section
           ? (await this.listAdAccounts(projectId)).some((a) => a.platform === key.split(':')[1])
-          : await (async () => { const sec = await this.readSection(projectId, key); return !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at)); })();
+          : key === 'unit_economy' // the audit waits for the Unit Economy to be written, or for that skill to stop working (it may itself be waiting for the brief)
+            ? ((await this.readSection(projectId, key))?.version != null || !must(await db.from('wf_runs').select('id').eq('project_id', projectId).eq('agent', 'researcher').eq('skill', key).in('status', ['queued', 'running']).limit(1), 'runs').length)
+            : await (async () => { const sec = await this.readSection(projectId, key); return !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at)); })();
         if (woke) {
           must(await db.from('wf_runs').update({ status: 'queued', attempt: 0, lease_until: null, error: null }).eq('id', r.id).eq('status', 'waiting'), 'resume');
           resumed += 1;
