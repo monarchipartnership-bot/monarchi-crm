@@ -95,3 +95,20 @@
 .wf-cmt { width:100%; border-radius:14px; border:0; box-shadow:0 0 0 1px var(--wf-border); background:var(--wf-bg); color:var(--wf-text); font:inherit; padding:10px 12px; min-height:70px; resize:vertical; }
 .wf-cmt:focus { outline:0; box-shadow:0 0 0 3px var(--wf-halo), 0 0 0 1px var(--wf-orchid); }
 .wf-dec h4 { margin:0 0 2px; font-size:15px; }
+
+/* the brief as a sheet and the Unit Economy page (step A4, variant B) */
+.wf-inp { height:32px; border-radius:10px; border:0; box-shadow:0 0 0 1px var(--wf-border); background:var(--wf-bg); color:var(--wf-text); font:inherit; padding:0 10px; width:100%; min-width:0; }
+.wf-inp:focus { outline:0; box-shadow:0 0 0 3px var(--wf-halo), 0 0 0 1px var(--wf-orchid); }
+.wf-sheet { width:100%; border-collapse:collapse; font-size:13px; }
+.wf-sheet th { text-align:left; font-size:11.5px; color:var(--wf-muted); text-transform:uppercase; letter-spacing:.05em; padding:6px 8px; white-space:nowrap; }
+.wf-sheet td { padding:5px 6px; border-top:1px solid var(--wf-line); vertical-align:middle; }
+.wf-sheet td.k { font-weight:600; min-width:150px; }
+.wf-sheet .wf-st { border:0; font:inherit; font-size:12px; font-weight:600; cursor:pointer; }
+.wf-sheet td.ro { padding:8px; overflow-wrap:anywhere; }
+.wf-tiles { display:grid; gap:10px; grid-template-columns:repeat(3,minmax(0,1fr)); }
+@media (max-width:860px) { .wf-tiles { grid-template-columns:minmax(0,1fr); } }
+.wf-tile { border-radius:16px; background:var(--wf-bg); box-shadow:0 0 0 1px var(--wf-border); padding:14px; display:grid; gap:4px; min-width:0; }
+.wf-tile b { font-size:20px; } .wf-tile .k { color:var(--wf-muted); font-size:12px; }
+.wf-tile.main { box-shadow:0 0 0 1px var(--wf-border), 0 0 0 4px var(--wf-halo); }
+.wf-ue-hero { background:var(--wf-grad); color:#fff; border-radius:18px; padding:16px 20px; box-shadow:0 0 0 4px var(--wf-halo); }
+.wf-ue-hero h2 { margin:0 0 2px; font-size:17px; } .wf-ue-hero p { margin:0; opacity:.92; }

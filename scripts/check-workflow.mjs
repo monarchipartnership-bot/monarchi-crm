@@ -8,6 +8,7 @@ import { planProject, processTick } from '../api/_lib/wf/tick.js';
 import { createMemoryWfRepo } from './wfMemoryRepo.mjs';
 import { computeUnitEconomy, renderUnitEconomy } from '../api/_lib/wf/skills/economics.js';
 import { unitEconomy } from '../api/_lib/wf/skills/unitEconomyAgent.js';
+import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } from '../src/lib/workflow/brief.js';
 import { agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
 
 let passed = 0;
@@ -381,6 +382,37 @@ await test('economics: when the brief changes later, the agent proposes, the per
   const ue = await repo.readSection(1, 'unit_economy');
   assert.equal(ue.version.body, 'Моя правка');
   assert.ok(repo.T.versions.some((v) => v.is_proposal && v.author === 'researcher'));
+});
+
+// ---------------------------------------------------------------- A4: the brief as a sheet
+await test('brief sheet: a form becomes content for the agents and comes back unchanged', () => {
+  const form = emptyForm();
+  form.values = { ...form.values, geo: 'Florida', budget_monthly: '30000', target_roas: '2,5', avg_order: '175', cogs_pct: '30', shipping_cost: '12', fee_pct: '3', returns_pct: '3', site_cvr_pct: '2', min_campaign_daily: '' };
+  form.meta = { avg_order: { status: 'confirmed', source: 'Shopify' }, cogs_pct: { source: 'оцінка клієнта' } };
+  form.products = [{ name: 'AirPlug', price: '150', cogs: '', status: 'confirmed', source: 'сайт' }, { name: '', price: '1' }];
+  form.offers = [{ name: 'Набір', pays: '280', list_value: '350', extra_cost: '', approved: false, status: 'assumption', source: '' }];
+  const c = contentFromForm(form);
+  assert.equal(c.economics.target_roas, 2.5, 'a comma is a decimal point');
+  assert.equal(c.economics.site_cvr, 0.02, 'percent becomes a fraction');
+  assert.equal(c.economics.min_campaign_daily, undefined, 'an empty field is not a zero');
+  assert.equal(c.economics.products.length, 1, 'a row without a name is dropped');
+  assert.equal(c.economics_meta.avg_order.status, 'confirmed'); assert.equal(c.economics_meta.cogs_pct.status, 'assumption', 'unmarked = assumption');
+  assert.equal(c.general.geo, 'Florida');
+  const back = formFromContent(c, 'текст');
+  assert.equal(back.values.site_cvr_pct, '2'); assert.equal(back.values.avg_order, '175'); assert.equal(back.products[0].status, 'confirmed'); assert.equal(back.text, 'текст');
+  assert.equal(rowStatus('', {}), 'empty'); assert.equal(rowStatus('1', { status: 'confirmed' }), 'confirmed'); assert.equal(rowStatus('1', {}), 'assumption');
+  assert.ok(briefGaps(c).empty.includes('Мін. бюджет кампанії на день'));
+});
+await test('brief sheet: numbers that are only assumptions are listed in the Unit Economy', () => {
+  const form = emptyForm();
+  form.values = { ...form.values, budget_monthly: '3000', avg_order: '100', cogs_pct: '40', shipping_cost: '5', fee_pct: '3', returns_pct: '2', target_roas: '3', min_campaign_daily: '15' };
+  form.meta = { avg_order: { status: 'confirmed' }, cogs_pct: { status: 'assumption', source: 'оцінка клієнта' } };
+  const c = contentFromForm(form);
+  const r = computeUnitEconomy(c.economics, c.economics_meta);
+  assert.ok(r.assumptions.some((a) => /Собівартість/.test(a) && /оцінка клієнта/.test(a)));
+  assert.ok(!r.assumptions.some((a) => /Середній чек/.test(a)), 'a confirmed number is not an assumption');
+  assert.equal(r.provisional, true);
+  assert.equal(r.thresholds.breakeven_cpa, computeUnitEconomy(c.economics).thresholds.breakeven_cpa, 'statuses do not change the numbers');
 });
 
 console.log(`\n${passed} workflow checks passed`);

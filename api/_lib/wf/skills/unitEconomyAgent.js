@@ -5,7 +5,7 @@ import { computeUnitEconomy, renderUnitEconomy } from './economics.js';
 
 export async function unitEconomy({ run, ctx }) {
   const brief = await ctx.repo.readSection(run.project_id, 'brief');
-  const res = computeUnitEconomy(brief?.version?.content?.economics || {});
+  const res = computeUnitEconomy(brief?.version?.content?.economics || {}, brief?.version?.content?.economics_meta || {});
   if (res.blocked) {
     return {
       blocked: { on: 'brief', reason: 'Unit Economy чекає на дані брифу: ціни та собівартість товарів.' },

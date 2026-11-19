@@ -3,6 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { acceptProposal, fetchAnsweredProposals, fetchDossier, fetchVersions, rejectProposal, saveHumanVersion } from '../../lib/api/workflow';
 import { agoText, openProposals, sectionRows } from '../../lib/workflow/view';
 import { Pill } from './parts';
+import BriefSheet from './BriefSheet';
+import UnitEconomyView from './UnitEconomyView';
 
 // «Досьє» of a project (screen 2 of step A3, the variant A of the mockup): the 10 sections on the left, the chosen one on the right with its versions
 // and the proposals of the agents. A person's version is never replaced by an agent: the agent can only propose.
@@ -43,7 +45,9 @@ export default function Dossier({ projectId, initialKey }) {
   async function run(fn) { setBusy(true); setErr(''); try { await fn(); await loadRows(); await loadSection(); } catch (e) { setErr(e.message || String(e)); } finally { setBusy(false); } }
   const startEdit = () => { setDraft(current?.body || ''); setEditing(true); setViewId(null); };
   const save = () => run(async () => { await saveHumanVersion(projectId, sec.key, draft, email); setEditing(false); });
-  const restore = (v) => run(() => saveHumanVersion(projectId, sec.key, v.body, email, `Відновлено версію ${v.version}`));
+  const restore = (v) => run(() => saveHumanVersion(projectId, sec.key, v.body, email, `Відновлено версію ${v.version}`, v.content || {}));
+  const saveBrief = (text, content) => run(async () => { await saveHumanVersion(projectId, 'brief', text, email, null, content); setEditing(false); });
+  const isBrief = sec.key === 'brief';
 
   return (
     <div className="wf wf-page wf-dos">
@@ -64,7 +68,16 @@ export default function Dossier({ projectId, initialKey }) {
             <h3 style={{ margin: 0 }}>{sec.name}</h3>
             {!editing && <button type="button" className="wf-btn p sm" disabled={busy} onClick={startEdit}>Редагувати</button>}
           </div>
-          {editing ? (
+          {isBrief ? (
+            editing
+              ? <BriefSheet key={'e' + (current?.id || 0)} version={current} busy={busy} onSave={saveBrief} onCancel={() => setEditing(false)} />
+              : (
+                <>
+                  {shown && <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}</div>}
+                  <BriefSheet key={'r' + (shown?.id || 0)} version={shown} readOnly />
+                </>
+              )
+          ) : editing ? (
             <>
               <label htmlFor="wf-body" className="wf-muted" style={{ fontSize: 12.5 }}>Текст розділу (нова версія буде вашою, агент її не замінить)</label>
               <textarea id="wf-body" className="wf-ta" value={draft} onChange={(e) => setDraft(e.target.value)} />
@@ -76,7 +89,7 @@ export default function Dossier({ projectId, initialKey }) {
           ) : shown ? (
             <>
               <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}{shown.sources?.length ? ` · джерела: ${shown.sources.map((s) => (typeof s === 'string' ? s : s.title || s.url || '')).filter(Boolean).join(', ')}` : ''}</div>
-              <div className="wf-doc">{shown.body || '(порожньо)'}</div>
+              {shown.content?.lines ? <UnitEconomyView content={shown.content} /> : <div className="wf-doc">{shown.body || '(порожньо)'}</div>}
             </>
           ) : <div className="wf-doc wf-muted">Розділ ще порожній. {sec.who === 'Менеджер' ? 'Натисніть «Редагувати» і заповніть його.' : `Його заповнить ${sec.who}, або ви можете написати самі.`}</div>}
           {humanEdited && !editing && <div className="wf-lock">Цей розділ редагувала людина. Агент надалі лише пропонує правки й не перезаписує їх.</div>}

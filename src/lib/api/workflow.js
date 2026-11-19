@@ -61,9 +61,9 @@ async function ensureSection(projectId, key) {
   return must(made, 'section').id;
 }
 // A person's edit is a new version; the agent can no longer replace it (it only proposes).
-export async function saveHumanVersion(projectId, key, body, email, note = null) {
+export async function saveHumanVersion(projectId, key, body, email, note = null, content = {}) {
   const sectionId = await ensureSection(projectId, key);
-  const row = must(await supabase.from('wf_section_versions').insert({ section_id: sectionId, body, author_kind: 'human', author: email || 'manager', note }).select(VERSION_COLS).single(), 'version');
+  const row = must(await supabase.from('wf_section_versions').insert({ section_id: sectionId, body, content, author_kind: 'human', author: email || 'manager', note }).select(VERSION_COLS).single(), 'version');
   await journal(projectId, email, { action: 'edit', subject: key, summary: `Правка людини, версія ${row.version}.` });
   return row;
 }

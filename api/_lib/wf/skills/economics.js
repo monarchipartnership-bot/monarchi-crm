@@ -47,7 +47,10 @@ export function normalizeInputs(econ = {}) {
   return e;
 }
 
-export function computeUnitEconomy(econInput = {}) {
+const LABELS = { budget_monthly: 'Місячний бюджет', target_roas: 'Цільовий ROAS', avg_order: 'Середній чек', cogs_pct: 'Собівартість', shipping_cost: 'Доставка й пакування', fee_pct: 'Комісії платежів', returns_pct: 'Повернення', site_cvr: 'Конверсія сайту', min_campaign_daily: 'Мінімальний бюджет кампанії' };
+
+// meta = { <param>: { status: 'confirmed' | 'assumption', source } } from the brief: a number that is only an assumption is listed for confirmation.
+export function computeUnitEconomy(econInput = {}, meta = {}) {
   const e0 = normalizeInputs(econInput);
   const assumptions = [];
   const e = { ...e0 };
@@ -55,6 +58,10 @@ export function computeUnitEconomy(econInput = {}) {
   for (const [k, label] of [['shipping_cost', 'Доставка й пакування'], ['fee_pct', 'Комісії платежів'], ['returns_pct', 'Повернення']]) {
     if (e[k] == null) { e[k] = 0; assumptions.push(`${label} не вказано: вважаємо 0, тому беззбитковий CPA може бути завищений.`); }
   }
+  const unconfirmed = (key, label, value, extra = '') => { const m = meta?.[key]; if (m && m.status !== 'confirmed') assumptions.push(`${label}: ${value}${extra} — підтвердити${m.source ? ` (джерело: ${m.source})` : ''}.`); };
+  for (const [k, label] of Object.entries(LABELS)) if (e0[k] != null) unconfirmed(k === 'site_cvr' ? 'site_cvr_pct' : k, label, k === 'site_cvr' ? `${r2(e0[k] * 100)}%` : e0[k]);
+  for (const p of e0.products) unconfirmed('product:' + p.name, `Товар «${p.name}»`, p.price ?? 'ціни немає');
+  for (const o of e0.offers) unconfirmed('offer:' + o.name, `Офер «${o.name}»`, o.pays ?? 'ціни немає');
   const campaignDaily = e.min_campaign_daily ?? DEFAULTS.min_campaign_daily;
   if (e.min_campaign_daily == null) assumptions.push(`Мінімальний бюджет кампанії не вказано: беремо ${DEFAULTS.min_campaign_daily} ${e.currency} на день.`);
 
