@@ -7,6 +7,7 @@ import { createHandlers } from '../api/_lib/wf/agents.js';
 import { planProject, processTick } from '../api/_lib/wf/tick.js';
 import { createMemoryWfRepo } from './wfMemoryRepo.mjs';
 import { computeUnitEconomy, renderUnitEconomy } from '../api/_lib/wf/skills/economics.js';
+import { intake } from '../api/_lib/wf/skills/intake.js';
 import { unitEconomy } from '../api/_lib/wf/skills/unitEconomyAgent.js';
 import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } from '../src/lib/workflow/brief.js';
 import { agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
@@ -413,6 +414,46 @@ await test('brief sheet: numbers that are only assumptions are listed in the Uni
   assert.ok(!r.assumptions.some((a) => /Середній чек/.test(a)), 'a confirmed number is not an assumption');
   assert.equal(r.provisional, true);
   assert.equal(r.thresholds.breakeven_cpa, computeUnitEconomy(c.economics).thresholds.breakeven_cpa, 'statuses do not change the numbers');
+});
+
+// ---------------------------------------------------------------- A4: intake (is there data in the cabinet?)
+const fakeMeta = (rows) => ({ insights: async ({ accountId }) => ({ account: 'act_' + accountId, rows }) });
+await test('intake: spend in the Meta account means data, so an audit will be made', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { intake } }) });
+  repo.addAccount(1, { platform: 'meta', account_id: '123', account_name: 'Acc' });
+  ctx.meta = fakeMeta([{ spend: 100, impressions: 5000, purchases: 3, period: { from_date: '2025-01-01', to_date: '2026-05-31' } }, { spend: 50.5, impressions: 100, period: { from_date: '2024-01-01', to_date: '2024-02-01' } }]);
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
+  await processTick(ctx);
+  assert.equal(repo.T.states.get(1).has_data, true);
+  const out = repo.T.runs[0].output;
+  assert.equal(out.spend, 150.5); assert.equal(out.accounts[0].from, '2024-01-01'); assert.equal(out.accounts[0].to, '2026-05-31');
+});
+await test('intake: an account that never spent money means no data and no audit', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { intake } }) });
+  repo.addAccount(1, { platform: 'meta', account_id: '123' });
+  ctx.meta = fakeMeta([]);
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
+  await processTick(ctx);
+  assert.equal(repo.T.states.get(1).has_data, false);
+});
+await test('intake: no account linked: the run waits, a task for the manager, it wakes up when an account is linked', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { intake } }) });
+  ctx.meta = fakeMeta([{ spend: 10, period: {} }]);
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'waiting'); assert.equal(repo.T.tasks[0].owner, 'manager');
+  await processTick(ctx); assert.equal(repo.T.runs[0].status, 'waiting', 'still no account');
+  repo.addAccount(1, { platform: 'google', account_id: '999' }); await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'waiting', 'a Google account does not count for the Meta check');
+  repo.addAccount(1, { platform: 'meta', account_id: '123' }); await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'done'); assert.equal(repo.T.states.get(1).has_data, true);
+});
+await test('intake: without the Meta reader (no token) the run fails with a readable reason', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { intake } }) });
+  repo.addAccount(1, { platform: 'meta', account_id: '123' });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'failed'); assert.match(repo.T.runs[0].error, /META_ACCESS_TOKEN/);
 });
 
 console.log(`\n${passed} workflow checks passed`);

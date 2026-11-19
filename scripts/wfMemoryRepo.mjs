@@ -3,7 +3,7 @@
 // project+agent+skill, one pending strategy or launch approval, the lease of a claimed run and the pause of a project.
 export function createMemoryWfRepo({ now = () => new Date() } = {}) {
   let seq = { run: 0, approval: 0, version: 0, section: 0 };
-  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [], tasks: [] };
+  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [], tasks: [], accounts: new Map() };
   const iso = () => now().toISOString();
   const OPEN = ['queued', 'running', 'waiting'];
 
@@ -74,6 +74,8 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       const v = T.versions.find((x) => x.id === sec.current_version_id);
       return { status: sec.status, version: v ? { version: v.version, body: v.body, content: v.content, author_kind: v.author_kind, created_at: v.created_at } : null };
     },
+    async listAdAccounts(projectId) { return (T.accounts.get(projectId) || []).map((a) => ({ ...a })); },
+    addAccount(projectId, a) { T.accounts.set(projectId, [...(T.accounts.get(projectId) || []), a]); },
     async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high' }) {
       if (T.tasks.some((t) => t.project_id === projectId && t.title === title && ['proposed', 'approved', 'in_progress'].includes(t.status))) return null;
       const t = { id: T.tasks.length + 1, project_id: projectId, type, title, evidence, owner, priority, status: 'proposed' };
@@ -84,8 +86,10 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       let resumed = 0;
       for (const r of T.runs.filter((x) => x.project_id === projectId && x.status === 'waiting')) {
         const key = r.state?.blocked_on; if (!key) continue;
-        const sec = await this.readSection(projectId, key);
-        if (sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at)) { Object.assign(r, { status: 'queued', attempt: 0, lease_until: null, error: null }); resumed += 1; }
+        const isAcc = key.startsWith('accounts:');
+        const sec = isAcc ? null : await this.readSection(projectId, key);
+        const woke = isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
+        if (woke) { Object.assign(r, { status: 'queued', attempt: 0, lease_until: null, error: null }); resumed += 1; }
       }
       return resumed;
     },

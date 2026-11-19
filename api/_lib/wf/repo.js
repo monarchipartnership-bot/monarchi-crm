@@ -64,6 +64,9 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       const v = must(await db.from('wf_section_versions').select('version, body, content, author_kind, created_at').eq('id', sec.current_version_id).single(), 'version');
       return { status: sec.status, version: v };
     },
+    async listAdAccounts(projectId) {
+      return must(await db.from('project_ad_accounts').select('platform, account_id, account_name, currency').eq('project_id', projectId), 'ad accounts') || [];
+    },
     // A task for people (for example «Потрібно від клієнта»). The same open task is not added twice.
     async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high', created_by = 'agent' }) {
       const same = must(await db.from('wf_tasks').select('id').eq('project_id', projectId).eq('title', title).in('status', ['proposed', 'approved', 'in_progress']).limit(1), 'task') || [];
@@ -76,8 +79,10 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       let resumed = 0;
       for (const r of waiting) {
         const key = r.state?.blocked_on; if (!key) continue;
-        const sec = await this.readSection(projectId, key);
-        if (sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at)) {
+        const woke = key.startsWith('accounts:') // the run waits for an ad account of a platform to be linked (accounts:meta); the others wait for a newer version of a section
+          ? (await this.listAdAccounts(projectId)).some((a) => a.platform === key.split(':')[1])
+          : await (async () => { const sec = await this.readSection(projectId, key); return !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at)); })();
+        if (woke) {
           must(await db.from('wf_runs').update({ status: 'queued', attempt: 0, lease_until: null, error: null }).eq('id', r.id).eq('status', 'waiting'), 'resume');
           resumed += 1;
         }

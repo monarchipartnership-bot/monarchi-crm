@@ -7,6 +7,7 @@ import { isCronRequest, signInAgent } from './_lib/agentSession.js';
 import { createRealHandlers } from './_lib/wf/agents.js';
 import { createWfRepo } from './_lib/wf/repo.js';
 import { processTick } from './_lib/wf/tick.js';
+import { fetchMetaInsights } from './_lib/metaAdsData.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -24,7 +25,9 @@ export default async function handler(req, res) {
       if (error || !data?.user) { bad(res, 401, 'Сесія недійсна'); return; }
     }
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
-    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers() });
+    const metaToken = process.env.META_ACCESS_TOKEN;
+    const meta = metaToken ? { insights: (o) => fetchMetaInsights({ ...o, token: metaToken }) } : null; // the Meta reader for the agents; its token never leaves the server
+    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers(), meta });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);
