@@ -90,7 +90,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
         const key = r.state?.blocked_on; if (!key) continue;
         const isAcc = key.startsWith('accounts:');
         const sec = isAcc ? null : await this.readSection(projectId, key);
-        const woke = key === 'site_url' ? !!String(T.websites?.get(projectId) || '').trim() : isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : key === 'unit_economy' ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
+        const woke = key === 'site_url' ? !!String(T.websites?.get(projectId) || '').trim() : isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : ['unit_economy', 'audit'].includes(key) ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
         if (woke) { Object.assign(r, { status: 'queued', attempt: 0, lease_until: null, error: null }); resumed += 1; }
       }
       return resumed;

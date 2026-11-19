@@ -8,6 +8,7 @@ import { createRealHandlers } from './_lib/wf/agents.js';
 import { createWfRepo } from './_lib/wf/repo.js';
 import { processTick } from './_lib/wf/tick.js';
 import { getModelClient } from './_lib/ai.js';
+import { createGa4Reader } from './_lib/ga4Client.js';
 import { speedKeyFromEnv } from './_lib/pageSpeed.js';
 import { fetchMetaCampaigns, fetchMetaInsights, fetchMetaPixels } from './_lib/metaAdsData.js';
 
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
       const r = await getModelClient(token).callModel({ agentKey: 'wf-researcher', projectId, runId, trigger, params: { model: 'claude-sonnet-5', max_tokens: maxTokens, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: user }] } });
       return { text: r.text, costUsd: r.costUsd };
     } : null;
-    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv() });
+    const stats = await processTick({ repo: createWfRepo(db), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader() });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);

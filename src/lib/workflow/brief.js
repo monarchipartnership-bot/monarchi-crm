@@ -6,6 +6,8 @@ export const GENERAL = [
   { key: 'geo', label: 'GEO' },
   { key: 'goal', label: 'Ціль у цифрах' },
   { key: 'priority', label: 'Акцент на товари (на певні чи на всі)' },
+  { key: 'audience', label: 'Цільова аудиторія (як її описує клієнт)' },
+  { key: 'ga4_property', label: 'GA4 Property ID клієнта (лише цифри)' },
 ];
 export const PARAMS = [
   { key: 'budget_monthly', label: 'Місячний бюджет' },

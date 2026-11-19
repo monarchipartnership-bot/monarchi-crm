@@ -3,6 +3,9 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { collectGa4Audience } from '../api/_lib/wf/skills/ga4Audience.js';
+import { buildAudiencePrompt, checkSegments, gatherFacts, sourceNotes } from '../api/_lib/wf/skills/audienceEngine.js';
+import { audience } from '../api/_lib/wf/skills/audienceAgent.js';
 import { collectSiteData, pageSignals, pickCroPages, pickProductLink } from '../api/_lib/wf/skills/siteData.js';
 import { AREAS, buildSitePrompt, checkFindings, parseSiteAnswer, renderSiteText, tasksFromFindings } from '../api/_lib/wf/skills/siteEngine.js';
 import { site } from '../api/_lib/wf/skills/siteAgent.js';
@@ -723,5 +726,126 @@ await test('site: no model, a closed site and an unreadable site are told apart'
   await d.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' }); await processTick(d.ctx);
   assert.equal(d.repo.T.runs[0].status, 'failed'); assert.match(d.repo.T.runs[0].error, /не у форматі JSON/);
   assert.equal(await d.repo.readSection(1, 'site').then((s) => s?.version ?? null), null, 'nothing is written from a bad answer');
+});
+// ---------------------------------------------------------------- A4: the audience skill (segments by the situation of buying)
+const gaResp = (rows) => ({ rows: rows.map(([k, u, s, p, r]) => ({ dimensionValues: [{ value: k }], metricValues: [{ value: String(u) }, { value: String(s ?? u) }, { value: String(p ?? 0) }, { value: String(r ?? 0) }] })) });
+const fakeGa4 = ({ demographics = true, fail = null } = {}) => {
+  const calls = [];
+  return { calls, runReport: async ({ propertyId, body }) => {
+    calls.push({ propertyId, dim: body.dimensions[0].name, range: body.dateRanges[0] });
+    const dim = body.dimensions[0].name;
+    if (fail) throw new Error(fail);
+    if (dim === 'userAgeBracket') return demographics ? gaResp([['25-34', 600, 700, 30, 3000], ['35-44', 300, 350, 10, 900], ['unknown', 100]]) : gaResp([['unknown', 1000]]);
+    if (dim === 'userGender') return demographics ? gaResp([['female', 700, 800, 35, 3500], ['male', 300]]) : gaResp([['unknown', 1000]]);
+    if (dim === 'country') return gaResp([['Ukraine', 900], ['Poland', 100]]);
+    if (dim === 'city') return gaResp([['Kyiv', 400], ['Lviv', 200], ['(not set)', 50]]);
+    if (dim === 'deviceCategory') return gaResp([['mobile', 800], ['desktop', 200]]);
+    if (dim === 'newVsReturning') return gaResp([['new', 700], ['returning', 300]]);
+    if (dim === 'sessionDefaultChannelGroup') return gaResp([['Paid Social', 500], ['Organic Search', 300]]);
+    if (dim === 'eventName') return { rows: [['view_item', 5000], ['add_to_cart', 600], ['purchase', 90]].map(([e, n]) => ({ dimensionValues: [{ value: e }], metricValues: [{ value: String(n) }] })) };
+    return { rows: [] };
+  } };
+};
+const AUD_BRIEF = { content: { general: { geo: 'Україна', goal: '60 замовлень на місяць', audience: 'Жінки, які купують меблі для першої квартири, та молоді родини', ga4_property: 'properties/123456789' }, economics: { products: [{ name: 'Стілець Дуб' }], offers: [] } }, body: '' };
+const AUD_AUDIT = { resultKind: 'purchases', currency: 'USD', breakdowns: { age: { life: [{ key: '25-34', share: 0.6, results: 120, roas: 2.4, cpr: 40, verdict: 'good' }, { key: '55-64', share: 0.2, results: 10, roas: 0.9, cpr: 120, verdict: 'bad' }], recent: [] }, gender: { life: [{ key: 'female', share: 0.8, results: 100, roas: 2.2, cpr: 45, verdict: 'good' }], recent: [] }, device: { life: [], recent: [] } } };
+const SEG = (o) => ({ name: 'Молоді родини', who: 'Пари, які облаштовують першу квартиру', situation: 'Переїзд, потрібні стільці й стіл', wants: 'Міцне дерево за розумну ціну', pains: 'Дешеві меблі ламаються', blockers: 'Не бачать матеріал вживу', convincers: 'Відгуки й гарантія', message: 'Меблі на роки', formats: 'Відео-огляд', products: 'Стілець Дуб', targeting: 'Інтереси: ремонт, дизайн інтер’єру', angles: ['Стілець, який переживе переїзд'], confirmed_by: [{ source: 'brief', ref: 'молоді родини' }, { source: 'meta', ref: '25-34' }, { source: 'ga4', ref: 'mobile' }], ...o });
+await test('audience: GA4 is read for the client property, demographics are checked, unknown values are kept out of the shares', async () => {
+  const ga = fakeGa4();
+  const d = await collectGa4Audience(ga, 'properties/123456789', new Date('2026-11-19T10:00:00Z'));
+  assert.equal(d.property, '123456789'); assert.deepEqual(d.window, { start: '2026-08-21', end: '2026-11-18' });
+  assert.equal(d.demographics, true); assert.equal(d.reports.age.rows[0].key, '25-34'); assert.equal(d.reports.age.rows[0].share, 0.667, '600 of 900 known users');
+  assert.equal(d.reports.age.unknown_users, 100); assert.equal(d.reports.city.rows.length, 2, '(not set) is not a city');
+  assert.deepEqual(d.funnel.map((f) => f.event), ['view_item', 'add_to_cart', 'purchase']);
+  assert.ok(ga.calls.every((c) => c.propertyId === '123456789'));
+  const off = await collectGa4Audience(fakeGa4({ demographics: false }), '1', new Date('2026-11-19T10:00:00Z'));
+  assert.equal(off.demographics, false, 'no age and gender in this GA4: they are skipped, the client is not asked');
+  const bad = await collectGa4Audience(fakeGa4({ fail: 'GA4: permission denied' }), '1', new Date('2026-11-19T10:00:00Z'));
+  assert.equal(Object.keys(bad.reports).length, 0); assert.ok(bad.errors.length >= 8);
+});
+await test('audience: confirmations are accepted only when the quote or key stands in the named source; invented numbers are flagged', async () => {
+  const ga = await collectGa4Audience(fakeGa4(), '1', new Date('2026-11-19T10:00:00Z'));
+  const facts = gatherFacts({ brief: AUD_BRIEF, audit: AUD_AUDIT, ga4: ga });
+  assert.equal(facts.meta.breakdowns.age[0].spend_share_pct, 60); assert.equal(facts.ga4.age[0].users_share_pct, 67); assert.ok(!('device' in facts.meta.breakdowns), 'empty breakdowns are left out');
+  const raw = { segments: [
+    SEG({}),
+    SEG({ name: 'Гіпотеза', confirmed_by: [] }),
+    SEG({ name: 'Вигадка', confirmed_by: [{ source: 'brief', ref: 'студенти' }, { source: 'meta', ref: '65+' }, { source: 'ga4', ref: 'tablet' }] }),
+    SEG({ name: 'Із цифрою', who: 'Покупці, яких у 3 рази більше, ніж інших, 74% з них жінки' }),
+    SEG({ name: '' }),
+  ], questions: ['Хто найчастіше купує: той, хто користується, чи той, хто дарує?'] };
+  const r = checkSegments(raw, facts);
+  assert.equal(r.dropped, 1);
+  const by = Object.fromEntries(r.segments.map((s) => [s.name, s]));
+  assert.equal(by['Молоді родини'].status, 'confirmed'); assert.equal(by['Молоді родини'].confirmed_by.length, 3);
+  assert.equal(by['Гіпотеза'].status, 'hypothesis');
+  assert.equal(by['Вигадка'].status, 'hypothesis'); assert.equal(by['Вигадка'].rejected.length, 3, 'none of the three refs is in its source');
+  assert.equal(by['Із цифрою'].status, 'unverified'); assert.match(by['Із цифрою'].problem, /74/);
+  assert.equal(r.questions.length, 1);
+  const noGa = checkSegments({ segments: [SEG({ confirmed_by: [{ source: 'ga4', ref: 'mobile' }] })], questions: [] }, gatherFacts({ brief: AUD_BRIEF, audit: null, ga4: null }));
+  assert.equal(noGa.segments[0].status, 'hypothesis', 'a source that does not exist confirms nothing');
+});
+await test('audience: the prompt says what sources exist and that a missing one is null; the notes say what was skipped and why', async () => {
+  const facts = gatherFacts({ brief: AUD_BRIEF, audit: null, ga4: null });
+  const p = buildAudiencePrompt({ facts });
+  assert.match(p.system, /SITUATION OF BUYING/); assert.match(p.system, /Never invent numbers/); assert.match(p.user, /"meta": null/); assert.match(p.user, /молоді родини/);
+  const n = sourceNotes({ facts, ga4: null, hasAudit: false, propertyGiven: false });
+  assert.ok(n.skipped.some((x) => /аудиту кабінету немає/.test(x)) && n.skipped.some((x) => /Property ID/.test(x)) && n.skipped.some((x) => /Відгуки/.test(x)));
+  const ga = await collectGa4Audience(fakeGa4({ demographics: false }), '1', new Date('2026-11-19T10:00:00Z'));
+  assert.ok(sourceNotes({ facts: gatherFacts({ brief: AUD_BRIEF, audit: AUD_AUDIT, ga4: ga }), ga4: ga, hasAudit: true, propertyGiven: true }).used.some((x) => /без віку й статі/.test(x)));
+});
+await test('audience: the skill waits for the brief and for the audit, reads all sources, writes the section, angles and the questions for the client', async () => {
+  const slowAudit = async () => { await new Promise((r) => setTimeout(r, 30)); return { writes: [{ key: 'audit', body: 'a', content: AUD_AUDIT }] }; };
+  const handlers = createHandlers({ researcher: { audience, audit: slowAudit } });
+  const { repo, ctx } = await setup({ handlers });
+  const asked = []; ctx.ga4 = fakeGa4();
+  ctx.ask = async (o) => { asked.push(o); return { costUsd: 0.05, text: JSON.stringify({ segments: [SEG({}), SEG({ name: 'Подарунки', who: 'Ті, хто купує подарунок на новосілля', situation: 'Новосілля друзів', confirmed_by: [{ source: 'meta', ref: 'female' }] })], questions: ['Хто ухвалює рішення про покупку?'] }) }; };
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audience' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'waiting'); assert.equal(repo.T.runs[0].state.blocked_on, 'brief'); assert.equal(asked.length, 0);
+  advance(1000); // the brief is written after the run began to wait
+  await repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: AUD_BRIEF.content });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audit' }); // the audit is working: the audience must wait for it
+  await processTick(ctx);
+  assert.equal(repo.T.runs.find((r) => r.skill === 'audit').status, 'done');
+  assert.equal(asked.length, 0, 'the model is not asked before the audit is there');
+  await processTick(ctx); // the audit section exists now: the audience wakes up and goes on
+  assert.equal(repo.T.runs.find((r) => r.skill === 'audience').status, 'done', repo.T.runs.find((r) => r.skill === 'audience').error);
+  assert.equal(asked.length, 1); assert.match(asked[0].user, /"25-34"/); assert.match(asked[0].user, /Kyiv/);
+  const c = (await repo.readSection(1, 'audience')).version.content;
+  assert.equal(c.segments.length, 2); assert.equal(c.segments[0].status, 'confirmed'); assert.equal(c.angles.length, 2);
+  assert.ok(c.sources.used.some((u) => /GA4/.test(u)) && c.sources.used.some((u) => /Кабінет Meta/.test(u)));
+  assert.equal(repo.T.tasks.find((t) => /Уточнити в клієнта/.test(t.title)).owner, 'manager');
+  assert.equal(repo.T.runs.find((r) => r.skill === 'audience').cost_usd, 0.05);
+});
+await test('audience: without GA4 or an audit it still works on the brief alone, and a failing GA4 becomes a task and a note', async () => {
+  const handlers = createHandlers({ researcher: { audience } });
+  const a = await setup({ handlers });
+  await a.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general: { goal: '60 замовлень на місяць' }, economics: {} } });
+  a.ctx.ask = async () => ({ text: '```json\n' + JSON.stringify({ segments: [SEG({ confirmed_by: [{ source: 'brief', ref: '60 замовлень' }] })], questions: ['Опишіть покупця.', 'Хто вирішує?'] }) + '\n```' });
+  await a.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audience' });
+  await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].status, 'done', a.repo.T.runs[0].error);
+  const sec = await a.repo.readSection(1, 'audience');
+  assert.equal(sec.version.content.segments[0].status, 'confirmed'); assert.ok(sec.version.content.sources.skipped.some((x) => /Property ID/.test(x)));
+  const b = await setup({ handlers });
+  await b.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: AUD_BRIEF.content });
+  b.ctx.ga4 = fakeGa4({ fail: 'GA4: The caller does not have permission' }); b.ctx.ask = async () => ({ text: JSON.stringify({ segments: [SEG({ confirmed_by: [] })], questions: [] }) });
+  await b.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audience' });
+  await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].status, 'done', b.repo.T.runs[0].error);
+  assert.ok(b.repo.T.tasks.some((t) => /доступ до GA4/.test(t.title))); assert.ok((await b.repo.readSection(1, 'audience')).version.content.open.some((o) => /GA4/.test(o)));
+});
+await test('audience: no model and a useless answer fail clearly and write nothing', async () => {
+  const handlers = createHandlers({ researcher: { audience } });
+  const a = await setup({ handlers }); await a.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: AUD_BRIEF.content });
+  await a.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audience' }); await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].status, 'failed'); assert.match(a.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  for (const [text, re] of [['Вибачте', /не у форматі JSON/], [JSON.stringify({ segments: [{ name: 'x' }] }), /жодного придатного сегмента/]]) {
+    const b = await setup({ handlers }); await b.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: AUD_BRIEF.content });
+    b.ctx.ask = async () => ({ text });
+    await b.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'audience' }); await processTick(b.ctx);
+    assert.equal(b.repo.T.runs[0].status, 'failed'); assert.match(b.repo.T.runs[0].error, re);
+    assert.equal((await b.repo.readSection(1, 'audience'))?.version ?? null, null);
+  }
 });
 console.log(`\n${passed} workflow checks passed`);
