@@ -91,8 +91,12 @@ export function checkMaterials(raw, inventory) {
   let reason = clip(m.reason, 400);
   const forced = verdict === 'enough' && inventory.hard_gaps.length > 0;
   if (forced) { verdict = 'not_enough'; reason = `${inventory.hard_gaps.join(' ')} ${reason}`.trim(); } // the code does not allow «enough» without the basics
+  // the rule of the owner (2026-11-24, found by the pilot): a product photo and the basics of the brand are enough for STATIC pictures, whatever the model thinks about video; the model's remark stays in the reason
+  const b = inventory.brand || {};
+  const lifted = verdict === 'not_enough' && inventory.hard_gaps.length === 0 && !!(b.colors_and_fonts || b.tone || b.copy_rules || b.figma);
+  if (lifted) { verdict = 'enough'; reason = `Є фото продукту й основи бренду: статичні картинки робимо. Для відео потрібна зйомка.${reason ? ' Зауваження: ' + reason : ''}`; }
   const shoot = (Array.isArray(m.shoot_list) ? m.shoot_list : []).map((s) => ({ what: clip(s?.what, 240), format: clip(s?.format, 120), why: clip(s?.why, 240), reference: clip(s?.reference, 120) })).filter((s) => s.what && s.format).slice(0, 10);
-  return { verdict, reason, forced, have: list(m.have), missing: [...inventory.hard_gaps, ...list(m.missing).filter((x) => !inventory.hard_gaps.includes(x))].slice(0, 10), shoot_list: verdict === 'not_enough' ? shoot : [] };
+  return { verdict, reason, forced, lifted, have: list(m.have), missing: [...inventory.hard_gaps, ...list(m.missing).filter((x) => !inventory.hard_gaps.includes(x))].slice(0, 10), shoot_list: verdict === 'not_enough' ? shoot : [] };
 }
 
 export function checkIdeas(raw, { facts, economics }) {

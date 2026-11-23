@@ -2254,4 +2254,15 @@ await test('materials: the verdict rule is «one product photo + brand basics» 
   const ok = inventoryOf({ assets: [{ kind: 'product', name: 'a', url: 'u' }], settings: { inputs: { tone: { body: 'спокійний' } } } });
   assert.equal(ok.hard_gaps.length, 0); assert.equal(ok.brand.tone, true);
 });
+await test('materials: «not enough» from the model is lifted to «enough» when there is a product photo and brand basics; not lifted without a photo or without any brand basics', () => {
+  const raw = (verdict) => ({ materials: { verdict, reason: 'немає відео', have: ['фото'], missing: ['відео'], shoot_list: [{ what: 'Відео', format: '9:16', why: 'рілс', reference: '' }] } });
+  const photo = { assets: [{ kind: 'product', name: 'a', url: 'u' }], settings: { inputs: { tone: { body: 'спокійний' } } } };
+  const lifted = checkMaterials(raw('not_enough'), inventoryOf(photo));
+  assert.equal(lifted.verdict, 'enough'); assert.equal(lifted.lifted, true); assert.deepEqual(lifted.shoot_list, []); assert.match(lifted.reason, /статичні картинки/); assert.match(lifted.reason, /немає відео/);
+  assert.equal(checkMaterials(raw('enough'), inventoryOf(photo)).lifted, false, 'an honest «enough» is not marked as lifted');
+  const noBrand = checkMaterials(raw('not_enough'), inventoryOf({ assets: [{ kind: 'product', name: 'a', url: 'u' }], settings: {} }));
+  assert.equal(noBrand.verdict, 'not_enough'); assert.equal(noBrand.shoot_list.length, 1);
+  const noPhoto = checkMaterials(raw('not_enough'), inventoryOf({ assets: [], settings: { inputs: { tone: { body: 'x' } } } }));
+  assert.equal(noPhoto.verdict, 'not_enough');
+});
 console.log(`\n${passed} workflow checks passed`);
