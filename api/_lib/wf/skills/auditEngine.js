@@ -207,7 +207,7 @@ export function computeAudit(data, th = null) {
   if (data.dailyTruncated) open.push('Денні дані по оголошеннях прочитано не повністю (обмеження обсягу): криву тестування рахували за частиною оголошень.');
 
   return {
-    version: 1, currency: c, resultKind: kind, thresholds: th ? { breakeven_roas: th.breakeven_roas, target_roas: th.target_roas } : null, min_spend: minSpend,
+    version: 1, currency: c, resultKind: kind, thresholds: th ? { breakeven_roas: th.breakeven_roas, target_roas: th.target_roas, breakeven_cpa: th.breakeven_cpa ?? null, target_cpa: th.target_cpa ?? null } : null, // all four: the automatic check compares them with the Unit Economy min_spend: minSpend,
     overview: { ...total, campaigns: campaignsCount, from: months[0]?.month || null, to: months[months.length - 1]?.month || null, active_months: spendMonths.length },
     years, months, concentration, above_breakeven: aboveBreakeven.map((m) => m.month), objectives, recent, test, breakdowns: bd, tracking,
     findings: F, change, open,

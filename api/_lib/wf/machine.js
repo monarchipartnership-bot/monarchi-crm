@@ -9,6 +9,13 @@ export const DEFAULTS = { optimizeEveryHours: 24, monthStartDay: 1 };
 export const RESEARCH_SKILLS = ['site', 'audience', 'unit_economy', 'competitors'];
 
 const OPEN = new Set(['queued', 'running', 'waiting']);
+export const MAX_FAILURES = 3;
+// how many runs of this skill failed since the last one that succeeded
+export function recentFailures(runs, agent, skill) {
+  const mine = runs.filter((r) => r.agent === agent && r.skill === skill);
+  const lastDone = Math.max(0, ...mine.filter((r) => r.status === 'done').map((r) => r.id));
+  return mine.filter((r) => r.status === 'failed' && r.id > lastDone).length;
+}
 const open = (runs, agent, skill) => runs.some((r) => r.agent === agent && r.skill === skill && OPEN.has(r.status));
 const openOf = (runs, agents) => runs.some((r) => agents.includes(r.agent) && OPEN.has(r.status));
 const byIdDesc = (a, b) => b.id - a.id;
@@ -26,7 +33,13 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
   if (!state || state.paused) return acts;
   const has = (k) => !!sections[k]?.hasCurrent;
   const queued = (agent, skill) => acts.some((a) => a.type === 'enqueue' && a.agent === agent && a.skill === skill);
-  const enqueue = (agent, skill, input = {}, priority = 100) => { if (!open(runs, agent, skill) && !queued(agent, skill)) acts.push({ type: 'enqueue', agent, skill, input, priority }); };
+  // A skill that failed three times in a row (since its last success) is NOT started again by the orchestrator: a run that cannot succeed would be repeated every minute for ever and cost money.
+  // The manager sees the failed runs and the journal line, fixes the cause, and asks for the run by hand («Перезапустити»).
+  const enqueue = (agent, skill, input = {}, priority = 100) => {
+    if (open(runs, agent, skill) || queued(agent, skill)) return;
+    if (recentFailures(runs, agent, skill) >= MAX_FAILURES) { if (!acts.some((a) => a.action === 'skill_stopped' && a.meta?.skill === `${agent}/${skill}`)) acts.push({ type: 'journal', action: 'skill_stopped', summary: `Крок ${agent}/${skill} не вдався ${MAX_FAILURES} рази поспіль: оркестратор його більше не запускає. Причину видно в запусках, після виправлення запустіть крок вручну.`, meta: { skill: `${agent}/${skill}` }, once: true }); return; }
+    acts.push({ type: 'enqueue', agent, skill, input, priority });
+  };
   const journal = (action, summary, meta = {}) => acts.push({ type: 'journal', action, summary, meta });
 
   // ---------------------------------------------------------------- 0 · start

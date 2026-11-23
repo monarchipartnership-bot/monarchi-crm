@@ -97,7 +97,7 @@ export function ageText(iso, now = new Date()) {
 
 // The card «Зараз» of the overview: one sentence about where the project is and, when it waits for the manager, which decision.
 // d = { state, sections: {key: row}, runs, approvals, hasBrief }
-export function nowCard({ state, runs = [], approvals = [], hasBrief = false }) {
+export function nowCard({ state, runs = [], approvals = [], hasBrief = false, journal = [] }) {
   if (!state) return { tone: 'mute', title: 'Процес для проєкту не запущено', text: 'Запустіть процес, і агенти почнуть працювати за документом «Робочий процес клієнта».', action: 'start' };
   if (state.paused) return { tone: 'warn', title: 'Проєкт на паузі', text: state.paused_reason || 'Агенти нічого не роблять, доки ви не зніміть паузу.', action: 'resume' };
   const pending = approvals.filter((a) => a.status === 'pending').sort(byIdDesc)[0];
@@ -111,7 +111,14 @@ export function nowCard({ state, runs = [], approvals = [], hasBrief = false }) 
     if (!state.contracts_signed_at) need.push('підтвердити підписання договорів');
     if (need.length) return { tone: 'warn', title: 'Для старту потрібно', text: need.join('; ') + '.', action: 'dossier' };
   }
-  const open = runs.filter((r) => OPEN.has(r.status)).sort((a, b) => a.id - b.id)[0];
+  const openRuns = runs.filter((r) => OPEN.has(r.status)).sort((a, b) => a.id - b.id);
+  const open = openRuns.find((r) => r.status !== 'waiting') || null;
+  // everything that is open waits for a person: say what for, and where to do it (found by the end-to-end run: a waiting run used to be shown as «Працює»)
+  if (!open && openRuns.length) { const w = openRuns[0]; return { tone: 'warn', title: `Чекає: ${agentName(w.agent)} ${SKILL_LABEL[w.skill] || w.skill}`, text: w.error || 'Крок чекає на дані від людини.', action: 'tasks' }; }
+  // the process is stopped by the automatic check or by a skill that failed three times: nothing is running, so «усе виконано» would be a lie
+  const stop = journal.find((j) => ['check_failed', 'skill_stopped', 'launch_stopped'].includes(j.action));
+  const moved = journal.find((j) => j.action === 'stage');
+  if (!open && stop && (!moved || moved.id < stop.id)) return { tone: 'bad', title: 'Процес зупинено', text: stop.summary, action: 'tasks' };
   if (open) return { tone: 'info', title: `Зараз: ${agentName(open.agent)} ${SKILL_LABEL[open.skill] || open.skill}`, text: open.status === 'queued' ? 'У черзі на виконання.' : 'Працює.', action: 'dossier' };
   const failed = runs.filter((r) => r.status === 'failed').sort(byIdDesc)[0];
   if (failed && !runs.some((r) => r.agent === failed.agent && r.skill === failed.skill && r.id > failed.id)) return { tone: 'bad', title: `Помилка: ${agentName(failed.agent)}, ${SKILL_LABEL[failed.skill] || failed.skill}`, text: failed.error || 'Крок не вдався після повторних спроб.', action: 'dossier' };

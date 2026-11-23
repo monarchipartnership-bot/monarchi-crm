@@ -3,6 +3,7 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { MAX_FAILURES, recentFailures } from '../api/_lib/wf/machine.js';
 import { dueState, digest, filterCounts, filterTasks, groupTasks, hasDraft, isBlocker, parseEvidence, sourceLabel } from '../src/lib/workflow/tasks.js';
 import { REMIND_DAYS, buildFeedbackPrompt, checkFeedback, draftOf, nextPayment, onboardingChecklist, parseFeedbackAnswer, profitability, renderFeedbackText } from '../api/_lib/wf/skills/supportEngine.js';
 import { onboarding, paymentReminder, periodsOf, weeklyReport } from '../api/_lib/wf/skills/supportAgent.js';
@@ -1920,5 +1921,39 @@ await test('tasks (backend): a task remembers the skill that made it and its due
   await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'payment_reminder' }); await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'onboarding' }); await processTick(s.ctx);
   const pay = s.repo.T.tasks.find((x) => /оплату/.test(x.title)); assert.equal(pay.due_date, due); assert.equal(pay.created_by, 'support/payment_reminder'); assert.ok(pay.evidence.startsWith('Чернетка:\n')); assert.match(parseEvidence(pay.evidence).draft, /^Добрий день, Лоза!/);
   assert.equal(parseEvidence(s.repo.T.tasks.find((x) => /вітання/.test(x.title)).evidence).draft.startsWith('Добрий день, Лоза!'), true);
+});
+// ---------------------------------------------------------------- found by the end-to-end run: a skill that cannot succeed must not be started again for ever
+await test('machine: a skill that failed three times in a row since its last success is not started again; the journal says so once; a success or a manual run starts the count again', () => {
+  const base = { now: new Date('2026-11-23T10:00:00Z'), state: { stage: 2, paused: false }, sections: {} };
+  const run = (id, agent, skill, status) => ({ id, agent, skill, status, input: {} });
+  const enq = (a) => a.filter((x) => x.type === 'enqueue').map((x) => `${x.agent}/${x.skill}`);
+  const done = run(1, 'creator', 'first_creatives', 'done');
+  const f = (id) => run(id, 'strategist', 'strategy', 'failed');
+  assert.deepEqual(enq(planNext({ ...base, runs: [done, f(2), f(3)] })), ['strategist/strategy'], 'two failures: one more try');
+  const stopped = planNext({ ...base, runs: [done, f(2), f(3), f(4)] });
+  assert.deepEqual(enq(stopped), []); assert.ok(stopped.some((a) => a.action === 'skill_stopped' && a.once && a.meta.skill === 'strategist/strategy' && /3 рази поспіль/.test(a.summary)));
+  assert.equal(recentFailures([f(2), run(3, 'strategist', 'strategy', 'done'), f(4)], 'strategist', 'strategy'), 1, 'a success in between starts the count again');
+  assert.deepEqual(enq(planNext({ ...base, runs: [done, f(2), f(3), f(4), run(5, 'strategist', 'strategy', 'queued')] })), [], 'nothing new while a run is open');
+  assert.equal(MAX_FAILURES, 3);
+});
+// ---------------------------------------------------------------- found by the end-to-end run (scripts/check-e2e.mjs)
+await test('e2e finding: the audit keeps all four thresholds, so the automatic check accepts an audit made by the real skill (it used to keep two and the research of every client with a history stalled for ever)', () => {
+  const th = { breakeven_roas: 1.75, target_roas: 2.5, breakeven_cpa: 100, target_cpa: 70 };
+  const a = computeAudit(AUDIT_DATA, th);
+  assert.deepEqual(a.thresholds, th);
+  const r = compareNumbers({ brief: V({ economics: LELIOR }), unit_economy: UE_OF(LELIOR), audit: V({ ...a, currency: 'USD' }) });
+  assert.deepEqual(r.problems, [], 'what the audit skill really writes agrees with the Unit Economy');
+  assert.equal(computeAudit(AUDIT_DATA, null).thresholds, null);
+});
+await test('e2e finding: the card «Зараз» does not call a waiting run «працює» and does not say «усе виконано» when the process is stopped by the check or by a skill that failed three times', () => {
+  const state = { stage: 1, paused: false };
+  const wait = nowCard({ state, runs: [{ id: 3, agent: 'researcher', skill: 'competitors', status: 'waiting', error: 'У брифі не вказано сайти конкурентів.' }] });
+  assert.equal(wait.tone, 'warn'); assert.match(wait.title, /Чекає: Дослідник/); assert.equal(wait.text, 'У брифі не вказано сайти конкурентів.'); assert.equal(wait.action, 'tasks');
+  const working = nowCard({ state, runs: [{ id: 3, agent: 'researcher', skill: 'competitors', status: 'waiting' }, { id: 4, agent: 'researcher', skill: 'site', status: 'running' }] });
+  assert.equal(working.tone, 'info', 'while something works, the card says what works');
+  const stopped = nowCard({ state, runs: [{ id: 5, agent: 'researcher', skill: 'site', status: 'done' }], journal: [{ id: 9, action: 'check_failed', summary: 'Автоматична перевірка знайшла проблеми: бюджет.' }, { id: 4, action: 'stage', summary: 'Старт' }] });
+  assert.equal(stopped.tone, 'bad'); assert.equal(stopped.title, 'Процес зупинено'); assert.match(stopped.text, /бюджет/);
+  const moved = nowCard({ state, runs: [{ id: 5, agent: 'researcher', skill: 'site', status: 'done' }], journal: [{ id: 11, action: 'stage', summary: 'Дослідження завершено' }, { id: 9, action: 'check_failed', summary: 'x' }] });
+  assert.equal(moved.tone, 'ok', 'a stop that was followed by a stage change is old news');
 });
 console.log(`\n${passed} workflow checks passed`);

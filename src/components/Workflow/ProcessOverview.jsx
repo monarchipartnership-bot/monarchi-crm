@@ -23,7 +23,7 @@ export default function ProcessOverview({ projectId, onGo }) {
 
   const { state, runs, approvals, journal, sections } = data;
   const hasBrief = !!sections.find((s) => s.key === 'brief')?.current_version_id;
-  const now = nowCard({ state, runs, approvals, hasBrief });
+  const now = nowCard({ state, runs, approvals, hasBrief, journal });
   const pending = approvals.filter((a) => a.status === 'pending').sort((a, b) => b.id - a.id)[0];
   const signoff = signoffWanted(state, approvals);
   const decision = pending ? { kind: pending.kind, projectId, id: pending.id, subject: pending.subject || {} } : signoff ? { kind: 'client', projectId, id: null } : null;
@@ -34,8 +34,9 @@ export default function ProcessOverview({ projectId, onGo }) {
     decide: () => document.getElementById('wf-decision')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
     signoff: () => document.getElementById('wf-decision')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
     dossier: () => onGo?.('dossier'),
+    tasks: () => onGo?.('tasks'),
   }[now.action];
-  const actionLabel = { start: 'Запустити процес', resume: 'Зняти паузу', decide: 'Прийняти рішення', signoff: 'Записати відповідь клієнта', dossier: 'Відкрити Досьє' }[now.action];
+  const actionLabel = { start: 'Запустити процес', resume: 'Зняти паузу', decide: 'Прийняти рішення', signoff: 'Записати відповідь клієнта', tasks: 'Відкрити задачі', dossier: 'Відкрити Досьє' }[now.action];
 
   return (
     <div className="wf wf-page wf-grid">
