@@ -70,6 +70,17 @@ export function createMetaWriter({ token, fetchFn = fetch, graph = GRAPH } = {})
       const j = await call('GET', actId(accountId), { fields: 'name,account_status,currency,disable_reason,timezone_name' });
       return { name: j.name, status: Number(j.account_status), currency: j.currency, disable_reason: j.disable_reason ?? null, timezone: j.timezone_name || null };
     },
+    // WHY a write is refused: which permissions the token has (found by the pilot: the token read the cabinet but could not create a campaign in it)
+    async diagnose() {
+      const out = { permissions: [], hasManagement: false, who: null, error: null };
+      try {
+        const p = await call('GET', 'me/permissions');
+        out.permissions = (p.data || []).filter((x) => x.status === 'granted').map((x) => x.permission);
+        out.hasManagement = out.permissions.includes('ads_management');
+      } catch (e) { out.error = String(e.message || e).slice(0, 200); }
+      try { const m = await call('GET', 'me', { fields: 'id,name' }); out.who = m.name ? `${m.name} (${m.id})` : m.id || null; } catch { /* the name is only a hint */ }
+      return out;
+    },
     async createCampaign({ accountId, name, objective = 'OUTCOME_SALES', status = 'ACTIVE' }) {
       const j = await call('POST', `${actId(accountId)}/campaigns`, { name, objective, status, special_ad_categories: [], buying_type: 'AUCTION', is_adset_budget_sharing_enabled: false });
       return j.id;

@@ -2277,4 +2277,18 @@ await test('higgsfield: a Cyrillic idempotency key never reaches the HTTP header
   await hfImage.submit({ request: { path: 'm', body: {} }, key: 'ключ', env, fetchFn }); await hfImage.submit({ request: { path: 'm', body: {} }, key: 'ключ', env, fetchFn });
   assert.equal(sent[2]['Idempotency-Key'], sent[3]['Idempotency-Key'], 'the same key gives the same header: a repeat stays harmless');
 });
+// ---------------------------------------------------------------- found by the pilot: Meta refused to create a campaign (#100/33) and the manager did not know why
+await test('launch: when Meta refuses a write the error says WHY (token without ads_management, or the cabinet not assigned to the user of the token); the diagnosis calls only read endpoints', async () => {
+  const mk = (perms) => ({ ...laWriter(), createCampaign: async () => { const e = new Error('Meta: Unsupported post request (#100/33)'); e.metaCode = 100; throw e; }, diagnose: async () => perms });
+  const noRight = await laSetup({ writer: mk({ permissions: ['ads_read', 'business_management'], hasManagement: false, who: 'CRM (1)', error: null }) }); await processTick(noRight.ctx);
+  const e1 = noRight.repo.T.runs.find((r) => r.skill === 'launch').error;
+  assert.match(e1, /#100\/33/); assert.match(e1, /ads_read, business_management/); assert.match(e1, /Потрібне право ads_management/);
+  const hasRight = await laSetup({ writer: mk({ permissions: ['ads_read', 'ads_management'], hasManagement: true, who: 'CRM (1)', error: null }) }); await processTick(hasRight.ctx);
+  assert.match(hasRight.repo.T.runs.find((r) => r.skill === 'launch').error, /не призначено цей кабінет із правом керувати кампаніями/);
+  // the writer: the diagnosis reads /me/permissions and /me only
+  const seen = [];
+  const w = createMetaWriter({ token: 'TOKEN123', fetchFn: async (url, init) => { seen.push({ url: String(url), method: init?.method || 'GET' }); return new Response(JSON.stringify(String(url).includes('me/permissions') ? { data: [{ permission: 'ads_read', status: 'granted' }, { permission: 'ads_management', status: 'declined' }] } : { id: '1', name: 'CRM' }), { status: 200 }); } });
+  const d = await w.diagnose(); assert.deepEqual(d.permissions, ['ads_read']); assert.equal(d.hasManagement, false); assert.equal(d.who, 'CRM (1)');
+  assert.ok(seen.every((c) => c.method === 'GET'), 'nothing is written while diagnosing');
+});
 console.log(`\n${passed} workflow checks passed`);
