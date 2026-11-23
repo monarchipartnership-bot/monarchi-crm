@@ -4,15 +4,25 @@
 import { planNext } from './machine.js';
 import { monthStart, reached } from './limits.js';
 const GUARD = /may not replace/;
+const STOP_ACTIONS = new Set(['check_failed', 'skill_stopped', 'launch_stopped']);
+// a notice to the manager (Telegram); a failure to send never breaks the work
+async function tell(ctx, event) {
+  if (!ctx.notify) return;
+  try { await ctx.notify(event); } catch { /* the notice is lost, the work goes on */ }
+}
 
 async function applyActions(ctx, projectId, actions, stats) {
   const { repo } = ctx;
   for (const a of actions) {
     if (a.type === 'enqueue') { const row = await repo.enqueueRun({ project_id: projectId, agent: a.agent, skill: a.skill, input: a.input, priority: a.priority }); if (row) stats.enqueued += 1; }
-    else if (a.type === 'approval') { const row = await repo.createApproval(projectId, a.kind, a.subject); if (row) stats.approvals += 1; }
+    else if (a.type === 'approval') { const row = await repo.createApproval(projectId, a.kind, a.subject); if (row) { stats.approvals += 1; await tell(ctx, { kind: 'approval', projectId, approvalKind: a.kind }); } }
     else if (a.type === 'set_stage') await repo.setStage(projectId, a.stage);
     else if (a.type === 'section_status') await repo.setSectionStatus(projectId, a.key, a.status);
-    else if (a.type === 'journal') { const entry = { action: a.action, summary: a.summary, meta: a.meta }; if (a.once) await repo.journalOnce(projectId, entry); else await repo.journal(projectId, entry); }
+    else if (a.type === 'journal') {
+      const entry = { action: a.action, summary: a.summary, meta: a.meta };
+      if (a.once) { if ((await repo.journalOnce(projectId, entry)) !== false && STOP_ACTIONS.has(a.action)) await tell(ctx, { kind: 'stopped', projectId, summary: a.summary }); }
+      else await repo.journal(projectId, entry);
+    }
   }
 }
 
@@ -39,7 +49,8 @@ async function runOne(ctx, run, stats) {
   if (hit) {
     const cap = hit === 'project' ? (snap.state?.cost_cap_usd ?? settings.project_cap_default_usd) : settings.monthly_cap_usd;
     await repo.finishRun(run.id, { status: 'waiting', error: hit === 'project' ? `Досягнуто ліміт витрат проєкту ($${Number(cap).toFixed(2)}).` : `Досягнуто загальний ліміт витрат агентів на місяць ($${Number(cap).toFixed(2)}).`, state: { blocked_on: 'cost_cap', blocked_at: now().toISOString() } });
-    await repo.journalOnce(run.project_id, { action: 'cost_cap', subject: `${run.agent}/${run.skill}`, summary: hit === 'project' ? 'Прогін зупинено: ліміт витрат проєкту.' : 'Прогін зупинено: загальний ліміт витрат на місяць.' });
+    const written = await repo.journalOnce(run.project_id, { action: 'cost_cap', subject: `${run.agent}/${run.skill}`, summary: hit === 'project' ? 'Прогін зупинено: ліміт витрат проєкту.' : 'Прогін зупинено: загальний ліміт витрат на місяць.' });
+    if (written !== false) await tell(ctx, { kind: 'cost_cap', projectId: run.project_id, summary: hit === 'project' ? `ліміт проєкту $${Number(cap).toFixed(2)} на місяць` : `загальний ліміт $${Number(cap).toFixed(2)} на місяць` });
     stats.waiting += 1;
     return;
   }
@@ -69,7 +80,7 @@ async function runOne(ctx, run, stats) {
       return;
     }
     if (result.stateUpdate) await repo.setProjectFlag(run.project_id, result.stateUpdate);
-    for (const ap of result.approvals || []) await repo.createApproval(run.project_id, ap.kind, ap.subject, run.agent);
+    for (const ap of result.approvals || []) { const row = await repo.createApproval(run.project_id, ap.kind, ap.subject, run.agent); if (row) await tell(ctx, { kind: 'approval', projectId: run.project_id, approvalKind: ap.kind }); }
     await repo.addSteps(run.id, result.steps || []);
     await repo.finishRun(run.id, { status: 'done', output: result.output || null, costUsd: result.costUsd || 0 });
     await repo.journal(run.project_id, { actor_kind: 'agent', actor: run.agent, action: 'run_done', subject: run.skill, summary: `Готово: ${run.agent}/${run.skill}` });

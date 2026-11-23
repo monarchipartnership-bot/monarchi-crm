@@ -3,15 +3,21 @@
     "api/project-agent-run.js": { "maxDuration": 300 },
     "api/project-profile-extract.js": { "maxDuration": 60 },
     "api/kb-search.js": { "maxDuration": 60 },
-    "api/project-brand-analyze.js": { "maxDuration": 90 },
-    "api/agent-tick.js": { "maxDuration": 300, "includeFiles": "node_modules/@fontsource/onest/files/onest-{latin,latin-ext,cyrillic,cyrillic-ext}-{500,800}-normal.woff2" },
-    "api/wf-tick.js": { "maxDuration": 300 },
+    "api/project-brand-analyze.js": { "maxDuration": 90 },
+
+    "api/agent-tick.js": { "maxDuration": 300, "includeFiles": "node_modules/@fontsource/onest/files/onest-{latin,latin-ext,cyrillic,cyrillic-ext}-{500,800}-normal.woff2" },
+
+
+
+    "api/wf-tick.js": { "maxDuration": 300 },
+
     "api/project-month-refresh.js": { "maxDuration": 60 },
     "api/report-creatives.js": { "maxDuration": 60 },
     "api/meta-ads-insights.js": { "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/api/agent-tick", "schedule": "* * * * *" }
+    { "path": "/api/agent-tick", "schedule": "* * * * *" },
+    { "path": "/api/wf-digest", "schedule": "0 7 * * *" }
   ],
   "headers": [
     { "source": "/r/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "Referrer-Policy", "value": "no-referrer" }] }

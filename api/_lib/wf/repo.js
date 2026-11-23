@@ -156,8 +156,9 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
     // the same line twice in a row (same action and text) is written once: a problem that persists is not repeated on every pass
     async journalOnce(projectId, entry) {
       const last = must(await db.from('wf_journal').select('action, summary').eq('project_id', projectId).eq('action', entry.action).order('id', { ascending: false }).limit(1), 'journal');
-      if (last?.[0] && last[0].summary === (entry.summary || '')) return;
-      return this.journal(projectId, entry);
+      if (last?.[0] && last[0].summary === (entry.summary || '')) return false;
+      await this.journal(projectId, entry);
+      return true;
     },
     // the latest journal line of one kind (for example when the last advice to raise a budget was given)
     async lastJournal(projectId, action) {
@@ -167,13 +168,21 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
     // the settings of the whole system (one row): the global stop and the default limits. Without the row (the migration is not applied) nothing is stopped and the limits are the defaults.
     async readSettings() {
       const r = await db.from('wf_settings').select('*').eq('id', 1).maybeSingle();
-      if (r.error) return { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 };
-      return r.data || { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 };
+      if (r.error) return { stopped: false, monthly_cap_usd: 1000, project_cap_default_usd: 100 };
+      return r.data || { stopped: false, monthly_cap_usd: 1000, project_cap_default_usd: 100 };
     },
     // everything the agents spent since a moment, all projects together
     async totalCost(sinceIso) {
       const rows = must(await db.from('wf_runs').select('cost_usd').gte('created_at', sinceIso), 'cost') || [];
       return rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0);
+    },
+    // where the notices go: the chat chosen for the agent system, or the chat of the «Сповіщення» of AI Agents (its topic «потрібна увага»)
+    async readNotifyTarget() {
+      const own = String((await this.readSettings()).notify_telegram_chat || '').trim();
+      if (own) return { chatId: own };
+      const ai = (await db.from('ai_agent_settings').select('tg_chat_id, attention_thread_id').eq('id', 1).maybeSingle()).data;
+      const chatId = String(ai?.tg_chat_id || '').trim();
+      return chatId ? { chatId, threadId: ai.attention_thread_id || undefined } : null;
     },
     async projectCost(projectId, sinceIso) {
       const rows = must(await db.from('wf_runs').select('cost_usd').eq('project_id', projectId).gte('created_at', sinceIso), 'cost') || [];

@@ -3,6 +3,7 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { createNotifier, digestMessage, noticeOf } from '../api/_lib/wf/notify.js';
 import { buildOverview, digestText, filterRows, usage } from '../src/lib/workflow/overview.js';
 import { reached } from '../api/_lib/wf/limits.js';
 import { MAX_FAILURES, recentFailures } from '../api/_lib/wf/machine.js';
@@ -2098,5 +2099,73 @@ await test('guard: the columns of the settings that the code reads and writes ex
   const real = Object.keys(createWfRepo({})).sort();
   const twin = Object.keys(createMemoryWfRepo({ now })).sort();
   assert.deepEqual(real.filter((k) => !twin.includes(k)), [], 'every method of the real storage exists in the twin, so the tests exercise what production runs');
+});
+// ---------------------------------------------------------------- A11: notices and the digest in Telegram
+await test('notices: the text says who, what and where to go; names are escaped; the digest is a quiet message with a button', () => {
+  const a = noticeOf({ kind: 'approval', project: 'Меблі <Лоза>', approvalKind: 'strategy' });
+  assert.match(a.text, /^🟣 <b>Меблі &lt;Лоза&gt;<\/b>: чекає на вас Апрув 1\./); assert.equal(a.path, '/projects/approvals');
+  const s = noticeOf({ kind: 'stopped', project: 'TM BYME', summary: 'Стратегія не вдалася 3 рази поспіль.' });
+  assert.match(s.text, /^🔴 <b>TM BYME<\/b>: процес зупинено\.\nСтратегія/); assert.equal(s.path, '/projects/overview');
+  assert.match(noticeOf({ kind: 'cost_cap', project: 'X', summary: 'ліміт проєкту $100.00 на місяць' }).text, /^🟠 <b>X<\/b>: досягнуто ліміт витрат агентів \(ліміт проєкту \$100\.00 на місяць\)/);
+  const m = digestMessage({ chatId: '-100', threadId: 8 }, 'Доброго ранку <все>');
+  assert.deepEqual([m.chatId, m.threadId, m.silent, m.url], ['-100', 8, true, 'https://crm.monarchi.agency/projects/overview']); assert.equal(m.text, 'Доброго ранку &lt;все&gt;');
+});
+await test('notices: the orchestrator tells the manager once about a new approval, a stopped process and a reached limit; nothing without a chat; a failed send never breaks the work', async () => {
+  const sent = [];
+  const mk = async (target = { chatId: '-1', threadId: 8 }, fail = false) => {
+    const { repo, ctx } = await setup();
+    repo.T.notifyTarget = target; repo.setProjectInfo(1, { name: 'Проєкт А', client: 'Клієнт А' });
+    ctx.notify = createNotifier({ repo, send: async (m) => { sent.push(m); if (fail) throw new Error('network'); return { ok: true }; } });
+    return { repo, ctx };
+  };
+  // 1) a handler asks for a decision
+  let { repo, ctx } = await mk();
+  await repo.enqueueRun({ project_id: 1, agent: 'strategist', skill: 'strategy' });
+  ctx.handlers = { strategist: { strategy: async () => ({ approvals: [{ kind: 'strategy', subject: { x: 1 } }] }) } };
+  await processTick(ctx);
+  assert.equal(sent.filter((m) => /чекає на вас Апрув 1/.test(m.text)).length, 1, 'one notice for one approval');
+  assert.deepEqual([sent[0].chatId, sent[0].threadId], ['-1', 8]); assert.match(sent[0].text, /Клієнт А/);
+  await processTick(ctx);
+  assert.equal(sent.filter((m) => /Апрув 1/.test(m.text)).length, 1, 'the next pass does not repeat it');
+  // 2) a limit is reached
+  sent.length = 0;
+  ({ repo, ctx } = await mk());
+  repo.T.settings.project_cap_default_usd = 1;
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
+  repo.T.runs[0].cost_usd = 5;
+  await processTick(ctx); await processTick(ctx);
+  assert.equal(sent.filter((m) => /досягнуто ліміт/.test(m.text)).length, 1, 'the limit is told once');
+  // 3) no chat: nothing is sent, the work is done
+  sent.length = 0;
+  ({ repo, ctx } = await mk(null));
+  repo.T.settings.project_cap_default_usd = 1;
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' }); repo.T.runs[0].cost_usd = 5;
+  await processTick(ctx);
+  assert.equal(sent.length, 0); assert.ok(repo.T.runs.some((x) => x.status === 'waiting'));
+  // 4) the send fails: the pass still finishes
+  ({ repo, ctx } = await mk({ chatId: '-1' }, true));
+  repo.T.settings.project_cap_default_usd = 1;
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' }); repo.T.runs[0].cost_usd = 5;
+  const r = await processTick(ctx);
+  assert.equal(r.waiting, 1, 'the work went on although the notice could not be sent');
+});
+await test('notices: a stopped process (the skill failed three times) is told once', async () => {
+  const sent = [];
+  const { repo, ctx } = await setup();
+  repo.T.notifyTarget = { chatId: '-1' };
+  ctx.notify = createNotifier({ repo, send: async (m) => { sent.push(m); return { ok: true }; } });
+  await human(repo, 'brief');
+  ctx.handlers = { ...createHandlers(), researcher: { ...createHandlers().researcher, intake: async () => { throw new Error('boom'); } } };
+  for (let i = 0; i < 8; i += 1) { await processTick(ctx); advance(1000); }
+  const stops = sent.filter((m) => /процес зупинено/.test(m.text));
+  assert.ok(stops.length >= 1 && stops.length <= 2, 'told, and not on every pass');
+  assert.equal(new Set(stops.map((m) => m.text)).size, stops.length, 'no identical notice twice');
+});
+await test('digest endpoint and cron: the file exists, the cron is daily, the settings are read from the shared loader', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+  assert.ok(vercel.crons.some((c) => c.path === '/api/wf-digest' && /^0 \d+ \* \* \*$/.test(c.schedule)), 'one digest a day');
+  const code = fs.readFileSync(path.join(root, 'api/wf-digest.js'), 'utf8');
+  assert.match(code, /loadOverviewData/); assert.match(code, /no started projects/);
 });
 console.log(`\n${passed} workflow checks passed`);

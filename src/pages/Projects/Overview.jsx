@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchOverviewData, saveLimits, setGlobalStop, setProjectCap, setProjectPaused } from '../../lib/api/workflow';
+import { fetchOverviewData, saveLimits, sendDigestNow, setGlobalStop, setProjectCap, setProjectPaused } from '../../lib/api/workflow';
 import { FILTERS, KIND, buildOverview, digestText, filterRows, money, usage } from '../../lib/workflow/overview';
 import { STAGES } from '../../lib/workflow/view';
 import { Pill } from '../../components/Workflow/parts';
@@ -74,6 +74,7 @@ export default function Overview() {
   const [sel, setSel] = useState(null);
   const [busy, setBusy] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
+  const [sent, setSent] = useState(false);
   const [limits, setLimits] = useState(null); // { monthly, project } while the limits are edited
   const load = useCallback(async () => {
     try { setData(await fetchOverviewData()); setErr(''); } catch (e) { setErr(e.message || String(e)); }
@@ -133,8 +134,12 @@ export default function Overview() {
           </div>
         )}
         <details style={{ marginTop: 10 }}>
-          <summary className="wf-muted" style={{ cursor: 'pointer' }}>Щоденний дайджест (о 9:00, канал ще не обрано) · перегляд</summary>
+          <summary className="wf-muted" style={{ cursor: 'pointer' }}>Щоденний дайджест (щодня о 9:00 у Telegram) · перегляд</summary>
           <pre className="wf-ov-digest">{digestText(ov)}</pre>
+          <div className="wf-row" style={{ marginTop: 8 }}>
+            <button type="button" className="wf-btn sm" disabled={busy} onClick={go(async () => { await sendDigestNow(); setSent(true); })}>Надіслати дайджест зараз</button>
+            {sent && <span className="wf-muted" role="status">Надіслано в Telegram-чат сповіщень.</span>}
+          </div>
         </details>
       </div>
 

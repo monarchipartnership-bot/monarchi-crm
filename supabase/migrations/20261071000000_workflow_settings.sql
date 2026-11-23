@@ -8,8 +8,8 @@ create table if not exists public.wf_settings (
   stopped_reason text,
   stopped_by text,
   stopped_at timestamptz,
-  monthly_cap_usd numeric(10,2) not null default 60 check (monthly_cap_usd >= 0),
-  project_cap_default_usd numeric(10,2) not null default 10 check (project_cap_default_usd >= 0),
+  monthly_cap_usd numeric(10,2) not null default 1000 check (monthly_cap_usd >= 0),
+  project_cap_default_usd numeric(10,2) not null default 100 check (project_cap_default_usd >= 0),
   notify_telegram_chat text,
   updated_at timestamptz not null default now()
 );

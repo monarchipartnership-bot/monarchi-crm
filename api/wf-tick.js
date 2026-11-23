@@ -8,6 +8,8 @@ import { createRealHandlers } from './_lib/wf/agents.js';
 import { createWfRepo } from './_lib/wf/repo.js';
 import { createValidator } from './_lib/wf/check.js';
 import { processTick } from './_lib/wf/tick.js';
+import { createNotifier } from './_lib/wf/notify.js';
+import { hasToken, sendMessage } from './_lib/telegram.js';
 import { getModelClient } from './_lib/ai.js';
 import { createGa4Reader } from './_lib/ga4Client.js';
 import { createMetaWriter } from './_lib/metaAdsWrite.js';
@@ -39,7 +41,8 @@ export default async function handler(req, res) {
       return { text: r.text, costUsd: r.costUsd };
     } : null;
     const repo = createWfRepo(db);
-    const stats = await processTick({ repo, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader(), metaWrite: metaToken ? createMetaWriter({ token: metaToken }) : null });
+    const notify = hasToken() ? createNotifier({ repo, send: (m) => sendMessage(m) }) : null; // notices to the manager in Telegram
+    const stats = await processTick({ repo, notify, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader(), metaWrite: metaToken ? createMetaWriter({ token: metaToken }) : null });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);

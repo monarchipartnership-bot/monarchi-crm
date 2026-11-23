@@ -5,7 +5,7 @@ import { reached } from '../api/_lib/wf/limits.js';
 
 export function createMemoryWfRepo({ now = () => new Date() } = {}) {
   let seq = { run: 0, approval: 0, version: 0, section: 0 };
-  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [], tasks: [], accounts: new Map(), settings: { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 } };
+  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [], tasks: [], accounts: new Map(), settings: { stopped: false, monthly_cap_usd: 1000, project_cap_default_usd: 100 } };
   const iso = () => now().toISOString();
   const OPEN = ['queued', 'running', 'waiting'];
 
@@ -118,11 +118,13 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
     async journal(projectId, entry) { T.journal.push({ project_id: projectId, at: iso(), ...entry }); },
     async journalOnce(projectId, entry) {
       const last = [...T.journal].reverse().find((j) => j.project_id === projectId && j.action === entry.action);
-      if (last && last.summary === (entry.summary || '')) return;
-      return this.journal(projectId, entry);
+      if (last && last.summary === (entry.summary || '')) return false;
+      await this.journal(projectId, entry);
+      return true;
     },
     async lastJournal(projectId, action) { return [...T.journal].reverse().find((j) => j.project_id === projectId && j.action === action) || null; },
     async readSettings() { return T.settings; },
+    async readNotifyTarget() { return T.notifyTarget || null; },
     async withinLimits(projectId) {
       const since = new Date(Date.UTC(now().getUTCFullYear(), now().getUTCMonth(), 1)).toISOString();
       return !reached({ state: T.states.get(projectId), settings: T.settings, projectSpent: await this.projectCost(projectId, since), totalSpent: await this.totalCost(since) });
