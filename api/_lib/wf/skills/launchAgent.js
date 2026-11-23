@@ -5,6 +5,7 @@
 //     continues where it stopped and never creates a campaign twice
 // 4 · the «Знімок запуску» is written (status «done»), and the journal gets the entry
 // ctx.metaWrite is the writer (api/_lib/metaAdsWrite.js), ctx.meta the reader. Without the writer the run FAILS with a clear reason: nothing is changed anywhere.
+import { otherPlatformsNote } from './platforms.js';
 import { collectSiteData } from './siteData.js';
 import { buildPlan, checkLaunch, renderLaunchText, snapshotOf } from './launchEngine.js';
 
@@ -20,8 +21,9 @@ function restore(prev) {
 }
 
 export async function launch({ run, ctx }) {
-  const accounts = (await ctx.repo.listAdAccounts(run.project_id)).filter((a) => a.platform === 'meta');
-  if (!accounts.length) return { blocked: { on: 'accounts:meta', reason: 'До проєкту не підключено рекламний кабінет Meta: запускати нікуди.' }, tasks: [{ type: 'ads', owner: 'manager', priority: 'high', title: 'Підключити рекламний кабінет Meta до проєкту', evidence: 'Без кабінету запуск неможливий.' }], steps: [{ title: 'Кабінет Meta не підключено', status: 'info' }] };
+  const allAccounts = await ctx.repo.listAdAccounts(run.project_id);
+  const accounts = allAccounts.filter((a) => a.platform === 'meta');
+  if (!accounts.length) return { blocked: { on: 'accounts:meta', reason: 'До проєкту не підключено рекламний кабінет Meta: запускати нікуди.' + otherPlatformsNote(allAccounts) }, tasks: [{ type: 'ads', owner: 'manager', priority: 'high', title: 'Підключити рекламний кабінет Meta до проєкту', evidence: 'Без кабінету запуск неможливий.' + otherPlatformsNote(allAccounts) }], steps: [{ title: 'Кабінет Meta не підключено', status: 'info' }] };
   const account = accounts[0];
   const prevSec = (await ctx.repo.readSection(run.project_id, 'launch'))?.version?.content || null;
   if (prevSec?.status === 'done') return { output: { already_launched: true }, steps: [{ title: 'Запуск уже виконано раніше: нічого не створюється', status: 'info' }] };

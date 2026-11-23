@@ -1,11 +1,13 @@
 // The Researcher's skill «audit» (step A4; document 1.2): reads the Meta account (auditData.js), counts the audit against the thresholds of the Unit Economy
 // (auditEngine.js) and writes the section «Аудит кабінету». The audit is made only when the account holds data (the stage decides that, see intake.js).
+import { otherPlatformsNote } from './platforms.js';
 import { collectAuditData } from './auditData.js';
 import { computeAudit, renderAuditText } from './auditEngine.js';
 
 export async function audit({ run, ctx }) {
-  const accounts = (await ctx.repo.listAdAccounts(run.project_id)).filter((a) => a.platform === 'meta');
-  if (!accounts.length) return { blocked: { on: 'accounts:meta', reason: 'До проєкту не підключено рекламний кабінет Meta.' }, tasks: [{ type: 'ads', owner: 'manager', priority: 'high', title: 'Підключити рекламний кабінет Meta до проєкту', evidence: 'Без кабінету аудит неможливий.' }], steps: [{ title: 'Кабінет Meta не підключено', status: 'info' }] };
+  const allAccounts = await ctx.repo.listAdAccounts(run.project_id);
+  const accounts = allAccounts.filter((a) => a.platform === 'meta');
+  if (!accounts.length) return { blocked: { on: 'accounts:meta', reason: 'До проєкту не підключено рекламний кабінет Meta.' + otherPlatformsNote(allAccounts) }, tasks: [{ type: 'ads', owner: 'manager', priority: 'high', title: 'Підключити рекламний кабінет Meta до проєкту', evidence: 'Без кабінету аудит неможливий.' + otherPlatformsNote(allAccounts) }], steps: [{ title: 'Кабінет Meta не підключено', status: 'info' }] };
   if (!ctx.meta?.insights) throw new Error('Немає доступу до Meta: у змінних середовища Vercel не задано META_ACCESS_TOKEN.');
   // the thresholds of the Unit Economy: if that skill is still working, wait for it (the audit is judged against break-even); if it is itself waiting for the brief, go on without
   const snap = await ctx.repo.loadSnapshot(run.project_id);

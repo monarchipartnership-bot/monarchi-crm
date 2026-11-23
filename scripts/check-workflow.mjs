@@ -3,6 +3,7 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { otherPlatformsNote } from '../api/_lib/wf/skills/platforms.js';
 import { createNotifier, digestMessage, noticeOf } from '../api/_lib/wf/notify.js';
 import { buildOverview, digestText, filterRows, usage } from '../src/lib/workflow/overview.js';
 import { reached } from '../api/_lib/wf/limits.js';
@@ -2167,5 +2168,19 @@ await test('digest endpoint and cron: the file exists, the cron is daily, the se
   assert.ok(vercel.crons.some((c) => c.path === '/api/wf-digest' && /^0 \d+ \* \* \*$/.test(c.schedule)), 'one digest a day');
   const code = fs.readFileSync(path.join(root, 'api/wf-digest.js'), 'utf8');
   assert.match(code, /loadOverviewData/); assert.match(code, /no started projects/);
+});
+// ---------------------------------------------------------------- A13 guard: a project with cabinets of other platforms does not wait in silence
+await test('platforms: a project with only Google or TikTok cabinets is told plainly that the agents work with Meta only; with a Meta cabinet nothing changes', async () => {
+  assert.equal(otherPlatformsNote([]), ''); assert.equal(otherPlatformsNote([{ platform: 'meta' }]), '');
+  assert.match(otherPlatformsNote([{ platform: 'google' }, { platform: 'tiktok' }, { platform: 'google' }]), /кабінети Google, TikTok, але автоматизації для них ще немає/);
+  const { repo, ctx } = await setup();
+  repo.addAccount(1, { platform: 'google', account_id: '555' });
+  for (const [fn, skill] of [[intake, 'intake'], [audit, 'audit'], [launch, 'launch']]) {
+    const r = await fn({ run: { id: 1, project_id: 1, agent: 'x', skill }, ctx });
+    assert.equal(r.blocked.on, 'accounts:meta'); assert.match(r.blocked.reason, /Google, але автоматизації/); assert.match(r.tasks[0].evidence, /Google/);
+  }
+  const { repo: r2, ctx: c2 } = await setup();
+  const plain = await intake({ run: { id: 1, project_id: 1, agent: 'x', skill: 'intake' }, ctx: c2 });
+  assert.ok(!/Google|TikTok/.test(plain.blocked.reason), 'no other platforms: the old plain reason');
 });
 console.log(`\n${passed} workflow checks passed`);

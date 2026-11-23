@@ -2,6 +2,7 @@
 // It looks at the Meta ad account linked to the project: was money ever spent there? The answer (has_data) decides whether the audit is made.
 // No account linked: the run waits and a task asks the manager to link it (it wakes up when an account appears).
 // ctx.meta = { insights({ accountId, level, datePreset, timeRange }) } is the Meta reader (api/_lib/metaAdsData.js); the tests give a fake one.
+import { otherPlatformsNote } from './platforms.js';
 
 // rows of the lifetime insights → { spend, impressions, purchases, from, to }
 export function summarizeLifetime(rows = []) {
@@ -12,11 +13,12 @@ export function summarizeLifetime(rows = []) {
 }
 
 export async function intake({ run, ctx }) {
-  const accounts = (await ctx.repo.listAdAccounts(run.project_id)).filter((a) => a.platform === 'meta');
+  const allAccounts = await ctx.repo.listAdAccounts(run.project_id);
+  const accounts = allAccounts.filter((a) => a.platform === 'meta');
   if (!accounts.length) {
     return {
-      blocked: { on: 'accounts:meta', reason: 'До проєкту не підключено рекламний кабінет Meta.' },
-      tasks: [{ type: 'ads', owner: 'manager', priority: 'high', title: 'Підключити рекламний кабінет Meta до проєкту', evidence: 'Без кабінету не можна перевірити, чи є дані для аудиту. Підключіть кабінет у картці проєкту (Інформація про проєкт, кабінети).' }],
+      blocked: { on: 'accounts:meta', reason: 'До проєкту не підключено рекламний кабінет Meta.' + otherPlatformsNote(allAccounts) },
+      tasks: [{ type: 'ads', owner: 'manager', priority: 'high', title: 'Підключити рекламний кабінет Meta до проєкту', evidence: 'Без кабінету не можна перевірити, чи є дані для аудиту. Підключіть кабінет у картці проєкту (Інформація про проєкт, кабінети).' + otherPlatformsNote(allAccounts) }],
       steps: [{ title: 'Кабінет Meta не підключено: перевірку відкладено', status: 'info' }],
     };
   }
