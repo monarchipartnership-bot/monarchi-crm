@@ -1,5 +1,7 @@
 // The storage of the orchestrator on the real database (the wf_* tables). The orchestrator talks to this interface only, so the tests run it on an
 // in-memory twin (scripts/wfMemoryRepo.mjs) that obeys the same rules. `db` is a signed-in Supabase client.
+import { monthStart, reached } from './limits.js';
+
 const UNIQUE = '23505';
 const must = (r, what) => { if (r.error) throw new Error(`${what}: ${r.error.message}`); return r.data; };
 const iso = (d) => d.toISOString();
@@ -45,7 +47,7 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       return must(await db.rpc('wf_claim_runs', { p_limit: limit, p_lease_minutes: leaseMinutes }), 'claim') || [];
     },
     async finishRun(id, { status, output = null, error = null, costUsd = 0, state = null }) {
-      const patch = { status, output, error, cost_usd: costUsd, finished_at: ['done', 'failed', 'cancelled'].includes(status) ? iso(now()) : null, lease_until: null };
+      const patch = { status, output, error, ...(costUsd ? { cost_usd: costUsd } : {}), finished_at: ['done', 'failed', 'cancelled'].includes(status) ? iso(now()) : null, lease_until: null };
       if (state) patch.state = state;
       must(await db.from('wf_runs').update(patch).eq('id', id), 'finish run');
     },
@@ -114,7 +116,9 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       let resumed = 0;
       for (const r of waiting) {
         const key = r.state?.blocked_on; if (!key) continue;
-        const woke = key === 'launch_fix' // the check before the launch is repeated every half hour: the pixel may have started to fire, the site may be back
+        const woke = key === 'cost_cap' // stopped by a limit: goes on when the numbers allow (the limit was raised, or a new month began)
+          ? await this.withinLimits(projectId)
+          : key === 'launch_fix' // the check before the launch is repeated every half hour: the pixel may have started to fire, the site may be back
           ? !!r.state?.blocked_at && (now() - new Date(r.state.blocked_at)) >= 30 * 60000
           : key === 'site_url' // the run waits for the website to be written in the project card
           ? !!String((await this.readProject(projectId))?.website || '').trim()
@@ -129,6 +133,11 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
         }
       }
       return resumed;
+    },
+    async withinLimits(projectId) {
+      const since = monthStart(now());
+      const [state, settings] = [must(await db.from('wf_project_state').select('cost_cap_usd').eq('project_id', projectId).maybeSingle(), 'state'), await this.readSettings()];
+      return !reached({ state, settings, projectSpent: await this.projectCost(projectId, since), totalSpent: await this.totalCost(since) });
     },
     async setSectionStatus(projectId, key, status) {
       const sec = await sectionRow(projectId, key);
@@ -154,6 +163,17 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
     async lastJournal(projectId, action) {
       const r = must(await db.from('wf_journal').select('at, summary, meta').eq('project_id', projectId).eq('action', action).order('id', { ascending: false }).limit(1), 'journal');
       return r?.[0] || null;
+    },
+    // the settings of the whole system (one row): the global stop and the default limits. Without the row (the migration is not applied) nothing is stopped and the limits are the defaults.
+    async readSettings() {
+      const r = await db.from('wf_settings').select('*').eq('id', 1).maybeSingle();
+      if (r.error) return { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 };
+      return r.data || { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 };
+    },
+    // everything the agents spent since a moment, all projects together
+    async totalCost(sinceIso) {
+      const rows = must(await db.from('wf_runs').select('cost_usd').gte('created_at', sinceIso), 'cost') || [];
+      return rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0);
     },
     async projectCost(projectId, sinceIso) {
       const rows = must(await db.from('wf_runs').select('cost_usd').eq('project_id', projectId).gte('created_at', sinceIso), 'cost') || [];

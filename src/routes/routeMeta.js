@@ -41,6 +41,13 @@ export const ROUTE_META = {
     pageIcon: PAGE_ICONS['page.projects'].src,
     infoLabel: 'Про розділ',
   },
+  '/projects/overview': {
+    title: 'Огляд проєктів',
+    desc: 'Усі запущені проєкти агентів: на якому етапі, хто чекає, скільки витрачено проти ліміту, аварійна зупинка.',
+    trail: [{ label: 'Project Managers Department' }, { label: 'Огляд проєктів' }],
+    pageIcon: PAGE_ICONS['page.projects-dashboard'].src,
+    infoLabel: 'Про розділ',
+  },
   '/projects/approvals': {
     title: 'Апруви',
     desc: 'Рішення, що чекають на менеджера: стратегія і перші креативи, підпис клієнта, запуск, великі зміни.',

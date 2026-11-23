@@ -21,6 +21,7 @@ import Projects from './pages/Projects/Projects';
 import ProjectsDashboard from './pages/Projects/Dashboard';
 import ProjectDetail from './pages/Projects/ProjectDetail';
 import Approvals from './pages/Projects/Approvals';
+import Overview from './pages/Projects/Overview';
 import ProjectReportsPage from './pages/Projects/Reports/ProjectReportsPage';
 import TeamCalendar from './pages/Team/TeamCalendar';
 import TeamAccounts from './pages/Team/TeamAccounts';
@@ -70,6 +71,7 @@ function AuthGate() {
         <Route path="/reports/deal-tasks" element={<DealTasksPage />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/dashboard" element={<ProjectsDashboard />} />
+        <Route path="/projects/overview" element={<Overview />} /> {/* «Огляд проєктів»: all started projects, who waits, spend against the limit, the emergency stop */}
         <Route path="/projects/approvals" element={<Approvals />} /> {/* «Апруви»: the decisions of the new agent system that wait for a manager */}
         <Route path="/projects/reports/daily" element={<Navigate to="/projects/reports/period" replace />} />
         <Route path="/projects/reports/period" element={<ProjectReportsPage mode="period" />} />

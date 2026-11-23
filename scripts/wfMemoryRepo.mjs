@@ -1,9 +1,11 @@
 // An in-memory twin of api/_lib/wf/repo.js for the tests. It obeys the same rules as the database (migrations 20261068 and 20261069):
 // the status moves of a section when a version is written, the rule that an agent never replaces a human or approved version, one open run per
 // project+agent+skill, one pending strategy or launch approval, the lease of a claimed run and the pause of a project.
+import { reached } from '../api/_lib/wf/limits.js';
+
 export function createMemoryWfRepo({ now = () => new Date() } = {}) {
   let seq = { run: 0, approval: 0, version: 0, section: 0 };
-  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [], tasks: [], accounts: new Map() };
+  const T = { states: new Map(), sections: [], versions: [], runs: [], steps: [], approvals: [], journal: [], tasks: [], accounts: new Map(), settings: { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 } };
   const iso = () => now().toISOString();
   const OPEN = ['queued', 'running', 'waiting'];
 
@@ -47,7 +49,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
     },
     async finishRun(id, { status, output = null, error = null, costUsd = 0, state = null }) {
       const r = T.runs.find((x) => x.id === id);
-      Object.assign(r, { status, output, error, cost_usd: costUsd, finished_at: ['done', 'failed', 'cancelled'].includes(status) ? iso() : null, lease_until: null });
+      Object.assign(r, { status, output, error, ...(costUsd ? { cost_usd: costUsd } : {}), finished_at: ['done', 'failed', 'cancelled'].includes(status) ? iso() : null, lease_until: null });
       if (state) r.state = state;
     },
     async addSteps(runId, steps) { (steps || []).forEach((s, i) => T.steps.push({ run_id: runId, n: s.n ?? i + 1, title: s.title, status: s.status || 'done', detail: s.detail || {} })); },
@@ -99,7 +101,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
         const key = r.state?.blocked_on; if (!key) continue;
         const isAcc = key.startsWith('accounts:');
         const sec = isAcc ? null : await this.readSection(projectId, key);
-        const woke = key === 'launch_fix' ? !!r.state?.blocked_at && (now() - new Date(r.state.blocked_at)) >= 30 * 60000 : key === 'site_url' ? !!String(T.websites?.get(projectId) || '').trim() : isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : ['unit_economy', 'audit', 'site', 'audience', 'competitors'].includes(key) ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
+        const woke = key === 'cost_cap' ? await this.withinLimits(projectId) : key === 'launch_fix' ? !!r.state?.blocked_at && (now() - new Date(r.state.blocked_at)) >= 30 * 60000 : key === 'site_url' ? !!String(T.websites?.get(projectId) || '').trim() : isAcc ? (T.accounts.get(projectId) || []).some((a) => a.platform === key.split(':')[1]) : ['unit_economy', 'audit', 'site', 'audience', 'competitors'].includes(key) ? (await this.readSection(projectId, key))?.version != null || !T.runs.some((x) => x.project_id === projectId && x.agent === 'researcher' && x.skill === key && ['queued', 'running'].includes(x.status)) : !!(sec?.version && r.state?.blocked_at && new Date(sec.version.created_at) > new Date(r.state.blocked_at));
         if (woke) { Object.assign(r, { status: 'queued', attempt: 0, lease_until: null, error: null }); resumed += 1; }
       }
       return resumed;
@@ -120,6 +122,12 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       return this.journal(projectId, entry);
     },
     async lastJournal(projectId, action) { return [...T.journal].reverse().find((j) => j.project_id === projectId && j.action === action) || null; },
+    async readSettings() { return T.settings; },
+    async withinLimits(projectId) {
+      const since = new Date(Date.UTC(now().getUTCFullYear(), now().getUTCMonth(), 1)).toISOString();
+      return !reached({ state: T.states.get(projectId), settings: T.settings, projectSpent: await this.projectCost(projectId, since), totalSpent: await this.totalCost(since) });
+    },
+    async totalCost(sinceIso) { return T.runs.filter((r) => r.created_at >= sinceIso).reduce((s, r) => s + Number(r.cost_usd || 0), 0); },
     async projectCost(projectId, sinceIso) { return T.runs.filter((r) => r.project_id === projectId && r.created_at >= sinceIso).reduce((s, r) => s + Number(r.cost_usd || 0), 0); },
     // helpers of the tests: what a person does in the CRM
     decide(approvalId, status, comment = null, by = 'manager@test') {

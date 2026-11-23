@@ -2,8 +2,7 @@
 // so that a finished run leads to the next step at once. The cron calls it about once a minute; a person's button can call it too.
 // ctx = { repo, handlers, now?, validate?, config? }.  repo: createWfRepo(db) or the in-memory twin; handlers: createHandlers(...)
 import { planNext } from './machine.js';
-
-const monthStart = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
+import { monthStart, reached } from './limits.js';
 const GUARD = /may not replace/;
 
 async function applyActions(ctx, projectId, actions, stats) {
@@ -33,10 +32,14 @@ async function runOne(ctx, run, stats) {
   const { repo, handlers } = ctx;
   const now = ctx.now || (() => new Date());
   const snap = await repo.loadSnapshot(run.project_id);
-  const cap = snap.state?.cost_cap_usd;
-  if (cap != null && (await repo.projectCost(run.project_id, monthStart(now()))) >= Number(cap)) {
-    await repo.finishRun(run.id, { status: 'waiting', error: `Досягнуто ліміт витрат проєкту ($${Number(cap).toFixed(2)}).` });
-    await repo.journal(run.project_id, { action: 'cost_cap', subject: `${run.agent}/${run.skill}`, summary: 'Прогін зупинено: ліміт витрат проєкту.' });
+  // the limit of the project (its own, or the default of the system) and the limit of everything together, both for this month
+  const settings = (await repo.readSettings?.()) || {};
+  const since = monthStart(now());
+  const hit = reached({ state: snap.state, settings, projectSpent: await repo.projectCost(run.project_id, since), totalSpent: (await repo.totalCost?.(since)) || 0 });
+  if (hit) {
+    const cap = hit === 'project' ? (snap.state?.cost_cap_usd ?? settings.project_cap_default_usd) : settings.monthly_cap_usd;
+    await repo.finishRun(run.id, { status: 'waiting', error: hit === 'project' ? `Досягнуто ліміт витрат проєкту ($${Number(cap).toFixed(2)}).` : `Досягнуто загальний ліміт витрат агентів на місяць ($${Number(cap).toFixed(2)}).`, state: { blocked_on: 'cost_cap', blocked_at: now().toISOString() } });
+    await repo.journalOnce(run.project_id, { action: 'cost_cap', subject: `${run.agent}/${run.skill}`, summary: hit === 'project' ? 'Прогін зупинено: ліміт витрат проєкту.' : 'Прогін зупинено: загальний ліміт витрат на місяць.' });
     stats.waiting += 1;
     return;
   }
@@ -60,7 +63,7 @@ async function runOne(ctx, run, stats) {
     for (const t of result.tasks || []) if (repo.addTask) await repo.addTask(run.project_id, { created_by: `${run.agent}/${run.skill}`, ...t });
     if (result.blocked) { // the run cannot go on without something from a person: it waits, a task says what is needed, and a new version of the section wakes it up
       await repo.addSteps(run.id, result.steps || []);
-      await repo.finishRun(run.id, { status: 'waiting', error: result.blocked.reason || null, state: { blocked_on: result.blocked.on, blocked_at: (ctx.now ? ctx.now() : new Date()).toISOString() } });
+      await repo.finishRun(run.id, { status: 'waiting', error: result.blocked.reason || null, costUsd: result.costUsd || 0, state: { blocked_on: result.blocked.on, blocked_at: (ctx.now ? ctx.now() : new Date()).toISOString() } });
       await repo.journalOnce(run.project_id, { actor_kind: 'agent', actor: run.agent, action: 'blocked', subject: run.skill, summary: result.blocked.reason || 'Крок чекає на дані від людини.' });
       stats.waiting += 1;
       return;
@@ -80,6 +83,8 @@ async function runOne(ctx, run, stats) {
 
 export async function processTick(ctx, { limit = 3, leaseMinutes = 10 } = {}) {
   const stats = { enqueued: 0, approvals: 0, claimed: 0, done: 0, failed: 0, waiting: 0 };
+  // the emergency stop: nothing is planned, nothing is taken, nothing is written anywhere while it is on
+  if ((await ctx.repo.readSettings?.())?.stopped) return { ...stats, stopped: true };
   const projects = await ctx.repo.listActiveProjects();
   for (const id of projects) await planProject(ctx, id, stats);
   const runs = await ctx.repo.claimRuns(limit, leaseMinutes);

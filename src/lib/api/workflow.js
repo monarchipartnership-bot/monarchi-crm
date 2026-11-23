@@ -162,3 +162,53 @@ export async function createTask(projectId, { title, type = 'client', owner = 'm
   const row = { project_id: projectId, type, title: String(title).trim(), owner, priority, evidence: String(evidence).trim() || null, created_by_kind: 'human', created_by: email || 'manager', due_date: /^\d{4}-\d{2}-\d{2}$/.test(due_date || '') ? due_date : null };
   return must(await supabase.from('wf_tasks').insert(row).select().single(), 'task');
 }
+
+// ----------------------------------------------------------------------- the overview of all projects (step A11)
+const DEFAULT_SETTINGS = { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 };
+const monthsBack = () => { const d = new Date(); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)).toISOString(); }; // two months are enough: the card needs the recent runs, the spend needs this month
+export async function fetchOverviewData() {
+  const [states, projects, runs, approvals, tasks, journalRows, briefs, settings] = await Promise.all([
+    supabase.from('wf_project_state').select('*'),
+    supabase.from('projects').select('id, name, client'),
+    supabase.from('wf_runs').select('id, project_id, agent, skill, status, error, cost_usd, state, created_at, finished_at').gte('created_at', monthsBack()).order('id', { ascending: false }).limit(4000),
+    supabase.from('wf_approvals').select('id, project_id, kind, status, requested_at, decided_at, subject').order('id', { ascending: false }).limit(800),
+    supabase.from('wf_tasks').select('id, project_id, owner, status').in('status', ['proposed', 'approved', 'in_progress']).limit(2000),
+    supabase.from('wf_journal').select('id, project_id, at, action, summary').in('action', ['check_failed', 'skill_stopped', 'launch_stopped', 'stage', 'cost_cap']).order('id', { ascending: false }).limit(800),
+    supabase.from('wf_sections').select('project_id').eq('key', 'brief').not('current_version_id', 'is', null),
+    supabase.from('wf_settings').select('*').eq('id', 1).maybeSingle(),
+  ]);
+  const byId = {};
+  for (const p of must(projects, 'projects') || []) byId[p.id] = { name: p.client || p.name };
+  return {
+    projects: byId, states: must(states, 'states') || [], runs: must(runs, 'runs') || [], approvals: must(approvals, 'approvals') || [], tasks: must(tasks, 'tasks') || [],
+    journal: must(journalRows, 'journal') || [], briefs: (must(briefs, 'briefs') || []).map((b) => b.project_id),
+    // without the table (the migration is not applied yet) the page still works; only the stop and the limits cannot be changed
+    settings: settings.error ? { ...DEFAULT_SETTINGS, missing: true } : { ...DEFAULT_SETTINGS, ...(settings.data || {}) },
+  };
+}
+// the emergency stop of ALL agents: the orchestrator reads it first on every pass
+export async function setGlobalStop(on, email, reason = '') {
+  const patch = { stopped: !!on, stopped_reason: on ? String(reason).trim() || null : null, stopped_by: email || 'manager', stopped_at: nowIso(), updated_at: nowIso() };
+  const r = await supabase.from('wf_settings').update(patch).eq('id', 1).select('id');
+  if (r.error) throw new Error('settings: ' + r.error.message);
+  if (!r.data?.length) throw new Error('Налаштування системи не знайдено: застосуйте міграцію 20261071.');
+}
+export async function saveLimits({ monthly_cap_usd, project_cap_default_usd }) {
+  const m = Number(monthly_cap_usd), p = Number(project_cap_default_usd);
+  if (!Number.isFinite(m) || m < 0 || !Number.isFinite(p) || p < 0) throw new Error('Ліміт це число від 0 доларів.');
+  const r = await supabase.from('wf_settings').update({ monthly_cap_usd: m, project_cap_default_usd: p, updated_at: nowIso() }).eq('id', 1).select('id');
+  if (r.error) throw new Error('settings: ' + r.error.message);
+  if (!r.data?.length) throw new Error('Налаштування системи не знайдено: застосуйте міграцію 20261071.');
+}
+export async function setProjectPaused(projectId, paused, email) {
+  must(await supabase.from('wf_project_state').update({ paused, paused_reason: paused ? 'Поставлено на паузу з огляду проєктів.' : null, updated_at: nowIso() }).eq('project_id', projectId), 'state');
+  await journal(projectId, email, { action: paused ? 'pause' : 'resume', summary: paused ? 'Проєкт поставлено на паузу.' : 'Паузу знято.' });
+}
+// the own limit of one project (empty = the default of the system)
+export async function setProjectCap(projectId, cap, email) {
+  const empty = cap === '' || cap == null;
+  const n = Number(cap);
+  if (!empty && (!Number.isFinite(n) || n < 0)) throw new Error('Ліміт це число від 0 доларів.');
+  must(await supabase.from('wf_project_state').update({ cost_cap_usd: empty ? null : n, updated_at: nowIso() }).eq('project_id', projectId), 'state');
+  await journal(projectId, email, { action: 'cost_cap_set', summary: empty ? 'Власний ліміт витрат прибрано: діє загальний.' : `Ліміт витрат агентів проєкту: $${n.toFixed(2)} на місяць.` });
+}

@@ -204,3 +204,25 @@
 .wf-ev { background:var(--wf-bg); border-radius:12px; padding:10px 12px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; box-shadow:0 0 0 1px var(--wf-line); }
 .wf-ev.draft { background:var(--wf-info-bg); }
 .wf-blockers { border-radius:18px; box-shadow:0 0 0 2px var(--wf-bad), 0 0 0 6px var(--wf-bad-bg); background:var(--wf-surface); padding:14px 16px; display:grid; gap:10px; min-width:0; }
+/* the overview of all projects (step A11, concept A «Пульт») */
+.wf-ov-glob { display:grid; gap:12px; }
+.wf-ov-stopbar { background:var(--wf-bad); color:#fff; border-radius:14px; padding:10px 14px; font-weight:600; display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+.wf-ov-nums { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+.wf-ov-num { border-radius:14px; background:var(--wf-bg); box-shadow:0 0 0 1px var(--wf-border); padding:10px 12px; display:grid; gap:2px; align-content:start; min-width:0; }
+.wf-ov-num b { font-size:22px; line-height:1.1; } .wf-ov-num span { color:var(--wf-muted); font-size:12px; }
+.wf-ov-num.hot { box-shadow:0 0 0 2px var(--wf-orchid), 0 0 0 5px var(--wf-halo); }
+.wf-ov-num .wf-ov-warn { color:var(--wf-bad); font-weight:600; }
+.wf-ov-digest { white-space:pre-wrap; background:var(--wf-bg); border-radius:12px; padding:10px 12px; box-shadow:0 0 0 1px var(--wf-line); font:inherit; font-size:13px; margin:8px 0 0; overflow-wrap:anywhere; }
+.wf-bar { height:8px; border-radius:6px; background:var(--wf-soft); overflow:hidden; margin-top:4px; } .wf-bar i { display:block; height:100%; background:var(--wf-grad); } .wf-bar.hot i { background:var(--wf-bad); }
+.wf-fb { border:0; font:inherit; font-weight:600; font-size:12.5px; height:28px; padding:0 12px; border-radius:999px; background:var(--wf-surface); color:var(--wf-text); box-shadow:0 0 0 1px var(--wf-border); cursor:pointer; }
+.wf-fb[aria-pressed="true"] { background:var(--wf-soft); color:var(--wf-plum); box-shadow:0 0 0 2px var(--wf-orchid); }
+.wf-fb:focus-visible, .wf-ov-strip:focus-visible { outline:2px solid var(--wf-orchid); outline-offset:2px; }
+.wf-ov-list { display:grid; gap:8px; }
+.wf-ov-strip { display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(220px,1.6fr) minmax(150px,1fr) minmax(120px,.8fr); gap:14px; align-items:center; padding:12px 14px; border-radius:16px; background:var(--wf-surface); box-shadow:0 0 0 1px var(--wf-border); cursor:pointer; text-align:left; font:inherit; color:inherit; border:0; width:100%; }
+.wf-ov-strip[aria-pressed="true"] { box-shadow:0 0 0 2px var(--wf-orchid), 0 0 0 6px var(--wf-halo); }
+@media (max-width:860px) { .wf-ov-strip { grid-template-columns:minmax(0,1fr); } }
+.wf-ov-drawer { margin-top:12px; box-shadow:0 0 0 2px var(--wf-orchid), 0 0 0 6px var(--wf-halo); }
+.wf-pipe { display:flex; align-items:center; } .wf-pipe-i { display:flex; align-items:center; }
+.wf-pipe .s { width:22px; height:22px; border-radius:50%; background:var(--wf-soft); color:var(--wf-muted); display:grid; place-items:center; font-size:11px; font-weight:700; flex:none; }
+.wf-pipe .s.done { background:var(--wf-ok-bg); color:var(--wf-ok); } .wf-pipe .s.cur { background:var(--wf-grad); color:#fff; box-shadow:0 0 0 4px var(--wf-halo); } .wf-pipe .s.cur.bad { background:var(--wf-bad); box-shadow:0 0 0 4px var(--wf-bad-bg); }
+.wf-pipe .l { height:2px; width:14px; background:var(--wf-border); flex:none; } .wf-pipe .l.done { background:var(--wf-ok); }

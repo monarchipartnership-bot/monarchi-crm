@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { buildOverview, digestText, filterRows, usage } from '../src/lib/workflow/overview.js';
+import { reached } from '../api/_lib/wf/limits.js';
 import { MAX_FAILURES, recentFailures } from '../api/_lib/wf/machine.js';
 import { dueState, digest, filterCounts, filterTasks, groupTasks, hasDraft, isBlocker, parseEvidence, sourceLabel } from '../src/lib/workflow/tasks.js';
 import { REMIND_DAYS, buildFeedbackPrompt, checkFeedback, draftOf, nextPayment, onboardingChecklist, parseFeedbackAnswer, profitability, renderFeedbackText } from '../api/_lib/wf/skills/supportEngine.js';
@@ -1955,5 +1957,146 @@ await test('e2e finding: the card «Зараз» does not call a waiting run «�
   assert.equal(stopped.tone, 'bad'); assert.equal(stopped.title, 'Процес зупинено'); assert.match(stopped.text, /бюджет/);
   const moved = nowCard({ state, runs: [{ id: 5, agent: 'researcher', skill: 'site', status: 'done' }], journal: [{ id: 11, action: 'stage', summary: 'Дослідження завершено' }, { id: 9, action: 'check_failed', summary: 'x' }] });
   assert.equal(moved.tone, 'ok', 'a stop that was followed by a stage change is old news');
+});
+// ---------------------------------------------------------------- A11: the overview of all projects, the global stop and the limits
+await test('stop: while the global stop is on, a pass plans nothing, takes nothing and writes nothing; when it is off the work goes on', async () => {
+  const { repo, ctx } = await setup();
+  await human(repo, 'brief');
+  repo.T.settings.stopped = true;
+  const r = await processTick(ctx);
+  assert.equal(r.stopped, true);
+  assert.deepEqual([r.enqueued, r.claimed, r.done], [0, 0, 0]);
+  assert.equal(repo.T.runs.length, 0); assert.equal(repo.T.journal.length, 0);
+  repo.T.settings.stopped = false;
+  const r2 = await processTick(ctx);
+  assert.ok(!r2.stopped && r2.enqueued > 0, 'after the stop is lifted the agents work again');
+});
+await test('limits: the default limit of the system works for a project without its own; the stopped run says why and wakes when the limit is raised', async () => {
+  const { repo, ctx } = await setup();
+  await human(repo, 'brief');
+  repo.T.settings.project_cap_default_usd = 1;
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
+  repo.T.runs[0].cost_usd = 5;
+  await processTick(ctx);
+  const stopped = repo.T.runs.find((x) => x.status === 'waiting');
+  assert.ok(stopped && /ліміт витрат проєкту/.test(stopped.error) && stopped.state.blocked_on === 'cost_cap', 'stopped by the default limit');
+  assert.equal(repo.T.runs[0].cost_usd, 5, 'a run that waits keeps what it already spent');
+  await processTick(ctx);
+  assert.ok(repo.T.runs.some((x) => x.status === 'waiting' && x.state?.blocked_on === 'cost_cap'), 'nothing changed: still waiting');
+  assert.equal(repo.T.journal.filter((j) => j.action === 'cost_cap').length, 1, 'the journal says it once');
+  repo.T.settings.project_cap_default_usd = 100;
+  await processTick(ctx);
+  assert.ok(!repo.T.runs.some((x) => x.status === 'waiting' && /ліміт/.test(x.error || '')), 'the limit was raised: the run goes on');
+  state(repo).cost_cap_usd = 2; repo.T.settings.project_cap_default_usd = 100; // an own limit beats the default
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' });
+  await processTick(ctx);
+  assert.ok(repo.T.runs.some((x) => x.skill === 'site' && x.status === 'waiting' && /\$2\.00/.test(x.error || '')), 'the own limit of the project counts');
+});
+await test('limits: the general limit of the month stops every project and says it is the general one', async () => {
+  const { repo, ctx } = await setup();
+  await human(repo, 'brief');
+  repo.T.settings.monthly_cap_usd = 2; repo.T.settings.project_cap_default_usd = 100;
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake' });
+  repo.T.runs[0].cost_usd = 3;
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' });
+  await processTick(ctx);
+  assert.ok(repo.T.runs.filter((x) => x.status === 'waiting').every((x) => /загальний ліміт/.test(x.error)) && repo.T.runs.some((x) => x.status === 'waiting'));
+});
+await test('limits: reached() looks at the own limit first, then at the general one; no limit means no stop', () => {
+  const s = { project_cap_default_usd: 10, monthly_cap_usd: 60 };
+  assert.equal(reached({ state: {}, settings: s, projectSpent: 9.99, totalSpent: 10 }), null);
+  assert.equal(reached({ state: {}, settings: s, projectSpent: 10, totalSpent: 10 }), 'project');
+  assert.equal(reached({ state: { cost_cap_usd: 3 }, settings: s, projectSpent: 3, totalSpent: 3 }), 'project');
+  assert.equal(reached({ state: { cost_cap_usd: 30 }, settings: s, projectSpent: 12, totalSpent: 60 }), 'total');
+  assert.equal(reached({ state: {}, settings: {}, projectSpent: 1e6, totalSpent: 1e6 }), null);
+});
+const OV_NOW = new Date('2026-11-23T10:00:00Z');
+const ovData = () => ({
+  now: OV_NOW,
+  projects: { 1: { name: 'Меблі Лоза' }, 2: { name: 'TM BYME' }, 3: { name: 'Mellowdiamond' }, 4: { name: 'OystersXO' }, 5: { name: 'Дім Світла' }, 6: { name: 'Лаванда' }, 7: { name: 'Fresh Nails' } },
+  states: [
+    { project_id: 1, stage: 2, paused: false, updated_at: '2026-11-21T10:00:00Z' },
+    { project_id: 2, stage: 3, paused: false, updated_at: '2026-11-20T10:00:00Z' },
+    { project_id: 3, stage: 1, paused: false, updated_at: '2026-11-18T10:00:00Z' },
+    { project_id: 4, stage: 4, paused: false, updated_at: '2026-11-10T10:00:00Z' },
+    { project_id: 5, stage: 4, paused: true, paused_reason: 'Клієнт у відпустці', updated_at: '2026-11-17T10:00:00Z' },
+    { project_id: 6, stage: 4, paused: false, cost_cap_usd: 3, updated_at: '2026-11-22T10:00:00Z' },
+    { project_id: 7, stage: 0, paused: false, paid_at: null, updated_at: '2026-11-22T10:00:00Z' },
+  ],
+  approvals: [{ id: 1, project_id: 1, kind: 'strategy', status: 'pending', requested_at: '2026-11-21T10:00:00Z' }],
+  runs: [
+    { id: 1, project_id: 3, agent: 'researcher', skill: 'competitors', status: 'waiting', error: 'У брифі не вказано сайти конкурентів.', state: { blocked_at: '2026-11-18T10:00:00Z' }, cost_usd: 0.5, created_at: '2026-11-18T09:00:00Z' },
+    { id: 2, project_id: 4, agent: 'mediabuyer', skill: 'optimize', status: 'running', cost_usd: 1.2, created_at: '2026-11-22T09:00:00Z' },
+    { id: 3, project_id: 4, agent: 'mediabuyer', skill: 'optimize', status: 'done', cost_usd: 9, created_at: '2026-10-30T09:00:00Z', finished_at: '2026-10-30T09:05:00Z' },
+    { id: 4, project_id: 6, agent: 'mediabuyer', skill: 'optimize', status: 'waiting', error: 'Досягнуто ліміт витрат проєкту ($3.00).', state: { blocked_at: '2026-11-22T10:00:00Z', blocked_on: 'cost_cap' }, cost_usd: 3, created_at: '2026-11-22T09:00:00Z' },
+  ],
+  tasks: [{ id: 1, project_id: 3, owner: 'client', status: 'proposed' }, { id: 2, project_id: 3, owner: 'client', status: 'done' }],
+  journal: [{ id: 5, project_id: 2, at: '2026-11-20T10:00:00Z', action: 'skill_stopped', summary: 'Стратегія не вдалася 3 рази поспіль.' }],
+  briefs: [1, 2, 3, 4, 5, 6, 7],
+  settings: { stopped: false, monthly_cap_usd: 60, project_cap_default_usd: 10 },
+});
+await test('overview: every project is one of five kinds (error, your action, waiting, pause, works), with who waits and how many days', () => {
+  const ov = buildOverview(ovData());
+  const by = (id) => ov.rows.find((r) => r.id === id);
+  assert.deepEqual(ov.rows.map((r) => r.kind), ['failed', 'action', 'action', 'action', 'wait', 'paused', 'ok'], 'errors first, then what needs you, then waiting, pause, works');
+  assert.equal(by(2).kind, 'failed'); assert.equal(by(2).what, 'Процес зупинено'); assert.equal(by(2).age, 3);
+  assert.deepEqual([by(1).kind, by(1).who, by(1).age, by(1).actLabel], ['action', 'Менеджер', 2, 'Відкрити апрув']);
+  assert.equal(ov.rows[1].id, 1, 'the oldest request of the manager is first');
+  assert.deepEqual([by(3).kind, by(3).who, by(3).age], ['wait', 'Клієнт', 5], 'the run waits for a task of the client');
+  assert.equal(by(4).kind, 'ok'); assert.equal(by(5).kind, 'paused'); assert.equal(by(5).age, 6);
+  assert.deepEqual([by(6).kind, by(6).who], ['action', 'Менеджер'], 'a run stopped by a limit waits for the manager to raise it');
+  assert.deepEqual([by(6).what, by(3).what], ['Ліміт витрат вичерпано', 'Чекаємо дані від клієнта'], 'the two most common waits are said plainly');
+  assert.equal(by(7).kind, 'action'); assert.equal(by(7).act, 'dossier'); assert.match(by(7).last, /оплату/);
+  assert.deepEqual(ov.counts, { all: 7, action: 3, failed: 1, wait: 1, paused: 1, ok: 1, needYou: 4 });
+});
+await test('overview: the waiting run goes to the manager when the manager holds an open task, and only closed tasks of the client do not count', () => {
+  const d = ovData();
+  d.tasks = [{ id: 1, project_id: 3, owner: 'client', status: 'proposed' }, { id: 3, project_id: 3, owner: 'manager', status: 'proposed' }];
+  assert.equal(buildOverview(d).rows.find((r) => r.id === 3).kind, 'action');
+  d.tasks = [{ id: 2, project_id: 3, owner: 'client', status: 'done' }];
+  const r = buildOverview(d).rows.find((x) => x.id === 3);
+  assert.deepEqual([r.kind, r.who], ['action', 'Менеджер'], 'nobody else can fix it');
+});
+await test('overview: the spend is this month only; the limit is the own one or the default; the bar warns from 80%', () => {
+  const ov = buildOverview(ovData());
+  const by = (id) => ov.rows.find((r) => r.id === id);
+  assert.equal(by(4).cost, 1.2, 'the 9 dollars of October are not counted');
+  assert.equal(ov.spent.toFixed(2), '4.70'); assert.equal(ov.cap, 60);
+  assert.deepEqual([by(6).cap, by(6).ownCap, by(4).cap, by(4).ownCap], [3, 3, 10, null]);
+  assert.deepEqual(usage(4.7, 60), { pct: 8, hot: false, over: false });
+  assert.deepEqual(usage(48, 60), { pct: 80, hot: true, over: false });
+  assert.deepEqual(usage(61, 60), { pct: 100, hot: true, over: true });
+  assert.deepEqual(usage(5, null), { pct: 0, hot: false, over: false });
+});
+await test('overview: filters, an empty list and a project that was never started', () => {
+  const ov = buildOverview(ovData());
+  assert.equal(filterRows(ov.rows, 'all').length, 7); assert.deepEqual(filterRows(ov.rows, 'wait').map((r) => r.id), [3]); assert.equal(filterRows(ov.rows, 'paused').length, 1);
+  const none = buildOverview({ now: OV_NOW, projects: { 1: { name: 'x' } } });
+  assert.deepEqual([none.rows.length, none.counts.all, none.spent], [0, 0, 0]);
+  assert.equal(buildOverview({ ...ovData(), states: [{ project_id: 99, stage: 1, paused: false }] }).rows[0].name, 'Проєкт 99');
+});
+await test('overview: the digest says what to do, whom we wait for, the spend, and warns when everything is stopped', () => {
+  const ov = buildOverview(ovData());
+  const t = digestText(ov);
+  assert.match(t, /^Доброго ранку! Сьогодні вам потрібно:/);
+  assert.match(t, /• Меблі Лоза: Чекає на вас: Апрув 1 \(2 дні\)/);
+  assert.match(t, /• TM BYME: зупинено, Процес зупинено \(3 дні\)/);
+  assert.match(t, /Чекаємо на клієнтів: Mellowdiamond \(5 дн\.\)\./);
+  assert.match(t, /На паузі: Дім Світла\./);
+  assert.match(t, /\$4\.70 з \$60\.00\. Помилок: 1\./);
+  assert.ok(!/Увага: усі агенти зупинено/.test(t));
+  const stopped = digestText(buildOverview({ ...ovData(), settings: { stopped: true, monthly_cap_usd: 60, project_cap_default_usd: 10 } }));
+  assert.match(stopped, /Увага: усі агенти зупинено\./);
+  const quiet = digestText(buildOverview({ ...ovData(), states: [ovData().states[3]], runs: [], approvals: [], journal: [], tasks: [] }));
+  assert.match(quiet, /Від вас сьогодні нічого не потрібно\./); assert.match(quiet, /Помилок немає\./);
+});
+await test('guard: the columns of the settings that the code reads and writes exist in the migration of the settings table; the real storage and its twin offer the same methods', async () => {
+  const sql = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../supabase/migrations/20261071000000_workflow_settings.sql'), 'utf8');
+  for (const col of ['stopped', 'stopped_reason', 'stopped_by', 'stopped_at', 'monthly_cap_usd', 'project_cap_default_usd', 'updated_at']) assert.ok(new RegExp(`\\b${col}\\b`).test(sql), `wf_settings.${col} is in the migration`);
+  assert.match(sql, /check \(id = 1\)/, 'one row only');
+  const { createWfRepo } = await import('../api/_lib/wf/repo.js');
+  const real = Object.keys(createWfRepo({})).sort();
+  const twin = Object.keys(createMemoryWfRepo({ now })).sort();
+  assert.deepEqual(real.filter((k) => !twin.includes(k)), [], 'every method of the real storage exists in the twin, so the tests exercise what production runs');
 });
 console.log(`\n${passed} workflow checks passed`);
