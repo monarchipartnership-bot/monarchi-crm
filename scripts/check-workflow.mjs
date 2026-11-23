@@ -2223,4 +2223,26 @@ await test('help: the map has the same six stages as the process, every stage is
   assert.match(fs.readFileSync(path.join(root, 'src/routes/routeMeta.js'), 'utf8'), /'\/projects\/help'/);
   assert.match(HELP_STAGES[3].wrong, /Запустити ще раз/, 'the way out of a stopped launch is told');
 });
+// ---------------------------------------------------------------- found by the pilot (project 27): a failed skill of the research or of the Creator stood for ever
+await test('machine: a research skill or the Creator that failed is started again (three failures in a row stop it, the journal says so, and the manager can start it by hand)', () => {
+  const base = { now: new Date('2026-11-24T10:00:00Z'), paused: false };
+  const run = (id, agent, skill, status) => ({ id, agent, skill, status, input: {} });
+  const enq = (a) => a.filter((x) => x.type === 'enqueue').map((x) => `${x.agent}/${x.skill}`);
+  const sections = { brief: { hasCurrent: true }, site: { hasCurrent: true }, audience: { hasCurrent: true }, unit_economy: { hasCurrent: true } };
+  const f = (id) => run(id, 'researcher', 'competitors', 'failed');
+  const st = { stage: 1, paused: false, has_data: false };
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections, runs: [f(1)] })), ['researcher/competitors'], 'one failure: one more try');
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections, runs: [f(1), f(2)] })), ['researcher/competitors']);
+  const stopped = planNext({ ...base, state: st, sections, runs: [f(1), f(2), f(3)] });
+  assert.deepEqual(enq(stopped), []); assert.ok(stopped.some((a) => a.action === 'skill_stopped' && a.meta.skill === 'researcher/competitors'));
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections, runs: [f(1), run(2, 'researcher', 'competitors', 'queued')] })), [], 'nothing new while a run is open');
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections: { ...sections, competitors: { hasCurrent: true } }, runs: [f(1)] })).filter((x) => x === 'researcher/competitors'), [], 'a skill whose section exists is not repeated');
+  // the audit is retried only when the cabinets hold data
+  assert.deepEqual(enq(planNext({ ...base, state: { ...st, has_data: true }, sections: { ...sections, competitors: { hasCurrent: true } }, runs: [run(1, 'researcher', 'audit', 'failed')] })).filter((x) => x.startsWith('researcher')), ['researcher/audit']);
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections: { ...sections, competitors: { hasCurrent: true } }, runs: [run(1, 'researcher', 'audit', 'failed')] })).filter((x) => x.startsWith('researcher')), []);
+  // the Creator of the first creatives
+  const s2 = { stage: 2, paused: false };
+  assert.deepEqual(enq(planNext({ ...base, state: s2, sections: {}, runs: [run(1, 'creator', 'first_creatives', 'failed')] })), ['creator/first_creatives']);
+  assert.deepEqual(enq(planNext({ ...base, state: s2, sections: { strategy: { hasCurrent: true, status: 'draft' } }, runs: [run(1, 'creator', 'first_creatives', 'failed')] })), ['creator/first_creatives']);
+});
 console.log(`\n${passed} workflow checks passed`);

@@ -58,6 +58,8 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
   // ---------------------------------------------------------------- 1 · research
   if (state.stage === STAGE.RESEARCH) {
     if (has('audience') && has('competitors') && !has('materials')) enqueue('creator', 'materials_ideas'); // ideas use the audience and the competitors
+    // a research skill that failed is started again (three failures in a row stop it, and the manager is told): found by the pilot, a failed skill used to stand for ever
+    for (const skill of [...RESEARCH_SKILLS, ...(state.has_data ? ['audit'] : [])]) { if (!has(skill) && lastRun(runs, 'researcher', skill)?.status === 'failed') enqueue('researcher', skill); }
     const need = [...RESEARCH_SKILLS, 'materials', 'ideas', ...(state.has_data ? ['audit'] : [])];
     const missing = need.filter((k) => !has(k));
     if (missing.length || openOf(runs, ['researcher', 'creator'])) return acts;
@@ -96,7 +98,7 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     }
     if (!has('strategy')) {
       const cr = lastRun(runs, 'creator', 'first_creatives');
-      if (!cr) { enqueue('creator', 'first_creatives'); return acts; }
+      if (!cr || cr.status === 'failed') { enqueue('creator', 'first_creatives'); return acts; } // a failed Creator is started again too
       if (isDone(cr) && !open(runs, 'strategist', 'strategy')) enqueue('strategist', 'strategy');
       return acts;
     }
@@ -106,7 +108,7 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     const sApp = lastApproval(approvals, 'strategy');
     if (status === 'draft' && has('strategy')) {
       const creatives = lastRun(runs, 'creator', 'first_creatives');
-      if (!creatives) { enqueue('creator', 'first_creatives'); return acts; }
+      if (!creatives || creatives.status === 'failed') { enqueue('creator', 'first_creatives'); return acts; }
       if (isDone(creatives) && !openOf(runs, ['strategist', 'creator']) && (!sApp || sApp.status !== 'pending')) {
         if (!checks.ok) {
           acts.push({ type: 'journal', action: 'check_failed', summary: 'Автоматична перевірка перед Апрувом 1 знайшла проблеми: ' + (checks.problems || []).join(' '), meta: {}, once: true });
