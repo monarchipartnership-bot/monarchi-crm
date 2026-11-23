@@ -17,6 +17,7 @@
   },
   "crons": [
     { "path": "/api/agent-tick", "schedule": "* * * * *" },
+    { "path": "/api/wf-tick", "schedule": "* * * * *" },
     { "path": "/api/wf-digest", "schedule": "0 7 * * *" }
   ],
   "headers": [
