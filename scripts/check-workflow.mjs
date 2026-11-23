@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { REMIND_DAYS, buildFeedbackPrompt, checkFeedback, draftOf, nextPayment, onboardingChecklist, parseFeedbackAnswer, profitability, renderFeedbackText } from '../api/_lib/wf/skills/supportEngine.js';
+import { onboarding, paymentReminder, periodsOf, weeklyReport } from '../api/_lib/wf/skills/supportAgent.js';
 import { analyse, judge, renderOptimizeText } from '../api/_lib/wf/skills/optimizeEngine.js';
 import { optimize } from '../api/_lib/wf/skills/optimizeAgent.js';
 import { actId, countriesOf, createMetaWriter, ctaType, landingUrl, minor, utmTags } from '../api/_lib/metaAdsWrite.js';
@@ -1777,5 +1779,100 @@ await test('optimize: the scale advice is given once in 72 hours; no launch mean
   assert.equal(m.repo.T.runs.find((r) => r.skill === 'optimize').status, 'failed'); assert.match(m.repo.T.runs.find((r) => r.skill === 'optimize').error, /META_ACCESS_TOKEN/);
   const o = await opSetup({ meta: { ...opMeta((since) => (since === snap.launched_at.slice(0, 10) ? OP_LIFE : [])), objects: async () => { throw new Error('(#200) no access'); } } }); await processTick(o.ctx);
   assert.equal(o.repo.T.runs.find((r) => r.skill === 'optimize').status, 'done'); assert.ok(o.repo.T.steps.some((st) => /Стан груп і оголошень не вдалося прочитати/.test(st.title)));
+});
+// ---------------------------------------------------------------- A10: the Support agent (drafts and tasks for the manager; the profit after ads by code)
+await test('support: the payment calendar: a monthly payment rolls forward, a one-time one stays, a wrong date is nothing', () => {
+  const now = new Date('2026-11-23T10:00:00Z');
+  assert.deepEqual(nextPayment({ date: '2026-11-25', period: 'щомісяця' }, now), { date: '2026-11-25', daysLeft: 2, monthly: true });
+  assert.deepEqual(nextPayment({ date: '2026-08-05', period: 'щомісяця' }, now), { date: '2026-12-05', daysLeft: 12, monthly: true }, 'the months that passed are skipped');
+  assert.deepEqual(nextPayment({ date: '2026-11-20', period: 'разово' }, now), { date: '2026-11-20', daysLeft: -3, monthly: false }, 'a one-time payment stays overdue');
+  assert.equal(nextPayment({ date: '25.11.2026' }, now), null); assert.equal(nextPayment({}, now), null);
+  assert.equal(nextPayment({ date: '2026-01-31', period: 'щомісяця' }, new Date('2026-02-10T00:00:00Z')).date, '2026-03-03', 'the end of a month does not break the roll');
+});
+await test('support: the drafts are templates in the language of the client and say only what is known; the checklist depends on what is already there', () => {
+  const g = draftOf('greet', 'uk', { client: 'Лоза', manager: 'Олена' }); assert.match(g, /Добрий день, Лоза!/); assert.match(g, /ваш менеджер Олена/);
+  assert.match(draftOf('greet', 'en', { client: 'Loza', manager: '' }), /^Hello, Loza!/); assert.doesNotMatch(draftOf('greet', 'en', { client: 'Loza', manager: '' }), /your manager is/);
+  assert.match(draftOf('pay', 'uk', { client: 'Лоза', amount: '500 USD', date: '2026-11-25', overdue: false }), /2026-11-25 очікується оплата у розмірі 500 USD/);
+  assert.match(draftOf('pay', 'uk', { client: '', amount: '', date: '2026-11-20', overdue: true }), /мала надійти 2026-11-20/); assert.doesNotMatch(draftOf('pay', 'uk', { client: '', amount: '', date: 'x', overdue: true }), /у розмірі/);
+  const all = onboardingChecklist({ hasAccount: false, website: '' }); assert.equal(all.length, 6); assert.ok(all.every((t) => t.owner === 'manager' && t.type === 'client'));
+  assert.equal(onboardingChecklist({ hasAccount: true, website: 'https://x.example' }).length, 4);
+});
+await test('support: the profit after ads and all costs, per order and in total, counted by code from the cabinet and the costs of the brief', () => {
+  const econ = { cogs_pct: 30, fee_pct: 3, returns_pct: 3, shipping_cost: 12 };
+  const p = profitability({ spend: 1000, purchases: 20, revenue: 3000 }, econ);
+  assert.deepEqual([p.aov, p.cost_per_order, p.contribution_per_order, p.ad_cost_per_order, p.profit_per_order, p.profit_total, p.roas, p.profitable], [150, 66, 84, 50, 34, 680, 3, true]);
+  assert.equal(profitability({ spend: 2000, purchases: 20, revenue: 3000 }, econ).profitable, false, 'the ads cost more than the orders earn');
+  assert.match(profitability({ spend: 100, purchases: 0, revenue: 0 }, econ).reason, /немає покупок/); assert.match(profitability({ spend: 100, purchases: 5, revenue: 500 }, {}).reason, /немає собівартості/);
+  assert.equal(profitability({ spend: 100, purchases: 5, revenue: 500 }, { cogs_pct: 40 }).profit_total, 200, 'fees, returns and shipping default to zero: 5 × 60 − 100');
+});
+await test('support: the feedback: the answer of the model is read, the numbers that are not in the facts are listed, the text is rendered with the profit', () => {
+  const facts = { now: { spend: 1000, orders: 20, cpa: 50, roas: 3 }, profit: { profit_total: 680 } };
+  const ok = checkFeedback({ explanation: 'За тиждень витрачено 1000, покупок 20, прибуток 680.', highlights: ['Ціна покупки 50'], next_steps: ['Лишаємо як є'], draft: 'Добрий день! Результат: 20 покупок.' }, facts);
+  assert.deepEqual(ok.stray, []);
+  const bad = checkFeedback({ explanation: 'Продажі зросли на 340%, а ROAS 9.', highlights: [], next_steps: [], draft: 'Привіт, 340% росту!' }, facts);
+  assert.deepEqual(bad.stray.sort(), ['340']); // 9 is a single digit and not checked, like everywhere else
+  const text = renderFeedbackText({ period: 'тиждень', facts: { now: { spend: 1000, orders: 20, cpa: 50, roas: 3 } }, profit: profitability({ spend: 1000, purchases: 20, revenue: 3000 }, { cogs_pct: 30, fee_pct: 3, returns_pct: 3, shipping_cost: 12 }), fb: { ...bad } });
+  assert.match(text, /Прибуток після реклами й усіх витрат: 680 \(34 на замовлення; внесок до реклами 84, реклама 50 на замовлення\)\. Реклама прибуткова\./); assert.match(text, /Увага: у тексті є числа, яких немає в даних \(340\)/);
+  assert.throws(() => parseFeedbackAnswer('Вибачте'), /не у форматі JSON/); assert.throws(() => parseFeedbackAnswer('{"explanation":"","draft":""}'), /немає пояснення або чернетки/);
+  const w = periodsOf('week', new Date('2026-11-23T10:00:00Z')); assert.deepEqual([w.cur.since, w.cur.until, w.prev.since, w.prev.until], ['2026-11-16', '2026-11-22', '2026-11-09', '2026-11-15']);
+  const m = periodsOf('month', new Date('2026-12-01T00:30:00Z')); assert.deepEqual([m.cur.since, m.cur.until, m.prev.since, m.prev.until, m.label], ['2026-11-01', '2026-11-30', '2026-10-01', '2026-10-31', 'місяць 2026-11']);
+});
+await test('support: onboarding makes the checklist and the greeting draft as tasks for the manager, once', async () => {
+  const s = await setup({ handlers: createHandlers({ support: { onboarding } }) });
+  s.repo.setProjectInfo(1, { client: 'Меблі Лоза', manager: 'Олена', client_language: 'uk' });
+  await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'onboarding' }); await processTick(s.ctx);
+  assert.equal(s.repo.T.runs[0].status, 'done', s.repo.T.runs[0].error);
+  const tasks = s.repo.T.tasks; assert.equal(tasks.length, 7); assert.ok(tasks.every((t) => t.owner === 'manager'));
+  const greet = tasks.find((t) => /вітання/.test(t.title)); assert.match(greet.evidence, /Добрий день, Меблі Лоза!/); assert.match(greet.evidence, /ваш менеджер Олена/);
+  assert.ok(tasks.some((t) => /Отримати доступ до рекламного кабінету/.test(t.title)) && tasks.some((t) => /Вказати сайт клієнта/.test(t.title)));
+  advance(1000); await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'onboarding' }); await processTick(s.ctx);
+  assert.equal(s.repo.T.tasks.length, 7, 'the same open task is not made twice');
+});
+await test('support: the payment reminder: nothing without a date, nothing while it is far, a draft and a task when it is near or overdue, the monthly payment rolls', async () => {
+  const mk = async (general) => { const s = await setup({ handlers: createHandlers({ support: { payment_reminder: paymentReminder } }) }); s.repo.setProjectInfo(1, { client: 'Лоза', client_language: 'uk' }); await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general, economics: {} } }); await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'payment_reminder' }); return s; };
+  const day = (n) => new Date(clock.t.getTime() + n * 864e5).toISOString().slice(0, 10);
+  const none = await mk({}); await processTick(none.ctx); assert.equal(none.repo.T.tasks.length, 0); assert.equal(none.repo.T.runs[0].output.skipped, true);
+  const far = await mk({ payment_next_date: day(20), payment_amount: '500 USD' }); await processTick(far.ctx); assert.equal(far.repo.T.tasks.length, 0); assert.equal(far.repo.T.runs[0].output.days_left, 20);
+  const near = await mk({ payment_next_date: day(2), payment_amount: '500 USD', payment_period: 'разово' }); await processTick(near.ctx);
+  assert.equal(near.repo.T.tasks.length, 1); assert.match(near.repo.T.tasks[0].title, /Нагадати клієнту про оплату 500 USD до/); assert.equal(near.repo.T.tasks[0].priority, 'medium'); assert.match(near.repo.T.tasks[0].evidence, /очікується оплата у розмірі 500 USD/);
+  const late = await mk({ payment_next_date: day(-3), payment_amount: '500 USD', payment_period: 'разово' }); await processTick(late.ctx);
+  assert.match(late.repo.T.tasks[0].title, /Оплата прострочена/); assert.equal(late.repo.T.tasks[0].priority, 'high'); assert.match(late.repo.T.tasks[0].evidence, /мала надійти/);
+  advance(1000); await late.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'payment_reminder' }); await processTick(late.ctx); assert.equal(late.repo.T.tasks.length, 1, 'one task for one overdue payment, not one a day');
+  const rolled = await mk({ payment_next_date: day(-60), payment_period: 'щомісяця' }); await processTick(rolled.ctx); assert.ok(rolled.repo.T.runs[0].output.days_left > -1, 'a monthly payment is never overdue: it rolls to the next date');
+});
+const spMeta = () => ({ insights: async ({ timeRange }) => ({ rows: timeRange.since === periodsOf('week', LA_NOW()).cur.since ? [{ ad_id: 'ad1', name: 'Креатив 1', spend: 600, purchases: 15, revenue: 2250, impressions: 20000, clicks: 400, reach: 8000 }, { ad_id: 'ad3', name: 'Креатив 3', spend: 400, purchases: 0, revenue: 0, impressions: 12000, clicks: 100, reach: 6000 }] : [{ ad_id: 'ad1', name: 'Креатив 1', spend: 700, purchases: 10, revenue: 1500, impressions: 22000, clicks: 300, reach: 9000 }] }) });
+await test('support: the weekly feedback reads the cabinet, counts the profit, and leaves a draft for the manager with the figures checked; no launch or no model is told clearly', async () => {
+  const snap = { status: 'done', targets: { breakeven_cpa: 100, target_cpa: 70, breakeven_roas: 1.75, target_roas: 2.5 }, account: { currency: 'USD' } };
+  const mk = async ({ launched = true, ask } = {}) => {
+    const s = await setup({ handlers: createHandlers({ support: { weekly_report: weeklyReport } }) });
+    s.repo.addAccount(1, LA_ACC); s.repo.setProjectInfo(1, { client: 'Лоза', client_language: 'uk' }); s.ctx.meta = spMeta(); s.asked = [];
+    if (launched) await s.repo.writeSectionVersion(1, 'launch', { author_kind: 'agent', author: 'mediabuyer', body: 'l', content: snap });
+    await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general: {}, economics: { cogs_pct: 30, fee_pct: 3, returns_pct: 3, shipping_cost: 12 } } });
+    await s.repo.journal(1, { actor_kind: 'agent', actor: 'mediabuyer', action: 'optimize', summary: 'x', meta: { actions: [{ name: 'Креатив 3', reason: 'Витрачено 400 без жодної покупки.' }] } });
+    if (ask !== null) s.ctx.ask = ask || (async (o) => { s.asked.push(o); return { costUsd: 0.05, text: JSON.stringify({ explanation: 'За тиждень витрачено 1000, покупок 15, ціна покупки 66.67.', highlights: ['Креатив 1 працює'], next_steps: ['Вимкнути Креатив 3'], draft: 'Добрий день! За тиждень 15 покупок, зростання на 500%.' }) }; });
+    await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'weekly_report' }); return s;
+  };
+  const s = await mk(); await processTick(s.ctx);
+  const run = s.repo.T.runs[0]; assert.equal(run.status, 'done', run.error);
+  const facts = JSON.parse(s.asked[0].user.slice(s.asked[0].user.indexOf('{'), s.asked[0].user.lastIndexOf('}') + 1));
+  assert.equal(facts.now.spend, 1000); assert.equal(facts.now.orders, 15); assert.equal(facts.before.orders, 10); assert.equal(facts.change_pct.orders, 50); assert.equal(facts.best_ads[0].name, 'Креатив 1'); assert.equal(facts.worst_ads[0].name, 'Креатив 3'); assert.deepEqual(facts.optimizer_advice, ['Креатив 3: Витрачено 400 без жодної покупки.']);
+  assert.equal(facts.profit.profit_total, 260, 'profit comes from the code: 15 orders × 84 − 1000'); assert.equal(facts.profit.profitable, true);
+  const t = s.repo.T.tasks.find((x) => /Фідбек за тиждень/.test(x.title)); assert.equal(t.owner, 'manager'); assert.match(t.evidence, /Прибуток після реклами й усіх витрат: 260/); assert.match(t.evidence, /Увага: у тексті є числа, яких немає в даних \(500\)/); assert.match(t.evidence, /Чернетка листа клієнту/);
+  assert.equal(run.cost_usd, 0.05); assert.equal(run.output.stray, 1);
+  const n = await mk({ launched: false, ask: null }); await processTick(n.ctx); assert.equal(n.repo.T.runs[0].status, 'done'); assert.equal(n.repo.T.runs[0].output.skipped, true);
+  const m = await mk({ ask: null }); await processTick(m.ctx); assert.equal(m.repo.T.runs[0].status, 'failed'); assert.match(m.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+});
+await test('machine: after the launch the weekly feedback is made every 7 days and the payment calendar is looked at every day', () => {
+  const base = { now: new Date('2026-11-23T10:00:00Z'), state: { stage: 4, paused: false }, sections: {} };
+  const enq = (a) => a.filter((x) => x.type === 'enqueue').map((x) => `${x.agent}/${x.skill}`);
+  const run = (skill, h) => ({ id: 1, agent: 'support', skill, status: 'done', input: {}, finished_at: new Date(base.now.getTime() - h * 3600e3).toISOString() });
+  const launched = { id: 9, agent: 'mediabuyer', skill: 'launch', status: 'done', input: {}, created_at: base.now.toISOString(), finished_at: base.now.toISOString() }; // this month is covered by the strategy: no monthly planning in this test
+  assert.deepEqual(enq(planNext({ ...base, runs: [launched] })).filter((x) => x.startsWith('support')), ['support/weekly_report', 'support/payment_reminder']);
+  assert.deepEqual(enq(planNext({ ...base, runs: [launched, run('weekly_report', 24 * 3), run('payment_reminder', 3)] })).filter((x) => x.startsWith('support')), [], 'not yet due');
+  assert.deepEqual(enq(planNext({ ...base, runs: [launched, run('weekly_report', 24 * 8), run('payment_reminder', 25)] })).filter((x) => x.startsWith('support')), ['support/weekly_report', 'support/payment_reminder']);
+});
+await test('brief: the payment calendar is part of the brief sheet', () => {
+  const f = formFromContent({ general: { payment_amount: '500 USD', payment_next_date: '2026-12-01', payment_period: 'щомісяця' } });
+  assert.deepEqual([f.values.payment_amount, f.values.payment_next_date, f.values.payment_period], ['500 USD', '2026-12-01', 'щомісяця']); assert.equal(contentFromForm(f).general.payment_period, 'щомісяця');
 });
 console.log(`\n${passed} workflow checks passed`);

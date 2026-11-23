@@ -9,6 +9,9 @@ export const GENERAL = [
   { key: 'audience', label: 'Цільова аудиторія (як її описує клієнт)' },
   { key: 'competitors', label: 'Конкуренти (сайти, по одному в рядку)' },
   { key: 'fb_page_id', label: 'ID сторінки Facebook, від імені якої йде реклама (цифри)' },
+  { key: 'payment_amount', label: 'Сума оплати за послуги (з валютою)' },
+  { key: 'payment_next_date', label: 'Дата наступної оплати (РРРР-ММ-ДД)' },
+  { key: 'payment_period', label: 'Оплата: щомісяця чи разово' },
   { key: 'ga4_property', label: 'GA4 Property ID клієнта (лише цифри)' },
 ];
 export const PARAMS = [

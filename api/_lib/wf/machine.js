@@ -141,6 +141,10 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     const lo = lastRun(runs, 'mediabuyer', 'optimize');
     const due = !lo || (lo.finished_at && now - new Date(lo.finished_at) >= cfg.optimizeEveryHours * 3600e3);
     if (due) enqueue('mediabuyer', 'optimize', {}, 50);
+    const lw = lastRun(runs, 'support', 'weekly_report'); // the weekly feedback for the manager: every 7 days; the payment calendar is looked at every day
+    if (!lw || (lw.finished_at && now - new Date(lw.finished_at) >= 7 * 24 * 3600e3)) enqueue('support', 'weekly_report', {}, 70);
+    const lp = lastRun(runs, 'support', 'payment_reminder');
+    if (!lp || (lp.finished_at && now - new Date(lp.finished_at) >= 24 * 3600e3)) enqueue('support', 'payment_reminder', {}, 80);
     const lm = lastRun(runs, 'strategist', 'monthly_plan');
     if (state.stage === STAGE.OPERATE) {
       const covered = [lm, lastRun(runs, 'mediabuyer', 'launch')].filter(Boolean).map((r) => ym(r.created_at)).sort().pop(); // the month of the launch is covered by the strategy

@@ -74,7 +74,8 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       const v = T.versions.find((x) => x.id === sec.current_version_id);
       return { status: sec.status, version: v ? { version: v.version, body: v.body, content: v.content, author_kind: v.author_kind, created_at: v.created_at } : null };
     },
-    async readProject(projectId) { return { id: projectId, website: T.websites?.get(projectId) ?? null, client_language: null }; },
+    async readProject(projectId) { return { id: projectId, website: T.websites?.get(projectId) ?? null, client_language: null, name: null, client: null, manager: null, ...(T.projectInfo?.get(projectId) || {}) }; },
+    setProjectInfo(projectId, info) { (T.projectInfo ||= new Map()).set(projectId, info); },
     setWebsite(projectId, url) { (T.websites ||= new Map()).set(projectId, url); },
     async readCreativeMaterials(projectId) { return T.materials?.get(projectId) || { settings: {}, assets: [] }; },
     setMaterials(projectId, m) { (T.materials ||= new Map()).set(projectId, m); },
