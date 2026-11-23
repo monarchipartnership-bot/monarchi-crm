@@ -25,7 +25,7 @@ import { allocate, budgetPlan, checkStrategy, gatherStrategyFacts, marginInfo, n
 import { strategy } from '../api/_lib/wf/skills/strategyAgent.js';
 import { checkCards, gatherCreativeFacts, goalsOf, referencePool, tagOf } from '../api/_lib/wf/skills/creativesEngine.js';
 import { firstCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
-import { checkIdeas, checkMaterials, gatherIdeaFacts, inventoryOf, offerEconomics, renderIdeasText } from '../api/_lib/wf/skills/ideasEngine.js';
+import { SYSTEM_PROMPT as IDEAS_PROMPT, checkIdeas, checkMaterials, gatherIdeaFacts, inventoryOf, offerEconomics, renderIdeasText } from '../api/_lib/wf/skills/ideasEngine.js';
 import { materialsIdeas } from '../api/_lib/wf/skills/materialsAgent.js';
 import { checkSources, compareNumbers, createValidator, findDuplicateTasks, validateProject } from '../api/_lib/wf/check.js';
 import { competitorCards, competitorHosts, siteAreaRows, siteCounts } from '../src/lib/workflow/sections.js';
@@ -2244,5 +2244,14 @@ await test('machine: a research skill or the Creator that failed is started agai
   const s2 = { stage: 2, paused: false };
   assert.deepEqual(enq(planNext({ ...base, state: s2, sections: {}, runs: [run(1, 'creator', 'first_creatives', 'failed')] })), ['creator/first_creatives']);
   assert.deepEqual(enq(planNext({ ...base, state: s2, sections: { strategy: { hasCurrent: true, status: 'draft' } }, runs: [run(1, 'creator', 'first_creatives', 'failed')] })), ['creator/first_creatives']);
+});
+// ---------------------------------------------------------------- owner's choice A (2026-11-24): static pictures are made from one product photo and brand basics
+await test('materials: the verdict rule is «one product photo + brand basics» for static pictures (the pilot showed the old wording asked for video and ready creatives); the code still forbids «enough» without a product photo', () => {
+  assert.match(IDEAS_PROMPT, /STATIC IMAGES/); assert.match(IDEAS_PROMPT, /at least one product photo AND the basics of the brand/);
+  assert.match(IDEAS_PROMPT, /does NOT make it "not_enough"/);
+  const inv = inventoryOf({ assets: [], settings: { inputs: { brand: { body: 'кольори' } } } });
+  assert.equal(inv.hard_gaps.length, 1, 'no product photo is still a hard gap');
+  const ok = inventoryOf({ assets: [{ kind: 'product', name: 'a', url: 'u' }], settings: { inputs: { tone: { body: 'спокійний' } } } });
+  assert.equal(ok.hard_gaps.length, 0); assert.equal(ok.brand.tone, true);
 });
 console.log(`\n${passed} workflow checks passed`);
