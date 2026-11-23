@@ -138,3 +138,27 @@ export async function fetchPackage(projectId, approvalId = null) {
   if (approvalId) out.approval = must(await supabase.from('wf_approvals').select('id, project_id, kind, subject, status').eq('id', approvalId).maybeSingle(), 'approval');
   return out;
 }
+
+// ----------------------------------------------------------------------- the pool of tasks of a project
+export async function fetchTasks(projectId) {
+  return must(await supabase.from('wf_tasks').select('*').eq('project_id', projectId).order('id', { ascending: false }).limit(300), 'tasks') || [];
+}
+// «Взяти в роботу», «Готово», «Відхилити» (a rejection needs a reason: the agents learn from it)
+export async function setTaskStatus(task, status, { result = '', email } = {}) {
+  if (status === 'rejected' && !String(result).trim()) throw new Error('Напишіть, чому відхиляєте задачу.');
+  const r = await supabase.from('wf_tasks').update({ status, result: String(result).trim() || null, updated_at: nowIso() }).eq('id', task.id).select('id');
+  if (r.error) throw new Error('task: ' + r.error.message);
+  if (!r.data?.length) throw new Error('Задачу не знайдено або її вже змінили.');
+  await journal(task.project_id, email, { action: 'task', subject: String(task.id), summary: `Задача «${task.title}»: ${{ in_progress: 'взято в роботу', done: 'зроблено', rejected: 'відхилено. ' + String(result).trim() }[status] || status}.` });
+}
+export async function setTaskOwner(task, owner, email) {
+  const r = await supabase.from('wf_tasks').update({ owner, updated_at: nowIso() }).eq('id', task.id).select('id');
+  if (r.error) throw new Error('task: ' + r.error.message);
+  await journal(task.project_id, email, { action: 'task', subject: String(task.id), summary: `Задачу «${task.title}» передано: ${owner}.` });
+}
+// a task of a person (not of an agent): the pool is one list for both
+export async function createTask(projectId, { title, type = 'client', owner = 'manager', priority = 'medium', due_date = null, evidence = '' }, email) {
+  if (!String(title || '').trim()) throw new Error('Напишіть, що треба зробити.');
+  const row = { project_id: projectId, type, title: String(title).trim(), owner, priority, evidence: String(evidence).trim() || null, created_by_kind: 'human', created_by: email || 'manager', due_date: /^\d{4}-\d{2}-\d{2}$/.test(due_date || '') ? due_date : null };
+  return must(await supabase.from('wf_tasks').insert(row).select().single(), 'task');
+}

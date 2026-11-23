@@ -57,7 +57,7 @@ async function runOne(ctx, run, stats) {
         await repo.journal(run.project_id, { actor_kind: 'agent', actor: run.agent, action: 'proposal', subject: wr.key, summary: 'Агент надіслав пропозицію замість заміни версії.' });
       }
     }
-    for (const t of result.tasks || []) if (repo.addTask) await repo.addTask(run.project_id, { ...t, created_by: run.agent });
+    for (const t of result.tasks || []) if (repo.addTask) await repo.addTask(run.project_id, { created_by: `${run.agent}/${run.skill}`, ...t });
     if (result.blocked) { // the run cannot go on without something from a person: it waits, a task says what is needed, and a new version of the section wakes it up
       await repo.addSteps(run.id, result.steps || []);
       await repo.finishRun(run.id, { status: 'waiting', error: result.blocked.reason || null, state: { blocked_on: result.blocked.on, blocked_at: (ctx.now ? ctx.now() : new Date()).toISOString() } });

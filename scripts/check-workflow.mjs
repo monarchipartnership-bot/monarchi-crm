@@ -3,6 +3,7 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { dueState, digest, filterCounts, filterTasks, groupTasks, hasDraft, isBlocker, parseEvidence, sourceLabel } from '../src/lib/workflow/tasks.js';
 import { REMIND_DAYS, buildFeedbackPrompt, checkFeedback, draftOf, nextPayment, onboardingChecklist, parseFeedbackAnswer, profitability, renderFeedbackText } from '../api/_lib/wf/skills/supportEngine.js';
 import { onboarding, paymentReminder, periodsOf, weeklyReport } from '../api/_lib/wf/skills/supportAgent.js';
 import { analyse, judge, renderOptimizeText } from '../api/_lib/wf/skills/optimizeEngine.js';
@@ -1874,5 +1875,50 @@ await test('machine: after the launch the weekly feedback is made every 7 days a
 await test('brief: the payment calendar is part of the brief sheet', () => {
   const f = formFromContent({ general: { payment_amount: '500 USD', payment_next_date: '2026-12-01', payment_period: 'щомісяця' } });
   assert.deepEqual([f.values.payment_amount, f.values.payment_next_date, f.values.payment_period], ['500 USD', '2026-12-01', 'щомісяця']); assert.equal(contentFromForm(f).general.payment_period, 'щомісяця');
+});
+// ---------------------------------------------------------------- the pool of tasks page («Мій день» with the block of blockers)
+const TK = (id, o = {}) => ({ id, project_id: 1, type: 'client', title: 'Задача ' + id, evidence: '', priority: 'medium', owner: 'manager', status: 'proposed', created_by_kind: 'agent', created_by: 'support/onboarding', due_date: null, created_at: '2026-11-20T09:00:00Z', ...o });
+const TODAY = new Date('2026-11-23T10:00:00Z');
+await test('tasks page: the evidence is a note, a draft, or a note with a draft; the source of a task is named; what the check before the launch and the strategy made blocks the launch', () => {
+  assert.deepEqual(parseEvidence('Умов повернення на сторінках немає.'), { note: 'Умов повернення на сторінках немає.', draft: '' });
+  assert.deepEqual(parseEvidence('Чернетка:\nДобрий день!\n\nДякуємо!'), { note: '', draft: 'Добрий день!\n\nДякуємо!' });
+  assert.deepEqual(parseEvidence('Цифри: 100.\n\nПрибуток 5.\n\nЧернетка листа клієнту\nДобрий день! 15 покупок.'), { note: 'Цифри: 100.\n\nПрибуток 5.', draft: 'Добрий день! 15 покупок.' });
+  assert.deepEqual(parseEvidence(null), { note: '', draft: '' });
+  assert.equal(sourceLabel(TK(1, { created_by: 'mediabuyer/launch' })), 'Перевірка перед запуском'); assert.equal(sourceLabel(TK(1, { created_by: 'creator/first_creatives' })), 'Креативи (готові)');
+  assert.equal(sourceLabel(TK(1, { created_by_kind: 'human', created_by: 'm@x' })), 'Додано вручну'); assert.equal(sourceLabel(TK(1, { created_by: 'x/y' })), 'x/y');
+  assert.equal(isBlocker(TK(1, { created_by: 'mediabuyer/launch' })), true); assert.equal(isBlocker(TK(1, { created_by: 'strategist/strategy' })), true);
+  assert.equal(isBlocker(TK(1, { created_by: 'mediabuyer/optimize' })), false, 'the advice of the optimiser does not stop a launch that already happened');
+  assert.equal(isBlocker(TK(1, { created_by: 'mediabuyer/launch', status: 'done' })), false); assert.equal(isBlocker(TK(1, { created_by: 'mediabuyer/launch', created_by_kind: 'human' })), false);
+});
+await test('tasks page: the due date is overdue, today or soon; the feed is grouped the way a manager works and sorted by urgency; the digest says what to do and whom we wait for', () => {
+  assert.deepEqual(['2026-11-20', '2026-11-23', '2026-11-25', '2026-11-30', null].map((d) => dueState(TK(1, { due_date: d }), TODAY)), ['overdue', 'today', 'soon', null, null]);
+  assert.equal(dueState(TK(1, { due_date: '2026-11-20', status: 'done' }), TODAY), null, 'a closed task has no deadline');
+  const tasks = [
+    TK(1, { priority: 'high', title: 'Вказати ID сторінки' }), TK(2, { priority: 'low', due_date: '2026-11-23', title: 'Дрібниця сьогодні' }), TK(3, { priority: 'medium', title: 'Просто зробити' }),
+    TK(4, { owner: 'client', priority: 'high', title: 'Піксель' }), TK(5, { owner: 'client_dev', title: 'Сторінка повернення' }), TK(6, { status: 'done' }), TK(7, { status: 'rejected' }),
+  ];
+  const g = groupTasks(tasks, TODAY);
+  assert.deepEqual(g.map((x) => [x.key, x.items.map((t) => t.id)]), [['hot', [1, 2]], ['week', [3]], ['waiting', [4, 5]], ['done', [7, 6]]]);
+  assert.equal(digest(tasks, TODAY), 'Сьогодні варто: Вказати ID сторінки; Дрібниця сьогодні. Чекаємо: клієнта 1, розробника клієнта 1.');
+  assert.equal(digest([TK(1, { priority: 'low' })], TODAY), 'Сьогодні нічого не горить.');
+  assert.equal(digest([TK(1, { title: 'a', priority: 'high' }), TK(2, { title: 'b', priority: 'high' }), TK(3, { title: 'c', priority: 'high' }), TK(4, { title: 'd', priority: 'high' })], TODAY), 'Сьогодні варто: a; b; c (ще 1).');
+  assert.deepEqual(groupTasks([], TODAY), []);
+});
+await test('tasks page: the filters and their counts: mine, blockers, drafts', () => {
+  const tasks = [TK(1, { created_by: 'mediabuyer/launch', owner: 'client' }), TK(2), TK(3, { evidence: 'Чернетка:\nТекст' }), TK(4, { evidence: 'Чернетка:\nТекст', status: 'done' }), TK(5, { owner: 'client' })];
+  assert.deepEqual(filterCounts(tasks), { all: 5, mine: 2, blockers: 1, drafts: 1 });
+  assert.deepEqual(filterTasks(tasks, 'blockers').map((t) => t.id), [1]); assert.deepEqual(filterTasks(tasks, 'drafts').map((t) => t.id), [3]); assert.deepEqual(filterTasks(tasks, 'mine').map((t) => t.id), [2, 3]);
+  assert.equal(hasDraft(TK(1, { evidence: 'Чернетка:\nx' })), true); assert.equal(hasDraft(TK(1, { evidence: 'x' })), false);
+});
+await test('tasks (backend): a task remembers the skill that made it and its due date; the check before the launch and the strategy mark what blocks the launch; the drafts are marked', async () => {
+  const b = await laSetup({ pixels: [] }); await processTick(b.ctx);
+  const t = b.repo.T.tasks.find((x) => x.type === 'tracking'); assert.equal(t.created_by, 'mediabuyer/launch'); assert.equal(isBlocker({ ...t, created_by_kind: 'agent' }), true);
+  const handlers = createHandlers({ support: { payment_reminder: paymentReminder, onboarding } });
+  const s = await setup({ handlers }); s.repo.setProjectInfo(1, { client: 'Лоза' });
+  const due = new Date(clock.t.getTime() + 2 * 864e5).toISOString().slice(0, 10);
+  await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general: { payment_next_date: due, payment_amount: '500 USD', payment_period: 'разово' }, economics: {} } });
+  await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'payment_reminder' }); await s.repo.enqueueRun({ project_id: 1, agent: 'support', skill: 'onboarding' }); await processTick(s.ctx);
+  const pay = s.repo.T.tasks.find((x) => /оплату/.test(x.title)); assert.equal(pay.due_date, due); assert.equal(pay.created_by, 'support/payment_reminder'); assert.ok(pay.evidence.startsWith('Чернетка:\n')); assert.match(parseEvidence(pay.evidence).draft, /^Добрий день, Лоза!/);
+  assert.equal(parseEvidence(s.repo.T.tasks.find((x) => /вітання/.test(x.title)).evidence).draft.startsWith('Добрий день, Лоза!'), true);
 });
 console.log(`\n${passed} workflow checks passed`);

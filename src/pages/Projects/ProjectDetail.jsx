@@ -45,11 +45,13 @@ import { fetchProjectCreative } from '../../lib/api/projectCreative';
 import { infoProgress } from '../../lib/agents/infoProgress';
 import ProcessOverview from '../../components/Workflow/ProcessOverview';
 import Dossier from '../../components/Workflow/Dossier';
+import Tasks from '../../components/Workflow/Tasks';
 
 const TABS = [
   { key: 'overview', label: 'Інформація про проєкт', icon: PAGE_ICONS['page.projects'].src },
   { key: 'process', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src }, // the new agent system: where the project is and what waits for the manager
   { key: 'dossier', label: 'Досьє', icon: PAGE_ICONS['page.projects'].src }, // the 10 sections the agents and people write together
+  { key: 'tasks', label: 'Задачі', icon: PAGE_ICONS['page.projects'].src }, // the pool of tasks: what the agents found or prepared, the drafts for the client
   { key: 'builder', label: 'Конструктор звіту', icon: null, line: <path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z" /> },
   { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
@@ -65,6 +67,7 @@ const STRIP = [
   TABS.find((x) => x.key === 'overview'),
   TABS.find((x) => x.key === 'process'),
   TABS.find((x) => x.key === 'dossier'),
+  TABS.find((x) => x.key === 'tasks'),
   { key: 'reports', label: 'Звітність', icon: PAGE_ICONS['page.weekly-report'].src },
   TABS.find((x) => x.key === 'agent'),
 ];
@@ -73,6 +76,7 @@ const STRIP_LINE = {
   overview: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
   process: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   dossier: <path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2zM8 7h7M8 11h7M8 15h4" />,
+  tasks: <path d="M5 4h14v16H5zM9 9l2 2 4-4M9 15h6" />,
   reports: <path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" />,
   agent: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></>,
 };
@@ -660,6 +664,7 @@ function ProjectDetailCard() {
         </div>
       ))}
       {tab === 'process' && <ProcessOverview key={'process-' + id} projectId={id} onGo={goWf} />}
+      {tab === 'tasks' && <Tasks key={'tasks-' + id} projectId={id} />}
       {tab === 'dossier' && <Dossier key={'dossier-' + id + (searchParams.get('section') || '')} projectId={id} initialKey={searchParams.get('section') || undefined} />}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}

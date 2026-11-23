@@ -87,9 +87,9 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       Object.assign(T.tasks.find((t) => t.id === keepId), { priority: patch.priority, evidence: patch.evidence });
       for (const id of dropIds) Object.assign(T.tasks.find((t) => t.id === id), { status: 'rejected', result: `Дубль задачі #${keepId}` });
     },
-    async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high' }) {
+    async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high', created_by = 'agent', due_date = null }) {
       if (T.tasks.some((t) => t.project_id === projectId && t.title === title && ['proposed', 'approved', 'in_progress'].includes(t.status))) return null;
-      const t = { id: T.tasks.length + 1, project_id: projectId, type, title, evidence, owner, priority, status: 'proposed' };
+      const t = { id: T.tasks.length + 1, project_id: projectId, type, title, evidence, owner, priority, status: 'proposed', created_by, due_date: /^\d{4}-\d{2}-\d{2}$/.test(String(due_date || '')) ? due_date : null };
       T.tasks.push(t);
       return { ...t };
     },

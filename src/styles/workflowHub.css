@@ -187,3 +187,20 @@
 .wf-rail { position:sticky; top:8px; display:grid; gap:10px; min-width:0; scroll-margin-top:12px; }
 @media (max-width:900px) { .wf-rail { position:static; } }
 .wf-prog { height:8px; border-radius:6px; background:var(--wf-soft); overflow:hidden; } .wf-prog i { display:block; height:100%; background:var(--wf-grad); }
+
+/* the pool of tasks: the feed «Мій день» with the block of blockers (step A10) */
+.wf-g2task { grid-template-columns:210px minmax(0,1fr); align-items:start; }
+@media (max-width:820px) { .wf-g2task { grid-template-columns:minmax(0,1fr); } }
+.wf-side { display:grid; gap:6px; position:sticky; top:8px; align-content:start; }
+@media (max-width:820px) { .wf-side { position:static; } }
+.wf-side button { text-align:left; display:flex; justify-content:space-between; gap:8px; border:0; font:inherit; font-weight:600; background:transparent; color:var(--wf-text); padding:8px 12px; border-radius:12px; cursor:pointer; }
+.wf-side button[aria-pressed="true"] { background:var(--wf-soft); box-shadow:0 0 0 3px var(--wf-halo); } .wf-side b { color:var(--wf-muted); font-weight:600; }
+.wf-side button:focus-visible { outline:2px solid var(--wf-orchid); outline-offset:2px; }
+.wf-task { background:var(--wf-surface); border-radius:16px; box-shadow:0 0 0 1px var(--wf-border); padding:12px 14px; display:grid; gap:8px; min-width:0; }
+.wf-task.done { opacity:.6; }
+.wf-task .hd { display:flex; gap:10px; align-items:flex-start; cursor:pointer; background:none; border:0; font:inherit; color:inherit; text-align:left; width:100%; padding:0; }
+.wf-task .hd:focus-visible { outline:2px solid var(--wf-orchid); outline-offset:2px; border-radius:8px; }
+.wf-task .dot { width:8px; align-self:stretch; border-radius:6px; flex:none; background:var(--wf-border); min-height:30px; } .wf-task .dot.high { background:var(--wf-bad); } .wf-task .dot.medium { background:var(--wf-warn); }
+.wf-ev { background:var(--wf-bg); border-radius:12px; padding:10px 12px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; box-shadow:0 0 0 1px var(--wf-line); }
+.wf-ev.draft { background:var(--wf-info-bg); }
+.wf-blockers { border-radius:18px; box-shadow:0 0 0 2px var(--wf-bad), 0 0 0 6px var(--wf-bad-bg); background:var(--wf-surface); padding:14px 16px; display:grid; gap:10px; min-width:0; }

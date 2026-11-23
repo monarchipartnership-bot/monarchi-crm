@@ -103,10 +103,10 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       if (dropIds.length) must(await db.from('wf_tasks').update({ status: 'rejected', result: `Дубль задачі #${keepId}`, updated_at: iso(now()) }).in('id', dropIds).eq('project_id', projectId), 'task merge');
     },
     // A task for people (for example «Потрібно від клієнта»). The same open task is not added twice.
-    async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high', created_by = 'agent' }) {
+    async addTask(projectId, { type = 'client', title, evidence = null, owner = 'client', priority = 'high', created_by = 'agent', due_date = null }) {
       const same = must(await db.from('wf_tasks').select('id').eq('project_id', projectId).eq('title', title).in('status', ['proposed', 'approved', 'in_progress']).limit(1), 'task') || [];
       if (same.length) return null;
-      return must(await db.from('wf_tasks').insert({ project_id: projectId, type, title, evidence, owner, priority, created_by_kind: 'agent', created_by }).select().single(), 'task');
+      return must(await db.from('wf_tasks').insert({ project_id: projectId, type, title, evidence, owner, priority, created_by_kind: 'agent', created_by, due_date: /^\d{4}-\d{2}-\d{2}$/.test(String(due_date || '')) ? due_date : null }).select().single(), 'task');
     },
     // A run that waits for a section (state.blocked_on) goes back to the queue when a newer version of that section appeared after it stopped.
     async resumeBlocked(projectId) {

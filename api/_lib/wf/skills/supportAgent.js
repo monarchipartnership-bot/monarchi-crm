@@ -7,6 +7,7 @@ import { agg } from './optimizeEngine.js';
 import { REMIND_DAYS, buildFeedbackPrompt, checkFeedback, draftOf, feedbackFacts, nextPayment, onboardingChecklist, parseFeedbackAnswer, profitability, renderFeedbackText } from './supportEngine.js';
 
 const DAY = 864e5;
+export const DRAFT = 'Чернетка:\n'; // a task whose evidence begins with this is a draft of a message to the client (the page shows it in a box with «Скопіювати»)
 const ymd = (d) => d.toISOString().slice(0, 10);
 const nameOf = (p) => String(p?.client || p?.name || '').trim();
 
@@ -15,7 +16,7 @@ export async function onboarding({ run, ctx }) {
   const accounts = await ctx.repo.listAdAccounts(run.project_id);
   const lang = project?.client_language === 'en' ? 'en' : 'uk';
   const tasks = onboardingChecklist({ hasAccount: accounts.length > 0, website: project?.website });
-  tasks.push({ type: 'client', owner: 'manager', priority: 'medium', title: 'Надіслати клієнту вітання (чернетка)', evidence: draftOf('greet', lang, { client: nameOf(project), manager: project?.manager || '' }) });
+  tasks.push({ type: 'client', owner: 'manager', priority: 'medium', title: 'Надіслати клієнту вітання (чернетка)', evidence: DRAFT + draftOf('greet', lang, { client: nameOf(project), manager: project?.manager || '' }) });
   return { tasks, steps: [{ title: `Чеклист нового проєкту: пунктів ${tasks.length - 1}` }, { title: 'Підготовлено чернетку вітання для менеджера' }], output: { checklist: tasks.length - 1 } };
 }
 
@@ -31,7 +32,7 @@ export async function paymentReminder({ run, ctx }) {
   const amount = String(g.payment_amount || '').trim();
   const title = overdue ? `Оплата прострочена (${next.date}): нагадати клієнту${amount ? ` про ${amount}` : ''}` : `Нагадати клієнту про оплату${amount ? ` ${amount}` : ''} до ${next.date}`;
   return {
-    tasks: [{ type: 'client', owner: 'manager', priority: overdue || next.daysLeft <= 1 ? 'high' : 'medium', title, evidence: draftOf('pay', lang, { client: nameOf(project), amount, date: next.date, overdue }) }],
+    tasks: [{ type: 'client', owner: 'manager', priority: overdue || next.daysLeft <= 1 ? 'high' : 'medium', title, evidence: DRAFT + draftOf('pay', lang, { client: nameOf(project), amount, date: next.date, overdue }), due_date: next.date }],
     steps: [{ title: `Оплата ${next.date}${overdue ? ' прострочена' : ` через ${next.daysLeft} дн.`}: підготовлено нагадування й чернетку` }],
     output: { next: next.date, days_left: next.daysLeft, overdue },
   };

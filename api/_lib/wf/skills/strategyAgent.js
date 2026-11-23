@@ -45,7 +45,7 @@ export async function strategy({ run, ctx }) {
     needed_from_client: needed, optimisation: opt, warnings: checked.warnings, notes: checked.notes, assumptions,
     creatives_branch: creatives?.content?.branch || null,
   };
-  const tasksOut = needed.map((x) => ({ type: /піксель/i.test(x.what) ? 'tracking' : /матеріал/i.test(x.what) ? 'creatives' : 'site', owner: 'client', priority: 'high', title: x.what.slice(0, 140), evidence: `Потрібно до ${x.due}. Джерело: ${x.source}.` })).filter((t) => t.type !== 'site');
+  const tasksOut = needed.map((x) => ({ type: /піксель/i.test(x.what) ? 'tracking' : /матеріал/i.test(x.what) ? 'creatives' : 'site', owner: 'client', priority: 'high', title: x.what.slice(0, 140), evidence: `Потрібно до ${x.due}. Джерело: ${x.source}.`, due_date: x.due })).filter((t) => t.type !== 'site');
   return {
     writes: [{ key: 'strategy', body: renderStrategyText({ ...content, goal: content.goal }), content, sources: [{ title: 'Бриф' }, { title: 'Unit Economy' }, ...(audience ? [{ title: 'Аудиторія' }] : []), ...(creatives ? [{ title: 'Креативи' }] : [])] }],
     tasks: tasksOut,
