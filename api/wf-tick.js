@@ -10,6 +10,7 @@ import { createValidator } from './_lib/wf/check.js';
 import { processTick } from './_lib/wf/tick.js';
 import { getModelClient } from './_lib/ai.js';
 import { createGa4Reader } from './_lib/ga4Client.js';
+import { createMetaWriter } from './_lib/metaAdsWrite.js';
 import { speedKeyFromEnv } from './_lib/pageSpeed.js';
 import { fetchMetaCampaigns, fetchMetaInsights, fetchMetaPixels } from './_lib/metaAdsData.js';
 
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
       return { text: r.text, costUsd: r.costUsd };
     } : null;
     const repo = createWfRepo(db);
-    const stats = await processTick({ repo, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader() });
+    const stats = await processTick({ repo, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader(), metaWrite: metaToken ? createMetaWriter({ token: metaToken }) : null });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);

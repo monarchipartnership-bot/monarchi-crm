@@ -114,7 +114,9 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       let resumed = 0;
       for (const r of waiting) {
         const key = r.state?.blocked_on; if (!key) continue;
-        const woke = key === 'site_url' // the run waits for the website to be written in the project card
+        const woke = key === 'launch_fix' // the check before the launch is repeated every half hour: the pixel may have started to fire, the site may be back
+          ? !!r.state?.blocked_at && (now() - new Date(r.state.blocked_at)) >= 30 * 60000
+          : key === 'site_url' // the run waits for the website to be written in the project card
           ? !!String((await this.readProject(projectId))?.website || '').trim()
           : key.startsWith('accounts:') // the run waits for an ad account of a platform to be linked (accounts:meta); the others wait for a newer version of a section
           ? (await this.listAdAccounts(projectId)).some((a) => a.platform === key.split(':')[1])

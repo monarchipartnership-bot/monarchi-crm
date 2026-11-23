@@ -126,8 +126,13 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
   // ---------------------------------------------------------------- 3 · launch
   if (state.stage === STAGE.LAUNCH) {
     const l = lastRun(runs, 'mediabuyer', 'launch');
+    const failed = runs.filter((r) => r.agent === 'mediabuyer' && r.skill === 'launch' && r.status === 'failed').length;
     if (!l) enqueue('mediabuyer', 'launch');
     else if (isDone(l)) { acts.push({ type: 'set_stage', stage: STAGE.OPERATE }); journal('stage', 'Кампанії запущено. Оптимізація.'); }
+    else if (l.status === 'failed') { // the launch goes on from the saved progress; three failures in a row stop it for a person
+      if (failed < 3) { enqueue('mediabuyer', 'launch'); acts.push({ type: 'journal', action: 'launch_retry', summary: `Запуск не вдався (спроба ${failed} з 3): повторюю з того місця, де зупинились.`, meta: {}, once: true }); }
+      else acts.push({ type: 'journal', action: 'launch_stopped', summary: 'Запуск не вдався тричі поспіль: потрібна допомога менеджера. Причина в кроках запуску.', meta: {}, once: true });
+    }
     return acts;
   }
 

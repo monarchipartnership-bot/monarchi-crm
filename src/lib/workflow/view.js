@@ -35,6 +35,8 @@ export const SECTIONS = [
   { key: 'materials', name: 'Матеріали', who: 'Креатор' },
   { key: 'ideas', name: 'Ідеї', who: 'Креатор' },
   { key: 'strategy', name: 'Стратегія', who: 'Стратег' },
+  { key: 'creatives', name: 'Креативи (готові)', who: 'Креатор' },
+  { key: 'launch', name: 'Знімок запуску', who: 'Медіабаєр' },
   { key: 'monthly_plan', name: 'План на місяць', who: 'Стратег' },
 ];
 export const sectionName = (key) => SECTIONS.find((s) => s.key === key)?.name || key;

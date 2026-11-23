@@ -3,6 +3,12 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { actId, countriesOf, createMetaWriter, ctaType, landingUrl, minor, utmTags } from '../api/_lib/metaAdsWrite.js';
+import { buildPlan, checkLaunch } from '../api/_lib/wf/skills/launchEngine.js';
+import { launch } from '../api/_lib/wf/skills/launchAgent.js';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { PACK_BLOCKS, blockOfTarget, buildPack, plural, remarksText, reviewState } from '../src/lib/workflow/pack.js';
 import { reworkCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { allocate, budgetPlan, checkStrategy, gatherStrategyFacts, marginInfo, neededFromClient, optimisationRules, prioritySource } from '../api/_lib/wf/skills/strategyEngine.js';
@@ -328,13 +334,13 @@ await test('screens: the card «Зараз» tells what is next', () => {
   assert.equal(nowCard({ state: { stage: 1 }, runs: [{ id: 3, agent: 'creator', skill: 'strategy', status: 'failed', error: 'boom' }] }).tone, 'bad');
   assert.equal(nowCard({ state: { stage: 1 }, runs: [{ id: 3, agent: 'creator', skill: 'strategy', status: 'failed' }, { id: 4, agent: 'creator', skill: 'strategy', status: 'done' }] }).tone, 'ok', 'a later run of the same step clears the error');
 });
-await test('screens: five agents, the dossier has ten sections, proposals not yet answered are open', () => {
+await test('screens: five agents, the dossier has twelve sections, proposals not yet answered are open', () => {
   const cards = agentCards([{ id: 1, agent: 'researcher', skill: 'site', status: 'done' }, { id: 2, agent: 'creator', skill: 'materials_ideas', status: 'running' }]);
   assert.equal(cards.length, 5);
   assert.equal(cards.find((c) => c.key === 'creator').active, true);
   assert.equal(cards.find((c) => c.key === 'mediabuyer').status, 'Не активний');
   const rows = sectionRows([{ id: 9, key: 'brief', status: 'approved', current_version_id: 4, needs_reapproval: true }]);
-  assert.equal(rows.length, 10);
+  assert.equal(rows.length, 12);
   assert.equal(rows[0].label, 'Затверджено'); assert.equal(rows[0].needsReapproval, true); assert.equal(rows[1].status, 'empty');
   const vs = [{ id: 1, version: 1, is_proposal: false }, { id: 2, version: 2, is_proposal: true }, { id: 3, version: 3, is_proposal: true }];
   assert.deepEqual(openProposals(vs, new Set([2])).map((v) => v.id), [3]);
@@ -1500,5 +1506,183 @@ await test('package: the blocks are built from the strategy and the creatives: a
   assert.equal(buildPack({ ...strategy, remarketing: { enabled: false } }, creatives).timeline.milestones.some((m) => m.title === 'Тиждень 2'), false);
   assert.deepEqual(p.money.campaigns, [{ name: 'К1', daily_budget: 90 }, { name: 'К2', daily_budget: 60 }]); assert.deepEqual(p.warnings, ['w1']);
   const empty = buildPack(null, null); assert.deepEqual(empty.scheme.campaigns, []); assert.equal(empty.summary.daily, null);
+});
+// ---------------------------------------------------------------- the code and the database must agree (the in-memory twin of the storage has no constraints, the real tables have)
+await test('database: every section key and every status written by the code is allowed by the check constraints of the migrations', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.js') ? [path.join(d, e.name)] : []));
+  const code = walk(path.join(root, 'api', '_lib', 'wf')).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+  const used = new Set([...code.matchAll(/(?:key|readSection\([^,()]+,|setSectionStatus\([^,()]+,|type: 'section_status', key):?\s*'([a-z_]+)'/g)].map((m) => m[1]));
+  const migrations = fs.readdirSync(path.join(root, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).sort().map((f) => fs.readFileSync(path.join(root, 'supabase', 'migrations', f), 'utf8'));
+  let allowed = null;
+  for (const m of migrations) for (const x of m.matchAll(/wf_sections[\s\S]{0,400}?check \(key in \(([^)]*)\)\)/g)) allowed = new Set([...x[1].matchAll(/'([a-z_]+)'/g)].map((y) => y[1]));
+  assert.ok(allowed && allowed.size >= 12, 'the constraint of the section keys is found in the migrations');
+  const sections = [...used].filter((k) => !['stub', 'draft', 'needs_rework', 'on_approval', 'approved'].includes(k) && /^(brief|audit|site|audience|unit_economy|competitors|materials|ideas|strategy|creatives|launch|monthly_plan|[a-z_]*plan|report)$/.test(k));
+  for (const k of sections) assert.ok(allowed.has(k), `section key «${k}» is written by the code but not allowed by the database`);
+  for (const k of ['brief', 'creatives', 'launch', 'strategy', 'ideas', 'materials']) assert.ok(allowed.has(k), `«${k}» must be allowed`);
+  // the task types and owners used by the skills
+  const taskTypes = new Set([...code.matchAll(/type: '(site|creatives|ads|tracking|brand|client|[a-z_]+)',\s*owner/g)].map((m) => m[1]));
+  for (const t of taskTypes) assert.ok(['site', 'creatives', 'ads', 'tracking', 'brand', 'client'].includes(t), `task type «${t}» is not allowed by the database`);
+});
+// ---------------------------------------------------------------- A8: the Media buyer's skill «launch» (the check before the launch, the writes to the cabinet, the snapshot)
+const LA_NOW = () => new Date(clock.t);
+const LA_DAY = () => LA_NOW().toISOString().slice(0, 10);
+const LA_FRESH = () => new Date(clock.t.getTime() - 864e5).toISOString(); // the pixel fired yesterday (the test clock moves on through the file)
+await test('meta write: the button, the countries, the money and the UTM tags are decided by code', () => {
+  assert.deepEqual([ctaType('Купити').type, ctaType('Дізнатись більше').type, ctaType('Замовити зараз').type, ctaType('').type, ctaType('Хмм').type, ctaType('Хмм').known], ['SHOP_NOW', 'LEARN_MORE', 'ORDER_NOW', 'NO_BUTTON', 'LEARN_MORE', false]);
+  assert.deepEqual(countriesOf('США, Україна'), { codes: ['US', 'UA'], unknown: [] }); assert.deepEqual(countriesOf('US, ua та Польща'), { codes: ['US', 'UA', 'PL'], unknown: [] });
+  assert.deepEqual(countriesOf('Атлантида'), { codes: [], unknown: ['Атлантида'] }); assert.deepEqual(countriesOf(''), { codes: [], unknown: [] });
+  assert.equal(minor(90), 9000); assert.equal(minor(33.335), 3334);
+  assert.equal(utmTags({ campaign: 'Холодна: молоді родини · 2026-11-23', content: 'c1-v2' }), 'utm_source=facebook&utm_medium=paid&utm_campaign=%D1%85%D0%BE%D0%BB%D0%BE%D0%B4%D0%BD%D0%B0-%D0%BC%D0%BE%D0%BB%D0%BE%D0%B4%D1%96-%D1%80%D0%BE%D0%B4%D0%B8%D0%BD%D0%B8-2026-11-23&utm_content=c1-v2');
+  assert.equal(landingUrl('shop.example/airplug?ref=1', 'utm_source=facebook&utm_medium=paid'), 'https://shop.example/airplug?ref=1&utm_source=facebook&utm_medium=paid');
+});
+await test('meta write: the requests have the shape of the Marketing API, nested values are JSON, the token never appears in an error, a read-only token is told apart', async () => {
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    seen.push({ url: String(url), method: init?.method || 'GET', body: init?.body ? Object.fromEntries(new URLSearchParams(init.body)) : null });
+    const u = String(url);
+    if (u.startsWith('https://store.example/')) return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+    if (u.includes('/adimages')) return new Response(JSON.stringify({ images: { bytes: { hash: 'h123' } } }), { status: 200 });
+    if (u.includes('/campaigns') && init?.body?.toString().includes('FAIL')) return new Response(JSON.stringify({ error: { message: 'Permission denied with TOKEN123', code: 200 } }), { status: 403 });
+    if (u.endsWith('act_55?fields=name%2Caccount_status%2Ccurrency%2Cdisable_reason%2Ctimezone_name&access_token=TOKEN123') || u.includes('act_55?fields')) return new Response(JSON.stringify({ name: 'Monarchi', account_status: 1, currency: 'USD' }), { status: 200 });
+    return new Response(JSON.stringify({ id: 'id' + seen.length }), { status: 200 });
+  };
+  const w = createMetaWriter({ token: 'TOKEN123', fetchFn });
+  assert.deepEqual(await w.accountInfo({ accountId: 'act_55' }), { name: 'Monarchi', status: 1, currency: 'USD', disable_reason: null, timezone: null });
+  await w.createCampaign({ accountId: '55', name: 'К1', status: 'ACTIVE' });
+  const camp = seen.at(-1); assert.match(camp.url, /\/act_55\/campaigns$/); assert.equal(camp.method, 'POST'); assert.equal(camp.body.objective, 'OUTCOME_SALES'); assert.equal(camp.body.status, 'ACTIVE'); assert.equal(camp.body.special_ad_categories, '[]'); assert.equal(camp.body.access_token, 'TOKEN123');
+  await w.createAdSet({ accountId: '55', campaignId: 'cmp1', name: 'Г1', dailyMinor: 9000, pixelId: 'px1', countries: ['US'] });
+  const set = seen.at(-1).body; assert.equal(set.daily_budget, '9000'); assert.equal(set.optimization_goal, 'OFFSITE_CONVERSIONS'); assert.deepEqual(JSON.parse(set.promoted_object), { pixel_id: 'px1', custom_event_type: 'PURCHASE' }); assert.deepEqual(JSON.parse(set.targeting).geo_locations, { countries: ['US'] }); assert.equal(set.campaign_id, 'cmp1');
+  assert.equal(await w.uploadImage({ accountId: '55', url: 'https://store.example/c1.png' }), 'h123'); assert.equal(seen.at(-1).body.bytes, Buffer.from([1, 2, 3]).toString('base64'), 'the picture is sent as bytes');
+  await assert.rejects(() => w.uploadImage({ accountId: '55', url: 'http://insecure.example/a.png' }), /https/);
+  await w.createAdCreative({ accountId: '55', name: 't', pageId: '777', link: 'https://shop.example/?utm_source=facebook', message: 'Текст', headline: 'Заголовок', imageHash: 'h123', cta: 'SHOP_NOW', urlTags: 'utm_source=facebook' });
+  const cr = JSON.parse(seen.at(-1).body.object_story_spec); assert.equal(cr.page_id, '777'); assert.equal(cr.link_data.image_hash, 'h123'); assert.deepEqual(cr.link_data.call_to_action, { type: 'SHOP_NOW', value: { link: 'https://shop.example/?utm_source=facebook' } });
+  await w.createAdCreative({ accountId: '55', name: 't', pageId: '777', link: 'https://s.example', message: 'm', headline: 'h', imageHash: 'h', cta: 'NO_BUTTON', urlTags: '' });
+  assert.equal(JSON.parse(seen.at(-1).body.object_story_spec).link_data.call_to_action, undefined, 'no button, no call_to_action');
+  await w.createAd({ accountId: '55', adsetId: 'set1', name: 'Оголошення', creativeId: 'cr1' }); assert.deepEqual(JSON.parse(seen.at(-1).body.creative), { creative_id: 'cr1' }); assert.equal(seen.at(-1).body.status, 'ACTIVE');
+  const err = await w.createCampaign({ accountId: '55', name: 'FAIL' }).catch((e) => e);
+  assert.match(err.message, /Permission denied with \*\*\*/); assert.doesNotMatch(err.message, /TOKEN123/); assert.match(err.message, /ads_management/); assert.equal(err.metaCode, 200);
+  assert.throws(() => createMetaWriter({}), /META_ACCESS_TOKEN/);
+});
+// the world of the launch tests
+const SHOP = { 'https://shop.example/': '<html><head><title>Shop</title></head><body><h1>AirPlug</h1><p>AirPlug + free 50 ml oil за 150 USD. Extrait 30 ml в наявності.</p></body></html>' };
+const LA_ACC = { platform: 'meta', account_id: '55', account_name: 'Monarchi test', currency: 'USD' };
+const LA_BRIEF = { content: { general: { goal: '60', geo: 'США', fb_page_id: '777000' }, economics: { ...LELIOR, offers: [{ name: 'AirPlug + free 50 ml oil', pays: 150, list_value: 150, extra_cost: 18, approved: true }] }, creative_goals: [] } };
+const LA_STRAT = { version: 1, geo: 'США', budget_monthly: 4500, budget: { daily: 150, min_daily: 15 }, campaigns: [
+  { name: 'Холодна: молоді родини', daily_budget: 90, ad_groups: [{ name: 'Молоді родини', segment: 'Молоді родини', creatives: [{ id: 'c1' }] }] },
+  { name: 'Холодна: широка', daily_budget: 60, ad_groups: [{ name: 'Широка аудиторія', segment: '', creatives: [{ id: 'c2' }] }] }] };
+const LA_CREATIVES = { items: [
+  { id: 'c1', goal: 'Продати хіт', tag: 'Продати хіт · AirPlug · Молоді родини · подарунок · картинка 4:5 · AirPlug + free 50 ml oil · v1', product: 'AirPlug', offer: 'AirPlug + free 50 ml oil', headline: 'AirPlug і олія в подарунок', primary_text: 'Тихий сон за 150.', cta: 'Купити', status: 'ready', image_url: 'https://store.example/c1.png', version: 1 },
+  { id: 'c2', goal: 'Розпродаж', tag: 'Розпродаж · Extrait 30 ml · усі · економія · картинка 9:16 · без оффера · v1', product: 'Extrait 30 ml', offer: '', headline: 'Спокійний сон', primary_text: 'Набір на літо.', cta: 'Дізнатись більше', status: 'ready', image_url: 'https://store.example/c2.png', version: 1 }] };
+const laWriter = ({ failAt = null, status = 1 } = {}) => {
+  const calls = []; let n = 0;
+  const rec = (name, fn) => async (a) => { if (failAt === name && !rec.failed) { rec.failed = true; throw new Error('Meta: temporary error (#2)'); } calls.push([name, a]); n += 1; return fn(a); };
+  return { calls, accountInfo: async () => ({ name: 'Monarchi', status, currency: 'USD', disable_reason: null }), createCampaign: rec('campaign', () => 'camp' + n), createAdSet: rec('adset', () => 'set' + n), uploadImage: rec('image', () => 'hash' + n), createAdCreative: rec('creative', () => 'cre' + n), createAd: rec('ad', () => 'ad' + n) };
+};
+const laSetup = async ({ pixels, account = LA_ACC, website = 'https://shop.example', brief = LA_BRIEF.content, strategy = LA_STRAT, creatives = LA_CREATIVES, writer, world = SHOP } = {}) => {
+  const s = await setup({ handlers: createHandlers({ mediabuyer: { launch } }) });
+  const net = fakeNet(world); Object.assign(s.ctx, net);
+  if (account) s.repo.addAccount(1, account);
+  if (website) s.repo.setWebsite(1, website);
+  s.ctx.meta = { pixels: async () => pixels ?? [{ id: 'px1', name: 'Main', lastFired: LA_FRESH() }] };
+  if (writer !== null) s.ctx.metaWrite = writer || laWriter();
+  if (brief) await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: brief });
+  if (strategy) await s.repo.writeSectionVersion(1, 'strategy', { author_kind: 'agent', author: 'strategist', body: 's', content: strategy });
+  if (creatives) await s.repo.writeSectionVersion(1, 'creatives', { author_kind: 'agent', author: 'creator', body: 'c', content: creatives });
+  await s.repo.writeSectionVersion(1, 'unit_economy', { author_kind: 'agent', author: 'researcher', body: 'ue', content: { thresholds: { breakeven_cpa: 100, target_cpa: 70, breakeven_roas: 1.75, target_roas: 2.5 } } });
+  await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'launch' });
+  return s;
+};
+await test('launch check: every thing the document lists blocks the launch with a reason and a task: cabinet, currency, tracking, page, site, geo, budgets, creatives, offer, stock', async () => {
+  const siteOf = async (html) => collectSiteData({ website: 'shop.example', ...fakeNet({ 'https://shop.example/': html }) });
+  const ok = await siteOf(SHOP['https://shop.example/']);
+  const base = { accountInfo: { status: 1, currency: 'USD' }, accountCurrency: 'USD', pixels: [{ id: 'px1', name: 'Main', lastFired: LA_FRESH() }], brief: LA_BRIEF, strategy: LA_STRAT, creatives: LA_CREATIVES, siteData: ok, website: 'https://shop.example', now: LA_NOW() };
+  const codes = (o) => checkLaunch({ ...base, ...o }).blockers.map((b) => b.code);
+  assert.deepEqual(codes({}), [], 'everything in order: no blockers');
+  assert.deepEqual(codes({ accountInfo: { status: 2, currency: 'USD', disable_reason: 1 } }), ['account']); assert.deepEqual(codes({ accountInfo: { status: 1, currency: 'EUR' } }), ['currency']);
+  assert.deepEqual(codes({ pixels: [] }), ['pixel']); assert.deepEqual(codes({ pixels: [{ id: 'p', name: 'Old', lastFired: '2026-10-01T00:00:00Z' }] }), ['pixel']); assert.deepEqual(codes({ pixels: [{ id: 'p', name: 'New', lastFired: null }] }), ['pixel']);
+  assert.deepEqual(codes({ website: '' }), ['site']); assert.deepEqual(codes({ siteData: { pages: [{ ok: false, error: 'HTTP 500' }], errors: [] } }), ['site']);
+  assert.deepEqual(codes({ brief: { content: { ...LA_BRIEF.content, general: { geo: 'США' } } } }), ['page']);
+  assert.deepEqual(codes({ strategy: { ...LA_STRAT, geo: 'Атлантида' }, brief: { content: { ...LA_BRIEF.content, general: { ...LA_BRIEF.content.general, geo: 'Атлантида' } } } }), ['geo']);
+  assert.deepEqual(codes({ strategy: { ...LA_STRAT, campaigns: [{ ...LA_STRAT.campaigns[0], daily_budget: 300 }, LA_STRAT.campaigns[1]] } }), ['budget', 'budget'], 'more than the brief allows, and not what the strategy says');
+  assert.deepEqual(codes({ creatives: { items: [{ ...LA_CREATIVES.items[0], status: 'needs_check', problems: ['число без джерела: 83'] }, LA_CREATIVES.items[1]] } }), ['creatives']);
+  assert.deepEqual(codes({ creatives: { items: [{ ...LA_CREATIVES.items[0], image_url: '' }, LA_CREATIVES.items[1]] } }), ['creatives']);
+  assert.deepEqual(codes({ strategy: { ...LA_STRAT, campaigns: [{ ...LA_STRAT.campaigns[0], ad_groups: [{ name: 'Порожня', creatives: [] }] }, LA_STRAT.campaigns[1]] } }), ['creatives']);
+  assert.deepEqual(codes({ siteData: await siteOf('<html><body><p>AirPlug за 100 USD. Extrait 30 ml.</p></body></html>') }), ['offer'], 'the offer of the ad is not on the site');
+  assert.deepEqual(codes({ siteData: await siteOf('<html><body><p>AirPlug + free 50 ml oil за 150 USD. Extrait 30 ml немає в наявності.</p></body></html>') }), ['stock']);
+  const r = checkLaunch({ ...base, siteData: await siteOf('<html><body><p>AirPlug + free 50 ml oil за 150 USD.</p></body></html>'), creatives: { items: [LA_CREATIVES.items[0], { ...LA_CREATIVES.items[1], cta: 'Хмм' }] } });
+  assert.deepEqual(r.blockers, []); assert.ok(r.warnings.some((w) => /Наявність товару «Extrait 30 ml» не вдалося перевірити/.test(w)) && r.warnings.some((w) => /Кнопка «Хмм»/.test(w)), 'what cannot be checked is a warning, not a blocker');
+  assert.ok(checkLaunch({ ...base, pixels: [] }).blockers[0].task.type === 'tracking' && checkLaunch({ ...base, pixels: [] }).blockers[0].task.owner === 'client', 'every blocker comes with the task for the right person');
+});
+await test('launch plan: names with the date, budgets in cents (a campaign with several groups is split without losing a cent), links with UTM tags, the button types', () => {
+  const plan = buildPlan({ strategy: { ...LA_STRAT, campaigns: [{ name: 'К', daily_budget: 100, ad_groups: [{ name: 'А', creatives: [{ id: 'c1' }] }, { name: 'Б', creatives: [{ id: 'c2' }] }, { name: 'В', creatives: [] }] }] }, creatives: LA_CREATIVES, website: 'https://shop.example', pageId: '777 000', pixelId: 'px1', now: LA_NOW() });
+  assert.equal(plan.campaigns[0].name, 'К · ' + LA_DAY()); assert.deepEqual(plan.campaigns[0].adsets.map((a) => a.dailyMinor), [3334, 3333, 3333]); assert.equal(plan.campaigns[0].adsets.reduce((s, a) => s + a.dailyMinor, 0), 10000);
+  assert.equal(plan.pageId, '777000'); assert.equal(plan.countries.join(), 'US');
+  const ad = plan.campaigns[0].adsets[0].ads[0]; assert.equal(ad.cta, 'SHOP_NOW'); assert.match(ad.link, /^https:\/\/shop\.example\/\?utm_source=facebook&utm_medium=paid&utm_campaign=.+&utm_content=c1-v1$/); assert.equal(ad.key, 'c1-v1');
+  const one = buildPlan({ strategy: LA_STRAT, creatives: LA_CREATIVES, website: 'shop.example', pageId: '7', pixelId: 'p', now: LA_NOW() });
+  assert.deepEqual(one.campaigns.map((c) => c.adsets[0].dailyMinor), [9000, 6000]);
+});
+await test('launch: without a cabinet it waits and asks; a problem found by the check changes nothing in the cabinet, tells the reasons, and is checked again after half an hour', async () => {
+  const a = await laSetup({ account: null }); await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].state.blocked_on, 'accounts:meta'); assert.equal(a.ctx.metaWrite.calls.length, 0);
+  const b = await laSetup({ pixels: [] }); await processTick(b.ctx);
+  const run = b.repo.T.runs[0];
+  assert.equal(run.status, 'waiting'); assert.equal(run.state.blocked_on, 'launch_fix'); assert.match(run.error, /немає піксельного набору/); assert.equal(b.ctx.metaWrite.calls.length, 0, 'nothing was changed in the cabinet');
+  assert.ok(b.repo.T.tasks.some((t) => t.type === 'tracking' && t.owner === 'client')); assert.equal((await b.repo.readSection(1, 'launch'))?.version ?? null, null);
+  await processTick(b.ctx); assert.equal(b.repo.T.runs[0].status, 'waiting', 'before half an hour it is not checked again');
+  advance(31 * 60000); b.ctx.meta.pixels = async () => [{ id: 'px1', name: 'Main', lastFired: new Date(clock.t.getTime() - 3600e3).toISOString() }]; // the pixel started to fire
+  await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].status, 'done', b.repo.T.runs[0].error); assert.ok(b.ctx.metaWrite.calls.length > 0);
+});
+await test('launch: the approved package is created in the cabinet in the right order, ACTIVE at once, and the snapshot of the launch is written; a second run does nothing', async () => {
+  const s = await laSetup(); await processTick(s.ctx);
+  const run = s.repo.T.runs[0];
+  assert.equal(run.status, 'done', run.error);
+  const calls = s.ctx.metaWrite.calls;
+  assert.deepEqual(calls.map((c) => c[0]), ['campaign', 'adset', 'image', 'creative', 'ad', 'campaign', 'adset', 'image', 'creative', 'ad']);
+  assert.equal(calls[0][1].status, 'ACTIVE'); assert.equal(calls[0][1].name, 'Холодна: молоді родини · ' + LA_DAY()); assert.equal(calls[1][1].dailyMinor, 9000); assert.equal(calls[1][1].pixelId, 'px1'); assert.deepEqual(calls[1][1].countries, ['US']); assert.equal(calls[1][1].campaignId, 'camp1');
+  assert.equal(calls[3][1].pageId, '777000'); assert.equal(calls[3][1].cta, 'SHOP_NOW'); assert.match(calls[3][1].link, /utm_source=facebook/); assert.equal(calls[3][1].imageHash, 'hash3'); assert.equal(calls[4][1].creativeId, 'cre4'); assert.equal(calls[4][1].adsetId, 'set2');
+  const snap = (await s.repo.readSection(1, 'launch')).version;
+  assert.equal(snap.content.status, 'done'); assert.equal(snap.content.campaigns.length, 2); assert.equal(snap.content.campaigns[0].adsets[0].ads[0].ad_id, 'ad5'); assert.equal(snap.content.targets.target_cpa, 70); assert.equal(snap.content.account.name, 'Monarchi test'); assert.equal(snap.content.strategy_version, 1);
+  assert.match(snap.body, /Знімок запуску. Запущено/); assert.match(snap.body, /utm_content=c1-v1/); assert.match(snap.body, /цільовий CPA 70/);
+  assert.ok(s.repo.T.journal.some((j) => j.action === 'launch' && /кампаній 2, оголошень 2, 150 на день \(ACTIVE\)/.test(j.summary)));
+  await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'launch' }); await processTick(s.ctx);
+  assert.equal(s.ctx.metaWrite.calls.length, 10, 'a launched project is not launched twice'); assert.equal(s.repo.T.runs.filter((r) => r.skill === 'launch')[1].output.already_launched, true);
+});
+await test('launch: when Meta fails halfway the progress is saved, the run fails with the reason, and the next run goes on without making the same campaign again', async () => {
+  const writer = laWriter({ failAt: 'creative' });
+  const s = await laSetup({ writer }); await processTick(s.ctx);
+  assert.equal(s.repo.T.runs[0].status, 'failed'); assert.match(s.repo.T.runs[0].error, /temporary error/);
+  const part = (await s.repo.readSection(1, 'launch')).version.content;
+  assert.equal(part.status, 'partial'); assert.equal(part.campaigns[0].id, 'camp1'); assert.equal(part.campaigns[0].adsets[0].id, 'set2'); assert.equal(part.campaigns[1].id, null);
+  const before = writer.calls.length;
+  advance(1000); await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'launch' }); await processTick(s.ctx);
+  assert.equal(s.repo.T.runs.filter((r) => r.skill === 'launch')[1].status, 'done', s.repo.T.runs.filter((r) => r.skill === 'launch')[1].error);
+  assert.equal(writer.calls.filter((c) => c[0] === 'campaign').length, 2, 'two campaigns in all, the first one was not made again'); assert.equal(writer.calls.filter((c) => c[0] === 'adset').length, 2);
+  assert.equal(writer.calls.slice(before)[0][0], 'image', 'it goes on with the picture of the first creative');
+  assert.equal((await s.repo.readSection(1, 'launch')).version.content.status, 'done');
+});
+await test('launch: no right to write fails clearly and changes nothing; a closed cabinet and a broken strategy are told apart', async () => {
+  const a = await laSetup({ writer: null }); await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].status, 'failed'); assert.match(a.repo.T.runs[0].error, /ads_management/);
+  const b = await laSetup({ writer: laWriter({ status: 2 }) }); await processTick(b.ctx);
+  assert.equal(b.repo.T.runs[0].status, 'waiting'); assert.match(b.repo.T.runs[0].error, /кабінет не активний/); assert.equal(b.ctx.metaWrite.calls.length, 0);
+  const c = await laSetup({ strategy: null }); await processTick(c.ctx);
+  assert.equal(c.repo.T.runs[0].status, 'failed'); assert.match(c.repo.T.runs[0].error, /Немає стратегії/);
+});
+await test('machine: a failed launch is tried again from the saved progress, three failures in a row stop it for a person', () => {
+  const base = { now: new Date('2026-11-23T10:00:00Z'), state: { stage: 3, paused: false }, sections: {} };
+  const run = (id, status) => ({ id, agent: 'mediabuyer', skill: 'launch', status, input: {} });
+  const enq = (a) => a.filter((x) => x.type === 'enqueue').map((x) => `${x.agent}/${x.skill}`);
+  assert.deepEqual(enq(planNext({ ...base, runs: [] })), ['mediabuyer/launch']);
+  assert.deepEqual(enq(planNext({ ...base, runs: [run(2, 'failed'), run(1, 'failed')] })), ['mediabuyer/launch']);
+  const stop = planNext({ ...base, runs: [run(3, 'failed'), run(2, 'failed'), run(1, 'failed')] });
+  assert.deepEqual(enq(stop), []); assert.ok(stop.some((a) => a.action === 'launch_stopped' && a.once));
+  assert.ok(planNext({ ...base, runs: [run(1, 'done')] }).some((a) => a.type === 'set_stage' && a.stage === 4), 'a finished launch moves on to the optimisation');
+  assert.deepEqual(enq(planNext({ ...base, runs: [run(1, 'waiting')] })), [], 'a launch waiting for the check is not duplicated');
+});
+await test('brief: the page the ads are published from is a row of the brief sheet', () => {
+  const f = formFromContent({ general: { fb_page_id: '777000', geo: 'США' } });
+  assert.equal(f.values.fb_page_id, '777000'); assert.equal(contentFromForm(f).general.fb_page_id, '777000');
 });
 console.log(`\n${passed} workflow checks passed`);
