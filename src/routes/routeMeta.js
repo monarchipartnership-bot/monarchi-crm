@@ -48,6 +48,13 @@ export const ROUTE_META = {
     pageIcon: PAGE_ICONS['page.projects-dashboard'].src,
     infoLabel: 'Про розділ',
   },
+  '/projects/help': {
+    title: 'Як це працює',
+    desc: 'Карта процесу агентів: шість етапів, що на них відбувається, що робите ви і що робити, якщо щось не так.',
+    trail: [{ label: 'Project Managers Department' }, { label: 'Як це працює' }],
+    pageIcon: PAGE_ICONS['page.projects'].src,
+    infoLabel: 'Про розділ',
+  },
   '/projects/approvals': {
     title: 'Апруви',
     desc: 'Рішення, що чекають на менеджера: стратегія і перші креативи, підпис клієнта, запуск, великі зміни.',

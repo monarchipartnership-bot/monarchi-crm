@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchProcess, patchState, runTickNow, startProcess } from '../../lib/api/workflow';
+import { fetchProcess, patchState, requestRun, runTickNow, startProcess } from '../../lib/api/workflow';
 import { agentCards, ageText, nowCard, signoffWanted } from '../../lib/workflow/view';
 import { Pill, Stepper } from './parts';
 import Decision from './Decision';
@@ -43,6 +43,7 @@ export default function ProcessOverview({ projectId, onGo }) {
       {err && <div className="wf-err" role="alert">{err}</div>}
       <div className={'wf-now ' + now.tone}>
         <div><h2>{now.title}</h2><p>{now.text}</p></div>
+        {now.rerun && <button type="button" className="wf-btn" disabled={busy} onClick={() => act(async () => { if (!(await requestRun(projectId, now.rerun.agent, now.rerun.skill, email))) throw new Error('Такий запуск уже в черзі або виконується.'); })} title="Спершу виправте причину зупинки, потім запустіть крок вручну">Запустити ще раз</button>}
         {mainAction && <button type="button" className="wf-btn" disabled={busy} onClick={mainAction}>{actionLabel}</button>}
       </div>
 

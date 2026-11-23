@@ -20,7 +20,7 @@ export async function fetchProcess(projectId) {
     supabase.from('wf_project_state').select('*').eq('project_id', projectId).maybeSingle(),
     supabase.from('wf_runs').select('id, agent, skill, status, created_at, finished_at, error').eq('project_id', projectId).order('id', { ascending: false }).limit(100),
     supabase.from('wf_approvals').select('*').eq('project_id', projectId).order('id', { ascending: false }).limit(50),
-    supabase.from('wf_journal').select('id, at, actor_kind, actor, action, summary').eq('project_id', projectId).order('id', { ascending: false }).limit(15),
+    supabase.from('wf_journal').select('id, at, actor_kind, actor, action, summary, meta').eq('project_id', projectId).order('id', { ascending: false }).limit(15),
     supabase.from('wf_sections').select('id, key, status, needs_reapproval, current_version_id, updated_at').eq('project_id', projectId),
   ]);
   return { state: must(state, 'state'), runs: must(runs, 'runs') || [], approvals: must(approvals, 'approvals') || [], journal: must(journalRows, 'journal') || [], sections: must(sections, 'sections') || [] };

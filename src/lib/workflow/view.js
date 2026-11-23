@@ -118,7 +118,11 @@ export function nowCard({ state, runs = [], approvals = [], hasBrief = false, jo
   // the process is stopped by the automatic check or by a skill that failed three times: nothing is running, so «усе виконано» would be a lie
   const stop = journal.find((j) => ['check_failed', 'skill_stopped', 'launch_stopped'].includes(j.action));
   const moved = journal.find((j) => j.action === 'stage');
-  if (!open && stop && (!moved || moved.id < stop.id)) return { tone: 'bad', title: 'Процес зупинено', text: stop.summary, action: 'tasks' };
+  if (!open && stop && (!moved || moved.id < stop.id)) {
+    // a skill that failed three times is never started again by the orchestrator: the manager fixes the cause and starts it by hand («Запустити ще раз»)
+    const [agent, skill] = String(stop.action === 'skill_stopped' ? stop.meta?.skill || '' : '').split('/');
+    return { tone: 'bad', title: 'Процес зупинено', text: stop.summary, action: 'tasks', ...(agent && skill ? { rerun: { agent, skill } } : {}) };
+  }
   if (open) return { tone: 'info', title: `Зараз: ${agentName(open.agent)} ${SKILL_LABEL[open.skill] || open.skill}`, text: open.status === 'queued' ? 'У черзі на виконання.' : 'Працює.', action: 'dossier' };
   const failed = runs.filter((r) => r.status === 'failed').sort(byIdDesc)[0];
   if (failed && !runs.some((r) => r.agent === failed.agent && r.skill === failed.skill && r.id > failed.id)) return { tone: 'bad', title: `Помилка: ${agentName(failed.agent)}, ${SKILL_LABEL[failed.skill] || failed.skill}`, text: failed.error || 'Крок не вдався після повторних спроб.', action: 'dossier' };

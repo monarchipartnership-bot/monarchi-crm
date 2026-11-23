@@ -48,7 +48,8 @@ import { computeUnitEconomy, renderUnitEconomy } from '../api/_lib/wf/skills/eco
 import { intake } from '../api/_lib/wf/skills/intake.js';
 import { unitEconomy } from '../api/_lib/wf/skills/unitEconomyAgent.js';
 import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } from '../src/lib/workflow/brief.js';
-import { agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
+import { STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
+import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
 
 let passed = 0;
 const test = async (name, fn) => { try { await fn(); passed += 1; console.log('ok  ', name); } catch (e) { console.error('FAIL', name, '\n', e); process.exitCode = 1; } };
@@ -2182,5 +2183,44 @@ await test('platforms: a project with only Google or TikTok cabinets is told pla
   const { repo: r2, ctx: c2 } = await setup();
   const plain = await intake({ run: { id: 1, project_id: 1, agent: 'x', skill: 'intake' }, ctx: c2 });
   assert.ok(!/Google|TikTok/.test(plain.blocked.reason), 'no other platforms: the old plain reason');
+});
+// ---------------------------------------------------------------- A13/A14: «Запустити ще раз» after a skill failed three times
+await test('rerun: the stopped-process card of a failed skill carries the way to start it again, and a manual run really goes through after the stop', async () => {
+  const jr = [{ id: 9, action: 'skill_stopped', summary: 'Крок researcher/intake не вдався 3 рази поспіль.', meta: { skill: 'researcher/intake' } }];
+  const card = nowCard({ state: { stage: 1, paused: false }, runs: [{ id: 5, agent: 'researcher', skill: 'intake', status: 'failed' }], journal: jr });
+  assert.equal(card.title, 'Процес зупинено'); assert.deepEqual(card.rerun, { agent: 'researcher', skill: 'intake' });
+  const check = nowCard({ state: { stage: 1, paused: false }, runs: [], journal: [{ id: 9, action: 'check_failed', summary: 'x', meta: {} }] });
+  assert.equal(check.rerun, undefined, 'a failed check is fixed in the data, not by a rerun');
+  // the real chain: the skill fails three times, the orchestrator stops, then the manager reruns it by hand and the work goes on
+  const { repo, ctx } = await setup();
+  await human(repo, 'brief');
+  const good = createHandlers();
+  let broken = true;
+  ctx.handlers = { ...good, researcher: { ...good.researcher, intake: async (a) => { if (broken) throw new Error('boom'); return good.researcher.intake(a); } } };
+  for (let i = 0; i < 8; i += 1) { await processTick(ctx); advance(1000); }
+  assert.ok(repo.T.journal.some((j) => j.action === 'skill_stopped' && j.meta?.skill === 'researcher/intake'), 'stopped');
+  const failedBefore = repo.T.runs.filter((r) => r.skill === 'intake' && r.status === 'failed').length;
+  broken = false;
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'intake', trigger: 'manual', priority: 50 });
+  for (let i = 0; i < 4; i += 1) { await processTick(ctx); advance(1000); }
+  assert.ok(repo.T.runs.some((r) => r.skill === 'intake' && r.status === 'done'), 'the manual run was taken and finished although the skill was stopped');
+  assert.equal(repo.T.runs.filter((r) => r.skill === 'intake' && r.status === 'failed').length, failedBefore, 'no new failures');
+});
+// ---------------------------------------------------------------- A14: the help «Як це працює»
+await test('help: the map has the same six stages as the process, every stage is fully written, every button leads to a real page, the page and the menu entry exist', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  assert.equal(HELP_STAGES.length, STAGES.length);
+  const app = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
+  HELP_STAGES.forEach((h, i) => {
+    assert.equal(h.n, STAGES[i].n); assert.equal(h.title, STAGES[i].title); assert.equal(h.hint, STAGES[i].hint, 'the same words as the stepper');
+    assert.ok(String(h.who).trim().length >= 2, `${h.title}: who`);
+    for (const k of ['what', 'you', 'see', 'wrong', 'tip']) assert.ok(String(h[k]).trim().length > 10, `${h.title}: ${k}`);
+    assert.ok(h.go.label && app.includes(`path="${h.go.to}"`), `${h.title}: the page ${h.go.to} exists`);
+  });
+  for (const c of HELP_CONTROLS) assert.ok(c.title && c.text && c.where);
+  assert.ok(app.includes('path="/projects/help"'));
+  assert.match(fs.readFileSync(path.join(root, 'src/components/Sidebar/sidebarData.js'), 'utf8'), /to: '\/projects\/help'/);
+  assert.match(fs.readFileSync(path.join(root, 'src/routes/routeMeta.js'), 'utf8'), /'\/projects\/help'/);
+  assert.match(HELP_STAGES[3].wrong, /Запустити ще раз/, 'the way out of a stopped launch is told');
 });
 console.log(`\n${passed} workflow checks passed`);

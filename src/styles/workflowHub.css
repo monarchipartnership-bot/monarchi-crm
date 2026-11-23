@@ -226,3 +226,19 @@
 .wf-pipe .s { width:22px; height:22px; border-radius:50%; background:var(--wf-soft); color:var(--wf-muted); display:grid; place-items:center; font-size:11px; font-weight:700; flex:none; }
 .wf-pipe .s.done { background:var(--wf-ok-bg); color:var(--wf-ok); } .wf-pipe .s.cur { background:var(--wf-grad); color:#fff; box-shadow:0 0 0 4px var(--wf-halo); } .wf-pipe .s.cur.bad { background:var(--wf-bad); box-shadow:0 0 0 4px var(--wf-bad-bg); }
 .wf-pipe .l { height:2px; width:14px; background:var(--wf-border); flex:none; } .wf-pipe .l.done { background:var(--wf-ok); }
+/* «Як це працює» (step A14, concept A «Карта процесу») */
+.wf-help { grid-template-columns:minmax(0,1fr); } /* one column that may be narrower than the stage row: the row scrolls inside itself on a phone */
+.wf-help-why { background:var(--wf-soft); border-radius:14px; padding:10px 14px; color:var(--wf-plum); font-size:13px; max-width:90ch; }
+.wf-help-track { display:grid; grid-template-columns:repeat(6,minmax(120px,1fr)); gap:8px; overflow-x:auto; padding:6px; }
+.wf-help-stage { border:0; font:inherit; color:inherit; text-align:left; background:var(--wf-surface); border-radius:16px; box-shadow:0 0 0 1px var(--wf-border); padding:10px 12px; cursor:pointer; display:grid; gap:4px; align-content:start; min-width:120px; }
+.wf-help-stage .n { width:26px; height:26px; border-radius:50%; background:var(--wf-soft); color:var(--wf-plum); display:grid; place-items:center; font-weight:800; font-size:12px; }
+.wf-help-stage .h { color:var(--wf-muted); font-size:12px; }
+.wf-help-stage[aria-pressed="true"] { box-shadow:0 0 0 2px var(--wf-orchid), 0 0 0 6px var(--wf-halo); }
+.wf-help-stage[aria-pressed="true"] .n { background:var(--wf-grad); color:#fff; }
+.wf-help-stage:focus-visible { outline:2px solid var(--wf-orchid); outline-offset:2px; }
+.wf-help-h { margin:0; font-size:17px; }
+.wf-help-detail { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+.wf-help-blk { background:var(--wf-bg); border-radius:14px; padding:10px 12px; box-shadow:0 0 0 1px var(--wf-line); }
+.wf-help-blk h4 { margin:0 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--wf-muted); font-weight:700; }
+.wf-help-blk p { margin:0; }
+.wf-help-tip { background:var(--wf-info-bg); color:var(--wf-info); border-radius:12px; padding:8px 12px; font-size:13px; margin-top:12px; }
