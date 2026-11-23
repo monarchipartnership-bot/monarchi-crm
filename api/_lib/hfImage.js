@@ -12,6 +12,7 @@
 //   HF_IMAGE_RATIOS       the aspect ratios the model accepts, comma separated, e.g. «1:1,3:2,2:3,4:3,3:4,16:9,9:16,21:9»; a format outside the list (4:5 of the
 //                         Meta feed) is asked as the nearest accepted one and the prompt keeps the important parts away from the edges that Meta trims
 // fetch and the database are handed in, so scripts/check-core.mjs runs all of it with a stand-in network.
+import { createHash } from 'node:crypto';
 
 const BASE = 'https://api.higgsfield.ai';
 const BUCKET = 'creative-assets';
@@ -109,6 +110,7 @@ export async function estimate({ request, env = process.env, fetchFn = fetch }) 
 
 // → { jobId, statusUrl }. Throws a readable Error.
 export async function submit({ request, key, env = process.env, fetchFn = fetch }) {
+  if (!/^[ -~]*$/.test(String(key))) key = 'k-' + createHash('sha1').update(String(key)).digest('hex').slice(0, 24); // a header value must be ASCII
   const res = await fetchFn(`${BASE}/${request.path}`, { method: 'POST', headers: { ...headers(env), 'Idempotency-Key': key }, body: JSON.stringify(request.body) });
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.request_id) throw new Error(detailOf(json, res.status));

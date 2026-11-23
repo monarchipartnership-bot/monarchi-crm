@@ -25,6 +25,7 @@ import { allocate, budgetPlan, checkStrategy, gatherStrategyFacts, marginInfo, n
 import { strategy } from '../api/_lib/wf/skills/strategyAgent.js';
 import { checkCards, gatherCreativeFacts, goalsOf, referencePool, tagOf } from '../api/_lib/wf/skills/creativesEngine.js';
 import { firstCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
+import * as hfImage from '../api/_lib/hfImage.js';
 import { SYSTEM_PROMPT as IDEAS_PROMPT, checkIdeas, checkMaterials, gatherIdeaFacts, inventoryOf, offerEconomics, renderIdeasText } from '../api/_lib/wf/skills/ideasEngine.js';
 import { materialsIdeas } from '../api/_lib/wf/skills/materialsAgent.js';
 import { checkSources, compareNumbers, createValidator, findDuplicateTasks, validateProject } from '../api/_lib/wf/check.js';
@@ -1274,7 +1275,7 @@ await test('creatives: branch A makes a card per goal, the pictures through Higg
   assert.equal(c.branch, 'A'); assert.equal(c.items.length, 2); assert.deepEqual(c.items.map((x) => x.status), ['ready', 'ready']);
   assert.match(c.items[0].image_url, /^https:\/\/store\.example\//, 'the picture is our copy, not the address of the provider'); assert.ok(c.items[0].path.startsWith('projects/1/creatives/'));
   assert.equal(c.spent_usd, 1); assert.equal(c.limit_usd, 5, 'no cap on the project: the default limit'); assert.equal(run.cost_usd, 1.1, 'the model 0.1 and two pictures 0.5');
-  assert.equal(s.ctx.hf.calls.submit.length, 2); assert.match(s.ctx.hf.calls.submit[0].key, /^wf-1-/); assert.deepEqual(s.ctx.hf.calls.submit[0].request.body.refs, ['https://f.example/p0.jpg'], 'the reference is the product photo of the client');
+  assert.equal(s.ctx.hf.calls.submit.length, 2); assert.match(s.ctx.hf.calls.submit[0].key, /^wf-1-/); assert.ok(s.ctx.hf.calls.submit.every((c) => /^[ -~]+$/.test(c.key)), 'the key of the request is ASCII even when the goal is Ukrainian'); assert.deepEqual(s.ctx.hf.calls.submit[0].request.body.refs, ['https://f.example/p0.jpg'], 'the reference is the product photo of the client');
   assert.equal(s.asked.length, 1); assert.match(s.asked[0].user, /"goal_index": 2/); assert.match((await s.repo.readSection(1, 'creatives')).version.body, /Продати хіт · AirPlug/);
   // a second run changes nothing: no new cards, no new pictures, no new questions to the model
   await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'first_creatives' });
@@ -2264,5 +2265,16 @@ await test('materials: «not enough» from the model is lifted to «enough» whe
   assert.equal(noBrand.verdict, 'not_enough'); assert.equal(noBrand.shoot_list.length, 1);
   const noPhoto = checkMaterials(raw('not_enough'), inventoryOf({ assets: [], settings: { inputs: { tone: { body: 'x' } } } }));
   assert.equal(noPhoto.verdict, 'not_enough');
+});
+await test('higgsfield: a Cyrillic idempotency key never reaches the HTTP header as it is (found by the pilot: the picture failed with «Cannot convert argument to a ByteString»)', async () => {
+  const sent = [];
+  const fetchFn = async (url, init) => { sent.push(init.headers); return { ok: true, json: async () => ({ request_id: 'r1', status_url: 'https://api.higgsfield.ai/requests/r1/status' }) }; };
+  const env = { HF_API_KEY_ID: 'a', HF_API_KEY_SECRET: 'b' };
+  await hfImage.submit({ request: { path: 'm', body: {} }, key: 'wf-27-залучити заявки-v1-1', env, fetchFn });
+  assert.match(sent[0]['Idempotency-Key'], /^[ -~]+$/); assert.notEqual(sent[0]['Idempotency-Key'], 'wf-27-залучити заявки-v1-1');
+  await hfImage.submit({ request: { path: 'm', body: {} }, key: 'wf-1-abc-v1-1', env, fetchFn });
+  assert.equal(sent[1]['Idempotency-Key'], 'wf-1-abc-v1-1', 'an ASCII key is left as it is');
+  await hfImage.submit({ request: { path: 'm', body: {} }, key: 'ключ', env, fetchFn }); await hfImage.submit({ request: { path: 'm', body: {} }, key: 'ключ', env, fetchFn });
+  assert.equal(sent[2]['Idempotency-Key'], sent[3]['Idempotency-Key'], 'the same key gives the same header: a repeat stays harmless');
 });
 console.log(`\n${passed} workflow checks passed`);

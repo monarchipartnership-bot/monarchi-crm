@@ -4,6 +4,7 @@
 // client with the strategy; the section says so. It can run again: cards that exist are kept, unfinished pictures are followed up, only new goals get new cards.
 // rework_creatives. The manager (Апрув 1) or the client returned SOME creatives with a comment: only those cards are made again (a new version v+1, the old comment kept in
 // their history), everything else stays as approved. ctx.ask is the model, ctx.hf the picture generator (the real one when its keys are set).
+import { createHash } from 'node:crypto';
 import * as hfReal from '../../hfImage.js';
 import { DEFAULT_IMAGE_LIMIT_USD, buildCreativesPrompt, checkCards, gatherCreativeFacts, goalsOf, imageRequestOf, parseCreativesAnswer, referencePool, renderCreativesText, tagOf } from './creativesEngine.js';
 
@@ -26,7 +27,7 @@ async function makePictures({ items, ctx, run, modelCost }) {
   let imageSpent = 0;
   const open = [];
   if (!hf) { open.push('Higgsfield не налаштовано на сервері (потрібні HF_API_KEY_ID, HF_API_KEY_SECRET, HF_IMAGE_MODEL): картинки не створювались, тексти готові.'); return { imageSpent, open, limit, hf }; }
-  const keyOf = (x) => `wf-${run.project_id}-${norm(x.goal).slice(0, 40)}-v${x.version || 1}-${(x.attempt || 0) + 1}`;
+  const keyOf = (x) => `wf-${run.project_id}-${createHash('sha1').update(norm(x.goal)).digest('hex').slice(0, 12)}-v${x.version || 1}-${(x.attempt || 0) + 1}`; // ASCII only: an HTTP header cannot carry Cyrillic (found by the pilot: goals are written in Ukrainian)
   for (const x of items) {
     if (!['planned', 'failed'].includes(x.status) || x.job || !x.visual_prompt || !x.references?.length) continue;
     let usd;
