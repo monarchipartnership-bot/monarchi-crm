@@ -142,3 +142,19 @@ export async function fetchMetaPixels({ accountId, token }) {
   const res = await graphGet(GRAPH + 'act_' + digits + '/adspixels?' + new URLSearchParams({ fields: 'id,name,last_fired_time,is_unavailable,creation_time', limit: '50', access_token: token }), token);
   return (res.data || []).map((p) => ({ id: String(p.id), name: p.name, lastFired: p.last_fired_time || null, unavailable: !!p.is_unavailable, created: p.creation_time || null }));
 }
+
+// The ad sets or the ads of an account with their real state: [{ id, name, status, campaign_id, adset_id, daily }]; status is the EFFECTIVE one (ACTIVE only when it really runs). Reads only.
+export async function fetchMetaObjects({ accountId, level = 'adset', token, maxPages = MAX_PAGES }) {
+  const digits = String(accountId || '').replace(/^act_/, '').replace(/\D/g, '');
+  if (!digits) throw new Error('accountId обовʼязковий');
+  if (!['adset', 'ad'].includes(level)) throw new Error('level: adset або ad');
+  const fields = level === 'adset' ? 'id,name,effective_status,campaign_id,daily_budget' : 'id,name,effective_status,adset_id,campaign_id';
+  let url = GRAPH + 'act_' + digits + '/' + (level === 'adset' ? 'adsets' : 'ads') + '?' + new URLSearchParams({ fields, limit: '200', access_token: token });
+  const out = [];
+  for (let page = 0; page < maxPages && url; page += 1) {
+    const res = await graphGet(url, token);
+    out.push(...(res.data || []));
+    url = res.paging?.next || null;
+  }
+  return out.map((o) => ({ id: String(o.id), name: o.name, status: o.effective_status || null, campaign_id: o.campaign_id ? String(o.campaign_id) : null, adset_id: o.adset_id ? String(o.adset_id) : null, daily: o.daily_budget != null ? Math.round(Number(o.daily_budget)) / 100 : null }));
+}

@@ -26,7 +26,7 @@ export default function ProcessOverview({ projectId, onGo }) {
   const now = nowCard({ state, runs, approvals, hasBrief });
   const pending = approvals.filter((a) => a.status === 'pending').sort((a, b) => b.id - a.id)[0];
   const signoff = signoffWanted(state, approvals);
-  const decision = pending ? { kind: pending.kind, projectId, id: pending.id } : signoff ? { kind: 'client', projectId, id: null } : null;
+  const decision = pending ? { kind: pending.kind, projectId, id: pending.id, subject: pending.subject || {} } : signoff ? { kind: 'client', projectId, id: null } : null;
   const cards = agentCards(runs);
   const mainAction = {
     start: () => act(() => startProcess(projectId, email)),

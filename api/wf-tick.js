@@ -12,7 +12,7 @@ import { getModelClient } from './_lib/ai.js';
 import { createGa4Reader } from './_lib/ga4Client.js';
 import { createMetaWriter } from './_lib/metaAdsWrite.js';
 import { speedKeyFromEnv } from './_lib/pageSpeed.js';
-import { fetchMetaCampaigns, fetchMetaInsights, fetchMetaPixels } from './_lib/metaAdsData.js';
+import { fetchMetaCampaigns, fetchMetaInsights, fetchMetaObjects, fetchMetaPixels } from './_lib/metaAdsData.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     }
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
     const metaToken = process.env.META_ACCESS_TOKEN;
-    const meta = metaToken ? { insights: (o) => fetchMetaInsights({ ...o, token: metaToken }), campaigns: (o) => fetchMetaCampaigns({ ...o, token: metaToken }), pixels: (o) => fetchMetaPixels({ ...o, token: metaToken }) } : null; // the Meta reader for the agents; its token never leaves the server
+    const meta = metaToken ? { insights: (o) => fetchMetaInsights({ ...o, token: metaToken }), campaigns: (o) => fetchMetaCampaigns({ ...o, token: metaToken }), pixels: (o) => fetchMetaPixels({ ...o, token: metaToken }), objects: (o) => fetchMetaObjects({ ...o, token: metaToken }) } : null; // the Meta reader for the agents; its token never leaves the server
     // the model for the skills that write text (site, audience, ...): every call is logged and held to the budgets by the shared client
     const trigger = isCronRequest(req) ? 'cron' : 'user';
     const ask = process.env.ANTHROPIC_API_KEY ? async ({ projectId = null, runId = null, system, user, images = [], maxTokens = 4000 }) => {

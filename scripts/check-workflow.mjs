@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { analyse, judge, renderOptimizeText } from '../api/_lib/wf/skills/optimizeEngine.js';
+import { optimize } from '../api/_lib/wf/skills/optimizeAgent.js';
 import { actId, countriesOf, createMetaWriter, ctaType, landingUrl, minor, utmTags } from '../api/_lib/metaAdsWrite.js';
 import { buildPlan, checkLaunch } from '../api/_lib/wf/skills/launchEngine.js';
 import { launch } from '../api/_lib/wf/skills/launchAgent.js';
@@ -1684,5 +1686,96 @@ await test('machine: a failed launch is tried again from the saved progress, thr
 await test('brief: the page the ads are published from is a row of the brief sheet', () => {
   const f = formFromContent({ general: { fb_page_id: '777000', geo: 'США' } });
   assert.equal(f.values.fb_page_id, '777000'); assert.equal(contentFromForm(f).general.fb_page_id, '777000');
+});
+// ---------------------------------------------------------------- A9: the Media buyer's skill «optimize» (recommendations by the rules of the owner; nothing is changed in the cabinet)
+const OP_TH = { breakeven_cpa: 100, target_cpa: 70, breakeven_roas: 1.75, target_roas: 2.5 };
+const opDay = (n) => new Date(clock.t.getTime() + n * 864e5);
+const opSnap = (daysAgo = 10) => ({ status: 'done', launched_at: opDay(-daysAgo).toISOString(), account: { id: '55', name: 'Monarchi test', currency: 'USD' }, targets: { ...OP_TH }, campaigns: [
+  { key: 'k1', name: 'К1', id: 'camp1', daily: 90, adsets: [{ key: 'k1/g1', name: 'Г1', id: 'set1', daily: 90, ads: [{ key: 'c1-v1', tag: 'Креатив 1', ad_id: 'ad1' }, { key: 'c2-v1', tag: 'Креатив 2', ad_id: 'ad2' }] }] },
+  { key: 'k2', name: 'К2', id: 'camp2', daily: 60, adsets: [{ key: 'k2/g2', name: 'Г2', id: 'set2', daily: 60, ads: [{ key: 'c3-v1', tag: 'Креатив 3', ad_id: 'ad3' }] }] }] });
+const opRow = (ad, spend, purchases, extra = {}) => ({ ad_id: ad, spend, purchases, revenue: purchases * 150, impressions: extra.impressions ?? spend * 40, clicks: extra.clicks ?? spend * 0.6, reach: extra.reach ?? spend * 30 });
+const OP_LIFE = [opRow('ad1', 300, 5), opRow('ad2', 400, 3), opRow('ad3', 200, 0)];
+await test('optimize: the verdict asks for time and enough spend first, then judges by the economics of the client', () => {
+  const m = (spend, purchases) => ({ spend, purchases, cpa: purchases ? spend / purchases : null });
+  assert.equal(judge(m(500, 9), OP_TH, 2).state, 'wait'); assert.match(judge(m(500, 9), OP_TH, 2).reason, /Перші 3 дні/);
+  assert.equal(judge(m(60, 0), OP_TH, 10).state, 'wait'); assert.match(judge(m(60, 0), OP_TH, 10).reason, /Витрачено 60 з 105/);
+  assert.equal(judge(m(120, 0), OP_TH, 10).state, 'off'); assert.match(judge(m(120, 0), OP_TH, 10).reason, /без жодної покупки/);
+  assert.equal(judge(m(400, 3), OP_TH, 10).state, 'off'); assert.equal(judge(m(450, 5), OP_TH, 10).state, 'keep'); assert.equal(judge(m(300, 5), OP_TH, 10).state, 'scale');
+  assert.equal(judge(m(500, 9), {}, 10).state, 'wait', 'without the thresholds nothing is judged');
+});
+await test('optimize: from the bottom up: a losing ad is off unless it is the last one of its group, a group off when all its ads are, a campaign off (through Апрув 3) when all its groups are', () => {
+  const r = analyse({ snapshot: opSnap(), thresholds: OP_TH, rows: { life: OP_LIFE, recent: [], prior: [] }, now: opDay(0) });
+  const find = (level, id) => r.actions.filter((a) => a.level === level && a.id === id);
+  assert.equal(find('ad', 'ad2')[0].action, 'off'); assert.match(find('ad', 'ad2')[0].reason, /133.*вища за беззбитковий 100/); assert.equal(find('ad', 'ad2')[0].significant, false);
+  assert.equal(find('ad', 'ad1')[0].action, 'keep'); assert.match(find('ad', 'ad1')[0].reason, /Працює добре/);
+  assert.equal(find('ad', 'ad3')[0].action, 'replace'); assert.equal(find('ad', 'ad3')[0].significant, true, 'the last ad of a group is replaced, not switched off');
+  assert.equal(find('adset', 'set1')[0].action, 'keep'); assert.equal(find('adset', 'set2')[0].action, 'off');
+  assert.equal(find('campaign', 'camp2')[0].action, 'off'); assert.equal(find('campaign', 'camp2')[0].significant, true); assert.equal(find('campaign', 'camp1').length, 0);
+  assert.deepEqual(r.significant.map((a) => `${a.level}:${a.id}`).sort(), ['ad:ad3', 'campaign:camp2']);
+  assert.equal(r.thresholds.min_spend_for_verdict, 105); assert.equal(r.totals.spend, 900);
+  const young = analyse({ snapshot: opSnap(2), thresholds: OP_TH, rows: { life: OP_LIFE, recent: [], prior: [] }, now: opDay(0) });
+  assert.ok(young.actions.every((a) => a.action === 'wait'), 'the first days only observe'); assert.equal(young.significant.length, 0);
+});
+await test('optimize: a worse neighbour that still earns stays; a pause by hand is respected; the scale is a step of 20% and not more often than every 72 hours', () => {
+  const snap = opSnap(); snap.campaigns[0].adsets[0].ads.push({ key: 'c4-v1', tag: 'Креатив 4', ad_id: 'ad4' });
+  const life = [opRow('ad1', 300, 6), opRow('ad2', 400, 8), opRow('ad4', 200, 2), opRow('ad3', 50, 1)];
+  const r = analyse({ snapshot: snap, thresholds: OP_TH, rows: { life, recent: [], prior: [] }, now: opDay(0) });
+  const worse = r.actions.find((a) => a.id === 'ad4' && a.level === 'ad'); assert.equal(worse.action, 'keep'); assert.match(worse.reason, /Суттєво гірший за сусідів/);
+  const scale = analyse({ snapshot: snap, thresholds: OP_TH, rows: { life: [opRow('ad1', 300, 5), opRow('ad2', 300, 5), opRow('ad3', 50, 1)], recent: [], prior: [] }, now: opDay(0), objects: { adsets: new Map([['set1', { status: 'ACTIVE', daily: 100 }]]) } });
+  const s = scale.actions.find((a) => a.level === 'adset' && a.id === 'set1'); assert.equal(s.action, 'scale'); assert.equal(s.to_daily, 120, '100 + 20%, from the real budget in the cabinet'); assert.match(s.effect, /\+0\.33 покупок на день/);
+  const soon = analyse({ snapshot: snap, thresholds: OP_TH, rows: { life: [opRow('ad1', 300, 5), opRow('ad2', 300, 5)], recent: [], prior: [] }, now: opDay(0), lastScaleAt: opDay(-1).toISOString() });
+  assert.equal(soon.actions.find((a) => a.level === 'adset' && a.id === 'set1').action, 'keep'); assert.match(soon.actions.find((a) => a.level === 'adset' && a.id === 'set1').reason, /не минуло 72 годин/);
+  const later = analyse({ snapshot: snap, thresholds: OP_TH, rows: { life: [opRow('ad1', 300, 5), opRow('ad2', 300, 5)], recent: [], prior: [] }, now: opDay(0), lastScaleAt: opDay(-4).toISOString() });
+  assert.equal(later.actions.find((a) => a.level === 'adset' && a.id === 'set1').action, 'scale');
+  const paused = analyse({ snapshot: snap, thresholds: OP_TH, rows: { life: OP_LIFE, recent: [], prior: [] }, now: opDay(0), objects: { ads: new Map([['ad2', { status: 'PAUSED' }]]) } });
+  assert.ok(!paused.actions.some((a) => a.id === 'ad2'), 'what is already off is not judged again');
+});
+await test('optimize: it earned before and not now means a new creative; tired creatives (frequency up, CTR down) ask for a new one; ads fine but no sales means the site and the tracking', () => {
+  const good = [opRow('ad1', 300, 5), opRow('ad2', 300, 4), opRow('ad3', 120, 2)];
+  const bad = analyse({ snapshot: opSnap(), thresholds: OP_TH, rows: { life: good, recent: [opRow('ad1', 120, 0), opRow('ad2', 100, 2)], prior: [] }, now: opDay(0) });
+  const rep = bad.actions.find((a) => a.id === 'ad1' && a.action === 'replace'); assert.ok(rep && rep.significant); assert.match(rep.reason, /Раніше окупалось.*за останні 3 дні витрачено 120 без покупок/);
+  const tired = analyse({ snapshot: opSnap(), thresholds: OP_TH, rows: { life: good, recent: [{ ...opRow('ad1', 120, 2), impressions: 4000, clicks: 20, reach: 1000 }], prior: [{ ...opRow('ad1', 120, 2), impressions: 4000, clicks: 40, reach: 2000 }] }, now: opDay(0) });
+  const t = tired.actions.find((a) => a.action === 'new_creative'); assert.ok(t && t.significant); assert.match(t.reason, /частота 2 → 4, CTR 1% → 0\.5%/);
+  const noSales = analyse({ snapshot: opSnap(), thresholds: OP_TH, rows: { life: [opRow('ad1', 300, 0), opRow('ad2', 300, 0), opRow('ad3', 300, 0)], recent: [], prior: [] }, now: opDay(0) });
+  assert.equal(noSales.tasks.length, 1); assert.equal(noSales.tasks[0].type, 'tracking'); assert.match(noSales.tasks[0].title, /перевірити сайт і трекінг/); assert.ok(noSales.notes.some((n) => /проблема на сайті або в трекінгу/.test(n)));
+  assert.equal(analyse({ snapshot: opSnap(), thresholds: OP_TH, rows: { life: OP_LIFE, recent: [], prior: [] }, now: opDay(0) }).tasks.length, 0, 'with sales there is no such task');
+  assert.match(renderOptimizeText(analyse({ snapshot: opSnap(), thresholds: OP_TH, rows: { life: OP_LIFE, recent: [], prior: [] }, now: opDay(0) }), { period: 'a – b', accountName: 'M' }), /Кампанія «К2»: вимкнути \(через Апрув 3\)/);
+});
+const opMeta = (rowsFor) => ({ insights: async ({ timeRange, level }) => { assert.equal(level, 'ad'); const since = timeRange.since; return { rows: rowsFor(since) }; }, objects: async ({ level }) => (level === 'adset' ? [{ id: 'set1', status: 'ACTIVE', daily: 90 }, { id: 'set2', status: 'ACTIVE', daily: 60 }] : [{ id: 'ad1', status: 'ACTIVE' }, { id: 'ad2', status: 'ACTIVE' }, { id: 'ad3', status: 'ACTIVE' }]) });
+const opSetup = async ({ snap = opSnap(), meta, launched = true } = {}) => {
+  const s = await setup({ handlers: createHandlers({ mediabuyer: { optimize } }) });
+  s.repo.addAccount(1, LA_ACC);
+  if (launched) await s.repo.writeSectionVersion(1, 'launch', { author_kind: 'agent', author: 'mediabuyer', body: 'l', content: snap });
+  await s.repo.writeSectionVersion(1, 'unit_economy', { author_kind: 'agent', author: 'researcher', body: 'ue', content: { thresholds: OP_TH } });
+  s.ctx.meta = meta === undefined ? opMeta((since) => (since === snap.launched_at.slice(0, 10) ? OP_LIFE : [])) : meta;
+  await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'optimize' });
+  return s;
+};
+await test('optimize: the skill reads three periods, writes the advice with the numbers into the journal and the steps, sends the significant changes to Апрув 3 once, and changes nothing in the cabinet', async () => {
+  const s = await opSetup(); const periods = []; const inner = s.ctx.meta.insights; s.ctx.meta.insights = async (o) => { periods.push(o.timeRange); return inner(o); };
+  await processTick(s.ctx);
+  const run = s.repo.T.runs.find((r) => r.skill === 'optimize');
+  assert.equal(run.status, 'done', run.error);
+  assert.equal(periods.length, 3); assert.equal(periods[0].since, opDay(-10).toISOString().slice(0, 10)); assert.equal(periods[1].since, opDay(-3).toISOString().slice(0, 10)); assert.equal(periods[1].until, opDay(-1).toISOString().slice(0, 10)); assert.equal(periods[2].since, opDay(-7).toISOString().slice(0, 10)); assert.equal(periods[2].until, opDay(-4).toISOString().slice(0, 10));
+  const j = s.repo.T.journal.find((x) => x.action === 'optimize'); assert.match(j.summary, /рекомендацій 4/); assert.ok(j.meta.actions.some((a) => a.level === 'campaign' && a.name === 'Кампанія «К2»'));
+  const ap = s.repo.T.approvals.filter((a) => a.kind === 'changes'); assert.equal(ap.length, 1); assert.equal(ap[0].subject.actions.length, 2); assert.equal(ap[0].subject.source, 'optimize');
+  assert.ok(s.repo.T.steps.some((st) => st.detail?.actions?.length), 'the advice is in the steps of the run');
+  advance(24 * 3600e3); await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'optimize' }); await processTick(s.ctx);
+  assert.equal(s.repo.T.approvals.filter((a) => a.kind === 'changes').length, 1, 'while Апрув 3 is open, a second one is not made');
+});
+await test('optimize: the scale advice is given once in 72 hours; no launch means nothing to do; no reader fails clearly; a reader of the states that fails is a note', async () => {
+  const snap = opSnap(); const life = [opRow('ad1', 300, 5), opRow('ad2', 300, 5), opRow('ad3', 300, 5)];
+  const s = await opSetup({ meta: opMeta((since) => (since === snap.launched_at.slice(0, 10) ? life : [])) });
+  await processTick(s.ctx);
+  assert.ok(s.repo.T.journal.some((j) => j.action === 'optimize_scale'), 'the advice to scale is remembered');
+  advance(24 * 3600e3); await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'optimize' }); await processTick(s.ctx);
+  const second = s.repo.T.journal.filter((j) => j.action === 'optimize').at(-1);
+  assert.ok(!second.meta.actions.some((a) => a.action === 'scale'), 'a day later the same advice is not repeated');
+  const n = await opSetup({ launched: false }); await processTick(n.ctx);
+  assert.equal(n.repo.T.runs.find((r) => r.skill === 'optimize').status, 'done'); assert.equal(n.repo.T.runs.find((r) => r.skill === 'optimize').output.skipped, true);
+  const m = await opSetup({ meta: null }); await processTick(m.ctx);
+  assert.equal(m.repo.T.runs.find((r) => r.skill === 'optimize').status, 'failed'); assert.match(m.repo.T.runs.find((r) => r.skill === 'optimize').error, /META_ACCESS_TOKEN/);
+  const o = await opSetup({ meta: { ...opMeta((since) => (since === snap.launched_at.slice(0, 10) ? OP_LIFE : [])), objects: async () => { throw new Error('(#200) no access'); } } }); await processTick(o.ctx);
+  assert.equal(o.repo.T.runs.find((r) => r.skill === 'optimize').status, 'done'); assert.ok(o.repo.T.steps.some((st) => /Стан груп і оголошень не вдалося прочитати/.test(st.title)));
 });
 console.log(`\n${passed} workflow checks passed`);

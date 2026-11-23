@@ -118,6 +118,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
       if (last && last.summary === (entry.summary || '')) return;
       return this.journal(projectId, entry);
     },
+    async lastJournal(projectId, action) { return [...T.journal].reverse().find((j) => j.project_id === projectId && j.action === action) || null; },
     async projectCost(projectId, sinceIso) { return T.runs.filter((r) => r.project_id === projectId && r.created_at >= sinceIso).reduce((s, r) => s + Number(r.cost_usd || 0), 0); },
     // helpers of the tests: what a person does in the CRM
     decide(approvalId, status, comment = null, by = 'manager@test') {

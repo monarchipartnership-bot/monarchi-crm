@@ -150,6 +150,11 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       if (last?.[0] && last[0].summary === (entry.summary || '')) return;
       return this.journal(projectId, entry);
     },
+    // the latest journal line of one kind (for example when the last advice to raise a budget was given)
+    async lastJournal(projectId, action) {
+      const r = must(await db.from('wf_journal').select('at, summary, meta').eq('project_id', projectId).eq('action', action).order('id', { ascending: false }).limit(1), 'journal');
+      return r?.[0] || null;
+    },
     async projectCost(projectId, sinceIso) {
       const rows = must(await db.from('wf_runs').select('cost_usd').eq('project_id', projectId).gte('created_at', sinceIso), 'cost') || [];
       return rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0);
