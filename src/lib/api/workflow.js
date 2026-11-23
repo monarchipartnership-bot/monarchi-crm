@@ -89,19 +89,22 @@ export async function fetchQueueData() {
   return { projects: byId, states: must(states, 'states') || [], approvals: must(apps, 'approvals') || [] };
 }
 // «Схвалити» or «Повернути». The orchestrator reads the answer on its next pass.
-export async function decideApproval(approval, status, comment, email) {
+export async function decideApproval(approval, status, comment, email, remarks = null) {
   const text = (comment || '').trim();
   if (status === 'returned' && !text) throw new Error('Щоб повернути, напишіть коментар: агент має знати, що виправити.');
-  const r = await supabase.from('wf_approvals').update({ status, comment: text || null, decided_by: email || 'manager', decided_at: nowIso() }).eq('id', approval.id).eq('status', 'pending').select('id');
+  const patch = { status, comment: text || null, decided_by: email || 'manager', decided_at: nowIso() };
+  if (remarks) patch.subject = { ...(approval.subject || {}), remarks: remarks.filter((x) => String(x.text || '').trim()).map((x) => ({ target: String(x.target), text: String(x.text).trim().slice(0, 600) })) }; // remarks pinned to the blocks of the package
+  const r = await supabase.from('wf_approvals').update(patch).eq('id', approval.id).eq('status', 'pending').select('id');
   if (r.error) throw new Error('approval: ' + r.error.message);
   if (!r.data?.length) throw new Error('Це рішення вже прийнято в іншому місці. Оновіть сторінку.');
   await journal(approval.project_id, email, { action: status === 'approved' ? 'approved' : 'returned', subject: approval.kind, summary: `${status === 'approved' ? 'Схвалено' : 'Повернуто'}: ${approval.kind}${text ? '. ' + text : ''}` });
 }
 // The answer of the client, recorded by the manager after Апрув 1: one finished row of kind «client».
-export async function recordClientAnswer(projectId, status, comment, email) {
+export async function recordClientAnswer(projectId, status, comment, email, remarks = null) {
   const text = (comment || '').trim();
   if (status === 'returned' && !text) throw new Error('Щоб повернути, напишіть, що клієнт просить виправити.');
-  must(await supabase.from('wf_approvals').insert({ project_id: projectId, kind: 'client', subject: { section: 'strategy' }, status, requested_by: email || 'manager', decided_by: email || 'manager', decided_at: nowIso(), comment: text || null }), 'client answer');
+  const subject = { section: 'strategy', ...(remarks ? { remarks: remarks.filter((x) => String(x.text || '').trim()).map((x) => ({ target: String(x.target), text: String(x.text).trim().slice(0, 600) })) } : {}) };
+  must(await supabase.from('wf_approvals').insert({ project_id: projectId, kind: 'client', subject, status, requested_by: email || 'manager', decided_by: email || 'manager', decided_at: nowIso(), comment: text || null }), 'client answer');
   await journal(projectId, email, { action: status === 'approved' ? 'approved' : 'returned', subject: 'client', summary: `Відповідь клієнта: ${status === 'approved' ? 'погодив' : 'повернув. ' + text}` });
 }
 
@@ -122,4 +125,16 @@ export async function requestRun(projectId, agent, skill, email) {
   if (r.error) { if (r.error.code === UNIQUE) return false; throw new Error('run: ' + r.error.message); }
   await journal(projectId, email, { action: 'run_requested', subject: skill, summary: `Менеджер попросив ще один запуск: ${agent} / ${skill}.` });
   return true;
+}
+
+// ----------------------------------------------------------------------- the package of the first launch (strategy + creatives) for the review
+// → { strategy: { id, version, content, body } | null, creatives: ... , approval: { id, subject } | null }
+export async function fetchPackage(projectId, approvalId = null) {
+  const secs = must(await supabase.from('wf_sections').select('id, key, current_version_id').eq('project_id', projectId).in('key', ['strategy', 'creatives']), 'sections') || [];
+  const ids = secs.map((x) => x.current_version_id).filter(Boolean);
+  const vers = ids.length ? must(await supabase.from('wf_section_versions').select('id, version, body, content, author_kind, created_at').in('id', ids), 'versions') || [] : [];
+  const out = { strategy: null, creatives: null, approval: null };
+  for (const sec of secs) { const v = vers.find((x) => x.id === sec.current_version_id); if (v) out[sec.key] = v; }
+  if (approvalId) out.approval = must(await supabase.from('wf_approvals').select('id, project_id, kind, subject, status').eq('id', approvalId).maybeSingle(), 'approval');
+  return out;
 }

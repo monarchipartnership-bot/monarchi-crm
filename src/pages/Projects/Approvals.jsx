@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchQueueData } from '../../lib/api/workflow';
 import { APPROVAL_KIND, ageText, approvalTitle, buildQueue } from '../../lib/workflow/view';
-import { DecisionPanel, Pill } from '../../components/Workflow/parts';
+import { Pill } from '../../components/Workflow/parts';
+import Decision from '../../components/Workflow/Decision';
 
 const TONE = { strategy: 'warn', client: 'warn', launch: 'info', changes: 'bad' };
 
@@ -21,6 +22,7 @@ export default function Approvals() {
 
   if (!queue) return <div className="wf wf-page">{err ? <div className="wf-err" role="alert">{err}</div> : <div className="wf-load">Завантаження…</div>}</div>;
   const chosen = queue.find((q) => q.key === sel) || queue[0] || null;
+  const wide = !!chosen && ['strategy', 'client'].includes(chosen.kind); // the package needs the whole width: the queue goes on top
   const onKey = (e, q) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(q.key); } };
 
   return (
@@ -29,7 +31,7 @@ export default function Approvals() {
       {queue.length === 0 ? (
         <div className="wf-card"><div className="wf-empty">Немає рішень, що чекають на вас. Коли агенти підготують стратегію, запуск або план на місяць, вони зʼявляться тут.</div></div>
       ) : (
-        <div className="wf-grid wf-g2">
+        <div className={'wf-grid' + (wide ? '' : ' wf-g2')}>
           <div className="wf-card">
             <h3>Черга апрувів · {queue.length}</h3>
             <div className="wf-tblwrap">
@@ -48,7 +50,7 @@ export default function Approvals() {
               </table>
             </div>
           </div>
-          {chosen && <DecisionPanel key={chosen.key} item={chosen} email={email} onDone={() => { setSel(null); load(); }} onOpenDossier={(section) => navigate(`/projects/${chosen.projectId}?tab=dossier&section=${section}`)} />}
+          {chosen && <Decision key={chosen.key} item={chosen} email={email} projectName={chosen.project} onDone={() => { setSel(null); load(); }} onOpenDossier={(section) => navigate(`/projects/${chosen.projectId}?tab=dossier&section=${section}`)} />}
         </div>
       )}
     </div>

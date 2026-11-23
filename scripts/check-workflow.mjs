@@ -3,6 +3,8 @@
 // Run:  node scripts/check-workflow.mjs
 import assert from 'node:assert/strict';
 import { planNext, STAGE } from '../api/_lib/wf/machine.js';
+import { PACK_BLOCKS, blockOfTarget, buildPack, plural, remarksText, reviewState } from '../src/lib/workflow/pack.js';
+import { reworkCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { allocate, budgetPlan, checkStrategy, gatherStrategyFacts, marginInfo, neededFromClient, optimisationRules, prioritySource } from '../api/_lib/wf/skills/strategyEngine.js';
 import { strategy } from '../api/_lib/wf/skills/strategyAgent.js';
 import { checkCards, gatherCreativeFacts, goalsOf, referencePool, tagOf } from '../api/_lib/wf/skills/creativesEngine.js';
@@ -1414,5 +1416,89 @@ await test('machine: the creatives are made first, the strategist follows; the a
   assert.ok(!held.some((a) => a.type === 'approval'), 'no approval while the check finds problems'); assert.ok(held.some((a) => a.action === 'check_failed' && a.once)); assert.ok(held.some((a) => a.type === 'enqueue' && a.skill === 'strategy'));
   const ok = acts({ ...draft, checks: { ok: true, problems: [], warnings: ['Сайт: непідтверджених знахідок 1.'] } });
   assert.deepEqual(ok.find((a) => a.type === 'approval').subject, { section: 'strategy', warnings: ['Сайт: непідтверджених знахідок 1.'] });
+});
+// ---------------------------------------------------------------- A7.2: remarks pinned to blocks of the package; only the returned creatives are made again
+await test('machine: remarks on creatives go to the Creator first, then the strategist refreshes the scheme; remarks on other blocks go to the strategist; no remarks work as before', () => {
+  const base = { now: new Date('2026-11-23T10:00:00Z'), state: { stage: 2, paused: false }, sections: { strategy: { status: 'on_approval', hasCurrent: true } } };
+  const done = [{ id: 1, agent: 'creator', skill: 'first_creatives', status: 'done', input: {} }, { id: 2, agent: 'strategist', skill: 'strategy', status: 'done', input: {} }];
+  const ret = (remarks, id = 7) => ({ id, kind: 'strategy', status: 'returned', comment: 'коментар', subject: { section: 'strategy', remarks } });
+  const enq = (a) => a.filter((x) => x.type === 'enqueue').map((x) => `${x.agent}/${x.skill}`);
+  const mixed = planNext({ ...base, runs: done, approvals: [ret([{ target: 'creative:c2', text: 'Прибрати слово спека' }, { target: 'budget', text: 'Менше на широку' }])] });
+  assert.deepEqual(enq(mixed), ['creator/rework_creatives']); assert.deepEqual(mixed.find((x) => x.type === 'enqueue').input.remarks, [{ target: 'creative:c2', text: 'Прибрати слово спека' }]);
+  const waiting = planNext({ ...base, runs: [...done, { id: 3, agent: 'creator', skill: 'rework_creatives', status: 'running', input: { rework_of: 7 } }], approvals: [ret([{ target: 'creative:c2', text: 'x' }])] });
+  assert.deepEqual(enq(waiting), [], 'the strategist waits for the Creator');
+  const after = planNext({ ...base, runs: [...done, { id: 3, agent: 'creator', skill: 'rework_creatives', status: 'done', input: { rework_of: 7 } }], approvals: [ret([{ target: 'creative:c2', text: 'x' }, { target: 'budget', text: 'Менше на широку' }])] });
+  const s = after.find((x) => x.type === 'enqueue'); assert.equal(`${s.agent}/${s.skill}`, 'strategist/strategy'); assert.deepEqual(s.input.remarks, [{ target: 'budget', text: 'Менше на широку' }]); assert.deepEqual(s.input.creatives_reworked, ['c2']); assert.equal(s.input.rework_of, 7);
+  assert.deepEqual(enq(planNext({ ...base, runs: done, approvals: [ret([{ target: 'budget', text: 'x' }])] })), ['strategist/strategy'], 'no creative remarks: straight to the strategist');
+  const plain = planNext({ ...base, runs: done, approvals: [{ id: 7, kind: 'strategy', status: 'returned', comment: 'Усе переробити', subject: { section: 'strategy' } }] });
+  assert.deepEqual(enq(plain), ['strategist/strategy']); assert.equal(plain.find((x) => x.type === 'enqueue').input.comment, 'Усе переробити');
+  const handled = planNext({ ...base, runs: [...done, { id: 4, agent: 'strategist', skill: 'strategy', status: 'queued', input: { rework_of: 7 } }], approvals: [ret([{ target: 'creative:c2', text: 'x' }])] });
+  assert.ok(!handled.some((x) => x.type === 'enqueue' && x.skill === 'rework_creatives'), 'a handled return is not handled twice');
+});
+await test('creatives: only the returned creative is made again (version 2, the comment kept, a new picture), the others stay as they were', async () => {
+  const handlers = createHandlers({ creator: { first_creatives: firstCreatives, rework_creatives: reworkCreatives } });
+  const s = await setup({ handlers }); s.asked = [];
+  s.repo.setMaterials(1, CR_MATERIALS);
+  await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: CR_BRIEF.content });
+  await s.repo.writeSectionVersion(1, 'ideas', { author_kind: 'agent', author: 'creator', body: 'i', content: CR_IDEAS });
+  await s.repo.writeSectionVersion(1, 'audience', { author_kind: 'agent', author: 'researcher', body: 'a', content: MAT_AUD });
+  await s.repo.writeSectionVersion(1, 'materials', { author_kind: 'agent', author: 'creator', body: 'm', content: { verdict: 'enough' } });
+  s.ctx.hf = fakeHf(); s.ctx.imageWaitMs = 0;
+  s.ctx.ask = async (o) => { s.asked.push(o); return { costUsd: 0.1, text: s.asked.length === 1 ? CR_ANSWER() : JSON.stringify({ cards: [CARD({ goal_index: 1, product: '', idea_id: '', segment: '', offer: '', headline: 'Спокійний сон узимку', primary_text: 'Лаконічний набір на холодну пору.', cta: 'Дізнатись більше', angle: 'економія', format: '9:16', references: [2] })] }) }; };
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'first_creatives' });
+  await processTick(s.ctx);
+  const first = (await s.repo.readSection(1, 'creatives')).version.content.items.map((x) => ({ ...x }));
+  assert.equal(first.length, 2); assert.equal(s.ctx.hf.calls.submit.length, 2);
+  advance(1000);
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'rework_creatives', input: { rework_of: 9, remarks: [{ target: 'creative:c2', text: 'Прибрати слово спека, у нас зима' }, { target: 'creative:c9', text: 'такого немає' }, { target: 'budget', text: 'не креатив' }] } });
+  await processTick(s.ctx);
+  const run = s.repo.T.runs.find((r) => r.skill === 'rework_creatives');
+  assert.equal(run.status, 'done', run.error);
+  const items = (await s.repo.readSection(1, 'creatives')).version.content.items;
+  assert.deepEqual(items[0], first[0], 'the first creative is untouched: the same texts, the same picture');
+  assert.equal(items[1].id, 'c2'); assert.equal(items[1].version, 2); assert.match(items[1].tag, /· v2$/); assert.equal(items[1].headline, 'Спокійний сон узимку'); assert.equal(items[1].status, 'ready');
+  assert.notEqual(items[1].image_url, first[1].image_url, 'a new picture'); assert.deepEqual(items[1].rework, [{ from_version: 1, comment: 'Прибрати слово спека, у нас зима' }]);
+  assert.equal(s.asked.length, 2); assert.match(s.asked[1].user, /"rework"/); assert.match(s.asked[1].user, /Прибрати слово спека/); assert.match(s.asked[1].user, /"goal_index": 1/); assert.doesNotMatch(s.asked[1].user, /Продати хіт/, 'the other goals are not asked again');
+  assert.equal(s.ctx.hf.calls.submit.length, 3); assert.match(s.ctx.hf.calls.submit[2].key, /-v2-1$/, 'a new key: the version is part of it');
+  assert.equal(run.cost_usd, 0.6, 'the model 0.1 and one picture 0.5: only the returned one is paid');
+  // nothing to do: no model call
+  const before = s.asked.length;
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'rework_creatives', input: { rework_of: 10, remarks: [{ target: 'creative:c9', text: 'x' }] } });
+  await processTick(s.ctx);
+  assert.equal(s.asked.length, before); assert.equal(s.repo.T.runs.filter((r) => r.skill === 'rework_creatives')[1].status, 'done');
+});
+// ---------------------------------------------------------------- A7.2: the package of the first launch (blocks, steps of the review, remarks)
+await test('package: the review state: approve only when every block is marked good and nothing is remarked; return only with a remark; a remark on a creative counts for the scheme', () => {
+  const all = Object.fromEntries(PACK_BLOCKS.map((b) => [b.key, true]));
+  assert.deepEqual([reviewState({}, []).answered, reviewState({}, []).canApprove, reviewState({}, []).canReturn], [0, false, false]);
+  assert.equal(reviewState(all, []).canApprove, true); assert.equal(reviewState(all, []).canReturn, false);
+  const withRemark = reviewState(all, [{ target: 'money', text: 'x' }]);
+  assert.equal(withRemark.canApprove, false, 'a remark has to be dealt with first'); assert.equal(withRemark.canReturn, true);
+  const part = reviewState({ summary: true }, [{ target: 'creative:c2', text: 'x' }]);
+  assert.equal(part.answered, 2, 'summary marked, scheme has a remark on a creative'); assert.deepEqual(part.pending, ['priorities', 'money', 'timeline', 'optimisation']); assert.equal(part.canReturn, true);
+  assert.equal(blockOfTarget('creative:c7'), 'scheme'); assert.equal(blockOfTarget('budget'), 'budget');
+  assert.equal(PACK_BLOCKS.length, 6);
+});
+await test('package: the text of the remarks names the block or the creative by its goal', () => {
+  const t = remarksText([{ target: 'money', text: ' Менше на широку ' }, { target: 'creative:c2', text: 'Прибрати слово спека' }, { target: 'scheme', text: '' }], [{ id: 'c2', goal: 'Розпродаж літа' }]);
+  assert.equal(t, 'Гроші: Менше на широку\nКреатив «Розпродаж літа»: Прибрати слово спека');
+  assert.equal(remarksText([], []), '');
+  assert.deepEqual([1, 2, 4, 5, 11, 12, 21, 22, 25].map((n) => plural(n, 'зауваження', 'зауваження', 'зауважень')), ['зауваження', 'зауваження', 'зауваження', 'зауважень', 'зауважень', 'зауважень', 'зауваження', 'зауваження', 'зауважень']);
+});
+await test('package: the blocks are built from the strategy and the creatives: ads in their groups, the rest apart, the timeline with the dates of the client', () => {
+  const strategy = { version: 2, rework: { comment: 'Менше на широку' }, budget_monthly: 4500, currency: 'USD', geo: 'США', summary: 'Текст', goal: { text: '60 замовлень', base: { orders_at_target: 64, orders_to_break_even: 45 } },
+    priority_source: 'margin', priorities: [{ product: 'AirPlug', margin_pct: 52 }], notes: ['«Cheap»: низька маржа, окремо не рекламуємо', 'інше'], warnings: ['w1'], assumptions: ['a1'],
+    budget: { daily: 150, monthly: 4500, min_daily: 15, max_campaigns: 10, scenarios: [{ name: 'Базовий' }] }, remarketing: { enabled: true }, seasonal: [],
+    campaigns: [{ name: 'К1', daily_budget: 90, ad_groups: [{ name: 'Г1', creatives: [{ id: 'c1', tag: 't1' }, { id: 'c9', tag: 'gone' }] }] }, { name: 'К2', daily_budget: 60, ad_groups: [{ name: 'Г2', creatives: [] }] }],
+    needed_from_client: [{ what: 'Налаштувати піксель', due: '2026-11-26', source: 'x' }], optimisation: { rules: ['r1'], assumptions: ['a'] } };
+  const creatives = { branch: 'A', items: [{ id: 'c1', tag: 't1', headline: 'H' }, { id: 'c2', tag: 't2' }] };
+  const p = buildPack(strategy, creatives);
+  assert.equal(p.version, 2); assert.equal(p.summary.daily, 150); assert.equal(p.summary.campaigns, 2); assert.equal(p.summary.base.orders_at_target, 64);
+  assert.equal(p.scheme.campaigns[0].groups[0].ads[0].headline, 'H'); assert.equal(p.scheme.campaigns[0].groups[0].ads[1].missing, true, 'a creative that is gone is shown as missing, not hidden');
+  assert.deepEqual(p.scheme.unplaced.map((c) => c.id), ['c2']); assert.deepEqual(p.priorities.notes, ['«Cheap»: низька маржа, окремо не рекламуємо']);
+  assert.equal(p.timeline.milestones[0].client, true); assert.equal(p.timeline.milestones[0].date, '2026-11-26'); assert.ok(p.timeline.milestones.some((m) => m.title === 'Тиждень 2'), 'remarketing week only when it is on');
+  assert.equal(buildPack({ ...strategy, remarketing: { enabled: false } }, creatives).timeline.milestones.some((m) => m.title === 'Тиждень 2'), false);
+  assert.deepEqual(p.money.campaigns, [{ name: 'К1', daily_budget: 90 }, { name: 'К2', daily_budget: 60 }]); assert.deepEqual(p.warnings, ['w1']);
+  const empty = buildPack(null, null); assert.deepEqual(empty.scheme.campaigns, []); assert.equal(empty.summary.daily, null);
 });
 console.log(`\n${passed} workflow checks passed`);

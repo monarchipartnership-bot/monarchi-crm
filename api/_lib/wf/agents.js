@@ -13,7 +13,7 @@ import { site } from './skills/siteAgent.js';
 import { audience } from './skills/audienceAgent.js';
 import { competitors } from './skills/competitorsAgent.js';
 import { materialsIdeas } from './skills/materialsAgent.js';
-import { firstCreatives } from './skills/creativesAgent.js';
+import { firstCreatives, reworkCreatives } from './skills/creativesAgent.js';
 import { strategy } from './skills/strategyAgent.js';
 const w = (key, body) => ({ key, body: `[заглушка] ${body}`, content: { stub: true }, sources: [] });
 const done = (extra = {}) => async () => ({ output: { stub: true }, steps: [{ title: 'Виконано (заглушка)' }], ...extra });
@@ -30,6 +30,7 @@ export const STUBS = {
   creator: {
     materials_ideas: done({ writes: [w('materials', 'Матеріали клієнта'), w('ideas', 'Банк ідей')] }),
     first_creatives: done({ output: { stub: true, creatives: 0 } }),
+    rework_creatives: done({ output: { stub: true, reworked: 0 } }),
   },
   strategist: {
     strategy: async ({ run }) => ({ writes: [w('strategy', run.input?.rework_of ? 'Стратегія (доопрацьована)' : 'Стратегія')], steps: [{ title: 'Стратегію складено (заглушка)' }] }),
@@ -46,7 +47,7 @@ export const STUBS = {
 };
 
 // The real agents built so far. The cron door (api/wf-tick.js) uses them; the tests of the orchestrator use the stand-ins only.
-export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors }, creator: { materials_ideas: materialsIdeas, first_creatives: firstCreatives }, strategist: { strategy } };
+export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors }, creator: { materials_ideas: materialsIdeas, first_creatives: firstCreatives, rework_creatives: reworkCreatives }, strategist: { strategy } };
 export function createRealHandlers(overrides = {}) { return createHandlers({ ...REAL, researcher: { ...REAL.researcher, ...(overrides.researcher || {}) }, creator: { ...REAL.creator, ...(overrides.creator || {}) }, strategist: { ...REAL.strategist, ...(overrides.strategist || {}) }, ...Object.fromEntries(Object.entries(overrides).filter(([k]) => !['researcher', 'creator', 'strategist'].includes(k))) }); }
 
 export function createHandlers(overrides = {}) {

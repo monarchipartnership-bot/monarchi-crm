@@ -65,9 +65,20 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     const handled = new Set(reworkRuns(runs).map((r) => r.input.rework_of));
     const returned = ['strategy', 'client', 'launch'].map((k) => lastApproval(approvals, k)).filter((a) => a && a.status === 'returned' && !handled.has(a.id)).sort(byIdDesc)[0];
     if (returned) {
+      // the remarks are pinned to blocks of the package; a remark on one creative («creative:c2») goes to the Creator, only that card is made again, and the strategist then refreshes the scheme
+      const remarks = Array.isArray(returned.subject?.remarks) ? returned.subject.remarks : [];
+      const forCreatives = remarks.filter((r) => String(r?.target || '').startsWith('creative:'));
+      const forStrategy = remarks.filter((r) => !String(r?.target || '').startsWith('creative:'));
+      const crRun = runs.filter((r) => r.agent === 'creator' && r.skill === 'rework_creatives' && r.input?.rework_of === returned.id).sort(byIdDesc)[0];
       acts.push({ type: 'section_status', key: 'strategy', status: 'needs_rework' });
-      enqueue('strategist', 'strategy', { rework_of: returned.id, comment: returned.comment || '' });
-      journal('returned', `Повернуто на доопрацювання (${returned.kind}): ${returned.comment || ''}`);
+      if (forCreatives.length && !crRun) {
+        enqueue('creator', 'rework_creatives', { rework_of: returned.id, remarks: forCreatives });
+        journal('returned', `Повернуто на доопрацювання (${returned.kind}): креативів ${forCreatives.length}${forStrategy.length ? `, інших блоків ${forStrategy.length}` : ''}. ${returned.comment || ''}`);
+        return acts;
+      }
+      if (forCreatives.length && !isDone(crRun)) return acts; // the Creator is working (or failed: the manager sees the run); the strategist follows after it
+      enqueue('strategist', 'strategy', { rework_of: returned.id, comment: returned.comment || '', remarks: forStrategy, creatives_reworked: forCreatives.map((r) => r.target.slice(9)) });
+      if (!forCreatives.length) journal('returned', `Повернуто на доопрацювання (${returned.kind}): ${returned.comment || ''}`);
       return acts;
     }
     if (!has('strategy')) {

@@ -22,7 +22,7 @@ export async function strategy({ run, ctx }) {
   const now = (ctx.now || (() => new Date()))();
   const margins = marginInfo(ueSec.content);
   const priority = prioritySource(brief.version);
-  const rework = run.input?.rework_of != null ? { comment: String(run.input.comment || '').slice(0, 800), previous: prev ? { summary: prev.content?.summary || '', campaigns: (prev.content?.campaigns || []).map((c) => ({ name: c.name, daily_budget: c.daily_budget, segments: c.segments })), priorities: (prev.content?.priorities || []).map((p) => p.product) } : null } : null;
+  const rework = run.input?.rework_of != null ? { comment: String(run.input.comment || '').slice(0, 800), remarks: (run.input.remarks || []).map((r) => ({ block: String(r.target || '').slice(0, 40), text: String(r.text || '').slice(0, 400) })), creatives_reworked: run.input.creatives_reworked || [], previous: prev ? { summary: prev.content?.summary || '', campaigns: (prev.content?.campaigns || []).map((c) => ({ name: c.name, daily_budget: c.daily_budget, segments: c.segments })), priorities: (prev.content?.priorities || []).map((p) => p.product) } : null } : null;
 
   const facts = gatherStrategyFacts({ brief: brief.version, plan, margins, priority, ue: ueSec.content, audience: audience?.content, ideas: ideas?.content, creatives: creatives?.content, materials: materials?.content, audit: audit?.content, rework });
   const project = await ctx.repo.readProject(run.project_id);

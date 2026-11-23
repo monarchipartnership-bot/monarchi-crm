@@ -9,6 +9,7 @@ import AuditView from './AuditView';
 import SiteView from './SiteView';
 import AudienceView from './AudienceView';
 import CompetitorsView from './CompetitorsView';
+import { CreativesPage, StrategyPage } from './Package';
 
 // «Досьє» of a project (screen 2 of step A3, the variant A of the mockup): the 10 sections on the left, the chosen one on the right with its versions
 // and the proposals of the agents. A person's version is never replaced by an agent: the agent can only propose.
@@ -55,7 +56,7 @@ export default function Dossier({ projectId, initialKey }) {
   const isBrief = sec.key === 'brief';
   // the sections of the Researcher have their own pages (step A4, variants B of the mockup); anything else is shown as the text
   const c = shown?.content || {};
-  const kind = sec.key === 'site' && c.schema && c.findings ? 'site' : sec.key === 'audience' && c.segments ? 'audience' : sec.key === 'competitors' && c.table ? 'competitors' : null;
+  const kind = sec.key === 'site' && c.schema && c.findings ? 'site' : sec.key === 'audience' && c.segments ? 'audience' : sec.key === 'competitors' && c.table ? 'competitors' : sec.key === 'strategy' && c.campaigns && c.budget ? 'strategy' : sec.key === 'creatives' && c.branch ? 'creatives' : null;
   // the ads a manager confirmed live in the structured part of the section: a new human version carries them
   const saveAds = async (ads) => {
     setBusy(true);
@@ -103,7 +104,7 @@ export default function Dossier({ projectId, initialKey }) {
             <>
               <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}{shown.sources?.length ? ` · джерела: ${shown.sources.map((s) => (typeof s === 'string' ? s : s.title || s.url || '')).filter(Boolean).join(', ')}` : ''}</div>
               {kind && <div className="wf-row" style={{ marginBottom: 10 }}><button type="button" className={'wf-btn sm' + (!asText ? ' p' : '')} onClick={() => setAsText(false)}>Огляд</button><button type="button" className={'wf-btn sm' + (asText ? ' p' : '')} onClick={() => setAsText(true)}>Текст</button></div>}
-              {kind && !asText ? (kind === 'site' ? <SiteView key={shown.id} content={shown.content} /> : kind === 'audience' ? <AudienceView key={shown.id} content={shown.content} /> : <CompetitorsView key={shown.id} content={shown.content} projectId={projectId} email={email} busy={busy || shown.id !== current?.id} onSaveAds={saveAds} />) :
+              {kind && !asText ? (kind === 'site' ? <SiteView key={shown.id} content={shown.content} /> : kind === 'audience' ? <AudienceView key={shown.id} content={shown.content} /> : kind === 'competitors' ? <CompetitorsView key={shown.id} content={shown.content} projectId={projectId} email={email} busy={busy || shown.id !== current?.id} onSaveAds={saveAds} /> : kind === 'strategy' ? <StrategyPage key={shown.id} projectId={projectId} content={shown.content} /> : <CreativesPage key={shown.id} content={shown.content} />) :
               shown.content?.lines ? <UnitEconomyView content={shown.content} /> : shown.content?.years && shown.content?.findings ? <AuditView content={shown.content} /> : <div className="wf-doc">{shown.body || '(порожньо)'}</div>}
             </>
           ) : <div className="wf-doc wf-muted">Розділ ще порожній. {sec.who === 'Менеджер' ? 'Натисніть «Редагувати» і заповніть його.' : `Його заповнить ${sec.who}, або ви можете написати самі.`}</div>}

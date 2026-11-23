@@ -21,7 +21,7 @@ export const agentName = (key) => AGENTS.find((a) => a.key === key)?.name || key
 
 export const SKILL_LABEL = {
   intake: 'перевіряє кабінети', site: 'аналізує сайт', audience: 'вивчає аудиторію', unit_economy: 'рахує юніт-економіку', competitors: 'аналізує конкурентів', audit: 'аудитує кабінети',
-  materials_ideas: 'готує матеріали та ідеї', first_creatives: 'робить перші креативи', strategy: 'складає стратегію', monthly_plan: 'складає план на місяць',
+  materials_ideas: 'готує матеріали та ідеї', first_creatives: 'робить перші креативи', rework_creatives: 'переробляє креативи за зауваженнями', strategy: 'складає стратегію', monthly_plan: 'складає план на місяць',
   launch: 'запускає кампанії', optimize: 'оптимізує кампанії', onboarding: 'готує супровід', monthly_report: 'збирає місячний звіт',
 };
 

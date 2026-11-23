@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchProcess, patchState, runTickNow, startProcess } from '../../lib/api/workflow';
 import { agentCards, ageText, nowCard, signoffWanted } from '../../lib/workflow/view';
-import { DecisionPanel, Pill, Stepper } from './parts';
+import { Pill, Stepper } from './parts';
+import Decision from './Decision';
 
 // «Огляд» of a project (screen 1 of step A3, the variant B of the mockup): the card «Зараз» first, then the stages, the five agents and the journal.
 export default function ProcessOverview({ projectId, onGo }) {
@@ -44,7 +45,7 @@ export default function ProcessOverview({ projectId, onGo }) {
         {mainAction && <button type="button" className="wf-btn" disabled={busy} onClick={mainAction}>{actionLabel}</button>}
       </div>
 
-      {decision && <div id="wf-decision"><DecisionPanel item={decision} email={email} onDone={load} onOpenDossier={() => onGo?.('dossier', 'strategy')} /></div>}
+      {decision && <div id="wf-decision"><Decision item={decision} email={email} onDone={load} onOpenDossier={() => onGo?.('dossier', 'strategy')} /></div>}
 
       {state && (
         <div className="wf-card">

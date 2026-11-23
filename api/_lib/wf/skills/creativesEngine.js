@@ -57,6 +57,7 @@ Rules:
 6. "visual_prompt" is in English: a concrete scene for an image generator. It must keep the product from the reference pictures recognisable, must NOT contain any text, letters, logos or prices in the image (the words are added separately), and respects brand.colors_and_fonts and brand.restrictions.
 7. "references" are the numbers ("n") of the client's pictures from "references" to base the picture on: the product photos first (at least one), at most 3.
 8. "angle" is the side from which the product is shown (gift, saving, guarantee, reviews...).
+9. If "rework" is given, the manager or the client returned that card with a comment ("rework" is listed by goal_index, with the previous texts): change what the comment asks and keep the rest of the card as it was.
 Answer with ONE JSON object and nothing else (no markdown fence):
 {"cards":[{"goal_index":1,"product":"","segment":"","idea_id":"","angle":"","format":"4:5","offer":"","headline":"","primary_text":"","cta":"","visual_prompt":"","references":[1]}]}
 Give exactly one card per goal.`;
