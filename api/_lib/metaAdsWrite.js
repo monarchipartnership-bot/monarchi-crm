@@ -81,6 +81,10 @@ export function createMetaWriter({ token, fetchFn = fetch, graph = GRAPH } = {})
       try { const m = await call('GET', 'me', { fields: 'id,name' }); out.who = m.name ? `${m.name} (${m.id})` : m.id || null; } catch { /* the name is only a hint */ }
       return out;
     },
+    // «would a campaign be accepted?» Meta's validate_only runs the permission and field checks and CREATES NOTHING
+    async validateWrite({ accountId }) {
+      return call('POST', `${actId(accountId)}/campaigns`, { name: 'validate', objective: 'OUTCOME_SALES', status: 'PAUSED', special_ad_categories: [], buying_type: 'AUCTION', is_adset_budget_sharing_enabled: false, execution_options: ['validate_only'] });
+    },
     async createCampaign({ accountId, name, objective = 'OUTCOME_SALES', status = 'ACTIVE' }) {
       const j = await call('POST', `${actId(accountId)}/campaigns`, { name, objective, status, special_ad_categories: [], buying_type: 'AUCTION', is_adset_budget_sharing_enabled: false });
       return j.id;

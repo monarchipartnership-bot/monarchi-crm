@@ -13,6 +13,7 @@ import { REMIND_DAYS, buildFeedbackPrompt, checkFeedback, draftOf, nextPayment, 
 import { onboarding, paymentReminder, periodsOf, weeklyReport } from '../api/_lib/wf/skills/supportAgent.js';
 import { analyse, judge, renderOptimizeText } from '../api/_lib/wf/skills/optimizeEngine.js';
 import { optimize } from '../api/_lib/wf/skills/optimizeAgent.js';
+import { launchCheck } from '../api/_lib/wf/skills/launchCheck.js';
 import { actId, countriesOf, createMetaWriter, ctaType, landingUrl, minor, utmTags } from '../api/_lib/metaAdsWrite.js';
 import { buildPlan, checkLaunch } from '../api/_lib/wf/skills/launchEngine.js';
 import { launch } from '../api/_lib/wf/skills/launchAgent.js';
@@ -2290,5 +2291,27 @@ await test('launch: when Meta refuses a write the error says WHY (token without 
   const w = createMetaWriter({ token: 'TOKEN123', fetchFn: async (url, init) => { seen.push({ url: String(url), method: init?.method || 'GET' }); return new Response(JSON.stringify(String(url).includes('me/permissions') ? { data: [{ permission: 'ads_read', status: 'granted' }, { permission: 'ads_management', status: 'declined' }] } : { id: '1', name: 'CRM' }), { status: 200 }); } });
   const d = await w.diagnose(); assert.deepEqual(d.permissions, ['ads_read']); assert.equal(d.hasManagement, false); assert.equal(d.who, 'CRM (1)');
   assert.ok(seen.every((c) => c.method === 'GET'), 'nothing is written while diagnosing');
+});
+// ---------------------------------------------------------------- launch_check: «can we write?» without creating anything
+await test('launch_check: confirms the right to write through validate_only and creates nothing; a refusal says why; no cabinet or no writer is a plain error', async () => {
+  const mk = async (writer) => {
+    const s = await setup({ handlers: createHandlers({ mediabuyer: { launch_check: launchCheck } }) });
+    s.repo.addAccount(1, LA_ACC); if (writer) s.ctx.metaWrite = writer;
+    await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'launch_check', trigger: 'manual' });
+    await processTick(s.ctx); return s;
+  };
+  const ok = laWriter(); ok.validateWrite = async () => ({ success: true });
+  const a = await mk(ok); const ra = a.repo.T.runs.find((r) => r.skill === 'launch_check');
+  assert.equal(ra.status, 'done'); assert.equal(ra.output.writable, true); assert.deepEqual(ok.calls, [], 'nothing was created');
+  const bad = laWriter(); bad.validateWrite = async () => { const e = new Error('Meta: Unsupported post request (#100/33)'); e.metaCode = 100; throw e; };
+  bad.diagnose = async () => ({ permissions: ['ads_read'], hasManagement: false, who: 'HUB (1)', error: null });
+  const b = await mk(bad); const rb = b.repo.T.runs.find((r) => r.skill === 'launch_check');
+  assert.notEqual(rb.status, 'done'); assert.match(rb.error, /НЕ підтверджено/); assert.match(rb.error, /ads_read/); assert.match(rb.error, /Нічого не створено/); assert.deepEqual(bad.calls, []);
+  const c = await mk(null); assert.match(c.repo.T.runs.find((r) => r.skill === 'launch_check').error, /META_WRITE_TOKEN/);
+  // the writer: validate_only is sent, as a POST that Meta will not execute
+  const seen = [];
+  const w = createMetaWriter({ token: 'TOKEN123', fetchFn: async (url, init) => { seen.push({ url: String(url), body: String(init?.body || '') }); return new Response(JSON.stringify({ success: true }), { status: 200 }); } });
+  await w.validateWrite({ accountId: '55' });
+  assert.match(seen[0].url, /\/act_55\/campaigns$/); assert.match(decodeURIComponent(seen[0].body), /execution_options=\["validate_only"\]/); assert.match(seen[0].body, /status=PAUSED/);
 });
 console.log(`\n${passed} workflow checks passed`);
