@@ -27,7 +27,10 @@ export async function launchCheck({ run, ctx }) {
     const list = pages.map((p) => `${p.name || '—'} (${p.id})`).join('; ') || 'жодної';
     if (!pageId) steps.push({ title: `ID сторінки Facebook у брифі не вказано. Кабінет може рекламувати: ${list}`, status: 'info' });
     else if (found) steps.push({ title: `Сторінка ${found.name || pageId} доступна для реклами з цього кабінету`, status: 'done' });
-    else throw new Error(`Сторінка ${pageId} з брифу НЕ доступна для реклами з цього кабінету. Кабінет може рекламувати: ${list}. Або вкажіть у брифі ID зі списку, або призначте сторінку цьому кабінету та користувачу токена (Business Settings → Сторінки → Додати людей/Призначити партнерів).`);
+    else {
+      let who = ''; try { const d = typeof ctx.metaWrite.diagnose === 'function' ? await ctx.metaWrite.diagnose() : null; if (d) who = ` Токен: ${d.who || '—'}; права: ${d.permissions.join(', ') || '—'}; сторінки, доступні користувачу токена: ${(d.pages || []).map((p) => `${p.name} (${p.id}; ${(p.tasks || []).join(', ') || 'без прав'})`).join('; ') || (d.pagesError ? 'не вдалося прочитати: ' + d.pagesError : 'жодної')}.`; } catch { /* only a hint */ }
+      throw new Error(`Сторінка ${pageId} з брифу НЕ доступна для реклами з цього кабінету. Кабінет може рекламувати: ${list}.${who} Або вкажіть у брифі ID зі списку, або призначте сторінку цьому кабінету та користувачу токена (Business Settings → Сторінки → Додати людей/Призначити партнерів).`);
+    }
   }
   return { output: { writable: true, account: accountId, name: info?.name || null, page_ok: pages ? !!pages.find((p) => p.id === pageId) : null, pages: pages || null }, steps };
 }

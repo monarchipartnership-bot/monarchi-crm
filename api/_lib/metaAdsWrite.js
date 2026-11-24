@@ -83,6 +83,7 @@ export function createMetaWriter({ token, fetchFn = fetch, graph = GRAPH } = {})
         out.hasManagement = out.permissions.includes('ads_management');
       } catch (e) { out.error = String(e.message || e).slice(0, 200); }
       try { const m = await call('GET', 'me', { fields: 'id,name' }); out.who = m.name ? `${m.name} (${m.id})` : m.id || null; } catch { /* the name is only a hint */ }
+      try { const a = await call('GET', 'me/accounts', { fields: 'id,name,tasks', limit: 50 }); out.pages = (a.data || []).map((p) => ({ id: String(p.id), name: p.name || '', tasks: p.tasks || [] })); } catch (e) { out.pagesError = String(e.message || e).slice(0, 160); }
       return out;
     },
     // the pages this cabinet may advertise for (found by the pilot: Meta refused the page of the brief); read only
