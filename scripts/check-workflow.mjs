@@ -2314,4 +2314,13 @@ await test('launch_check: confirms the right to write through validate_only and 
   await w.validateWrite({ accountId: '55' });
   assert.match(seen[0].url, /\/act_55\/campaigns$/); assert.match(decodeURIComponent(seen[0].body), /execution_options=\["validate_only"\]/); assert.match(seen[0].body, /status=PAUSED/);
 });
+await test('launch: a launch asked for as PAUSED creates every object switched off and says so in the snapshot; the default stays ACTIVE', async () => {
+  const paused = await laSetup(); paused.repo.T.runs[0].input = { status: 'PAUSED' }; await processTick(paused.ctx);
+  const w = paused.ctx.metaWrite;
+  assert.ok(w.calls.length > 0); assert.ok(w.calls.filter(([n]) => ['campaign', 'adset', 'ad'].includes(n)).every(([, a]) => a.status === 'PAUSED'), 'campaign, ad set and ad are all PAUSED');
+  const snap = (await paused.repo.readSection(1, 'launch')).version.content;
+  assert.equal(snap.status, 'done'); assert.ok(snap.warnings.some((x) => /PAUSED/.test(x) && /не витрачаються/.test(x)));
+  const normal = await laSetup(); await processTick(normal.ctx);
+  assert.ok(normal.ctx.metaWrite.calls.filter(([n]) => ['campaign', 'adset', 'ad'].includes(n)).every(([, a]) => a.status === 'ACTIVE'));
+});
 console.log(`\n${passed} workflow checks passed`);

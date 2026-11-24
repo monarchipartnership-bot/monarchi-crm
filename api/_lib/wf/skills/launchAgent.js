@@ -57,7 +57,9 @@ export async function launch({ run, ctx }) {
   const pixelId = (pixels || []).filter((p) => p.lastFired && now - new Date(p.lastFired) <= 7 * DAY).sort((a, b) => new Date(b.lastFired) - new Date(a.lastFired))[0]?.id;
   const plan = buildPlan({ strategy: strategySec.content, creatives: creativesSec?.content, website, pageId: brief.content.general.fb_page_id, pixelId, now });
   const thresholds = ue?.content?.thresholds || null;
-  const status = ctx.launchStatus || 'ACTIVE';
+  // «PAUSED» (asked for by hand in run.input.status) makes every object but turns nothing on: no money is spent until the manager switches the campaigns on in Ads Manager
+  const status = run.input?.status === 'PAUSED' ? 'PAUSED' : (ctx.launchStatus || 'ACTIVE');
+  if (status === 'PAUSED') warnings.push('Усе створено ВИМКНЕНИМ (PAUSED): реклама не крутиться і гроші не витрачаються, доки ви не увімкнете кампанії в Ads Manager.');
   const created = prevSec?.status === 'partial' ? restore(prevSec) : empty();
   const save = async (st) => ctx.repo.writeSectionVersion(run.project_id, 'launch', { author_kind: 'agent', author: 'mediabuyer', run_id: run.id, sources: [], body: renderLaunchText(snapshotOf({ plan, created, account, thresholds, strategy: strategySec.content, status: st, now, warnings })), content: snapshotOf({ plan, created, account, thresholds, strategy: strategySec.content, status: st, now, warnings }) });
 
