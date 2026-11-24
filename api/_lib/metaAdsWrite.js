@@ -31,6 +31,10 @@ export function countriesOf(text) {
   return { codes: [...codes], unknown };
 }
 
+// the countries of the European Union: an ad shown there needs the name of the advertiser and of the payer (the DSA rule of Meta; found by the pilot: Poland in the GEO)
+const EU = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);
+export const hasEu = (codes = []) => codes.some((c) => EU.has(String(c).toUpperCase()));
+
 // money: Meta takes the budget in the smallest unit of the account currency (cents); the currencies with two decimals are assumed
 export const minor = (amount) => Math.round(Number(amount) * 100);
 
@@ -89,11 +93,12 @@ export function createMetaWriter({ token, fetchFn = fetch, graph = GRAPH } = {})
       const j = await call('POST', `${actId(accountId)}/campaigns`, { name, objective, status, special_ad_categories: [], buying_type: 'AUCTION', is_adset_budget_sharing_enabled: false });
       return j.id;
     },
-    async createAdSet({ accountId, campaignId, name, dailyMinor, pixelId, countries, status = 'ACTIVE', optimizationGoal = 'OFFSITE_CONVERSIONS', customEvent = 'PURCHASE' }) {
+    async createAdSet({ accountId, campaignId, name, dailyMinor, pixelId, countries, status = 'ACTIVE', optimizationGoal = 'OFFSITE_CONVERSIONS', customEvent = 'PURCHASE', dsaName = null }) {
       const j = await call('POST', `${actId(accountId)}/adsets`, {
         name, campaign_id: campaignId, daily_budget: dailyMinor, billing_event: 'IMPRESSIONS', optimization_goal: optimizationGoal, bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
         promoted_object: { pixel_id: pixelId, custom_event_type: customEvent },
         targeting: { geo_locations: { countries }, age_min: 18, targeting_automation: { advantage_audience: 1 } }, status,
+        ...(dsaName && hasEu(countries) ? { dsa_beneficiary: dsaName, dsa_payor: dsaName } : {}),
       });
       return j.id;
     },

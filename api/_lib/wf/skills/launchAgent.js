@@ -71,7 +71,7 @@ export async function launch({ run, ctx }) {
     for (const c of plan.campaigns) {
       if (!created.campaigns[c.key]) { created.campaigns[c.key] = await w.createCampaign({ accountId, name: c.name, status }); steps += 1; await save('partial'); } // the id is saved at once: a repeat never makes this campaign again
       for (const a of c.adsets) {
-        if (!created.adsets[a.key]) { created.adsets[a.key] = await w.createAdSet({ accountId, campaignId: created.campaigns[c.key], name: a.name, dailyMinor: a.dailyMinor, pixelId: plan.pixelId, countries: plan.countries, status }); steps += 1; await save('partial'); }
+        if (!created.adsets[a.key]) { created.adsets[a.key] = await w.createAdSet({ accountId, campaignId: created.campaigns[c.key], name: a.name, dailyMinor: a.dailyMinor, pixelId: plan.pixelId, countries: plan.countries, status, dsaName: String(brief.content.general?.dsa_name || '').trim() || null }); steps += 1; await save('partial'); }
         for (const x of a.ads) {
           if (!created.creatives[x.key]) {
             const url = x.creative.image_url;
@@ -87,7 +87,7 @@ export async function launch({ run, ctx }) {
   } catch (e) {
     await save('partial').catch(() => {}); // what is already made is remembered: the repeat of the run goes on from here
     // a refused write: say WHY in words of the manager (does the token have ads_management; if it has, the cabinet is not assigned to its user with the right to manage campaigns)
-    if ([100, 200, 10, 3].includes(e?.metaCode) && typeof ctx.metaWrite?.diagnose === 'function') {
+    if ((/#100\/33/.test(String(e?.message)) || [200, 10, 3].includes(e?.metaCode)) && typeof ctx.metaWrite?.diagnose === 'function') { // only a refusal of the right to write, not every error with code 100
       try {
         const d = await ctx.metaWrite.diagnose();
         e.message += d.error ? ` Діагностика токена не вдалася: ${d.error}`

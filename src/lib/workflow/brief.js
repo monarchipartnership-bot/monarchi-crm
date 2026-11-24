@@ -9,6 +9,7 @@ export const GENERAL = [
   { key: 'audience', label: 'Цільова аудиторія (як її описує клієнт)' },
   { key: 'competitors', label: 'Конкуренти (сайти, по одному в рядку)' },
   { key: 'fb_page_id', label: 'ID сторінки Facebook, від імені якої йде реклама (цифри)' },
+  { key: 'dsa_name', label: 'Для показу в країнах ЄС: назва рекламодавця (хто отримує вигоду від реклами і хто за неї платить)' },
   { key: 'payment_amount', label: 'Сума оплати за послуги (з валютою)' },
   { key: 'payment_next_date', label: 'Дата наступної оплати (РРРР-ММ-ДД)' },
   { key: 'payment_period', label: 'Оплата: щомісяця чи разово' },

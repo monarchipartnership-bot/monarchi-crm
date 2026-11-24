@@ -14,7 +14,7 @@ import { onboarding, paymentReminder, periodsOf, weeklyReport } from '../api/_li
 import { analyse, judge, renderOptimizeText } from '../api/_lib/wf/skills/optimizeEngine.js';
 import { optimize } from '../api/_lib/wf/skills/optimizeAgent.js';
 import { launchCheck } from '../api/_lib/wf/skills/launchCheck.js';
-import { actId, countriesOf, createMetaWriter, ctaType, landingUrl, minor, utmTags } from '../api/_lib/metaAdsWrite.js';
+import { actId, countriesOf, createMetaWriter, hasEu, ctaType, landingUrl, minor, utmTags } from '../api/_lib/metaAdsWrite.js';
 import { buildPlan, checkLaunch } from '../api/_lib/wf/skills/launchEngine.js';
 import { launch } from '../api/_lib/wf/skills/launchAgent.js';
 import fs from 'node:fs';
@@ -2322,5 +2322,28 @@ await test('launch: a launch asked for as PAUSED creates every object switched o
   assert.equal(snap.status, 'done'); assert.ok(snap.warnings.some((x) => /PAUSED/.test(x) && /не витрачаються/.test(x)));
   const normal = await laSetup(); await processTick(normal.ctx);
   assert.ok(normal.ctx.metaWrite.calls.filter(([n]) => ['campaign', 'adset', 'ad'].includes(n)).every(([, a]) => a.status === 'ACTIVE'));
+});
+// ---------------------------------------------------------------- found by the pilot: Poland in the GEO and Meta wanted the advertiser and payer (DSA)
+await test('launch: a country of the EU needs the advertiser name (DSA): the check blocks without it, the ad set carries it, other countries are left as they were, and an unrelated #100 error gets no permission diagnosis', async () => {
+  const siteOf = async (html) => collectSiteData({ website: 'shop.example', ...fakeNet({ 'https://shop.example/': html }) });
+  const ok = await siteOf(SHOP['https://shop.example/']);
+  const base = { accountInfo: { status: 1, currency: 'USD' }, accountCurrency: 'USD', pixels: [{ id: 'px1', name: 'Main', lastFired: LA_FRESH() }], brief: LA_BRIEF, strategy: LA_STRAT, creatives: LA_CREATIVES, siteData: ok, website: 'https://shop.example', now: clock.t };
+  const eu = (general) => ({ ...LA_BRIEF, content: { ...LA_BRIEF.content, general: { ...LA_BRIEF.content.general, geo: 'Україна, Польща', ...general } } });
+  const euStrat = { ...LA_STRAT, geo: 'Україна, Польща' };
+  const without = checkLaunch({ ...base, brief: eu({}), strategy: euStrat }).blockers.map((b) => b.code);
+  assert.ok(without.includes('dsa'), 'Poland without the name blocks the launch');
+  assert.ok(!checkLaunch({ ...base, brief: eu({ dsa_name: "Mon'Archi" }), strategy: euStrat }).blockers.map((b) => b.code).includes('dsa'));
+  assert.ok(!checkLaunch(base).blockers.map((b) => b.code).includes('dsa'), 'a non-EU geo is not asked');
+  assert.equal(hasEu(['UA', 'PL']), true); assert.equal(hasEu(['UA', 'US']), false);
+  const seen = [];
+  const w = createMetaWriter({ token: 'TOKEN123', fetchFn: async (url, init) => { seen.push(String(init?.body || '')); return new Response(JSON.stringify({ id: 'set1' }), { status: 200 }); } });
+  await w.createAdSet({ accountId: '55', campaignId: 'c1', name: 'Г', dailyMinor: 9000, pixelId: 'px', countries: ['UA', 'PL'], dsaName: "Mon'Archi" });
+  assert.match(decodeURIComponent(seen[0]), /dsa_beneficiary=Mon'Archi/); assert.match(decodeURIComponent(seen[0]), /dsa_payor=Mon'Archi/);
+  await w.createAdSet({ accountId: '55', campaignId: 'c1', name: 'Г', dailyMinor: 9000, pixelId: 'px', countries: ['UA'], dsaName: "Mon'Archi" });
+  assert.ok(!/dsa_/.test(seen[1]), 'outside the EU the fields are not sent');
+  // an error with code 100 that is not «no right to write» keeps its own text
+  const wr = laWriter(); wr.createCampaign = async () => { const e = new Error('Meta: Вкажіть рекламодавця (#100/3858081)'); e.metaCode = 100; throw e; }; wr.diagnose = async () => { throw new Error('must not be called'); };
+  const s = await laSetup({ writer: wr }); await processTick(s.ctx);
+  assert.match(s.repo.T.runs.find((r) => r.skill === 'launch').error, /3858081/); assert.ok(!/Діагностика/.test(s.repo.T.runs.find((r) => r.skill === 'launch').error));
 });
 console.log(`\n${passed} workflow checks passed`);

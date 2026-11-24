@@ -4,7 +4,7 @@
 //   buildPlan    → what will be created in the cabinet: campaigns → ad sets → ads, with budgets in the smallest currency unit, links with UTM tags and button types
 //   snapshotOf   → the «Знімок запуску»: what was launched, when, with which settings, creatives and target CPAs, so that the results can be compared later
 // The code decides every number and name here; there is no model in this skill.
-import { countriesOf, ctaType, landingUrl, minor, slug, utmTags } from '../../metaAdsWrite.js';
+import { countriesOf, ctaType, hasEu, landingUrl, minor, slug, utmTags } from '../../metaAdsWrite.js';
 
 const num = (v) => { const x = Number(v); return v !== '' && v != null && Number.isFinite(x) ? x : null; };
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -53,6 +53,8 @@ export function checkLaunch({ accountInfo, accountCurrency, pixels, brief, strat
   // where to show: the countries from the GEO of the brief
   const geo = countriesOf(s.geo || b.general?.geo);
   if (!geo.codes.length || geo.unknown.length) block('geo', `Не вдалося визначити країни показу з GEO «${s.geo || b.general?.geo || ''}»${geo.unknown.length ? ` (незрозуміло: ${geo.unknown.join(', ')})` : ''}. Напишіть країни словами або кодами (наприклад «США, Україна» чи «US, UA»).`, task('ads', 'manager', 'Уточнити GEO в брифі', 'Країни показу не визначено.'));
+  // an ad shown in the European Union needs the name of the advertiser and payer (DSA); the manager writes it in the brief
+  if (hasEu(geo.codes) && !String(b.general?.dsa_name || '').trim()) block('dsa', 'Країни показу містять країну ЄС (' + geo.codes.filter((c) => hasEu([c])).join(', ') + '): Meta вимагає назву рекламодавця і платника. Вкажіть її в брифі (поле для ЄС), запуск зупинено.', task('ads', 'manager', 'Вказати в брифі назву рекламодавця для показу в ЄС', 'Реклама в країнах ЄС потребує назви особи чи організації, яку просуває оголошення (правило DSA).'));
 
   // budgets follow the strategy and the brief
   const camps = s.campaigns || [];
