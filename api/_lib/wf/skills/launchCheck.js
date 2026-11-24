@@ -16,8 +16,18 @@ export async function launchCheck({ run, ctx }) {
     try { const d = typeof ctx.metaWrite.diagnose === 'function' ? await ctx.metaWrite.diagnose() : null; if (d) why = d.error ? ` Діагностика не вдалася: ${d.error}` : d.hasManagement ? ` Токен${d.who ? ' ' + d.who : ''} має право ads_management, отже користувачу токена не призначено цей кабінет із правом керувати кампаніями.` : ` Токен${d.who ? ' ' + d.who : ''} має лише права: ${d.permissions.join(', ') || 'немає'}; потрібне ads_management.`; } catch { /* the original error stays */ }
     throw new Error(`Право запису в кабінет НЕ підтверджено: ${e.message}${why} Нічого не створено.`);
   }
-  return {
-    output: { writable: true, account: accountId, name: info?.name || null },
-    steps: [{ title: `Право запису в кабінет ${info?.name || accountId} підтверджено (перевірка без створення кампаній)`, status: 'done' }],
-  };
+  // the page the ads are published from must be one the cabinet may promote
+  const brief = (await ctx.repo.readSection(run.project_id, 'brief'))?.version?.content || {};
+  const pageId = String(brief.general?.fb_page_id || '').replace(/\D/g, '');
+  let pages = null;
+  if (typeof ctx.metaWrite.promotePages === 'function') { try { pages = await ctx.metaWrite.promotePages({ accountId }); } catch (e) { pages = null; } }
+  const steps = [{ title: `Право запису в кабінет ${info?.name || accountId} підтверджено (перевірка без створення кампаній)`, status: 'done' }];
+  if (pages) {
+    const found = pages.find((p) => p.id === pageId);
+    const list = pages.map((p) => `${p.name || '—'} (${p.id})`).join('; ') || 'жодної';
+    if (!pageId) steps.push({ title: `ID сторінки Facebook у брифі не вказано. Кабінет може рекламувати: ${list}`, status: 'info' });
+    else if (found) steps.push({ title: `Сторінка ${found.name || pageId} доступна для реклами з цього кабінету`, status: 'done' });
+    else throw new Error(`Сторінка ${pageId} з брифу НЕ доступна для реклами з цього кабінету. Кабінет може рекламувати: ${list}. Або вкажіть у брифі ID зі списку, або призначте сторінку цьому кабінету та користувачу токена (Business Settings → Сторінки → Додати людей/Призначити партнерів).`);
+  }
+  return { output: { writable: true, account: accountId, name: info?.name || null, page_ok: pages ? !!pages.find((p) => p.id === pageId) : null, pages: pages || null }, steps };
 }

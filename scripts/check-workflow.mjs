@@ -2346,4 +2346,21 @@ await test('launch: a country of the EU needs the advertiser name (DSA): the che
   const s = await laSetup({ writer: wr }); await processTick(s.ctx);
   assert.match(s.repo.T.runs.find((r) => r.skill === 'launch').error, /3858081/); assert.ok(!/Діагностика/.test(s.repo.T.runs.find((r) => r.skill === 'launch').error));
 });
+// ---------------------------------------------------------------- found by the pilot: Meta refused the Facebook page of the brief
+await test('launch_check: the page of the brief must be among the pages the cabinet may promote; the answer lists them when it is not; nothing is created', async () => {
+  const mk = async (pages) => {
+    const s = await setup({ handlers: createHandlers({ mediabuyer: { launch_check: launchCheck } }) });
+    s.repo.addAccount(1, LA_ACC);
+    await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general: { fb_page_id: '777' }, economics: {} } });
+    const w = laWriter(); w.validateWrite = async () => ({ success: true }); w.promotePages = async () => pages; s.ctx.metaWrite = w;
+    await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'launch_check', trigger: 'manual' }); await processTick(s.ctx);
+    return { run: s.repo.T.runs.find((r) => r.skill === 'launch_check'), w };
+  };
+  const good = await mk([{ id: '777', name: 'Моя сторінка' }]);
+  assert.equal(good.run.status, 'done'); assert.equal(good.run.output.page_ok, true); assert.deepEqual(good.w.calls, []);
+  const bad = await mk([{ id: '555', name: 'Інша сторінка' }]);
+  assert.notEqual(bad.run.status, 'done'); assert.match(bad.run.error, /777.*НЕ доступна/); assert.match(bad.run.error, /Інша сторінка \(555\)/); assert.deepEqual(bad.w.calls, []);
+  const none = await mk([]);
+  assert.match(none.run.error, /жодної/);
+});
 console.log(`\n${passed} workflow checks passed`);

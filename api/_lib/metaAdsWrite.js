@@ -85,6 +85,11 @@ export function createMetaWriter({ token, fetchFn = fetch, graph = GRAPH } = {})
       try { const m = await call('GET', 'me', { fields: 'id,name' }); out.who = m.name ? `${m.name} (${m.id})` : m.id || null; } catch { /* the name is only a hint */ }
       return out;
     },
+    // the pages this cabinet may advertise for (found by the pilot: Meta refused the page of the brief); read only
+    async promotePages({ accountId }) {
+      const j = await call('GET', `${actId(accountId)}/promote_pages`, { fields: 'id,name', limit: 100 });
+      return (j.data || []).map((p) => ({ id: String(p.id), name: p.name || '' }));
+    },
     // «would a campaign be accepted?» Meta's validate_only runs the permission and field checks and CREATES NOTHING
     async validateWrite({ accountId }) {
       return call('POST', `${actId(accountId)}/campaigns`, { name: 'validate', objective: 'OUTCOME_SALES', status: 'PAUSED', special_ad_categories: [], buying_type: 'AUCTION', is_adset_budget_sharing_enabled: false, execution_options: ['validate_only'] });
