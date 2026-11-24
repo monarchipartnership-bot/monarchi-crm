@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     } : null;
     const repo = createWfRepo(db);
     const notify = hasToken() ? createNotifier({ repo, send: (m) => sendMessage(m) }) : null; // notices to the manager in Telegram
-    const stats = await processTick({ repo, notify, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader(), metaWrite: metaToken ? createMetaWriter({ token: metaToken }) : null });
+    const stats = await processTick({ repo, notify, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader(), metaWrite: (process.env.META_WRITE_TOKEN || metaToken) ? createMetaWriter({ token: process.env.META_WRITE_TOKEN || metaToken }) : null });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);

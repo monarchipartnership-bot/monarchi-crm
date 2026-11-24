@@ -90,7 +90,7 @@ export async function launch({ run, ctx }) {
         const d = await ctx.metaWrite.diagnose();
         e.message += d.error ? ` Діагностика токена не вдалася: ${d.error}`
           : d.hasManagement ? ` Діагностика: токен${d.who ? ' ' + d.who : ''} має право ads_management, отже користувачу токена не призначено цей кабінет із правом керувати кампаніями (Business Settings → Користувачі системи → Додати активи → Рекламні акаунти → «Керування кампаніями»).`
-          : ` Діагностика: токен${d.who ? ' ' + d.who : ''} має лише права: ${d.permissions.join(', ') || 'немає'}. Потрібне право ads_management: створіть токен користувача системи з цим правом і задайте його як META_ACCESS_TOKEN у Vercel.`;
+          : ` Діагностика: токен${d.who ? ' ' + d.who : ''} має лише права: ${d.permissions.join(', ') || 'немає'}. Потрібне право ads_management: створіть токен користувача системи з цим правом (і призначте цьому користувачу кабінет із правом «Керування кампаніями») та задайте його у Vercel як META_WRITE_TOKEN; токен для читання лишається META_ACCESS_TOKEN.`;
       } catch { /* the original error stays */ }
     }
     throw e;
