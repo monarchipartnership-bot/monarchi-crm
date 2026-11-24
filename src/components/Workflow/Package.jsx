@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import useDialogA11y from '../../lib/useDialogA11y';
 import { Pill } from './parts';
 import { PACK_BLOCKS, blockOfTarget, buildPack, plural, remarksText, reviewState } from '../../lib/workflow/pack';
 import { decideApproval, fetchPackage, recordClientAnswer } from '../../lib/api/workflow';
@@ -7,7 +9,7 @@ const dmy = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso.split('-').rev
 const STATUS = { ready: ['ok', 'Готово'], planned: ['mute', 'Заплановано'], producing: ['info', 'Генерується'], failed: ['bad', 'Не вдалося'], needs_check: ['warn', 'Потрібна перевірка'] };
 
 // An ad as it will look in the feed: the page, the text, the picture, the headline and the button. The tag under it is what the Media buyer reads later.
-function Ad({ c, page, review }) {
+function Ad({ c, page, review, onZoom }) {
   const [tone, label] = STATUS[c.status] || ['mute', c.status || ''];
   const target = 'creative:' + c.id;
   const remark = review?.remarks.find((r) => r.target === target);
@@ -15,7 +17,7 @@ function Ad({ c, page, review }) {
     <div className={'wf-ad2' + (remark ? ' flag' : '')}>
       <div className="hd"><span className="av" /><div><b>{page}</b><div className="wf-muted" style={{ fontSize: 11.5 }}>Реклама</div></div></div>
       <div className="tx">{c.primary_text || c.tag}</div>
-      {c.image_url ? <img src={c.image_url} alt={c.headline || c.tag} loading="lazy" /> : <div className={'im ' + (c.status === 'failed' ? 'bad' : c.status === 'needs_check' ? 'warn' : '')}>{c.status === 'failed' ? 'Картинки немає' : c.status === 'producing' ? 'Генерується…' : c.missing ? 'Креатив не знайдено' : 'Картинки ще немає'}</div>}
+      {c.image_url ? <button type="button" className="wf-zoom" onClick={() => onZoom?.(c.id)} aria-label={`Відкрити креатив «${c.headline || c.tag}» у великому форматі`}><img src={c.image_url} alt={c.headline || c.tag} loading="lazy" /><span className="zi" aria-hidden="true">⤢</span></button> : <div className={'im ' + (c.status === 'failed' ? 'bad' : c.status === 'needs_check' ? 'warn' : '')}>{c.status === 'failed' ? 'Картинки немає' : c.status === 'producing' ? 'Генерується…' : c.missing ? 'Креатив не знайдено' : 'Картинки ще немає'}</div>}
       <div className="ft"><b>{c.headline}</b>{c.cta && <span className="cta">{c.cta}</span>}</div>
       <div className="adm">
         <div className="wf-row"><Pill tone={tone}>{label}</Pill>{c.version > 1 && <span className="wf-chip">версія {c.version}</span>}</div>
@@ -29,6 +31,44 @@ function Ad({ c, page, review }) {
     </div>
   );
 }
+
+// The creative in a large format: the picture as big as the screen allows, the texts next to it, the arrows (and ← →) go through the creatives, Esc closes.
+function Lightbox({ items, start, onClose }) {
+  const [i, setI] = useState(Math.max(0, start));
+  const box = useRef(null);
+  useDialogA11y(box, onClose, { initialFocus: '[data-close]' });
+  const c = items[i];
+  const go = useCallback((d) => setI((x) => (x + d + items.length) % items.length), [items.length]);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); } };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [go]);
+  if (!c) return null;
+  return createPortal(
+    <div className="wf wf-lb" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div ref={box} className="wf-lb-box" role="dialog" aria-modal="true" aria-label={`Креатив ${i + 1} з ${items.length}`} tabIndex={-1}>
+        <div className="wf-lb-img"><img src={c.image_url} alt={c.headline || c.tag} /></div>
+        <div className="wf-lb-side">
+          <div className="wf-row" style={{ justifyContent: 'space-between' }}>
+            <span className="wf-muted">{items.length > 1 ? `Креатив ${i + 1} з ${items.length}` : 'Креатив'}</span>
+            <button type="button" className="wf-btn sm" data-close onClick={onClose} aria-label="Закрити">Закрити</button>
+          </div>
+          {c.headline && <h3 className="wf-lb-h">{c.headline}</h3>}
+          {c.primary_text && <p style={{ margin: 0 }}>{c.primary_text}</p>}
+          {c.cta && <div><span className="wf-ad2 cta" style={{ display: 'inline-block' }}>{c.cta}</span></div>}
+          <div className="wf-tag">{c.tag}</div>
+          <div className="wf-row" style={{ marginTop: 'auto' }}>
+            {items.length > 1 && <><button type="button" className="wf-btn sm" onClick={() => go(-1)} aria-label="Попередній креатив">← Назад</button><button type="button" className="wf-btn sm" onClick={() => go(1)} aria-label="Наступний креатив">Далі →</button></>}
+            <a className="wf-btn sm" href={c.image_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-grid', placeItems: 'center', textDecoration: 'none' }}>Відкрити оригінал</a>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+const withPicture = (list) => list.filter((x) => x.image_url);
 
 function Composer({ label, initial, onAdd, onCancel, onRemove }) {
   const [text, setText] = useState(initial || '');
@@ -72,9 +112,13 @@ function Block({ k, title, review, children, hero }) {
 // The package exactly as the client will see it. Without `review` it is only read (the page of the section «Стратегія»).
 export function PackageView({ pack, page, review }) {
   const { summary: s, priorities, scheme, money, timeline, optimisation } = pack;
+  const [zoom, setZoom] = useState(null);
+  const pictures = withPicture([...scheme.campaigns.flatMap((c) => c.groups.flatMap((g) => g.ads)), ...scheme.unplaced]);
+  const onZoom = (id) => setZoom(pictures.findIndex((x) => x.id === id));
   const pct = (x) => (money.daily ? Math.round(((x || 0) / money.daily) * 100) : 0);
   return (
     <div className="wf-pk">
+      {zoom != null && zoom >= 0 && <Lightbox items={pictures} start={zoom} onClose={() => setZoom(null)} />}
       <Block k="summary" title="Підсумок" review={review} hero>
         <div style={{ fontSize: 17, fontWeight: 700 }}>Стратегія першого місяця{page ? ` для «${page}»` : ''}</div>
         <div style={{ opacity: .85 }}>{s.geo ? s.geo + ' · ' : ''}версія {pack.version}{pack.rework ? ` · за коментарем: «${pack.rework.comment}»` : ''}</div>
@@ -106,13 +150,13 @@ export function PackageView({ pack, page, review }) {
             {c.groups.map((g, k) => (
               <div key={k} className="wf-grp">
                 <div className="wf-row"><b style={{ fontSize: 13 }}>Група «{g.name}»</b>{g.segment && <span className="wf-muted" style={{ fontSize: 12 }}>аудиторія: {g.segment}</span>}</div>
-                {g.ads.length ? <div className="wf-ads">{g.ads.map((a) => <Ad key={a.id} c={a} page={page} review={review} />)}</div> : <div className="wf-muted" style={{ fontSize: 13 }}>Креативів у групі поки немає.</div>}
+                {g.ads.length ? <div className="wf-ads">{g.ads.map((a) => <Ad key={a.id} c={a} page={page} review={review} onZoom={onZoom} />)}</div> : <div className="wf-muted" style={{ fontSize: 13 }}>Креативів у групі поки немає.</div>}
               </div>
             ))}
           </div>
         ))}
         {scheme.unplaced.length > 0 && (
-          <div className="wf-camp"><b>Креативи без групи</b><div className="wf-ads">{scheme.unplaced.map((a) => <Ad key={a.id} c={a} page={page} review={review} />)}</div></div>
+          <div className="wf-camp"><b>Креативи без групи</b><div className="wf-ads">{scheme.unplaced.map((a) => <Ad key={a.id} c={a} page={page} review={review} onZoom={onZoom} />)}</div></div>
         )}
       </Block>
 
@@ -249,11 +293,15 @@ export function StrategyPage({ projectId, content, projectName }) {
 // The page of the section «Креативи (готові)»: every creative as an ad of the feed, with the state, the tag and the cost of the pictures.
 export function CreativesPage({ content, projectName }) {
   const items = content.items || [];
+  const [zoom, setZoom] = useState(null);
+  const pictures = withPicture(items);
+  const onZoom = (id) => setZoom(pictures.findIndex((x) => x.id === id));
   return (
     <div className="wf-col">
       {content.branch === 'B' && <div className="wf-lock">{content.note || 'Матеріалів недостатньо: креативи ще не створюються.'}</div>}
       {items.length > 0 && <div className="wf-muted">Витрачено на картинки {Number(content.spent_usd || 0).toFixed(2)} USD з ліміту проєкту {Number(content.limit_usd || 0).toFixed(2)}.</div>}
-      <div className="wf-ads">{items.map((c) => <Ad key={c.id} c={c} page={projectName} />)}</div>
+      {zoom != null && zoom >= 0 && <Lightbox items={pictures} start={zoom} onClose={() => setZoom(null)} />}
+      <div className="wf-ads">{items.map((c) => <Ad key={c.id} c={c} page={projectName} onZoom={onZoom} />)}</div>
       {(content.open || []).length > 0 && <div className="wf-muted" style={{ fontSize: 12.5 }}>Відкриті питання: {content.open.join(' ')}</div>}
     </div>
   );

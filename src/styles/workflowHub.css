@@ -242,3 +242,15 @@
 .wf-help-blk h4 { margin:0 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--wf-muted); font-weight:700; }
 .wf-help-blk p { margin:0; }
 .wf-help-tip { background:var(--wf-info-bg); color:var(--wf-info); border-radius:12px; padding:8px 12px; font-size:13px; margin-top:12px; }
+/* the creative in a large format (the picture of an ad can be opened; the corner mark is always visible, no hover effects) */
+.wf-zoom { display:block; position:relative; width:100%; padding:0; border:0; background:none; cursor:zoom-in; font:inherit; }
+.wf-zoom img { display:block; }
+.wf-zoom .zi { position:absolute; right:8px; bottom:8px; width:28px; height:28px; border-radius:50%; background:rgba(46,16,55,.72); color:#fff; display:grid; place-items:center; font-size:15px; line-height:1; }
+.wf-zoom:focus-visible { outline:2px solid var(--wf-orchid); outline-offset:-2px; }
+.wf-lb { position:fixed; inset:0; z-index:1300; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(30,10,38,.82); }
+.wf-lb-box { background:var(--wf-surface); border-radius:20px; max-width:min(1180px,100%); max-height:calc(100vh - 40px); width:100%; display:grid; grid-template-columns:minmax(0,1.4fr) minmax(260px,1fr); overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+.wf-lb-img { background:#150a1a; display:grid; place-items:center; min-height:0; }
+.wf-lb-img img { max-width:100%; max-height:calc(100vh - 40px); object-fit:contain; display:block; }
+.wf-lb-side { padding:18px 20px; display:flex; flex-direction:column; gap:12px; overflow:auto; min-width:0; }
+.wf-lb-h { margin:0; font-size:18px; }
+@media (max-width:760px) { .wf-lb-box { grid-template-columns:minmax(0,1fr); overflow:auto; } .wf-lb-img img { max-height:60vh; } }

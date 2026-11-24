@@ -2363,4 +2363,14 @@ await test('launch_check: the page of the brief must be among the pages the cabi
   const none = await mk([]);
   assert.match(none.run.error, /жодної/);
 });
+// ---------------------------------------------------------------- the creative can be opened in a large format (owner's remark 2026-11-24)
+await test('creatives: every picture of an ad is a button that opens the large viewer (dialog, arrows, Esc); the viewer and its styles exist, and only ads with a picture are in it', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const src = fs.readFileSync(path.join(root, 'src/components/Workflow/Package.jsx'), 'utf8');
+  assert.match(src, /function Lightbox/); assert.match(src, /className="wf-zoom"/); assert.match(src, /role="dialog"/); assert.match(src, /useDialogA11y\(box, onClose/);
+  assert.match(src, /ArrowLeft/); assert.match(src, /ArrowRight/); assert.match(src, /withPicture\(/);
+  assert.equal((src.match(/onZoom=\{onZoom\}/g) || []).length >= 3, true, 'the package and the page of the creatives both pass the viewer to every ad');
+  const css = fs.readFileSync(path.join(root, 'src/styles/workflowHub.css'), 'utf8');
+  assert.match(css, /\.wf-lb-box/); assert.match(css, /\.wf-zoom/);
+});
 console.log(`\n${passed} workflow checks passed`);
