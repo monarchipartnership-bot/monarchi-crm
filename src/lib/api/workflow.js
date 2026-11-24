@@ -99,6 +99,21 @@ export async function fetchAgentsLive() {
   ]);
   return { ...data, feed: feed.error ? [] : feed.data || [], lastTickAt: tick.error ? null : tick.data?.last_tick_at || null };
 }
+// What the window «Витрати» reads: the runs of three months (cost_usd), the model calls of the AI in the CRM, the projects, their states and the limits.
+export async function fetchSpendData() {
+  const d = new Date();
+  const since = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 2, 1)).toISOString();
+  const [runs, calls, projects, states, settings] = await Promise.all([
+    supabase.from('wf_runs').select('id, project_id, agent, skill, status, cost_usd, created_at').gte('created_at', since).order('id', { ascending: false }).limit(6000),
+    supabase.from('ai_calls').select('run_id, agent_key, project_id, cost_usd, created_at').gte('created_at', since).order('id', { ascending: false }).limit(8000),
+    supabase.from('projects').select('id, name, client'),
+    supabase.from('wf_project_state').select('project_id, cost_cap_usd'),
+    supabase.from('wf_settings').select('*').eq('id', 1).maybeSingle(),
+  ]);
+  const byId = {};
+  for (const p of must(projects, 'projects') || []) byId[p.id] = { name: p.client || p.name };
+  return { runs: must(runs, 'runs') || [], calls: calls.error ? [] : calls.data || [], projects: byId, states: must(states, 'states') || [], settings: settings.error ? { monthly_cap_usd: 1000, project_cap_default_usd: 100 } : settings.data || { monthly_cap_usd: 1000, project_cap_default_usd: 100 } };
+}
 // The latest «Готовність до запуску» check of a project (the skill mediabuyer/launch_check) with its steps.
 export async function fetchReadiness(projectId) {
   const run = must(await supabase.from('wf_runs').select('id, status, error, output, input, created_at, finished_at').eq('project_id', projectId).eq('agent', 'mediabuyer').eq('skill', 'launch_check').order('id', { ascending: false }).limit(1).maybeSingle(), 'readiness');

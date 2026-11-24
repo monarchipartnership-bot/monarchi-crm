@@ -55,6 +55,7 @@ import { AGENTS, RERUN_SKILLS, SKILL_LABEL, STAGES, agentCards, buildQueue, nowC
 import { readinessOf } from '../src/lib/workflow/readiness.js';
 import { ACTIVE_AGENTS, INTEGRATED_SKILLS, mapIslands } from '../src/lib/workflow/registry.js';
 import { agentFacts, agentStates, feedOf, podStates } from '../src/lib/workflow/mapLive.js';
+import { monthsOffered, spendReport } from '../src/lib/workflow/spendStats.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
 import { headlineOf, historyOf, pendingCount, pendingItem, pendingList, roadOf } from '../src/lib/workflow/approvalsTab.js';
 
@@ -2499,5 +2500,37 @@ await test('map page: /ai-agents is the full-screen map (immersive layout), fed 
   assert.match(scene, /opts\.islands/); assert.ok(!/const LAYOUT = \[/.test(scene), 'no fixed layout of eight islands any more');
   assert.match(read('src/pages/AiAgents/map/room.js'), /for \(const isl of islands\) \{ const dir/, 'one route from the hub to every island');
   assert.match(scene, /Оркестратор/);
+});
+// ---------------------------------------------------------------- the window «Витрати» (restored on the new data)
+await test('spend: the month against the limits, by project, agent, skill and day; the model apart from the pictures; the forecast; the other spend of the AI; another month does not mix in', () => {
+  const now = new Date('2026-11-24T22:00:00Z');
+  const run = (id, project_id, agent, skill, cost, at, status = 'done') => ({ id, project_id, agent, skill, status, cost_usd: cost, created_at: at });
+  const runs = [run(1, 3, 'creator', 'first_creatives', 0.5, '2026-11-24T10:00:00Z'), run(2, 3, 'researcher', 'site', 0.04, '2026-11-24T09:00:00Z'), run(3, 27, 'strategist', 'strategy', 0.02, '2026-11-23T09:00:00Z'), run(4, 27, 'mediabuyer', 'launch', 0, '2026-11-23T10:00:00Z', 'failed'), run(5, 3, 'creator', 'first_creatives', 9, '2026-10-30T10:00:00Z')];
+  const calls = [{ run_id: '1', agent_key: 'wf-researcher', cost_usd: 0.1, created_at: '2026-11-24T10:00:00Z' }, { run_id: '2', agent_key: 'wf-researcher', cost_usd: 0.04, created_at: '2026-11-24T09:00:00Z' }, { run_id: '3', agent_key: 'wf-researcher', cost_usd: 0.02, created_at: '2026-11-23T09:00:00Z' },
+    { run_id: null, agent_key: 'report-work-summary', cost_usd: 0.017, created_at: '2026-11-23T10:00:00Z' }, { run_id: null, agent_key: 'creative-creative_strategy', cost_usd: 0.139, created_at: '2026-11-18T10:00:00Z' }, { run_id: null, agent_key: 'report-work-summary', cost_usd: 5, created_at: '2026-10-01T10:00:00Z' }];
+  const projects = { 3: { name: 'Mellow' }, 27: { name: 'Mon-Archi' } };
+  const rep = spendReport({ now, runs, calls, projects, states: [{ project_id: 27, cost_cap_usd: 0.05 }], settings: { monthly_cap_usd: 1000, project_cap_default_usd: 100 } });
+  assert.equal(rep.month, '2026-11'); assert.equal(rep.spent, 0.56, 'October does not mix in'); assert.equal(rep.runs, 4);
+  assert.equal(rep.modelCost, 0.16); assert.equal(rep.picturesCost, 0.4, 'what is not the model is the pictures');
+  assert.equal(rep.cap, 1000); assert.equal(rep.pct, 0); assert.equal(rep.hot, false);
+  assert.equal(rep.daysPassed, 24); assert.equal(Math.round(rep.forecast * 1000) / 1000, 0.7, 'the spend so far / days passed × days of the month');
+  assert.deepEqual(rep.perProject.map((p) => p.name), ['Mellow', 'Mon-Archi']); assert.equal(rep.perProject[0].cap, 100); assert.equal(rep.perProject[1].cap, 0.05); assert.equal(rep.perProject[1].ownCap, 0.05); assert.equal(rep.perProject[1].hot, false);
+  assert.equal(rep.perAgent.length, 5); assert.equal(rep.perAgent.find((a) => a.key === 'creator').spent, 0.5); assert.equal(rep.perAgent.find((a) => a.key === 'mediabuyer').failed, 1);
+  assert.equal(rep.perSkill[0].label, 'робить перші креативи');
+  assert.equal(rep.perDay.length, 30); assert.equal(rep.perDay[23].spent, 0.54); assert.equal(rep.perDay[24].future, true); assert.equal(rep.perDay[22].spent, 0.02);
+  assert.deepEqual(rep.topRuns.map((r) => r.id), [1, 2, 3]);
+  assert.deepEqual(rep.other.map((o) => o.label), ['Креативний відділ (старий)', 'Резюме роботи для звітів']); assert.equal(rep.otherTotal, 0.156);
+  // the limit of a project reached, and a month in the past
+  const hot = spendReport({ now, runs: [run(9, 27, 'strategist', 'strategy', 0.045, '2026-11-23T09:00:00Z')], states: [{ project_id: 27, cost_cap_usd: 0.05 }], settings: {} });
+  assert.equal(hot.perProject[0].hot, true); assert.equal(hot.perProject[0].pct, 90);
+  const oct = spendReport({ now, month: '2026-10', runs, calls, projects, settings: {} }); assert.equal(oct.spent, 9); assert.equal(oct.current, false); assert.equal(oct.forecast, null); assert.equal(oct.otherTotal, 5);
+  assert.deepEqual(monthsOffered(now), ['2026-11', '2026-10', '2026-09']);
+});
+await test('spend: the window is wired into the section (button, tab, the number on the map opens it; the limits are changed in the overview)', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const home = fs.readFileSync(path.join(root, 'src/pages/AiAgents/AiAgentsHome.jsx'), 'utf8');
+  assert.match(home, /spend: \{ title: 'Витрати'/); assert.match(home, /openWin\('spend'\)/); assert.match(home, /<Page onOpen=\{openWin\} \/>/);
+  const win = fs.readFileSync(path.join(root, 'src/pages/AiAgents/Spend.jsx'), 'utf8');
+  assert.match(win, /Змінити ліміти/); assert.match(win, /Інші витрати ШІ/); assert.match(win, /fetchSpendData/);
 });
 console.log(`\n${passed} workflow checks passed`);

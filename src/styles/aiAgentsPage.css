@@ -50,3 +50,4 @@
 .aia-win-x { height:34px; padding:0 18px; border-radius:999px; border:1px solid rgba(255,255,255,.55); background:rgba(255,255,255,.14); color:#fff; font:inherit; font-weight:600; font-size:13px; cursor:pointer; }
 .aia-win-body { flex:1 1 auto; min-height:0; overflow:auto; }
 .aia-win-body .wf-page { max-width:none; }
+.aia-click { cursor:pointer; }
