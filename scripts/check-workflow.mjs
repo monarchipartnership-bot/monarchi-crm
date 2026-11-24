@@ -2226,9 +2226,11 @@ await test('help: the map has the same six stages as the process, every stage is
     assert.ok(h.go.label && app.includes(`path="${h.go.to}"`), `${h.title}: the page ${h.go.to} exists`);
   });
   for (const c of HELP_CONTROLS) assert.ok(c.title && c.text && c.where);
-  assert.ok(app.includes('path="/projects/help"'));
-  assert.match(fs.readFileSync(path.join(root, 'src/components/Sidebar/sidebarData.js'), 'utf8'), /to: '\/projects\/help'/);
-  assert.match(fs.readFileSync(path.join(root, 'src/routes/routeMeta.js'), 'utf8'), /'\/projects\/help'/);
+  // owner's rule (2026-11-24): the pages about the agents are WINDOWS of the section «AI Agents», not pages of the CRM menu; the old addresses lead to the windows
+  const side = fs.readFileSync(path.join(root, 'src/components/Sidebar/sidebarData.js'), 'utf8');
+  for (const k of ['help', 'overview', 'approvals']) { assert.ok(!side.includes(`to: '/projects/${k}'`), `${k} is not in the menu of the CRM`); assert.ok(app.includes(`path="/projects/${k}" element={<Navigate to="/ai-agents?window=${k}" replace />}`), `the old address of ${k} leads to its window`); }
+  const home = fs.readFileSync(path.join(root, 'src/pages/AiAgents/AiAgentsHome.jsx'), 'utf8');
+  assert.match(home, /WINDOWS = \{ approvals:/); assert.match(home, /overview:/); assert.match(home, /help:/); assert.match(home, /<AiWindow /);
   assert.match(HELP_STAGES[3].wrong, /Запустити ще раз/, 'the way out of a stopped launch is told');
   assert.match(HELP_STAGES[2].you, /вкладку «Апруви»/); assert.match(HELP_STAGES[3].you, /Готовність до запуску/); assert.match(HELP_STAGES[2].wrong, /картці Креатора/);
 });

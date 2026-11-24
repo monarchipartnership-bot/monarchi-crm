@@ -42,3 +42,11 @@
 .aia-agent { display:flex; flex-direction:column; gap:4px; }
 @media (max-width:1100px) { .aia-kpis { max-width:calc(100vw - 32px); min-width:0; top:140px; } .aia-left { top:210px; width:200px; } .aia-right { top:auto; bottom:84px; height:38vh; width:calc(100vw - 48px); } }
 @media (prefers-reduced-motion: reduce) { .aia-page * { transition:none !important; animation:none !important; } }
+/* the full-size windows of the section (Апруви, Огляд проєктів, Як це працює): a light sheet over the dark map */
+.aia-win-back { position:absolute; inset:0; z-index:20; background:rgba(23,5,28,.74); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:20px; }
+.aia-win { width:min(1320px,100%); height:100%; max-height:calc(100dvh - 40px); background:#FAF6FC; color:#2E1037; border-radius:22px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 24px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(235,156,239,.35); }
+.aia-win-head { flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; background:linear-gradient(88deg,#b544b5,#661466); color:#fff; }
+.aia-win-head h2 { margin:0; font-size:19px; font-weight:700; }
+.aia-win-x { height:34px; padding:0 18px; border-radius:999px; border:1px solid rgba(255,255,255,.55); background:rgba(255,255,255,.14); color:#fff; font:inherit; font-weight:600; font-size:13px; cursor:pointer; }
+.aia-win-body { flex:1 1 auto; min-height:0; overflow:auto; }
+.aia-win-body .wf-page { max-width:none; }
