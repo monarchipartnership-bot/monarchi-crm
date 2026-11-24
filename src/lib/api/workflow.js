@@ -90,6 +90,15 @@ export async function fetchQueueData() {
   for (const p of must(projects, 'projects') || []) byId[p.id] = { name: p.client || p.name };
   return { projects: byId, states: must(states, 'states') || [], approvals: must(apps, 'approvals') || [] };
 }
+// Everything the map of the AI Agents reads: the overview rows (states, runs of two months, approvals, tasks, settings), the latest events of all projects and the clock of the orchestrator.
+export async function fetchAgentsLive() {
+  const data = await loadOverviewData(supabase);
+  const [feed, tick] = await Promise.all([
+    supabase.from('wf_journal').select('id, project_id, at, action, summary').order('id', { ascending: false }).limit(60),
+    supabase.from('ai_agent_settings').select('last_tick_at').eq('id', 1).maybeSingle(),
+  ]);
+  return { ...data, feed: feed.error ? [] : feed.data || [], lastTickAt: tick.error ? null : tick.data?.last_tick_at || null };
+}
 // The latest «Готовність до запуску» check of a project (the skill mediabuyer/launch_check) with its steps.
 export async function fetchReadiness(projectId) {
   const run = must(await supabase.from('wf_runs').select('id, status, error, output, input, created_at, finished_at').eq('project_id', projectId).eq('agent', 'mediabuyer').eq('skill', 'launch_check').order('id', { ascending: false }).limit(1).maybeSingle(), 'readiness');

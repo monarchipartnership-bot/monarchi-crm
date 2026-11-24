@@ -8,7 +8,7 @@ import './Layout.css';
 // the page itself owns all the screen space (e.g. the Constellation map,
 // which is meant to feel like a fullscreen space canvas, not a boxed-in
 // CRM page).
-const IMMERSIVE_PREFIXES = ['/tools/constellation-test'];
+const IMMERSIVE_PREFIXES = ['/tools/constellation-test', '/ai-agents'];
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);

@@ -54,6 +54,7 @@ import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } fro
 import { AGENTS, RERUN_SKILLS, SKILL_LABEL, STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
 import { readinessOf } from '../src/lib/workflow/readiness.js';
 import { ACTIVE_AGENTS, INTEGRATED_SKILLS, mapIslands } from '../src/lib/workflow/registry.js';
+import { agentFacts, agentStates, feedOf, podStates } from '../src/lib/workflow/mapLive.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
 import { headlineOf, historyOf, pendingCount, pendingItem, pendingList, roadOf } from '../src/lib/workflow/approvalsTab.js';
 
@@ -2463,5 +2464,38 @@ await test('registry: the skills that the orchestrator runs are exactly the skil
   assert.deepEqual(isl.slice(1).map((x) => x.key), ['service', 'sales', 'seo', 'smm']); assert.ok(isl.slice(1).every((x) => x.archived && /в архіві/.test(x.label)));
   const rad = (n) => Math.max(3.9, (n * 4.4) / (2 * Math.PI)) + 1.45 + 0.55; // the radius of an island as the scene makes it
   for (let i = 0; i < isl.length; i += 1) for (let j = i + 1; j < isl.length; j += 1) assert.ok(Math.hypot(isl[i].p[0] - isl[j].p[0], isl[i].p[1] - isl[j].p[1]) > rad(isl[i].agents.length) + rad(isl[j].agents.length) + 1, `${isl[i].key} and ${isl[j].key} overlap`);
+});
+// ---------------------------------------------------------------- the map of the AI Agents: live states, facts of an agent, the feed (restored 2026-11-24)
+await test('map live: the state of every agent (problem, work, a decision that waits, ready, inactive), the pods of archived departments are inactive, the feed speaks in words of the manager', () => {
+  const now = new Date('2026-11-24T22:00:00Z');
+  const run = (id, agent, skill, status, extra = {}) => ({ id, project_id: 3, agent, skill, status, created_at: '2026-11-24T20:00:00Z', finished_at: '2026-11-24T20:05:00Z', cost_usd: 0.1, ...extra });
+  const st = [{ project_id: 3, stage: 2, paused: false }];
+  const none = agentStates({ runs: [], approvals: [], states: [], now }); assert.deepEqual(Object.values(none), ['inactive', 'inactive', 'inactive', 'inactive', 'inactive']);
+  const runs = [run(1, 'researcher', 'site', 'done'), run(2, 'creator', 'first_creatives', 'running'), run(3, 'mediabuyer', 'launch', 'failed'), run(4, 'support', 'onboarding', 'done', { finished_at: '2026-11-01T00:00:00Z', created_at: '2026-11-01T00:00:00Z' })];
+  const s = agentStates({ runs, approvals: [{ id: 9, project_id: 3, kind: 'strategy', status: 'pending' }], states: st, now });
+  assert.equal(s.researcher, 'waiting'); assert.equal(s.creator, 'working'); assert.equal(s.mediabuyer, 'problem'); assert.equal(s.support, 'inactive', 'nothing for a week');
+  assert.equal(s.strategist, 'paused', 'the approval of the strategy waits for the manager');
+  // a failure that a later success of the same work followed is old news; a failed readiness check is not a problem of the system
+  const s2 = agentStates({ runs: [run(1, 'mediabuyer', 'launch', 'failed'), run(2, 'mediabuyer', 'launch', 'done'), run(3, 'mediabuyer', 'launch_check', 'failed')], approvals: [], states: st, now });
+  assert.equal(s2.mediabuyer, 'waiting');
+  const isl = mapIslands(); const pods = podStates(isl, s);
+  assert.equal(pods.creator, 'working'); assert.ok(isl.filter((x) => x.archived).flatMap((x) => x.agents).every((a) => pods[a.key] === 'inactive'));
+  // the facts of an agent
+  const f = agentFacts({ agent: 'creator', runs: [run(5, 'creator', 'first_creatives', 'running'), run(6, 'creator', 'materials_ideas', 'done', { cost_usd: 0.3 })], projects: { 3: { name: 'Mellow' } }, now, since: '2026-11-01T00:00:00Z' });
+  assert.equal(f.open.length, 1); assert.equal(f.open[0].project, 'Mellow'); assert.equal(f.recent[0].id, 6, 'the newest first'); assert.equal(f.open[0].id, 5); assert.equal(Math.round(f.cost * 100) / 100, 0.4); assert.equal(f.runs, 2);
+  // the feed: no small events, newest first, the tab to open
+  const feed = feedOf({ projects: { 3: { name: 'Mellow' } }, journal: [{ id: 1, project_id: 3, at: 'a', action: 'run_done', summary: 'Готово' }, { id: 2, project_id: 3, at: 'b', action: 'approval', summary: 'Апрув 1 чекає' }, { id: 3, project_id: 3, at: 'c', action: 'run_failed', summary: 'Помилка' }, { id: 4, project_id: null, at: 'd', action: 'state', summary: 'x' }] });
+  assert.deepEqual(feed.map((x) => x.id), [3, 2]); assert.equal(feed[0].bad, true); assert.equal(feed[1].tab, 'approvals'); assert.equal(feed[1].project, 'Mellow');
+});
+await test('map page: /ai-agents is the full-screen map (immersive layout), fed by the registry and the live rows; the scene takes its islands from the registry and draws a route to every island', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  assert.match(read('src/components/Layout/Layout.jsx'), /IMMERSIVE_PREFIXES = \[[^\]]*'\/ai-agents'/);
+  const page = read('src/pages/AiAgents/AiAgentsHome.jsx');
+  assert.match(page, /<AgentMap3D /); assert.match(page, /mapIslands\(\)/); assert.match(page, /fetchAgentsLive/); assert.match(page, /Аварійна зупинка/); assert.match(page, /Виконати крок зараз/); assert.match(page, /Що зараз/);
+  const scene = read('src/pages/AiAgents/map/createAgentMap.js');
+  assert.match(scene, /opts\.islands/); assert.ok(!/const LAYOUT = \[/.test(scene), 'no fixed layout of eight islands any more');
+  assert.match(read('src/pages/AiAgents/map/room.js'), /for \(const isl of islands\) \{ const dir/, 'one route from the hub to every island');
+  assert.match(scene, /Оркестратор/);
 });
 console.log(`\n${passed} workflow checks passed`);
