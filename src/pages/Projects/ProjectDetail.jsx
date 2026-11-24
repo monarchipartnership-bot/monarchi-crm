@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AutoResizeTextarea from '../../components/Reports/AutoResizeTextarea';
 import PlatformReports from '../../components/Projects/Reports/PlatformReports';
@@ -44,6 +44,9 @@ import '../../styles/reportsPlum.css'; // the hand-made part: switch of the sect
 import { fetchProjectCreative } from '../../lib/api/projectCreative';
 import { infoProgress } from '../../lib/agents/infoProgress';
 import ProcessOverview from '../../components/Workflow/ProcessOverview';
+import ApprovalsTab from '../../components/Workflow/ApprovalsTab';
+import { fetchApprovalsOf } from '../../lib/api/workflow';
+import { pendingCount } from '../../lib/workflow/approvalsTab';
 import Dossier from '../../components/Workflow/Dossier';
 import Tasks from '../../components/Workflow/Tasks';
 
@@ -52,6 +55,7 @@ const TABS = [
   { key: 'process', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src }, // the new agent system: where the project is and what waits for the manager
   { key: 'dossier', label: 'Досьє', icon: PAGE_ICONS['page.projects'].src }, // the 10 sections the agents and people write together
   { key: 'tasks', label: 'Задачі', icon: PAGE_ICONS['page.projects'].src }, // the pool of tasks: what the agents found or prepared, the drafts for the client
+  { key: 'approvals', label: 'Апруви', icon: PAGE_ICONS['page.projects'].src }, // the decisions of the manager: what waits now, the road, the history (owner's choice A, 2026-11-24)
   { key: 'builder', label: 'Конструктор звіту', icon: null, line: <path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z" /> },
   { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
@@ -68,6 +72,7 @@ const STRIP = [
   TABS.find((x) => x.key === 'process'),
   TABS.find((x) => x.key === 'dossier'),
   TABS.find((x) => x.key === 'tasks'),
+  TABS.find((x) => x.key === 'approvals'),
   { key: 'reports', label: 'Звітність', icon: PAGE_ICONS['page.weekly-report'].src },
   TABS.find((x) => x.key === 'agent'),
 ];
@@ -77,6 +82,7 @@ const STRIP_LINE = {
   process: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   dossier: <path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2zM8 7h7M8 11h7M8 15h4" />,
   tasks: <path d="M5 4h14v16H5zM9 9l2 2 4-4M9 15h6" />,
+  approvals: <><circle cx="12" cy="12" r="9" /><path d="M8 12.5l3 3 5-6" /></>,
   reports: <path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" />,
   agent: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></>,
 };
@@ -191,6 +197,9 @@ function ProjectDetailCard() {
   const [accVersion, setAccVersion] = useState(0); // grows when the cabinets of the project change (the builder reads them once)
   const [workCount, setWorkCount] = useState(0); // reports waiting in «Робота над звітами» (the badge of the tab)
   useEffect(() => { let off = false; countWorkReports(id).then((n) => { if (!off) setWorkCount(n); }); return () => { off = true; }; }, [id, tab]);
+  const [approvalCount, setApprovalCount] = useState(0); // decisions that wait for the manager in this project (the badge of the tab «Апруви»)
+  const refreshApprovals = useCallback(() => { fetchApprovalsOf(id).then((d) => setApprovalCount(pendingCount({ projectId: id, state: d.state, approvals: d.approvals }))).catch(() => setApprovalCount(0)); }, [id]);
+  useEffect(() => { refreshApprovals(); }, [refreshApprovals, tab]);
   useEffect(() => { setVisited((v) => (v.has(paneKey) ? v : new Set(v).add(paneKey))); }, [paneKey]);
   useEffect(() => { setVisited(new Set([paneKey])); setCfgVersion(0); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -555,7 +564,7 @@ function ProjectDetailCard() {
             className={'pw-tab' + (activeStrip === t.key ? ' on' : '')} onClick={() => openStrip(t.key)}
           >
             <span className="pw-tab-m"><svg viewBox="0 0 24 24" aria-hidden="true">{STRIP_LINE[t.key]}</svg></span>
-            <span>{t.label}</span>{t.key === 'reports' && workCount > 0 && <span className="pw-tab-n" aria-label={`${workCount} у роботі`}>{workCount}</span>}
+            <span>{t.label}</span>{t.key === 'reports' && workCount > 0 && <span className="pw-tab-n" aria-label={`${workCount} у роботі`}>{workCount}</span>}{t.key === 'approvals' && approvalCount > 0 && <span className="pw-tab-n" aria-label={`${approvalCount} чекає на вас`}>{approvalCount}</span>}
           </button>
         ))}
       </div>
@@ -665,6 +674,7 @@ function ProjectDetailCard() {
       ))}
       {tab === 'process' && <ProcessOverview key={'process-' + id} projectId={id} onGo={goWf} />}
       {tab === 'tasks' && <Tasks key={'tasks-' + id} projectId={id} />}
+      {tab === 'approvals' && <ApprovalsTab key={'approvals-' + id} projectId={id} projectName={project?.client || project?.name} onChanged={refreshApprovals} onGo={goWf} />}
       {tab === 'dossier' && <Dossier key={'dossier-' + id + (searchParams.get('section') || '')} projectId={id} initialKey={searchParams.get('section') || undefined} />}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}

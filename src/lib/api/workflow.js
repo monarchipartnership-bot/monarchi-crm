@@ -90,6 +90,14 @@ export async function fetchQueueData() {
   for (const p of must(projects, 'projects') || []) byId[p.id] = { name: p.client || p.name };
   return { projects: byId, states: must(states, 'states') || [], approvals: must(apps, 'approvals') || [] };
 }
+// The tab «Апруви» of one project: its state and all its approvals (the newest 200).
+export async function fetchApprovalsOf(projectId) {
+  const [state, apps] = await Promise.all([
+    supabase.from('wf_project_state').select('project_id, stage, paused').eq('project_id', projectId).maybeSingle(),
+    supabase.from('wf_approvals').select('*').eq('project_id', projectId).order('id', { ascending: false }).limit(200),
+  ]);
+  return { state: must(state, 'state'), approvals: must(apps, 'approvals') || [] };
+}
 // «Схвалити» or «Повернути». The orchestrator reads the answer on its next pass.
 export async function decideApproval(approval, status, comment, email, remarks = null) {
   const text = (comment || '').trim();

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchProcess, patchState, requestRun, runTickNow, startProcess } from '../../lib/api/workflow';
-import { agentCards, ageText, nowCard, signoffWanted } from '../../lib/workflow/view';
+import { agentCards, ageText, nowCard } from '../../lib/workflow/view';
 import { Pill, Stepper } from './parts';
-import Decision from './Decision';
 
 // «Огляд» of a project (screen 1 of step A3, the variant B of the mockup): the card «Зараз» first, then the stages, the five agents and the journal.
 export default function ProcessOverview({ projectId, onGo }) {
@@ -24,19 +23,16 @@ export default function ProcessOverview({ projectId, onGo }) {
   const { state, runs, approvals, journal, sections } = data;
   const hasBrief = !!sections.find((s) => s.key === 'brief')?.current_version_id;
   const now = nowCard({ state, runs, approvals, hasBrief, journal });
-  const pending = approvals.filter((a) => a.status === 'pending').sort((a, b) => b.id - a.id)[0];
-  const signoff = signoffWanted(state, approvals);
-  const decision = pending ? { kind: pending.kind, projectId, id: pending.id, subject: pending.subject || {} } : signoff ? { kind: 'client', projectId, id: null } : null;
   const cards = agentCards(runs);
   const mainAction = {
     start: () => act(() => startProcess(projectId, email)),
     resume: () => act(() => patchState(projectId, { paused: false, paused_reason: null }, email, 'Паузу знято.')),
-    decide: () => document.getElementById('wf-decision')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-    signoff: () => document.getElementById('wf-decision')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    decide: () => onGo?.('approvals'), // the decisions live in the tab «Апруви» (owner's choice A, 2026-11-24)
+    signoff: () => onGo?.('approvals'),
     dossier: () => onGo?.('dossier'),
     tasks: () => onGo?.('tasks'),
   }[now.action];
-  const actionLabel = { start: 'Запустити процес', resume: 'Зняти паузу', decide: 'Прийняти рішення', signoff: 'Записати відповідь клієнта', tasks: 'Відкрити задачі', dossier: 'Відкрити Досьє' }[now.action];
+  const actionLabel = { start: 'Запустити процес', resume: 'Зняти паузу', decide: 'Відкрити «Апруви»', signoff: 'Відкрити «Апруви»', tasks: 'Відкрити задачі', dossier: 'Відкрити Досьє' }[now.action];
 
   return (
     <div className="wf wf-page wf-grid">
@@ -46,8 +42,6 @@ export default function ProcessOverview({ projectId, onGo }) {
         {now.rerun && <button type="button" className="wf-btn" disabled={busy} onClick={() => act(async () => { if (!(await requestRun(projectId, now.rerun.agent, now.rerun.skill, email))) throw new Error('Такий запуск уже в черзі або виконується.'); })} title="Спершу виправте причину зупинки, потім запустіть крок вручну">Запустити ще раз</button>}
         {mainAction && <button type="button" className="wf-btn" disabled={busy} onClick={mainAction}>{actionLabel}</button>}
       </div>
-
-      {decision && <div id="wf-decision"><Decision item={decision} email={email} onDone={load} onOpenDossier={() => onGo?.('dossier', 'strategy')} /></div>}
 
       {state && (
         <div className="wf-card">

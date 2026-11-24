@@ -52,6 +52,7 @@ import { unitEconomy } from '../api/_lib/wf/skills/unitEconomyAgent.js';
 import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } from '../src/lib/workflow/brief.js';
 import { STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
+import { headlineOf, historyOf, pendingCount, pendingItem, pendingList, roadOf } from '../src/lib/workflow/approvalsTab.js';
 
 let passed = 0;
 const test = async (name, fn) => { try { await fn(); passed += 1; console.log('ok  ', name); } catch (e) { console.error('FAIL', name, '\n', e); process.exitCode = 1; } };
@@ -2372,5 +2373,40 @@ await test('creatives: every picture of an ad is a button that opens the large v
   assert.equal((src.match(/onZoom=\{onZoom\}/g) || []).length >= 3, true, 'the package and the page of the creatives both pass the viewer to every ad');
   const css = fs.readFileSync(path.join(root, 'src/styles/workflowHub.css'), 'utf8');
   assert.match(css, /\.wf-lb-box/); assert.match(css, /\.wf-zoom/);
+});
+// ---------------------------------------------------------------- the tab «Апруви» of a project (owner's choice A, 2026-11-24)
+await test('approvals tab: what waits, the road of four steps, the counter and the history; the route gives the project id as a string and it still works', () => {
+  const st = { project_id: 3, stage: 2, paused: false };
+  const ap = (id, kind, status, extra = {}) => ({ id, project_id: 3, kind, status, subject: {}, requested_at: '2026-11-24T10:00:00Z', ...extra });
+  // nothing yet: no state, no rows
+  assert.deepEqual(pendingList({ projectId: '3', state: null, approvals: [] }), []); assert.equal(headlineOf(null).tone, 'mute');
+  // Апрув 1 waits
+  const a1 = [ap(9, 'strategy', 'pending')];
+  assert.equal(pendingCount({ projectId: '3', state: st, approvals: a1 }), 1); assert.equal(pendingItem({ projectId: '3', state: st, approvals: a1 }).kind, 'strategy');
+  assert.deepEqual(roadOf({ projectId: '3', state: st, approvals: a1 }).map((r) => r.status), ['current', 'todo', 'todo', 'todo']);
+  assert.match(headlineOf(pendingItem({ projectId: 3, state: st, approvals: a1 })).title, /Чекає на вас: Апрув 1/);
+  // Апрув 1 approved: the client answer waits to be recorded (a virtual item)
+  const a2 = [ap(9, 'strategy', 'approved', { decided_at: '2026-11-24T11:00:00Z', decided_by: 'Олексій', comment: 'ок' })];
+  const p2 = pendingItem({ projectId: 3, state: st, approvals: a2 }); assert.equal(p2.kind, 'client'); assert.equal(p2.virtual, true);
+  assert.deepEqual(roadOf({ projectId: 3, state: st, approvals: a2 }).map((r) => r.status), ['done', 'current', 'todo', 'todo']);
+  // returned strategy, then a new round: the old one is returned, the new one current
+  const a3 = [ap(11, 'strategy', 'pending'), ap(9, 'strategy', 'returned', { decided_at: '2026-11-24T11:00:00Z' })];
+  assert.equal(roadOf({ projectId: 3, state: st, approvals: a3 })[0].status, 'current');
+  assert.equal(roadOf({ projectId: 3, state: st, approvals: [ap(9, 'strategy', 'returned', { decided_at: '2026-11-24T11:00:00Z' })] })[0].status, 'returned');
+  // rows of other projects do not count
+  assert.equal(pendingCount({ projectId: 3, state: st, approvals: [{ ...ap(5, 'strategy', 'pending'), project_id: 4 }] }), 0);
+  // the history: only decided ones, the newest first, with who and the comment
+  const h = historyOf([ap(1, 'strategy', 'approved', { decided_at: '2026-11-24T11:00:00Z', decided_by: 'A', comment: 'x' }), ap(2, 'launch', 'returned', { decided_at: '2026-11-24T12:00:00Z', decided_by: 'B', comment: 'y' }), ap(3, 'changes', 'pending')]);
+  assert.deepEqual(h.map((x) => x.id), [2, 1]); assert.equal(h[0].title, 'Апрув 2'); assert.equal(h[0].who, 'B'); assert.equal(h[1].comment, 'x');
+});
+await test('approvals tab: the tab is in the card of the project with the counter, the decision lives there and «Огляд» only leads to it', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const card = fs.readFileSync(path.join(root, 'src/pages/Projects/ProjectDetail.jsx'), 'utf8');
+  assert.match(card, /key: 'approvals', label: 'Апруви'/); assert.match(card, /<ApprovalsTab /); assert.match(card, /pendingCount\(/); assert.match(card, /t\.key === 'approvals' && approvalCount > 0/);
+  assert.ok(card.indexOf("TABS.find((x) => x.key === 'tasks')") < card.indexOf("TABS.find((x) => x.key === 'approvals')"), 'the tab stands after «Задачі»');
+  const ov = fs.readFileSync(path.join(root, 'src/components/Workflow/ProcessOverview.jsx'), 'utf8');
+  assert.ok(!/import Decision/.test(ov), 'the decision is not shown twice'); assert.match(ov, /onGo\?\.\('approvals'\)/);
+  const tab = fs.readFileSync(path.join(root, 'src/components/Workflow/ApprovalsTab.jsx'), 'utf8');
+  assert.match(tab, /<Decision /); assert.match(tab, /Історія рішень/);
 });
 console.log(`\n${passed} workflow checks passed`);
