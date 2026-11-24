@@ -129,15 +129,19 @@ export function nowCard({ state, runs = [], approvals = [], hasBrief = false, jo
   return { tone: 'ok', title: `Етап «${STAGES[state.stage]?.title || state.stage}»`, text: 'Усе виконано, чекаємо наступної події.', action: null };
 }
 
-// The five cards of the agents: what each one is doing now or did last.
+// The skills a manager may start again by hand from the card of an agent. NOT the launch: it writes to a cabinet and has its own road (Апрув 2, the stopped-process card).
+export const RERUN_SKILLS = new Set(['intake', 'audit', 'site', 'audience', 'unit_economy', 'competitors', 'materials_ideas', 'first_creatives', 'strategy', 'optimize', 'onboarding', 'payment_reminder', 'weekly_report', 'monthly_report']);
+
+// The five cards of the agents: what each one is doing now or did last. `rerun` = the skill that can be started again (the last one that finished or failed, when nothing of this agent is open).
 export function agentCards(runs = []) {
   return AGENTS.map((a) => {
     const mine = runs.filter((r) => r.agent === a.key).sort(byIdDesc);
     const open = mine.find((r) => OPEN.has(r.status));
     const last = mine[0];
     if (open) return { ...a, tone: 'info', status: open.status === 'queued' ? 'У черзі' : 'Працює', note: SKILL_LABEL[open.skill] || open.skill, active: open.status === 'running' };
-    if (last?.status === 'failed') return { ...a, tone: 'bad', status: 'Помилка', note: SKILL_LABEL[last.skill] || last.skill };
-    if (last) return { ...a, tone: 'ok', status: 'Готово', note: `Остання робота: ${SKILL_LABEL[last.skill] || last.skill}` };
+    const rerun = last && RERUN_SKILLS.has(last.skill) ? last.skill : null;
+    if (last?.status === 'failed') return { ...a, tone: 'bad', status: 'Помилка', note: SKILL_LABEL[last.skill] || last.skill, rerun };
+    if (last) return { ...a, tone: 'ok', status: 'Готово', note: `Остання робота: ${SKILL_LABEL[last.skill] || last.skill}`, rerun };
     return { ...a, tone: 'mute', status: 'Не активний', note: 'Ще нічого не робив' };
   });
 }

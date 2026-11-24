@@ -50,7 +50,8 @@ import { computeUnitEconomy, renderUnitEconomy } from '../api/_lib/wf/skills/eco
 import { intake } from '../api/_lib/wf/skills/intake.js';
 import { unitEconomy } from '../api/_lib/wf/skills/unitEconomyAgent.js';
 import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } from '../src/lib/workflow/brief.js';
-import { STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
+import { RERUN_SKILLS, STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
+import { readinessOf } from '../src/lib/workflow/readiness.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
 import { headlineOf, historyOf, pendingCount, pendingItem, pendingList, roadOf } from '../src/lib/workflow/approvalsTab.js';
 
@@ -1593,8 +1594,9 @@ const laWriter = ({ failAt = null, status = 1 } = {}) => {
   const rec = (name, fn) => async (a) => { if (failAt === name && !rec.failed) { rec.failed = true; throw new Error('Meta: temporary error (#2)'); } calls.push([name, a]); n += 1; return fn(a); };
   return { calls, accountInfo: async () => ({ name: 'Monarchi', status, currency: 'USD', disable_reason: null }), createCampaign: rec('campaign', () => 'camp' + n), createAdSet: rec('adset', () => 'set' + n), uploadImage: rec('image', () => 'hash' + n), createAdCreative: rec('creative', () => 'cre' + n), createAd: rec('ad', () => 'ad' + n) };
 };
-const laSetup = async ({ pixels, account = LA_ACC, website = 'https://shop.example', brief = LA_BRIEF.content, strategy = LA_STRAT, creatives = LA_CREATIVES, writer, world = SHOP } = {}) => {
+const laSetup = async ({ pixels, account = LA_ACC, website = 'https://shop.example', brief = LA_BRIEF.content, strategy = LA_STRAT, creatives = LA_CREATIVES, writer, world = SHOP, approved = true } = {}) => {
   const s = await setup({ handlers: createHandlers({ mediabuyer: { launch } }) });
+  if (approved) s.repo.T.approvals.push({ id: 900, project_id: 1, kind: 'launch', subject: {}, status: 'approved', requested_at: '2026-11-23T09:00:00Z', decided_at: '2026-11-23T09:30:00Z', decided_by: 'manager@test' }); // Апрув 2 is given, as the orchestrator would wait for it
   const net = fakeNet(world); Object.assign(s.ctx, net);
   if (account) s.repo.addAccount(1, account);
   if (website) s.repo.setWebsite(1, website);
@@ -2225,6 +2227,7 @@ await test('help: the map has the same six stages as the process, every stage is
   assert.match(fs.readFileSync(path.join(root, 'src/components/Sidebar/sidebarData.js'), 'utf8'), /to: '\/projects\/help'/);
   assert.match(fs.readFileSync(path.join(root, 'src/routes/routeMeta.js'), 'utf8'), /'\/projects\/help'/);
   assert.match(HELP_STAGES[3].wrong, /Запустити ще раз/, 'the way out of a stopped launch is told');
+  assert.match(HELP_STAGES[2].you, /вкладку «Апруви»/); assert.match(HELP_STAGES[3].you, /Готовність до запуску/); assert.match(HELP_STAGES[2].wrong, /картці Креатора/);
 });
 // ---------------------------------------------------------------- found by the pilot (project 27): a failed skill of the research or of the Creator stood for ever
 await test('machine: a research skill or the Creator that failed is started again (three failures in a row stop it, the journal says so, and the manager can start it by hand)', () => {
@@ -2418,5 +2421,29 @@ await test('launch_check: in read-only mode (a real client) nothing is sent to t
   const r = s.repo.T.runs.find((x) => x.skill === 'launch_check');
   assert.equal(r.status, 'done'); assert.equal(validated, 0, 'validate_only was not even called'); assert.equal(r.output.read_only, true); assert.equal(r.output.writable, null);
   assert.deepEqual(w.calls, []); assert.match(JSON.stringify(r.output.pages), /Сторінка клієнта/);
+});
+await test('launch: the skill itself refuses to write to a cabinet without an approved Апрув 2 (a manual run cannot bypass the rule); with Апрув 2 it works as before', async () => {
+  const no = await laSetup({ approved: false }); await processTick(no.ctx);
+  const r = no.repo.T.runs.find((x) => x.skill === 'launch');
+  assert.notEqual(r.status, 'done'); assert.match(r.error, /лише після Апрува 2/); assert.deepEqual(no.ctx.metaWrite.calls, [], 'nothing was written');
+  const pend = await laSetup({ approved: false }); pend.repo.T.approvals.push({ id: 901, project_id: 1, kind: 'launch', subject: {}, status: 'pending', requested_at: '2026-11-23T09:00:00Z' }); await processTick(pend.ctx);
+  assert.deepEqual(pend.ctx.metaWrite.calls, [], 'a pending Апрув 2 is not enough');
+  const ok = await laSetup(); await processTick(ok.ctx); assert.ok(ok.ctx.metaWrite.calls.length > 0);
+});
+// ---------------------------------------------------------------- «Готовність до запуску» and the rerun of a finished step (a plan of 2026-11-24)
+await test('readiness card: the result of launch_check in words of the manager; a rerun is offered for finished steps but never for the launch', () => {
+  assert.equal(readinessOf({}).tone, 'mute'); assert.equal(readinessOf({ run: { status: 'running' } }).busy, true);
+  const failed = readinessOf({ run: { status: 'failed', error: 'Сторінка НЕ доступна' } }); assert.equal(failed.tone, 'bad'); assert.match(failed.lines[0].text, /НЕ доступна/);
+  const ok = readinessOf({ run: { status: 'done', output: { read_only: true, pages: [{ id: '1', name: 'П' }], page_ok: true } }, steps: [{ title: 'Кабінет активний', status: 'info' }, { title: 'Сторінка доступна', status: 'done' }] });
+  assert.equal(ok.tone, 'ok'); assert.match(ok.title, /запис не перевірявся/); assert.deepEqual(ok.lines.map((l) => l.tone), ['info', 'ok']);
+  assert.equal(readinessOf({ run: { status: 'done', output: { read_only: true, pages: [], page_ok: false } } }).tone, 'warn');
+  assert.match(readinessOf({ run: { status: 'done', output: { read_only: false, writable: true, pages: [{ id: '1' }], page_ok: true } } }).title, /право запису/);
+  const cards = agentCards([{ id: 1, agent: 'creator', skill: 'first_creatives', status: 'done' }, { id: 2, agent: 'mediabuyer', skill: 'launch', status: 'done' }, { id: 3, agent: 'researcher', skill: 'site', status: 'failed' }, { id: 4, agent: 'strategist', skill: 'strategy', status: 'running' }]);
+  const by = (k) => cards.find((c) => c.key === k);
+  assert.equal(by('creator').rerun, 'first_creatives'); assert.equal(by('researcher').rerun, 'site'); assert.ok(!by('mediabuyer').rerun, 'the launch is never rerun from a card'); assert.ok(!by('strategist').rerun, 'nothing is rerun while a run is open');
+  assert.equal(RERUN_SKILLS.has('launch'), false); assert.equal(RERUN_SKILLS.has('launch_check'), false);
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const ov = fs.readFileSync(path.join(root, 'src/components/Workflow/ProcessOverview.jsx'), 'utf8');
+  assert.match(ov, /<Readiness /); assert.match(ov, /read_only: true/); assert.match(ov, /a\.rerun &&/);
 });
 console.log(`\n${passed} workflow checks passed`);

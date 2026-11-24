@@ -265,3 +265,8 @@
 .wf-hist { display:grid; } .wf-hr { display:grid; grid-template-columns:110px minmax(0,1fr); gap:12px; padding:11px 0; border-bottom:1px solid var(--wf-line); }
 .wf-hr:last-child { border:0; } .wf-hr time { color:var(--wf-muted); font-size:12.5px; }
 @media (max-width:820px) { .wf-road { grid-template-columns:repeat(2,minmax(0,1fr)); } .wf-hr { grid-template-columns:minmax(0,1fr); gap:2px; } }
+/* the lines of «Готовність до запуску» */
+.wf-rd { font-size:13px; padding:5px 0 5px 22px; position:relative; border-bottom:1px solid var(--wf-line); overflow-wrap:anywhere; }
+.wf-rd:last-of-type { border-bottom:0; }
+.wf-rd::before { content:""; position:absolute; left:2px; top:11px; width:10px; height:10px; border-radius:50%; background:var(--wf-ok); }
+.wf-rd.info::before { background:var(--wf-info); } .wf-rd.bad::before { background:var(--wf-bad); } .wf-rd.warn::before { background:var(--wf-warn); }

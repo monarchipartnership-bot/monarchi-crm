@@ -27,6 +27,10 @@ export async function launch({ run, ctx }) {
   const account = accounts[0];
   const prevSec = (await ctx.repo.readSection(run.project_id, 'launch'))?.version?.content || null;
   if (prevSec?.status === 'done') return { output: { already_launched: true }, steps: [{ title: 'Запуск уже виконано раніше: нічого не створюється', status: 'info' }] };
+  // the rule of the document in the skill itself, not only in the orchestrator: nothing is written to a cabinet before Апрув 2 (found while planning a «run again» button: a manual run must not bypass it)
+  const snapAp = await ctx.repo.loadSnapshot(run.project_id);
+  const launchAp = (snapAp.approvals || []).filter((a) => a.kind === 'launch').sort((a, b) => b.id - a.id)[0];
+  if (launchAp?.status !== 'approved') throw new Error('Запуск у кабінет можливий лише після Апрува 2, а його ще немає. Нічого не змінено.');
   if (!ctx.metaWrite) throw new Error('Немає права запису в кабінет: у Vercel не задано META_ACCESS_TOKEN з правом ads_management. Нічого не змінено.');
 
   const get = async (k) => (await ctx.repo.readSection(run.project_id, k))?.version || null;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchProcess, patchState, requestRun, runTickNow, startProcess } from '../../lib/api/workflow';
+import { fetchProcess, fetchReadiness, patchState, requestRun, runTickNow, startProcess } from '../../lib/api/workflow';
+import { readinessOf } from '../../lib/workflow/readiness';
 import { agentCards, ageText, nowCard } from '../../lib/workflow/view';
 import { Pill, Stepper } from './parts';
 
@@ -66,6 +67,8 @@ export default function ProcessOverview({ projectId, onGo }) {
         </div>
       )}
 
+      {state && <Readiness projectId={projectId} email={email} />}
+
       <div className="wf-grid wf-g2">
         <div className="wf-card">
           <h3>Агенти</h3>
@@ -73,7 +76,10 @@ export default function ProcessOverview({ projectId, onGo }) {
             <div key={a.key} className={'wf-ag' + (a.active ? ' run' : '')}>
               <div className="ic" aria-hidden="true">{a.short}</div>
               <div><b>{a.name}</b><p>{a.note}</p></div>
-              <Pill tone={a.tone}>{a.status}</Pill>
+              <div className="wf-row">
+                {a.rerun && <button type="button" className="wf-btn sm" disabled={busy} onClick={() => act(async () => { if (!(await requestRun(projectId, a.key, a.rerun, email))) throw new Error('Такий запуск уже в черзі або виконується.'); })} title="Запустити останню навичку ще раз, наприклад коли з'явились нові матеріали">Запустити ще раз</button>}
+                <Pill tone={a.tone}>{a.status}</Pill>
+              </div>
             </div>
           ))}
         </div>
@@ -83,6 +89,40 @@ export default function ProcessOverview({ projectId, onGo }) {
             <div className="wf-j">{journal.map((j) => <div key={j.id}><time dateTime={j.at} title={new Date(j.at).toLocaleString('uk-UA')}>{ageText(j.at)}</time><span>{j.summary}</span></div>)}</div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// «Готовність до запуску»: one button checks the cabinet of Meta, the Facebook page and the token without creating anything in the cabinet.
+function Readiness({ projectId, email }) {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const load = useCallback(async () => { try { setData(await fetchReadiness(projectId)); } catch (e) { setErr(e.message || String(e)); } }, [projectId]);
+  useEffect(() => { load(); }, [load]);
+  const view = readinessOf(data || {});
+  useEffect(() => { if (!view.busy) return undefined; const t = setInterval(load, 5000); return () => clearInterval(t); }, [view.busy, load]);
+  async function check(readOnly) {
+    setBusy(true); setErr('');
+    try { if (!(await requestRun(projectId, 'mediabuyer', 'launch_check', email, readOnly ? { read_only: true } : {}))) setErr('Перевірка вже виконується.'); await load(); } catch (e) { setErr(e.message || String(e)); } finally { setBusy(false); }
+  }
+  return (
+    <div className="wf-card">
+      <div className="wf-row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+        <h3 style={{ margin: 0 }}>Готовність до запуску</h3>
+        <Pill tone={view.tone}>{view.title}</Pill>
+      </div>
+      <div className="wf-muted" style={{ fontSize: 12.5, marginBottom: 8 }}>Перевіряє кабінет Meta, сторінку Facebook і доступи токена. У кабінеті нічого не створюється.</div>
+      {err && <div className="wf-err" role="alert" style={{ marginBottom: 8 }}>{err}</div>}
+      {view.lines.map((l, i) => <div key={i} className={'wf-rd ' + l.tone}>{l.text}</div>)}
+      <div className="wf-row" style={{ marginTop: 10 }}>
+        <button type="button" className="wf-btn sm p" disabled={busy || view.busy} onClick={() => check(true)}>Перевірити</button>
+        <details className="wf-muted" style={{ fontSize: 12.5 }}>
+          <summary>Перевірити також право запису</summary>
+          <div style={{ margin: '6px 0' }}>Надсилає в Meta пробний запит у режимі «без створення»: Meta перевіряє права, але нічого не зберігає. Для своїх і тестових проєктів.</div>
+          <button type="button" className="wf-btn sm" disabled={busy || view.busy} onClick={() => check(false)}>Перевірити з правом запису</button>
+        </details>
       </div>
     </div>
   );

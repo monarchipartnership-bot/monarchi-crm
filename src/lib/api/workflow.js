@@ -90,6 +90,12 @@ export async function fetchQueueData() {
   for (const p of must(projects, 'projects') || []) byId[p.id] = { name: p.client || p.name };
   return { projects: byId, states: must(states, 'states') || [], approvals: must(apps, 'approvals') || [] };
 }
+// The latest «Готовність до запуску» check of a project (the skill mediabuyer/launch_check) with its steps.
+export async function fetchReadiness(projectId) {
+  const run = must(await supabase.from('wf_runs').select('id, status, error, output, input, created_at, finished_at').eq('project_id', projectId).eq('agent', 'mediabuyer').eq('skill', 'launch_check').order('id', { ascending: false }).limit(1).maybeSingle(), 'readiness');
+  const steps = run ? must(await supabase.from('wf_run_steps').select('n, title, status').eq('run_id', run.id).order('n'), 'readiness steps') || [] : [];
+  return { run, steps };
+}
 // The tab «Апруви» of one project: its state and all its approvals (the newest 200).
 export async function fetchApprovalsOf(projectId) {
   const [state, apps] = await Promise.all([
@@ -130,8 +136,8 @@ export async function uploadCompetitorShot(projectId, file) {
 }
 
 // Asks the orchestrator for one more run of a skill (the same open run is not queued twice). → true if queued, false if one is already open.
-export async function requestRun(projectId, agent, skill, email) {
-  const r = await supabase.from('wf_runs').insert({ project_id: projectId, agent, skill, trigger: 'manual', priority: 50, created_by: email || 'manager' });
+export async function requestRun(projectId, agent, skill, email, input = {}) {
+  const r = await supabase.from('wf_runs').insert({ project_id: projectId, agent, skill, input, trigger: 'manual', priority: 50, created_by: email || 'manager' });
   if (r.error) { if (r.error.code === UNIQUE) return false; throw new Error('run: ' + r.error.message); }
   await journal(projectId, email, { action: 'run_requested', subject: skill, summary: `Менеджер попросив ще один запуск: ${agent} / ${skill}.` });
   return true;
