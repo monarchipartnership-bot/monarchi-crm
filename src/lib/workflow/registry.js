@@ -22,7 +22,7 @@ export const ACTIVE_AGENTS = [
   },
   {
     key: 'strategist', name: 'Стратег', short: 'Ст', does: 'Стратегія та план на місяць', rights: 'read',
-    skills: [{ key: 'strategy', label: 'складає стратегію' }, { key: 'monthly_plan', label: 'складає план на місяць', integrated: false, stub: true }], // monthly_plan: the orchestrator already asks for it on the 1st, but the skill is still a stand-in (found 2026-11-24)
+    skills: [{ key: 'strategy', label: 'складає стратегію' }, { key: 'monthly_plan', label: 'складає план на місяць' }],
     reads: ['Усі розділи Досьє', 'Пороги Unit Economy'], writes: ['Стратегія', 'План на місяць'], note: 'Бюджет рахує код, структуру кампаній обирає модель.',
   },
   {

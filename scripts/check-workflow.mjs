@@ -56,6 +56,8 @@ import { readinessOf } from '../src/lib/workflow/readiness.js';
 import { ACTIVE_AGENTS, INTEGRATED_SKILLS, mapIslands } from '../src/lib/workflow/registry.js';
 import { agentFacts, agentStates, feedOf, podStates } from '../src/lib/workflow/mapLive.js';
 import { monthsOffered, spendReport } from '../src/lib/workflow/spendStats.js';
+import { dueFor, eventsFor, gatherPlanFacts, checkPlan, monthWindows, parsePlanAnswer, renderPlanText, summarizeLastMonth } from '../api/_lib/wf/skills/monthlyPlanEngine.js';
+import { monthlyPlan } from '../api/_lib/wf/skills/monthlyPlanAgent.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
 import { headlineOf, historyOf, pendingCount, pendingItem, pendingList, roadOf } from '../src/lib/workflow/approvalsTab.js';
 
@@ -2460,7 +2462,7 @@ await test('registry: the skills that the orchestrator runs are exactly the skil
   assert.deepEqual(ACTIVE_AGENTS.filter((a) => a.rights === 'write').map((a) => a.key), ['mediabuyer']);
   for (const a of ACTIVE_AGENTS) { assert.ok(a.name && a.does && a.skills.length && a.reads.length && a.writes.length, a.key); }
   assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'support').skills.some((s) => s.key === 'period_report' && s.integrated === false), 'the report agent is registered as a skill of the Support agent, not yet integrated');
-  assert.deepEqual(ACTIVE_AGENTS.flatMap((x) => x.skills.filter((s) => s.stub).map((s) => `${x.key}/${s.key}`)), ['strategist/monthly_plan'], 'the stand-ins are listed openly: when the month plan is built, remove the mark');
+  assert.deepEqual(ACTIVE_AGENTS.flatMap((x) => x.skills.filter((s) => s.stub).map((s) => `${x.key}/${s.key}`)), [], 'no stand-ins are left: the month plan is a real skill since 2026-11-25');
   assert.equal(AGENTS.length, 5); assert.equal(SKILL_LABEL.launch, 'запускає кампанії');
   const isl = mapIslands();
   assert.equal(isl.length, 5); assert.equal(isl[0].archived, false); assert.equal(isl[0].agents.length, 5);
@@ -2532,5 +2534,66 @@ await test('spend: the window is wired into the section (button, tab, the number
   assert.match(home, /spend: \{ title: 'Витрати'/); assert.match(home, /openWin\('spend'\)/); assert.match(home, /<Page onOpen=\{openWin\} \/>/);
   const win = fs.readFileSync(path.join(root, 'src/pages/AiAgents/Spend.jsx'), 'utf8');
   assert.match(win, /Змінити ліміти/); assert.match(win, /Інші витрати ШІ/); assert.match(win, /fetchSpendData/);
+});
+// ---------------------------------------------------------------- the skill «План на місяць» (Стратег; document, step 5): the stand-in is replaced by the real skill
+await test('monthly plan engine: the calendar gives the dates, the results of the last month are counted by code, the budget stays inside the step, unknown campaigns and events are dropped, a new campaign needs the client', () => {
+  const now = new Date('2026-11-23T09:00:00Z');
+  const win = monthWindows(now);
+  assert.equal(win.key, '2026-11'); assert.deepEqual([win.prev.since, win.prev.until], ['2026-10-01', '2026-10-31']);
+  const ev = eventsFor({ geoCodes: ['US'], from: win.from, to: win.to });
+  assert.deepEqual(ev.map((e) => `${e.key}:${e.date}`), ['black_friday:2026-11-27', 'cyber_monday:2026-11-30'], 'the dates of the calendar, not of the model');
+  const dec = eventsFor({ geoCodes: ['UA'], ...monthWindows(new Date('2026-12-02T09:00:00Z')) });
+  assert.deepEqual(dec.map((e) => e.key), ['christmas', 'new_year'], 'Ukraine: no cyber monday; the New Year after the month is prepared in advance');
+  assert.ok(!eventsFor({ geoCodes: ['UA'], from: win.from, to: win.to }).some((e) => e.key === 'cyber_monday'));
+  assert.equal(dueFor('site', '2026-11-27', now), '2026-11-25', 'ten days before is in the past: two days from now');
+  assert.equal(dueFor('banner', '2026-12-25', now), '2026-12-18');
+  // the results of the last month
+  const last = summarizeLastMonth({ campaignRows: [{ campaign_id: 'c1', campaign_name: 'А', spend: 300, purchases: 6, revenue: 1500 }, { campaign_id: 'c2', campaign_name: 'Б', spend: 100, purchases: 0, revenue: 0 }], adRows: [{ ad_id: 'a1', ad_name: 'тег 1', spend: 200, purchases: 5, revenue: 1200 }, { ad_id: 'a2', ad_name: 'тег 2', spend: 150, purchases: 0, revenue: 0 }] });
+  assert.equal(last.totals.spend, 400); assert.equal(last.totals.purchases, 6); assert.equal(last.by_campaign[0].name, 'А'); assert.equal(last.best_ads[0].tag, 'тег 1'); assert.equal(last.worst_ads[0].tag, 'тег 2');
+  // the facts and the check
+  const facts = gatherPlanFacts({ brief: { content: { general: { geo: 'США', goal: 'продажі' }, economics: { products: [{ name: 'Товар' }], currency: 'USD' } } }, strategy: { campaigns: [{ name: 'Кампанія А', daily_budget: 100 }, { name: 'Кампанія Б', daily_budget: 50 }] }, plan: { monthly: 4500, daily: 150, min_daily: 20, currency: 'USD' }, last, events: ev, month: win.key });
+  const raw = { summary: 'Минулий місяць пройшов добре.', worked: ['Креатив «тег 1» дав 5 покупок'], not_worked: ['«тег 2» витратив 150 без покупок'], goals: ['Підготувати акцію до Чорної п’ятниці'],
+    campaigns: [{ name: 'Кампанія А', decision: 'change', daily_budget: 400, reason: 'Результат кращий за цільовий' }, { name: 'Кампанія Б', decision: 'stop', reason: 'Без покупок' }, { name: 'Вигадана', decision: 'keep' }, { name: 'Нова', decision: 'new', daily_budget: 30, reason: 'Ремаркетинг, потрібне погодження клієнта' }, { name: 'Друга нова', decision: 'new', daily_budget: 30 }],
+    events: [{ key: 'black_friday', what: 'Акція', creative_goal: { goal: 'Продати хіт зі знижкою', product: 'Товар' }, site_tasks: [{ what: 'Оновити банер', kind: 'banner' }, { what: 'Вказати ціни', kind: 'prices' }] }, { key: 'prom', what: 'Вигадана подія' }, { key: 'black_friday', what: 'Дубль' }] };
+  const c = checkPlan(raw, { facts, now });
+  const byName = Object.fromEntries(c.campaigns.map((x) => [x.name, x]));
+  assert.equal(byName['Кампанія А'].daily_budget, 120, 'a change is limited to the step of the rules (20%)'); assert.equal(byName['Кампанія А'].was, 100);
+  assert.equal(byName['Кампанія Б'].daily_budget, 0); assert.equal(byName['Кампанія Б'].decision, 'stop');
+  assert.ok(!byName['Вигадана'], 'a campaign that is not in the strategy is dropped'); assert.equal(byName['Нова'].needs_client_approval, true); assert.ok(!byName['Друга нова'], 'one new campaign a month');
+  assert.deepEqual(c.events.map((e) => e.key), ['black_friday']); assert.equal(c.events[0].date, '2026-11-27'); assert.equal(c.events[0].site_tasks[0].due, '2026-11-25'); assert.equal(c.events[0].creative_goal.product, 'Товар');
+  assert.ok(c.notes.some((n) => /виходить за крок/.test(n)) && c.notes.some((n) => /немає в стратегії/.test(n)));
+  assert.ok(c.warnings.some((w) => /нова кампанія/i.test(w)), 'the client is told about a new campaign');
+  assert.ok(c.warnings.some((w) => /числа, яких немає/.test(w)) === false, 'numbers that stand in the facts are fine');
+  const strayCheck = checkPlan({ ...raw, summary: 'Виросли продажі на 87%.' }, { facts, now }); assert.ok(strayCheck.warnings.some((w) => /87/.test(w)), 'a number from nowhere is flagged');
+  assert.throws(() => parsePlanAnswer('не json'), /не у форматі JSON/); assert.throws(() => parsePlanAnswer('{"summary":"x"}'), /немає рішень/);
+  const text = renderPlanText({ ...c, month: '2026-11', version: 1, last_month: { ...last, period: '2026-10-01 – 2026-10-31' }, summary: c.summary });
+  assert.match(text, /План на 2026-11 \(версія 1\)/); assert.match(text, /Витрачено 400, покупок 6/); assert.match(text, /Чорна п’ятниця, 2026-11-27/); assert.match(text, /Клієнту до 2026-11-25: Оновити банер/); assert.match(text, /потрібне погодження клієнта/);
+});
+await test('monthly plan skill: reads the last month from the cabinet, writes the section and the tasks of the client, is blocked without a strategy; the stand-in is gone', async () => {
+  assert.equal(typeof REAL.strategist.monthly_plan, 'function', 'the real skill is registered');
+  clock.t = new Date('2026-11-23T09:00:00Z'); // the plan is made at the start of November; the tests before this one moved the clock
+  const mk = async ({ strategy = true, launch = true } = {}) => {
+    const s = await setup({ handlers: createHandlers({ strategist: { monthly_plan: monthlyPlan } }) });
+    s.repo.addAccount(1, { platform: 'meta', account_id: '55' });
+    await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general: { geo: 'США', goal: 'продажі' }, economics: { currency: 'USD', budget_monthly: 4500, min_campaign_daily: 20, avg_order: 100, cogs_pct: 40, products: [{ name: 'Товар', price: 100, cogs: 40 }] } } });
+    if (strategy) await s.repo.writeSectionVersion(1, 'strategy', { author_kind: 'agent', author: 'strategist', body: 's', content: { campaigns: [{ name: 'Кампанія А', daily_budget: 100 }, { name: 'Кампанія Б', daily_budget: 50 }] } });
+    if (launch) await s.repo.writeSectionVersion(1, 'launch', { author_kind: 'agent', author: 'mediabuyer', body: 'l', content: { status: 'done', launched_at: '2026-10-05T00:00:00Z', campaigns: [] } });
+    const reads = []; s.ctx.meta = { insights: async (o) => { reads.push(o); return { rows: o.level === 'campaign' ? [{ campaign_id: 'c1', campaign_name: 'Кампанія А', spend: 300, purchases: 6, revenue: 1500 }] : [{ ad_id: 'a1', ad_name: 'тег 1', spend: 300, purchases: 6, revenue: 1500 }] }; } };
+    s.asked = []; s.ctx.ask = async (a) => { s.asked.push(a); return { text: JSON.stringify({ summary: 'Минулий місяць був вдалим.', worked: ['«тег 1» дав покупки'], not_worked: [], goals: ['Підготуватись до Чорної п’ятниці'], campaigns: [{ name: 'Кампанія А', decision: 'change', daily_budget: 110, reason: 'Добрий результат' }], events: [{ key: 'black_friday', what: 'Акція', creative_goal: { goal: 'Хіт зі знижкою', product: 'Товар' }, site_tasks: [{ what: 'Оновити банер на сайті', kind: 'banner' }] }] }), costUsd: 0.03 }; };
+    s.reads = reads;
+    await s.repo.enqueueRun({ project_id: 1, agent: 'strategist', skill: 'monthly_plan' }); await processTick(s.ctx);
+    return s;
+  };
+  const s = await mk();
+  const run = s.repo.T.runs.find((r) => r.skill === 'monthly_plan'); assert.equal(run.status, 'done', run.error); assert.equal(run.cost_usd, 0.03);
+  assert.deepEqual(s.reads.map((r) => r.level).sort(), ['ad', 'campaign']); assert.deepEqual(s.reads[0].timeRange, { since: '2026-10-01', until: '2026-10-31' }, 'the last month, read only');
+  const sec = await s.repo.readSection(1, 'monthly_plan'); const c = sec.version.content;
+  assert.equal(c.version, 1); assert.equal(c.month, '2026-11'); assert.equal(c.last_month.totals.spend, 300); assert.equal(c.campaigns.find((x) => x.name === 'Кампанія А').daily_budget, 110);
+  assert.match(sec.version.body, /План на 2026-11/); assert.match(sec.version.body, /Чорна п’ятниця/);
+  assert.ok(s.repo.T.tasks.some((t) => t.owner === 'client' && /банер/.test(t.title) && t.due_date === '2026-11-25'), 'a task for the client with a date');
+  assert.ok(s.repo.T.tasks.some((t) => t.owner === 'manager' && /цілі креативів/.test(t.title)), 'the goals of the creatives go to the manager');
+  assert.match(s.asked[0].user, /black_friday/); assert.ok(!/Вигадана подія/.test(s.asked[0].user));
+  const none = await mk({ strategy: false }); const r2 = none.repo.T.runs.find((r) => r.skill === 'monthly_plan'); assert.notEqual(r2.status, 'done'); assert.equal(none.asked.length, 0, 'the model is not asked without a strategy');
+  const nolaunch = await mk({ launch: false }); assert.equal(nolaunch.reads.length, 0, 'without a launch nothing is read from the cabinet'); assert.equal(nolaunch.repo.T.runs.find((r) => r.skill === 'monthly_plan').status, 'done'); assert.equal((await nolaunch.repo.readSection(1, 'monthly_plan')).version.content.last_month, null);
 });
 console.log(`\n${passed} workflow checks passed`);
