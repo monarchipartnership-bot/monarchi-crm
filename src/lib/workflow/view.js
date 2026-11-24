@@ -1,5 +1,6 @@
 // What the screens of the new agent system show (step A3; document «Робочий процес клієнта»). PURE functions: they take rows of the wf_* tables and
 // return what is to be drawn, so they can be tested without a browser or a database. The words are the document's own.
+import { ACTIVE_AGENTS } from './registry.js';
 
 export const STAGES = [
   { n: 0, title: 'Заведення', hint: 'бриф, оплата, договори' },
@@ -10,20 +11,10 @@ export const STAGES = [
   { n: 5, title: 'Місяць', hint: 'план, Апрув 3' },
 ];
 
-export const AGENTS = [
-  { key: 'researcher', name: 'Дослідник', short: 'До', does: 'Сайт, аудиторія, конкуренти, аудит, юніт-економіка' },
-  { key: 'creator', name: 'Креатор', short: 'Кр', does: 'Матеріали, ідеї та креативи' },
-  { key: 'strategist', name: 'Стратег', short: 'Ст', does: 'Стратегія та план на місяць' },
-  { key: 'mediabuyer', name: 'Медіабаєр', short: 'Ме', does: 'Запуск і оптимізація кампаній' },
-  { key: 'support', name: 'Супровід', short: 'Су', does: 'Матеріали для звіту та спілкування з клієнтом' },
-];
+export const AGENTS = ACTIVE_AGENTS.map(({ key, name, short, does }) => ({ key, name, short, does })); // the registry (registry.js) is the one source of the team
 export const agentName = (key) => AGENTS.find((a) => a.key === key)?.name || key;
 
-export const SKILL_LABEL = {
-  intake: 'перевіряє кабінети', site: 'аналізує сайт', audience: 'вивчає аудиторію', unit_economy: 'рахує юніт-економіку', competitors: 'аналізує конкурентів', audit: 'аудитує кабінети',
-  materials_ideas: 'готує матеріали та ідеї', first_creatives: 'робить перші креативи', rework_creatives: 'переробляє креативи за зауваженнями', strategy: 'складає стратегію', monthly_plan: 'складає план на місяць',
-  launch: 'запускає кампанії', launch_check: 'перевіряє право запису в кабінет', optimize: 'оптимізує кампанії', onboarding: 'готує супровід', payment_reminder: 'дивиться календар оплат', weekly_report: 'готує тижневий фідбек', monthly_report: 'готує місячний фідбек',
-};
+export const SKILL_LABEL = Object.fromEntries(ACTIVE_AGENTS.flatMap((a) => a.skills.map((k) => [k.key, k.label])));
 
 export const SECTIONS = [
   { key: 'brief', name: 'Бриф', who: 'Менеджер' },

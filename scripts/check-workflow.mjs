@@ -43,6 +43,7 @@ import { site } from '../api/_lib/wf/skills/siteAgent.js';
 import { readHtml } from '../api/_lib/siteReader.js';
 import { computeAudit, renderAuditText, testCurve } from '../api/_lib/wf/skills/auditEngine.js';
 import { audit } from '../api/_lib/wf/skills/auditAgent.js';
+import { REAL } from '../api/_lib/wf/agents.js';
 import { createHandlers } from '../api/_lib/wf/agents.js';
 import { planProject, processTick } from '../api/_lib/wf/tick.js';
 import { createMemoryWfRepo } from './wfMemoryRepo.mjs';
@@ -50,8 +51,9 @@ import { computeUnitEconomy, renderUnitEconomy } from '../api/_lib/wf/skills/eco
 import { intake } from '../api/_lib/wf/skills/intake.js';
 import { unitEconomy } from '../api/_lib/wf/skills/unitEconomyAgent.js';
 import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } from '../src/lib/workflow/brief.js';
-import { RERUN_SKILLS, STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
+import { AGENTS, RERUN_SKILLS, SKILL_LABEL, STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
 import { readinessOf } from '../src/lib/workflow/readiness.js';
+import { ACTIVE_AGENTS, INTEGRATED_SKILLS, mapIslands } from '../src/lib/workflow/registry.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
 import { headlineOf, historyOf, pendingCount, pendingItem, pendingList, roadOf } from '../src/lib/workflow/approvalsTab.js';
 
@@ -2445,5 +2447,21 @@ await test('readiness card: the result of launch_check in words of the manager; 
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const ov = fs.readFileSync(path.join(root, 'src/components/Workflow/ProcessOverview.jsx'), 'utf8');
   assert.match(ov, /<Readiness /); assert.match(ov, /read_only: true/); assert.match(ov, /a\.rerun &&/);
+});
+// ---------------------------------------------------------------- the registry of the agents is the one source of the team (owner's decision of 2026-11-24)
+await test('registry: the skills that the orchestrator runs are exactly the skills of the registry; only the Media buyer may write to a cabinet; the map has the team and four archived departments that do not overlap', () => {
+  const real = Object.entries(REAL).flatMap(([a, sk]) => Object.keys(sk).map((k) => `${a}/${k}`)).sort();
+  assert.deepEqual(real, [...INTEGRATED_SKILLS].sort(), 'a skill is in the code and not in the registry, or the other way round');
+  assert.deepEqual(ACTIVE_AGENTS.map((a) => a.key), ['researcher', 'creator', 'strategist', 'mediabuyer', 'support']);
+  assert.deepEqual(ACTIVE_AGENTS.filter((a) => a.rights === 'write').map((a) => a.key), ['mediabuyer']);
+  for (const a of ACTIVE_AGENTS) { assert.ok(a.name && a.does && a.skills.length && a.reads.length && a.writes.length, a.key); }
+  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'support').skills.some((s) => s.key === 'period_report' && s.integrated === false), 'the report agent is registered as a skill of the Support agent, not yet integrated');
+  assert.deepEqual(ACTIVE_AGENTS.flatMap((x) => x.skills.filter((s) => s.stub).map((s) => `${x.key}/${s.key}`)), ['strategist/monthly_plan'], 'the stand-ins are listed openly: when the month plan is built, remove the mark');
+  assert.equal(AGENTS.length, 5); assert.equal(SKILL_LABEL.launch, 'запускає кампанії');
+  const isl = mapIslands();
+  assert.equal(isl.length, 5); assert.equal(isl[0].archived, false); assert.equal(isl[0].agents.length, 5);
+  assert.deepEqual(isl.slice(1).map((x) => x.key), ['service', 'sales', 'seo', 'smm']); assert.ok(isl.slice(1).every((x) => x.archived && /в архіві/.test(x.label)));
+  const rad = (n) => Math.max(3.9, (n * 4.4) / (2 * Math.PI)) + 1.45 + 0.55; // the radius of an island as the scene makes it
+  for (let i = 0; i < isl.length; i += 1) for (let j = i + 1; j < isl.length; j += 1) assert.ok(Math.hypot(isl[i].p[0] - isl[j].p[0], isl[i].p[1] - isl[j].p[1]) > rad(isl[i].agents.length) + rad(isl[j].agents.length) + 1, `${isl[i].key} and ${isl[j].key} overlap`);
 });
 console.log(`\n${passed} workflow checks passed`);
