@@ -2409,4 +2409,14 @@ await test('approvals tab: the tab is in the card of the project with the counte
   const tab = fs.readFileSync(path.join(root, 'src/components/Workflow/ApprovalsTab.jsx'), 'utf8');
   assert.match(tab, /<Decision /); assert.match(tab, /Історія рішень/);
 });
+await test('launch_check: in read-only mode (a real client) nothing is sent to the write endpoints; it still names the token and lists the pages the cabinet may promote', async () => {
+  const s = await setup({ handlers: createHandlers({ mediabuyer: { launch_check: launchCheck } }) });
+  s.repo.addAccount(1, LA_ACC);
+  await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { general: {}, economics: {} } });
+  const w = laWriter(); let validated = 0; w.validateWrite = async () => { validated += 1; return {}; }; w.promotePages = async () => [{ id: '9', name: 'Сторінка клієнта' }]; s.ctx.metaWrite = w;
+  await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'launch_check', trigger: 'manual', input: { read_only: true } }); await processTick(s.ctx);
+  const r = s.repo.T.runs.find((x) => x.skill === 'launch_check');
+  assert.equal(r.status, 'done'); assert.equal(validated, 0, 'validate_only was not even called'); assert.equal(r.output.read_only, true); assert.equal(r.output.writable, null);
+  assert.deepEqual(w.calls, []); assert.match(JSON.stringify(r.output.pages), /Сторінка клієнта/);
+});
 console.log(`\n${passed} workflow checks passed`);

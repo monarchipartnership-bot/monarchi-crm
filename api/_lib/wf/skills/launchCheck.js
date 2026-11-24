@@ -9,8 +9,10 @@ export async function launchCheck({ run, ctx }) {
   if (!ctx.metaWrite) throw new Error('Немає права запису в кабінет: у Vercel не задано META_WRITE_TOKEN (або META_ACCESS_TOKEN) з правом ads_management. Нічого не змінено.');
   const accountId = accounts[0].account_id;
   let info = null; try { info = await ctx.metaWrite.accountInfo({ accountId }); } catch { info = null; }
+  // run.input.read_only: for a real client's cabinet nothing is sent to the write endpoints at all, only reads (who the token is, which pages the cabinet may promote)
+  const readOnly = run.input?.read_only === true;
   try {
-    await ctx.metaWrite.validateWrite({ accountId });
+    if (!readOnly) await ctx.metaWrite.validateWrite({ accountId });
   } catch (e) {
     let why = '';
     try { const d = typeof ctx.metaWrite.diagnose === 'function' ? await ctx.metaWrite.diagnose() : null; if (d) why = d.error ? ` Діагностика не вдалася: ${d.error}` : d.hasManagement ? ` Токен${d.who ? ' ' + d.who : ''} має право ads_management, отже користувачу токена не призначено цей кабінет із правом керувати кампаніями.` : ` Токен${d.who ? ' ' + d.who : ''} має лише права: ${d.permissions.join(', ') || 'немає'}; потрібне ads_management.`; } catch { /* the original error stays */ }
@@ -21,7 +23,7 @@ export async function launchCheck({ run, ctx }) {
   const pageId = String(brief.general?.fb_page_id || '').replace(/\D/g, '');
   let pages = null;
   if (typeof ctx.metaWrite.promotePages === 'function') { try { pages = await ctx.metaWrite.promotePages({ accountId }); } catch (e) { pages = null; } }
-  const steps = [{ title: `Право запису в кабінет ${info?.name || accountId} підтверджено (перевірка без створення кампаній)`, status: 'done' }];
+  const steps = [readOnly ? { title: `Кабінет ${info?.name || accountId}${info?.status === 1 ? ' активний' : ''}: право запису не перевірялось (режим лише читання)`, status: 'info' } : { title: `Право запису в кабінет ${info?.name || accountId} підтверджено (перевірка без створення кампаній)`, status: 'done' }];
   if (pages) {
     const found = pages.find((p) => p.id === pageId);
     const list = pages.map((p) => `${p.name || '—'} (${p.id})`).join('; ') || 'жодної';
@@ -32,5 +34,5 @@ export async function launchCheck({ run, ctx }) {
       throw new Error(`Сторінка ${pageId} з брифу НЕ доступна для реклами з цього кабінету. Кабінет може рекламувати: ${list}.${who} Або вкажіть у брифі ID зі списку, або призначте сторінку цьому кабінету та користувачу токена (Business Settings → Сторінки → Додати людей/Призначити партнерів).`);
     }
   }
-  return { output: { writable: true, account: accountId, name: info?.name || null, page_ok: pages ? !!pages.find((p) => p.id === pageId) : null, pages: pages || null }, steps };
+  return { output: { writable: readOnly ? null : true, read_only: readOnly, account: accountId, name: info?.name || null, page_ok: pages ? !!pages.find((p) => p.id === pageId) : null, pages: pages || null }, steps };
 }
