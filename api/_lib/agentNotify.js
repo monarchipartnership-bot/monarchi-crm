@@ -20,7 +20,7 @@ export function buildNotifications({ projectId, projectName, periodType, status,
     type: ok ? 'project_report' : 'project_agent_problem',
     title: ok ? 'Звіт готовий до доопрацювання' : 'Агент не зміг створити звіт',
     body: `${name}: ${message}`.slice(0, 400),
-    link: ok ? `/projects/${projectId}?tab=work` : `/projects/${projectId}?tab=agent`,
+    link: ok ? `/projects/${projectId}?tab=work` : `/projects/${projectId}?tab=settings`,
     project_id: projectId,
   }));
 }

@@ -20,7 +20,6 @@ import ReportBuilder from '../../components/Projects/Builder/ReportBuilder';
 import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
-import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
 import { fetchAgent } from '../../lib/api/projectAgents';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
@@ -60,7 +59,6 @@ const TABS = [
   { key: 'compose', label: 'Формування звіту', icon: PAGE_ICONS['page.weekly-report'].src },
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
-  { key: 'agent', label: 'Агент звітів', icon: PAGE_ICONS['page.ai-agents'].src },
   { key: 'settings', label: 'Налаштування агентів', icon: PAGE_ICONS['page.ai-agents'].src }, // when they work, how much they spend, what they do alone, when they tell a person (one place)
 ];
 
@@ -76,7 +74,6 @@ const STRIP = [
   TABS.find((x) => x.key === 'tasks'),
   TABS.find((x) => x.key === 'approvals'),
   { key: 'reports', label: 'Звітність', icon: PAGE_ICONS['page.weekly-report'].src },
-  TABS.find((x) => x.key === 'agent'),
   TABS.find((x) => x.key === 'settings'),
 ];
 // the line icons of the menu of the card (the menu is the one of the AI Agents section: a round medallion with a line icon)
@@ -109,7 +106,8 @@ const COMPOSE_ICONS = {
 };
 const KEEP_ALIVE = ['builder', 'compose:period', 'compose:weekly', 'compose:monthly', 'work']; // panes that keep their state while the card is open
 function parseTab(params) {
-  const t = params.get('tab');
+  const t0 = params.get('tab');
+  const t = t0 === 'agent' ? 'settings' : t0; // the old address of «Агент звітів»: its settings moved into «Налаштування агентів»
   if (COMPOSE_MODES.some(([k]) => k === t)) return { tab: 'compose', mode: t };
   const mode = COMPOSE_MODES.some(([k]) => k === params.get('mode')) ? params.get('mode') : 'weekly';
   return { tab: TABS.some((x) => x.key === t) ? t : 'overview', mode };
@@ -527,8 +525,8 @@ function ProjectDetailCard() {
               : <span className="pw-chip">{project.client}</span>)}
             {project.manager && <span className="pw-chip">{project.manager}</span>}
             {agentChip && (
-              <button type="button" className={'pw-chip pw-chip--agent pw-chip--' + agentChip.tone} onClick={() => setTab('agent')} title="Відкрити вкладку AI Агент">
-                AI-агент: {agentChip.label}
+              <button type="button" className={'pw-chip pw-chip--agent pw-chip--' + agentChip.tone} onClick={() => setTab('settings')} title="Відкрити налаштування агентів: блок «Звіти для клієнта»">
+                Агент звітів: {agentChip.label}
               </button>
             )}
           </div>
@@ -650,7 +648,6 @@ function ProjectDetailCard() {
       {tab === 'approvals' && <ApprovalsTab key={'approvals-' + id} projectId={id} projectName={project?.client || project?.name} onChanged={refreshApprovals} onGo={goWf} />}
       {tab === 'dossier' && <Dossier key={'dossier-' + id + (searchParams.get('section') || '')} projectId={id} initialKey={searchParams.get('section') || undefined} />}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
-      {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
       {tab === 'settings' && <AgentSettings key={'settings-' + id} projectId={id} />}
       {tab === 'brief' && <BriefPage key={'brief-' + id} projectId={id} onGo={goWf} />}
       </div>

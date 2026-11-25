@@ -4,6 +4,7 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 import { fetchSettingsData, saveConfig, saveNotifyChat, setSmallActions } from '../../lib/api/agentSettings';
 import { saveLimits, setGlobalStop, setProjectCap, setProjectPaused } from '../../lib/api/workflow';
 import { DEFAULTS, SPEC, getPath, resolveConfig, sourceOf } from '../../lib/workflow/agentConfig';
+import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
 
 // «Налаштування агентів» (owner's rule 2026-11-26: all the settings in one place, one page with two entrances: the card of a project and the section AI Agents).
 // Two levels: «усі проєкти» and «цей проєкт» (it overrides the first). A change is saved with one button; a value of a project can be put back to the level above.
@@ -93,7 +94,7 @@ export default function AgentSettings({ projectId: fixedProject = null, onOpen }
         <div className="wf-card">
           <h3>Коли працюють</h3>
           {only(['optimize.every_hours', 'optimize.at_hour', 'optimize.skip_weekends', 'month_plan.day']).map(field)}
-          <div className="wf-muted" style={{ fontSize: 12.5, marginTop: 8 }}>Оркестратор перевіряє, що пора робити, щохвилини, цілодобово. Тижневий і місячний звіти мають свій розклад у вкладці проєкту «Звітність».</div>
+          <div className="wf-muted" style={{ fontSize: 12.5, marginTop: 8 }}>Оркестратор перевіряє, що пора робити, щохвилини, цілодобово. Розклад тижневого й місячного звітів для клієнта налаштовується нижче, у блоці «Звіти для клієнта».</div>
         </div>
 
         <div className="wf-card">
@@ -149,6 +150,16 @@ export default function AgentSettings({ projectId: fixedProject = null, onOpen }
           </div>
         )}
       </div>
+
+      {scope === 'project' && (
+        <div className="wf-col" key={'reports-' + project}>
+          <div className="wf-card">
+            <h3>Звіти для клієнта</h3>
+            <div className="wf-muted" style={{ fontSize: 13 }}>Агент звітів (навичка Супроводу): які звіти робить, коли, для кого, кому й куди повідомляє. Тут же журнал його дій. Самі звіти лежать у вкладці «Звітність». Ці налаштування зберігаються окремою кнопкою «Зберегти» всередині блоку.</div>
+          </div>
+          <ProjectAgentTab projectId={project} />
+        </div>
+      )}
 
       {dirty && (
         <div className="wf-set-bar" role="region" aria-label="Незбережені зміни">

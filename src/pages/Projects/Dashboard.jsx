@@ -143,7 +143,7 @@ export default function Dashboard() {
   // «Потрібна увага»: where the AI agent hit a problem, and the drafts it made that wait for a person.
   const attention = useMemo(() => {
     const nameOf = (id) => projects.find((p) => String(p.id) === String(id))?.name || `Проєкт ${id}`;
-    const problems = agentRows.filter((a) => a.health === 'problem').map((a) => ({ key: 'p' + a.project_id, kind: 'problem', projectId: a.project_id, project: nameOf(a.project_id), text: a.last_error || 'Агент повідомив про проблему.', to: `/projects/${a.project_id}?tab=agent`, action: 'Відкрити агента' }));
+    const problems = agentRows.filter((a) => a.health === 'problem').map((a) => ({ key: 'p' + a.project_id, kind: 'problem', projectId: a.project_id, project: nameOf(a.project_id), text: a.last_error || 'Агент повідомив про проблему.', to: `/projects/${a.project_id}?tab=settings`, action: 'Відкрити агента' }));
     const reviews = agentDrafts.map((r) => ({ key: 'r' + r.id, kind: 'review', projectId: r.project_id, project: nameOf(r.project_id), text: `${r.period_type === 'monthly' ? 'Місячний' : 'Тижневий'} звіт · ${r.platform === 'all' ? 'Разом' : platformInfo(r.platform).label} за ${fmtIso(r.period_start)} – ${fmtIso(r.period_end)}: чернетка агента чекає перевірки`, to: `/projects/${r.project_id}?tab=${r.period_type}&platform=${r.platform === 'all' ? 'total' : r.platform}`, action: 'Перевірити' }));
     return [...problems, ...reviews];
   }, [projects, agentRows, agentDrafts]);

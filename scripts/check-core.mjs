@@ -1209,7 +1209,7 @@ await ok('notifications: a finished draft and a problem go to the chosen people,
   const bad = fakeRepo({ agent: withPeople });
   await runProjectReport({ repo: bad, post: broken, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' });
   assert.equal(bad.log.notifications[0].type, 'project_agent_problem');
-  assert.equal(bad.log.notifications[0].link, '/projects/3?tab=agent');
+  assert.equal(bad.log.notifications[0].link, '/projects/3?tab=settings');
   const quiet = fakeRepo({ agent: withPeople, recentNotice: true });
   await runProjectReport({ repo: quiet, post: broken, projectId: 3, periodType: 'weekly', trigger: 'cron', today: '2026-10-15' });
   assert.equal(quiet.log.notifications.length, 0);

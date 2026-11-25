@@ -111,7 +111,8 @@ function nextRuns(config) {
   return out;
 }
 
-export default function ProjectAgentTab({ projectId }) {
+// part: 'all' (the old tab), 'settings' (the status, «Запустити зараз» and the settings: lives in «Налаштування агентів»), 'history' (the journal of the actions)
+export default function ProjectAgentTab({ projectId, part = 'all' }) {
   const [confirm, confirmDialog] = useConfirm();
   const { email } = useAuth();
   const [agent, setAgent] = useState(null);
@@ -228,7 +229,7 @@ export default function ProjectAgentTab({ projectId }) {
         </div>
       )}
 
-      {noLayout.length > 0 && (
+      {part !== 'history' && noLayout.length > 0 && (
         <div className="prep-internal-note" role="note">
           <b>Макет звіту не налаштовано{linked.length > 1 ? `: ${noLayout.map((p) => platformInfo(p).label).join(', ')}` : ''}.</b> Агент складає звіти лише для платформ із макетом.{' '}
           <button type="button" className="pacc-link" onClick={() => navigate(`/projects/${projectId}?tab=builder&platform=${noLayout[0]}`)}>Відкрити «Конструктор звіту»</button>
@@ -236,7 +237,7 @@ export default function ProjectAgentTab({ projectId }) {
       )}
 
       {/* Status */}
-      <section className="pag-card pag-status">
+      {part !== 'history' && <section className="pag-card pag-status">
         <div className="pag-status-main">
           <span className={'pag-dot pag-dot--' + status.tone} aria-hidden="true" />
           <div>
@@ -285,10 +286,10 @@ export default function ProjectAgentTab({ projectId }) {
           <div className="pacc-hint pag-hint">Запуск за розкладом ще не ввімкнено: поки агент працює лише за кнопкою «Створити звіт». Перемикач і розклад збережуться й почнуть діяти, коли запуск за розкладом буде ввімкнено.</div>
         )}
         {message && <div className="pacc-err pag-error">{message}</div>}
-      </section>
+      </section>}
 
       {/* Settings: five groups in the order the agent works — what it does, when, the presentation, who is told, the note */}
-      {agent && form && (
+      {part !== 'history' && agent && form && (
         <section className="pag-card pag-settings">
           <div className="pag-card-head">
             <div>
@@ -429,7 +430,7 @@ export default function ProjectAgentTab({ projectId }) {
       )}
 
       {/* History */}
-      <section className="pag-card">
+      {part !== 'settings' && <section className="pag-card">
         <div className="pag-card-head">
           <HubTitle icon="clock">Історія дій</HubTitle>
           <div className="pag-card-actions">
@@ -460,7 +461,7 @@ export default function ProjectAgentTab({ projectId }) {
             ))}
           </ul>
         )}
-      </section>
+      </section>}
       {confirmDialog}
     </div>
   );
