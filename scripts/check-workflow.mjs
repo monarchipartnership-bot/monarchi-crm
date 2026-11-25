@@ -11,7 +11,7 @@ import { MAX_FAILURES, recentFailures } from '../api/_lib/wf/machine.js';
 import { dueState, digest, filterCounts, filterTasks, groupTasks, hasDraft, isBlocker, parseEvidence, sourceLabel } from '../src/lib/workflow/tasks.js';
 import { REMIND_DAYS, buildFeedbackPrompt, checkFeedback, draftOf, nextPayment, onboardingChecklist, parseFeedbackAnswer, profitability, renderFeedbackText } from '../api/_lib/wf/skills/supportEngine.js';
 import { onboarding, paymentReminder, periodsOf, weeklyReport } from '../api/_lib/wf/skills/supportAgent.js';
-import { analyse, judge, renderOptimizeText } from '../api/_lib/wf/skills/optimizeEngine.js';
+import { analyse, judge, renderOptimizeText, SMALL, pickSmallActions } from '../api/_lib/wf/skills/optimizeEngine.js';
 import { optimize } from '../api/_lib/wf/skills/optimizeAgent.js';
 import { launchCheck } from '../api/_lib/wf/skills/launchCheck.js';
 import { actId, countriesOf, createMetaWriter, hasEu, ctaType, landingUrl, minor, utmTags } from '../api/_lib/metaAdsWrite.js';
@@ -3310,5 +3310,86 @@ await test('video launch: a video that Meta cannot process, or has not processed
   const up = laVideoWriter({ failUpload: true });
   const c = await laSetup({ writer: up, creatives: { ...LA_CREATIVES, videos: [LA_VIDEO()] } }); await processTick(c.ctx);
   assert.match(c.repo.T.runs[0].error, /bad video/);
+});
+// ---------------------------------------------------------------- the queue of the owner: «дрібні дії» of the optimiser (OFF by default; a closed list; only the Media buyer; only in a project that allows it)
+const SM_ACTIVE = (...ids) => new Map(ids.map((id) => [id, { status: 'ACTIVE' }]));
+await test('small actions: a weak ad is paused only when it is not the last working one of its group, one per group a pass, at most three a pass; unknown states are never touched', () => {
+  const snap = opSnap(); snap.campaigns[0].adsets[0].ads.push({ key: 'c4-v1', tag: 'Креатив 4', ad_id: 'ad4' });
+  const off = (id, spend, extra = {}) => ({ level: 'ad', id, name: 'Оголошення ' + id, action: 'off', reason: 'збиткове', metrics: { spend }, significant: false, ...extra });
+  const objects = { ads: SM_ACTIVE('ad1', 'ad2', 'ad3', 'ad4'), adsets: new Map() };
+  const p = pickSmallActions({ actions: [off('ad2', 400), off('ad4', 500)], snapshot: snap, objects });
+  assert.deepEqual(p.apply.map((x) => x.id), ['ad4'], 'only one ad of a group is paused in a pass, the one that spent more'); assert.equal(p.apply[0].after, 'PAUSED'); assert.match(p.skipped[0].why, /вже призупинено одне/);
+  const last = pickSmallActions({ actions: [off('ad3', 200)], snapshot: snap, objects }); assert.deepEqual(last.apply, []); assert.match(last.skipped[0].why, /останнє працююче/);
+  const unknown = pickSmallActions({ actions: [off('ad2', 400)], snapshot: snap, objects: { ads: SM_ACTIVE('ad1'), adsets: new Map() } }); assert.deepEqual(unknown.apply, []); assert.match(unknown.skipped[0].why, /невідомий/);
+  const already = pickSmallActions({ actions: [off('ad2', 400)], snapshot: snap, objects: { ads: new Map([['ad1', { status: 'ACTIVE' }], ['ad2', { status: 'PAUSED' }]]), adsets: new Map() } }); assert.deepEqual(already.apply, []);
+  const sig = pickSmallActions({ actions: [off('ad2', 400, { significant: true }), { level: 'campaign', id: 'camp2', action: 'off', significant: true }, { level: 'ad', id: 'ad3', action: 'replace', significant: true }], snapshot: snap, objects }); assert.deepEqual(sig.apply, [], 'significant changes, campaigns and replacements are never small');
+  const many = opSnap(); many.campaigns = [0, 1, 2, 3].map((i) => ({ key: 'k' + i, name: 'К' + i, id: 'camp' + i, adsets: [{ key: 'g' + i, name: 'Г' + i, id: 'set' + i, ads: [{ ad_id: 'a' + i }, { ad_id: 'b' + i }] }] }));
+  const four = pickSmallActions({ actions: [0, 1, 2, 3].map((i) => off('a' + i, 100 + i)), snapshot: many, objects: { ads: SM_ACTIVE('a0', 'b0', 'a1', 'b1', 'a2', 'b2', 'a3', 'b3'), adsets: new Map() } });
+  assert.equal(four.apply.length, SMALL.max_ad_pauses); assert.match(four.skipped[0].why, /ліміт 3 пауз/);
+});
+await test('small actions: a budget is raised by the agreed step only inside the budget of the brief, from the real budget of the cabinet, a few a pass; without the facts nothing is raised', () => {
+  const snap = opSnap();
+  const sc = (id, to) => ({ level: 'adset', id, name: 'Група ' + id, action: 'scale', reason: 'працює добре', to_daily: to, significant: false });
+  const objects = { ads: new Map(), adsets: new Map([['set1', { status: 'ACTIVE', daily: 90 }], ['set2', { status: 'ACTIVE', daily: 60 }]]) };
+  const room = pickSmallActions({ actions: [sc('set1', 108), sc('set2', 72)], snapshot: snap, objects, dailyCap: 200 });
+  assert.deepEqual(room.apply.map((x) => [x.kind, x.id, x.from, x.to]), [['adset_scale', 'set1', 90, 108], ['adset_scale', 'set2', 60, 72]]);
+  const tight = pickSmallActions({ actions: [sc('set1', 108), sc('set2', 72)], snapshot: snap, objects, dailyCap: 170 });
+  assert.deepEqual(tight.apply.map((x) => x.id), ['set1'], 'the second would pass the budget of the brief'); assert.match(tight.skipped[0].why, /вийшла б за бюджет із брифу \(170 на день\)/);
+  assert.deepEqual(pickSmallActions({ actions: [sc('set1', 108)], snapshot: snap, objects, dailyCap: 150 }).apply, [], 'the budget of the brief is already used: no headroom');
+  assert.match(pickSmallActions({ actions: [sc('set1', 108)], snapshot: snap, objects, dailyCap: null }).skipped[0].why, /немає місячного бюджету/);
+  assert.match(pickSmallActions({ actions: [sc('set1', 108)], snapshot: snap, objects: { ads: new Map(), adsets: new Map() }, dailyCap: 500 }).skipped[0].why, /невідомий/);
+  assert.equal(pickSmallActions({ actions: [sc('set1', 500)], snapshot: snap, objects, dailyCap: 1000 }).apply[0].to, 108, 'never more than the step (20%) whatever the advice says');
+  const three = opSnap(); three.campaigns[1].adsets.push({ key: 'g3', name: 'Г3', id: 'set3', ads: [{ ad_id: 'ad9' }] }); const o3 = { ads: new Map(), adsets: new Map([['set1', { status: 'ACTIVE', daily: 90 }], ['set2', { status: 'ACTIVE', daily: 60 }], ['set3', { status: 'ACTIVE', daily: 30 }]]) };
+  assert.equal(pickSmallActions({ actions: [sc('set1', 108), sc('set2', 72), sc('set3', 36)], snapshot: three, objects: o3, dailyCap: 1000 }).apply.length, SMALL.max_scales);
+  assert.deepEqual(SMALL, { max_ad_pauses: 3, max_scales: 2, headroom_pct: 0 });
+});
+await test('small actions: the writer can only PAUSE an ad (never switch one on) and set the daily budget of a group in the smallest unit', async () => {
+  const seen = [];
+  const w = createMetaWriter({ token: 'TOKEN123', fetchFn: async (url, init) => { seen.push({ url: String(url), body: Object.fromEntries(new URLSearchParams(init?.body?.toString() || '')) }); return new Response(JSON.stringify({ success: true }), { status: 200 }); } });
+  await w.setAdStatus({ adId: 'ad_555', status: 'PAUSED' }); assert.match(seen.at(-1).url, /\/555$/); assert.equal(seen.at(-1).body.status, 'PAUSED');
+  await assert.rejects(() => w.setAdStatus({ adId: '555', status: 'ACTIVE' }), /лише призупиняти/); assert.equal(seen.length, 1, 'nothing was sent for a refused status');
+  await w.setAdsetDaily({ adsetId: '777', dailyMinor: 10800 }); assert.match(seen.at(-1).url, /\/777$/); assert.equal(seen.at(-1).body.daily_budget, '10800');
+  await assert.rejects(() => w.setAdsetDaily({ adsetId: '777', dailyMinor: 0 }), /більше нуля/);
+});
+const smSetup = async ({ flag = true, writer, meta, brief = 6000, life = OP_LIFE } = {}) => {
+  const snap = opSnap();
+  const s = await opSetup({ snap, meta: meta === undefined ? opMeta((since) => (since === snap.launched_at.slice(0, 10) ? life : [])) : meta });
+  await s.repo.setProjectFlag(1, { auto_small_actions: flag });
+  if (brief != null) await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: { economics: { budget_monthly: brief } } });
+  const calls = []; s.calls = calls;
+  if (writer !== null) s.ctx.metaWrite = writer || { setAdStatus: async (a) => { calls.push(['pause', a]); return true; }, setAdsetDaily: async (a) => { calls.push(['daily', a]); return true; } };
+  return s;
+};
+await test('small actions: OFF by default nothing is changed in the cabinet; ON the weak ad is paused with a journal line that says how to undo it, and the big changes still go to Апрув 3', async () => {
+  const off = await smSetup({ flag: false }); await processTick(off.ctx);
+  assert.equal(off.calls.length, 0, 'a project that did not switch it on is never touched'); assert.equal(off.repo.T.runs.find((r) => r.skill === 'optimize').output.auto_enabled, false);
+  const on = await smSetup(); await processTick(on.ctx);
+  const run = on.repo.T.runs.find((r) => r.skill === 'optimize'); assert.equal(run.status, 'done', run.error);
+  assert.deepEqual(on.calls, [['pause', { adId: 'ad2', status: 'PAUSED' }]], 'ad2 (133 against the break-even 100) is paused; ad3 is the last of its group and is NOT paused');
+  const j = on.repo.T.journal.find((x) => x.action === 'optimize_auto'); assert.match(j.summary, /Автоматично призупинено оголошення «Креатив 2»[\s\S]*Відкотити/); assert.deepEqual(j.meta.undo, { set_status: 'ACTIVE' }); assert.equal(j.meta.before, 'ACTIVE');
+  assert.equal(run.output.applied, 1); assert.ok(on.repo.T.steps.some((x) => /Автоматично призупинено оголошення «Креатив 2»/.test(x.title)));
+  assert.equal(on.repo.T.approvals.filter((a) => a.kind === 'changes').length, 1, 'the campaign off and the replacement still go to Апрув 3');
+  assert.ok(!on.repo.T.approvals[0].subject.actions.some((a) => a.id === 'ad2'), 'what the agent did itself is not asked again');
+});
+await test('small actions: a good group gets its budget raised by the step inside the brief; the 72 hours start; no brief budget, no writer, no read of the cabinet and a failing write are notes, never a crash', async () => {
+  const good = [opRow('ad1', 300, 5), opRow('ad2', 300, 5), opRow('ad3', 300, 5)];
+  const s = await smSetup({ life: good }); await processTick(s.ctx);
+  assert.deepEqual(s.calls, [['daily', { adsetId: 'set1', dailyMinor: 10800 }], ['daily', { adsetId: 'set2', dailyMinor: 7200 }]], '90 +20% and 60 +20%, in cents');
+  assert.ok(s.repo.T.journal.some((j) => j.action === 'optimize_auto' && /піднято бюджет «Група «Г1»»: 90 → 108/.test(j.summary))); assert.ok(s.repo.T.journal.some((j) => j.action === 'optimize_scale'));
+  const tight = await smSetup({ life: good, brief: 4500 }); await processTick(tight.ctx); assert.equal(tight.calls.length, 0, 'the budget of the brief is fully used: no room'); assert.ok(tight.repo.T.steps.some((x) => /вийшла б за бюджет із брифу/.test(x.title)));
+  const nobrief = await smSetup({ life: good, brief: null }); await processTick(nobrief.ctx); assert.equal(nobrief.calls.length, 0); assert.ok(nobrief.repo.T.steps.some((x) => /немає місячного бюджету/.test(x.title)));
+  const nowriter = await smSetup({ writer: null }); await processTick(nowriter.ctx); assert.equal(nowriter.repo.T.runs.find((r) => r.skill === 'optimize').status, 'done'); assert.ok(nowriter.repo.T.steps.some((x) => /запису в кабінет немає: лише рекомендації/.test(x.title)));
+  const snapAll = opSnap(); const blind = await smSetup({ meta: { insights: async ({ timeRange }) => ({ rows: timeRange.since === snapAll.launched_at.slice(0, 10) ? OP_LIFE : [] }), objects: async () => { throw new Error('Meta: 500'); } } }); await processTick(blind.ctx);
+  assert.equal(blind.calls.length, 0, 'a cabinet that was not read is never changed blindly'); assert.ok(blind.repo.T.steps.some((x) => /стан оголошень у кабінеті не прочитано/.test(x.title)));
+  const bad = await smSetup({ writer: { setAdStatus: async () => { throw new Error('Meta: Permission denied (#200)'); }, setAdsetDaily: async () => true } }); await processTick(bad.ctx);
+  const br = bad.repo.T.runs.find((r) => r.skill === 'optimize'); assert.equal(br.status, 'done', 'a refused write does not fail the run'); assert.equal(br.output.auto_failed, 1); assert.ok(bad.repo.T.steps.some((x) => /Дрібні дії не вдалися \(1\)[\s\S]*Permission denied/.test(x.title))); assert.ok(!bad.repo.T.journal.some((j) => j.action === 'optimize_auto'));
+});
+await test('small actions: the switch is per project, off by default, in the overview of the project (after the launch), with the migration; the card of the Media buyer says it', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  assert.match(rd('supabase/migrations/20261074000000_workflow_small_actions.sql'), /auto_small_actions boolean not null default false/);
+  const ov = rd('src/components/Workflow/ProcessOverview.jsx'); assert.match(ov, /Дрібні дії оптимізатора/); assert.match(ov, /auto_small_actions: !state\.auto_small_actions/); assert.match(ov, /state\.stage >= 3/);
+  assert.match(ACTIVE_AGENTS.find((a) => a.key === 'mediabuyer').note, /дрібні дії/);
+  assert.equal(ACTIVE_AGENTS.find((a) => a.key === 'mediabuyer').rights, 'write'); assert.deepEqual(ACTIVE_AGENTS.filter((a) => a.rights === 'write').map((a) => a.key), ['mediabuyer'], 'still the only agent that writes to a cabinet');
 });
 console.log(`\n${passed} workflow checks passed`);

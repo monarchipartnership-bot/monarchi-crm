@@ -123,6 +123,49 @@ export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastSca
   return { actions, significant, tasks, notes, totals: all, days_live: r2(daysLive), thresholds: { breakeven_cpa: th.breakeven_cpa ?? null, target_cpa: th.target_cpa ?? null, min_spend_for_verdict: min } };
 }
 
+// ---------------------------------------------------------------- «дрібні дії»: what the Media buyer may do ALONE in a project that allows it (default: nobody does anything alone)
+// The list is CLOSED: pause one weak ad (never the last working one of a group), raise the budget of a good ad group by the agreed step inside the budget of the brief. Everything else
+// (a campaign or a group off, a replacement, a new creative, any budget above the step) stays a recommendation or goes to Апрув 3. The numbers are assumptions until management confirms them.
+export const SMALL = { max_ad_pauses: 3, max_scales: 2, headroom_pct: 0 }; // headroom_pct: how far above the daily budget of the brief the total may go (0 = never)
+
+// actions = analyse().actions; objects = what is on in the cabinet now; dailyCap = the daily budget of the brief (or null: no scaling). → { apply: [...], skipped: [{ name, why }] }
+export function pickSmallActions({ actions, snapshot, objects = {}, dailyCap = null, limits = SMALL }) {
+  const apply = [], skipped = [];
+  const adsetOfAd = new Map();
+  for (const c of snapshot?.campaigns || []) for (const a of c.adsets || []) for (const x of a.ads || []) if (x.ad_id) adsetOfAd.set(String(x.ad_id), a);
+  const status = (map, id) => String(map?.get?.(String(id))?.status || '').toUpperCase();
+  const activeAds = (adset) => (adset.ads || []).filter((x) => x.ad_id && status(objects.ads, x.ad_id) === 'ACTIVE');
+
+  const pauses = actions.filter((a) => a.level === 'ad' && a.action === 'off' && !a.significant).sort((x, y) => (y.metrics?.spend || 0) - (x.metrics?.spend || 0));
+  const touched = new Set();
+  for (const a of pauses) {
+    const adset = adsetOfAd.get(String(a.id));
+    if (!objects.ads?.get?.(String(a.id))) { skipped.push({ name: a.name, why: 'стан оголошення в кабінеті невідомий' }); continue; }
+    if (status(objects.ads, a.id) !== 'ACTIVE') { skipped.push({ name: a.name, why: 'оголошення вже не працює' }); continue; }
+    if (!adset || activeAds(adset).filter((x) => String(x.ad_id) !== String(a.id)).length < 1) { skipped.push({ name: a.name, why: 'це останнє працююче оголошення групи' }); continue; }
+    if (touched.has(adset)) { skipped.push({ name: a.name, why: 'в цій групі вже призупинено одне оголошення за цей прохід' }); continue; }
+    if (apply.filter((x) => x.kind === 'ad_off').length >= limits.max_ad_pauses) { skipped.push({ name: a.name, why: `ліміт ${limits.max_ad_pauses} пауз за прохід` }); continue; }
+    touched.add(adset);
+    apply.push({ kind: 'ad_off', id: String(a.id), name: a.name, reason: a.reason, before: 'ACTIVE', after: 'PAUSED' });
+  }
+
+  const scales = actions.filter((a) => a.level === 'adset' && a.action === 'scale' && a.to_daily != null);
+  const total = (snapshot?.campaigns || []).flatMap((c) => c.adsets || []).filter((s) => s.id && status(objects.adsets, s.id) === 'ACTIVE').reduce((t, s) => t + (num(objects.adsets.get(String(s.id)).daily) || 0), 0);
+  let running = total;
+  for (const a of scales) {
+    const cur = num(objects.adsets?.get?.(String(a.id))?.daily);
+    if (cur == null) { skipped.push({ name: a.name, why: 'поточний бюджет групи в кабінеті невідомий' }); continue; }
+    if (dailyCap == null) { skipped.push({ name: a.name, why: 'у брифі немає місячного бюджету: ліміту для підняття немає' }); continue; }
+    const next = r2(Math.min(num(a.to_daily), cur * (1 + PARAMS.budget_step_pct / 100)));
+    if (!(next > cur)) { skipped.push({ name: a.name, why: 'підняття не більше за поточний бюджет' }); continue; }
+    if (running - cur + next > dailyCap * (1 + limits.headroom_pct / 100) + 1e-9) { skipped.push({ name: a.name, why: `сума денних бюджетів вийшла б за бюджет із брифу (${r2(dailyCap)} на день)` }); continue; }
+    if (apply.filter((x) => x.kind === 'adset_scale').length >= limits.max_scales) { skipped.push({ name: a.name, why: `ліміт ${limits.max_scales} підняттів за прохід` }); continue; }
+    running = r2(running - cur + next);
+    apply.push({ kind: 'adset_scale', id: String(a.id), name: a.name, reason: a.reason, from: cur, to: next });
+  }
+  return { apply, skipped };
+}
+
 const LABEL = { off: 'вимкнути', scale: 'масштабувати', keep: 'лишити', wait: 'чекати', replace: 'замінити креатив', new_creative: 'новий креатив' };
 export function renderOptimizeText(r, { period, accountName }) {
   const out = [`Оптимізація (лише рекомендації). Період даних: ${period}. Кабінет: ${accountName || '—'}. Днів з запуску: ${r.days_live}.`];

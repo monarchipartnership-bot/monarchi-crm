@@ -146,6 +146,17 @@ export function createMetaWriter({ token, fetchFn = fetch, graph = GRAPH } = {})
       const j = await call('POST', `${actId(accountId)}/adcreatives`, { name, object_story_spec: spec, url_tags: urlTags });
       return j.id;
     },
+    // the SMALL actions of the optimiser (only when a project allows them): the agent may only PAUSE an ad (never switch one on) and set the daily budget of an ad group
+    async setAdStatus({ adId, status }) {
+      if (status !== 'PAUSED') throw new Error('Агент може лише призупиняти оголошення, а не вмикати їх.');
+      await call('POST', String(adId).replace(/\D/g, ''), { status });
+      return true;
+    },
+    async setAdsetDaily({ adsetId, dailyMinor }) {
+      if (!(Number(dailyMinor) > 0)) throw new Error('Денний бюджет групи має бути більше нуля.');
+      await call('POST', String(adsetId).replace(/\D/g, ''), { daily_budget: Math.round(Number(dailyMinor)) });
+      return true;
+    },
     async createAd({ accountId, adsetId, name, creativeId, status = 'ACTIVE' }) {
       const j = await call('POST', `${actId(accountId)}/ads`, { name, adset_id: adsetId, creative: { creative_id: creativeId }, status });
       return j.id;
