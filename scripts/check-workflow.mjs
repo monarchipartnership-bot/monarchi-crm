@@ -3550,7 +3550,7 @@ await test('agent settings page: ONE page with two entrances (a tab in the card 
   assert.ok(!/saveLimits\(/.test(ovw) && /window=settings/.test(ovw), 'the window «Мої проєкти» no longer edits the limits: it leads to the settings');
   for (const path of Object.keys(CFG_SPEC)) assert.ok(page.includes(path), 'the page shows ' + path);
 });
-await test('one brief: a tab «Бриф» in the card of the project and the same page in the dossier; every fact of the brief page is a fact of the registry or of the old sheet; nothing of the old sheet is lost (scalars, products, offers, goals, free text)', () => {
+await test('one brief: a tab «Бриф» in the card of the project and NOT a second copy in the dossier; every fact of the brief page is a fact of the registry or of the old sheet; nothing of the old sheet is lost (scalars, products, offers, goals, free text)', () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
   const pd = rd('src/pages/Projects/ProjectDetail.jsx'), dos = rd('src/components/Workflow/Dossier.jsx'), page = rd('src/components/Workflow/BriefPage.jsx'), lists = rd('src/components/Workflow/BriefLists.jsx');
@@ -3558,7 +3558,7 @@ await test('one brief: a tab «Бриф» in the card of the project and the sam
   assert.match(pd, /next0 === 'dossier' && section0 === 'brief' \? \['brief', undefined\]/, 'the old links «досьє → бриф» lead to the tab');
   assert.match(pd, /const INFO_SECTIONS = \[\['main', 'Основне'\]\]/, 'the old sections of the info tab are merged into the brief');
   assert.ok(!/ProjectCreativeTab key=\{'info-'/.test(pd) && !/<InfoSummary /.test(pd));
-  assert.match(dos, /<BriefPage /); assert.ok(!fs.existsSync(path.join(root, 'src/components/Workflow/BriefSheet.jsx')), 'one sheet, not two');
+  assert.ok(!/BriefPage/.test(dos), 'the dossier no longer holds a second copy of the brief page'); assert.match(dos, /filter\(\(s\) => s\.key !== 'brief'\)/, 'the brief is not a section of the dossier list'); assert.match(dos, /initialKey !== 'brief'/); assert.ok(!fs.existsSync(path.join(root, 'src/components/Workflow/BriefSheet.jsx')), 'one sheet, not two');
   for (const k of ROWS.map((r) => r.key)) assert.ok(page.includes(`'${k}'`), 'the brief page has the scalar ' + k);
   for (const k of ['website', 'about', 'offer', 'tone', 'copy_rules', 'restrictions', 'seasonality', 'examples', 'figma_url', 'client_language']) assert.ok(page.includes(`'${k}'`), k);
   for (const part of ['Товари', 'Офери', 'Цілі перших креативів']) assert.ok(lists.includes(part), part);
