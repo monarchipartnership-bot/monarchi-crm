@@ -65,7 +65,8 @@ export default function BriefPage({ projectId, onGo }) {
   const toggleStatus = (k) => setForm((f) => ({ ...f, meta: { ...f.meta, [k]: { ...(f.meta[k] || {}), status: f.meta[k]?.status === 'confirmed' ? 'assumption' : 'confirmed' } } }));
   const setX = (k, v) => setExtra((x) => ({ ...x, [k]: v }));
   const settings = ctx.card.settings || {};
-  const run = async (fn, msg, key = 'save') => { setBusy(key); setErr(''); setOk(''); try { await fn(); await load(); if (msg) setOk(msg); } catch (x) { setErr(x.message || String(x)); } finally { setBusy(''); } };
+  // keepDraft: the action changes something that is saved at once (a button wording, a file, the payment): only the reference data is read again, the unsaved edits of the form stay
+  const run = async (fn, msg, key = 'save', keepDraft = false) => { setBusy(key); setErr(''); setOk(''); try { await fn(); if (keepDraft) setCtx(await loadBriefContext(projectId)); else await load(); if (msg) setOk(msg); } catch (x) { setErr(x.message || String(x)); } finally { setBusy(''); } };
 
   async function saveAll() {
     await run(async () => {
@@ -78,11 +79,11 @@ export default function BriefPage({ projectId, onGo }) {
       if (Object.keys(proj).length) await updateProject(projectId, proj);
     }, 'Бриф збережено.');
   }
-  const saveCta = (patch) => run(() => saveSettings(projectId, { figma_url: settings.figma_url, restrictions: settings.restrictions, cta_mode: settings.cta_mode, cta_text: settings.cta_text, ...patch }, email), null, 'cta');
+  const saveCta = (patch) => run(() => saveSettings(projectId, { figma_url: settings.figma_url, restrictions: settings.restrictions, cta_mode: settings.cta_mode, cta_text: settings.cta_text, ...patch }, email), null, 'cta', true);
   async function addCta() { let next; try { next = addCtaVariant(settings.cta_text, cta); } catch (x) { setErr(x.message); return; } await saveCta({ cta_text: next }); setCta(''); }
-  async function addFiles(list, kind) { await run(async () => { for (const file of [...list]) await uploadAsset(projectId, file, kind, email); }, null, 'file:' + kind); }
-  async function removeAsset(a) { if (await confirm({ title: 'Прибрати файл?', body: `«${a.name}» зникне з бібліотеки клієнта.`, confirmLabel: 'Прибрати', danger: true })) run(() => deleteAsset(a), null, 'del'); }
-  const flag = (k) => run(() => patchState(projectId, k === 'paid' ? { paid_at: new Date().toISOString() } : { contracts_signed_at: new Date().toISOString() }, email, k === 'paid' ? 'Оплату підтверджено.' : 'Договори підписано.'), null, k);
+  async function addFiles(list, kind) { await run(async () => { for (const file of [...list]) await uploadAsset(projectId, file, kind, email); }, null, 'file:' + kind, true); }
+  async function removeAsset(a) { if (await confirm({ title: 'Прибрати файл?', body: `«${a.name}» зникне з бібліотеки клієнта.`, confirmLabel: 'Прибрати', danger: true })) run(() => deleteAsset(a), null, 'del', true); }
+  const flag = (k) => run(() => patchState(projectId, k === 'paid' ? { paid_at: new Date().toISOString() } : { contracts_signed_at: new Date().toISOString() }, email, k === 'paid' ? 'Оплату підтверджено.' : 'Договори підписано.'), null, k, true);
 
   const need = (k) => report.items.find((i) => i.key === k);
   const missing = report.items.filter((i) => !i.ok && i.level === 'required');

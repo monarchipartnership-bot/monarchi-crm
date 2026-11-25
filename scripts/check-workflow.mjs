@@ -3689,4 +3689,10 @@ await test('brief extraction: the endpoint needs a person, writes nothing, asks 
   assert.match(imp, /conflictOf\(f, form, extra\)/); assert.match(imp, /mode: c \? 'skip'/); assert.match(page, /applyChosen\(\{ form, extra \}, chosen, source\)/); assert.match(page, /<BriefImport /);
   assert.match(client, /authedPost\('\/api\/brief-extract'/); assert.match(client, /MAX_TOTAL_BYTES = 3 \* 1024 \* 1024/);
 });
+await test('one brief: an action that is saved at once (a button wording, a file, the payment) must not wipe the edits the person has not saved yet (found by the test of 2026-11-26)', () => {
+  const page = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src/components/Workflow/BriefPage.jsx'), 'utf8');
+  assert.match(page, /const run = async \(fn, msg, key = 'save', keepDraft = false\)/); assert.match(page, /if \(keepDraft\) setCtx\(await loadBriefContext\(projectId\)\); else await load\(\)/);
+  for (const part of ["null, 'cta', true)", "'file:' + kind, true)", "null, 'del', true)", "null, k, true)"]) assert.ok(page.includes(part), 'keeps the draft: ' + part);
+  assert.ok(/saveAll\(\) \{\s*await run\(async \(\) => \{[\s\S]*?\}, 'Бриф збережено\.'\);/.test(page), 'the save of the page itself reloads the form from the store');
+});
 console.log(`\n${passed} workflow checks passed`);
