@@ -131,7 +131,7 @@ function Readiness({ projectId, email }) {
   return (
     <div className="wf-card">
       <div className="wf-row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-        <h3 style={{ margin: 0 }}>Готовність до запуску</h3>
+        <h3 style={{ margin: 0 }}>Готовність кабінету</h3>
         <Pill tone={view.tone}>{view.title}</Pill>
       </div>
       <div className="wf-muted" style={{ fontSize: 12.5, marginBottom: 8 }}>Перевіряє кабінет Meta, сторінку Facebook і доступи токена. У кабінеті нічого не створюється.</div>

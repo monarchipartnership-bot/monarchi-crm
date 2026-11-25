@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { requestRun } from '../../lib/api/workflow';
 import { AUDIO, MOTIONS, QUALITY, RESOLUTIONS, VIDEO_MONTHLY_MAX, videosThisMonth } from '../../../api/_lib/wf/skills/videoEngine.js';
 import { LANGS } from '../../../api/_lib/wf/skills/variationsEngine.js';
+import Select from '../common/Select';
 
 const STATUS = { planned: 'заплановано', producing: 'генерується', ready: 'готово', failed: 'не вдалося' };
 
@@ -39,7 +40,7 @@ export default function VideoPanel({ projectId, email, items = [], videos = [], 
   const sel = (id, label, value, set, options) => (
     <div className="wf-col" style={{ gap: 4 }}>
       <label htmlFor={id} className="wf-muted" style={{ fontSize: 12.5 }}>{label}</label>
-      <select id={id} className="wf-bd-in" value={value} onChange={(e) => set(e.target.value)}>{options.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+      <Select ariaLabel={label} value={value} onChange={set} options={options.map(([k, v]) => ({ value: k, label: v }))} />
     </div>
   );
   return (

@@ -4,3 +4,6 @@
 .infotip-btn[aria-expanded="true"] { color: #fff; background: linear-gradient(135deg, #AE40AE, #7B2A7B); box-shadow: none; }
 .infotip-btn:focus-visible { outline: 3px solid #AE40AE; outline-offset: 2px; }
 .infotip-pop { position: absolute; z-index: 40; left: 0; top: calc(100% + 8px); width: max-content; max-width: min(340px, 78vw); padding: 10px 14px; border: 1.5px solid #EBC6EB; border-radius: 14px; background: #fff; box-shadow: 0 10px 26px -8px #68276840; font: 500 13px/1.45 'Onest', sans-serif; letter-spacing: 0; text-transform: none; color: #4a2a4a; white-space: normal; text-align: left; }
+/* on the dark plum pages (project card tabs, AI Agents) */
+.pw-dark .infotip-btn, .ai-immersive .infotip-btn { color: #F6E9FA; background: rgba(235, 156, 239, .16); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .45); }
+.pw-dark .infotip-btn[aria-expanded="true"], .ai-immersive .infotip-btn[aria-expanded="true"] { color: #fff; background: linear-gradient(135deg, #B544B5, #661466); box-shadow: none; }

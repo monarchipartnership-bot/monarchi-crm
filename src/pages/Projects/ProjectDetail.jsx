@@ -43,6 +43,7 @@ import ProcessOverview from '../../components/Workflow/ProcessOverview';
 import AgentSettings from '../AiAgents/AgentSettings';
 import BriefPage from '../../components/Workflow/BriefPage';
 import ApprovalsTab from '../../components/Workflow/ApprovalsTab';
+import '../../styles/workflowDark.css';
 import { fetchApprovalsOf } from '../../lib/api/workflow';
 import { pendingCount } from '../../lib/workflow/approvalsTab';
 import Dossier from '../../components/Workflow/Dossier';
@@ -380,7 +381,7 @@ function ProjectDetailCard() {
         {f.type === 'select' ? (
           <Select value={raw || ''} onChange={save} ariaLabel={f.label} options={[{ value: '', label: 'Не вказано' }, ...f.options.map((o) => ({ value: o, label: o }))]} />
         ) : f.type === 'date' ? (
-          <input type="date" value={raw || ''} aria-label={f.label} onChange={(e) => save(e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} />
+          <DatePicker value={raw || ''} onChange={save} placeholder={f.label} />
         ) : (
           <AutoField type={f.type === 'url' ? 'text' : f.type} value={raw} placeholder={f.placeholder} step={f.type === 'number' ? '0.01' : undefined} ariaLabel={f.label} onCommit={save} />
         )}
@@ -550,7 +551,7 @@ function ProjectDetailCard() {
         ))}
       </div>
 
-      <div className={'pw-workspace ' + (tab === 'overview' ? 'pw-dark' : isReport ? 'pw-dark pw-rep' : 'pw-sheet')} data-dd={tab === 'overview' || isReport ? 'night' : 'hub'} id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
+      <div className={'pw-workspace ' + (tab === 'overview' ? 'pw-dark' : isReport ? 'pw-dark pw-rep' : tab === 'approvals' || tab === 'tasks' || tab === 'brief' || tab === 'process' || tab === 'dossier' || tab === 'settings' ? 'pw-dark pw-wfd' : 'pw-sheet')} data-dd={tab === 'overview' || isReport || tab === 'approvals' || tab === 'tasks' || tab === 'brief' || tab === 'process' || tab === 'dossier' || tab === 'settings' ? 'night' : 'hub'} id="pw-panel" role="tabpanel" aria-labelledby={'pw-tab-' + activeStrip}>
       {isReport && (
         <div className="pcr-tabs pw-sub pw-isub" role="tablist" aria-label="Розділи звітності">
           {REPORT_TABS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={'pcr-tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{label}{k === 'work' && workCount > 0 ? <em>{workCount}</em> : null}</button>)}

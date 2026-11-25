@@ -10,6 +10,8 @@ import { FIELD, SECTIONS, checkBrief } from '../../lib/workflow/briefSchema';
 import { ROWS, STATUS_LABEL, STATUS_TONE, contentFromForm, formFromContent, rowStatus } from '../../lib/workflow/brief';
 import { Pill } from './parts';
 import BriefLists from './BriefLists';
+import Select from '../common/Select';
+import DatePicker from '../common/DatePicker';
 import BriefImport from './BriefImport';
 import { applyChosen } from '../../lib/workflow/briefExtract';
 
@@ -101,8 +103,12 @@ export default function BriefPage({ projectId, onGo }) {
         <label htmlFor={'bf-' + k}>{lbl}{(HINT[k] || it?.why) && <small>{HINT[k] || it.why}</small>}</label>
         <div>
           {k === 'client_language'
-            ? <select id={'bf-' + k} className="wf-bd-in" style={{ width: 'auto' }} value={val} onChange={(e) => setX(k, e.target.value)}><option value="">Українська (за замовчуванням)</option><option value="uk">Українська</option><option value="en">Англійська</option></select>
-            : long
+            ? <Select ariaLabel={lbl} value={val} onChange={(v) => setX(k, v)} options={[{ value: '', label: 'Українська (за замовчуванням)' }, { value: 'uk', label: 'Українська' }, { value: 'en', label: 'Англійська' }]} />
+            : k === 'payment_next_date'
+              ? <DatePicker value={val} onChange={(iso) => setVal(k, iso)} placeholder="Оберіть дату" />
+              : k === 'payment_period'
+                ? <Select ariaLabel={lbl} value={val} onChange={(v) => setVal(k, v)} options={[{ value: '', label: 'Не вказано' }, { value: 'щомісяця', label: 'Щомісяця' }, { value: 'разово', label: 'Разово' }, ...(val && !['щомісяця', 'разово'].includes(val) ? [{ value: val, label: val }] : [])]} />
+                : long
               ? <textarea id={'bf-' + k} className="wf-ta" rows={2} value={val} onChange={(e) => (store === 'brief' ? setVal(k, e.target.value) : setX(k, e.target.value))} placeholder={it?.ask?.placeholder} />
               : <input id={'bf-' + k} className="wf-bd-in" inputMode={store === 'brief' && !ROW[k]?.text ? 'decimal' : 'text'} value={val} onChange={(e) => (store === 'brief' ? setVal(k, e.target.value) : setX(k, e.target.value))} placeholder={it?.ask?.placeholder} />}
           <div className="wf-bd-meta">
@@ -165,10 +171,8 @@ export default function BriefPage({ projectId, onGo }) {
     ),
   };
 
-  return (
-    <div className="wf wf-page wf-col">
-      {confirmDialog}
-      <div className="wf-card">
+  const headEl = (
+    <>
         <div className="wf-row" style={{ justifyContent: 'space-between' }}>
           <div className="wf-row">
             <div className="wf-ring" style={{ '--p': pct }}><b>{report.required.ok}/{report.required.total}</b></div>
@@ -181,8 +185,13 @@ export default function BriefPage({ projectId, onGo }) {
         </div>
         {missing.length > 0 && <div className="wf-row" style={{ marginTop: 10 }}>{missing.map((m) => <a key={m.key} className="wf-miss" href={'#f-' + (m.kind === 'files' ? 'files' : m.key)}>{m.label}</a>)}</div>}
         {ctx.state?.brief_pending && <div className="wf-muted" style={{ fontSize: 12.5, marginTop: 8 }}>Бриф складено з сайту: це припущення. Перевірте поля, допишіть цифри й підтвердіть: доки бриф не підтверджено, процес не стартує.</div>}
-      </div>
-      <BriefImport form={form} extra={extra} language={ctx.project?.client_language === 'en' ? 'en' : 'uk'} onApply={(chosen, source) => { const r = applyChosen({ form, extra }, chosen, source); setForm(r.form); setExtra(r.extra); return r.applied; }} />
+    </>
+  );
+
+  return (
+    <div className="wf wf-page wf-col">
+      {confirmDialog}
+      <BriefImport form={form} extra={extra} language={ctx.project?.client_language === 'en' ? 'en' : 'uk'} onApply={(chosen, source) => { const r = applyChosen({ form, extra }, chosen, source); setForm(r.form); setExtra(r.extra); return r.applied; }} head={headEl} />
       {err && <div className="wf-err" role="alert">{err}</div>}
       {ok && !dirty && <div className="wf-muted" role="status" style={{ fontSize: 13 }}>{ok}</div>}
 

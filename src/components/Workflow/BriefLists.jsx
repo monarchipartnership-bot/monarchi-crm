@@ -1,3 +1,4 @@
+import Select from '../common/Select';
 import { STATUS_LABEL, STATUS_TONE } from '../../lib/workflow/brief';
 
 // The lists of the brief: products, offers and the goals of the first creatives (moved from the old sheet of the brief; the page of the brief is BriefPage.jsx).
@@ -65,10 +66,7 @@ export default function BriefLists({ form, setForm, readOnly = false }) {
               <tr key={i}>
                 <td className={readOnly ? 'ro' : ''}>{readOnly ? g.goal : <input className="wf-inp" aria-label="Ціль креатива" value={g.goal} onChange={(e) => setList('goals', i, { goal: e.target.value })} placeholder="Що рекламуємо і що хочемо отримати" />}</td>
                 <td className={readOnly ? 'ro' : ''}>{readOnly ? (g.product || 'агент обере') : (
-                  <select className="wf-inp" aria-label="Товар для креатива" value={g.product} onChange={(e) => setList('goals', i, { product: e.target.value })}>
-                    <option value="">Агент обере з брифу</option>
-                    {form.products.filter((p) => p.name.trim()).map((p) => <option key={p.name} value={p.name.trim()}>{p.name.trim()}</option>)}
-                  </select>
+                  <Select ariaLabel="Товар для креатива" value={g.product} onChange={(v) => setList('goals', i, { product: v })} options={[{ value: '', label: 'Агент обере з брифу' }, ...form.products.filter((p) => p.name.trim()).map((p) => ({ value: p.name.trim(), label: p.name.trim() }))]} />
                 )}</td>
                 {!readOnly && <td><button type="button" className="wf-btn sm d" onClick={() => del('goals', i)} aria-label="Прибрати ціль">×</button></td>}
               </tr>))}</tbody>

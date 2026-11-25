@@ -43,3 +43,9 @@
 .projects-page.is-plum .proj-modal-folder .pacc-hint { color: #D6AEE0; }
 .projects-page.is-plum .proj-modal-folder .pmh-mi { background: rgba(235, 156, 239, .2); }
 .projects-page.is-plum .proj-modal-folder .pmh-mi--ln { background: linear-gradient(135deg, #C25AC4, #7E2483); }
+/* «Швидкий старт» dialog: the same dark plum dialog as «Створити проєкт» (it reuses the field rules of .proj-modal-folder above) */
+.projects-page.is-plum .qs-dialog.modal-box { background: rgba(30, 8, 36, .98); border: 0; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 30px 80px rgba(0, 0, 0, .6), 0 0 40px rgba(181, 68, 181, .18); color: #F6E9FA; color-scheme: dark; border-radius: 28px; padding: 24px 28px; }
+.projects-page.is-plum .qs-dialog h2 { color: #F6E9FA; }
+.projects-page.is-plum .qs-dialog b, .projects-page.is-plum .qs-dialog li { color: #F6E9FA; }
+.projects-page.is-plum .qs-dialog .btn:not(.btn-p) { background: rgba(255, 255, 255, .1); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .4); }
+.projects-page.is-plum .qs-dialog .form-err { background: rgba(255, 138, 138, .16); color: #FF8A8A; border-radius: 16px; padding: 8px 14px; }

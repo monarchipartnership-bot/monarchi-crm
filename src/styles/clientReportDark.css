@@ -82,12 +82,13 @@ body:has(.crh.crp:not(.pdfd)) { background: #17051c; }
 .crh.crp .crp-ms .mt { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .crh.crp .crp-ms .mt h2 { margin: 0; font: 800 23px/1.15 'Onest', sans-serif; letter-spacing: -.2px; }
 .crh.crp .crp-ms .mt .cx-chips { margin: 0; justify-content: center; }
-.crh.crp .crp-ms .tl { display: flex; align-items: center; gap: 6px; max-width: 100%; overflow-x: auto; padding: 3px; scrollbar-width: none; }
-.crh.crp .crp-ms .tl button { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--track); color: var(--sec); font: 700 11px 'Onest', sans-serif; text-align: center; }
-.crh.crp .crp-ms .tl button svg { width: 16px; height: 16px; }
-.crh.crp .crp-ms .tl button.fin { background: var(--okb); color: var(--ok); }
-.crh.crp .crp-ms .tl button.run { background: var(--wab); color: var(--wa); }
-.crh.crp .crp-ms .tl button.on { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+.crh.crp .crp-ms .mtl { display: flex; align-items: center; gap: 6px; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 6px 4px; scrollbar-width: none; } /* overflow-x makes overflow-y auto too: the glow of the lit month made a thin vertical scrollbar, the stripe the owner saw next to the first button (2026-11-25) */
+.crh.crp .crp-ms .mtl::-webkit-scrollbar { display: none; }
+.crh.crp .crp-ms .mtl button { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--track); color: var(--sec); font: 700 11px 'Onest', sans-serif; text-align: center; }
+.crh.crp .crp-ms .mtl button svg { width: 16px; height: 16px; }
+.crh.crp .crp-ms .mtl button.fin { background: var(--okb); color: var(--ok); }
+.crh.crp .crp-ms .mtl button.run { background: var(--wab); color: var(--wa); }
+.crh.crp .crp-ms .mtl button.on { background: var(--grad); color: #fff; box-shadow: var(--glow); }
 
 /* ---- the hero: the main number and the cards with sparklines ---- */
 .crh.crp .cx-hero { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; }
@@ -231,7 +232,7 @@ body:has(.crh.crp:not(.pdfd)) { background: #17051c; }
   .crh.crp .crp-ms .ar { width: 38px; height: 38px; }
   .crh.crp .crp-ms .mid { flex-direction: column; gap: 10px; }
   .crh.crp .crp-ms .mt h2 { font-size: 20px; }
-  .crh.crp .crp-ms .tl { max-width: 100%; }
+  .crh.crp .crp-ms .mtl { max-width: 100%; }
   .crh.crp .cx-big .v { font-size: 42px; }
   .crh.crp .cx-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .crh.crp .cx-tiles .mc .mct .v { font-size: 20px; }
@@ -239,3 +240,52 @@ body:has(.crh.crp:not(.pdfd)) { background: #17051c; }
   .crh.crp .cx-weeks { grid-template-columns: minmax(0, 1fr); }
   .crh.crp .cx-sec { scroll-margin-top: 118px; }
 }
+
+/* the four numbers of the overview */
+.crh.crp .cx-quad .mc { border-radius: 24px; }
+.crh.crp .cx-quad .mc .mct .v { font-size: 28px; }
+.crh.crp .cx-quad .mc.main { background: var(--hero); box-shadow: var(--glow), var(--shadow); }
+.crh.crp .cx-quad .mc.main .mct small, .crh.crp .cx-quad .mc.main .mct .v, .crh.crp .cx-quad .mc.main .mcf .sub { color: #fff; }
+.crh.crp .cx-quad .mc.main .mct small, .crh.crp .cx-quad .mc.main .mcf .sub { opacity: .85; }
+@media (max-width: 700px) { .crh.crp .cx-quad { gap: 10px; } .crh.crp .cx-quad .mc { padding: 14px 16px; } .crh.crp .cx-quad .mc .mct .v { font-size: 22px; } }
+
+
+/* the switch «Month · Week 1 · Week 2» under the month, the banner of a week, the tabs of the table and of the notes (owner's picks of 2026-11-25) */
+.crh.crp .crp-scope { display: flex; justify-content: center; }
+.crh.crp .crp-scope .sw { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 3px; padding: 4px; border-radius: 999px; background: var(--card2); box-shadow: inset 0 0 0 1.5px var(--ln); max-width: 100%; }
+.crh.crp .crp-scope .sw button { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border-radius: 999px; color: var(--sec); font: 700 14px/1.15 'Onest', sans-serif; text-align: center; }
+.crh.crp .crp-scope .sw button small { font: 500 10.5px 'Onest', sans-serif; opacity: .8; }
+.crh.crp .crp-scope .sw button.on { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+.crh.crp .crp-ban { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 8px 8px 8px 18px; border-radius: 999px; background: rgba(181, 68, 181, .18); box-shadow: inset 0 0 0 1.5px var(--acc); font-size: 13px; color: var(--sec); }
+.crh.crp .crp-ban b { color: var(--ink); font-weight: 800; }
+.crh.crp .crp-ban .grow { flex: 1; }
+.crh.crp .crp-ban .bk { height: 32px; padding: 0 16px; border-radius: 999px; background: var(--card2); box-shadow: inset 0 0 0 1.5px var(--ln); color: var(--ink); font: 700 12.5px 'Onest', sans-serif; text-align: center; }
+.crh.crp .cx-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.crh.crp .cx-tabs button { height: 36px; padding: 0 18px; border-radius: 999px; background: var(--card2); box-shadow: inset 0 0 0 1.5px var(--ln); color: var(--sec); font: 700 13px 'Onest', sans-serif; text-align: center; }
+.crh.crp .cx-tabs button.on { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+.crh.crp .cx-ttabs { margin: 8px 16px 6px; }
+.crh.crp .cx-notes { display: block; }
+.crh.crp .cx-notes .tcard { max-width: 78ch; }
+.crh.crp .cx-notes .tcard p, .crh.crp .cx-notes .cx-list li { font-size: 14.5px; line-height: 1.65; }
+@media (max-width: 700px) {
+  .crh.crp .crp-scope .sw { width: 100%; border-radius: 26px; }
+  .crh.crp .crp-scope .sw button { flex: 1 1 30%; padding: 0 10px; }
+  .crh.crp .crp-ban { border-radius: 22px; padding: 10px 12px; }
+  .crh.crp .cx-tabs button { padding: 0 14px; }
+}
+
+/* a report without campaign groups: the figures are tiles, not one column stretched over the whole card (Kasumee Business Ads, 2026-11-25) */
+.crh.crp .cx-mtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; padding: 6px 16px 10px; }
+.crh.crp .cx-mt { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 20px; background: var(--card2); box-shadow: inset 0 0 0 1.2px var(--ln); min-width: 0; }
+.crh.crp .cx-mt .lb { font-size: 12px; font-weight: 600; color: var(--sec); }
+.crh.crp .cx-mt .v { font: 800 22px/1.15 'Onest', sans-serif; font-variant-numeric: tabular-nums; }
+.crh.crp .cx-mt .dm { margin: 2px 0 0; }
+/* few columns: the table does not stretch to the full width */
+.crh.crp table.hubt.full.few { table-layout: auto; width: 100%; max-width: 720px; margin: 0 auto; }
+
+/* the table of a report without campaign groups: metric, this period, previous period, change */
+.crh.crp table.hubt.full.cmp { table-layout: auto; width: 100%; max-width: 900px; margin: 0 auto; }
+.crh.crp .hubt.full.cmp th:first-child { width: 38%; }
+.crh.crp .hubt.full.cmp td.was { color: var(--sec); font-weight: 600; }
+.crh.crp .hubt.full.cmp td.chg .dm { margin: 0 0 0 auto; }
+.crh.crp .hubt.full.cmp td { padding-top: 11px; padding-bottom: 11px; }

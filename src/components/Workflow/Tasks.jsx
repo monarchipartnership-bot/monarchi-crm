@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createTask, fetchTasks, setTaskOwner, setTaskStatus } from '../../lib/api/workflow';
+import Select from '../common/Select';
+import DatePicker from '../common/DatePicker';
 import { Pill } from './parts';
 import { FILTERS, OWNER_LABEL, PRIORITY_LABEL, TYPE_LABEL, ageDays, digest, dueState, filterCounts, filterTasks, groupTasks, hasDraft, isBlocker, isOpen, parseEvidence, sourceLabel } from '../../lib/workflow/tasks';
 
@@ -21,7 +23,7 @@ function Task({ t, busy, onAct }) {
     try { await navigator.clipboard.writeText(draft); setNote('Скопійовано. Вставте в чат клієнта.'); } catch { setNote('Не вдалося скопіювати автоматично: виділіть текст і скопіюйте вручну.'); }
   }
   return (
-    <div className={'wf-task' + (live ? '' : ' done')}>
+    <div className={'wf-task' + (live ? '' : ' done') + (open ? ' op' : '')}>
       <button type="button" className="hd" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className={'dot ' + t.priority} />
         <span style={{ flex: 1, minWidth: 0 }}>
@@ -36,6 +38,7 @@ function Task({ t, busy, onAct }) {
             {due && <Pill tone={DUE_TONE[due]}>{DUE_TEXT[due]}</Pill>}
           </span>
         </span>
+        <span className="chv" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg></span>
       </button>
       {open && (
         <div className="wf-col">
@@ -71,16 +74,17 @@ function AddTask({ projectId, email, onDone }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+  const setV = (k, v) => setF((x) => ({ ...x, [k]: v }));
   async function save() { setBusy(true); setErr(''); try { await createTask(projectId, f, email); setF({ title: '', type: 'client', owner: 'manager', priority: 'medium', due_date: '', evidence: '' }); onDone(); } catch (e) { setErr(e.message || String(e)); } finally { setBusy(false); } }
   return (
     <div className="wf-card wf-col">
       <h3>Нова задача</h3>
       <input className="wf-inp" aria-label="Що треба зробити" placeholder="Що треба зробити" value={f.title} onChange={set('title')} />
-      <div className="wf-row">
-        <select className="wf-inp" style={{ width: 'auto' }} aria-label="Тип" value={f.type} onChange={set('type')}>{Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-        <select className="wf-inp" style={{ width: 'auto' }} aria-label="Виконавець" value={f.owner} onChange={set('owner')}>{Object.entries(OWNER_LABEL).filter(([k]) => k !== 'agent').map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-        <select className="wf-inp" style={{ width: 'auto' }} aria-label="Пріоритет" value={f.priority} onChange={set('priority')}>{Object.entries(PRIORITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-        <input className="wf-inp" style={{ width: 'auto' }} type="date" aria-label="Строк" value={f.due_date} onChange={set('due_date')} />
+      <div className="wf-fr">
+        <label className="wf-fld"><span>Тип</span><Select ariaLabel="Тип" value={f.type} onChange={(v) => setV('type', v)} options={Object.entries(TYPE_LABEL).map(([k, v]) => ({ value: k, label: v }))} /></label>
+        <label className="wf-fld"><span>Виконавець</span><Select ariaLabel="Виконавець" value={f.owner} onChange={(v) => setV('owner', v)} options={Object.entries(OWNER_LABEL).filter(([k]) => k !== 'agent').map(([k, v]) => ({ value: k, label: v }))} /></label>
+        <label className="wf-fld"><span>Пріоритет</span><Select ariaLabel="Пріоритет" value={f.priority} onChange={(v) => setV('priority', v)} options={Object.entries(PRIORITY_LABEL).map(([k, v]) => ({ value: k, label: v }))} /></label>
+        <label className="wf-fld"><span>Строк</span><DatePicker value={f.due_date} onChange={(iso) => setV('due_date', iso)} placeholder="Без строку" /></label>
       </div>
       <textarea className="wf-cmt" aria-label="Деталі" placeholder="Деталі (необов’язково)" value={f.evidence} onChange={set('evidence')} />
       {err && <div className="wf-err" role="alert">{err}</div>}

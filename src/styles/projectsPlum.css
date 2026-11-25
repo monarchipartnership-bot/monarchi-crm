@@ -22,6 +22,8 @@
 .projects-page.folder-design.is-plum .proj-search input { background: none; color: #F6E9FA; }
 .projects-page.folder-design.is-plum .proj-search-cnt, .projects-page.folder-design.is-plum .proj-search-clr { background: rgba(235, 156, 239, .18); color: #F6E9FA; }
 .projects-page.folder-design.is-plum .proj-divider { display: none; }
+/* the secondary button of the toolbar («Швидкий старт»): the global light-purple .btn was unreadable on the plum plate */
+.projects-page.folder-design.is-plum .proj-toolbar .btn:not(.btn-p) { background: rgba(255, 255, 255, .1); color: #F6E9FA; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .4); }
 /* the status filter: text with a glowing line */
 .projects-page.folder-design.is-plum .proj-tabs { background: none; padding: 0; gap: 22px; border-radius: 0; }
 .projects-page.folder-design.is-plum .proj-tab { position: relative; height: 38px; padding: 0 2px; border-radius: 0; background: none; box-shadow: none; color: #D6AEE0; font: 700 13.5px 'Onest', sans-serif; }

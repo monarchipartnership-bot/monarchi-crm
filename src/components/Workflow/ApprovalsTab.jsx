@@ -34,10 +34,13 @@ export default function ApprovalsTab({ projectId, projectName, onChanged, onGo }
       </div>
 
       <ol className="wf-road" aria-label="Шлях рішень проєкту">
-        {road.map((r) => (
+        {road.map((r, i) => (
           <li key={r.kind} className={'wf-rs ' + r.status} aria-current={r.status === 'current' ? 'step' : undefined}>
+            <span className="wf-rm" aria-hidden="true"><b>{r.status === 'done' ? '✓' : r.status === 'returned' ? '!' : i + 1}</b></span>
             <b>{r.title}</b>
-            <span>{r.note}{r.at ? ` · ${when(r.at)}` : ''}</span>
+            <small>{r.hint}</small>
+            <Pill tone={ROAD_TONE[r.status]}>{r.status === 'todo' ? 'ще попереду' : r.note}</Pill>
+            {r.at && <small>{when(r.at)}</small>}
           </li>
         ))}
       </ol>

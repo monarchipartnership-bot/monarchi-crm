@@ -22,7 +22,7 @@ export default function QuickStartModal({ onClose, onStart, busy }) {
   }
   return (
     <div className="modal-overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <form ref={box} className="modal-box" role="dialog" aria-modal="true" aria-label="Швидкий старт" tabIndex={-1} style={{ maxWidth: 560 }} onSubmit={submit}>
+      <form ref={box} data-dd="night" className="modal-box proj-modal-folder qs-dialog" role="dialog" aria-modal="true" aria-label="Швидкий старт" tabIndex={-1} style={{ maxWidth: 560 }} onSubmit={submit}>
         <h2 style={{ margin: '0 0 4px' }}>Швидкий старт</h2>
         <p style={{ margin: '0 0 14px', opacity: 0.75 }}>Достатньо посилання на сайт клієнта: бриф складеться з нього, а ви його перевірите.</p>
         <div className="pf-grid">
@@ -47,7 +47,7 @@ export default function QuickStartModal({ onClose, onStart, busy }) {
           <b>Що станеться далі</b>
           <ol style={{ margin: '6px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>{QUICK_STEPS.map((s) => <li key={s}>{s}</li>)}</ol>
         </div>
-        {err && <div role="alert" style={{ marginTop: 10, color: '#a9425d' }}>{err}</div>}
+        {err && <div role="alert" className="form-err" style={{ marginTop: 10 }}>{err}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>Скасувати</button>
           <button type="submit" className="btn btn-p" disabled={busy || !site.trim()}>{busy ? 'Створюю…' : 'Створити і почати'}</button>

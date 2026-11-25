@@ -154,3 +154,10 @@
 .project-detail-page.pw.is-plum .pw-rep .prep-export-menu { background: #2a0d30; border: 0; border-radius: 20px; padding: 6px; z-index: 60; box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3), 0 18px 44px rgba(0, 0, 0, .6); }
 .project-detail-page.pw.is-plum .pw-rep .prep-export-menu button { color: #F6E9FA; border-radius: 999px; }
 .project-detail-page.pw.is-plum .pw-rep .prep-export-menu button:hover:not(:disabled) { background: rgba(235, 156, 239, .16); }
+/* phone: the sticky save bar took a third of the screen with three stacked buttons; compact rows instead (decision 66 audit) */
+@media (max-width: 640px) {
+  .project-detail-page.pw .ch-save { gap: 8px; padding: 8px 10px; border-radius: 20px; }
+  .project-detail-page.pw .ch-sbtns { gap: 6px; }
+  .project-detail-page.pw .ch-sbtns .btn { height: 32px; padding: 0 11px; font-size: 12px; gap: 6px; }
+  .project-detail-page.pw .ch-sbtns .btn svg { width: 14px; height: 14px; }
+}

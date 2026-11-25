@@ -82,6 +82,7 @@
 .project-detail-page.pw.is-plum .pw-dark .ov-field-box { background: var(--pl-card); box-shadow: inset 0 0 0 1.5px var(--pl-ln); }
 .project-detail-page.pw.is-plum .pw-dark .ov-field-box:has(input, .ui-select, .date-picker, .status-picker, .svc-picker, .client-picker, textarea) { background: none; box-shadow: none; }
 .project-detail-page.pw.is-plum .pw-dark .ov-field-value { color: var(--pl-ink); }
+.project-detail-page.pw.is-plum .pw-dark .ov-link { color: #EB9CEF; }
 .project-detail-page.pw.is-plum .pw-dark .ov-field-icon { background: rgba(235, 156, 239, .16); }
 .project-detail-page.pw.is-plum .pw-dark .ov-field-icon svg { stroke: var(--pl-ink); }
 .project-detail-page.pw.is-plum .pw-dark .ov-save-state { background: rgba(235, 156, 239, .14); }
@@ -183,3 +184,8 @@
 .project-detail-page.pw.is-plum .pw-dark .client-picker-selected { background: var(--pl-field); color: var(--pl-ink); box-shadow: inset 0 0 0 1.5px var(--pl-ln); border: 0; }
 .project-detail-page.pw.is-plum .pw-dark .client-picker-change { color: #EB9CEF; }
 .project-detail-page.pw.is-plum .pw-dark .client-picker-list * { scrollbar-width: thin; scrollbar-color: rgba(235, 156, 239, .45) transparent; }
+/* status chips and pills inside the dark tabs (the light mint/amber/rose fills were left over from the sheet look) */
+.project-detail-page.pw.is-plum .pw-dark :is(.pw-chip--ok, .pacc-pill--ok) { background: rgba(75, 224, 127, .16); color: var(--pl-ok, #4BE07F); }
+.project-detail-page.pw.is-plum .pw-dark :is(.pw-chip--warn, .pacc-pill--warn) { background: rgba(255, 210, 63, .15); color: #FFD23F; }
+.project-detail-page.pw.is-plum .pw-dark :is(.pw-chip--bad, .pacc-pill--bad) { background: rgba(255, 122, 154, .16); color: #FF9BD2; }
+.project-detail-page.pw.is-plum .pw-dark :is(.pw-chip--muted, .pacc-pill--muted) { background: rgba(255, 255, 255, .1); color: #D6AEE0; }

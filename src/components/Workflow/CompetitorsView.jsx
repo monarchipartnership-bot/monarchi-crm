@@ -3,6 +3,8 @@ import { Pill } from './parts';
 import { adProblems } from '../../lib/workflow/ads';
 import { competitorCards, competitorHosts } from '../../lib/workflow/sections';
 import { requestRun, uploadCompetitorShot } from '../../lib/api/workflow';
+import Select from '../common/Select';
+import DatePicker from '../common/DatePicker';
 
 const blank = () => ({ competitor: '', library_url: '', screenshot_url: '', active_since: '', note: '' });
 const dmy = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso.split('-').reverse().join('.') : '');
@@ -91,11 +93,11 @@ export default function CompetitorsView({ content, projectId, email, busy, onSav
                 );
               })}
               <tr className="wf-addrow">
-                <td><select className="wf-inp" aria-label="Конкурент" value={draft.competitor || hosts[0] || ''} onChange={set('competitor')}>{hosts.map((h) => <option key={h} value={h}>{h}</option>)}</select></td>
+                <td><Select ariaLabel="Конкурент" value={draft.competitor || hosts[0] || ''} onChange={(v) => set('competitor')({ target: { value: v } })} options={hosts.map((h) => ({ value: h, label: h }))} /></td>
                 <td><input className="wf-inp" aria-label="Посилання на оголошення в Бібліотеці реклами" placeholder="https://www.facebook.com/ads/library/?id=…" value={draft.library_url} onChange={set('library_url')} /></td>
                 <td><input ref={file} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={pick} />
                   <button type="button" className="wf-btn sm" disabled={up || busy} onClick={() => file.current?.click()}>{up ? 'Завантаження…' : draft.screenshot_url ? 'Скриншот додано ✓' : 'Скриншот…'}</button></td>
-                <td><input className="wf-inp" type="date" aria-label="Активно з" value={draft.active_since} onChange={set('active_since')} /></td>
+                <td><DatePicker value={draft.active_since} onChange={(iso) => set('active_since')({ target: { value: iso } })} placeholder="Активно з" /></td>
                 <td><div className="wf-row"><button type="button" className="wf-btn p sm" disabled={busy || up || empty || !hosts.length} onClick={save}>{editing == null ? 'Додати' : 'Зберегти'}</button>{editing != null && <button type="button" className="wf-btn sm" onClick={() => { setEditing(null); setDraft(blank()); }}>Скасувати</button>}</div></td>
               </tr>
             </tbody>

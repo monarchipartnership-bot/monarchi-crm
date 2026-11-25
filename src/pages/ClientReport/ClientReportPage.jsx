@@ -37,6 +37,7 @@ export default function ClientReportPage() {
   const { token } = useParams();
   const [state, setState] = useState({ phase: 'loading', payload: null });
   const [tab, setTab] = useState(null); // 'all' | a month key; null = the latest month
+  const [scopes, setScopes] = useState({}); // per month: 'm' (the month report) or a week number
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_shared_report', { p_token: token || '' });
@@ -99,6 +100,15 @@ export default function ClientReportPage() {
   const steps = months.length > 1 ? ['all', ...months.map((m) => m.key)] : months.map((m) => m.key);
   const at = Math.max(0, steps.indexOf(current));
   const go = (d) => { const k = steps[at + d]; if (k) setTab(k); };
+  // what the page below tells about (owner's pick A, 2026-11-25): the month report or one of its weeks, chosen by a switch right under the month
+  const scopeOptions = month && current !== 'all' ? [
+    ...(month.monthly ? [{ k: 'm', label: t('Month'), sub: month.running ? t('To date') : t('Final') }] : []),
+    ...month.weeks.map((w) => ({ k: String(w.n), label: t('Week {n}', { n: w.n }), sub: w.label })),
+  ] : [];
+  const wantScope = month ? scopes[month.key] : null;
+  const scope = scopeOptions.some((o) => o.k === wantScope) ? wantScope : month?.monthly ? 'm' : scopeOptions[scopeOptions.length - 1]?.k || 'm';
+  const scopeNow = scopeOptions.find((o) => o.k === scope);
+  const pickScope = (k) => setScopes((c) => ({ ...c, [month.key]: k }));
   const title = current === 'all' && months.length > 1 ? t('All months') : month ? `${monthNameIn(month.key, lang)} ${month.key.slice(0, 4)}` : '';
 
   const pill = <span className={`plb plb-${model.platform || 'x'}`}>{pf.logo ? <span className={`ic ${pf.logo}`} style={{ width: 16, height: 16, borderRadius: '50%' }} /> : null}{t(pf.label)}</span>;
@@ -136,7 +146,7 @@ export default function ClientReportPage() {
                 <h2>{title}</h2>
               </div>
               {steps.length > 2 && (
-                <div className="tl" role="group" aria-label={t('Months')}>
+                <div className="mtl" role="group" aria-label={t('Months')}>
                   {months.length > 1 && (
                     <button type="button" className={`all${current === 'all' ? ' on' : ''}`} aria-pressed={current === 'all'} onClick={() => setTab('all')} title={t('All months')}><Icon name="roas" /></button>
                   )}
@@ -151,8 +161,25 @@ export default function ClientReportPage() {
             </div>
             <button type="button" className="ar nx" onClick={() => go(1)} disabled={at >= steps.length - 1} aria-label={t('Next month')}>&#8250;</button>
           </div>
-          <SectionNav watch={current} />
-          <div id="view">{current === 'all' && months.length > 1 ? <AllMonths model={model} /> : month ? <MonthView key={month.key} month={month} model={model} /> : null}</div>
+          {scopeOptions.length > 1 && (
+            <div className="crp-scope">
+              <div className="sw" role="group" aria-label={t('Report period')}>
+                {scopeOptions.map((o) => (
+                  <button type="button" key={o.k} className={o.k === scope ? 'on' : ''} aria-pressed={o.k === scope} onClick={() => pickScope(o.k)}>{o.label}<small>{o.sub}</small></button>
+                ))}
+              </div>
+            </div>
+          )}
+          <SectionNav watch={current + scope} />
+          {scopeOptions.length > 1 && scope !== 'm' && scopeNow && (
+            <div className="crp-ban">
+              <span>{t('You are viewing the report of')}</span>
+              <b>{scopeNow.label} · {scopeNow.sub}</b>
+              <span className="grow" />
+              {month.monthly && <button type="button" className="bk" onClick={() => pickScope('m')}>{t('Back to the month')}</button>}
+            </div>
+          )}
+          <div id="view">{current === 'all' && months.length > 1 ? <AllMonths model={model} /> : month ? <MonthView key={`${month.key}:${scope}`} month={month} model={model} scope={scope} /> : null}</div>
         </>
       )}
     </Frame>

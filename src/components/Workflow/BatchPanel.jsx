@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchBriefProducts, requestRun } from '../../lib/api/workflow';
 import { BATCH_DEFAULT, BATCH_MAX } from '../../../api/_lib/wf/skills/batchEngine.js';
+import Select from '../common/Select';
 
 // «Пакет креативів» (Zeely item 2): a manager asks the Creator for a batch of static ads for one product. The number is only a wish: the code cuts it to what the image limit of the project pays for.
 // While an agent proposal waits in the section, a new batch would be built on the old text and lose the cards of the proposal, so the panel waits until the manager answers it.
@@ -36,7 +37,7 @@ export default function BatchPanel({ projectId, email, proposals = 0, onRequeste
           <div className="wf-row" style={{ alignItems: 'flex-end' }}>
             <div className="wf-col" style={{ gap: 4 }}>
               <label htmlFor="wf-batch-product" className="wf-muted" style={{ fontSize: 12.5 }}>Товар</label>
-              <select id="wf-batch-product" className="wf-bd-in" value={product} onChange={(e) => setProduct(e.target.value)}>{products.map((p) => <option key={p} value={p}>{p}</option>)}</select>
+              <Select ariaLabel="Товар" value={product} onChange={setProduct} options={products.map((p) => ({ value: p, label: p }))} />
             </div>
             <div className="wf-col" style={{ gap: 4 }}>
               <label htmlFor="wf-batch-count" className="wf-muted" style={{ fontSize: 12.5 }}>Скільки креативів (до {BATCH_MAX})</label>

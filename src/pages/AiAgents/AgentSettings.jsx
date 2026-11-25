@@ -4,6 +4,7 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 import { fetchSettingsData, saveConfig, saveNotifyChat, setSmallActions } from '../../lib/api/agentSettings';
 import { saveLimits, setGlobalStop, setProjectCap, setProjectPaused } from '../../lib/api/workflow';
 import { DEFAULTS, SPEC, getPath, resolveConfig, sourceOf } from '../../lib/workflow/agentConfig';
+import Select from '../../components/common/Select';
 import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
 
 // «Налаштування агентів» (owner's rule 2026-11-26: all the settings in one place, one page with two entrances: the card of a project and the section AI Agents).
@@ -80,10 +81,10 @@ export default function AgentSettings({ projectId: fixedProject = null, onOpen }
             <div className="wf-muted" style={{ fontSize: 13, marginTop: 4, maxWidth: 640 }}>Тут усе, що керує роботою агентів: коли працюють, скільки витрачають, що роблять самі, про що повідомляють. {scope === 'project' ? 'Значення цього проєкту мають перевагу над загальними.' : 'Ці значення діють для всіх проєктів, де немає власного.'}</div>
           </div>
           <div className="wf-row">
-            <label htmlFor="wf-set-scope" className="wf-muted" style={{ fontSize: 12.5 }}>Для кого:</label>
+            <span className="wf-muted" style={{ fontSize: 12.5 }}>Для кого:</span>
             {fixedProject
-              ? <select id="wf-set-scope" className="wf-bd-in" value={project ? 'project' : 'global'} onChange={(e) => setProject(e.target.value === 'project' ? fixedProject : null)} disabled={dirty}><option value="project">Цей проєкт (свої значення)</option><option value="global">Усі проєкти (за замовчуванням)</option></select>
-              : <select id="wf-set-scope" className="wf-bd-in" value={project || ''} onChange={(e) => setProject(e.target.value ? Number(e.target.value) : null)} disabled={dirty}><option value="">Усі проєкти (за замовчуванням)</option>{data.projects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
+              ? <Select disabled={dirty} ariaLabel="Для кого" value={project ? 'project' : 'global'} onChange={(v) => { if (!dirty) setProject(v === 'project' ? fixedProject : null); }} options={[{ value: 'project', label: 'Цей проєкт (свої значення)' }, { value: 'global', label: 'Усі проєкти (за замовчуванням)' }]} />
+              : <Select disabled={dirty} ariaLabel="Для кого" searchable value={project ? String(project) : ''} onChange={(v) => { if (!dirty) setProject(v ? Number(v) : null); }} options={[{ value: '', label: 'Усі проєкти (за замовчуванням)' }, ...data.projects.map((x) => ({ value: String(x.id), label: x.name }))]} />}
           </div>
         </div>
       </div>

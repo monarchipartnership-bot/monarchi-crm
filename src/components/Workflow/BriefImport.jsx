@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Select from '../common/Select';
 import { ACCEPT, MAX_FILES, extractBrief } from '../../lib/api/briefExtract';
 import { SPEC, conflictOf } from '../../lib/workflow/briefExtract';
 
@@ -6,7 +7,7 @@ import { SPEC, conflictOf } from '../../lib/workflow/briefExtract';
 // accepts it into the form of the brief. Nothing is saved here: the accepted facts fill the page and the brief is saved with its own button.
 const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
 
-export default function BriefImport({ form, extra, language = 'uk', onApply }) {
+export default function BriefImport({ form, extra, language = 'uk', onApply, head = null }) {
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -65,28 +66,31 @@ export default function BriefImport({ form, extra, language = 'uk', onApply }) {
   };
   const chosenCount = rows.filter((x) => x.mode !== 'skip').length;
 
-  return (
-    <div className="wf-card wf-imp">
-      <div className="wf-row" style={{ justifyContent: 'space-between' }}>
-        <h3 style={{ margin: 0 }}>Розкажіть про клієнта своїми словами</h3>
-        <span className="wf-muted" style={{ fontSize: 12.5 }}>Система розставить факти по полях, ви лише перевірите</span>
-      </div>
+  const hero = (
+    <div className="wf-bd-hero">
+      {head}
+      <div className="wf-bd-hero-t"><h3>Розкажіть про клієнта своїми словами</h3><span>Система розставить факти по полях, ви лише перевірите</span></div>
       {!res && (
         <>
           <textarea className="wf-ta" style={{ marginTop: 10, minHeight: 90 }} aria-label="Розповідь про клієнта" placeholder="Наприклад: клієнт продає меблі з дуба, доставка по Україні й до Польщі, бюджет близько 4500 доларів на місяць, хочемо 60 покупок. Слова «дешевий» і «акція» не вживати." value={text} onChange={(e) => setText(e.target.value)} />
           <div className="wf-row" style={{ marginTop: 10 }}>
-            <button type="button" className={'wf-btn sm' + (listening ? ' p' : '')} aria-pressed={listening} onClick={dictate}>{listening ? '⏹ Слухаю… натисніть, щоб зупинити' : '🎙 Надиктувати'}</button>
+            <button type="button" className={'wf-btn sm' + (listening ? ' rec' : '')} aria-pressed={listening} onClick={dictate}>{listening ? '⏹ Слухаю… натисніть, щоб зупинити' : '🎙 Надиктувати'}</button>
             <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { setFiles((f) => [...f, ...e.target.files].slice(0, MAX_FILES)); e.target.value = ''; }} />
             <button type="button" className="wf-btn sm" onClick={() => fileRef.current?.click()}>📎 Прикріпити файл (PDF, Word, TXT)</button>
             {files.map((f, i) => <span key={f.name + i} className="wf-pill-x">{f.name}<button type="button" aria-label={`Прибрати «${f.name}»`} onClick={() => setFiles((x) => x.filter((_, j) => j !== i))}>×</button></span>)}
-            <span className="wf-row" style={{ marginLeft: 'auto' }}><button type="button" className="wf-btn p" disabled={busy || (text.trim().length < 8 && !files.length)} onClick={analyse}>{busy ? 'Розбираю…' : 'Розібрати і розставити'}</button></span>
+            <span className="wf-row" style={{ marginLeft: 'auto' }}><button type="button" className="wf-btn main" disabled={busy || (text.trim().length < 8 && !files.length)} onClick={analyse}>{busy ? 'Розбираю…' : 'Розібрати і розставити'}</button></span>
           </div>
         </>
       )}
       {err && <div className="wf-err" role="alert" style={{ marginTop: 8 }}>{err}</div>}
-      {done && <div className="wf-muted" role="status" style={{ marginTop: 8 }}>{done}</div>}
-
+      {done && <div className="wf-bd-hero-ok" role="status">{done}</div>}
+    </div>
+  );
+  return (
+    <>
+      {hero}
       {res && (
+        <div className="wf-card wf-imp">
         <div style={{ marginTop: 12 }}>
           <div className="wf-h">Знайдено: {rows.length}. Позначте, що додати в бриф</div>
           {res.files.some((f) => f.read === 'pdf') && <div className="wf-muted" style={{ fontSize: 12.5, marginBottom: 6 }}>PDF читає модель: код не може звірити цитати з нього, тому такі пункти позначено «перевірте».</div>}
@@ -111,11 +115,9 @@ export default function BriefImport({ form, extra, language = 'uk', onApply }) {
                     {x.conflict && <span className="wf-st bad"><i />у брифі вже є: {x.conflict.slice(0, 80)}</span>}
                   </div>
                 </div>
-                <select className="wf-bd-in" style={{ width: 'auto' }} aria-label={`Що зробити: ${label}`} value={x.mode} onChange={(e) => upd(i, { mode: e.target.value })}>
-                  {x.conflict
-                    ? <><option value="skip">Залишити поточне</option><option value="set">Замінити</option>{long && <option value="append">Дописати</option>}</>
-                    : <><option value="set">Додати в бриф</option><option value="skip">Пропустити</option></>}
-                </select>
+                <div className="wf-imp-mode"><Select ariaLabel={`Що зробити: ${label}`} value={x.mode} onChange={(v) => upd(i, { mode: v })} options={x.conflict
+                  ? [{ value: 'skip', label: 'Залишити поточне' }, { value: 'set', label: 'Замінити' }, ...(long ? [{ value: 'append', label: 'Дописати' }] : [])]
+                  : [{ value: 'set', label: 'Додати в бриф' }, { value: 'skip', label: 'Пропустити' }]} /></div>
               </div>
             );
           })}
@@ -127,7 +129,8 @@ export default function BriefImport({ form, extra, language = 'uk', onApply }) {
             <button type="button" className="wf-btn" onClick={() => { setRes(null); setRows([]); }}>Скасувати</button>
           </div>
         </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }

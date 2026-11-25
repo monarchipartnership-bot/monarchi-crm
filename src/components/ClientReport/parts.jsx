@@ -59,19 +59,21 @@ export function ReportTexts({ view, builder = null }) {
   });
 }
 
-// The manager's texts on their own, wide and easy to read: the first block (what was done) on the left, the others one under another on the right.
+// The manager's texts (owner's pick A, 2026-11-25): one text at a time under tabs «What was done · Conclusion · Plans», wide and easy to read. A report with a single text has no tabs.
 export function NotesGrid({ view }) {
+  const [at, setAt] = useState(0);
   let extra = 0;
-  const cards = view.blocks.filter((b) => String(view.sections?.[b.key] || '').trim()).map((b) => {
-    const icon = BLOCK_ICONS[b.key] || EXTRA_ICONS[extra++ % EXTRA_ICONS.length];
-    return <TextCard key={b.key} icon={icon} title={b.title} text={view.sections[b.key]} />;
-  });
-  if (!cards.length) return null;
-  const [first, ...rest] = cards;
+  const items = view.blocks.filter((b) => String(view.sections?.[b.key] || '').trim()).map((b) => ({ b, icon: BLOCK_ICONS[b.key] || EXTRA_ICONS[extra++ % EXTRA_ICONS.length] }));
+  if (!items.length) return null;
+  const cur = items[Math.min(at, items.length - 1)];
   return (
-    <div className={'cx-notes' + (rest.length ? '' : ' one')}>
-      <div className="cx-nl">{first}</div>
-      {rest.length > 0 && <div className="cx-nr">{rest}</div>}
+    <div className="cx-notes">
+      {items.length > 1 && (
+        <div className="cx-tabs" role="tablist">
+          {items.map((x, i) => <button key={x.b.key} type="button" role="tab" aria-selected={x === cur} className={x === cur ? 'on' : ''} onClick={() => setAt(i)}>{x.b.title}</button>)}
+        </div>
+      )}
+      <TextCard icon={cur.icon} title={cur.b.title} text={view.sections[cur.b.key]} />
     </div>
   );
 }
@@ -146,12 +148,13 @@ export function Creatives({ items, heading = true, large = false }) {
   );
 }
 
-function hintText(view, folded) {
+function hintText(view, folded, noGroups = false) {
   const t = trFor(view.lang);
   const parts = [];
   const range = view.prev ? rangeText(view.prev.period.start, view.prev.period.end) : '';
   if (view.prev) parts.push(view.type === 'monthly' ? t('Arrows compare with {name}', { name: prevName(view) }) : view.type === 'custom' ? t('Arrows compare with the previous period ({range})', { range }) : t('Arrows compare with the previous week ({range})', { range }));
   const text = parts.length ? `${parts[0]}${t(': green is better, red is worse, grey is neutral (costs: lower is better). ')}` : '';
+  if (noGroups) return text.trim().replace(/[:;]\s*$/, '.');
   return `${text}${t('Green cell is the best campaign group (ROAS, CPP, CTR), red is the weakest ROAS.')}${folded ? t(' Small groups are folded into «Other».') : ''}`;
 }
 
@@ -177,7 +180,8 @@ function heatOf(row, columns, i) {
 // `builder`: { hidden: [keys], onToggle(key) } puts an eye on every row (the metric is shown to the client or not).
 //   builder.tools = { onChange(action, key, toKey, toIndex), options(key) } lets a person drag a metric row up or down (smoothly, the other rows make room) and click it to replace or
 //   remove it: the buttons appear to the left of the metric. Alt + ↑ / ↓ on the focused metric moves it for the keyboard.
-export function MetricTable({ view, keys, custom, platformLabel, builder = null, full = false }) {
+export function MetricTable({ view, keys, custom, platformLabel, builder = null, full = false, tabbed = true }) {
+  const [secTab, setSecTab] = useState(null); // the client's page shows one section of the table at a time (Results, Delivery, Funnel steps …)
   const [showAll, setShowAll] = useState(full && !builder); // the client's page opens with every group by name; the builder keeps the folded view
   const rt = useRowTools(builder?.tools || null);
   const tr = trFor(view.lang);
@@ -186,12 +190,61 @@ export function MetricTable({ view, keys, custom, platformLabel, builder = null,
   // The client's page (`full`): the table takes the whole width and does not scroll sideways, the groups are columns with a short name and a stage tag, and the rows are grouped
   // into Results / Delivery / Funnel steps. On a phone the width is not enough, so there it scrolls. In the builder the rows stay flat (they can be dragged).
   if (full && !builder) {
-    const order = t.rows.map((r, i) => ({ r, i, sec: SECTION_OF(r.key) })).sort((a, b) => a.sec - b.sec || a.i - b.i);
-    const sections = new Set(order.map((x) => x.sec));
-    const dense = t.columns.length > 8 ? ' dense' : '';
+    const all = t.rows.map((r, i) => ({ r, i, sec: SECTION_OF(r.key) })).sort((a, b) => a.sec - b.sec || a.i - b.i);
+    const sections = new Set(all.map((x) => x.sec));
+    const tabs = tabbed && sections.size > 1 ? [...sections] : [];
+    const curSec = tabs.length ? (tabs.includes(secTab) ? secTab : tabs[0]) : null;
+    const order = tabs.length ? all.filter((x) => x.sec === curSec) : all;
+    const dense = (t.columns.length > 8 ? ' dense' : '') + (t.columns.length <= 3 ? ' few' : '');
     let last = -1;
+    const tabsEl = tabs.length > 0 && (
+      <div className="cx-tabs cx-ttabs" role="tablist">
+        {tabs.map((k) => <button key={k} type="button" role="tab" aria-selected={k === curSec} className={k === curSec ? 'on' : ''} onClick={() => setSecTab(k)}>{tr(SECTION_NAMES[k])}</button>)}
+      </div>
+    );
+    // A report without campaign groups has only the general column: a table of it would be one column stretched over the card, so the table compares the period with the previous one
+    // (metric · this period · previous period · change)
+    if (t.columns.length === 1) {
+      const hasPrev = Boolean(view.prev);
+      return (
+        <>
+          {tabsEl}
+          <div className="cx-tw">
+            <table className="hubt fx full cmp">
+              <thead>
+                <tr>
+                  <th>{tr('Metric')}</th>
+                  <th className="gen">{rangeText(view.start, view.end)}</th>
+                  {hasPrev && <th>{rangeText(view.prev.period.start, view.prev.period.end)}</th>}
+                  {hasPrev && <th>{tr('Change')}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {order.flatMap(({ r, sec }) => {
+                  const c = r.cells[0];
+                  const rows = [];
+                  if (!tabs.length && sections.size > 1 && sec !== last) rows.push(<tr className="cx-secrow" key={`s${sec}`}><td colSpan={hasPrev ? 4 : 2}>{tr(SECTION_NAMES[sec])}</td></tr>);
+                  last = sec;
+                  rows.push(
+                    <tr key={r.key}>
+                      <td>{r.label}</td>
+                      <td className="gen"><span className="cx-v">{c.text}</span></td>
+                      {hasPrev && <td className="was"><span className="cx-v">{c.prevText ?? '—'}</span></td>}
+                      {hasPrev && <td className="chg">{c.isNew ? <span className="dm none">{tr('new')}</span> : <Mark change={c.change} />}</td>}
+                    </tr>,
+                  );
+                  return rows;
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint">{hintText(view, false, true)}</p>
+        </>
+      );
+    }
     return (
       <>
+        {tabsEl}
         <div className="cx-tw">
           <table className={'hubt fx full' + dense} style={{ '--cols': t.columns.length }}>
             <thead>
@@ -208,7 +261,7 @@ export function MetricTable({ view, keys, custom, platformLabel, builder = null,
             <tbody>
               {order.flatMap(({ r, sec }) => {
                 const rows = [];
-                if (sections.size > 1 && sec !== last) rows.push(<tr className="cx-secrow" key={`s${sec}`}><td colSpan={t.columns.length + 1}>{tr(SECTION_NAMES[sec])}</td></tr>);
+                if (!tabs.length && sections.size > 1 && sec !== last) rows.push(<tr className="cx-secrow" key={`s${sec}`}><td colSpan={t.columns.length + 1}>{tr(SECTION_NAMES[sec])}</td></tr>);
                 last = sec;
                 const row = t.rows.find((x) => x.key === r.key);
                 rows.push(

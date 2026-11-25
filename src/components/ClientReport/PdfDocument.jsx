@@ -111,7 +111,7 @@ export default function PdfDocument({ view, projectName, platformLabel, custom =
 
         <section className="pdfp land" data-pdf-page>
           <Header title={t('Every metric, group by group')} />
-          <div className="rf pdf-card pdf-table"><MetricTable full view={view} keys={viewKeys(view, model, { all: true })} {...ctx} /></div>
+          <div className="rf pdf-card pdf-table"><MetricTable full tabbed={false} view={view} keys={viewKeys(view, model, { all: true })} {...ctx} /></div>
           <Footer />
         </section>
 

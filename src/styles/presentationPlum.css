@@ -83,3 +83,8 @@
 .pb-overlay .ui-select-trigger, .pb-pop .ui-select-trigger { height: 36px; padding: 0 8px 0 16px; border: 0; border-radius: 999px; background: rgba(23, 5, 28, .6); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F6E9FA; font: 500 13px 'Onest', sans-serif; }
 .pb-overlay .ui-select-trigger[aria-expanded="true"], .pb-overlay .ui-select-trigger:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px #EB9CEF; }
 .pb-overlay .ui-select-chevron, .pb-pop .ui-select-chevron { width: 22px; height: 22px; border-radius: 50%; background: rgba(235, 156, 239, .16); color: #F6E9FA; display: inline-grid; place-items: center; }
+/* the CRM Select / DatePicker in the side panels of the page itself (until now only the portaled windows were dark; the triggers here stayed white) */
+.pb .ui-select-trigger, .pb .date-picker-trigger { height: 36px; padding: 0 8px 0 16px; border: 0; border-radius: 999px; background: rgba(23, 5, 28, .6); box-shadow: inset 0 0 0 1.5px rgba(235, 156, 239, .3); color: #F6E9FA; font: 500 13px 'Onest', sans-serif; }
+.pb .ui-select-trigger[aria-expanded="true"], .pb .ui-select-trigger:focus-visible, .pb .date-picker-trigger:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px #EB9CEF; }
+.pb .ui-select-chevron, .pb .date-picker-ic { width: 22px; height: 22px; border-radius: 50%; background: rgba(235, 156, 239, .16); color: #F6E9FA; display: inline-grid; place-items: center; }
+.pb .ui-select-placeholder, .pb .date-picker-placeholder { color: #8a6a98; }

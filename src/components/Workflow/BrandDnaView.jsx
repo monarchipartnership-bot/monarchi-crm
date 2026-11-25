@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pill } from './parts';
 import { brandGaps, normHex, renderBrandText } from '../../../api/_lib/wf/skills/brandDnaEngine.js';
+import Select from '../common/Select';
 
 const COLOR_ROLE = { primary: 'основний', secondary: 'другий', accent: 'акцент', background: 'фон', text: 'текст' };
 const FONT_ROLE = { headings: 'заголовки', body: 'основний текст' };
@@ -115,7 +116,7 @@ export function BrandDnaEditor({ content, busy, onSave, onCancel }) {
               <div key={i} className="wf-row">
                 <input type="color" aria-label={`Колір ${i + 1}`} value={normHex(x.hex) || '#000000'} onChange={(e) => setColor(i, { hex: e.target.value })} />
                 <input className="wf-bd-in" style={{ width: 110 }} aria-label={`Hex колір ${i + 1}`} value={x.hex} onChange={(e) => setColor(i, { hex: e.target.value })} />
-                <select className="wf-bd-in" aria-label={`Роль кольору ${i + 1}`} value={x.role} onChange={(e) => setColor(i, { role: e.target.value })}>{Object.entries(COLOR_ROLE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+                <Select ariaLabel={`Роль кольору ${i + 1}`} value={x.role} onChange={(v) => setColor(i, { role: v })} options={Object.entries(COLOR_ROLE).map(([k, v]) => ({ value: k, label: v }))} />
                 <button type="button" className="wf-btn sm d" onClick={() => setColors((p) => p.filter((_, j) => j !== i))}>Прибрати</button>
               </div>
             ))}
@@ -128,7 +129,7 @@ export function BrandDnaEditor({ content, busy, onSave, onCancel }) {
             {fonts.map((x, i) => (
               <div key={i} className="wf-row">
                 <input className="wf-bd-in" style={{ width: 200 }} aria-label={`Шрифт ${i + 1}`} value={x.name} onChange={(e) => setFont(i, { name: e.target.value })} />
-                <select className="wf-bd-in" aria-label={`Роль шрифту ${i + 1}`} value={x.role} onChange={(e) => setFont(i, { role: e.target.value })}>{Object.entries(FONT_ROLE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+                <Select ariaLabel={`Роль шрифту ${i + 1}`} value={x.role} onChange={(v) => setFont(i, { role: v })} options={Object.entries(FONT_ROLE).map(([k, v]) => ({ value: k, label: v }))} />
                 <button type="button" className="wf-btn sm d" onClick={() => setFonts((p) => p.filter((_, j) => j !== i))}>Прибрати</button>
               </div>
             ))}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { requestRun } from '../../lib/api/workflow';
 import { ELEMENTS, LANGS, MERGE_MAX, MODES, VAR_MAX } from '../../../api/_lib/wf/skills/variationsEngine.js';
+import Select from '../common/Select';
 
 // «Варіації креативу» (Zeely item 3): the manager picks an ad that worked and asks the Creator for versions of it.
 //   змінити елементи: the elements that are ticked may change, every other one is locked and stays exactly as it was (the code copies it from the source)
@@ -40,7 +41,7 @@ export default function VariationsPanel({ projectId, email, items = [], proposal
   const pick = (id, value, set, label) => (
     <div className="wf-col" style={{ gap: 4 }}>
       <label htmlFor={id} className="wf-muted" style={{ fontSize: 12.5 }}>{label}</label>
-      <select id={id} className="wf-bd-in" value={value} onChange={(e) => set(e.target.value)}>{cards.map((c) => <option key={c.id} value={c.id}>{c.id} · {c.headline}</option>)}</select>
+      <Select ariaLabel={label} value={value} onChange={set} options={cards.map((c) => ({ value: c.id, label: `${c.id} · ${c.headline}` }))} />
     </div>
   );
   return (
@@ -55,7 +56,7 @@ export default function VariationsPanel({ projectId, email, items = [], proposal
         {mode === 'localize' && (
           <div className="wf-col" style={{ gap: 4 }}>
             <label htmlFor="wf-var-lang" className="wf-muted" style={{ fontSize: 12.5 }}>Мова</label>
-            <select id="wf-var-lang" className="wf-bd-in" value={lang} onChange={(e) => setLang(e.target.value)}>{Object.entries(LANGS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+            <Select ariaLabel="Мова" value={lang} onChange={setLang} options={Object.entries(LANGS).map(([k, v]) => ({ value: k, label: v }))} />
           </div>
         )}
         {mode !== 'localize' && (
