@@ -21,6 +21,8 @@ export function detectTags(html = '') {
     meta_pixel: /fbq\s*\(|connect\.facebook\.net\/[^"']*fbevents\.js|facebook\.com\/tr\?/i.test(s),
     ga: /gtag\s*\(|googletagmanager\.com\/gtag\/js|google-analytics\.com\/(analytics|ga)\.js|G-[A-Z0-9]{6,}/.test(s),
     gtm: /googletagmanager\.com\/gtm\.js|GTM-[A-Z0-9]{4,}/.test(s),
+    // Shopify loads the pixel and the analytics through its own sandbox (web pixels): they are NOT visible in the HTML, so a site on Shopify never gets a «no pixel» claim
+    shopify: /cdn\.shopify\.com|Shopify\.shop\b|myshopify\.com/i.test(s),
   };
 }
 
@@ -34,8 +36,8 @@ export function siteFindings({ pages = [], tags = null } = {}) {
   const out = [];
   const add = (id) => out.push({ id, en: FINDINGS[id].en, uk: FINDINGS[id].uk });
   if (!s.viewport) add('no_viewport');
-  if (tags && !tags.meta_pixel && !tags.gtm) add('no_meta_pixel');
-  if (tags && !tags.ga && !tags.gtm) add('no_analytics');
+  if (tags && !tags.meta_pixel && !tags.gtm && !tags.shopify) add('no_meta_pixel');
+  if (tags && !tags.ga && !tags.gtm && !tags.shopify) add('no_analytics');
   const product = ok.find((p) => p.kind === 'product');
   if (product && !(product.signals.structured || []).some((t) => /^product$/i.test(t))) add('no_product_schema');
   if (ok.length >= 2 && !any((x) => (x.returns_words || []).length) ) add('no_returns_info');

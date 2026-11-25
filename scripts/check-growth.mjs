@@ -173,13 +173,16 @@ await test('flow: the code watches quiet deals (open, no change of stage for 7 d
   assert.deepEqual(staleDeals(deals, { days: 7, now: new Date('2026-11-27T00:00:00Z') }).map((d) => [d.id, d.quietDays]), [[1, 26]]);
 });
 await test('site findings: only facts the code read; a Tag Manager container hides the «no pixel» claim; nothing is said about a site that was not read', () => {
-  assert.deepEqual(detectTags('<script>fbq("init","1")</script><script src="https://www.googletagmanager.com/gtag/js?id=G-ABCDEF1"></script>'), { meta_pixel: true, ga: true, gtm: false });
+  assert.deepEqual(detectTags('<script>fbq("init","1")</script><script src="https://www.googletagmanager.com/gtag/js?id=G-ABCDEF1"></script>'), { meta_pixel: true, ga: true, gtm: false, shopify: false });
   assert.equal(detectTags('<script src="https://www.googletagmanager.com/gtm.js?id=GTM-ABCD12"></script>').gtm, true);
   const home = { kind: 'home', ok: true, signals: { viewport: false, phone_link: false, email_link: false, messengers: [], images: 20, lazy_images: 0, forms: 0, returns_words: [], review_words: [] } };
   const prod = { kind: 'product', ok: true, signals: { structured: ['Organization'], returns_words: [], review_words: [], forms: 0 } };
   const ids = (o) => siteFindings(o).map((f) => f.id);
   assert.deepEqual(ids({ pages: [home, prod], tags: { meta_pixel: false, ga: false, gtm: false } }), ['no_viewport', 'no_meta_pixel', 'no_analytics', 'no_product_schema', 'no_returns_info', 'no_reviews', 'no_contact_channel', 'heavy_images', 'no_lead_form']);
   assert.ok(!ids({ pages: [home, prod], tags: { meta_pixel: false, ga: false, gtm: true } }).includes('no_meta_pixel')); // the pixel may live inside the container
+  assert.equal(detectTags('<link href="https://cdn.shopify.com/s/x.css">').shopify, true);
+  const shop = ids({ pages: [home, prod], tags: { meta_pixel: false, ga: false, gtm: false, shopify: true } }); // found by the live check on a real Shopify store that runs Meta ads
+  assert.ok(!shop.includes('no_meta_pixel') && !shop.includes('no_analytics'), 'a Shopify site never gets a «no pixel» claim');
   assert.deepEqual(ids({ pages: [{ kind: 'home', ok: false }], tags: null }), []);
   assert.deepEqual(ids({ pages: [home], tags: null }).filter((x) => x.startsWith('no_meta')), []); // tags unknown: no claim
 });
