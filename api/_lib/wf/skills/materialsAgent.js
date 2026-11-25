@@ -20,8 +20,9 @@ export async function materialsIdeas({ run, ctx }) {
     }
   }
   const materials = await ctx.repo.readCreativeMaterials(run.project_id);
-  const inventory = inventoryOf(materials);
-  const facts = gatherIdeaFacts({ brief: brief.version, materials, audit: sec.audit?.content || null, competitors: sec.competitors?.content || null, audience: sec.audience?.content || null, unitEconomy: sec.unit_economy?.content || null });
+  const brandDna = (await ctx.repo.readSection(run.project_id, 'brand_dna'))?.version?.content || null; // the brand profile fills what the notes of the card leave empty
+  const inventory = inventoryOf(materials, brandDna);
+  const facts = gatherIdeaFacts({ brief: brief.version, materials, brandDna, audit: sec.audit?.content || null, competitors: sec.competitors?.content || null, audience: sec.audience?.content || null, unitEconomy: sec.unit_economy?.content || null });
 
   const project = await ctx.repo.readProject(run.project_id);
   const prompt = buildIdeasPrompt({ facts, language: project?.client_language === 'en' ? 'en' : 'uk' });

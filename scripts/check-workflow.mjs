@@ -54,11 +54,15 @@ import { briefGaps, contentFromForm, emptyForm, formFromContent, rowStatus } fro
 import { AGENTS, RERUN_SKILLS, SKILL_LABEL, STAGES, agentCards, buildQueue, nowCard, openProposals, sectionRows, signoffWanted } from '../src/lib/workflow/view.js';
 import { readinessOf } from '../src/lib/workflow/readiness.js';
 import { ACTIVE_AGENTS, INTEGRATED_SKILLS, mapIslands } from '../src/lib/workflow/registry.js';
+import { sectionName } from '../src/lib/workflow/view.js';
 import { agentFacts, agentStates, feedOf, podStates } from '../src/lib/workflow/mapLive.js';
 import { monthsOffered, spendReport } from '../src/lib/workflow/spendStats.js';
 import { durationText, filterRuns, runCounts, runRows } from '../src/lib/workflow/runsView.js';
 import { connectionChecks } from '../api/_lib/wf/status.js';
 import { periodReport } from '../api/_lib/wf/skills/periodReport.js';
+import { brandDna, collectBrandAssets } from '../api/_lib/wf/skills/brandDnaAgent.js';
+import { brandForCreator, brandGaps, buildBrandPrompt, checkBrand, dnaIsUsable, extractBrandSignals, manualNotes, normHex, parseBrandAnswer, tabooHits } from '../api/_lib/wf/skills/brandDnaEngine.js';
+import { SYSTEM_PROMPT as CREATIVES_PROMPT } from '../api/_lib/wf/skills/creativesEngine.js';
 import { enqueueReportRun, reportsViaOrchestrator } from '../api/_lib/wf/reportBridge.js';
 import { dueFor, eventsFor, gatherPlanFacts, checkPlan, monthWindows, parsePlanAnswer, renderPlanText, summarizeLastMonth } from '../api/_lib/wf/skills/monthlyPlanEngine.js';
 import { monthlyPlan } from '../api/_lib/wf/skills/monthlyPlanAgent.js';
@@ -124,7 +128,7 @@ await test('brain: stage 0 waits for the brief, the payment and the contracts', 
   assert.deepEqual(planNext({ state: base, sections: { brief: { hasCurrent: true } } }), []); // brief, but no payment
   const go = planNext({ state: { ...base, paid_at: 'x', contracts_signed_at: 'x' }, sections: { brief: { hasCurrent: true } } });
   assert.ok(go.some((a) => a.type === 'set_stage' && a.stage === 1));
-  assert.deepEqual(go.filter((a) => a.type === 'enqueue').map((a) => a.skill).sort(), ['audience', 'audit', 'competitors', 'onboarding', 'site', 'unit_economy']);
+  assert.deepEqual(go.filter((a) => a.type === 'enqueue').map((a) => a.skill).sort(), ['audience', 'audit', 'brand_dna', 'competitors', 'onboarding', 'site', 'unit_economy']);
 });
 await test('brain: no data in the cabinets means no audit', () => {
   const go = planNext({ state: { stage: 0, paused: false, paid_at: 'x', contracts_signed_at: 'x', has_data: false }, sections: { brief: { hasCurrent: true } } });
@@ -359,13 +363,13 @@ await test('screens: the card «Зараз» tells what is next', () => {
   assert.equal(nowCard({ state: { stage: 1 }, runs: [{ id: 3, agent: 'creator', skill: 'strategy', status: 'failed', error: 'boom' }] }).tone, 'bad');
   assert.equal(nowCard({ state: { stage: 1 }, runs: [{ id: 3, agent: 'creator', skill: 'strategy', status: 'failed' }, { id: 4, agent: 'creator', skill: 'strategy', status: 'done' }] }).tone, 'ok', 'a later run of the same step clears the error');
 });
-await test('screens: five agents, the dossier has twelve sections, proposals not yet answered are open', () => {
+await test('screens: five agents, the dossier has thirteen sections, proposals not yet answered are open', () => {
   const cards = agentCards([{ id: 1, agent: 'researcher', skill: 'site', status: 'done' }, { id: 2, agent: 'creator', skill: 'materials_ideas', status: 'running' }]);
   assert.equal(cards.length, 5);
   assert.equal(cards.find((c) => c.key === 'creator').active, true);
   assert.equal(cards.find((c) => c.key === 'mediabuyer').status, 'Не активний');
   const rows = sectionRows([{ id: 9, key: 'brief', status: 'approved', current_version_id: 4, needs_reapproval: true }]);
-  assert.equal(rows.length, 12);
+  assert.equal(rows.length, 13);
   assert.equal(rows[0].label, 'Затверджено'); assert.equal(rows[0].needsReapproval, true); assert.equal(rows[1].status, 'empty');
   const vs = [{ id: 1, version: 1, is_proposal: false }, { id: 2, version: 2, is_proposal: true }, { id: 3, version: 3, is_proposal: true }];
   assert.deepEqual(openProposals(vs, new Set([2])).map((v) => v.id), [3]);
@@ -2246,7 +2250,7 @@ await test('machine: a research skill or the Creator that failed is started agai
   const base = { now: new Date('2026-11-24T10:00:00Z'), paused: false };
   const run = (id, agent, skill, status) => ({ id, agent, skill, status, input: {} });
   const enq = (a) => a.filter((x) => x.type === 'enqueue').map((x) => `${x.agent}/${x.skill}`);
-  const sections = { brief: { hasCurrent: true }, site: { hasCurrent: true }, audience: { hasCurrent: true }, unit_economy: { hasCurrent: true } };
+  const sections = { brief: { hasCurrent: true }, site: { hasCurrent: true }, audience: { hasCurrent: true }, unit_economy: { hasCurrent: true }, brand_dna: { hasCurrent: true } };
   const f = (id) => run(id, 'researcher', 'competitors', 'failed');
   const st = { stage: 1, paused: false, has_data: false };
   assert.deepEqual(enq(planNext({ ...base, state: st, sections, runs: [f(1)] })), ['researcher/competitors'], 'one failure: one more try');
@@ -2684,5 +2688,125 @@ await test('report bridge: the switch, the queue entry of a due report, a report
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const tickSrc = fs.readFileSync(path.join(root, 'api/agent-tick.js'), 'utf8'); assert.match(tickSrc, /runFor: reportsViaOrchestrator\(\) \? enqueueReportRun\(db\) : /, 'without the switch the clock makes the report itself');
   assert.match(fs.readFileSync(path.join(root, 'api/wf-tick.js'), 'utf8'), /const reports = \{ run: /);
+});
+// ---------------------------------------------------------------- Zeely item 1 (owner's decision 2026-11-25): the profile «ДНК бренду», made from the website, checked by a person, used by the Creator
+const BRAND_CSS = `:root{--brand-primary:#c2185b;--text:#222222;--bg:#ffffff;--accent-color:#ff9800} @font-face{font-family:"Playfair Display";src:url(x.woff2)} h1,h2{font-family:"Playfair Display",serif} body{font-family:Inter,Arial,sans-serif;color:#222} .btn{background:#c2185b;color:rgb(255,255,255)} .grey{color:#888888} .btn2{background:#c2185b}`;
+const BRAND_HOME = `<html><head><title>Меблі Лоза</title><meta name="theme-color" content="#C2185B"><link rel="stylesheet" href="/s.css"><link rel="stylesheet" href="https://cdn.example/lib.css"><link rel="icon" href="/fav.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Playfair+Display&display=swap" rel="stylesheet"><meta property="og:image" content="https://loza.example/og.jpg"><style>.x{color:#00aa88}</style></head>
+<body><img class="site-logo" src="/img/logo.svg" alt="Лоза"><h1>Стільці з дубу</h1><p>Меблі з натурального дерева, зроблені вручну.</p></body></html>`;
+const BRAND_SITE = { ...SITE, 'https://loza.example/': BRAND_HOME, 'https://loza.example/s.css': BRAND_CSS, 'https://cdn.example/lib.css': '.l{color:#123456}' };
+const BRAND_ANSWER = (o = {}) => JSON.stringify({
+  identity: { colors: [{ hex: '#c2185b', role: 'primary' }, { hex: '#FF9800', role: 'accent' }, { hex: '#00ff00', role: 'secondary' }, { hex: '#c2185b', role: 'accent' }], fonts: [{ name: 'Playfair Display', role: 'headings' }, { name: 'Comic Sans', role: 'body' }, { name: 'inter', role: 'body' }], logo_url: 'https://loza.example/img/logo.svg', style: 'Тепла, ремісницька, натуральне дерево.', visual_donts: ['пластик'] },
+  branding: { overview: 'Виробник меблів з дубу.', values: ['натуральність', 'ручна робота'], tagline: 'Дуб, який служить' },
+  communication: { tone: 'Тепло, на «ви»', taboo_words: ['дешевий', 'акція'], taboo_claims: ['найкращі в Україні'], headline_avoid: ['крик капсом'] }, rules: ['Показувати дерево крупним планом'], ...o });
+await test('brand dna: colours, fonts and logos are found by code in the page and its style sheets (named variables weigh more, grey is not a brand colour, generic fonts are skipped)', async () => {
+  const net = fakeNet(BRAND_SITE);
+  const assets = await collectBrandAssets({ url: 'https://loza.example/', ...net });
+  assert.equal(assets.css.length, 2, 'the style sheets of the page are read, at most three'); assert.ok(net.hits.some((u) => u.endsWith('/s.css')));
+  const s = extractBrandSignals(assets);
+  assert.equal(s.theme_color, '#c2185b'); assert.equal(s.colors[0].hex, '#c2185b');
+  assert.ok(s.colors.find((c) => c.hex === '#ff9800') && s.colors.find((c) => c.hex === '#00aa88'), 'a named variable and an inline style are read');
+  assert.equal(s.colors.find((c) => c.hex === '#888888').chromatic, false); assert.equal(s.colors.find((c) => c.hex === '#c2185b').chromatic, true);
+  assert.deepEqual(s.fonts.map((f) => f.name).sort(), ['Inter', 'Playfair Display'], 'Arial and serif are generic and skipped; a Google font and a font-face are found');
+  assert.deepEqual(s.logos.map((l) => l.url), ['https://loza.example/img/logo.svg', 'https://loza.example/fav.png', 'https://loza.example/og.jpg']);
+  assert.equal(normHex('#ABC'), '#aabbcc'); assert.equal(normHex('red'), null);
+  const closed = await collectBrandAssets({ url: 'https://loza.example/', ...fakeNet({ ...BRAND_SITE, 'https://loza.example/s.css': undefined }) });
+  assert.equal(closed.css.length, 1, 'a style sheet that does not load is skipped, the rest is read');
+  await assert.rejects(() => collectBrandAssets({ url: 'http://localhost/', ...net }), /Внутрішні/);
+});
+await test('brand dna: the check keeps only what the code of the site confirms; nothing invented stays', async () => {
+  const s = extractBrandSignals(await collectBrandAssets({ url: 'https://loza.example/', ...fakeNet(BRAND_SITE) }));
+  const r = checkBrand(parseBrandAnswer('```json\n' + BRAND_ANSWER() + '\n```'), s, {});
+  assert.deepEqual(r.dna.identity.colors, [{ hex: '#c2185b', role: 'primary' }, { hex: '#ff9800', role: 'accent' }], 'an invented colour and a repeat are dropped, the hex is normalised');
+  assert.deepEqual(r.dna.identity.fonts, [{ name: 'Playfair Display', role: 'headings' }, { name: 'Inter', role: 'body' }], 'an invented font is dropped, a name is matched without case');
+  assert.equal(r.dna.identity.logo_url, 'https://loza.example/img/logo.svg');
+  assert.equal(r.dropped.length, 2); assert.match(r.dropped.join(' '), /#00ff00/); assert.match(r.dropped.join(' '), /Comic Sans/);
+  assert.equal(checkBrand(parseBrandAnswer(BRAND_ANSWER({ identity: { logo_url: 'https://evil.example/x.png', colors: [], fonts: [] } })), s, {}).dna.identity.logo_url, '', 'a logo address that was not on the page is dropped');
+  assert.equal(r.dna.reviewed, false); assert.equal(r.dna.source, 'site');
+  assert.throws(() => parseBrandAnswer('Вибачте'), /не у форматі JSON/); assert.throws(() => parseBrandAnswer('{"a":'), /не у форматі JSON|пошкоджений/);
+  const empty = checkBrand({}, s, {});
+  assert.equal(brandGaps(empty.dna).length, 5, 'every empty field is a question to the manager'); assert.equal(dnaIsUsable(empty.dna), false); assert.equal(dnaIsUsable(r.dna), true);
+});
+await test('brand dna: the prompt forbids inventing; the notes of a person win over the profile, the profile fills only what the notes leave empty', async () => {
+  const s = extractBrandSignals(await collectBrandAssets({ url: 'https://loza.example/', ...fakeNet(BRAND_SITE) }));
+  const p = buildBrandPrompt({ signals: s, pages: [{ kind: 'home', title: 'Лоза', text: 'Меблі з дерева' }], notes: { tone: 'Строго', restrictions: 'Без слова «дешево»' } });
+  assert.match(p.system, /ONLY from "signals.colors"/); assert.match(p.system, /Never invent/); assert.match(p.user, /#c2185b/); assert.match(p.user, /Строго/); assert.match(p.user, /Без слова/);
+  const dna = checkBrand(parseBrandAnswer(BRAND_ANSWER()), s, {}).dna;
+  const mine = brandForCreator(dna, { tone: 'Строго, на «ви»', brand: '', copy_rules: '' });
+  assert.equal(mine.tone, 'Строго, на «ви»', 'the manager\'s tone wins'); assert.match(mine.colors_and_fonts, /primary #c2185b/); assert.match(mine.colors_and_fonts, /Playfair Display \(headings\)/);
+  assert.deepEqual(mine.taboo_words, ['дешевий', 'акція']); assert.equal(brandForCreator({ identity: { colors: [], fonts: [] }, communication: {}, branding: {} }, {}), null, 'an empty profile gives nothing');
+  assert.equal(manualNotes({ settings: { restrictions: 'не обіцяти знижок', inputs: { tone: { body: 'тепло' } } } }).restrictions, 'не обіцяти знижок');
+});
+await test('brand dna: banned words and claims are found in a text by whole words and phrases (never inside another word)', () => {
+  const t = { taboo_words: ['дешевий', 'акція'], taboo_claims: ['найкращі в Україні'] };
+  assert.deepEqual(tabooHits('Дешевий стілець! Акція — тільки сьогодні.', t), ['дешевий', 'акція']);
+  assert.deepEqual(tabooHits('Ми — найкращі в Україні.', t), ['найкращі в Україні']);
+  assert.deepEqual(tabooHits('Акційний стілець і дешевизна', t), [], 'a part of another word is not a hit');
+  assert.deepEqual(tabooHits('Нічого', {}), []);
+});
+await test('brand dna: the skill reads the site, asks the model once, writes the section with the mark «потребує перевірки», makes a task for the gaps, costs are counted; without a site it waits', async () => {
+  const { repo, ctx } = await setup({ handlers: createHandlers({ researcher: { brand_dna: brandDna } }) });
+  Object.assign(ctx, fakeNet(BRAND_SITE)); const asked = [];
+  ctx.ask = async (o) => { asked.push(o); return { costUsd: 0.03, text: BRAND_ANSWER() }; };
+  repo.setMaterials(1, { settings: { restrictions: 'Не обіцяти знижок', inputs: {} }, assets: [] });
+  await repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'brand_dna' });
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'waiting'); assert.equal(asked.length, 0, 'no site, no model call');
+  repo.setWebsite(1, 'https://loza.example');
+  await processTick(ctx);
+  assert.equal(repo.T.runs[0].status, 'done', repo.T.runs[0].error);
+  assert.equal(asked.length, 1); assert.match(asked[0].user, /Не обіцяти знижок/);
+  const s = await repo.readSection(1, 'brand_dna'); const c = s.version.content;
+  assert.equal(c.identity.colors.length, 2); assert.equal(c.reviewed, false); assert.equal(c.has_manual_notes, true); assert.ok(c.signals.colors.length >= 3);
+  assert.match(s.version.body, /потребує перевірки менеджером/); assert.match(s.version.body, /Відкинуто, бо не підтверджено кодом сайту/);
+  assert.equal(repo.T.runs[0].cost_usd, 0.03); assert.equal(repo.T.runs[0].output.colors, 2);
+  assert.ok(!repo.T.tasks.some((t) => t.title === 'Перевірити й доповнити ДНК бренду'), 'a complete profile makes no task');
+  const gap = await setup({ handlers: createHandlers({ researcher: { brand_dna: brandDna } }) });
+  Object.assign(gap.ctx, fakeNet(BRAND_SITE)); gap.ctx.ask = async () => ({ costUsd: 0, text: '{}' }); gap.repo.setWebsite(1, 'https://loza.example');
+  await gap.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'brand_dna' }); await processTick(gap.ctx);
+  assert.equal(gap.repo.T.runs[0].status, 'done'); assert.ok(gap.repo.T.tasks.some((t) => t.title === 'Перевірити й доповнити ДНК бренду' && /Кольори бренду не визначено/.test(t.evidence)), 'what is missing is a task of the manager, not an invention');
+  const closed = await setup({ handlers: createHandlers({ researcher: { brand_dna: brandDna } }) });
+  Object.assign(closed.ctx, fakeNet(BRAND_SITE, 'User-agent: *\nDisallow: /')); closed.ctx.ask = async () => { throw new Error('must not be called'); }; closed.repo.setWebsite(1, 'https://loza.example');
+  await closed.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'brand_dna' }); await processTick(closed.ctx);
+  assert.equal(closed.repo.T.runs[0].status, 'done'); assert.equal(closed.repo.T.runs[0].output.blocked_by_robots, true); assert.ok(closed.repo.T.tasks.some((t) => /вручну/.test(t.title)));
+});
+await test('brand dna and the Creator: the profile counts as the basics of the brand, fills the notes the card leaves empty, and the code rejects a text with a banned word', async () => {
+  const dna = checkBrand(parseBrandAnswer(BRAND_ANSWER()), extractBrandSignals(await collectBrandAssets({ url: 'https://loza.example/', ...fakeNet(BRAND_SITE) })), {}).dna;
+  const bare = { settings: { cta_mode: 'always', cta_text: 'Купити', inputs: {} }, assets: [{ kind: 'product', name: 'p.png', url: 'https://f.example/p.png' }] };
+  assert.equal(inventoryOf(bare).brand.dna, false); assert.equal(inventoryOf(bare, dna).brand.dna, true);
+  const inv = inventoryOf(bare, dna);
+  assert.match(inv.notes.tone, /Тепло/); assert.match(inv.notes.brand, /c2185b/);
+  const raw = { verdict: 'not_enough', reason: 'Немає відео', have: [], missing: [], shoot_list: [{ what: 'відео', format: '9:16' }] };
+  assert.equal(checkMaterials({ materials: raw }, inventoryOf(bare)).verdict, 'not_enough', 'without the profile and without any notes the model\'s verdict stays');
+  assert.equal(checkMaterials({ materials: raw }, inv).verdict, 'enough', 'a product photo and the profile are enough for static pictures');
+  const goals = goalsOf(CR_BRIEF);
+  const facts = gatherCreativeFacts({ brief: CR_BRIEF, materials: CR_MATERIALS, ideas: CR_IDEAS, audience: MAT_AUD, goals, brandDna: dna });
+  assert.deepEqual(facts.brand.taboo_words, ['дешевий', 'акція']); assert.deepEqual(facts.brand.visual_donts, ['пластик']); assert.equal(facts.brand.tone, 'Тепло, на «ви»', 'the tone of the card wins');
+  assert.equal(gatherCreativeFacts({ brief: CR_BRIEF, materials: CR_MATERIALS, ideas: CR_IDEAS, audience: MAT_AUD, goals }).brand.taboo_words, undefined, 'without a profile nothing changes');
+  const pool = referencePool(CR_MATERIALS);
+  const ok = checkCards(JSON.parse(CR_ANSWER()).cards, { facts, pool });
+  assert.equal(ok.cards[0].status, 'planned');
+  const bad = checkCards([CARD({ headline: 'Акція на AirPlug', primary_text: 'Дешевий сон за 150.' })], { facts, pool });
+  assert.equal(bad.cards[0].status, 'needs_check'); assert.match(bad.cards[0].problems.join(' '), /заборонене клієнтом слово або твердження: дешевий, акція/);
+  assert.match(CREATIVES_PROMPT, /taboo_words/); assert.match(CREATIVES_PROMPT, /visual_donts/);
+});
+await test('brand dna: the orchestrator makes it at the start of the research, the ideas wait only while it is being made, a failed or missing one never stops the stage', () => {
+  const base = { now: new Date('2026-11-25T10:00:00Z'), paused: false };
+  const enq = (a) => a.filter((x) => x.type === 'enqueue').map((x) => `${x.agent}/${x.skill}`);
+  const run = (id, status) => ({ id, agent: 'researcher', skill: 'brand_dna', status, input: {} });
+  const secs = { brief: { hasCurrent: true }, site: { hasCurrent: true }, audience: { hasCurrent: true }, competitors: { hasCurrent: true }, unit_economy: { hasCurrent: true } };
+  const st = { stage: 1, paused: false, has_data: false };
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections: secs, runs: [] })), ['researcher/brand_dna'], 'a project already in the research gets it too, and the ideas wait for it');
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections: secs, runs: [run(1, 'running')] })), [], 'the ideas wait while it is made');
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections: { ...secs, brand_dna: { hasCurrent: true } }, runs: [run(1, 'done')] })), ['creator/materials_ideas'], 'when it is ready the ideas start');
+  assert.deepEqual(enq(planNext({ ...base, state: st, sections: secs, runs: [run(1, 'failed'), run(2, 'failed'), run(3, 'failed')] })), ['creator/materials_ideas'], 'three failures stop it and the ideas are not blocked');
+  const need = planNext({ ...base, state: st, sections: { ...secs, materials: { hasCurrent: true }, ideas: { hasCurrent: true } }, runs: [run(1, 'failed'), run(2, 'failed'), run(3, 'failed')] });
+  assert.ok(need.some((a) => a.type === 'set_stage' && a.stage === 2), 'the stage goes on without the profile');
+});
+await test('brand dna: the section is in the dossier, the skill is the Researcher\'s, and the migration allows the key', () => {
+  assert.equal(sectionName('brand_dna'), 'ДНК бренду');
+  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'researcher').skills.some((s) => s.key === 'brand_dna') && ACTIVE_AGENTS.find((a) => a.key === 'researcher').writes.includes('ДНК бренду'));
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  assert.match(fs.readFileSync(path.join(root, 'supabase/migrations/20261072000000_workflow_brand_dna.sql'), 'utf8'), /'monthly_plan','brand_dna'/);
 });
 console.log(`\n${passed} workflow checks passed`);

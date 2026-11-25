@@ -9,6 +9,7 @@
 //   · an idea says where it comes from (a competitor, a segment of the audience, or our own); a source that does not exist is changed to «власна ідея»
 import { computeUnitEconomy } from './economics.js';
 import { briefFacts } from './siteEngine.js';
+import { brandForCreator, manualNotes } from './brandDnaEngine.js';
 
 const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const norm = (s) => String(s || '').toLowerCase().replace(/[«»"“”„'’`]/g, '').replace(/\s+/g, ' ').trim();
@@ -21,19 +22,22 @@ export const SOURCE_LABEL = { competitor: 'від конкурента', audienc
 
 // ---------------------------------------------------------------- what the client has (counted by code)
 // materials = { settings: { cta_mode, cta_text, restrictions, figma_url, inputs: { key: { body } } }, assets: [{ kind, name, url }] } (the project card)
-export function inventoryOf(materials) {
+// brandDna = the content of the section «ДНК бренду» (or null): a person's notes win, the profile fills the gaps
+export function inventoryOf(materials, brandDna = null) {
   const assets = materials?.assets || [], s = materials?.settings || {}, inputs = s.inputs || {};
   const count = Object.fromEntries(Object.keys(KINDS).map((k) => [k, assets.filter((a) => a.kind === k).length]));
   const text = (k) => clip(inputs[k]?.body, 1200);
   const brand = { figma: !!String(s.figma_url || '').trim(), colors_and_fonts: !!text('brand'), tone: !!text('tone'), copy_rules: !!text('copy_rules'), restrictions: !!clip(s.restrictions, 10), cta: !!clip(s.cta_text, 2), links_to_creatives: !!text('examples') };
+  const dna = brandForCreator(brandDna, manualNotes(materials));
+  brand.dna = !!dna;
   const hard = [];
   if (!count.product) hard.push('Немає жодного фото продукту: без нього не можна ні зробити візуал, ні взяти референс.');
-  return { count, brand, hard_gaps: hard, notes: { tone: text('tone'), brand: text('brand'), copy_rules: text('copy_rules'), restrictions: clip(s.restrictions, 600), offer: text('offer'), examples: text('examples') } };
+  return { count, brand, hard_gaps: hard, notes: { tone: text('tone') || dna?.tone || '', brand: text('brand') || dna?.colors_and_fonts || '', copy_rules: text('copy_rules') || dna?.copy_rules || '', restrictions: clip(s.restrictions, 600), offer: text('offer'), examples: text('examples') }, dna };
 }
 
 // ---------------------------------------------------------------- the facts the model may use
-export function gatherIdeaFacts({ brief, materials, audit, competitors, audience, unitEconomy }) {
-  const inv = inventoryOf(materials);
+export function gatherIdeaFacts({ brief, materials, audit, competitors, audience, unitEconomy, brandDna = null }) {
+  const inv = inventoryOf(materials, brandDna);
   const ads = audit?.recent?.ads;
   const past = ads ? { best: (ads.best || []).slice(0, 4).map((l) => ({ name: clip(l.name, 80), roas: l.roas, results: l.results })), worst: (ads.worst || []).slice(0, 3).map((l) => ({ name: clip(l.name, 80), roas: l.roas })) } : null;
   const comp = competitors ? {
@@ -93,7 +97,7 @@ export function checkMaterials(raw, inventory) {
   if (forced) { verdict = 'not_enough'; reason = `${inventory.hard_gaps.join(' ')} ${reason}`.trim(); } // the code does not allow «enough» without the basics
   // the rule of the owner (2026-11-24, found by the pilot): a product photo and the basics of the brand are enough for STATIC pictures, whatever the model thinks about video; the model's remark stays in the reason
   const b = inventory.brand || {};
-  const lifted = verdict === 'not_enough' && inventory.hard_gaps.length === 0 && !!(b.colors_and_fonts || b.tone || b.copy_rules || b.figma);
+  const lifted = verdict === 'not_enough' && inventory.hard_gaps.length === 0 && !!(b.colors_and_fonts || b.tone || b.copy_rules || b.figma || b.dna);
   if (lifted) { verdict = 'enough'; reason = `Є фото продукту й основи бренду: статичні картинки робимо. Для відео потрібна зйомка.${reason ? ' Зауваження: ' + reason : ''}`; }
   const shoot = (Array.isArray(m.shoot_list) ? m.shoot_list : []).map((s) => ({ what: clip(s?.what, 240), format: clip(s?.format, 120), why: clip(s?.why, 240), reference: clip(s?.reference, 120) })).filter((s) => s.what && s.format).slice(0, 10);
   return { verdict, reason, forced, lifted, have: list(m.have), missing: [...inventory.hard_gaps, ...list(m.missing).filter((x) => !inventory.hard_gaps.includes(x))].slice(0, 10), shoot_list: verdict === 'not_enough' ? shoot : [] };
@@ -134,7 +138,7 @@ export function checkIdeas(raw, { facts, economics }) {
 // ---------------------------------------------------------------- the texts of the two sections
 export function renderMaterialsText(inv, m, { assetsSeen }) {
   const out = ['Креативи (матеріали): що є в клієнта і чого не вистачає.'];
-  out.push(`Є: ${Object.entries(inv.count).filter(([, n]) => n).map(([k, n]) => `${KINDS[k]} ${n}`).join(', ') || 'файлів немає'}. Бренд: ${Object.entries({ figma: 'макет у Figma', colors_and_fonts: 'кольори й шрифти', tone: 'тон', copy_rules: 'правила до текстів', restrictions: 'обмеження', cta: 'текст кнопки', links_to_creatives: 'посилання на креативи' }).map(([k, l]) => `${l}: ${inv.brand[k] ? 'є' : 'немає'}`).join('; ')}.`);
+  out.push(`Є: ${Object.entries(inv.count).filter(([, n]) => n).map(([k, n]) => `${KINDS[k]} ${n}`).join(', ') || 'файлів немає'}. Бренд: ${Object.entries({ figma: 'макет у Figma', dna: 'ДНК бренду', colors_and_fonts: 'кольори й шрифти', tone: 'тон', copy_rules: 'правила до текстів', restrictions: 'обмеження', cta: 'текст кнопки', links_to_creatives: 'посилання на креативи' }).map(([k, l]) => `${l}: ${inv.brand[k] ? 'є' : 'немає'}`).join('; ')}.`);
   out.push(`Висновок: ${m.verdict === 'enough' ? 'матеріалів достатньо для створення креативів' : 'матеріалів недостатньо'}. ${m.reason}`);
   if (m.have.length) { out.push('', 'Є'); m.have.forEach((t) => out.push(`• ${t}`)); }
   if (m.missing.length) { out.push('', 'Не вистачає'); m.missing.forEach((t) => out.push(`• ${t}`)); }

@@ -105,7 +105,8 @@ export async function firstCreatives({ run, ctx }) {
   if (fresh.length) {
     const ideasSec = (await ctx.repo.readSection(run.project_id, 'ideas'))?.version?.content || null;
     const audSec = (await ctx.repo.readSection(run.project_id, 'audience'))?.version?.content || null;
-    const facts = gatherCreativeFacts({ brief: brief.version, materials, ideas: ideasSec, audience: audSec, goals: fresh });
+    const brandDna = (await ctx.repo.readSection(run.project_id, 'brand_dna'))?.version?.content || null;
+    const facts = gatherCreativeFacts({ brief: brief.version, materials, ideas: ideasSec, audience: audSec, goals: fresh, brandDna });
     const project = await ctx.repo.readProject(run.project_id);
     const prompt = buildCreativesPrompt({ facts, language: project?.client_language === 'en' ? 'en' : 'uk' });
     const answer = await ctx.ask({ projectId: run.project_id, runId: run.id, system: prompt.system, user: prompt.user, maxTokens: 6000 });
@@ -135,7 +136,8 @@ export async function reworkCreatives({ run, ctx }) {
   const pool = referencePool(materials);
   const ideasSec = (await ctx.repo.readSection(run.project_id, 'ideas'))?.version?.content || null;
   const audSec = (await ctx.repo.readSection(run.project_id, 'audience'))?.version?.content || null;
-  const facts = gatherCreativeFacts({ brief, materials, ideas: ideasSec, audience: audSec, goals });
+  const brandDna = (await ctx.repo.readSection(run.project_id, 'brand_dna'))?.version?.content || null;
+  const facts = gatherCreativeFacts({ brief, materials, ideas: ideasSec, audience: audSec, goals, brandDna });
   facts.rework = targets.map((t, i) => ({ goal_index: i + 1, comment: t.text, previous: { headline: t.item.headline, primary_text: t.item.primary_text, angle: t.item.angle, offer: t.item.offer, cta: t.item.cta, visual_prompt: t.item.visual_prompt } }));
   const project = await ctx.repo.readProject(run.project_id);
   const prompt = buildCreativesPrompt({ facts, language: project?.client_language === 'en' ? 'en' : 'uk' });

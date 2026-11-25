@@ -8,6 +8,7 @@
 //   · the references of the picture are only files of the client (product photos first), never addresses made up by the model
 //   · the TAG of the creative (ціль · товар · для кого · кут · формат · оффер · версія) is built here from the checked fields, so the Media buyer can rely on it
 import { inventoryOf } from './ideasEngine.js';
+import { tabooHits } from './brandDnaEngine.js';
 
 const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const norm = (s) => String(s || '').toLowerCase().replace(/[«»"“”„'’`]/g, '').replace(/\s+/g, ' ').trim();
@@ -29,9 +30,9 @@ export function referencePool(materials) {
   return assets.filter((a) => a.kind in order).sort((a, b) => order[a.kind] - order[b.kind]).slice(0, 12).map((a, i) => ({ n: i + 1, kind: a.kind, name: clip(a.name, 60), url: a.url }));
 }
 
-export function gatherCreativeFacts({ brief, materials, ideas, audience, goals }) {
+export function gatherCreativeFacts({ brief, materials, ideas, audience, goals, brandDna = null }) {
   const e = brief?.content?.economics || {};
-  const inv = inventoryOf(materials);
+  const inv = inventoryOf(materials, brandDna);
   const cta = String(materials?.settings?.cta_mode || 'always') === 'none' ? [] : String(materials?.settings?.cta_text || '').split('\n').map((t) => clip(t, 40)).filter(Boolean).slice(0, 6);
   return {
     goals: goals.map((g, i) => ({ goal_index: i + 1, ...g })),
@@ -40,7 +41,7 @@ export function gatherCreativeFacts({ brief, materials, ideas, audience, goals }
     currency: e.currency || null,
     ideas: (ideas?.items || []).filter((x) => x.status === 'ok').slice(0, 14).map((x) => ({ id: x.id, hook: x.hook, angle: x.angle, format: x.format, segment: x.segment, offer: x.offer?.approved ? x.offer.name : null })),
     segments: (audience?.segments || []).map((s) => ({ name: s.name, who: s.who, message: s.message, status: s.status })),
-    brand: { tone: inv.notes.tone, copy_rules: inv.notes.copy_rules, restrictions: inv.notes.restrictions, colors_and_fonts: inv.notes.brand, cta_wordings: cta },
+    brand: { tone: inv.notes.tone, copy_rules: inv.notes.copy_rules, restrictions: inv.notes.restrictions, colors_and_fonts: inv.notes.brand, cta_wordings: cta, ...(inv.dna ? { taboo_words: inv.dna.taboo_words, taboo_claims: inv.dna.taboo_claims, headline_avoid: inv.dna.headline_avoid, visual_donts: inv.dna.visual_donts, tagline: inv.dna.tagline } : {}) },
     references: referencePool(materials).map((r) => ({ n: r.n, kind: r.kind, name: r.name })),
     formats: Object.keys(FORMATS),
   };
@@ -52,9 +53,9 @@ Rules:
 1. Use ONLY facts from the input. Never invent a price, a discount, a number, a guarantee, a result or a claim about the product. A number in a text may only be a price or a number that stands in the input.
 2. An OFFER (discount, gift, set) may be used only if it is in "approved_offers": give its exact name. Otherwise "offer" is an empty string and the texts mention no offer.
 3. "cta" is one of "brand.cta_wordings" (exactly); if that list is empty, "cta" is empty.
-4. "headline" at most 40 characters, "primary_text" at most 220 characters. Follow brand.tone, brand.copy_rules and brand.restrictions. Write them in Ukrainian unless the input says otherwise.
+4. "headline" at most 40 characters, "primary_text" at most 220 characters. Follow brand.tone, brand.copy_rules and brand.restrictions. Never use a word or claim from brand.taboo_words or brand.taboo_claims, and avoid the headline styles in brand.headline_avoid. Write them in Ukrainian unless the input says otherwise.
 5. "format" is one of "formats": 4:5 for the feed, 9:16 for stories and reels, 1:1 as a fallback.
-6. "visual_prompt" is in English: a concrete scene for an image generator. It must keep the product from the reference pictures recognisable, must NOT contain any text, letters, logos or prices in the image (the words are added separately), and respects brand.colors_and_fonts and brand.restrictions.
+6. "visual_prompt" is in English: a concrete scene for an image generator. It must keep the product from the reference pictures recognisable, must NOT contain any text, letters, logos or prices in the image (the words are added separately), and respects brand.colors_and_fonts and brand.restrictions, and shows nothing from brand.visual_donts.
 7. "references" are the numbers ("n") of the client's pictures from "references" to base the picture on: the product photos first (at least one), at most 3.
 8. "angle" is the side from which the product is shown (gift, saving, guarantee, reviews...).
 9. If "rework" is given, the manager or the client returned that card with a comment ("rework" is listed by goal_index, with the previous texts): change what the comment asks and keep the rest of the card as it was.
@@ -116,6 +117,8 @@ export function checkCards(rawCards, { facts, pool, version = 1 }) {
     if (!FORMATS[r.format]) notes.push('Формат не з дозволених: взято 4:5.');
     const headline = clip(r.headline, 40), primary = clip(r.primary_text, 220);
     if (!headline || !primary) problems.push('немає заголовка або тексту');
+    const banned = tabooHits(`${headline} ${primary}`, facts.brand);
+    if (banned.length) problems.push(`заборонене клієнтом слово або твердження: ${banned.slice(0, 3).join(', ')}`);
     const stray = numbersOf(`${headline} ${primary}`).filter((n) => n.length > 1 && !allowed.has(n));
     if (stray.length) problems.push(`число без джерела: ${[...new Set(stray)].slice(0, 3).join(', ')}`);
     let button = clip(r.cta, 40);

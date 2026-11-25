@@ -50,6 +50,7 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     acts.push({ type: 'set_stage', stage: STAGE.RESEARCH });
     journal('stage', 'Умови старту виконані: оплата, договори, бриф. Починаємо дослідження.');
     RESEARCH_SKILLS.forEach((s) => enqueue('researcher', s));
+    enqueue('researcher', 'brand_dna');
     if (state.has_data) enqueue('researcher', 'audit'); // no data in the cabinets: no audit
     enqueue('support', 'onboarding');
     return acts;
@@ -57,7 +58,11 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
 
   // ---------------------------------------------------------------- 1 · research
   if (state.stage === STAGE.RESEARCH) {
-    if (has('audience') && has('competitors') && !has('materials')) enqueue('creator', 'materials_ideas'); // ideas use the audience and the competitors
+    // the brand profile (not required to go on: a failed or missing one never blocks the stage) is made early, because the Creator reads it; the ideas wait only while it is still being made
+    const brandRun = lastRun(runs, 'researcher', 'brand_dna');
+    const brandPending = !has('brand_dna') && (open(runs, 'researcher', 'brand_dna') || !brandRun || (brandRun.status === 'failed' && recentFailures(runs, 'researcher', 'brand_dna') < MAX_FAILURES));
+    if (!has('brand_dna') && (!brandRun || brandRun.status === 'failed')) enqueue('researcher', 'brand_dna');
+    if (has('audience') && has('competitors') && !has('materials') && !brandPending) enqueue('creator', 'materials_ideas'); // ideas use the audience and the competitors
     // a research skill that failed is started again (three failures in a row stop it, and the manager is told): found by the pilot, a failed skill used to stand for ever
     for (const skill of [...RESEARCH_SKILLS, ...(state.has_data ? ['audit'] : [])]) { if (!has(skill) && lastRun(runs, 'researcher', skill)?.status === 'failed') enqueue('researcher', skill); }
     const need = [...RESEARCH_SKILLS, 'materials', 'ideas', ...(state.has_data ? ['audit'] : [])];

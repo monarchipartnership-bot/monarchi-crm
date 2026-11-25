@@ -23,6 +23,7 @@ export const SECTIONS = [
   { key: 'audience', name: 'Аудиторія', who: 'Дослідник' },
   { key: 'unit_economy', name: 'Юніт-економіка', who: 'Дослідник' },
   { key: 'competitors', name: 'Конкуренти', who: 'Дослідник' },
+  { key: 'brand_dna', name: 'ДНК бренду', who: 'Дослідник' },
   { key: 'materials', name: 'Матеріали', who: 'Креатор' },
   { key: 'ideas', name: 'Ідеї', who: 'Креатор' },
   { key: 'strategy', name: 'Стратегія', who: 'Стратег' },
