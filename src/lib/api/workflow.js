@@ -99,6 +99,24 @@ export async function fetchAgentsLive() {
   ]);
   return { ...data, feed: feed.error ? [] : feed.data || [], lastTickAt: tick.error ? null : tick.data?.last_tick_at || null };
 }
+// The window «Прогони»: the latest runs of all projects and the steps of one run.
+export async function fetchRunsList(limit = 300) {
+  const [runs, projects] = await Promise.all([
+    supabase.from('wf_runs').select('id, project_id, agent, skill, status, error, cost_usd, trigger, created_at, finished_at').order('id', { ascending: false }).limit(limit),
+    supabase.from('projects').select('id, name, client'),
+  ]);
+  const byId = {};
+  for (const p of must(projects, 'projects') || []) byId[p.id] = { name: p.client || p.name };
+  return { runs: must(runs, 'runs') || [], projects: byId };
+}
+export async function fetchRunSteps(runId) {
+  return must(await supabase.from('wf_run_steps').select('n, title, status').eq('run_id', runId).order('n'), 'steps') || [];
+}
+// The window «Підключення»: the server checks what the agents work with (no secrets come back).
+export async function fetchConnections() {
+  const { authedPost } = await import('../adAccounts.js');
+  return authedPost('/api/wf-status', {});
+}
 // What the window «Витрати» reads: the runs of three months (cost_usd), the model calls of the AI in the CRM, the projects, their states and the limits.
 export async function fetchSpendData() {
   const d = new Date();

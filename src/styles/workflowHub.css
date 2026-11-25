@@ -270,3 +270,9 @@
 .wf-rd:last-of-type { border-bottom:0; }
 .wf-rd::before { content:""; position:absolute; left:2px; top:11px; width:10px; height:10px; border-radius:50%; background:var(--wf-ok); }
 .wf-rd.info::before { background:var(--wf-info); } .wf-rd.bad::before { background:var(--wf-bad); } .wf-rd.warn::before { background:var(--wf-warn); }
+/* the window «Підключення»: a lamp, the name, the words, the state */
+.wf-cn-row { display:grid; grid-template-columns:18px minmax(0,1fr) auto; gap:12px; align-items:start; padding:12px 0; border-bottom:1px solid var(--wf-line); }
+.wf-cn-row:last-child { border-bottom:0; }
+.wf-cn-dot { width:12px; height:12px; border-radius:50%; margin-top:5px; background:var(--wf-muted); }
+.wf-cn-dot.ok { background:var(--wf-ok); } .wf-cn-dot.warn { background:var(--wf-warn); } .wf-cn-dot.bad { background:var(--wf-bad); }
+.wf-okb[role="status"] { margin:0; }

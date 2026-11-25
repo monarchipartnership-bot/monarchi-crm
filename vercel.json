@@ -10,6 +10,7 @@
 
 
     "api/wf-tick.js": { "maxDuration": 300 },
+    "api/wf-status.js": { "maxDuration": 60 },
 
     "api/project-month-refresh.js": { "maxDuration": 60 },
     "api/report-creatives.js": { "maxDuration": 60 },

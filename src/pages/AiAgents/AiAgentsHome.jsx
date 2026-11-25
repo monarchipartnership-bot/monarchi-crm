@@ -17,7 +17,9 @@ const Approvals = lazy(() => import('../Projects/Approvals'));
 const Overview = lazy(() => import('../Projects/Overview'));
 const Help = lazy(() => import('../Projects/Help'));
 const Spend = lazy(() => import('./Spend'));
-const WINDOWS = { approvals: { title: 'Апруви', Page: Approvals }, overview: { title: 'Огляд проєктів', Page: Overview }, spend: { title: 'Витрати', Page: Spend }, help: { title: 'Як це працює', Page: Help } };
+const Runs = lazy(() => import('./Runs'));
+const Connections = lazy(() => import('./Connections'));
+const WINDOWS = { approvals: { title: 'Апруви', Page: Approvals }, overview: { title: 'Огляд проєктів', Page: Overview }, runs: { title: 'Прогони', Page: Runs }, spend: { title: 'Витрати', Page: Spend }, connections: { title: 'Підключення', Page: Connections }, help: { title: 'Як це працює', Page: Help } };
 
 const TICK = { ok: 'працює', warn: 'повільно', bad: 'не відповідає' };
 const tickLevel = (iso, now = new Date()) => { if (!iso) return 'bad'; const m = (now - new Date(iso)) / 60000; return m < 3 ? 'ok' : m < 15 ? 'warn' : 'bad'; };
@@ -75,7 +77,9 @@ export default function AiAgentsHome() {
       <nav className="aia-nav" aria-label="Розділи AI Agents">
         <button type="button" className={'aia-tab' + (win ? '' : ' active')} onClick={() => openWin(null)}>Мапа</button>
         <button type="button" className={'aia-tab' + (win === 'overview' ? ' active' : '')} onClick={() => openWin('overview')}>Огляд проєктів</button>
+        <button type="button" className={'aia-tab' + (win === 'runs' ? ' active' : '')} onClick={() => openWin('runs')}>Прогони</button>
         <button type="button" className={'aia-tab' + (win === 'spend' ? ' active' : '')} onClick={() => openWin('spend')}>Витрати</button>
+        <button type="button" className={'aia-tab' + (win === 'connections' ? ' active' : '')} onClick={() => openWin('connections')}>Підключення</button>
         <button type="button" className={'aia-tab' + (win === 'approvals' ? ' active' : '')} onClick={() => openWin('approvals')}>Апруви{queue.length > 0 && <b className="aia-badge">{queue.length}</b>}</button>
       </nav>
       <button type="button" className="aia-back" onClick={() => nav('/')}>← До CRM</button>
@@ -94,7 +98,9 @@ export default function AiAgentsHome() {
       <aside className="aia-left" aria-label="Швидкі дії">
         <button type="button" className="aia-q primary" onClick={() => openWin('approvals')}><span>Апруви</span>{queue.length > 0 && <b className="aia-badge">{queue.length}</b>}</button>
         <button type="button" className="aia-q" onClick={() => openWin('overview')}>Огляд проєктів</button>
+        <button type="button" className="aia-q" onClick={() => openWin('runs')}>Прогони</button>
         <button type="button" className="aia-q" onClick={() => openWin('spend')}>Витрати</button>
+        <button type="button" className="aia-q" onClick={() => openWin('connections')}>Підключення</button>
         <button type="button" className="aia-q" disabled={busy || ov?.stopped} onClick={tickNow} title="Оркестратор виконує один прохід зараз, не чекаючи наступної хвилини">Виконати крок зараз</button>
         <button type="button" className={'aia-q ' + (ov?.stopped ? 'ok' : 'danger')} disabled={busy} onClick={stop}>{ov?.stopped ? 'Відновити роботу' : 'Аварійна зупинка'}</button>
         <button type="button" className="aia-q" onClick={() => openWin('help')}>Як це працює</button>

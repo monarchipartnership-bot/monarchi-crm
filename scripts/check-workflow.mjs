@@ -56,6 +56,8 @@ import { readinessOf } from '../src/lib/workflow/readiness.js';
 import { ACTIVE_AGENTS, INTEGRATED_SKILLS, mapIslands } from '../src/lib/workflow/registry.js';
 import { agentFacts, agentStates, feedOf, podStates } from '../src/lib/workflow/mapLive.js';
 import { monthsOffered, spendReport } from '../src/lib/workflow/spendStats.js';
+import { durationText, filterRuns, runCounts, runRows } from '../src/lib/workflow/runsView.js';
+import { connectionChecks } from '../api/_lib/wf/status.js';
 import { dueFor, eventsFor, gatherPlanFacts, checkPlan, monthWindows, parsePlanAnswer, renderPlanText, summarizeLastMonth } from '../api/_lib/wf/skills/monthlyPlanEngine.js';
 import { monthlyPlan } from '../api/_lib/wf/skills/monthlyPlanAgent.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
@@ -2595,5 +2597,58 @@ await test('monthly plan skill: reads the last month from the cabinet, writes th
   assert.match(s.asked[0].user, /black_friday/); assert.ok(!/Вигадана подія/.test(s.asked[0].user));
   const none = await mk({ strategy: false }); const r2 = none.repo.T.runs.find((r) => r.skill === 'monthly_plan'); assert.notEqual(r2.status, 'done'); assert.equal(none.asked.length, 0, 'the model is not asked without a strategy');
   const nolaunch = await mk({ launch: false }); assert.equal(nolaunch.reads.length, 0, 'without a launch nothing is read from the cabinet'); assert.equal(nolaunch.repo.T.runs.find((r) => r.skill === 'monthly_plan').status, 'done'); assert.equal((await nolaunch.repo.readSection(1, 'monthly_plan')).version.content.last_month, null);
+});
+// ---------------------------------------------------------------- the windows «Прогони» and «Підключення» (item 3 of the plan)
+await test('runs view: rows, filters, counts; a rerun is offered for finished work but never for the launch or for an open run', () => {
+  const runs = [{ id: 3, project_id: 3, agent: 'creator', skill: 'first_creatives', status: 'done', cost_usd: 0.25, trigger: 'manual', created_at: '2026-11-24T10:00:00Z', finished_at: '2026-11-24T10:01:30Z' },
+    { id: 2, project_id: 27, agent: 'mediabuyer', skill: 'launch', status: 'failed', error: 'Meta: помилка', cost_usd: 0, created_at: '2026-11-24T09:00:00Z', finished_at: '2026-11-24T09:00:05Z' },
+    { id: 1, project_id: 27, agent: 'researcher', skill: 'site', status: 'running', cost_usd: 0, created_at: '2026-11-24T08:00:00Z', finished_at: null }];
+  const rows = runRows({ runs, projects: { 3: { name: 'Mellow' }, 27: { name: 'Mon' } } });
+  assert.deepEqual(rows.map((r) => r.id), [3, 2, 1], 'the newest first');
+  assert.equal(rows[0].project, 'Mellow'); assert.equal(rows[0].duration, '1 хв 30 с'); assert.equal(rows[0].manual, true); assert.equal(rows[0].canRerun, true);
+  assert.equal(rows[1].canRerun, false, 'the launch is not rerun from the list'); assert.equal(rows[1].error, 'Meta: помилка'); assert.equal(rows[1].tone, 'bad');
+  assert.equal(rows[2].canRerun, false, 'nothing is rerun while it runs'); assert.equal(rows[2].open, true); assert.equal(rows[2].duration, '');
+  assert.deepEqual(runCounts(rows), { all: 3, failed: 1, open: 1, done: 1 });
+  assert.deepEqual(filterRuns(rows, { status: 'failed' }).map((r) => r.id), [2]); assert.deepEqual(filterRuns(rows, { status: 'open' }).map((r) => r.id), [1]);
+  assert.deepEqual(filterRuns(rows, { agent: 'creator' }).map((r) => r.id), [3]); assert.deepEqual(filterRuns(rows, { project: '27' }).map((r) => r.id), [2, 1]);
+  assert.equal(durationText(45), '45 с'); assert.equal(durationText(3720), '1 год 2 хв'); assert.equal(durationText(0.2), 'менше секунди');
+});
+await test('connections: every check says its state in words, secrets never come out, a token without the right to write is a problem with the way to fix it, a slow cron is told', async () => {
+  const meta = (perms, who = 'HUB (1)', pages = []) => async (url) => {
+    const u = String(url); const body = u.includes('me/permissions') ? { data: perms.map((p) => ({ permission: p, status: 'granted' })) } : u.includes('me/accounts') ? { data: pages } : { id: '1', name: who.split(' ')[0] };
+    return new Response(JSON.stringify(body), { status: 200 });
+  };
+  const SECRET = 'SECRET-TOKEN-VALUE';
+  const env = { META_ACCESS_TOKEN: SECRET, META_WRITE_TOKEN: SECRET + '2', HF_API_KEY_ID: 'a', HF_API_KEY_SECRET: 'b', HF_IMAGE_MODEL: 'm', ANTHROPIC_API_KEY: 'k', TELEGRAM_BOT_TOKEN: 't', GOOGLE_OAUTH_CLIENT_ID: 'x', GOOGLE_OAUTH_CLIENT_SECRET: 'y', GOOGLE_OAUTH_REFRESH_TOKEN: 'z', GOOGLE_ADS_DEVELOPER_TOKEN: 'd', GOOGLE_ADS_CLIENT_ID: 'c', GOOGLE_ADS_CLIENT_SECRET: 's', GOOGLE_ADS_REFRESH_TOKEN: 'r' };
+  const now = new Date('2026-11-24T22:00:00Z');
+  const telegramInfo = async () => ({ ok: true, result: { username: 'mon_bot' } });
+  const good = await connectionChecks({ env, fetchFn: meta(['ads_read', 'ads_management', 'pages_show_list', 'pages_read_engagement']), settings: { notify_chat: '-100', last_tick_at: '2026-11-24T21:59:30Z' }, now, telegramInfo });
+  const by = (l) => Object.fromEntries(l.map((c) => [c.key, c]));
+  const g = by(good);
+  assert.deepEqual(['meta_read', 'meta_write', 'images', 'model', 'telegram', 'orchestrator', 'ga4', 'google_ads', 'tiktok'], good.map((c) => c.key));
+  assert.equal(g.meta_read.tone, 'ok'); assert.equal(g.meta_write.tone, 'ok'); assert.equal(g.images.tone, 'ok'); assert.equal(g.model.tone, 'ok'); assert.equal(g.telegram.tone, 'ok'); assert.match(g.telegram.text, /@mon_bot/); assert.equal(g.orchestrator.tone, 'ok');
+  assert.equal(g.google_ads.tone, 'warn'); assert.match(g.google_ads.text, /Агентів для Google ще немає/); assert.equal(g.tiktok.tone, 'mute');
+  assert.ok(!JSON.stringify(good).includes(SECRET), 'a secret never comes out');
+  // the pilot's own case: the token reads, but cannot write
+  const ro = by(await connectionChecks({ env: { ...env, META_WRITE_TOKEN: undefined }, fetchFn: meta(['ads_read', 'public_profile']), settings: { notify_chat: '-1', last_tick_at: '2026-11-24T21:50:00Z' }, now, telegramInfo }));
+  assert.equal(ro.meta_read.tone, 'ok'); assert.equal(ro.meta_write.tone, 'bad'); assert.match(ro.meta_write.text, /ads_management/); assert.match(ro.meta_write.text, /META_WRITE_TOKEN/); assert.match(ro.meta_write.details.join(' '), /ads_read, public_profile/);
+  assert.equal(ro.orchestrator.tone, 'warn');
+  const nopages = by(await connectionChecks({ env, fetchFn: meta(['ads_read', 'ads_management']), settings: {}, now, telegramInfo }));
+  assert.equal(nopages.meta_write.tone, 'warn'); assert.match(nopages.meta_write.text, /pages_show_list/); assert.equal(nopages.telegram.tone, 'warn', 'no chat for the notices'); assert.equal(nopages.orchestrator.tone, 'bad', 'no pass of the cron at all');
+  // nothing set
+  const none = by(await connectionChecks({ env: {}, fetchFn: meta([]), settings: {}, now }));
+  assert.equal(none.meta_read.tone, 'bad'); assert.equal(none.meta_write.tone, 'bad'); assert.match(none.images.text, /HF_API_KEY_ID/); assert.equal(none.model.tone, 'bad'); assert.equal(none.telegram.tone, 'bad'); assert.equal(none.ga4.tone, 'warn');
+  // Meta refuses the token
+  const refused = by(await connectionChecks({ env, fetchFn: async () => new Response(JSON.stringify({ error: { message: 'Invalid OAuth access token', code: 190 } }), { status: 400 }), settings: {}, now, telegramInfo }));
+  assert.equal(refused.meta_read.tone, 'bad'); assert.match(refused.meta_read.text, /не прийняла токен/);
+});
+await test('the windows «Прогони» and «Підключення» are wired into the section; the endpoint wants the session of a person and has a time limit', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  const home = read('src/pages/AiAgents/AiAgentsHome.jsx');
+  assert.match(home, /runs: \{ title: 'Прогони'/); assert.match(home, /connections: \{ title: 'Підключення'/); assert.match(home, /openWin\('runs'\)/); assert.match(home, /openWin\('connections'\)/);
+  const ep = read('api/wf-status.js'); assert.match(ep, /Method not allowed/); assert.match(ep, /Потрібна авторизація/); assert.match(ep, /getUser\(token\)/);
+  assert.match(read('vercel.json'), /"api\/wf-status.js": \{ "maxDuration": 60 \}/);
+  assert.match(read('src/pages/AiAgents/Runs.jsx'), /Запустити ще раз/); assert.match(read('src/pages/AiAgents/Connections.jsx'), /Перевірити знову/);
 });
 console.log(`\n${passed} workflow checks passed`);
