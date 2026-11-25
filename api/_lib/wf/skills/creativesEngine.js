@@ -79,11 +79,11 @@ export function parseCreativesAnswer(text) {
 
 // the tag of a creative: «ціль · товар · для кого · кут · формат · оффер · версія» (document, glossary). Built from CHECKED fields only.
 export function tagOf(c) {
-  return [clip(c.goal, 40), c.product || 'без товару', c.segment || 'усі', c.angle || '—', c.format_label, c.offer || 'без оффера', 'v' + (c.version || 1)].join(' · ');
+  return [clip(c.goal, 40), c.product || 'без товару', c.segment || 'усі', c.angle || '—', c.format_label, c.offer || 'без оффера', 'v' + (c.version || 1), ...(c.variant ? [c.variant] : [])].join(' · '); // a variation of an ad carries its own mark at the end
 }
 
 // the numbers a text may carry: prices and numbers of the brief, of the manager's goal, of the approved offers, of the notes of the brand
-function allowedNumbers(facts) {
+export function allowedNumbers(facts) {
   return new Set(numbersOf(norm(JSON.stringify({ g: facts.goals, p: facts.products, o: facts.approved_offers, b: facts.brand, i: facts.ideas }))));
 }
 

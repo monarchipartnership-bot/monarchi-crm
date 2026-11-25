@@ -10,7 +10,7 @@ import { affordableCount, buildBatchGoals, clampCount, markDuplicates } from './
 import { DEFAULT_IMAGE_LIMIT_USD, buildCreativesPrompt, checkCards, gatherCreativeFacts, goalsOf, imageRequestOf, parseCreativesAnswer, referencePool, renderCreativesText, tagOf } from './creativesEngine.js';
 
 const real = { buildImageRequest: hfReal.buildImageRequest, profile: hfReal.profileFromEnv, estimate: hfReal.estimate, submit: hfReal.submit, check: hfReal.check };
-const hfOf = (ctx) => (ctx.hf === undefined ? (hfReal.isConfigured() ? real : null) : ctx.hf);
+export const hfOf = (ctx) => (ctx.hf === undefined ? (hfReal.isConfigured() ? real : null) : ctx.hf);
 const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 const r4 = (x) => Math.round(x * 10000) / 10000;
 const monthStart = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
@@ -18,7 +18,7 @@ const sleepOf = (ctx) => ctx.sleep || ((ms) => new Promise((r) => setTimeout(r, 
 
 // The pictures of the cards that need one: the limit is the cost cap of the PROJECT (or a default one when the project has none); what the project already spent this month
 // counts. Unfinished pictures (also of an earlier run) are followed until they are ready or the time of this run is over. → { imageSpent, open, limit, hf }
-async function makePictures({ items, ctx, run, modelCost }) {
+export async function makePictures({ items, ctx, run, modelCost }) {
   const hf = hfOf(ctx);
   const snap = await ctx.repo.loadSnapshot(run.project_id);
   const limit = snap.state?.cost_cap_usd != null ? Number(snap.state.cost_cap_usd) : DEFAULT_IMAGE_LIMIT_USD;
@@ -28,7 +28,7 @@ async function makePictures({ items, ctx, run, modelCost }) {
   let imageSpent = 0;
   const open = [];
   if (!hf) { open.push('Higgsfield не налаштовано на сервері (потрібні HF_API_KEY_ID, HF_API_KEY_SECRET, HF_IMAGE_MODEL): картинки не створювались, тексти готові.'); return { imageSpent, open, limit, hf }; }
-  const keyOf = (x) => `wf-${run.project_id}-${createHash('sha1').update(norm(x.goal)).digest('hex').slice(0, 12)}-v${x.version || 1}-${(x.attempt || 0) + 1}`; // ASCII only: an HTTP header cannot carry Cyrillic (found by the pilot: goals are written in Ukrainian)
+  const keyOf = (x) => `wf-${run.project_id}-${createHash('sha1').update(norm(x.goal) + (x.variation ? '|' + x.id : '')).digest('hex').slice(0, 12)}-v${x.version || 1}-${(x.attempt || 0) + 1}`; // ASCII only: an HTTP header cannot carry Cyrillic (found by the pilot: goals are written in Ukrainian)
   for (const x of items) {
     if (!['planned', 'failed'].includes(x.status) || x.job || !x.visual_prompt || !x.references?.length) continue;
     let usd;
@@ -60,7 +60,7 @@ async function makePictures({ items, ctx, run, modelCost }) {
   return { imageSpent, open, limit, hf };
 }
 
-function finish({ items, ctx, run, goalsCount, fresh, modelCost, pics, answerCost, note, batches = [] }) {
+export function finish({ items, ctx, run, goalsCount, fresh, modelCost, pics, answerCost, note, batches = [] }) {
   const open = [...pics.open];
   items.forEach((x) => { if (x.status === 'needs_check') open.push(`«${x.tag}»: ${x.problems.join('; ')}.`); });
   if (items.some((x) => x.status === 'failed')) open.push('Не всі картинки вдалося створити: причини біля кожного креатива.');
@@ -155,6 +155,22 @@ export async function reworkCreatives({ run, ctx }) {
   return finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches: sec.batches || [], note: `Перероблено креативів: ${checked.cards.length}` });
 }
 
+// How many cards with NEW pictures the money allows: the limit of the project minus what it spent this month minus the pictures that are already planned and wait for money, divided by the price of one picture.
+// Without a generator the texts cost nothing and nothing is cut. → { hf, count, limitedBy, perImage }
+export async function capByLimit({ ctx, run, items, pool, count }) {
+  const hf = hfOf(ctx);
+  if (!hf) return { hf, count, limitedBy: null, perImage: null };
+  const snap = await ctx.repo.loadSnapshot(run.project_id);
+  const limit = snap.state?.cost_cap_usd != null ? Number(snap.state.cost_cap_usd) : DEFAULT_IMAGE_LIMIT_USD;
+  const before = await ctx.repo.projectCost(run.project_id, monthStart((ctx.now || (() => new Date()))()));
+  const sample = { visual_prompt: 'sample', ratio: '4:5', references: pool.filter((p) => p.kind === 'product').slice(0, 1).map((p) => ({ url: p.url })) };
+  let perImage;
+  try { perImage = await hf.estimate({ request: imageRequestOf(sample, hf) }); } catch (e) { throw new Error(`Не вдалося оцінити ціну картинки: ${String(e.message || e).slice(0, 200)}`); }
+  const waiting = items.filter((x) => ['planned', 'failed'].includes(x.status) && !x.job && x.visual_prompt).length;
+  const a = affordableCount({ count, remaining: limit - before - waiting * perImage, perImage });
+  return { hf, count: a.count, limitedBy: a.limitedBy, perImage };
+}
+
 // The skill «batch_creatives» (Zeely item 2): a batch of static ads for ONE product. input = { product, count }. Code picks the number (at most 20, and no more than the image limit of the project can pay for),
 // gives every card an idea of the bank and a format, the model writes the words, the same checks run, repeats of a headline go to the manager. The cards are added to the section «Креативи (готові)»
 // (an approved section receives them as a proposal of the agent, which the manager accepts).
@@ -177,21 +193,10 @@ export async function batchCreatives({ run, ctx }) {
   const audSec = (await ctx.repo.readSection(run.project_id, 'audience'))?.version?.content || null;
   const brandDna = (await ctx.repo.readSection(run.project_id, 'brand_dna'))?.version?.content || null;
 
-  // how many the money allows: the limit of the project minus what it spent this month minus the pictures that are already planned and wait for money
   const asked = clampCount(run.input?.count);
-  let count = asked, limitedBy = null, perImage = null;
-  const hf = hfOf(ctx);
-  if (hf) {
-    const snap = await ctx.repo.loadSnapshot(run.project_id);
-    const limit = snap.state?.cost_cap_usd != null ? Number(snap.state.cost_cap_usd) : DEFAULT_IMAGE_LIMIT_USD;
-    const before = await ctx.repo.projectCost(run.project_id, monthStart((ctx.now || (() => new Date()))()));
-    const sample = { visual_prompt: 'sample', ratio: '4:5', references: pool.filter((p) => p.kind === 'product').slice(0, 1).map((p) => ({ url: p.url })) };
-    try { perImage = await hf.estimate({ request: imageRequestOf(sample, hf) }); } catch (e) { throw new Error(`Не вдалося оцінити ціну картинки: ${String(e.message || e).slice(0, 200)}`); }
-    const waiting = items.filter((x) => ['planned', 'failed'].includes(x.status) && !x.job && x.visual_prompt).length;
-    const a = affordableCount({ count, remaining: limit - before - waiting * perImage, perImage });
-    count = a.count; limitedBy = a.limitedBy;
-    if (count === 0) return { output: { items: 0, limited: true }, steps: [{ title: `Ліміт проєкту на картинки вичерпано (картинка ≈ $${perImage.toFixed(2)}): пакет не створено`, status: 'info' }], tasks: [{ type: 'creatives', owner: 'manager', priority: 'medium', title: 'Підняти ліміт витрат проєкту на картинки', evidence: `Пакет креативів на «${chosen}» не створено: лишок ліміту не вистачає навіть на одну картинку.` }] };
-  }
+  const cap = await capByLimit({ ctx, run, items, pool, count: asked });
+  const { count, limitedBy, perImage } = cap;
+  if (count === 0) return { output: { items: 0, limited: true }, steps: [{ title: `Ліміт проєкту на картинки вичерпано (картинка ≈ $${perImage.toFixed(2)}): пакет не створено`, status: 'info' }], tasks: [{ type: 'creatives', owner: 'manager', priority: 'medium', title: 'Підняти ліміт витрат проєкту на картинки', evidence: `Пакет креативів на «${chosen}» не створено: лишок ліміту не вистачає навіть на одну картинку.` }] };
 
   const ideas = ((ideasSec?.items) || []).filter((x) => x.status === 'ok').slice(0, 14).map((x) => ({ id: x.id }));
   const goals = buildBatchGoals({ product: chosen, count, ideas, existing: items });

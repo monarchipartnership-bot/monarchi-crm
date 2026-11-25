@@ -65,6 +65,8 @@ import { brandForCreator, brandGaps, buildBrandPrompt, checkBrand, dnaIsUsable, 
 import { SYSTEM_PROMPT as CREATIVES_PROMPT } from '../api/_lib/wf/skills/creativesEngine.js';
 import { BATCH_DEFAULT, BATCH_MAX, affordableCount, buildBatchGoals, clampCount, markDuplicates } from '../api/_lib/wf/skills/batchEngine.js';
 import { batchCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
+import { MERGE_MAX, SYSTEM_PROMPT as SYSTEM_VARIATIONS, VAR_MAX, checkVariations, needsPicture, normalizeRequest } from '../api/_lib/wf/skills/variationsEngine.js';
+import { adVariations } from '../api/_lib/wf/skills/variationsAgent.js';
 import { enqueueReportRun, reportsViaOrchestrator } from '../api/_lib/wf/reportBridge.js';
 import { dueFor, eventsFor, gatherPlanFacts, checkPlan, monthWindows, parsePlanAnswer, renderPlanText, summarizeLastMonth } from '../api/_lib/wf/skills/monthlyPlanEngine.js';
 import { monthlyPlan } from '../api/_lib/wf/skills/monthlyPlanAgent.js';
@@ -2918,5 +2920,127 @@ await test('batch: the skill is the Creator\'s, a person starts it from the sect
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const dossier = fs.readFileSync(path.join(root, 'src/components/Workflow/Dossier.jsx'), 'utf8'), panel = fs.readFileSync(path.join(root, 'src/components/Workflow/BatchPanel.jsx'), 'utf8');
   assert.match(dossier, /BatchPanel/); assert.match(dossier, /sec\.key === 'creatives'/); assert.match(panel, /requestRun\(projectId, 'creator', 'batch_creatives'/); assert.match(panel, /BATCH_MAX/); assert.match(panel, /proposals/);
+});
+// ---------------------------------------------------------------- Zeely item 3 (owner's decision 2026-11-25): variations of an ad that worked (vary / merge / localize)
+const VSRC = (id, o = {}) => ({ id, goal: 'Продати хіт', product: 'AirPlug', segment: 'Молоді родини', idea_id: 'i1', angle: 'подарунок', ratio: '4:5', format_label: 'картинка 4:5', offer: 'AirPlug + free 50 ml oil', headline: 'AirPlug і олія в подарунок', primary_text: 'Тихий сон за 150: дарунок до замовлення.', cta: 'Купити', visual_prompt: 'A calm bedroom, the earplug case on a nightstand', references: [{ n: 1, kind: 'product', url: 'https://f.example/p1.png' }], image_url: `https://img.example/${id}.png`, path: `p/${id}.png`, status: 'ready', version: 1, job: null, cost_usd: 0.5, tag: 'x', ...o });
+const VFACTS = () => { const f = gatherCreativeFacts({ brief: CR_BRIEF, materials: CR_MATERIALS, ideas: CR_IDEAS, audience: MAT_AUD, goals: [{ goal: 'Продати хіт', product: 'AirPlug' }] }); f.brand.taboo_words = ['дешевий']; return f; };
+await test('variations: the request is checked in words of the manager (what to do, how many sources, which elements may change, which language); counts are clamped', () => {
+  assert.throws(() => normalizeRequest({}), /Не вказано, що робити/);
+  assert.throws(() => normalizeRequest({ mode: 'vary', source: 'c1', vary: [] }), /хоча б один елемент/); assert.throws(() => normalizeRequest({ mode: 'vary', vary: ['headline'] }), /один креатив-джерело/);
+  assert.throws(() => normalizeRequest({ mode: 'merge', sources: ['c1'] }), /рівно два різні/); assert.throws(() => normalizeRequest({ mode: 'merge', sources: ['c1', 'c1'] }), /рівно два різні/);
+  assert.throws(() => normalizeRequest({ mode: 'localize', source: 'c1', language: 'xx' }), /Оберіть мову/);
+  assert.deepEqual(normalizeRequest({ mode: 'vary', source: 'c1', vary: ['headline', 'bogus', 'cta'], count: 99 }), { mode: 'vary', sources: ['c1'], vary: ['headline', 'cta'], count: VAR_MAX, language: '' });
+  assert.equal(normalizeRequest({ mode: 'vary', source: 'c1', vary: ['angle'] }).count, 3); assert.equal(normalizeRequest({ mode: 'merge', sources: ['c1', 'c2'], count: 9 }).count, MERGE_MAX);
+  assert.deepEqual(normalizeRequest({ mode: 'localize', source: 'c1', language: 'en', count: 5 }), { mode: 'localize', sources: ['c1'], vary: ['headline', 'primary_text'], count: 1, language: 'en' });
+  assert.equal(needsPicture(normalizeRequest({ mode: 'vary', source: 'c1', vary: ['headline', 'angle', 'cta'] })), false); assert.equal(needsPicture(normalizeRequest({ mode: 'vary', source: 'c1', vary: ['format'] })), true);
+  assert.equal(needsPicture(normalizeRequest({ mode: 'merge', sources: ['c1', 'c2'] })), true); assert.equal(needsPicture(normalizeRequest({ mode: 'localize', source: 'c1', language: 'pl' })), false);
+});
+await test('variations: what is locked comes from the source whatever the model wrote; numbers, banned words, a copy of the source and a repeat are caught; a variant without a new picture keeps the picture of the source', () => {
+  const facts = VFACTS(), src = VSRC('c1');
+  const req = normalizeRequest({ mode: 'vary', source: 'c1', vary: ['headline', 'angle'], count: 4 });
+  const raw = [
+    { headline: 'Тиша вдома', angle: 'спокій', primary_text: 'ЗМІНЕНО', cta: 'Дізнатись більше', format: '9:16', visual_prompt: 'other scene', offer: 'Set $280' },
+    { headline: 'Тиша вдома', angle: 'сон' },
+    { headline: 'Дешевий сон', angle: 'економія' },
+    { headline: src.headline, angle: src.angle },
+    { headline: 'Ще один', angle: 'ще' },
+  ];
+  const r = checkVariations(raw, { req, sources: [src], facts, existing: [] });
+  assert.equal(r.cards.length, 4, 'at most the asked count');
+  const a = r.cards[0];
+  assert.equal(a.headline, 'Тиша вдома'); assert.equal(a.angle, 'спокій');
+  assert.equal(a.primary_text, src.primary_text); assert.equal(a.cta, 'Купити'); assert.equal(a.ratio, '4:5'); assert.equal(a.visual_prompt, src.visual_prompt); assert.equal(a.offer, src.offer, 'locked fields are the source\'s, not the model\'s');
+  assert.equal(a.status, 'ready'); assert.equal(a.image_url, src.image_url); assert.equal(a.variation.of[0], 'c1'); assert.match(a.tag, /вар\. 1 від c1$/);
+  assert.equal(r.cards[1].status, 'needs_check'); assert.match(r.cards[1].problems.join(' '), /заголовок повторює інший креатив/, 'two variants with the same headline');
+  assert.match(r.cards[2].problems.join(' '), /заборонене клієнтом слово або твердження: дешевий/);
+  assert.match(r.cards[3].problems.join(' '), /нічим не відрізняється від джерела/);
+  const stray = checkVariations([{ headline: 'Сон', primary_text: 'Тихий сон за 999.', angle: 'x' }], { req: normalizeRequest({ mode: 'vary', source: 'c1', vary: ['primary_text'] }), sources: [src], facts, existing: [] }).cards[0];
+  assert.match(stray.problems.join(' '), /число без джерела: 999/); assert.equal(stray.headline, src.headline);
+  const fmt = checkVariations([{ format: '9:16', cta: 'Дізнатись більше' }], { req: normalizeRequest({ mode: 'vary', source: 'c1', vary: ['format', 'cta'] }), sources: [src], facts, existing: [] }).cards[0];
+  assert.equal(fmt.ratio, '9:16'); assert.equal(fmt.cta, 'Дізнатись більше'); assert.equal(fmt.status, 'planned', 'a new format needs a new picture'); assert.equal(fmt.image_url, ''); assert.match(fmt.tag, /картинка 9:16/);
+  const badCta = checkVariations([{ cta: 'Беріть!', format: '7:7' }], { req: normalizeRequest({ mode: 'vary', source: 'c1', vary: ['format', 'cta'] }), sources: [src], facts, existing: [] }).cards[0];
+  assert.equal(badCta.cta, 'Купити'); assert.equal(badCta.ratio, '4:5'); assert.equal(badCta.notes.length, 2);
+  const loc = checkVariations([{ headline: 'AirPlug and oil as a gift', primary_text: 'Quiet sleep for 150: a gift with the order.' }], { req: normalizeRequest({ mode: 'localize', source: 'c1', language: 'en' }), sources: [src], facts, existing: [] }).cards[0];
+  assert.equal(loc.status, 'ready'); assert.equal(loc.image_url, src.image_url); assert.equal(loc.language, 'en'); assert.equal(loc.cta, 'Купити'); assert.match(loc.tag, /мова en$/); assert.deepEqual(loc.problems, []);
+  const badLoc = checkVariations([{ headline: 'AirPlug as a gift', primary_text: 'Quiet sleep for 190.' }], { req: normalizeRequest({ mode: 'localize', source: 'c1', language: 'en' }), sources: [src], facts, existing: [] }).cards[0];
+  assert.match(badLoc.problems.join(' '), /числа в перекладі не збігаються/);
+  const src2 = VSRC('c2', { references: [{ n: 2, kind: 'product', url: 'https://f.example/p2.png' }, { n: 3, kind: 'logo', url: 'https://f.example/l.png' }], ratio: '9:16', format_label: 'картинка 9:16' });
+  const mg = checkVariations([{ headline: 'Тиша разом', primary_text: 'Сон за 150 для всієї родини.', angle: 'родина', visual_prompt: 'Family asleep' }], { req: normalizeRequest({ mode: 'merge', sources: ['c1', 'c2'] }), sources: [src, src2], facts, existing: [] }).cards[0];
+  assert.deepEqual(mg.references.map((x) => x.n), [1, 2, 3]); assert.equal(mg.status, 'planned'); assert.equal(mg.image_url, ''); assert.deepEqual(mg.variation.of, ['c1', 'c2']); assert.match(mg.tag, /злиття c1\+c2$/);
+  assert.match(SYSTEM_VARIATIONS, /localize/); assert.match(SYSTEM_VARIATIONS, /never repeat a headline/);
+});
+const varSetup = async (opts = {}) => {
+  const s = await setup({ handlers: createHandlers({ creator: { ad_variations: adVariations } }) });
+  s.repo.setMaterials(1, CR_MATERIALS);
+  await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: CR_BRIEF.content });
+  await s.repo.writeSectionVersion(1, 'ideas', { author_kind: 'agent', author: 'creator', body: 'i', content: CR_IDEAS });
+  await s.repo.writeSectionVersion(1, 'audience', { author_kind: 'agent', author: 'researcher', body: 'a', content: MAT_AUD });
+  await s.repo.writeSectionVersion(1, 'creatives', { author_kind: 'agent', author: 'creator', body: 'c', content: { schema: 1, branch: 'A', items: opts.items || [VSRC('c1'), VSRC('c2', { headline: 'Тиша за 150', segment: '', idea_id: '' })], spent_usd: 1, limit_usd: 5, open: [] } });
+  s.asked = [];
+  s.ctx.ask = opts.ask === undefined ? async (o) => {
+    s.asked.push(o);
+    const f = JSON.parse(o.user.slice(o.user.indexOf('{'), o.user.lastIndexOf('}') + 1));
+    const cards = Array.from({ length: f.count }, (_, i) => ({ headline: f.mode === 'localize' ? 'AirPlug and oil as a gift' : `Заголовок ${i + 1}`, primary_text: f.mode === 'localize' ? 'Quiet sleep for 150: a gift with the order.' : 'Тихий сон за 150, кожну ніч.', angle: `кут ${i + 1}`, cta: 'Купити', visual_prompt: `Scene ${i + 1}`, format: '9:16' }));
+    return { costUsd: 0.1, text: JSON.stringify({ cards }) };
+  } : opts.ask;
+  s.ctx.hf = opts.hf === undefined ? fakeHf() : opts.hf; s.ctx.imageWaitMs = 0;
+  if (opts.cap != null) await s.repo.setProjectFlag(1, { cost_cap_usd: opts.cap });
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'ad_variations', input: opts.input, trigger: 'manual' });
+  return s;
+};
+await test('variations: texts only (no new picture) cost nothing but the model; the cards keep the picture, the lock and a log of what was changed', async () => {
+  const s = await varSetup({ input: { mode: 'vary', source: 'c1', vary: ['headline', 'angle'], count: 3 } });
+  await processTick(s.ctx);
+  const run = s.repo.T.runs[0]; assert.equal(run.status, 'done', run.error);
+  const c = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.items.length, 5); const n = c.items.slice(2);
+  assert.deepEqual(n.map((x) => x.id), ['c3', 'c4', 'c5']); assert.ok(n.every((x) => x.status === 'ready' && x.image_url === 'https://img.example/c1.png' && x.primary_text === VSRC('c1').primary_text && x.variation.of[0] === 'c1'));
+  assert.deepEqual(n.map((x) => x.headline), ['Заголовок 1', 'Заголовок 2', 'Заголовок 3']);
+  assert.equal(s.ctx.hf.calls.submit.length, 0, 'no picture is bought'); assert.equal(run.cost_usd, 0.1); assert.equal(c.batches[0].mode, 'vary'); assert.deepEqual(c.batches[0].changed, ['headline', 'angle']);
+  assert.match(s.asked[0].system, /Mode "vary"/); assert.match(s.asked[0].user, /"write"/);
+  // the picture of the winner is not asked for again, and a second round of variations numbers on
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'ad_variations', input: { mode: 'vary', source: 'c1', vary: ['headline'], count: 1 }, trigger: 'manual' });
+  await processTick(s.ctx);
+  const c2 = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c2.items.length, 6); assert.match(c2.items[5].tag, /вар\. 4 від c1$/);
+  assert.equal(c2.items[5].headline, 'Заголовок 1'); assert.equal(c2.items[5].status, 'needs_check', 'the same headline as the first round is sent to the manager');
+});
+await test('variations: a new scene or format needs pictures: they are cut to the image limit; a merge builds on two cards; a localization keeps the picture; not even one picture fits → nothing is made', async () => {
+  const cut = await varSetup({ cap: 1.3, input: { mode: 'vary', source: 'c1', vary: ['visual_prompt', 'headline'], count: 5 } });
+  await processTick(cut.ctx);
+  const c = (await cut.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.items.length, 4, 'two old cards and two new ones: 1.3 at 0.5 per picture pays for two'); assert.equal(c.batches[0].asked, 5); assert.equal(c.batches[0].limited_by, 'limit');
+  assert.ok(c.items.slice(2).every((x) => x.status === 'ready' && x.image_url && x.image_url !== 'https://img.example/c1.png'), 'new pictures were made'); assert.equal(cut.ctx.hf.calls.submit.length, 2);
+  assert.ok(cut.repo.T.steps.some((x) => /Ліміт проєкту дозволяє 2 з 5/.test(x.title)));
+  const mg = await varSetup({ cap: 100, input: { mode: 'merge', sources: ['c1', 'c2'], count: 2 } });
+  await processTick(mg.ctx);
+  assert.equal(mg.repo.T.runs[0].status, 'done', mg.repo.T.runs[0].error);
+  const m = (await mg.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(m.items.length, 4); assert.ok(m.items.slice(2).every((x) => x.variation.mode === 'merge' && x.variation.of.join() === 'c1,c2' && x.image_url && x.image_url !== 'https://img.example/c1.png'));
+  assert.match(mg.asked[0].user, /"id": "c2"/);
+  const lo = await varSetup({ input: { mode: 'localize', source: 'c1', language: 'en' } });
+  await processTick(lo.ctx);
+  const l = (await lo.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(l.items.length, 3); assert.equal(l.items[2].language, 'en'); assert.equal(l.items[2].image_url, 'https://img.example/c1.png'); assert.equal(l.items[2].status, 'ready'); assert.equal(lo.ctx.hf.calls.submit.length, 0);
+  assert.match(lo.asked[0].user, /англійська \(en\)/);
+  const none = await varSetup({ cap: 0.3, input: { mode: 'vary', source: 'c1', vary: ['format'], count: 2 } });
+  await processTick(none.ctx);
+  assert.equal(none.repo.T.runs[0].output.limited, true); assert.equal(none.asked.length, 0, 'no money, no model call'); assert.ok(none.repo.T.tasks.some((t) => t.title === 'Підняти ліміт витрат проєкту на картинки'));
+});
+await test('variations: a missing card, a card without words, a bad request and a missing model are clear errors; the identical picture request of two variants never shares one job key', async () => {
+  const lost = await varSetup({ input: { mode: 'vary', source: 'c9', vary: ['headline'] } }); await processTick(lost.ctx);
+  assert.notEqual(lost.repo.T.runs[0].status, 'done'); assert.match(lost.repo.T.runs[0].error, /Креатива c9 немає/); assert.equal(lost.asked.length, 0);
+  const bare = await varSetup({ items: [VSRC('c1', { headline: '' })], input: { mode: 'vary', source: 'c1', vary: ['headline'] } }); await processTick(bare.ctx); assert.match(bare.repo.T.runs[0].error, /без заголовка чи тексту/);
+  const bad = await varSetup({ input: { mode: 'merge', sources: ['c1'] } }); await processTick(bad.ctx); assert.match(bad.repo.T.runs[0].error, /рівно два різні/);
+  const nom = await varSetup({ ask: null, input: { mode: 'vary', source: 'c1', vary: ['headline'] } }); await processTick(nom.ctx); assert.match(nom.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const s = await varSetup({ cap: 100, input: { mode: 'vary', source: 'c1', vary: ['visual_prompt'], count: 3 } }); await processTick(s.ctx);
+  const keys = s.ctx.hf.calls.submit.map((x) => x.key);
+  assert.equal(new Set(keys).size, 3, 'three variants of one goal have three different keys (Higgsfield would give them one picture otherwise)'); assert.ok(keys.every((k) => /^[\x20-\x7e]+$/.test(k)));
+});
+await test('variations: the skill is the Creator\'s and a person starts it from the section of the creatives (mode, sources, locks, count, language)', () => {
+  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'creator').skills.some((s) => s.key === 'ad_variations'));
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const dossier = fs.readFileSync(path.join(root, 'src/components/Workflow/Dossier.jsx'), 'utf8'), panel = fs.readFileSync(path.join(root, 'src/components/Workflow/VariationsPanel.jsx'), 'utf8');
+  assert.match(dossier, /VariationsPanel/); assert.match(panel, /requestRun\(projectId, 'creator', 'ad_variations'/); assert.match(panel, /VAR_MAX/); assert.match(panel, /LANGS/); assert.match(panel, /ELEMENTS/); assert.match(panel, /proposals/);
 });
 console.log(`\n${passed} workflow checks passed`);
