@@ -1,0 +1,165 @@
+<title>ДНК бренду, макети</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one section page of the project dossier, two variants to pick from (A: one-look card, B: editor with review state). Hub style: matte white cards, plum accent, soft shadows. */
+:root{
+  --bg:#f3f0f8; --card:rgba(255,255,255,.86); --card-line:#e4def0; --fg:#241b36; --muted:#6f6585; --accent:#6a35d6; --accent-2:#9b5cf0; --accent-soft:#ece4fb;
+  --ok:#1f8a5b; --ok-soft:#dff3e9; --warn:#a8640f; --warn-soft:#fbeed7; --bad:#b3303f; --bad-soft:#f9e1e4; --shadow:0 1px 2px rgba(60,30,110,.06),0 8px 24px rgba(60,30,110,.07);
+  --font-ui:'Inter',system-ui,sans-serif; --font-head:'Space Grotesk','Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17121f;--card:rgba(40,32,58,.82);--card-line:#3a2f52;--fg:#efeaf8;--muted:#a79ebe;--accent:#a47bff;--accent-2:#c09bff;--accent-soft:#33264f;--ok:#58c995;--ok-soft:#183a2d;--warn:#e8b25c;--warn-soft:#3b2d14;--bad:#f08894;--bad-soft:#42212a;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17121f;--card:rgba(40,32,58,.82);--card-line:#3a2f52;--fg:#efeaf8;--muted:#a79ebe;--accent:#a47bff;--accent-2:#c09bff;--accent-soft:#33264f;--ok:#58c995;--ok-soft:#183a2d;--warn:#e8b25c;--warn-soft:#3b2d14;--bad:#f08894;--bad-soft:#42212a;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.5;padding-block:24px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--font-head);margin:0;text-wrap:balance}
+h1{font-size:26px;letter-spacing:-.01em}
+h2{font-size:15px}
+.lead{color:var(--muted);margin:4px 0 0;max-width:62ch}
+.pick{display:flex;gap:8px;flex-wrap:wrap}
+.pick button{font:inherit;font-weight:600;border:1px solid var(--card-line);background:var(--card);color:var(--fg);padding:8px 16px;border-radius:12px;cursor:pointer}
+.pick button[aria-pressed="true"]{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.pick button:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--card-line);border-radius:18px;box-shadow:var(--shadow);padding:18px 20px;min-width:0}
+.head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.mu{background:var(--accent-soft);color:var(--accent)}
+.btn{font:inherit;font-weight:600;border:1px solid var(--card-line);background:var(--card);color:var(--fg);padding:8px 16px;border-radius:12px;cursor:pointer}
+.btn.p{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.sw div{width:84px}
+.sw i{display:block;height:54px;border-radius:12px;border:1px solid var(--card-line)}
+.sw b{display:block;font-size:12px;margin-top:6px;font-variant-numeric:tabular-nums}
+.sw span{font-size:11px;color:var(--muted)}
+.spec{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--card-line)}
+.spec:last-child{border:0}
+.spec .big{font-size:28px;line-height:1.15}
+.spec small{color:var(--muted)}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{padding:3px 10px;border-radius:999px;background:var(--bad-soft);color:var(--bad);font-size:12px;font-weight:600}
+.tag.n{background:var(--accent-soft);color:var(--accent)}
+ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.logo{display:flex;align-items:center;justify-content:center;height:90px;border-radius:12px;border:1px dashed var(--card-line);font-family:Georgia,serif;font-size:30px;color:#c2185b;background:#fff}
+.gap{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--warn-soft);color:var(--warn);font-size:13px}
+.src{font-size:12px;color:var(--muted)}
+/* variant B */
+.form{display:flex;flex-direction:column;gap:14px}
+.row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px 16px;align-items:start;padding:10px 0;border-bottom:1px solid var(--card-line)}
+.row:last-child{border:0}
+@media(max-width:620px){.row{grid-template-columns:1fr}}
+.row>label{font-weight:600;padding-top:7px}
+.row>label small{display:block;font-weight:400;color:var(--muted)}
+.inp{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--card-line);border-radius:10px;padding:7px 10px;width:100%}
+.inp:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;gap:8px;align-items:center;padding:4px 10px 4px 5px;border-radius:999px;border:1px solid var(--card-line);background:var(--bg)}
+.chip i{width:22px;height:22px;border-radius:50%;border:1px solid var(--card-line)}
+.chip em{font-style:normal;font-size:11px;color:var(--muted)}
+.mark{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;margin-left:6px;vertical-align:1px}
+.mark.s{background:var(--accent-soft);color:var(--accent)} .mark.h{background:var(--ok-soft);color:var(--ok)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.note{font-size:12px;color:var(--muted)}
+[hidden]{display:none!important}
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>ДНК бренду: два макети розділу</h1>
+    <p class="lead">Розділ у досьє проєкту «Лоза»: кольори, шрифти й логотип знайшов код у сайті, тон і правила описала модель, менеджер перевіряє. Це макет, дані взято для прикладу.</p>
+  </div>
+  <div class="pick" role="group" aria-label="Варіант макета">
+    <button id="bA" aria-pressed="true" type="button">Варіант А: картка одним поглядом</button>
+    <button id="bB" aria-pressed="false" type="button">Варіант Б: редактор із перевіркою</button>
+  </div>
+
+  <!-- VARIANT A -->
+  <section id="A" class="wrap" style="gap:16px">
+    <div class="card head">
+      <div>
+        <h2 style="font-size:18px">ДНК бренду · Лоза</h2>
+        <div class="src">З сайту loza.example · 25 листопада · ще не перевірено менеджером</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pill">Потребує перевірки</span><button class="btn" type="button">Редагувати</button><button class="btn p" type="button">Підтвердити профіль</button></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Кольори</div>
+        <div class="sw">
+          <div><i style="background:#c2185b"></i><b>#c2185b</b><span>основний</span></div>
+          <div><i style="background:#ff9800"></i><b>#ff9800</b><span>акцент</span></div>
+          <div><i style="background:#222222"></i><b>#222222</b><span>текст</span></div>
+          <div><i style="background:#ffffff"></i><b>#ffffff</b><span>фон</span></div>
+        </div>
+        <div class="label" style="margin-top:18px">Логотип</div>
+        <div class="logo">Лоза</div>
+        <div class="src" style="margin-top:6px">Знайдено на сторінці: /img/logo.svg</div>
+      </div>
+      <div class="card">
+        <div class="label">Шрифти</div>
+        <div class="spec"><span class="big" style="font-family:'Playfair Display',Georgia,serif">Стільці з дубу</span><small>Playfair Display · заголовки</small></div>
+        <div class="spec"><span style="font-size:16px">Меблі з натурального дерева, зроблені вручну.</span><small>Inter · основний текст</small></div>
+        <div class="label" style="margin-top:14px">Стиль картинок</div>
+        <p style="margin:0">Тепла, ремісницька, натуральне дерево, крупні плани матеріалу.</p>
+        <div class="tags" style="margin-top:8px"><span class="tag">Не показувати: пластик</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Бренд</div>
+        <p style="margin:0 0 8px">Виробник меблів з дубу. Слоган сайту: <b>«Дуб, який служить»</b>.</p>
+        <div class="tags"><span class="tag n">натуральність</span><span class="tag n">ручна робота</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Комунікація</div>
+        <p style="margin:0 0 10px">Тон: тепло, на «ви».</p>
+        <div class="label">Заборонено в текстах реклами</div>
+        <div class="tags"><span class="tag">дешевий</span><span class="tag">акція</span><span class="tag">найкращі в Україні</span></div>
+        <p class="note" style="margin:10px 0 0">Креатор не отримає текст із цими словами: система поверне його на перевірку.</p>
+      </div>
+    </div>
+    <div class="gap"><span aria-hidden="true">!</span><div><b>Що ще треба від менеджера.</b> Шрифт «Comic Sans» код у сайті не знайшов, тому в профіль його не взято. Заборонені слова додано з поля «Обмеження» картки проєкту.</div></div>
+  </section>
+
+  <!-- VARIANT B -->
+  <section id="B" class="wrap" style="gap:16px" hidden>
+    <div class="card bar">
+      <div><h2 style="font-size:18px">ДНК бренду · Лоза</h2><div class="src">Кожне поле показує, звідки воно: «з сайту» чи «ваше». Ваші правки агент більше не перезаписує, лише пропонує.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button">Оновити з сайту</button><button class="btn p" type="button">Зберегти і підтвердити</button></div>
+    </div>
+    <div class="card form">
+      <div class="label" style="margin:0">Візуальна ідентичність</div>
+      <div class="row"><label for="c1">Кольори<small>тільки ті, що є в коді сайту</small></label>
+        <div class="chips" id="c1"><span class="chip"><i style="background:#c2185b"></i>#c2185b <em>основний</em></span><span class="chip"><i style="background:#ff9800"></i>#ff9800 <em>акцент</em></span><button class="btn" type="button">+ колір</button><span class="mark s">з сайту</span></div></div>
+      <div class="row"><label for="f1">Шрифти</label><div class="chips" id="f1"><span class="chip">Playfair Display <em>заголовки</em></span><span class="chip">Inter <em>текст</em></span><span class="mark s">з сайту</span></div></div>
+      <div class="row"><label for="st">Стиль картинок</label><div><textarea class="inp" id="st" rows="2">Тепла, ремісницька, натуральне дерево, крупні плани матеріалу.</textarea><span class="mark s" style="margin:6px 0 0">з сайту</span></div></div>
+      <div class="row"><label for="vd">Не показувати</label><div><input class="inp" id="vd" value="пластик"><span class="mark h" style="margin:6px 0 0">ваше</span></div></div>
+      <div class="label" style="margin:10px 0 0">Бренд</div>
+      <div class="row"><label for="ov">Про компанію</label><textarea class="inp" id="ov" rows="2">Виробник меблів з дубу.</textarea></div>
+      <div class="row"><label for="tl">Слоган</label><input class="inp" id="tl" value="Дуб, який служить"></div>
+      <div class="label" style="margin:10px 0 0">Комунікація</div>
+      <div class="row"><label for="tn">Тон</label><div><input class="inp" id="tn" value="Тепло, на «ви»"><span class="mark h" style="margin:6px 0 0">ваше, з картки проєкту</span></div></div>
+      <div class="row"><label for="tw">Заборонені слова<small>через кому</small></label><input class="inp" id="tw" value="дешевий, акція"></div>
+      <div class="row"><label for="tc">Заборонені твердження</label><input class="inp" id="tc" value="найкращі в Україні"></div>
+    </div>
+    <div class="card">
+      <div class="label">Перевірка системи</div>
+      <ul>
+        <li><span class="pill ok">знайдено</span> кольори, шрифти, логотип</li>
+        <li><span class="pill">не підтверджено</span> «Comic Sans»: шрифту немає в коді сайту, відкинуто</li>
+        <li><span class="pill mu">діє</span> текст креативу із забороненим словом повертається менеджеру</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="note">Яка структура ближча: А (профіль читається за секунду, правки в окремому вікні) чи Б (одразу редагується, видно джерело кожного поля)? Можна взяти А для перегляду й Б як вікно «Редагувати».</div>
+</div>
+
+<script>
+(function(){
+  var A=document.getElementById('A'),B=document.getElementById('B'),bA=document.getElementById('bA'),bB=document.getElementById('bB');
+  function show(v){A.hidden=v!=='A';B.hidden=v!=='B';bA.setAttribute('aria-pressed',v==='A');bB.setAttribute('aria-pressed',v==='B');}
+  bA.addEventListener('click',function(){show('A')});bB.addEventListener('click',function(){show('B')});
+})();
+</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&family=Playfair+Display&display=swap">

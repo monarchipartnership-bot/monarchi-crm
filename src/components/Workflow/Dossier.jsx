@@ -10,6 +10,7 @@ import SiteView from './SiteView';
 import AudienceView from './AudienceView';
 import CompetitorsView from './CompetitorsView';
 import { CreativesPage, StrategyPage } from './Package';
+import { BrandDnaEditor, BrandDnaView } from './BrandDnaView';
 
 // «Досьє» of a project (screen 2 of step A3, the variant A of the mockup): the 10 sections on the left, the chosen one on the right with its versions
 // and the proposals of the agents. A person's version is never replaced by an agent: the agent can only propose.
@@ -54,6 +55,9 @@ export default function Dossier({ projectId, initialKey }) {
   const restore = (v) => run(() => saveHumanVersion(projectId, sec.key, v.body, email, `Відновлено версію ${v.version}`, v.content || {}));
   const saveBrief = (text, content) => run(async () => { await saveHumanVersion(projectId, 'brief', text, email, null, content); setEditing(false); });
   const isBrief = sec.key === 'brief';
+  const isBrand = sec.key === 'brand_dna' && !!current?.content?.identity; // the structured profile has its own view and its own editing window
+  const saveBrand = (body, content) => run(async () => { await saveHumanVersion(projectId, 'brand_dna', body, email, 'Профіль перевірено й збережено менеджером', content); setEditing(false); });
+  const confirmBrand = () => run(() => saveHumanVersion(projectId, 'brand_dna', current.body, email, 'Профіль підтверджено', { ...current.content, reviewed: true }));
   // the sections of the Researcher have their own pages (step A4, variants B of the mockup); anything else is shown as the text
   const c = shown?.content || {};
   const kind = sec.key === 'site' && c.schema && c.findings ? 'site' : sec.key === 'audience' && c.segments ? 'audience' : sec.key === 'competitors' && c.table ? 'competitors' : sec.key === 'strategy' && c.campaigns && c.budget ? 'strategy' : sec.key === 'creatives' && c.branch ? 'creatives' : null;
@@ -80,7 +84,7 @@ export default function Dossier({ projectId, initialKey }) {
         <div className="wf-card">
           <div className="wf-row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
             <h3 style={{ margin: 0 }}>{sec.name}</h3>
-            {!editing && <button type="button" className="wf-btn p sm" disabled={busy} onClick={startEdit}>Редагувати</button>}
+            {!editing && !isBrand && <button type="button" className="wf-btn p sm" disabled={busy} onClick={startEdit}>Редагувати</button>}
           </div>
           {isBrief ? (
             editing
@@ -91,6 +95,13 @@ export default function Dossier({ projectId, initialKey }) {
                   <BriefSheet key={'r' + (shown?.id || 0)} version={shown} readOnly />
                 </>
               )
+          ) : isBrand && editing ? (
+            <BrandDnaEditor key={'be' + current.id} content={current.content} busy={busy} onSave={saveBrand} onCancel={() => setEditing(false)} />
+          ) : isBrand && shown ? (
+            <>
+              <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}</div>
+              <BrandDnaView key={shown.id} content={shown.content || {}} busy={busy} onEdit={startEdit} onConfirm={confirmBrand} />
+            </>
           ) : editing ? (
             <>
               <label htmlFor="wf-body" className="wf-muted" style={{ fontSize: 12.5 }}>Текст розділу (нова версія буде вашою, агент її не замінить)</label>

@@ -276,3 +276,29 @@
 .wf-cn-dot { width:12px; height:12px; border-radius:50%; margin-top:5px; background:var(--wf-muted); }
 .wf-cn-dot.ok { background:var(--wf-ok); } .wf-cn-dot.warn { background:var(--wf-warn); } .wf-cn-dot.bad { background:var(--wf-bad); }
 .wf-okb[role="status"] { margin:0; }
+
+/* ДНК бренду (Zeely item 1): the view (variant A) and the editing window (variant B) */
+.wf-bd-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+@media (max-width:760px) { .wf-bd-grid { grid-template-columns:1fr; } }
+.wf-bd-sw { display:flex; gap:10px; flex-wrap:wrap; }
+.wf-bd-sw > div { width:84px; }
+.wf-bd-sw i { display:block; height:54px; border-radius:12px; box-shadow:0 0 0 1px var(--wf-border); }
+.wf-bd-sw b { display:block; font-size:12px; margin-top:6px; font-variant-numeric:tabular-nums; }
+.wf-bd-sw span { font-size:11px; color:var(--wf-muted); }
+.wf-bd-logo { display:flex; flex-direction:column; gap:6px; }
+.wf-bd-logo img { max-height:80px; max-width:100%; object-fit:contain; align-self:flex-start; background:#fff; border-radius:12px; box-shadow:0 0 0 1px var(--wf-border); padding:8px; }
+.wf-bd-logo span { font-size:12px; overflow-wrap:anywhere; }
+.wf-bd-font { display:flex; flex-direction:column; padding:8px 0; border-bottom:1px solid var(--wf-line); }
+.wf-bd-font:last-of-type { border-bottom:0; }
+.wf-bd-font small { color:var(--wf-muted); }
+.wf-bd-row { display:grid; grid-template-columns:160px minmax(0,1fr); gap:6px 16px; padding:10px 0; border-bottom:1px solid var(--wf-line); align-items:start; }
+.wf-bd-row:last-child { border-bottom:0; }
+@media (max-width:620px) { .wf-bd-row { grid-template-columns:1fr; } }
+.wf-bd-row > label { font-weight:600; padding-top:6px; }
+.wf-bd-row > label small { display:block; font-weight:400; color:var(--wf-muted); }
+.wf-bd-in { font:inherit; padding:6px 10px; border-radius:10px; border:1px solid var(--wf-border); background:var(--wf-surface); color:var(--wf-text); width:100%; }
+select.wf-bd-in { width:auto; }
+.wf-bd-mark { display:inline-block; font-size:11px; font-weight:600; padding:1px 8px; border-radius:999px; margin-top:6px; }
+.wf-bd-mark.s { background:var(--wf-soft); color:var(--wf-plum); }
+.wf-bd-mark.h { background:var(--wf-ok-bg); color:var(--wf-ok); }
+.wf-bd-form .wf-ta { width:100%; }

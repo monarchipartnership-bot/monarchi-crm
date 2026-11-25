@@ -2809,4 +2809,12 @@ await test('brand dna: the section is in the dossier, the skill is the Researche
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   assert.match(fs.readFileSync(path.join(root, 'supabase/migrations/20261072000000_workflow_brand_dna.sql'), 'utf8'), /'monthly_plan','brand_dna'/);
 });
+await test('brand dna page: the dossier shows the profile as a card (variant A) and edits it in a form (variant B) that keeps the source of every field and never lets the agent overwrite a human version', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const dossier = fs.readFileSync(path.join(root, 'src/components/Workflow/Dossier.jsx'), 'utf8');
+  const view = fs.readFileSync(path.join(root, 'src/components/Workflow/BrandDnaView.jsx'), 'utf8');
+  assert.match(dossier, /BrandDnaView/); assert.match(dossier, /BrandDnaEditor/); assert.match(dossier, /sec\.key === 'brand_dna' && !!current\?\.content\?\.identity/);
+  assert.match(dossier, /saveHumanVersion\(projectId, 'brand_dna'/, 'a human version is saved by the person');
+  assert.match(view, /next\.edited = /); assert.match(view, /reviewed: true/); assert.match(view, /з сайту/); assert.match(view, /ваше/);
+});
 console.log(`\n${passed} workflow checks passed`);
