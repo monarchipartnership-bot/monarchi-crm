@@ -58,7 +58,8 @@ Rules:
 6. "visual_prompt" is in English: a concrete scene for an image generator. It must keep the product from the reference pictures recognisable, must NOT contain any text, letters, logos or prices in the image (the words are added separately), and respects brand.colors_and_fonts and brand.restrictions, and shows nothing from brand.visual_donts.
 7. "references" are the numbers ("n") of the client's pictures from "references" to base the picture on: the product photos first (at least one), at most 3.
 8. "angle" is the side from which the product is shown (gift, saving, guarantee, reviews...).
-9. If "rework" is given, the manager or the client returned that card with a comment ("rework" is listed by goal_index, with the previous texts): change what the comment asks and keep the rest of the card as it was.
+9. If a goal has "assigned_idea", build the card on exactly that idea of "ideas" and give its id; if it has "format_hint", use that format. Cards of the same product must differ in angle, headline and picture scene: never repeat a headline.
+10. If "rework" is given, the manager or the client returned that card with a comment ("rework" is listed by goal_index, with the previous texts): change what the comment asks and keep the rest of the card as it was.
 Answer with ONE JSON object and nothing else (no markdown fence):
 {"cards":[{"goal_index":1,"product":"","segment":"","idea_id":"","angle":"","format":"4:5","offer":"","headline":"","primary_text":"","cta":"","visual_prompt":"","references":[1]}]}
 Give exactly one card per goal.`;
@@ -107,14 +108,14 @@ export function checkCards(rawCards, { facts, pool, version = 1 }) {
     if (!product && goal.product) notes.push(`Товару «${goal.product}» немає в брифі: креатив без товару.`);
     const segment = segs.get(norm(r.segment)) || '';
     if (r.segment && !segment) notes.push('Такого сегмента в розділі «Аудиторія» немає: креатив для всіх.');
-    const idea = ideas.get(r.idea_id) || null;
+    const idea = ideas.get(goal.assigned_idea) || ideas.get(r.idea_id) || null; // a batch gives every card an idea of its own: the plan of the code wins
     if (r.idea_id && !idea) notes.push('Ідеї з таким номером у банку немає: кут власний.');
     const angle = clip(r.angle, 80) || idea?.angle || '';
     const wantedOffer = clip(r.offer, 120);
     const offer = wantedOffer ? approved.get(norm(wantedOffer)) || '' : '';
     if (wantedOffer && !offer) notes.push(`Оффер «${wantedOffer}» не погоджений клієнтом: у креатив не взято.`);
-    const ratio = FORMATS[r.format] ? r.format : '4:5';
-    if (!FORMATS[r.format]) notes.push('Формат не з дозволених: взято 4:5.');
+    const ratio = FORMATS[goal.format_hint] ? goal.format_hint : FORMATS[r.format] ? r.format : '4:5'; // a batch plans the formats too
+    if (!FORMATS[goal.format_hint] && !FORMATS[r.format]) notes.push('Формат не з дозволених: взято 4:5.');
     const headline = clip(r.headline, 40), primary = clip(r.primary_text, 220);
     if (!headline || !primary) problems.push('немає заголовка або тексту');
     const banned = tabooHits(`${headline} ${primary}`, facts.brand);

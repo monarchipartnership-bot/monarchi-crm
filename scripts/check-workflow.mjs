@@ -63,6 +63,8 @@ import { periodReport } from '../api/_lib/wf/skills/periodReport.js';
 import { brandDna, collectBrandAssets } from '../api/_lib/wf/skills/brandDnaAgent.js';
 import { brandForCreator, brandGaps, buildBrandPrompt, checkBrand, dnaIsUsable, extractBrandSignals, manualNotes, normHex, parseBrandAnswer, tabooHits } from '../api/_lib/wf/skills/brandDnaEngine.js';
 import { SYSTEM_PROMPT as CREATIVES_PROMPT } from '../api/_lib/wf/skills/creativesEngine.js';
+import { BATCH_DEFAULT, BATCH_MAX, affordableCount, buildBatchGoals, clampCount, markDuplicates } from '../api/_lib/wf/skills/batchEngine.js';
+import { batchCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { enqueueReportRun, reportsViaOrchestrator } from '../api/_lib/wf/reportBridge.js';
 import { dueFor, eventsFor, gatherPlanFacts, checkPlan, monthWindows, parsePlanAnswer, renderPlanText, summarizeLastMonth } from '../api/_lib/wf/skills/monthlyPlanEngine.js';
 import { monthlyPlan } from '../api/_lib/wf/skills/monthlyPlanAgent.js';
@@ -2816,5 +2818,105 @@ await test('brand dna page: the dossier shows the profile as a card (variant A) 
   assert.match(dossier, /BrandDnaView/); assert.match(dossier, /BrandDnaEditor/); assert.match(dossier, /sec\.key === 'brand_dna' && !!current\?\.content\?\.identity/);
   assert.match(dossier, /saveHumanVersion\(projectId, 'brand_dna'/, 'a human version is saved by the person');
   assert.match(view, /next\.edited = /); assert.match(view, /reviewed: true/); assert.match(view, /з сайту/); assert.match(view, /ваше/);
+});
+// ---------------------------------------------------------------- Zeely item 2 (owner's decision 2026-11-25): a batch of static ads for one product, as many as the image limit of the project allows
+await test('batch: the count is clamped to 20, cut to what the limit pays for, every card gets its own idea and a format by the cycle, names continue where the last batch stopped', () => {
+  assert.equal(clampCount(undefined), BATCH_DEFAULT); assert.equal(clampCount('x'), BATCH_DEFAULT); assert.equal(clampCount(0), BATCH_DEFAULT); assert.equal(clampCount(7.9), 7); assert.equal(clampCount(500), BATCH_MAX);
+  assert.deepEqual(affordableCount({ count: 10, remaining: 3, perImage: 0.5 }), { count: 6, limitedBy: 'limit', can: 6 });
+  assert.deepEqual(affordableCount({ count: 4, remaining: 3, perImage: 0.5 }), { count: 4, limitedBy: null });
+  assert.equal(affordableCount({ count: 4, remaining: 0.4, perImage: 0.5 }).count, 0); assert.equal(affordableCount({ count: 4, remaining: 0, perImage: null }).count, 4, 'no generator: the texts cost nothing');
+  assert.equal(affordableCount({ count: 3, remaining: 1.5, perImage: 0.5 }).count, 3, 'a price that divides the rest exactly still fits (no rounding loss)');
+  const ideas = [{ id: 'i1' }, { id: 'i2' }, { id: 'i3' }];
+  const g = buildBatchGoals({ product: 'AirPlug', count: 5, ideas, existing: [{ product: 'AirPlug', idea_id: 'i1', goal: 'Продати хіт' }] });
+  assert.deepEqual(g.map((x) => x.assigned_idea), ['i2', 'i3', 'i1', 'i2', 'i3'], 'ideas that were not used for this product come first, then the cycle goes on');
+  assert.deepEqual(g.map((x) => x.format_hint), ['4:5', '9:16', '1:1', '4:5', '9:16']); assert.equal(g[0].goal, 'Пакет «AirPlug» №1');
+  const next = buildBatchGoals({ product: 'AirPlug', count: 2, ideas, existing: g.map((x) => ({ ...x, idea_id: x.assigned_idea })) });
+  assert.deepEqual(next.map((x) => x.goal), ['Пакет «AirPlug» №6', 'Пакет «AirPlug» №7'], 'the numbers go on'); assert.equal(next[0].format_hint, '1:1', 'the format cycle goes on too: five cards used 4:5, 9:16, 1:1, 4:5, 9:16');
+  assert.equal(buildBatchGoals({ product: 'X', count: 1, ideas: [] })[0].assigned_idea, '', 'no ideas: the card is the model\'s own');
+  const cards = markDuplicates([{ headline: 'Тиша вдома!', tag: 'a' }, { headline: 'тиша вдома', tag: 'b' }, { headline: 'Інше', tag: 'c' }], [{ headline: 'Інше', tag: 'старе' }]);
+  assert.equal(cards[0].status, undefined); assert.equal(cards[1].status, 'needs_check'); assert.match(cards[1].problems[0], /повторює інший креатив: «a»/); assert.equal(cards[2].status, 'needs_check'); assert.match(cards[2].problems[0], /«старе»/);
+});
+await test('batch: the plan of the code (idea, format) wins over the answer of the model; without a plan the old behaviour stays', () => {
+  const goals = [{ goal: 'Пакет «AirPlug» №1', product: 'AirPlug', assigned_idea: 'i1', format_hint: '9:16' }];
+  const facts = gatherCreativeFacts({ brief: CR_BRIEF, materials: CR_MATERIALS, ideas: CR_IDEAS, audience: MAT_AUD, goals });
+  const r = checkCards([CARD({ idea_id: '', format: '1:1' })], { facts, pool: referencePool(CR_MATERIALS) }).cards[0];
+  assert.equal(r.idea_id, 'i1'); assert.equal(r.ratio, '9:16'); assert.ok(!r.notes.some((n) => /Формат/.test(n)));
+  assert.match(CREATIVES_PROMPT, /assigned_idea/); assert.match(CREATIVES_PROMPT, /never repeat a headline/);
+  const plain = checkCards([CARD({ idea_id: '', format: '1:1' })], { facts: gatherCreativeFacts({ brief: CR_BRIEF, materials: CR_MATERIALS, ideas: CR_IDEAS, audience: MAT_AUD, goals: goalsOf(CR_BRIEF) }), pool: referencePool(CR_MATERIALS) }).cards[0];
+  assert.equal(plain.ratio, '1:1'); assert.equal(plain.idea_id, '');
+});
+const batchSetup = async (opts = {}) => {
+  const s = await setup({ handlers: createHandlers({ creator: { batch_creatives: batchCreatives } }) });
+  s.repo.setMaterials(1, CR_MATERIALS);
+  await s.repo.writeSectionVersion(1, 'brief', { author_kind: 'human', author: 'm@x', body: '', content: CR_BRIEF.content });
+  await s.repo.writeSectionVersion(1, 'ideas', { author_kind: 'agent', author: 'creator', body: 'i', content: CR_IDEAS });
+  await s.repo.writeSectionVersion(1, 'audience', { author_kind: 'agent', author: 'researcher', body: 'a', content: MAT_AUD });
+  await s.repo.writeSectionVersion(1, 'materials', { author_kind: 'agent', author: 'creator', body: 'm', content: { verdict: opts.verdict || 'enough' } });
+  s.asked = [];
+  s.ctx.ask = opts.ask === undefined ? async (o) => {
+    s.asked.push(o);
+    const f = JSON.parse(o.user.slice(o.user.indexOf('{'), o.user.lastIndexOf('}') + 1));
+    return { costUsd: 0.2, text: JSON.stringify({ cards: f.goals.map((g) => CARD({ goal_index: g.goal_index, idea_id: '', format: '1:1', headline: opts.sameHeadline ? 'Один заголовок' : `Заголовок ${g.goal}`, angle: `кут ${g.goal_index}` })) }) };
+  } : opts.ask;
+  s.ctx.hf = opts.hf === undefined ? fakeHf() : opts.hf; s.ctx.imageWaitMs = 0;
+  if (opts.cap != null) await s.repo.setProjectFlag(1, { cost_cap_usd: opts.cap });
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'batch_creatives', input: opts.input || { product: 'AirPlug', count: 4 }, trigger: 'manual' });
+  return s;
+};
+await test('batch: the skill makes the cards of one product with their own ideas and formats, pictures inside the limit, and writes them to the creatives section with a log of the batch', async () => {
+  const s = await batchSetup({ cap: 100 });
+  await processTick(s.ctx);
+  const run = s.repo.T.runs[0]; assert.equal(run.status, 'done', run.error);
+  const c = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.items.length, 4); assert.deepEqual(c.items.map((x) => x.goal), [1, 2, 3, 4].map((n) => `Пакет «AirPlug» №${n}`));
+  assert.deepEqual(c.items.map((x) => x.ratio), ['4:5', '9:16', '1:1', '4:5'], 'the format is the plan of the code, whatever the model wrote');
+  assert.ok(c.items.every((x) => x.idea_id === 'i1' && x.status === 'ready' && x.image_url), 'every card has its idea and its picture'); assert.deepEqual(c.items.map((x) => x.id), ['c1', 'c2', 'c3', 'c4']);
+  assert.equal(c.batches.length, 1); assert.equal(c.batches[0].asked, 4); assert.equal(c.batches[0].made, 4); assert.equal(c.batches[0].limited_by, null);
+  assert.equal(s.ctx.hf.calls.submit.length, 4); assert.equal(run.cost_usd, 0.2 + 4 * 0.5, 'the model and the pictures are charged to the run');
+  assert.equal(s.asked.length, 1, 'one model call for the whole batch'); assert.ok(s.asked[0].maxTokens >= 1500 + 520 * 4);
+  // a second batch continues the numbering and keeps the cards that exist
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'batch_creatives', input: { product: 'airplug', count: 2 }, trigger: 'manual' });
+  await processTick(s.ctx);
+  assert.equal(s.repo.T.runs[1].status, 'done', s.repo.T.runs[1].error);
+  const c2 = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c2.items.length, 6); assert.equal(c2.items[4].goal, 'Пакет «AirPlug» №5'); assert.equal(c2.batches.length, 2); assert.equal(c2.items[4].id, 'c5');
+  assert.ok(c2.items.slice(4).every((x) => /заголовок повторює/.test((x.problems || []).join(' ')) === false), 'different headlines are not repeats');
+});
+await test('batch: the limit of the project cuts the batch (20 asked, 10 paid), nothing is made when not even one picture fits, a product not in the brief is an error, a repeated headline goes to the manager', async () => {
+  const cut = await batchSetup({ cap: 5.4, input: { product: 'AirPlug', count: 50 } });
+  await processTick(cut.ctx);
+  const c = (await cut.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.items.length, 10, 'a limit of 5.4 at 0.5 per picture pays for 10 cards, 20 were the most that could be asked');
+  assert.equal(c.batches[0].asked, 20); assert.equal(c.batches[0].limited_by, 'limit'); assert.ok(cut.repo.T.steps.some((x) => /Ліміт проєкту дозволяє 10 з 20/.test(x.title)));
+  assert.equal(cut.ctx.hf.calls.submit.length, 10);
+  const none = await batchSetup({ cap: 0.3 });
+  await processTick(none.ctx);
+  assert.equal(none.repo.T.runs[0].status, 'done'); assert.equal(none.asked.length, 0, 'no money, no model call'); assert.equal(none.repo.T.runs[0].output.limited, true);
+  assert.ok(none.repo.T.tasks.some((t) => t.title === 'Підняти ліміт витрат проєкту на картинки'));
+  const noProduct = await batchSetup({ input: { product: 'Чужий товар', count: 3 } });
+  await processTick(noProduct.ctx);
+  assert.notEqual(noProduct.repo.T.runs[0].status, 'done'); assert.match(noProduct.repo.T.runs[0].error, /Товару «Чужий товар» немає в брифі/); assert.equal(noProduct.asked.length, 0);
+  const none2 = await batchSetup({ input: {} });
+  await processTick(none2.ctx); assert.match(none2.repo.T.runs[0].error, /Не вказано товар/);
+  const same = await batchSetup({ cap: 100, sameHeadline: true });
+  await processTick(same.ctx);
+  const sc = (await same.repo.readSection(1, 'creatives')).version.content;
+  assert.deepEqual(sc.items.map((x) => x.status), ['ready', 'needs_check', 'needs_check', 'needs_check']);
+  assert.match(sc.items[1].problems.join(' '), /заголовок повторює інший креатив/);
+});
+await test('batch: without the materials it waits, without the model it fails clearly, without a generator the texts are made and no limit is applied', async () => {
+  const b = await batchSetup({ verdict: 'not_enough', ask: async () => { throw new Error('must not be called'); } });
+  await processTick(b.ctx); assert.equal(b.repo.T.runs[0].status, 'waiting'); assert.equal(b.repo.T.runs[0].state.blocked_on, 'materials');
+  const m = await batchSetup({ ask: null }); await processTick(m.ctx); assert.equal(m.repo.T.runs[0].status, 'failed'); assert.match(m.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const t = await batchSetup({ hf: null, input: { product: 'AirPlug', count: 3 } }); await processTick(t.ctx);
+  assert.equal(t.repo.T.runs[0].status, 'done', t.repo.T.runs[0].error);
+  const tc = (await t.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(tc.items.length, 3); assert.ok(tc.items.every((x) => x.status === 'planned' && !x.image_url)); assert.match(tc.open.join(' '), /Higgsfield не налаштовано/);
+});
+await test('batch: the skill is the Creator\'s, a person starts it from the section of the creatives (product and count), the panel stops while an agent proposal waits', () => {
+  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'creator').skills.some((s) => s.key === 'batch_creatives'));
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const dossier = fs.readFileSync(path.join(root, 'src/components/Workflow/Dossier.jsx'), 'utf8'), panel = fs.readFileSync(path.join(root, 'src/components/Workflow/BatchPanel.jsx'), 'utf8');
+  assert.match(dossier, /BatchPanel/); assert.match(dossier, /sec\.key === 'creatives'/); assert.match(panel, /requestRun\(projectId, 'creator', 'batch_creatives'/); assert.match(panel, /BATCH_MAX/); assert.match(panel, /proposals/);
 });
 console.log(`\n${passed} workflow checks passed`);

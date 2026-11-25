@@ -11,6 +11,7 @@ import AudienceView from './AudienceView';
 import CompetitorsView from './CompetitorsView';
 import { CreativesPage, StrategyPage } from './Package';
 import { BrandDnaEditor, BrandDnaView } from './BrandDnaView';
+import BatchPanel from './BatchPanel';
 
 // «Досьє» of a project (screen 2 of step A3, the variant A of the mockup): the 10 sections on the left, the chosen one on the right with its versions
 // and the proposals of the agents. A person's version is never replaced by an agent: the agent can only propose.
@@ -113,6 +114,7 @@ export default function Dossier({ projectId, initialKey }) {
             </>
           ) : shown ? (
             <>
+              {sec.key === 'creatives' && <BatchPanel projectId={projectId} email={email} proposals={proposals.length} onRequested={loadSection} />}
               <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}{shown.sources?.length ? ` · джерела: ${shown.sources.map((s) => (typeof s === 'string' ? s : s.title || s.url || '')).filter(Boolean).join(', ')}` : ''}</div>
               {kind && <div className="wf-row" style={{ marginBottom: 10 }}><button type="button" className={'wf-btn sm' + (!asText ? ' p' : '')} onClick={() => setAsText(false)}>Огляд</button><button type="button" className={'wf-btn sm' + (asText ? ' p' : '')} onClick={() => setAsText(true)}>Текст</button></div>}
               {kind && !asText ? (kind === 'site' ? <SiteView key={shown.id} content={shown.content} /> : kind === 'audience' ? <AudienceView key={shown.id} content={shown.content} /> : kind === 'competitors' ? <CompetitorsView key={shown.id} content={shown.content} projectId={projectId} email={email} busy={busy || shown.id !== current?.id} onSaveAds={saveAds} /> : kind === 'strategy' ? <StrategyPage key={shown.id} projectId={projectId} content={shown.content} /> : <CreativesPage key={shown.id} content={shown.content} />) :

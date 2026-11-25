@@ -6,6 +6,7 @@
 // their history), everything else stays as approved. ctx.ask is the model, ctx.hf the picture generator (the real one when its keys are set).
 import { createHash } from 'node:crypto';
 import * as hfReal from '../../hfImage.js';
+import { affordableCount, buildBatchGoals, clampCount, markDuplicates } from './batchEngine.js';
 import { DEFAULT_IMAGE_LIMIT_USD, buildCreativesPrompt, checkCards, gatherCreativeFacts, goalsOf, imageRequestOf, parseCreativesAnswer, referencePool, renderCreativesText, tagOf } from './creativesEngine.js';
 
 const real = { buildImageRequest: hfReal.buildImageRequest, profile: hfReal.profileFromEnv, estimate: hfReal.estimate, submit: hfReal.submit, check: hfReal.check };
@@ -59,12 +60,12 @@ async function makePictures({ items, ctx, run, modelCost }) {
   return { imageSpent, open, limit, hf };
 }
 
-function finish({ items, ctx, run, goalsCount, fresh, modelCost, pics, answerCost, note }) {
+function finish({ items, ctx, run, goalsCount, fresh, modelCost, pics, answerCost, note, batches = [] }) {
   const open = [...pics.open];
   items.forEach((x) => { if (x.status === 'needs_check') open.push(`«${x.tag}»: ${x.problems.join('; ')}.`); });
   if (items.some((x) => x.status === 'failed')) open.push('Не всі картинки вдалося створити: причини біля кожного креатива.');
   const spentAll = r4(items.reduce((s, x) => s + Number(x.cost_usd || 0), 0));
-  const content = { schema: 1, branch: 'A', items, spent_usd: spentAll, limit_usd: pics.limit, open };
+  const content = { schema: 1, branch: 'A', items, spent_usd: spentAll, limit_usd: pics.limit, open, ...(batches.length ? { batches } : {}) };
   const ready = items.filter((x) => x.status === 'ready').length;
   return {
     writes: [{ key: 'creatives', body: renderCreativesText(items, { branch: 'A', spent: spentAll, limit: pics.limit, open }), content, sources: [{ title: 'Бриф: цілі креативів' }, { title: 'Банк ідей' }, { title: 'Картка проєкту: матеріали' }] }],
@@ -117,7 +118,7 @@ export async function firstCreatives({ run, ctx }) {
     checked.cards.forEach((c, i) => items.push({ id: `c${base + i + 1}`, ...c, image_url: '', path: '', job: null, cost_usd: 0 })); // a goal the model skipped is made on the next run
   }
   const pics = await makePictures({ items, ctx, run, modelCost });
-  return finish({ items, ctx, run, modelCost, pics, note: `Цілей: ${goals.length}, нових карток: ${fresh.length}` });
+  return finish({ items, ctx, run, modelCost, pics, batches: prev?.batches || [], note: `Цілей: ${goals.length}, нових карток: ${fresh.length}` });
 }
 
 // remarks = [{ target: 'creative:c2', text }]: the creatives the manager or the client returned. Only they are made again.
@@ -151,5 +152,62 @@ export async function reworkCreatives({ run, ctx }) {
     Object.assign(old, card, { id: old.id, image_url: '', path: '', job: null, attempt: 0, estimate_usd: 0, note: '', rework: [...(old.rework || []), { from_version: old.version || 1, comment: t.text }] });
   }
   const pics = await makePictures({ items, ctx, run, modelCost: answer.costUsd || 0 });
-  return finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, note: `Перероблено креативів: ${checked.cards.length}` });
+  return finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches: sec.batches || [], note: `Перероблено креативів: ${checked.cards.length}` });
+}
+
+// The skill «batch_creatives» (Zeely item 2): a batch of static ads for ONE product. input = { product, count }. Code picks the number (at most 20, and no more than the image limit of the project can pay for),
+// gives every card an idea of the bank and a format, the model writes the words, the same checks run, repeats of a headline go to the manager. The cards are added to the section «Креативи (готові)»
+// (an approved section receives them as a proposal of the agent, which the manager accepts).
+export async function batchCreatives({ run, ctx }) {
+  const product = String(run.input?.product || '').trim();
+  const brief = await ctx.repo.readSection(run.project_id, 'brief');
+  if (!brief?.version) return { blocked: { on: 'brief', reason: 'Пакет креативів чекає на бриф.' }, steps: [{ title: 'Брифу ще немає', status: 'info' }] };
+  const names = (brief.version.content?.economics?.products || []).map((p) => String(p?.name || '').trim()).filter(Boolean);
+  const chosen = names.find((n) => norm(n) === norm(product));
+  if (!chosen) throw new Error(product ? `Товару «${product}» немає в брифі: пакет створюється лише для товарів брифу.` : 'Не вказано товар для пакета креативів.');
+  const materialsSec = (await ctx.repo.readSection(run.project_id, 'materials'))?.version || null;
+  if (materialsSec?.content?.verdict === 'not_enough') return { blocked: { on: 'materials', reason: 'Матеріалів недостатньо: пакет робиться після їх отримання.' }, steps: [{ title: 'Матеріалів недостатньо', status: 'info' }] };
+  if (!ctx.ask) throw new Error('Немає доступу до моделі: у змінних середовища Vercel не задано ANTHROPIC_API_KEY.');
+
+  const prev = (await ctx.repo.readSection(run.project_id, 'creatives'))?.version?.content;
+  const items = prev?.branch === 'A' && Array.isArray(prev.items) ? prev.items.map((x) => ({ ...x })) : [];
+  const materials = await ctx.repo.readCreativeMaterials(run.project_id);
+  const pool = referencePool(materials);
+  const ideasSec = (await ctx.repo.readSection(run.project_id, 'ideas'))?.version?.content || null;
+  const audSec = (await ctx.repo.readSection(run.project_id, 'audience'))?.version?.content || null;
+  const brandDna = (await ctx.repo.readSection(run.project_id, 'brand_dna'))?.version?.content || null;
+
+  // how many the money allows: the limit of the project minus what it spent this month minus the pictures that are already planned and wait for money
+  const asked = clampCount(run.input?.count);
+  let count = asked, limitedBy = null, perImage = null;
+  const hf = hfOf(ctx);
+  if (hf) {
+    const snap = await ctx.repo.loadSnapshot(run.project_id);
+    const limit = snap.state?.cost_cap_usd != null ? Number(snap.state.cost_cap_usd) : DEFAULT_IMAGE_LIMIT_USD;
+    const before = await ctx.repo.projectCost(run.project_id, monthStart((ctx.now || (() => new Date()))()));
+    const sample = { visual_prompt: 'sample', ratio: '4:5', references: pool.filter((p) => p.kind === 'product').slice(0, 1).map((p) => ({ url: p.url })) };
+    try { perImage = await hf.estimate({ request: imageRequestOf(sample, hf) }); } catch (e) { throw new Error(`Не вдалося оцінити ціну картинки: ${String(e.message || e).slice(0, 200)}`); }
+    const waiting = items.filter((x) => ['planned', 'failed'].includes(x.status) && !x.job && x.visual_prompt).length;
+    const a = affordableCount({ count, remaining: limit - before - waiting * perImage, perImage });
+    count = a.count; limitedBy = a.limitedBy;
+    if (count === 0) return { output: { items: 0, limited: true }, steps: [{ title: `Ліміт проєкту на картинки вичерпано (картинка ≈ $${perImage.toFixed(2)}): пакет не створено`, status: 'info' }], tasks: [{ type: 'creatives', owner: 'manager', priority: 'medium', title: 'Підняти ліміт витрат проєкту на картинки', evidence: `Пакет креативів на «${chosen}» не створено: лишок ліміту не вистачає навіть на одну картинку.` }] };
+  }
+
+  const ideas = ((ideasSec?.items) || []).filter((x) => x.status === 'ok').slice(0, 14).map((x) => ({ id: x.id }));
+  const goals = buildBatchGoals({ product: chosen, count, ideas, existing: items });
+  const facts = gatherCreativeFacts({ brief: brief.version, materials, ideas: ideasSec, audience: audSec, goals, brandDna });
+  const project = await ctx.repo.readProject(run.project_id);
+  const prompt = buildCreativesPrompt({ facts, language: project?.client_language === 'en' ? 'en' : 'uk' });
+  const answer = await ctx.ask({ projectId: run.project_id, runId: run.id, system: prompt.system, user: prompt.user, maxTokens: Math.min(12000, 1500 + 520 * count) });
+  const checked = checkCards(parseCreativesAnswer(answer.text), { facts, pool });
+  if (!checked.cards.length) throw new Error('Модель не повернула жодного придатного креатива.');
+  markDuplicates(checked.cards, items);
+  const base = items.length;
+  checked.cards.forEach((c, i) => items.push({ id: `c${base + i + 1}`, ...c, image_url: '', path: '', job: null, cost_usd: 0 }));
+  const batches = [...(prev?.batches || []), { run: run.id, product: chosen, asked, made: checked.cards.length, limited_by: limitedBy, per_image_usd: perImage }];
+  const pics = await makePictures({ items, ctx, run, modelCost: answer.costUsd || 0 });
+  const out = finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches, note: `Пакет «${chosen}»: замовлено ${asked}, створено ${checked.cards.length}${limitedBy ? ' (більше не вміщається в ліміт проєкту)' : ''}${checked.missing.length ? `, модель пропустила ${checked.missing.length}` : ''}` });
+  if (limitedBy) out.steps.unshift({ title: `Ліміт проєкту дозволяє ${count} з ${asked} картинок (одна ≈ $${perImage.toFixed(2)})`, status: 'info' });
+  out.output = { ...out.output, asked, made: checked.cards.length, limited_by: limitedBy };
+  return out;
 }

@@ -18,6 +18,7 @@ export const ACTIVE_AGENTS = [
     key: 'creator', name: 'Креатор', short: 'Кр', does: 'Матеріали, ідеї та креативи', rights: 'read',
     skills: [
       { key: 'materials_ideas', label: 'готує матеріали та ідеї' }, { key: 'first_creatives', label: 'робить перші креативи' }, { key: 'rework_creatives', label: 'переробляє креативи за зауваженнями' },
+      { key: 'batch_creatives', label: 'робить пакет креативів на товар' },
     ],
     reads: ['Бриф', 'Файли й бренд клієнта', 'ДНК бренду', 'Аудиторія і конкуренти'], writes: ['Матеріали', 'Ідеї', 'Креативи (готові)'], note: 'Картинки створюються через Higgsfield в межах ліміту проєкту.',
   },

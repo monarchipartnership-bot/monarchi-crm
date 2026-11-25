@@ -177,6 +177,14 @@ export async function uploadCompetitorShot(projectId, file) {
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
+// The products of the brief (names), for the batch of creatives: the current version of the section «Бриф».
+export async function fetchBriefProducts(projectId) {
+  const sec = must(await supabase.from('wf_sections').select('current_version_id').eq('project_id', projectId).eq('key', 'brief').maybeSingle(), 'section');
+  if (!sec?.current_version_id) return [];
+  const v = must(await supabase.from('wf_section_versions').select('content').eq('id', sec.current_version_id).maybeSingle(), 'version');
+  return (v?.content?.economics?.products || []).map((p) => String(p?.name || '').trim()).filter(Boolean);
+}
+
 // Asks the orchestrator for one more run of a skill (the same open run is not queued twice). → true if queued, false if one is already open.
 export async function requestRun(projectId, agent, skill, email, input = {}) {
   const r = await supabase.from('wf_runs').insert({ project_id: projectId, agent, skill, input, trigger: 'manual', priority: 50, created_by: email || 'manager' });
