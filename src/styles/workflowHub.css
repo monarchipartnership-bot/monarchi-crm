@@ -312,3 +312,26 @@ select.wf-bd-in { width:auto; }
 .wf-pf-dot.ok { background:var(--wf-ok-bg); color:var(--wf-ok); } .wf-pf-dot.bad { background:var(--wf-bad-bg); color:var(--wf-bad); } .wf-pf-dot.warn { background:var(--wf-warn-bg); color:var(--wf-warn); }
 .wf-pf-ask { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; align-items:flex-start; }
 .wf-pf-in { max-width:380px; width:100%; }
+
+/* Налаштування агентів: one page, two entrances (the card of a project and the section AI Agents) */
+.wf-set-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+@media (max-width:860px) { .wf-set-grid { grid-template-columns:1fr; } }
+.wf-set { display:flex; justify-content:space-between; gap:14px; align-items:center; padding:9px 0; border-bottom:1px solid var(--wf-line); }
+.wf-set:last-of-type { border-bottom:0; }
+.wf-set .t { min-width:0; }
+.wf-set .t b { display:block; font-weight:600; }
+.wf-set .c { display:flex; gap:8px; align-items:center; flex:none; }
+.wf-set-num { width:84px; }
+.wf-set-src { display:inline-block; margin-top:2px; font-size:11px; font-weight:600; padding:1px 8px; border-radius:999px; background:var(--wf-soft); color:var(--wf-muted); }
+.wf-set-src.project { background:var(--wf-info-bg); color:var(--wf-info); }
+.wf-set-src.global { background:var(--wf-soft); color:var(--wf-plum); }
+.wf-sw { position:relative; width:44px; height:24px; flex:none; display:inline-block; }
+.wf-sw input { opacity:0; position:absolute; inset:0; width:100%; height:100%; margin:0; cursor:pointer; }
+.wf-sw i { position:absolute; inset:0; border-radius:999px; background:var(--wf-border); transition:background .15s; }
+.wf-sw i::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 3px rgba(0,0,0,.3); }
+.wf-sw input:checked + i { background:var(--wf-orchid); }
+.wf-sw input:checked + i::after { transform:translateX(20px); }
+.wf-sw input:focus-visible + i { outline:2px solid var(--wf-orchid); outline-offset:2px; }
+.wf-set-stop { box-shadow:0 0 0 1px var(--wf-bad); background:var(--wf-bad-bg); }
+.wf-set-bar { position:sticky; bottom:12px; display:flex; gap:10px; align-items:center; justify-content:flex-end; padding:10px 16px; border-radius:16px; background:var(--wf-surface); box-shadow:0 0 0 1px var(--wf-border), 0 8px 24px rgba(60,30,110,.18); z-index:5; }
+.wf-set-bar span { margin-right:auto; font-weight:600; }

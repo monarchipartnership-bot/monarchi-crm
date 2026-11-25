@@ -88,14 +88,10 @@ export default function ProcessOverview({ projectId, onGo }) {
         <div className="wf-card">
           <div className="wf-row" style={{ justifyContent: 'space-between' }}>
             <div>
-              <h3 style={{ margin: 0 }}>Дрібні дії оптимізатора</h3>
-              <div className="wf-muted" style={{ fontSize: 13, marginTop: 4, maxWidth: 640 }}>
-                {state.auto_small_actions
-                  ? 'Увімкнено: Медіабаєр сам призупиняє слабке оголошення (не останнє в групі) і піднімає бюджет доброї групи кроком до 20% у межах бюджету з брифу. Кожна дія записується в журнал із тим, як її відкотити. Усе інше, зокрема вимкнення кампанії чи групи, нові креативи і більші зміни бюджету, іде на Апрув 3.'
-                  : 'Вимкнено: оптимізатор лише дає рекомендації, у кабінеті нічого не змінює. Увімкніть, щоб він сам виконував дрібні дії: пауза слабкого оголошення і підняття бюджету доброї групи на крок.'}
-              </div>
+              <h3 style={{ margin: 0 }}>Налаштування агентів</h3>
+              <div className="wf-muted" style={{ fontSize: 13, marginTop: 4, maxWidth: 640 }}>Розклад, ліміти витрат, дрібні дії оптимізатора ({state.auto_small_actions ? 'зараз увімкнено' : 'зараз вимкнено'}), пороги й сповіщення: усе в одному місці.</div>
             </div>
-            <button type="button" className={'wf-btn sm' + (state.auto_small_actions ? '' : ' p')} disabled={busy} onClick={() => act(() => patchState(projectId, { auto_small_actions: !state.auto_small_actions }, email, state.auto_small_actions ? 'Дрібні дії оптимізатора вимкнено: лише рекомендації.' : 'Дрібні дії оптимізатора ввімкнено: Медіабаєр сам призупиняє слабкі оголошення і піднімає бюджет у межах кроку.'))}>{state.auto_small_actions ? 'Вимкнути' : 'Увімкнути'}</button>
+            <button type="button" className="wf-btn sm p" onClick={() => onGo?.('settings')}>Відкрити налаштування</button>
           </div>
         </div>
       )}

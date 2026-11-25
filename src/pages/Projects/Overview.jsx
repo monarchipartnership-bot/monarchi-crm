@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchOverviewData, saveLimits, sendDigestNow, setGlobalStop, setProjectCap, setProjectPaused } from '../../lib/api/workflow';
+import { fetchOverviewData, sendDigestNow, setGlobalStop, setProjectCap, setProjectPaused } from '../../lib/api/workflow';
 import { FILTERS, KIND, buildOverview, digestText, filterRows, money, usage } from '../../lib/workflow/overview';
 import { STAGES } from '../../lib/workflow/view';
 import { Pill } from '../../components/Workflow/parts';
@@ -75,7 +75,6 @@ export default function Overview() {
   const [busy, setBusy] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
   const [sent, setSent] = useState(false);
-  const [limits, setLimits] = useState(null); // { monthly, project } while the limits are edited
   const load = useCallback(async () => {
     try { setData(await fetchOverviewData()); setErr(''); } catch (e) { setErr(e.message || String(e)); }
   }, []);
@@ -122,19 +121,10 @@ export default function Overview() {
           </div>
         </div>
         <div className="wf-row" style={{ marginTop: 10 }}>
-          <button type="button" className="wf-btn sm" aria-expanded={!!limits} onClick={() => setLimits(limits ? null : { monthly: String(settings.monthly_cap_usd), project: String(settings.project_cap_default_usd) })}>Ліміти витрат</button>
+          <button type="button" className="wf-btn sm" onClick={() => navigate('/ai-agents?window=settings')}>Ліміти, розклад і сповіщення: Налаштування агентів</button>
         </div>
-        {limits && (
-          <div className="wf-row" style={{ marginTop: 10 }}>
-            <label htmlFor="wf-lim-m" className="wf-muted" style={{ fontSize: 12.5 }}>Усього на місяць, $</label>
-            <input id="wf-lim-m" className="wf-inp" inputMode="decimal" value={limits.monthly} onChange={(e) => setLimits({ ...limits, monthly: e.target.value })} style={{ width: 100 }} />
-            <label htmlFor="wf-lim-p" className="wf-muted" style={{ fontSize: 12.5 }}>На проєкт за замовчуванням, $</label>
-            <input id="wf-lim-p" className="wf-inp" inputMode="decimal" value={limits.project} onChange={(e) => setLimits({ ...limits, project: e.target.value })} style={{ width: 100 }} />
-            <button type="button" className="wf-btn p sm" disabled={busy || settings.missing} onClick={go(async () => { await saveLimits({ monthly_cap_usd: limits.monthly, project_cap_default_usd: limits.project }); setLimits(null); })}>Зберегти</button>
-          </div>
-        )}
         <details style={{ marginTop: 10 }}>
-          <summary className="wf-muted" style={{ cursor: 'pointer' }}>Щоденний дайджест (щодня о 9:00 у Telegram) · перегляд</summary>
+          <summary className="wf-muted" style={{ cursor: 'pointer' }}>Ранкове зведення в Telegram · перегляд</summary>
           <pre className="wf-ov-digest">{digestText(ov)}</pre>
           <div className="wf-row" style={{ marginTop: 8 }}>
             <button type="button" className="wf-btn sm" disabled={busy} onClick={go(async () => { await sendDigestNow(); setSent(true); })}>Надіслати дайджест зараз</button>

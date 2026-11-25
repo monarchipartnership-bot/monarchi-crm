@@ -44,6 +44,7 @@ import '../../styles/reportsPlum.css'; // the hand-made part: switch of the sect
 import { fetchProjectCreative } from '../../lib/api/projectCreative';
 import { infoProgress } from '../../lib/agents/infoProgress';
 import ProcessOverview from '../../components/Workflow/ProcessOverview';
+import AgentSettings from '../AiAgents/AgentSettings';
 import ApprovalsTab from '../../components/Workflow/ApprovalsTab';
 import { fetchApprovalsOf } from '../../lib/api/workflow';
 import { pendingCount } from '../../lib/workflow/approvalsTab';
@@ -61,6 +62,7 @@ const TABS = [
   { key: 'work', label: 'Робота над звітами', icon: null, line: <path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /> },
   { key: 'decks', label: 'Історія проекту', icon: PAGE_ICONS['page.clients-report'].src },
   { key: 'agent', label: 'Агент звітів', icon: PAGE_ICONS['page.ai-agents'].src },
+  { key: 'settings', label: 'Налаштування агентів', icon: PAGE_ICONS['page.ai-agents'].src }, // when they work, how much they spend, what they do alone, when they tell a person (one place)
 ];
 
 // «Звітність» (owner, 2026-11-11): the four report tabs are one tab of the card with four sections inside. Their keys and addresses stay (?tab=builder, compose, work, decks),
@@ -75,6 +77,7 @@ const STRIP = [
   TABS.find((x) => x.key === 'approvals'),
   { key: 'reports', label: 'Звітність', icon: PAGE_ICONS['page.weekly-report'].src },
   TABS.find((x) => x.key === 'agent'),
+  TABS.find((x) => x.key === 'settings'),
 ];
 // the line icons of the menu of the card (the menu is the one of the AI Agents section: a round medallion with a line icon)
 const STRIP_LINE = {
@@ -85,6 +88,7 @@ const STRIP_LINE = {
   approvals: <><circle cx="12" cy="12" r="9" /><path d="M8 12.5l3 3 5-6" /></>,
   reports: <path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7" />,
   agent: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></>,
+  settings: <><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></>,
 };
 const STATUSES = ['active', 'paused', 'completed'];
 
@@ -678,6 +682,7 @@ function ProjectDetailCard() {
       {tab === 'dossier' && <Dossier key={'dossier-' + id + (searchParams.get('section') || '')} projectId={id} initialKey={searchParams.get('section') || undefined} />}
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
+      {tab === 'settings' && <AgentSettings key={'settings-' + id} projectId={id} />}
       </div>
       {confirmDialog}
     </div>

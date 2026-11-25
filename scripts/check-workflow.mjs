@@ -3390,7 +3390,7 @@ await test('small actions: the switch is per project, off by default, in the ove
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
   assert.match(rd('supabase/migrations/20261074000000_workflow_small_actions.sql'), /auto_small_actions boolean not null default false/);
-  const ov = rd('src/components/Workflow/ProcessOverview.jsx'); assert.match(ov, /Дрібні дії оптимізатора/); assert.match(ov, /auto_small_actions: !state\.auto_small_actions/); assert.match(ov, /state\.stage >= 3/);
+  const ov = rd('src/components/Workflow/ProcessOverview.jsx'), page = rd('src/pages/AiAgents/AgentSettings.jsx'); assert.match(page, /Дрібні дії оптимізатора/); assert.match(page, /setSmallActions\(project/); assert.match(ov, /Налаштування агентів/); assert.match(ov, /onGo\?\.\('settings'\)/); assert.match(ov, /state\.stage >= 3/);
   assert.match(ACTIVE_AGENTS.find((a) => a.key === 'mediabuyer').note, /дрібні дії/);
   assert.equal(ACTIVE_AGENTS.find((a) => a.key === 'mediabuyer').rights, 'write'); assert.deepEqual(ACTIVE_AGENTS.filter((a) => a.rights === 'write').map((a) => a.key), ['mediabuyer'], 'still the only agent that writes to a cabinet');
 });
@@ -3533,5 +3533,17 @@ await test('agent settings: the report switch works from the settings or the old
   assert.match(dg, /resolveConfig\(stored\)/); assert.match(dg, /cfg\.notify\.digest_hour/); assert.match(dg, /_digest_on/); assert.match(dg, /cfg\.notify\.digest\b/);
   assert.match(fs.readFileSync(path.join(root, 'api/agent-tick.js'), 'utf8'), /reports_via_orchestrator/);
   assert.match(fs.readFileSync(path.join(root, 'supabase/migrations/20261075000000_workflow_config.sql'), 'utf8'), /wf_settings add column if not exists config jsonb[\s\S]*wf_project_state add column if not exists config jsonb/);
+});
+await test('agent settings page: ONE page with two entrances (a tab in the card of a project and a window of AI Agents), the limits and the stop live there and not in a second place, the page saves only through the rules of agentConfig', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  const page = rd('src/pages/AiAgents/AgentSettings.jsx'), api = rd('src/lib/api/agentSettings.js'), pd = rd('src/pages/Projects/ProjectDetail.jsx'), home = rd('src/pages/AiAgents/AiAgentsHome.jsx'), ovw = rd('src/pages/Projects/Overview.jsx');
+  assert.match(pd, /key: 'settings', label: 'Налаштування агентів'/); assert.match(pd, /<AgentSettings key=\{'settings-' \+ id\} projectId=\{id\} \/>/); assert.match(pd, /TABS\.find\(\(x\) => x\.key === 'settings'\)/);
+  assert.match(home, /settings: \{ title: 'Налаштування агентів', Page: AgentSettings \}/); assert.match(home, /openWin\('settings'\)/);
+  assert.match(api, /applyChanges\(stored, changes, scope\)/); assert.match(api, /throw new Error\(errors\.map/); assert.match(api, /wf_project_state'\)\.update\(\{ config/); assert.match(api, /wf_settings'\)\.update\(\{ config/);
+  for (const part of ['Коли працюють', 'Скільки можуть витрачати', 'Що роблять самі', 'Пороги рішень', 'Про що повідомляти в Telegram', 'Аварійна зупинка всіх агентів', 'Пауза проєкту', 'Зберегти зміни', 'Скинути']) assert.ok(page.includes(part), part);
+  assert.match(page, /saveLimits\(/); assert.match(page, /setGlobalStop\(/); assert.match(page, /setProjectCap\(/); assert.match(page, /setSmallActions\(project/); assert.match(page, /resolveConfig\(/); assert.match(page, /sourceOf\(/);
+  assert.ok(!/saveLimits\(/.test(ovw) && /window=settings/.test(ovw), 'the window «Мої проєкти» no longer edits the limits: it leads to the settings');
+  for (const path of Object.keys(CFG_SPEC)) assert.ok(page.includes(path), 'the page shows ' + path);
 });
 console.log(`\n${passed} workflow checks passed`);

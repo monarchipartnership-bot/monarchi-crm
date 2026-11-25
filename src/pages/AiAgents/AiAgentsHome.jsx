@@ -19,7 +19,8 @@ const Help = lazy(() => import('../Projects/Help'));
 const Spend = lazy(() => import('./Spend'));
 const Runs = lazy(() => import('./Runs'));
 const Connections = lazy(() => import('./Connections'));
-const WINDOWS = { approvals: { title: 'Апруви', Page: Approvals }, overview: { title: 'Огляд проєктів', Page: Overview }, runs: { title: 'Прогони', Page: Runs }, spend: { title: 'Витрати', Page: Spend }, connections: { title: 'Підключення', Page: Connections }, help: { title: 'Як це працює', Page: Help } };
+const AgentSettings = lazy(() => import('./AgentSettings'));
+const WINDOWS = { approvals: { title: 'Апруви', Page: Approvals }, overview: { title: 'Огляд проєктів', Page: Overview }, runs: { title: 'Прогони', Page: Runs }, spend: { title: 'Витрати', Page: Spend }, connections: { title: 'Підключення', Page: Connections }, settings: { title: 'Налаштування агентів', Page: AgentSettings }, help: { title: 'Як це працює', Page: Help } };
 
 const TICK = { ok: 'працює', warn: 'повільно', bad: 'не відповідає' };
 const tickLevel = (iso, now = new Date()) => { if (!iso) return 'bad'; const m = (now - new Date(iso)) / 60000; return m < 3 ? 'ok' : m < 15 ? 'warn' : 'bad'; };
@@ -80,6 +81,7 @@ export default function AiAgentsHome() {
         <button type="button" className={'aia-tab' + (win === 'runs' ? ' active' : '')} onClick={() => openWin('runs')}>Прогони</button>
         <button type="button" className={'aia-tab' + (win === 'spend' ? ' active' : '')} onClick={() => openWin('spend')}>Витрати</button>
         <button type="button" className={'aia-tab' + (win === 'connections' ? ' active' : '')} onClick={() => openWin('connections')}>Підключення</button>
+        <button type="button" className={'aia-tab' + (win === 'settings' ? ' active' : '')} onClick={() => openWin('settings')}>Налаштування</button>
         <button type="button" className={'aia-tab' + (win === 'approvals' ? ' active' : '')} onClick={() => openWin('approvals')}>Апруви{queue.length > 0 && <b className="aia-badge">{queue.length}</b>}</button>
       </nav>
       <button type="button" className="aia-back" onClick={() => nav('/')}>← До CRM</button>
