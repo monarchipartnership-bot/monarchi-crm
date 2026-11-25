@@ -899,3 +899,11 @@
 /* 2026-11-18: the legend of a donut was squeezed to 116px (the later `.sl{min-width:0}` removed its 150px floor, so in a 320px card the words broke letter by letter and the card grew to 1800px). The legend gets its floor back and drops under the donut when the card is narrow. */
 .crh .stw .sl { flex: 1 1 150px; min-width: min(150px, 100%); }
 .crh .slr span { overflow-wrap: anywhere; }
+
+/* 2026-11-25: the four numbers of the overview in the order they are read (spent, revenue, ROAS, sales); the result is the lit card. */
+.crh .cx-quad { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.crh .cx-quad .mc { justify-content: space-between; padding: 18px 20px; }
+.crh .cx-quad .mc.main { background: linear-gradient(135deg, #8E2C9C, #4A1066); color: #fff; box-shadow: 0 18px 40px -14px #66146688; }
+.crh .cx-quad .mc.main .mct small, .crh .cx-quad .mc.main .mcf .sub { color: #F3D5F6; }
+@media (max-width: 980px) { .crh .cx-quad { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+

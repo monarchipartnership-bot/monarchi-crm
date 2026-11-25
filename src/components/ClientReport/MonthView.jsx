@@ -7,42 +7,27 @@ import { fmtValue, kpiCards, prevName, rangeText, roasBars, spendSlices, viewKey
 import { monthNameIn, normLang, trFor } from '../../lib/clientLang';
 import { computeMetric } from '../../lib/reportMetrics';
 
-// The six numbers of a report: the main one on a plum card (revenue, for lead projects the leads) with the two that explain it, the rest in tiles. `all`: the team's view (nothing hidden).
+// The four numbers of a report in the order a client reads them (owner, 2026-11-25): what was spent, what it brought in, the return, the number of sales (for lead projects: spent,
+// leads, cost per lead, clicks). The result (revenue / leads) is the lit card. The rest (cost per purchase, reach …) is in the table below. `all`: the team's view (nothing hidden).
+const KPI_ORDER = { ecom: ['spend', 'revenue', 'roas', 'purchases'], leadgen: ['spend', 'leads', 'cpl', 'clicks'] };
 export function Kpis({ view, all = false, series = null }) {
   const t = trFor(view.lang);
   const vs = prevName(view);
   const cards = kpiCards(view, { all });
   if (!cards.length) return null;
   const lead = view.kind === 'leadgen';
-  const hero = cards.find((k) => k.key === (lead ? 'leads' : 'revenue')) || cards[0];
-  const subs = (lead ? ['cpl', 'clicks'] : ['roas', 'purchases']).map((key) => cards.find((c) => c.key === key && c !== hero)).filter(Boolean);
-  const rest = cards.filter((c) => c !== hero && !subs.includes(c));
+  const picks = (KPI_ORDER[lead ? 'leadgen' : 'ecom']).map((key) => cards.find((c) => c.key === key)).filter(Boolean);
+  const list = picks.length ? picks : cards.slice(0, 4);
+  const main = lead ? 'leads' : 'revenue';
   return (
-    <div className={'cx-hero' + (rest.length ? '' : ' alone')}>
-      <div className="cx-big">
-        <small>{hero.label}</small>
-        <b className="v">{hero.value}</b>
-        {hero.change && <div className="cx-bd"><DeltaPill change={hero.change} /><span>{t('vs')} {vs}</span></div>}
-        {series?.[hero.key] && <Spark values={series[hero.key]} g={['#FFFFFF', '#F3C6F7']} w={300} h={64} className="spk cx-hspk" />}
-        {subs.length > 0 && (
-          <div className="cx-sub">
-            {subs.map((k) => (
-              <div key={k.key}><b>{k.value}</b><span>{k.label}{k.change ? ` ${k.change.arrow} ${k.change.pct}` : ''}</span></div>
-            ))}
-          </div>
-        )}
-      </div>
-      {rest.length > 0 && (
-        <div className="cx-tiles">
-          {rest.map((k) => (
-            <div className="rf mc" key={k.key}>
-              <div className="mch"><Medallion icon={k.icon} cls="sm" /><div className="mct"><small>{k.label}</small><b className="v">{k.value}</b></div></div>
-              {series?.[k.key] && <Spark values={series[k.key]} g={['#F6C5FA', '#C25AC4']} w={240} h={52} className="spk cx-kspk" />}
-              <div className="mcf">{k.change && <><DeltaPill change={k.change} /><span className="sub">{t('vs')} {vs}</span></>}</div>
-            </div>
-          ))}
+    <div className="cx-quad">
+      {list.map((k) => (
+        <div className={'rf mc cx-q' + (k.key === main ? ' main' : '')} key={k.key}>
+          <div className="mch"><Medallion icon={k.icon} cls="sm" /><div className="mct"><small>{k.label}</small><b className="v">{k.value}</b></div></div>
+          {series?.[k.key] && <Spark values={series[k.key]} g={k.key === main ? ['#FFFFFF', '#F3C6F7'] : ['#F6C5FA', '#C25AC4']} w={240} h={52} className="spk cx-kspk" />}
+          <div className="mcf">{k.change && <><DeltaPill change={k.change} /><span className="sub">{t('vs')} {vs}</span></>}</div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -138,10 +123,10 @@ export default function MonthView({ month, model }) {
     </Box>
   ) : null;
   const sparks = {};
-  if (total && month.weeks.length > 1) {
+  if (total && month.weeks.length > 2) { // two points make a straight line, not a trend
     kpiCards(total).forEach((c) => {
       const vals = month.weeks.map((w) => computeMetric(c.key, w.view.total));
-      if (vals.filter((x) => x != null && Number.isFinite(x)).length > 1) sparks[c.key] = vals.map((x) => (Number.isFinite(x) ? x : 0));
+      if (vals.filter((x) => x != null && Number.isFinite(x)).length > 2) sparks[c.key] = vals.map((x) => (Number.isFinite(x) ? x : 0));
     });
   }
   const slices = total ? spendSlices(total).map((s, i) => ({ ...s, g: PALETTE[i % PALETTE.length] })) : [];

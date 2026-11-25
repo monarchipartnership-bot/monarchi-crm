@@ -68,7 +68,7 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
     },
     // what the skills need to know about the project itself: its website and the language of the client
     async readProject(projectId) {
-      return must(await db.from('projects').select('id, website, client_language, name, client, manager').eq('id', projectId).maybeSingle(), 'project');
+      return must(await db.from('projects').select('id, website, client_language, name, client, manager, country').eq('id', projectId).maybeSingle(), 'project');
     },
     // the materials of the client kept in the project card (the page «Креативи»): the notes and the brand in project_creative.inputs, the files by kind
     async readCreativeMaterials(projectId) {
