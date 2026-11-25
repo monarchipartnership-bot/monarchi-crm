@@ -302,6 +302,11 @@ export function CreativesPage({ content, projectName }) {
       {items.length > 0 && <div className="wf-muted">Витрачено на картинки {Number(content.spent_usd || 0).toFixed(2)} USD з ліміту проєкту {Number(content.limit_usd || 0).toFixed(2)}.</div>}
       {zoom != null && zoom >= 0 && <Lightbox items={pictures} start={zoom} onClose={() => setZoom(null)} />}
       <div className="wf-ads">{items.map((c) => <Ad key={c.id} c={c} page={projectName} onZoom={onZoom} />)}</div>
+      {(content.videos || []).filter((v) => v.video_url).length > 0 && (
+        <div className="wf-col"><b>Відео</b><div className="wf-ads">{content.videos.filter((v) => v.video_url).map((v) => (
+          <div key={v.id} className="wf-card"><div className="wf-muted" style={{ fontSize: 12.5, marginBottom: 6 }}>{v.id} з креатива {v.of} · {v.duration} с</div><video src={v.video_url} controls preload="metadata" playsInline style={{ width: '100%', maxHeight: 360, borderRadius: 10, background: '#000' }} /></div>
+        ))}</div></div>
+      )}
       {(content.open || []).length > 0 && <div className="wf-muted" style={{ fontSize: 12.5 }}>Відкриті питання: {content.open.join(' ')}</div>}
     </div>
   );

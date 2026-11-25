@@ -112,9 +112,15 @@ export function buildPlan({ strategy, creatives, website, pageId, pixelId, now }
     const adsets = groups.map((g, gi) => ({
       key: `${slug(c.name)}/${slug(g.name)}`, name: `${g.name} · ${date}`, group: g.name, segment: g.segment || '',
       dailyMinor: minor(gi === 0 ? r2(Number(c.daily_budget) - each * (groups.length - 1)) : each),
-      ads: (g.creatives || []).map((x) => byId[x.id]).filter(Boolean).map((a) => {
+      // every card is an ad with its picture; a READY video made from the picture that the card has now is one more ad of the same group (a video of an older picture is not used)
+      ads: (g.creatives || []).map((x) => byId[x.id]).filter(Boolean).flatMap((a) => {
         const tags = utmTags({ campaign: c.name, content: `${a.id}-v${a.version || 1}` });
-        return { key: `${a.id}-v${a.version || 1}`, name: a.tag, creative: a, link: landingUrl(website, tags), urlTags: tags, cta: ctaType(a.cta).type };
+        const image = { key: `${a.id}-v${a.version || 1}`, name: a.tag, creative: a, link: landingUrl(website, tags), urlTags: tags, cta: ctaType(a.cta).type };
+        const videos = (creatives?.videos || []).filter((v) => v.of === a.id && v.status === 'ready' && /^https:\/\//i.test(v.video_url || '') && v.start_url === a.image_url);
+        return [image, ...videos.map((v) => {
+          const vt = utmTags({ campaign: c.name, content: `${a.id}-v${a.version || 1}-${v.id}` });
+          return { key: `${a.id}-v${a.version || 1}-${v.id}`, name: `${a.tag} · відео ${v.id}`, creative: a, video: v, link: landingUrl(website, vt), urlTags: vt, cta: ctaType(a.cta).type };
+        })];
       }),
     }));
     return { key: slug(c.name), name: `${c.name} · ${date}`, daily: Number(c.daily_budget), adsets };

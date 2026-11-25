@@ -68,6 +68,9 @@ import { batchCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { MERGE_MAX, SYSTEM_PROMPT as SYSTEM_VARIATIONS, VAR_MAX, checkVariations, needsPicture, normalizeRequest } from '../api/_lib/wf/skills/variationsEngine.js';
 import { adVariations } from '../api/_lib/wf/skills/variationsAgent.js';
 import { briefDraft } from '../api/_lib/wf/skills/briefDraftAgent.js';
+import { VIDEO_MONTHLY_MAX, buildMotionPrompt, isTestimonial, normalizeVideoRequest, planVideos, renderVideosText, videosThisMonth } from '../api/_lib/wf/skills/videoEngine.js';
+import { animateCreatives } from '../api/_lib/wf/skills/videoAgent.js';
+import { buildVideoRequest, check as hfVideoCheck, isConfigured as hfVideoConfigured, missingConfig as hfVideoMissing, profileFromEnv as hfVideoProfile } from '../api/_lib/hfVideo.js';
 import { buildBriefDraftPrompt, checkBriefDraft, corpusOf, detectCurrency, numbersSet, parseBriefDraftAnswer, priceLines, renderBriefDraftText } from '../api/_lib/wf/skills/briefDraftEngine.js';
 import { QUICK_STEPS, nameFromSite, normalizeSite } from '../src/lib/workflow/quickStart.js';
 import { enqueueReportRun, reportsViaOrchestrator } from '../api/_lib/wf/reportBridge.js';
@@ -3124,5 +3127,188 @@ await test('quick start: the button on the page of projects, the dialog, the cal
   assert.match(rd('src/components/Workflow/ProcessOverview.jsx'), /brief_pending: false/); assert.match(rd('src/components/Workflow/ProcessOverview.jsx'), /Підтвердити бриф/);
   const mig = rd('supabase/migrations/20261073000000_workflow_quick_start.sql'); assert.match(mig, /brief_pending boolean/); assert.match(mig, /launch_paused boolean/);
   assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'researcher').skills.some((s) => s.key === 'brief_draft'));
+});
+// ---------------------------------------------------------------- Zeely item 5 (owner's decisions 2026-11-25): videos from the pictures of ready creatives
+await test('video: the request is cleaned (3 sources at most, 4-10 seconds, resolution, quality, sound mode, motion) and a voice-over needs a language', () => {
+  assert.throws(() => normalizeVideoRequest({}), /хоча б один готовий креатив/); assert.throws(() => normalizeVideoRequest({ source: 'c1', audio: 'voice' }), /оберіть мову/);
+  assert.deepEqual(normalizeVideoRequest({ sources: ['c1', 'c1', 'c2', 'c3', 'c4'], duration: 99, resolution: '4k', quality: 'x', audio: 'sound', motion: 'orbit' }), { sources: ['c1', 'c2', 'c3'], duration: 10, resolution: '720p', quality: 'fast', audio: 'sound', language: '', motion: 'orbit' });
+  assert.equal(normalizeVideoRequest({ source: 'c1', duration: 1 }).duration, 4); assert.equal(normalizeVideoRequest({ source: 'c1' }).duration, 10);
+  assert.deepEqual(normalizeVideoRequest({ source: 'c1', audio: 'voice', language: 'uk', resolution: '1080p', quality: 'std' }), { sources: ['c1'], duration: 10, resolution: '1080p', quality: 'std', audio: 'voice', language: 'uk', motion: 'push_in' });
+  assert.equal(VIDEO_MONTHLY_MAX, 3);
+});
+await test('video: the prompt keeps the product unchanged and forbids text in the frame; the voice-over is the creative\'s own text; a line that speaks as a customer is refused', () => {
+  const card = VSRC('c1');
+  const base = normalizeVideoRequest({ source: 'c1' });
+  const p = buildMotionPrompt({ card, req: base });
+  assert.match(p, /exactly as in the image/); assert.match(p, /No text, subtitles, captions/); assert.match(p, /push-in/); assert.ok(!/voice-over/.test(p) && !/ambient/.test(p), 'silent: nothing about sound');
+  assert.match(buildMotionPrompt({ card, req: normalizeVideoRequest({ source: 'c1', audio: 'sound' }) }), /No speech/);
+  assert.match(buildMotionPrompt({ card, req: normalizeVideoRequest({ source: 'c1', audio: 'voice', language: 'pl' }) }), /voice-over in польська says: "Тихий сон за 150: дарунок до замовлення\."/);
+  for (const t of ['Я купила це місяць тому і дуже рада', 'Мені допомогло заснути', 'I bought it and I love it', 'As a customer I recommend']) assert.equal(isTestimonial(t), true, t);
+  for (const t of ['Тихий сон за 150: дарунок до замовлення.', 'Замовляйте сьогодні', 'Купуйте беруші і спіть спокійно']) assert.equal(isTestimonial(t), false, t);
+  const now = new Date('2026-11-25T10:00:00Z');
+  const items = [VSRC('c1'), VSRC('c2', { primary_text: 'Я купив і задоволений' }), VSRC('c3', { status: 'producing', image_url: '' })];
+  assert.throws(() => planVideos({ req: normalizeVideoRequest({ source: 'c2', audio: 'voice', language: 'uk' }), items, now }), /звучить як відгук покупця/);
+  assert.equal(planVideos({ req: normalizeVideoRequest({ source: 'c2', audio: 'sound' }), items, now }).videos.length, 1, 'without a voice-over the picture is enough');
+  assert.throws(() => planVideos({ req: normalizeVideoRequest({ source: 'c3' }), items, now }), /ще без готової картинки/); assert.throws(() => planVideos({ req: normalizeVideoRequest({ source: 'c9' }), items, now }), /Креатива c9 немає/);
+  const old = [{ id: 'v1', of: 'c1', month: '2026-11', status: 'ready' }, { id: 'v2', of: 'c1', month: '2026-11', status: 'failed' }, { id: 'v3', of: 'c1', month: '2026-10', status: 'ready' }];
+  assert.equal(videosThisMonth(old, now), 1, 'a failed video and another month are not counted');
+  const two = planVideos({ req: normalizeVideoRequest({ sources: ['c1', 'c2'] }), items, videos: [...old, { id: 'v4', of: 'c2', month: '2026-11', status: 'ready' }], now });
+  assert.equal(two.videos.length, 1); assert.deepEqual(two.skipped, ['c2'], 'only what the monthly limit of 3 allows is planned'); assert.equal(two.videos[0].start_url, VSRC('c1').image_url);
+  assert.match(renderVideosText([{ id: 'v1', of: 'c1', duration: 10, resolution: '720p', audio_mode: 'sound', status: 'ready', video_url: 'https://s/x.mp4' }]), /v1 з креатива c1: 10 с, 720p, зі звуком і музикою, без мови \[готово\] · https:\/\/s\/x\.mp4/);
+});
+await test('video: the request to Higgsfield is built from the profile (model path, start frame parameter) and the status is read from the video fields; the config is checked', async () => {
+  const profile = hfVideoProfile({ HF_VIDEO_MODEL: '/vendor/model/i2v', HF_VIDEO_START_PARAM: 'start_image', HF_VIDEO_EXTRA: '{"genre":"auto"}' });
+  assert.equal(profile.path, 'vendor/model/i2v');
+  const r = buildVideoRequest({ prompt: 'Animate', aspect_ratio: '9:16', duration: 10, resolution: '720p', quality: 'fast', audio: false, start_url: 'https://img.example/c1.png' }, profile);
+  assert.deepEqual(r, { path: 'vendor/model/i2v', body: { genre: 'auto', prompt: 'Animate', aspect_ratio: '9:16', duration: 10, resolution: '720p', mode: 'fast', generate_audio: false, start_image: 'https://img.example/c1.png' } });
+  assert.equal(buildVideoRequest({ prompt: 'x', duration: 5, resolution: '720p', quality: 'std', audio: true, start_url: 'http://insecure/x.png' }, profile).body.start_image, undefined, 'only https frames');
+  assert.deepEqual(hfVideoMissing({}), ['HF_API_KEY_ID', 'HF_API_KEY_SECRET', 'HF_VIDEO_MODEL']); assert.equal(hfVideoConfigured({ HF_API_KEY_ID: 'a', HF_API_KEY_SECRET: 'b', HF_VIDEO_MODEL: 'm' }), true);
+  const st = (json, ok = true) => async () => ({ ok, json: async () => json });
+  const url = 'https://api.higgsfield.ai/requests/1/status';
+  assert.deepEqual(await hfVideoCheck({ statusUrl: url, env: {}, fetchFn: st({ status: 'completed', video: { url: 'https://v/1.mp4' } }) }), { state: 'ready', url: 'https://v/1.mp4' });
+  assert.equal((await hfVideoCheck({ statusUrl: url, env: {}, fetchFn: st({ status: 'completed', videos: [{ url: 'https://v/2.mp4' }] }) })).url, 'https://v/2.mp4');
+  assert.equal((await hfVideoCheck({ statusUrl: url, env: {}, fetchFn: st({ status: 'completed' }) })).state, 'failed');
+  assert.match((await hfVideoCheck({ statusUrl: url, env: {}, fetchFn: st({ status: 'nsfw' }) })).error, /модерацією/); assert.equal((await hfVideoCheck({ statusUrl: url, env: {}, fetchFn: st({ status: 'in_progress' }) })).state, 'pending');
+  assert.equal((await hfVideoCheck({ statusUrl: url, env: {}, fetchFn: st({}, false) })).state, 'pending'); assert.equal((await hfVideoCheck({ statusUrl: 'https://evil.example/x', env: {} })).state, 'failed');
+});
+const fakeHfv = ({ price = 1.5, states = {}, estimateFail = false, submitFail = false } = {}) => {
+  const calls = { estimate: [], submit: [], check: [] };
+  return { calls, profile: () => ({ path: 'fake/video', startParam: 'start_image', extra: {} }), buildVideoRequest: (v, p) => ({ path: p.path, body: { prompt: v.prompt, duration: v.duration, resolution: v.resolution, mode: v.quality, generate_audio: v.audio, start_image: v.start_url } }),
+    estimate: async ({ request }) => { calls.estimate.push(request); if (estimateFail) throw new Error('Higgsfield: wrong parameter'); return price; },
+    submit: async ({ request, key }) => { if (submitFail) throw new Error('Higgsfield: rejected'); calls.submit.push({ request, key }); return { jobId: 'vj' + calls.submit.length, statusUrl: 'https://api.higgsfield.ai/requests/vj' + calls.submit.length + '/status' }; },
+    check: async ({ statusUrl }) => { calls.check.push(statusUrl); return states[statusUrl] || { state: 'ready', url: 'https://cdn.hf.example/' + statusUrl.split('/').slice(-2)[0] + '.mp4' }; } };
+};
+const vidSetup = async (opts = {}) => {
+  const s = await setup({ handlers: createHandlers({ creator: { animate_creatives: animateCreatives } }) });
+  await s.repo.writeSectionVersion(1, 'creatives', { author_kind: 'agent', author: 'creator', body: 'c', content: { schema: 1, branch: 'A', items: opts.items || [VSRC('c1'), VSRC('c2', { headline: 'Тиша', segment: '' })], spent_usd: 1, limit_usd: 5, open: [], batches: [{ run: 1 }], ...(opts.videos ? { videos: opts.videos } : {}) } });
+  s.ctx.hfv = opts.hfv === undefined ? fakeHfv() : opts.hfv; s.ctx.videoWaitMs = 0;
+  if (opts.cap != null) await s.repo.setProjectFlag(1, { cost_cap_usd: opts.cap });
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'animate_creatives', input: opts.input || { sources: ['c1', 'c2'] }, trigger: 'manual' });
+  return s;
+};
+await test('video: the skill estimates first, makes the videos of the chosen cards inside the money of the project, copies them into our storage, and keeps the cards and the batches of the section', async () => {
+  const s = await vidSetup({ cap: 100, input: { sources: ['c1', 'c2'], duration: 10, resolution: '1080p', quality: 'std', audio: 'sound', motion: 'orbit' } });
+  await processTick(s.ctx);
+  const run = s.repo.T.runs[0]; assert.equal(run.status, 'done', run.error);
+  const c = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.items.length, 2); assert.equal(c.batches.length, 1, 'the cards and the log of the batches stay'); assert.equal(c.videos.length, 2);
+  assert.deepEqual(c.videos.map((v) => [v.id, v.of, v.status, v.video_url]), [['v1', 'c1', 'ready', 'https://store.example/v1.mp4'], ['v2', 'c2', 'ready', 'https://store.example/v2.mp4']]);
+  assert.equal(s.ctx.hfv.calls.estimate.length, 2, 'the price is asked before the video is made'); assert.equal(s.ctx.hfv.calls.submit.length, 2);
+  const body = s.ctx.hfv.calls.submit[0].request.body; assert.equal(body.duration, 10); assert.equal(body.resolution, '1080p'); assert.equal(body.mode, 'std'); assert.equal(body.generate_audio, true); assert.equal(body.start_image, VSRC('c1').image_url); assert.match(body.prompt, /orbits/);
+  assert.ok(s.ctx.hfv.calls.submit.every((x) => /^[\x20-\x7e]+$/.test(x.key)) && new Set(s.ctx.hfv.calls.submit.map((x) => x.key)).size === 2, 'ASCII and different keys');
+  assert.equal(run.cost_usd, 3); assert.match((await s.repo.readSection(1, 'creatives')).version.body, /Відео[\s\S]*v1 з креатива c1/);
+  // a second request the same month counts against the limit of three
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'animate_creatives', input: { sources: ['c1', 'c2'] }, trigger: 'manual' });
+  await processTick(s.ctx);
+  const c2 = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c2.videos.length, 3, 'only one more fits into three a month'); assert.ok(s.repo.T.steps.some((x) => /не вміщається в місячний ліміт 3: c2/.test(x.title)));
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'animate_creatives', input: { sources: ['c1'] }, trigger: 'manual' });
+  await processTick(s.ctx);
+  assert.equal(s.repo.T.runs[2].output.limited, 'month'); assert.equal(s.ctx.hfv.calls.submit.length, 3, 'nothing is made over the limit');
+});
+await test('video: a video that does not fit the money of the project stays planned with the reason; a failed or moderated one is not charged; a wrong parameter is found by the free estimate', async () => {
+  const tight = await vidSetup({ cap: 2, hfv: fakeHfv({ price: 1.5 }) });
+  await processTick(tight.ctx);
+  const t = (await tight.repo.readSection(1, 'creatives')).version.content;
+  assert.deepEqual(t.videos.map((v) => v.status), ['ready', 'planned'], 'the first fits (1.5 of 2), the second does not'); assert.match(t.videos[1].note, /не вміщається в ліміт проєкту/); assert.equal(tight.ctx.hfv.calls.submit.length, 1);
+  const bad = await vidSetup({ cap: 100, hfv: fakeHfv({ states: { 'https://api.higgsfield.ai/requests/vj1/status': { state: 'failed', error: 'Higgsfield відхилив результат модерацією. Змініть сцену.' } } }) });
+  await processTick(bad.ctx);
+  const b = (await bad.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(b.videos[0].status, 'failed'); assert.match(b.videos[0].note, /модерацією/); assert.equal(b.videos[0].cost_usd, 0); assert.equal(bad.repo.T.runs[0].cost_usd, 1.5, 'only the video that was made is charged');
+  const wrong = await vidSetup({ cap: 100, hfv: fakeHfv({ estimateFail: true }) });
+  await processTick(wrong.ctx);
+  const w = (await wrong.repo.readSection(1, 'creatives')).version.content;
+  assert.ok(w.videos.every((v) => v.status === 'failed' && /wrong parameter/.test(v.note))); assert.equal(wrong.ctx.hfv.calls.submit.length, 0, 'nothing is submitted when the estimate fails'); assert.equal(wrong.repo.T.runs[0].cost_usd, 0);
+});
+await test('video: a video still being made is picked up by a second run («Забрати готові відео»); no generator, no cards, a card without a picture, a customer-like voice-over are clear errors', async () => {
+  const pend = { 'https://api.higgsfield.ai/requests/vj1/status': { state: 'pending' } };
+  const s = await vidSetup({ cap: 100, input: { sources: ['c1'] }, hfv: fakeHfv({ states: pend }) });
+  await processTick(s.ctx);
+  const c = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(c.videos[0].status, 'producing'); assert.ok(c.videos[0].job.statusUrl); assert.match(c.open.join(' '), /Забрати готові відео/);
+  delete pend['https://api.higgsfield.ai/requests/vj1/status']; // the video is ready now
+  await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'animate_creatives', input: { follow: true }, trigger: 'manual' });
+  await processTick(s.ctx);
+  const d = (await s.repo.readSection(1, 'creatives')).version.content;
+  assert.equal(d.videos.length, 1, 'a follow-up makes no new video'); assert.equal(d.videos[0].status, 'ready'); assert.equal(d.videos[0].video_url, 'https://store.example/v1.mp4'); assert.equal(s.ctx.hfv.calls.submit.length, 1, 'the job is not submitted twice');
+  assert.ok(!(d.open || []).some((o) => /Забрати готові відео/.test(o)));
+  const none = await vidSetup({ hfv: null }); await processTick(none.ctx); assert.notEqual(none.repo.T.runs[0].status, 'done'); assert.match(none.repo.T.runs[0].error, /HF_VIDEO_MODEL/);
+  const bare = await vidSetup({ items: [] }); await processTick(bare.ctx); assert.equal(bare.repo.T.runs[0].status, 'done'); assert.match(bare.repo.T.steps.map((x) => x.title).join(' '), /Креативів ще немає/);
+  const nopic = await vidSetup({ items: [VSRC('c1', { status: 'planned', image_url: '' })], input: { sources: ['c1'] } }); await processTick(nopic.ctx); assert.match(nopic.repo.T.runs[0].error, /ще без готової картинки/);
+  const talk = await vidSetup({ items: [VSRC('c1', { primary_text: 'Я купила і дуже рада' })], input: { sources: ['c1'], audio: 'voice', language: 'uk' } }); await processTick(talk.ctx); assert.match(talk.repo.T.runs[0].error, /звучить як відгук покупця/); assert.equal(talk.ctx.hfv.calls.estimate.length, 0);
+});
+await test('video: the pictures skills keep the videos of the section (a batch must not lose them); the skill is the Creator\'s; the panel is in the section of the creatives', async () => {
+  const s = await batchSetup({ cap: 100 });
+  await s.repo.writeSectionVersion(1, 'creatives', { author_kind: 'agent', author: 'creator', body: 'c', content: { schema: 1, branch: 'A', items: [], spent_usd: 0, limit_usd: 5, open: [], videos: [{ id: 'v1', of: 'c1', status: 'ready', video_url: 'https://s/v1.mp4' }] } });
+  await processTick(s.ctx);
+  assert.equal(s.repo.T.runs[0].status, 'done', s.repo.T.runs[0].error);
+  assert.deepEqual((await s.repo.readSection(1, 'creatives')).version.content.videos.map((v) => v.id), ['v1']);
+  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'creator').skills.some((x) => x.key === 'animate_creatives'));
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const dossier = fs.readFileSync(path.join(root, 'src/components/Workflow/Dossier.jsx'), 'utf8'), panel = fs.readFileSync(path.join(root, 'src/components/Workflow/VideoPanel.jsx'), 'utf8');
+  assert.match(dossier, /VideoPanel/); assert.match(panel, /requestRun\(projectId, 'creator', 'animate_creatives'/); assert.match(panel, /follow: true/); assert.match(panel, /VIDEO_MONTHLY_MAX/); assert.match(panel, /<video/);
+});
+// ---------------------------------------------------------------- Zeely item 5: a ready video of a creative becomes one more ad of the same group; Meta takes the video from our address and processes it first
+await test('video launch: the Meta writer sends the video by address, reads its processing state, and makes a video ad (video_data with the picture as the cover, a destination even without a button)', async () => {
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    const u = String(url); seen.push({ url: u, method: init?.method || 'GET', body: Object.fromEntries(new URLSearchParams(init?.body?.toString() || '')) });
+    if (u.includes('/advideos')) return new Response(JSON.stringify({ id: 4242 }), { status: 200 });
+    if (u.includes('/4242?')) return new Response(JSON.stringify({ status: { video_status: seen.filter((x) => x.url.includes('/4242?')).length < 2 ? 'processing' : 'ready' } }), { status: 200 });
+    if (u.includes('/9?')) return new Response(JSON.stringify({ status: { video_status: 'error', processing_progress: 'bad codec' } }), { status: 200 });
+    return new Response(JSON.stringify({ id: 'cr1' }), { status: 200 });
+  };
+  const w = createMetaWriter({ token: 'TOKEN123', fetchFn });
+  assert.equal(await w.uploadVideo({ accountId: '55', url: 'https://store.example/v1.mp4', title: 'Відео v1' }), '4242');
+  assert.match(seen.at(-1).url, /\/act_55\/advideos$/); assert.equal(seen.at(-1).body.file_url, 'https://store.example/v1.mp4'); assert.equal(seen.at(-1).method, 'POST');
+  await assert.rejects(() => w.uploadVideo({ accountId: '55', url: 'http://insecure.example/v.mp4' }), /https/);
+  assert.equal((await w.videoReady({ videoId: '4242' })).state, 'pending'); assert.equal((await w.videoReady({ videoId: '4242' })).state, 'ready');
+  const bad = await w.videoReady({ videoId: '9' }); assert.equal(bad.state, 'failed'); assert.match(bad.error, /bad codec/);
+  await w.createAdCreative({ accountId: '55', name: 't', pageId: '777', link: 'https://shop.example/?u=1', message: 'Текст', headline: 'Заголовок', imageHash: 'h1', cta: 'SHOP_NOW', urlTags: 'u=1', videoId: '4242' });
+  const spec = JSON.parse(seen.at(-1).body.object_story_spec);
+  assert.equal(spec.link_data, undefined); assert.deepEqual(spec.video_data, { video_id: '4242', image_hash: 'h1', message: 'Текст', title: 'Заголовок', call_to_action: { type: 'SHOP_NOW', value: { link: 'https://shop.example/?u=1' } } });
+  await w.createAdCreative({ accountId: '55', name: 't', pageId: '777', link: 'https://s.example', message: 'm', headline: 'h', imageHash: 'h', cta: 'NO_BUTTON', urlTags: '', videoId: '4242' });
+  assert.equal(JSON.parse(seen.at(-1).body.object_story_spec).video_data.call_to_action.type, 'LEARN_MORE', 'a video ad always has a destination');
+});
+const LA_VIDEO = (o = {}) => ({ id: 'v1', of: 'c1', status: 'ready', video_url: 'https://store.example/v1.mp4', start_url: LA_CREATIVES.items[0].image_url, duration: 10, ...o });
+await test('video launch: only a READY video made from the picture the card has now becomes an ad of the same group, with its own key and UTM', () => {
+  const plan = (videos) => buildPlan({ strategy: LA_STRAT, creatives: { ...LA_CREATIVES, videos }, website: 'shop.example', pageId: '7', pixelId: 'p', now: LA_NOW() });
+  const ads = plan([LA_VIDEO()]).campaigns[0].adsets[0].ads;
+  assert.equal(ads.length, 2); assert.equal(ads[0].video, undefined); assert.equal(ads[1].video.id, 'v1'); assert.match(ads[1].key, /^c1-v1-v1$/); assert.match(ads[1].name, /· відео v1$/); assert.match(ads[1].link, /utm_content=c1-v1-v1/); assert.equal(ads[1].creative.id, 'c1');
+  assert.equal(plan([]).campaigns[0].adsets[0].ads.length, 1, 'without videos nothing changes');
+  for (const bad of [LA_VIDEO({ status: 'producing' }), LA_VIDEO({ video_url: '' }), LA_VIDEO({ video_url: 'http://x/v.mp4' }), LA_VIDEO({ start_url: 'https://old.example/old.png' }), LA_VIDEO({ of: 'c9' })]) assert.equal(plan([bad]).campaigns[0].adsets[0].ads.length, 1, JSON.stringify(bad));
+  assert.equal(plan([LA_VIDEO(), LA_VIDEO({ id: 'v2' })]).campaigns[0].adsets[0].ads.length, 3);
+});
+const laVideoWriter = ({ states = ['ready'], failUpload = false } = {}) => {
+  const w = laWriter(); let i = 0;
+  w.uploadVideo = async (a) => { if (failUpload) throw new Error('Meta: bad video (#100)'); w.calls.push(['video', a]); return 'vid77'; };
+  w.videoReady = async (a) => { w.calls.push(['videoReady', a]); const st = states[Math.min(i, states.length - 1)]; i += 1; return { state: st, error: st === 'failed' ? 'bad codec' : null }; };
+  const base = w.createAdCreative; w.createAdCreative = async (a) => { const r = await base(a); return r; };
+  return w;
+};
+await test('video launch: the video is uploaded, waited for until Meta has processed it, and its ad is made after the picture ad; the PAUSED launch creates it switched off', async () => {
+  const w = laVideoWriter({ states: ['pending', 'pending', 'ready'] });
+  const s = await laSetup({ writer: w, creatives: { ...LA_CREATIVES, videos: [LA_VIDEO()] } }); s.ctx.videoReadyStepMs = 0; s.ctx.sleep = async () => {};
+  s.repo.T.runs.length = 0; await s.repo.enqueueRun({ project_id: 1, agent: 'mediabuyer', skill: 'launch', input: { status: 'PAUSED' } }); await processTick(s.ctx);
+  const run = s.repo.T.runs.at(-1); assert.equal(run.status, 'done', run.error);
+  const names = w.calls.map((c) => c[0]);
+  assert.deepEqual(names, ['campaign', 'adset', 'image', 'creative', 'ad', 'video', 'videoReady', 'videoReady', 'videoReady', 'creative', 'ad', 'campaign', 'adset', 'image', 'creative', 'ad']);
+  const vid = w.calls.find((c) => c[0] === 'video')[1]; assert.equal(vid.url, 'https://store.example/v1.mp4'); assert.match(vid.title, /відео v1/);
+  const creatives = w.calls.filter((c) => c[0] === 'creative').map((c) => c[1]); assert.equal(creatives[0].videoId, null); assert.equal(creatives[1].videoId, 'vid77'); assert.equal(creatives[1].imageHash, 'hash3', 'the same cover picture, uploaded once'); assert.match(creatives[1].link, /utm_content=c1-v1-v1/);
+  assert.ok(w.calls.filter((c) => c[0] === 'ad').every((c) => c[1].status === 'PAUSED'));
+  const snap = (await s.repo.readSection(1, 'launch')).version.content; assert.equal(snap.campaigns[0].adsets[0].ads.length, 2); assert.match(snap.campaigns[0].adsets[0].ads[1].tag, /відео v1/);
+  assert.ok(s.repo.T.journal.some((j) => j.action === 'launch' && /оголошень 3/.test(j.summary)));
+});
+await test('video launch: a video that Meta cannot process, or has not processed in time, stops the launch with the reason and keeps what is made; a failed upload says why', async () => {
+  const slow = laVideoWriter({ states: ['pending'] });
+  const a = await laSetup({ writer: slow, creatives: { ...LA_CREATIVES, videos: [LA_VIDEO()] } }); a.ctx.videoReadyWaitMs = 10; a.ctx.videoReadyStepMs = 5; a.ctx.sleep = async () => {};
+  await processTick(a.ctx);
+  assert.equal(a.repo.T.runs[0].status, 'failed'); assert.match(a.repo.T.runs[0].error, /Meta ще обробляє відео v1/); assert.ok(slow.calls.some((c) => c[0] === 'ad'), 'the picture ad that was made stays');
+  const broken = laVideoWriter({ states: ['failed'] });
+  const b = await laSetup({ writer: broken, creatives: { ...LA_CREATIVES, videos: [LA_VIDEO()] } }); await processTick(b.ctx);
+  assert.match(b.repo.T.runs[0].error, /Meta не обробила відео v1: bad codec/);
+  const up = laVideoWriter({ failUpload: true });
+  const c = await laSetup({ writer: up, creatives: { ...LA_CREATIVES, videos: [LA_VIDEO()] } }); await processTick(c.ctx);
+  assert.match(c.repo.T.runs[0].error, /bad video/);
 });
 console.log(`\n${passed} workflow checks passed`);

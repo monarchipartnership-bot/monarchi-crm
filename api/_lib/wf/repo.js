@@ -92,6 +92,18 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
         return { url: db.storage.from('creative-assets').getPublicUrl(path).data.publicUrl || url, path };
       } catch { return { url, path: '' }; }
     },
+    // a finished video is copied into our storage too (the provider keeps it only 7 days). → { url, path } (the original address and an empty path if the copy fails)
+    async persistProjectVideo(projectId, { url, name }) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return { url, path: '' };
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        const path = `projects/${projectId}/creatives/${String(name).replace(/[^\w.-]+/g, '_')}-${Date.now()}.mp4`;
+        const up = await db.storage.from('creative-assets').upload(path, bytes, { contentType: 'video/mp4', upsert: true });
+        if (up.error) return { url, path: '' };
+        return { url: db.storage.from('creative-assets').getPublicUrl(path).data.publicUrl || url, path };
+      } catch { return { url, path: '' }; }
+    },
     async listAdAccounts(projectId) {
       return must(await db.from('project_ad_accounts').select('platform, account_id, account_name, currency').eq('project_id', projectId), 'ad accounts') || [];
     },

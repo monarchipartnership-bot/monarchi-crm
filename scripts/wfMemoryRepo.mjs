@@ -81,6 +81,7 @@ export function createMemoryWfRepo({ now = () => new Date() } = {}) {
     setWebsite(projectId, url) { (T.websites ||= new Map()).set(projectId, url); },
     async readCreativeMaterials(projectId) { return T.materials?.get(projectId) || { settings: {}, assets: [] }; },
     setMaterials(projectId, m) { (T.materials ||= new Map()).set(projectId, m); },
+    async persistProjectVideo(projectId, { url, name }) { return { url: 'https://store.example/' + name + '.mp4', path: `projects/${projectId}/creatives/${name}.mp4`, from: url }; },
     async persistProjectImage(projectId, { url, name }) { return { url: 'https://store.example/' + name + '.png', path: `projects/${projectId}/creatives/${name}.png`, from: url }; },
     async listAdAccounts(projectId) { return (T.accounts.get(projectId) || []).map((a) => ({ ...a })); },
     addAccount(projectId, a) { T.accounts.set(projectId, [...(T.accounts.get(projectId) || []), a]); },

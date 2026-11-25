@@ -42,7 +42,7 @@ export async function adVariations({ run, ctx }) {
   const log = { run: run.id, mode: req.mode, of: req.sources, changed: req.vary, asked, made: checked.cards.length, limited_by: cap.limitedBy, ...(req.language ? { language: req.language } : {}) };
   const pics = await makePictures({ items, ctx, run, modelCost: answer.costUsd || 0 });
   const reused = checked.cards.filter((c) => c.status === 'ready').length;
-  const out = finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches: [...(prev?.batches || []), log], note: `Варіацій (${req.mode}): замовлено ${asked}, створено ${checked.cards.length}${reused ? `, із старою картинкою ${reused}` : ''}${cap.limitedBy ? ' (більше не вміщається в ліміт проєкту)' : ''}` });
+  const out = finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches: [...(prev?.batches || []), log], videos: prev?.videos || [], note: `Варіацій (${req.mode}): замовлено ${asked}, створено ${checked.cards.length}${reused ? `, із старою картинкою ${reused}` : ''}${cap.limitedBy ? ' (більше не вміщається в ліміт проєкту)' : ''}` });
   if (cap.limitedBy) out.steps.unshift({ title: `Ліміт проєкту дозволяє ${cap.count} з ${asked} картинок (одна ≈ $${cap.perImage.toFixed(2)})`, status: 'info' });
   out.output = { ...out.output, mode: req.mode, asked, made: checked.cards.length, reused, limited_by: cap.limitedBy };
   return out;

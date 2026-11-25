@@ -120,10 +120,30 @@ export function createMetaWriter({ token, fetchFn = fetch, graph = GRAPH } = {})
       if (!first?.hash) throw new Error('Meta не повернула hash картинки.');
       return first.hash;
     },
-    async createAdCreative({ accountId, name, pageId, link, message, headline, imageHash, cta, urlTags }) {
-      const link_data = { link, message, name: headline, image_hash: imageHash };
-      if (cta && cta !== 'NO_BUTTON') link_data.call_to_action = { type: cta, value: { link } };
-      const j = await call('POST', `${actId(accountId)}/adcreatives`, { name, object_story_spec: { page_id: pageId, link_data }, url_tags: urlTags });
+    // the video is taken by Meta from our public address (file_url, no bytes through us) and processed ASYNCHRONOUSLY: → the id of the video; videoReady says when it can be used
+    async uploadVideo({ accountId, url, title }) {
+      if (!/^https:\/\//i.test(url || '')) throw new Error('Відео креатива має бути за адресою https.');
+      const j = await call('POST', `${actId(accountId)}/advideos`, { file_url: url, name: String(title || 'video').slice(0, 100) });
+      if (!j.id) throw new Error('Meta не повернула id відео.');
+      return String(j.id);
+    },
+    async videoReady({ videoId }) {
+      const j = await call('GET', String(videoId), { fields: 'status' });
+      const s = j.status?.video_status;
+      return { state: s === 'ready' ? 'ready' : s === 'error' ? 'failed' : 'pending', error: s === 'error' ? clean(JSON.stringify(j.status?.processing_progress ?? j.status), token) : null };
+    },
+    // an ad with a picture (link_data) or, when videoId is given, a video ad (video_data; the picture of the creative is its cover, Meta needs one)
+    async createAdCreative({ accountId, name, pageId, link, message, headline, imageHash, cta, urlTags, videoId = null }) {
+      let spec;
+      if (videoId) {
+        const video_data = { video_id: videoId, image_hash: imageHash, message, title: headline, call_to_action: { type: cta && cta !== 'NO_BUTTON' ? cta : 'LEARN_MORE', value: { link } } }; // a video ad needs a destination: no button means «Дізнатись більше»
+        spec = { page_id: pageId, video_data };
+      } else {
+        const link_data = { link, message, name: headline, image_hash: imageHash };
+        if (cta && cta !== 'NO_BUTTON') link_data.call_to_action = { type: cta, value: { link } };
+        spec = { page_id: pageId, link_data };
+      }
+      const j = await call('POST', `${actId(accountId)}/adcreatives`, { name, object_story_spec: spec, url_tags: urlTags });
       return j.id;
     },
     async createAd({ accountId, adsetId, name, creativeId, status = 'ACTIVE' }) {

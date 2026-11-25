@@ -79,8 +79,18 @@ export async function launch({ run, ctx }) {
         for (const x of a.ads) {
           if (!created.creatives[x.key]) {
             const url = x.creative.image_url;
-            hashes[url] ||= await w.uploadImage({ accountId, url });
-            created.creatives[x.key] = await w.createAdCreative({ accountId, name: x.name, pageId: plan.pageId, link: x.link, message: x.creative.primary_text, headline: x.creative.headline, imageHash: hashes[url], cta: x.cta, urlTags: x.urlTags });
+            hashes[url] ||= await w.uploadImage({ accountId, url }); // the picture is the cover of a video ad too
+            let videoId = null;
+            if (x.video) { // Meta takes the video from our address and processes it: the ad is made when it is ready (a video that is not ready in time stops the launch, a repeat goes on from the saved progress)
+              videoId = await w.uploadVideo({ accountId, url: x.video.video_url, title: x.name });
+              const sleep = ctx.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
+              const maxWait = ctx.videoReadyWaitMs ?? 120000, step = ctx.videoReadyStepMs ?? 5000;
+              let waited = 0, st = await w.videoReady({ videoId });
+              while (st.state === 'pending' && waited < maxWait) { await sleep(step); waited += step; st = await w.videoReady({ videoId }); }
+              if (st.state === 'failed') throw new Error(`Meta не обробила відео ${x.video.id}${st.error ? `: ${st.error}` : ''}. Видаліть це відео з креативів або зробіть інше.`);
+              if (st.state !== 'ready') throw new Error(`Meta ще обробляє відео ${x.video.id}: запуск зупинено, повторіть його за кілька хвилин (створене лишається).`);
+            }
+            created.creatives[x.key] = await w.createAdCreative({ accountId, name: x.name, pageId: plan.pageId, link: x.link, message: x.creative.primary_text, headline: x.creative.headline, imageHash: hashes[url], cta: x.cta, urlTags: x.urlTags, videoId });
             steps += 1;
           }
           if (!created.ads[x.key]) { created.ads[x.key] = await w.createAd({ accountId, adsetId: created.adsets[a.key], name: x.name, creativeId: created.creatives[x.key], status }); steps += 1; }

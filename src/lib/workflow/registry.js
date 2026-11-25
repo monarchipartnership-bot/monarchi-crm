@@ -21,6 +21,7 @@ export const ACTIVE_AGENTS = [
       { key: 'materials_ideas', label: 'готує матеріали та ідеї' }, { key: 'first_creatives', label: 'робить перші креативи' }, { key: 'rework_creatives', label: 'переробляє креативи за зауваженнями' },
       { key: 'batch_creatives', label: 'робить пакет креативів на товар' },
       { key: 'ad_variations', label: 'робить варіації креативу, що спрацював' },
+      { key: 'animate_creatives', label: 'робить відео з готових картинок' },
     ],
     reads: ['Бриф', 'Файли й бренд клієнта', 'ДНК бренду', 'Аудиторія і конкуренти'], writes: ['Матеріали', 'Ідеї', 'Креативи (готові)'], note: 'Картинки створюються через Higgsfield в межах ліміту проєкту.',
   },

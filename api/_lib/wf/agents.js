@@ -17,6 +17,7 @@ import { briefDraft } from './skills/briefDraftAgent.js';
 import { materialsIdeas } from './skills/materialsAgent.js';
 import { batchCreatives, firstCreatives, reworkCreatives } from './skills/creativesAgent.js';
 import { adVariations } from './skills/variationsAgent.js';
+import { animateCreatives } from './skills/videoAgent.js';
 import { strategy } from './skills/strategyAgent.js';
 import { monthlyPlan } from './skills/monthlyPlanAgent.js';
 import { launch } from './skills/launchAgent.js';
@@ -44,6 +45,7 @@ export const STUBS = {
     rework_creatives: done({ output: { stub: true, reworked: 0 } }),
     batch_creatives: done({ output: { stub: true, made: 0 } }),
     ad_variations: done({ output: { stub: true, made: 0 } }),
+    animate_creatives: done({ output: { stub: true, made: 0 } }),
   },
   strategist: {
     strategy: async ({ run }) => ({ writes: [w('strategy', run.input?.rework_of ? 'Стратегія (доопрацьована)' : 'Стратегія')], steps: [{ title: 'Стратегію складено (заглушка)' }] }),
@@ -64,7 +66,7 @@ export const STUBS = {
 };
 
 // The real agents built so far. The cron door (api/wf-tick.js) uses them; the tests of the orchestrator use the stand-ins only.
-export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors, brand_dna: brandDna, brief_draft: briefDraft }, creator: { materials_ideas: materialsIdeas, first_creatives: firstCreatives, rework_creatives: reworkCreatives, batch_creatives: batchCreatives, ad_variations: adVariations }, strategist: { strategy, monthly_plan: monthlyPlan }, mediabuyer: { launch, launch_check: launchCheck, optimize }, support: { onboarding, payment_reminder: paymentReminder, weekly_report: weeklyReport, monthly_report: monthlyReport, period_report: periodReport } };
+export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors, brand_dna: brandDna, brief_draft: briefDraft }, creator: { materials_ideas: materialsIdeas, first_creatives: firstCreatives, rework_creatives: reworkCreatives, batch_creatives: batchCreatives, ad_variations: adVariations, animate_creatives: animateCreatives }, strategist: { strategy, monthly_plan: monthlyPlan }, mediabuyer: { launch, launch_check: launchCheck, optimize }, support: { onboarding, payment_reminder: paymentReminder, weekly_report: weeklyReport, monthly_report: monthlyReport, period_report: periodReport } };
 export function createRealHandlers(overrides = {}) { return createHandlers({ ...REAL, researcher: { ...REAL.researcher, ...(overrides.researcher || {}) }, creator: { ...REAL.creator, ...(overrides.creator || {}) }, strategist: { ...REAL.strategist, ...(overrides.strategist || {}) }, mediabuyer: { ...REAL.mediabuyer, ...(overrides.mediabuyer || {}) }, support: { ...REAL.support, ...(overrides.support || {}) }, ...Object.fromEntries(Object.entries(overrides).filter(([k]) => !['researcher', 'creator', 'strategist', 'mediabuyer', 'support'].includes(k))) }); }
 
 export function createHandlers(overrides = {}) {

@@ -60,12 +60,12 @@ export async function makePictures({ items, ctx, run, modelCost }) {
   return { imageSpent, open, limit, hf };
 }
 
-export function finish({ items, ctx, run, goalsCount, fresh, modelCost, pics, answerCost, note, batches = [] }) {
+export function finish({ items, ctx, run, goalsCount, fresh, modelCost, pics, answerCost, note, batches = [], videos = [] }) {
   const open = [...pics.open];
   items.forEach((x) => { if (x.status === 'needs_check') open.push(`«${x.tag}»: ${x.problems.join('; ')}.`); });
   if (items.some((x) => x.status === 'failed')) open.push('Не всі картинки вдалося створити: причини біля кожного креатива.');
   const spentAll = r4(items.reduce((s, x) => s + Number(x.cost_usd || 0), 0));
-  const content = { schema: 1, branch: 'A', items, spent_usd: spentAll, limit_usd: pics.limit, open, ...(batches.length ? { batches } : {}) };
+  const content = { schema: 1, branch: 'A', items, spent_usd: spentAll, limit_usd: pics.limit, open, ...(batches.length ? { batches } : {}), ...(videos.length ? { videos } : {}) }; // the videos belong to the section: a picture skill must not lose them
   const ready = items.filter((x) => x.status === 'ready').length;
   return {
     writes: [{ key: 'creatives', body: renderCreativesText(items, { branch: 'A', spent: spentAll, limit: pics.limit, open }), content, sources: [{ title: 'Бриф: цілі креативів' }, { title: 'Банк ідей' }, { title: 'Картка проєкту: матеріали' }] }],
@@ -118,7 +118,7 @@ export async function firstCreatives({ run, ctx }) {
     checked.cards.forEach((c, i) => items.push({ id: `c${base + i + 1}`, ...c, image_url: '', path: '', job: null, cost_usd: 0 })); // a goal the model skipped is made on the next run
   }
   const pics = await makePictures({ items, ctx, run, modelCost });
-  return finish({ items, ctx, run, modelCost, pics, batches: prev?.batches || [], note: `Цілей: ${goals.length}, нових карток: ${fresh.length}` });
+  return finish({ items, ctx, run, modelCost, pics, batches: prev?.batches || [], videos: prev?.videos || [], note: `Цілей: ${goals.length}, нових карток: ${fresh.length}` });
 }
 
 // remarks = [{ target: 'creative:c2', text }]: the creatives the manager or the client returned. Only they are made again.
@@ -152,7 +152,7 @@ export async function reworkCreatives({ run, ctx }) {
     Object.assign(old, card, { id: old.id, image_url: '', path: '', job: null, attempt: 0, estimate_usd: 0, note: '', rework: [...(old.rework || []), { from_version: old.version || 1, comment: t.text }] });
   }
   const pics = await makePictures({ items, ctx, run, modelCost: answer.costUsd || 0 });
-  return finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches: sec.batches || [], note: `Перероблено креативів: ${checked.cards.length}` });
+  return finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches: sec.batches || [], videos: sec.videos || [], note: `Перероблено креативів: ${checked.cards.length}` });
 }
 
 // How many cards with NEW pictures the money allows: the limit of the project minus what it spent this month minus the pictures that are already planned and wait for money, divided by the price of one picture.
@@ -211,7 +211,7 @@ export async function batchCreatives({ run, ctx }) {
   checked.cards.forEach((c, i) => items.push({ id: `c${base + i + 1}`, ...c, image_url: '', path: '', job: null, cost_usd: 0 }));
   const batches = [...(prev?.batches || []), { run: run.id, product: chosen, asked, made: checked.cards.length, limited_by: limitedBy, per_image_usd: perImage }];
   const pics = await makePictures({ items, ctx, run, modelCost: answer.costUsd || 0 });
-  const out = finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches, note: `Пакет «${chosen}»: замовлено ${asked}, створено ${checked.cards.length}${limitedBy ? ' (більше не вміщається в ліміт проєкту)' : ''}${checked.missing.length ? `, модель пропустила ${checked.missing.length}` : ''}` });
+  const out = finish({ items, ctx, run, modelCost: answer.costUsd || 0, pics, batches, videos: prev?.videos || [], note: `Пакет «${chosen}»: замовлено ${asked}, створено ${checked.cards.length}${limitedBy ? ' (більше не вміщається в ліміт проєкту)' : ''}${checked.missing.length ? `, модель пропустила ${checked.missing.length}` : ''}` });
   if (limitedBy) out.steps.unshift({ title: `Ліміт проєкту дозволяє ${count} з ${asked} картинок (одна ≈ $${perImage.toFixed(2)})`, status: 'info' });
   out.output = { ...out.output, asked, made: checked.cards.length, limited_by: limitedBy };
   return out;
