@@ -83,7 +83,7 @@ export default function BriefPage({ projectId, onGo }) {
   async function addCta() { let next; try { next = addCtaVariant(settings.cta_text, cta); } catch (x) { setErr(x.message); return; } await saveCta({ cta_text: next }); setCta(''); }
   async function addFiles(list, kind) { await run(async () => { for (const file of [...list]) await uploadAsset(projectId, file, kind, email); }, null, 'file:' + kind, true); }
   async function removeAsset(a) { if (await confirm({ title: 'Прибрати файл?', body: `«${a.name}» зникне з бібліотеки клієнта.`, confirmLabel: 'Прибрати', danger: true })) run(() => deleteAsset(a), null, 'del', true); }
-  const flag = (k) => run(() => patchState(projectId, k === 'paid' ? { paid_at: new Date().toISOString() } : { contracts_signed_at: new Date().toISOString() }, email, k === 'paid' ? 'Оплату підтверджено.' : 'Договори підписано.'), null, k, true);
+  const flag = (k, off) => run(() => patchState(projectId, k === 'paid' ? { paid_at: off ? null : new Date().toISOString() } : { contracts_signed_at: off ? null : new Date().toISOString() }, email, off ? (k === 'paid' ? 'Підтвердження оплати скасовано.' : 'Підтвердження договору скасовано.') : (k === 'paid' ? 'Оплату підтверджено.' : 'Договори підписано.')), null, k, true);
 
   const need = (k) => report.items.find((i) => i.key === k);
   const missing = report.items.filter((i) => !i.ok && i.level === 'required');
@@ -159,8 +159,8 @@ export default function BriefPage({ projectId, onGo }) {
     flags: (
       <div className="wf-bd-row" key="flags"><label>Оплата й договір<small>Процес стартує після обох.</small></label>
         <div className="wf-row">
-          {ctx.state?.paid_at ? <Pill tone="ok">оплату підтверджено</Pill> : <button type="button" className="wf-btn sm p" disabled={busy === 'paid'} onClick={() => flag('paid')}>Підтвердити оплату</button>}
-          {ctx.state?.contracts_signed_at ? <Pill tone="ok">договір підписано</Pill> : <button type="button" className="wf-btn sm p" disabled={busy === 'contracts'} onClick={() => flag('contracts')}>Договір підписано</button>}
+          {ctx.state?.paid_at ? <><Pill tone="ok">оплату підтверджено</Pill><button type="button" className="wf-btn sm" disabled={busy === 'paid'} onClick={() => flag('paid', true)}>Скасувати</button></> : <button type="button" className="wf-btn sm p" disabled={busy === 'paid'} onClick={() => flag('paid')}>Підтвердити оплату</button>}
+          {ctx.state?.contracts_signed_at ? <><Pill tone="ok">договір підписано</Pill><button type="button" className="wf-btn sm" disabled={busy === 'contracts'} onClick={() => flag('contracts', true)}>Скасувати</button></> : <button type="button" className="wf-btn sm p" disabled={busy === 'contracts'} onClick={() => flag('contracts')}>Договір підписано</button>}
         </div></div>
     ),
   };

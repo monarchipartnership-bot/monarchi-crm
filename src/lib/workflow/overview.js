@@ -15,7 +15,7 @@ export const KIND = {
 export const FILTERS = [['all', 'Усі'], ['action', 'Потрібна дія'], ['failed', 'Помилки'], ['wait', 'Чекаємо'], ['paused', 'Пауза']];
 
 // the button that goes with a card of «Зараз»
-const ACT_LABEL = { decide: 'Відкрити апрув', signoff: 'Записати відповідь клієнта', dossier: 'Відкрити досьє', tasks: 'Відкрити задачі', resume: 'Зняти паузу' };
+const ACT_LABEL = { decide: 'Відкрити апрув', signoff: 'Записати відповідь клієнта', dossier: 'Відкрити досьє', brief: 'Відкрити бриф', tasks: 'Відкрити задачі', resume: 'Зняти паузу' };
 
 export const monthStart = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
 const days = (iso, now) => (iso ? Math.max(0, Math.floor((now - new Date(iso)) / DAY)) : 0);
@@ -47,7 +47,7 @@ export function buildOverview({ projects = {}, states = [], runs = [], approvals
       const stop = myJournal.find((j) => ['check_failed', 'skill_stopped', 'launch_stopped'].includes(j.action));
       sinceIso = stop?.at || myRuns.filter((r) => r.status === 'failed').sort((a, b) => b.id - a.id)[0]?.finished_at || null;
     } else if (card.tone === 'warn') {
-      if (['decide', 'signoff', 'dossier'].includes(card.action)) {
+      if (['decide', 'signoff', 'dossier', 'brief'].includes(card.action)) {
         kind = 'action'; who = 'Менеджер';
         sinceIso = pending?.requested_at || (card.action === 'signoff' ? myApprovals.filter((a) => a.kind === 'strategy' && a.status === 'approved').sort((a, b) => b.id - a.id)[0]?.decided_at : null) || state.updated_at;
       } else { // a run waits for something: for a limit (the manager raises it), for the client's data (a task of the client), or for the manager's own

@@ -50,7 +50,7 @@ function Drawer({ row, ov, email, onDone, onOpen, setErr }) {
         <Bar spent={row.cost} cap={row.cap} />
       </div>
       <div className="wf-row" style={{ marginTop: 12 }}>
-        <button type="button" className="wf-btn p sm" onClick={() => onOpen(row, row.act === 'dossier' ? 'dossier' : row.act === 'tasks' ? 'tasks' : 'process')}>Відкрити проєкт</button>
+        <button type="button" className="wf-btn p sm" onClick={() => onOpen(row, row.act === 'dossier' ? 'dossier' : row.act === 'brief' ? 'brief' : row.act === 'tasks' ? 'tasks' : 'process')}>Відкрити проєкт</button>
         <button type="button" className="wf-btn sm" disabled={busy || ov.stopped} onClick={() => run(() => setProjectPaused(row.id, !row.paused, email))}>{row.paused ? 'Зняти паузу' : 'Поставити на паузу'}</button>
         <button type="button" className="wf-btn sm" onClick={() => { setEditing((x) => !x); setCapText(row.ownCap == null ? '' : String(row.ownCap)); }} aria-expanded={editing}>Змінити ліміт</button>
       </div>

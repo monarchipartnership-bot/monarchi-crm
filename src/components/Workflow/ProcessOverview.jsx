@@ -32,9 +32,10 @@ export default function ProcessOverview({ projectId, onGo }) {
     decide: () => onGo?.('approvals'), // the decisions live in the tab «Апруви» (owner's choice A, 2026-11-24)
     signoff: () => onGo?.('approvals'),
     dossier: () => onGo?.('dossier'),
+    brief: () => onGo?.('brief'),
     tasks: () => onGo?.('tasks'),
   }[now.action];
-  const actionLabel = { start: 'Запустити процес', resume: 'Зняти паузу', decide: 'Відкрити «Апруви»', signoff: 'Відкрити «Апруви»', tasks: 'Відкрити задачі', dossier: 'Відкрити Досьє' }[now.action];
+  const actionLabel = { start: 'Запустити процес', resume: 'Зняти паузу', decide: 'Відкрити «Апруви»', signoff: 'Відкрити «Апруви»', tasks: 'Відкрити задачі', dossier: 'Відкрити Досьє', brief: 'Відкрити «Бриф»' }[now.action];
 
   return (
     <div className="wf wf-page wf-grid">
@@ -71,16 +72,6 @@ export default function ProcessOverview({ projectId, onGo }) {
             </div>
           )}
           {state.launch_paused && state.stage < 3 && <div className="wf-muted" style={{ fontSize: 13 }}>Перший запуск піде ВИМКНЕНИМ (PAUSED): гроші не витрачаються, доки ви самі не ввімкнете кампанії в Ads Manager.</div>}
-        </div>
-      )}
-
-      {state && state.stage === 0 && (
-        <div className="wf-card">
-          <h3>Умови старту</h3>
-          <Cond ok={hasBrief} label="Бриф заповнено" action={<button type="button" className="wf-btn sm" onClick={() => onGo?.('brief')}>Відкрити бриф</button>} />
-          <Cond ok={!!state.paid_at} label="Оплату підтверджено" action={<button type="button" className="wf-btn sm" disabled={busy} onClick={() => act(() => patchState(projectId, { paid_at: state.paid_at ? null : new Date().toISOString() }, email, state.paid_at ? 'Оплату знято.' : 'Оплату підтверджено.'))}>{state.paid_at ? 'Зняти' : 'Підтвердити'}</button>} />
-          <Cond ok={!!state.contracts_signed_at} label="Договори підписано" action={<button type="button" className="wf-btn sm" disabled={busy} onClick={() => act(() => patchState(projectId, { contracts_signed_at: state.contracts_signed_at ? null : new Date().toISOString() }, email, state.contracts_signed_at ? 'Підписання договорів знято.' : 'Договори підписано.'))}>{state.contracts_signed_at ? 'Зняти' : 'Підтвердити'}</button>} />
-          <Cond ok={state.has_data != null} label={state.has_data == null ? 'Дані в кабінетах: Дослідник перевірить, коли заповнено бриф' : state.has_data ? 'У кабінетах є дані: буде аудит' : 'У кабінетах немає даних: аудиту не буде'} />
         </div>
       )}
 
@@ -157,8 +148,4 @@ function Readiness({ projectId, email }) {
       </div>
     </div>
   );
-}
-
-function Cond({ ok, label, action }) {
-  return <div className="wf-cond"><Pill tone={ok ? 'ok' : 'warn'}>{ok ? 'Готово' : 'Потрібно'}</Pill><span>{label}</span>{action}</div>;
 }

@@ -65,9 +65,6 @@
 .wf-j > div:last-child { border:0; } .wf-j time { color:var(--wf-muted); font-size:12px; }
 
 /* start conditions */
-.wf-cond { display:flex; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--wf-line); }
-.wf-cond:last-child { border:0; }
-.wf-cond > span:first-child { flex:1; }
 
 /* dossier */
 .wf-dos { display:grid; grid-template-columns:270px minmax(0,1fr); gap:14px; align-items:start; }

@@ -98,10 +98,10 @@ export function nowCard({ state, runs = [], approvals = [], hasBrief = false, jo
   if (so) return { tone: 'warn', title: 'Запишіть відповідь клієнта', text: 'Стратегію затверджено (Апрув 1). Запуск чекає на підпис клієнта.', action: 'signoff', approvalId: null };
   if (state.stage === 0) {
     const need = [];
-    if (!hasBrief) need.push('заповнити бриф у Досьє');
+    if (!hasBrief) need.push('заповнити бриф');
     if (!state.paid_at) need.push('підтвердити оплату');
     if (!state.contracts_signed_at) need.push('підтвердити підписання договорів');
-    if (need.length) return { tone: 'warn', title: 'Для старту потрібно', text: need.join('; ') + '.', action: 'dossier' };
+    if (need.length) return { tone: 'warn', title: 'Для старту потрібно', text: need.join('; ') + '.', action: 'brief' };
   }
   const openRuns = runs.filter((r) => OPEN.has(r.status)).sort((a, b) => a.id - b.id);
   const open = openRuns.find((r) => r.status !== 'waiting') || null;

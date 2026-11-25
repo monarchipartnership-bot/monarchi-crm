@@ -2084,7 +2084,7 @@ await test('overview: every project is one of five kinds (error, your action, wa
   assert.equal(by(4).kind, 'ok'); assert.equal(by(5).kind, 'paused'); assert.equal(by(5).age, 6);
   assert.deepEqual([by(6).kind, by(6).who], ['action', 'Менеджер'], 'a run stopped by a limit waits for the manager to raise it');
   assert.deepEqual([by(6).what, by(3).what], ['Ліміт витрат вичерпано', 'Чекаємо дані від клієнта'], 'the two most common waits are said plainly');
-  assert.equal(by(7).kind, 'action'); assert.equal(by(7).act, 'dossier'); assert.match(by(7).last, /оплату/);
+  assert.equal(by(7).kind, 'action'); assert.equal(by(7).act, 'brief'); assert.match(by(7).last, /оплату/);
   assert.deepEqual(ov.counts, { all: 7, action: 3, failed: 1, wait: 1, paused: 1, ok: 1, needYou: 4 });
 });
 await test('overview: the waiting run goes to the manager when the manager holds an open task, and only closed tasks of the client do not count', () => {
