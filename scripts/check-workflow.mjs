@@ -68,6 +68,10 @@ import { batchCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { MERGE_MAX, SYSTEM_PROMPT as SYSTEM_VARIATIONS, VAR_MAX, checkVariations, needsPicture, normalizeRequest } from '../api/_lib/wf/skills/variationsEngine.js';
 import { adVariations } from '../api/_lib/wf/skills/variationsAgent.js';
 import { DEFAULTS as CFG_DEFAULTS, SPEC as CFG_SPEC, applyChanges, checkValue, getPath as cfgGet, plannerConfig, resolveConfig, sourceOf as cfgSource } from '../src/lib/workflow/agentConfig.js';
+import { SPEC as EX_SPEC, applyChosen, buildExtractPrompt, checkExtraction, conflictOf, currentValue, shapeValue } from '../src/lib/workflow/briefExtract.js';
+import { docxText, isDocx, isPdf } from '../api/_lib/docText.js';
+import { readFiles } from '../api/brief-extract.js';
+import zlib from 'node:zlib';
 import { FIELDS, SECTIONS as BS_SECTIONS, applyToBrief, checkBrief, geoHasEu, planWrite, unitInputsOk } from '../src/lib/workflow/briefSchema.js';
 import { briefDraft } from '../api/_lib/wf/skills/briefDraftAgent.js';
 import { VIDEO_MONTHLY_MAX, buildMotionPrompt, isTestimonial, normalizeVideoRequest, planVideos, renderVideosText, videosThisMonth } from '../api/_lib/wf/skills/videoEngine.js';
@@ -3573,5 +3577,116 @@ await test('one brief: the form of the brief keeps what the old sheet kept: a sa
   assert.deepEqual(back.economics.products, [{ name: 'Стілець', price: 3200, cogs: null }]); assert.deepEqual(back.creative_goals, [{ goal: 'Продати хіт', product: 'Стілець' }]); assert.equal(back.economics.offers[0].approved, true);
   assert.equal(back.economics_meta.goal.status, 'confirmed'); assert.equal(back.draft_from_site, undefined, 'a brief saved by a person is no longer a draft from the site');
   assert.equal(checkBrief({ brief: back, project: { website: 'https://x.example' }, card: { settings: { inputs: {} }, assets: [] }, accounts: [], state: {} }).items.find((i) => i.key === 'budget_monthly').ok, true, 'what the page saved counts in the check');
+});
+// ---------------------------------------------------------------- «Розкажіть про клієнта своїми словами»: the model finds the facts, the CODE checks them, a person accepts them into the form of the brief
+const EX_TEXT = 'Клієнт продає меблі з дуба. Доставка по Україні й до Польщі. Бюджет на рекламу близько 4500 доларів на місяць. Хочемо 60 покупок на місяць. Середній чек 175, собівартість 30%. Стілець Дуб коштує 3200 грн. Слова «дешевий» і «акція» не вживати. Сторінка Facebook 107633047825429.';
+const EX_ANSWER = (o = {}) => JSON.stringify({
+  facts: [
+    { key: 'budget_monthly', value: '4500 USD', quote: 'Бюджет на рекламу близько 4500 доларів на місяць' },
+    { key: 'goal', value: '60 покупок на місяць', quote: 'Хочемо 60 покупок на місяць' },
+    { key: 'avg_order', value: '175', quote: 'Середній чек 175' },
+    { key: 'cogs_pct', value: '30%', quote: 'собівартість 30%' },
+    { key: 'geo', value: 'Україна, Польща', quote: 'Доставка по Україні й до Польщі' },
+    { key: 'restrictions', value: 'не вживати слова «дешевий» і «акція»', quote: 'Слова «дешевий» і «акція» не вживати' },
+    { key: 'fb_page_id', value: '107633047825429', quote: 'Сторінка Facebook 107633047825429' },
+    { key: 'target_roas', value: '9', quote: 'ROAS дев’ять' },
+    { key: 'nonsense', value: 'x', quote: 'x' },
+    { key: 'budget_monthly', value: '9999', quote: 'Бюджет на рекламу близько 4500 доларів' },
+    { key: 'fee_pct', value: 'багато', quote: 'комісії' },
+    { key: 'tone', value: 'Тепло, на «ви»', quote: 'Тон спілкування теплий' },
+  ],
+  products: [{ name: 'Стілець Дуб', price: 3200, cogs: null, quote: 'Стілець Дуб коштує 3200 грн' }, { name: 'Диван Хмара', price: 5000, cogs: null, quote: 'Диван Хмара за 5000' }],
+  offers: [{ name: 'Безкоштовна доставка', pays: null, quote: 'Доставка по Україні' }], goals: [{ goal: 'Продати Стілець Дуб', product: 'Стілець Дуб', quote: 'Хочемо 60 покупок на місяць' }], unplaced: ['клієнт з Києва'], ...o });
+await test('brief extraction: every fact is checked by code: the quote must stand in the text, a number must stand in the quote, the shape must fit the field; invented keys, bad values and repeats are dropped; what the code could not confirm is marked «перевірте»', () => {
+  const r = checkExtraction(EX_ANSWER(), { text: EX_TEXT });
+  const by = Object.fromEntries(r.facts.map((f) => [f.key, f]));
+  assert.deepEqual(['budget_monthly', 'goal', 'avg_order', 'cogs_pct', 'geo', 'restrictions', 'fb_page_id'].map((k) => by[k].state), Array(7).fill('ok'));
+  assert.equal(by.budget_monthly.value, '4500', 'a number without the currency'); assert.equal(by.cogs_pct.value, '30'); assert.equal(by.fb_page_id.value, '107633047825429');
+  assert.equal(by.target_roas.state, 'check'); assert.match(by.target_roas.why, /цитати немає в тексті/); assert.equal(by.tone.state, 'check');
+  assert.ok(!r.facts.some((f) => f.key === 'nonsense'), 'an unknown key is dropped'); assert.equal(r.facts.filter((f) => f.key === 'budget_monthly').length, 1, 'a repeat is dropped');
+  assert.ok(r.dropped.some((d) => /невідоме поле «nonsense»/.test(d)) && r.dropped.some((d) => /Комісії платежів, %: не число/.test(d)));
+  assert.equal(r.products.find((p) => p.name === 'Стілець Дуб').state, 'ok'); assert.equal(r.products.find((p) => p.name === 'Диван Хмара').state, 'check');
+  assert.equal(r.goals[0].state, 'ok'); assert.deepEqual(r.unplaced, ['клієнт з Києва']);
+  const wrongNumber = checkExtraction(JSON.stringify({ facts: [{ key: 'budget_monthly', value: '7000', quote: 'Бюджет на рекламу близько 4500 доларів на місяць' }] }), { text: EX_TEXT }).facts[0];
+  assert.equal(wrongNumber.state, 'check'); assert.match(wrongNumber.why, /числа немає в тексті/, 'the number is not in the text: the model made it up');
+  const pdf = checkExtraction(EX_ANSWER(), { text: 'коротка примітка', unreadable: ['offer.pdf'] });
+  assert.ok(pdf.facts.every((f) => f.state === 'check') && /offer\.pdf/.test(pdf.facts[0].why), 'what comes from a PDF cannot be checked by code: a person looks');
+  assert.throws(() => checkExtraction('Вибачте', { text: 'x' }), /Не вдалося розібрати відповідь/); assert.deepEqual(checkExtraction('{"facts":[]}', { text: 'x' }).facts, []);
+  assert.deepEqual(checkExtraction('```json\n' + EX_ANSWER({ facts: [] }) + '\n```', { text: EX_TEXT }).facts, []);
+});
+await test('brief extraction: the values are shaped by the kind of the field (numbers, digits, dates, currency, language, address)', () => {
+  assert.deepEqual(shapeValue('budget_monthly', '4 500 USD'), { value: '4500' }); assert.deepEqual(shapeValue('avg_order', '175,5 грн'), { value: '175.5' }); assert.match(shapeValue('avg_order', 'багато').error, /не число/);
+  assert.deepEqual(shapeValue('fb_page_id', '1076 3304 7825 429'), { value: '107633047825429' }); assert.match(shapeValue('fb_page_id', 'моя сторінка').error, /цифри/);
+  assert.deepEqual(shapeValue('payment_next_date', '2026-12-01'), { value: '2026-12-01' }); assert.match(shapeValue('payment_next_date', '1 грудня').error, /РРРР-ММ-ДД/);
+  assert.deepEqual(shapeValue('currency', 'usd'), { value: 'USD' }); assert.match(shapeValue('currency', 'долар').error, /трьох літер/); assert.deepEqual(shapeValue('client_language', 'EN'), { value: 'en' }); assert.match(shapeValue('client_language', 'pl').error, /uk або en/);
+  assert.deepEqual(shapeValue('website', 'https://loza.example'), { value: 'https://loza.example' }); assert.match(shapeValue('website', 'loza').error, /адреса сайту/);
+  assert.match(shapeValue('geo', '').error, /порожнє/); assert.equal(shapeValue('tone', 'Тепло,   на «ви»').value, 'Тепло, на «ви»'); assert.equal(shapeValue('about', 'Рядок 1\nРядок 2').value, 'Рядок 1\nРядок 2', 'a long text keeps its lines');
+  assert.ok(Object.keys(EX_SPEC).every((k) => EX_SPEC[k].label && EX_SPEC[k].hint), 'every fact has a label and a hint for the model');
+});
+const EX_BASE = () => ({ form: formFromContent({ general: { geo: 'Україна' }, economics: { currency: 'USD', products: [{ name: 'Стілець Дуб', price: null }] }, creative_goals: [] }, ''), extra: { tone: '', restrictions: 'не обіцяти знижок', about: '' } });
+await test('brief extraction: a fact that differs from what the brief holds is a conflict that is NOT replaced by default; accepted facts fill the form as assumptions with their source, products and goals are merged, an offer is never approved by itself, nothing old is touched', () => {
+  const base = EX_BASE(); const snapshot = JSON.stringify(base);
+  const geo = { key: 'geo', value: 'Україна, Польща' }, budget = { key: 'budget_monthly', value: '4500' }, restr = { key: 'restrictions', value: 'не вживати слова «дешевий»' };
+  assert.equal(conflictOf(geo, base.form, base.extra), 'Україна'); assert.equal(conflictOf(budget, base.form, base.extra), ''); assert.equal(conflictOf({ key: 'geo', value: ' україна ' }, base.form, base.extra), '', 'the same value is no conflict');
+  assert.equal(currentValue('restrictions', base.form, base.extra), 'не обіцяти знижок');
+  const r = applyChosen(base, { facts: [{ ...geo, mode: 'set' }, { ...budget, mode: 'set' }, { ...restr, mode: 'append' }, { key: 'tone', value: 'Тепло', mode: 'set' }], products: [{ name: 'стілець дуб', price: 3200, cogs: null }, { name: 'Диван', price: 5000, cogs: null }], offers: [{ name: 'Подарунок', pays: 150 }], goals: [{ goal: 'Продати Диван', product: 'Диван' }, { goal: 'Привести покупців', product: 'Чужий' }], notes: ['клієнт з Києва'] }, 'commercial-offer.pdf');
+  assert.equal(r.form.values.geo, 'Україна, Польща'); assert.equal(r.form.values.budget_monthly, '4500'); assert.deepEqual(r.form.meta.budget_monthly, { status: 'assumption', source: 'commercial-offer.pdf' });
+  assert.equal(r.extra.restrictions, 'не обіцяти знижок\nне вживати слова «дешевий»'); assert.equal(r.extra.tone, 'Тепло');
+  assert.equal(r.form.products.length, 2); assert.equal(r.form.products[0].price, '3200', 'a price is added to a product that has none'); assert.deepEqual(r.form.products[1], { name: 'Диван', price: '5000', cogs: '', status: 'assumption', source: 'commercial-offer.pdf' });
+  assert.equal(r.form.offers[0].approved, false, 'an offer is never approved by the client by itself');
+  assert.deepEqual(r.form.goals, [{ goal: 'Продати Диван', product: 'Диван' }, { goal: 'Привести покупців', product: '' }], 'a goal about an unknown product keeps the words, not the product');
+  assert.match(r.form.text, /Не розкладено з розповіді:\n• клієнт з Києва/); assert.ok(r.applied >= 9);
+  assert.equal(JSON.stringify(base), snapshot, 'the old form is not touched');
+  assert.equal(applyChosen(base, { facts: [{ key: 'nope', value: 'x', mode: 'set' }] }).applied, 0, 'an unknown key never enters');
+  const again = applyChosen(r, { products: [{ name: 'Диван', price: 1, cogs: null }], goals: [{ goal: 'Продати Диван', product: 'Диван' }] }); assert.equal(again.form.products.length, 2); assert.equal(again.form.goals.length, 2, 'the same product and goal are not added twice');
+});
+await test('brief extraction: the whole road with a stand-in model: the words go in, the facts are checked and accepted, the check of the readiness now has what it lacked', () => {
+  const p = buildExtractPrompt({ text: EX_TEXT, fileNames: ['offer.pdf'], language: 'uk' });
+  assert.match(p.system, /Never invent a fact/); assert.match(p.system, /exact words from the source/); assert.match(p.system, /"fb_page_id" \(numeric id/); assert.match(p.user, /TEXT OF THE MANAGER/); assert.match(p.user, /offer\.pdf/); assert.ok(p.user.includes('Бюджет на рекламу'));
+  const checked = checkExtraction(EX_ANSWER(), { text: EX_TEXT });
+  const start = EX_BASE();
+  const before = checkBrief({ brief: contentFromForm(start.form), project: { website: 'https://shop.example' }, card: { settings: { inputs: {} }, assets: [] }, accounts: [], state: {} });
+  const missing = before.items.filter((i) => !i.ok && i.level === 'required').map((i) => i.key);
+  assert.ok(['budget_monthly', 'goal', 'avg_order', 'cogs_pct', 'fb_page_id', 'competitors'].every((k) => k === 'competitors' || missing.includes(k)));
+  const chosen = { facts: checked.facts.filter((f) => f.state === 'ok').map((f) => ({ key: f.key, value: f.value, mode: conflictOf(f, start.form, start.extra) ? 'skip' : 'set' })), products: [], offers: [], goals: checked.goals.map((g) => ({ goal: g.goal, product: g.product })), notes: [] };
+  const done = applyChosen(start, chosen, 'Розповідь менеджера');
+  const after = checkBrief({ brief: contentFromForm(done.form), project: { website: 'https://shop.example' }, card: { settings: { inputs: {} }, assets: [] }, accounts: [], state: {} });
+  const still = after.items.filter((i) => !i.ok && i.level === 'required').map((i) => i.key);
+  for (const k of ['budget_monthly', 'goal', 'avg_order', 'cogs_pct', 'fb_page_id', 'creative_goals']) assert.ok(!still.includes(k), k + ' came from the words');
+  assert.ok(still.includes('competitors') && still.includes('product_photo'), 'what the words did not say is still asked for');
+  assert.equal(contentFromForm(done.form).general.geo, 'Україна', 'the geo conflict was not replaced: the person did not choose «Замінити»');
+});
+const makeZip = (entries) => {
+  const locals = [], centrals = []; let offset = 0;
+  for (const [name, data, deflate] of entries) {
+    const nameB = Buffer.from(name), raw = Buffer.from(data), comp = deflate ? zlib.deflateRawSync(raw) : raw;
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(deflate ? 8 : 0, 8); lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(nameB.length, 26);
+    const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(deflate ? 8 : 0, 10); ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(raw.length, 24); ch.writeUInt16LE(nameB.length, 28); ch.writeUInt32LE(offset, 42);
+    locals.push(lh, nameB, comp); centrals.push(ch, nameB); offset += 30 + nameB.length + comp.length;
+  }
+  const cd = Buffer.concat(centrals), end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10); end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, cd, end]);
+};
+await test('brief files: the text of a Word file, a text file and markdown is read by code (so quotes can be checked), a PDF is left to the model; wrong types, too many files, too big and empty files are refused in words', () => {
+  const xml = '<w:document><w:body><w:p><w:r><w:t>Бюджет 4500 &amp; доставка</w:t></w:r></w:p><w:p><w:r><w:t>Тон:</w:t></w:r><w:tab/><w:r><w:t>теплий</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>ROAS</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>2.5</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>';
+  for (const deflate of [true, false]) { const t = docxText(makeZip([['[Content_Types].xml', '<x/>', true], ['word/document.xml', xml, deflate]])); assert.match(t, /Бюджет 4500 & доставка\nТон:\tтеплий/); assert.match(t, /ROAS \| 2\.5/); }
+  assert.throws(() => docxText(makeZip([['other.xml', '<x/>', true]])), /Не вдалося прочитати Word-файл/); assert.throws(() => docxText(Buffer.from('not a zip')), /Не вдалося прочитати Word-файл/);
+  const b64 = (s) => Buffer.from(s).toString('base64');
+  const r = readFiles([{ name: 'brief.docx', type: '', data: makeZip([['word/document.xml', xml, true]]).toString('base64') }, { name: 'note.txt', type: 'text/plain', data: b64('Тон теплий') }, { name: 'offer.pdf', type: 'application/pdf', data: b64('%PDF-1.4 x') }]);
+  assert.deepEqual(r.files.map((f) => [f.name, f.read]), [['brief.docx', 'text'], ['note.txt', 'text'], ['offer.pdf', 'pdf']]);
+  assert.match(r.text, /\[Файл brief\.docx\][\s\S]*Бюджет 4500/); assert.match(r.text, /\[Файл note\.txt\]\nТон теплий/); assert.equal(r.pdfBlocks.length, 1); assert.equal(r.pdfBlocks[0].source.media_type, 'application/pdf'); assert.deepEqual(r.unreadable, ['offer.pdf']);
+  assert.throws(() => readFiles([{ name: 'a.exe', type: 'application/x-msdownload', data: b64('x') }]), /підходять PDF, Word/); assert.throws(() => readFiles([{ name: 'e.txt', type: 'text/plain', data: '' }]), /порожній/);
+  assert.throws(() => readFiles(Array(4).fill({ name: 'a.txt', type: 'text/plain', data: b64('x') })), /до 3/); assert.throws(() => readFiles([{ name: 'big.txt', type: 'text/plain', data: 'A'.repeat(4_100_000) }]), /завеликі/);
+  assert.match(readFiles([{ name: 'rules.md', type: '', data: b64('# Правила') }]).text, /\[Файл rules\.md\][\s\S]*# Правила/); assert.deepEqual(readFiles(undefined).files, []); assert.equal(isPdf('X.PDF', ''), true); assert.equal(isDocx('a.DOCX', ''), true);
+});
+await test('brief extraction: the endpoint needs a person, writes nothing, asks the model once and checks the answer by code; the page has the dictation, the files, the quotes and the choice for a conflict, and the accepted facts only fill the form', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  const api = rd('api/brief-extract.js'), imp = rd('src/components/Workflow/BriefImport.jsx'), page = rd('src/components/Workflow/BriefPage.jsx'), client = rd('src/lib/api/briefExtract.js');
+  assert.match(api, /auth\.getUser\(token\)/); assert.match(api, /callModel\(/); assert.match(api, /checkExtraction\(/); assert.ok(!/\.insert\(|\.update\(|\.upsert\(/.test(api), 'nothing is written by the endpoint');
+  assert.match(rd('vercel.json'), /"api\/brief-extract\.js": \{ "maxDuration": 90 \}/);
+  for (const part of ['Розкажіть про клієнта своїми словами', 'Розібрати і розставити', 'Надиктувати', 'Прикріпити файл', 'цитата є в тексті', 'Залишити поточне', 'Замінити', 'Дописати', 'Додати вибране', 'Зберегти бриф', 'SpeechRecognition']) assert.ok((imp + page).includes(part), part);
+  assert.match(imp, /conflictOf\(f, form, extra\)/); assert.match(imp, /mode: c \? 'skip'/); assert.match(page, /applyChosen\(\{ form, extra \}, chosen, source\)/); assert.match(page, /<BriefImport /);
+  assert.match(client, /authedPost\('\/api\/brief-extract'/); assert.match(client, /MAX_TOTAL_BYTES = 3 \* 1024 \* 1024/);
 });
 console.log(`\n${passed} workflow checks passed`);
