@@ -1,0 +1,311 @@
+<title>Бриф і налаштування агентів</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: three screens of the one-place model (brief, agent settings, pre-launch check), switched by tabs; plum Hub palette, matte cards. */
+:root{
+  --bg:#f3f0f8; --card:rgba(255,255,255,.9); --line:#e4def0; --fg:#241b36; --muted:#6f6585; --accent:#6a35d6; --accent2:#9b5cf0; --soft:#ece4fb;
+  --ok:#1f8a5b; --ok-bg:#dff3e9; --warn:#a8640f; --warn-bg:#fbeed7; --bad:#b3303f; --bad-bg:#f9e1e4; --info:#2f5f9e; --info-bg:#e5eefb;
+  --shadow:0 1px 2px rgba(60,30,110,.06),0 8px 24px rgba(60,30,110,.07); --head:'Space Grotesk','Inter',system-ui,sans-serif; --ui:'Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17121f;--card:rgba(40,32,58,.88);--line:#3a2f52;--fg:#efeaf8;--muted:#a79ebe;--accent:#a47bff;--accent2:#c09bff;--soft:#33264f;--ok:#58c995;--ok-bg:#183a2d;--warn:#e8b25c;--warn-bg:#3b2d14;--bad:#f08894;--bad-bg:#42212a;--info:#8fb6ee;--info-bg:#1d2b44;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17121f;--card:rgba(40,32,58,.88);--line:#3a2f52;--fg:#efeaf8;--muted:#a79ebe;--accent:#a47bff;--accent2:#c09bff;--soft:#33264f;--ok:#58c995;--ok-bg:#183a2d;--warn:#e8b25c;--warn-bg:#3b2d14;--bad:#f08894;--bad-bg:#42212a;--info:#8fb6ee;--info-bg:#1d2b44;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:14px;line-height:1.5;padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--head);margin:0;text-wrap:balance}
+h1{font-size:24px} h2{font-size:17px} h3{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.lead{color:var(--muted);margin:4px 0 0;max-width:70ch}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tabs button,.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:8px 16px;border-radius:999px;cursor:pointer}
+.tabs button[aria-pressed="true"],.btn.p{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
+.btn.sm{padding:4px 12px;font-size:12.5px} .btn.d{color:var(--bad)} .btn:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:16px 18px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sp{justify-content:space-between}
+.muted{color:var(--muted)} .small{font-size:12.5px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;background:var(--soft);color:var(--accent);white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.info{background:var(--info-bg);color:var(--info)}
+.inp{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 10px;width:100%}
+textarea.inp{resize:vertical;min-height:84px}
+select.inp{width:auto}
+.screen[hidden]{display:none}
+.mock-note{background:var(--info-bg);color:var(--info);border-radius:12px;padding:8px 12px;font-size:13px}
+/* brief */
+.layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:860px){.layout{grid-template-columns:1fr}}
+.rail{position:sticky;top:12px;display:flex;flex-direction:column;gap:4px}
+@media(max-width:860px){.rail{position:static;flex-direction:row;flex-wrap:wrap}}
+.rail a{display:flex;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:10px;color:var(--fg);text-decoration:none;font-weight:500}
+.rail a:hover{background:var(--soft)}
+.ring{--p:64;width:64px;height:64px;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--soft) 0);display:grid;place-items:center;flex:none}
+.ring b{width:48px;height:48px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-family:var(--head);font-size:14px}
+.field{display:grid;grid-template-columns:200px minmax(0,1fr);gap:4px 16px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start}
+.field:last-child{border-bottom:0}
+@media(max-width:620px){.field{grid-template-columns:1fr}}
+.field>label{font-weight:600;padding-top:6px}
+.field>label small{display:block;font-weight:400;color:var(--muted)}
+.meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.imp{border:1.5px dashed var(--accent);background:linear-gradient(180deg,var(--soft),transparent)}
+.found{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) auto;gap:8px 14px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.found:last-child{border:0}
+@media(max-width:700px){.found{grid-template-columns:1fr}}
+.quote{font-size:12px;color:var(--muted);font-style:italic}
+table{border-collapse:collapse;width:100%} th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px} th{color:var(--muted);font-weight:600}
+.tw{overflow-x:auto}
+/* settings */
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.set{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.set:last-child{border:0}
+.set .t b{display:block} .set .t span{color:var(--muted);font-size:12.5px}
+.sw{position:relative;width:44px;height:24px;flex:none}
+.sw input{opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.sw i{position:absolute;inset:0;border-radius:999px;background:var(--line);transition:background .15s}
+.sw i::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw input:checked+i{background:var(--accent)} .sw input:checked+i::after{transform:translateX(20px)}
+.sw input:focus-visible+i{outline:2px solid var(--accent);outline-offset:2px}
+.nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 12px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.nav .it{padding:5px 12px;border-radius:999px;color:var(--muted);font-weight:500}
+.nav .it.on{background:var(--soft);color:var(--accent);font-weight:700}
+.nav .it.hl{outline:2px solid var(--accent);color:var(--accent);font-weight:700}
+.stop{border-color:var(--bad);background:var(--bad-bg)}
+/* preflight */
+.chk{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start}
+.chk:last-child{border:0}
+.dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;margin-top:2px}
+.dot.ok{background:var(--ok-bg);color:var(--ok)} .dot.bad{background:var(--bad-bg);color:var(--bad)} .dot.warn{background:var(--warn-bg);color:var(--warn)}
+.chk .ask{grid-column:2/4;display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.chk .ask .inp{max-width:360px}
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Один бриф, одні налаштування, перевірка перед запуском</h1>
+    <p class="lead">Макет моделі «одне місце на кожен вид інформації». Дані в прикладі умовні, проєкт Mon'Archi. Три екрани перемикаються кнопками нижче.</p>
+  </div>
+  <div class="tabs" role="group" aria-label="Екран макета">
+    <button type="button" data-s="brief" aria-pressed="true">1. Бриф (єдиний)</button>
+    <button type="button" data-s="settings" aria-pressed="false">2. Налаштування агентів</button>
+    <button type="button" data-s="pre" aria-pressed="false">3. Перевірка перед запуском</button>
+  </div>
+
+  <!-- ============ SCREEN 1: BRIEF ============ -->
+  <section class="screen" id="s-brief">
+    <div class="mock-note" style="margin-bottom:16px">Було: «Інформація про проєкт» і «Бриф» з дублями (бюджет, ціль, аудиторія, ГЕО, конкуренти в обох). Стало: один бриф. Поля CRM (виконавець, статус, оплата, посилання на Worksection) лишаються в шапці проєкту, вони не для агентів.</div>
+    <div class="layout">
+      <nav class="rail card" aria-label="Розділи брифу">
+        <a href="#b-import">Розказати словами</a>
+        <a href="#b-biz">Про бізнес <span class="pill warn">3/5</span></a>
+        <a href="#b-money">Цілі й гроші <span class="pill bad">2/8</span></a>
+        <a href="#b-prod">Товари й офери <span class="pill ok">3/3</span></a>
+        <a href="#b-geo">ГЕО й мови <span class="pill ok">2/2</span></a>
+        <a href="#b-brand">Бренд і креативи <span class="pill warn">4/7</span></a>
+        <a href="#b-acc">Доступи <span class="pill warn">1/4</span></a>
+        <a href="#b-pay">Оплата й договір <span class="pill ok">2/2</span></a>
+      </nav>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="card row sp">
+          <div class="row"><div class="ring" style="--p:64"><b>64%</b></div><div><h2>Бриф · Mon'Archi</h2><div class="muted small">Заповнено 14 з 22 полів. Обов'язкових не вистачає 4: вони підсвічені.</div></div></div>
+          <div class="row"><span class="pill warn">Чернетка</span><button class="btn p" type="button">Підтвердити бриф</button></div>
+        </div>
+
+        <div class="card imp" id="b-import">
+          <div class="row sp"><h2>Розкажіть про клієнта своїми словами</h2><span class="muted small">Система сама розставить факти по полях, ви лише перевірите</span></div>
+          <textarea class="inp" id="dict" style="margin-top:10px" aria-label="Розповідь про клієнта">Клієнт продає меблі з дуба з Києва, доставка по Україні й до Польщі. Бюджет на рекламу близько 4500 доларів на місяць. Хочемо 60 покупок на місяць. Середній чек 175, собівартість 30%. Тон спілкування теплий, на «ви». Слова «дешевий» і «акція» не вживати.</textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" type="button" id="mic" aria-pressed="false">🎙 Надиктувати</button>
+            <button class="btn" type="button">📎 Прикріпити файл (PDF, DOCX, TXT)</button>
+            <span class="pill info">прикріплено: commercial-offer.pdf</span>
+            <span class="row" style="margin-left:auto"><button class="btn p" type="button" id="parse">Розібрати і розставити</button></span>
+          </div>
+          <div id="found" hidden style="margin-top:14px">
+            <h3>Знайдено 8 фактів: перевірте</h3>
+            <div class="found"><b>Місячний бюджет</b><div><input class="inp" value="4500 USD" aria-label="Місячний бюджет"><div class="quote">«бюджет близько 4500 доларів на місяць»</div></div><span class="row"><button class="btn sm p" type="button">Прийняти</button><button class="btn sm" type="button">Пропустити</button></span></div>
+            <div class="found"><b>Ціль у цифрах</b><div><input class="inp" value="60 покупок на місяць" aria-label="Ціль"><div class="quote">«Хочемо 60 покупок на місяць»</div></div><span class="row"><button class="btn sm p" type="button">Прийняти</button><button class="btn sm" type="button">Пропустити</button></span></div>
+            <div class="found"><b>Середній чек / собівартість</b><div><input class="inp" value="175 USD / 30%" aria-label="Чек"><div class="quote">«Середній чек 175, собівартість 30%»</div></div><span class="row"><button class="btn sm p" type="button">Прийняти</button><button class="btn sm" type="button">Пропустити</button></span></div>
+            <div class="found"><b>ГЕО</b><div><input class="inp" value="Україна, Польща" aria-label="ГЕО"><div class="quote">«доставка по Україні й до Польщі»</div></div><span class="row"><button class="btn sm p" type="button">Прийняти</button><button class="btn sm" type="button">Пропустити</button></span></div>
+            <div class="found"><b>Тон</b><div><input class="inp" value="Тепло, на «ви»" aria-label="Тон"><div class="quote">«Тон спілкування теплий, на «ви»»</div></div><span class="row"><button class="btn sm p" type="button">Прийняти</button><button class="btn sm" type="button">Пропустити</button></span></div>
+            <div class="found"><b>Заборонені слова</b><div><input class="inp" value="дешевий, акція" aria-label="Заборонені слова"><div class="quote">«Слова «дешевий» і «акція» не вживати»</div></div><span class="row"><button class="btn sm p" type="button">Прийняти</button><button class="btn sm" type="button">Пропустити</button></span></div>
+            <div class="row" style="margin-top:10px"><button class="btn p" type="button">Прийняти все знайдене</button><span class="muted small">Не знайшов: ID сторінки Facebook, назву рекламодавця для ЄС, цільовий ROAS. Система додасть їх у «Що ще потрібно» нижче.</span></div>
+          </div>
+        </div>
+
+        <div class="card" id="b-biz">
+          <div class="row sp"><h2>Про бізнес</h2><span class="muted small">Потрібне Досліднику та Стратегу</span></div>
+          <div class="field"><label>Сайт<small>агенти читають його самі</small></label><div><input class="inp" value="https://monarchi.agency"><div class="meta"><span class="pill ok">підтверджено</span></div></div></div>
+          <div class="field"><label>Чим займається<small>коротко, 2-3 речення</small></label><div><textarea class="inp" style="min-height:60px">Рекламне агентство повного циклу: Meta Ads, Google Ads, сайти.</textarea><div class="meta"><span class="pill warn">припущення з сайту</span></div></div></div>
+          <div class="field"><label>Оффер і відмінності</label><div><textarea class="inp" style="min-height:60px">Безкоштовний аудит реклами за 24 години.</textarea><div class="meta"><span class="pill ok">підтверджено</span></div></div></div>
+          <div class="field"><label>Аудиторія<small>як її описує клієнт</small></label><div><textarea class="inp" style="min-height:60px"></textarea><div class="meta"><span class="pill bad">порожньо</span><span class="pill">потрібне для: Аудиторія, Стратег</span></div></div></div>
+          <div class="field"><label>Сайти конкурентів<small>по одному в рядок</small></label><div><textarea class="inp" style="min-height:60px">netpeak.group
+i-media.ua</textarea><div class="meta"><span class="pill ok">підтверджено</span></div></div></div>
+        </div>
+
+        <div class="card" id="b-money">
+          <div class="row sp"><h2>Цілі й гроші</h2><span class="pill bad">не вистачає 3 обов'язкових</span></div>
+          <div class="field"><label>Місячний бюджет</label><div><input class="inp" placeholder="наприклад 4500"><div class="meta"><span class="pill bad">порожньо</span><span class="pill">потрібне для: Стратег, Медіабаєр</span><button class="btn sm" type="button">Додати словами</button></div></div></div>
+          <div class="field"><label>Ціль у цифрах</label><div><input class="inp" placeholder="наприклад 60 покупок на місяць"><div class="meta"><span class="pill bad">порожньо</span></div></div></div>
+          <div class="field"><label>Валюта та середній чек</label><div class="row"><select class="inp"><option>USD</option></select><input class="inp" style="max-width:140px" value="175"></div></div>
+          <div class="field"><label>Собівартість, доставка, комісії, повернення</label><div class="row"><input class="inp" style="max-width:110px" value="30" aria-label="Собівартість %"><input class="inp" style="max-width:110px" value="12" aria-label="Доставка"><input class="inp" style="max-width:110px" value="3" aria-label="Комісії %"><input class="inp" style="max-width:110px" value="3" aria-label="Повернення %"></div></div>
+          <div class="field"><label>Цільовий ROAS</label><div><input class="inp" style="max-width:140px" placeholder="2.5"><div class="meta"><span class="pill bad">порожньо</span><button class="btn sm" type="button">Порахувати з маржі</button></div></div></div>
+        </div>
+
+        <div class="card" id="b-prod">
+          <div class="row sp"><h2>Товари й офери</h2><span class="muted small">Креативи беруть товари тільки звідси</span></div>
+          <div class="tw"><table><thead><tr><th>Товар</th><th>Ціна</th><th>Статус</th></tr></thead><tbody>
+            <tr><td>Стілець Дуб</td><td>3200 грн</td><td><span class="pill ok">підтверджено</span></td></tr>
+            <tr><td>Стіл Лоза</td><td>8900 грн</td><td><span class="pill warn">з сайту</span></td></tr>
+            <tr><td>Офер: безкоштовна доставка від 5000 грн</td><td></td><td><span class="pill ok">погоджений клієнтом</span></td></tr></tbody></table></div>
+        </div>
+
+        <div class="card" id="b-geo"><div class="row sp"><h2>ГЕО й мови</h2></div>
+          <div class="field"><label>Країни показу</label><div><input class="inp" value="Україна, Польща"><div class="meta"><span class="pill info">Польща: потрібна назва рекламодавця для ЄС</span></div></div></div>
+          <div class="field"><label>Мова текстів</label><div><select class="inp"><option>Українська</option><option>Англійська</option></select></div></div>
+        </div>
+
+        <div class="card" id="b-brand"><div class="row sp"><h2>Бренд і креативи</h2><button class="btn sm" type="button">Відкрити ДНК бренду</button></div>
+          <div class="field"><label>Тон і правила текстів</label><div><input class="inp" value="Тепло, на «ви»"><div class="meta"><span class="pill ok">підтверджено</span></div></div></div>
+          <div class="field"><label>Заборонені слова й обмеження</label><div><input class="inp" value="дешевий, акція; не обіцяти знижок"></div></div>
+          <div class="field"><label>Текст кнопки</label><div class="row"><span class="pill">Купити ×</span><span class="pill">Дізнатись більше ×</span><button class="btn sm" type="button">Додати</button></div></div>
+          <div class="field"><label>Файли<small>логотип, фото товару, приклади</small></label><div class="row"><span class="pill ok">логотип 1</span><span class="pill ok">фото товару 6</span><span class="pill">приклади 2</span><button class="btn sm" type="button">Додати файли</button></div></div>
+          <div class="field"><label>Сезонність, події</label><div><input class="inp" value="Чорна п'ятниця, Різдво"></div></div>
+          <div class="field"><label>Цілі перших креативів</label><div><span class="pill ok">Продати хіт</span> <span class="pill ok">Розпродаж літа</span></div></div>
+        </div>
+
+        <div class="card" id="b-acc"><div class="row sp"><h2>Доступи</h2><span class="muted small">Потрібні запуску</span></div>
+          <div class="field"><label>Кабінет Meta</label><div class="row"><span class="pill ok">Mon'Archi підключено</span></div></div>
+          <div class="field"><label>Сторінка Facebook</label><div><input class="inp" placeholder="ID сторінки (цифри)"><div class="meta"><span class="pill bad">порожньо</span><button class="btn sm" type="button">Показати сторінки, доступні кабінету</button></div></div></div>
+          <div class="field"><label>Назва рекламодавця для ЄС</label><div><input class="inp"><div class="meta"><span class="pill bad">потрібно для Польщі</span></div></div></div>
+          <div class="field"><label>GA4 Property ID</label><div><input class="inp" placeholder="необов'язково"></div></div>
+        </div>
+
+        <div class="card" id="b-pay"><div class="row sp"><h2>Оплата й договір</h2></div>
+          <div class="row"><span class="pill ok">Оплату підтверджено 23.11</span><span class="pill ok">Договір підписано</span><span class="muted small">Сума, дата наступної оплати й період теж тут.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 2: SETTINGS ============ -->
+  <section class="screen" id="s-settings" hidden>
+    <div class="mock-note" style="margin-bottom:16px">Одна сторінка, два входи. У проєкті: кнопка «Налаштування агентів» в шапці. В AI Agents: вкладка «Налаштування» у верхній панелі. Відкривається та сама сторінка, відрізняється тільки обраний проєкт.</div>
+    <div class="grid2" style="margin-bottom:16px">
+      <div><h3 style="margin-bottom:6px">Вхід із проєкту</h3><div class="nav"><span class="it">Інформація</span><span class="it">Бриф</span><span class="it">Досьє</span><span class="it">Звіти</span><span class="it hl">⚙ Налаштування агентів</span></div></div>
+      <div><h3 style="margin-bottom:6px">Вхід з AI Agents</h3><div class="nav"><span class="it">Мапа</span><span class="it">Прогони</span><span class="it">Витрати</span><span class="it">Підключення</span><span class="it">Апруви</span><span class="it hl">⚙ Налаштування</span></div></div>
+    </div>
+    <div class="card row sp" style="margin-bottom:16px">
+      <div><h2>Налаштування агентів</h2><div class="muted small">Тут усе, що керує роботою агентів: коли працюють, скільки витрачають, що роблять самі, про що повідомляють.</div></div>
+      <div class="row"><label class="muted small" for="scope">Для кого:</label><select class="inp" id="scope"><option>Проєкт Mon'Archi (свої значення)</option><option>Усі проєкти (за замовчуванням)</option></select></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Коли працюють</h3>
+        <div class="set"><div class="t"><b>Перевірка оптимізації</b><span>Як часто Медіабаєр дивиться на результати після запуску</span></div><select class="inp"><option>раз на добу</option><option>двічі на добу</option><option>раз на 2 доби</option></select></div>
+        <div class="set"><div class="t"><b>Час перевірки</b><span>Київський час</span></div><input class="inp" style="max-width:100px" value="10:00" aria-label="Час перевірки"></div>
+        <div class="set"><div class="t"><b>План на місяць</b><span>Коли Стратег складає план на новий місяць</span></div><span class="row"><select class="inp"><option>1</option></select><span class="muted small">-го числа</span></span></div>
+        <div class="set"><div class="t"><b>Тижневий звіт</b><span>Куди йде: чернетка в «Звіти»</span></div><span class="row"><select class="inp"><option>понеділок</option></select><input class="inp" style="max-width:90px" value="09:00" aria-label="Час тижневого"></span></div>
+        <div class="set"><div class="t"><b>Місячний звіт</b></div><span class="row"><select class="inp"><option>1</option></select><input class="inp" style="max-width:90px" value="09:00" aria-label="Час місячного"></span></div>
+        <div class="set"><div class="t"><b>Не працювати у вихідні</b><span>Оптимізація й дрібні дії пропускають суботу й неділю</span></div><label class="sw"><input type="checkbox" aria-label="Не працювати у вихідні"><i></i></label></div>
+      </div>
+      <div class="card">
+        <h3>Скільки можуть витрачати</h3>
+        <div class="set"><div class="t"><b>Місячний ліміт усіх агентів</b><span>Використано $1,26 з ліміту</span></div><input class="inp" style="max-width:110px" value="$1000" aria-label="Місячний ліміт"></div>
+        <div class="set"><div class="t"><b>Ліміт на проєкт</b><span>Для Mon'Archi діє свій: $100</span></div><input class="inp" style="max-width:110px" value="$100" aria-label="Ліміт на проєкт"></div>
+        <div class="set"><div class="t"><b>Відео на проєкт на місяць</b></div><input class="inp" style="max-width:110px" value="3" aria-label="Відео на місяць"></div>
+        <h3 style="margin-top:14px">Що роблять самі</h3>
+        <div class="set"><div class="t"><b>Дрібні дії оптимізатора</b><span id="smallTxt">Вимкнено: лише рекомендації, у кабінеті нічого не змінюється</span></div><label class="sw"><input type="checkbox" id="small" aria-label="Дрібні дії оптимізатора"><i></i></label></div>
+        <div class="set" id="smallSet" hidden><div class="t"><b>Межі дрібних дій</b><span>Пауз за прохід / підйомів бюджету / крок</span></div><span class="row"><input class="inp" style="max-width:60px" value="3" aria-label="Пауз"><input class="inp" style="max-width:60px" value="2" aria-label="Підйомів"><input class="inp" style="max-width:70px" value="20%" aria-label="Крок"></span></div>
+        <div class="set"><div class="t"><b>Звіти через оркестратор</b><span>Агент звітів працює як навичка Супроводу</span></div><label class="sw"><input type="checkbox" aria-label="Звіти через оркестратор"><i></i></label></div>
+      </div>
+      <div class="card">
+        <h3>Пороги рішень</h3>
+        <div class="set"><div class="t"><b>Дні навчання без оцінки</b><span>Перші дні оголошення лише спостерігаємо</span></div><input class="inp" style="max-width:80px" value="3" aria-label="Дні навчання"></div>
+        <div class="set"><div class="t"><b>Витрати до вердикту</b><span>У частках цільового CPA</span></div><input class="inp" style="max-width:80px" value="1.5×" aria-label="Витрати до вердикту"></div>
+        <div class="set"><div class="t"><b>Крок бюджету</b><span>Не частіше ніж раз на 72 години</span></div><span class="row"><input class="inp" style="max-width:70px" value="20%" aria-label="Крок"><input class="inp" style="max-width:70px" value="72 год" aria-label="Інтервал"></span></div>
+        <div class="set"><div class="t"><b>Зміна бюджету більша за крок</b><span>Завжди через Апрув 3</span></div><span class="pill info">зафіксовано</span></div>
+      </div>
+      <div class="card">
+        <h3>Про що повідомляти в Telegram</h3>
+        <div class="set"><div class="t"><b>Чат для повідомлень</b></div><select class="inp"><option>Mon'Archi · Агенти</option></select></div>
+        <div class="set"><div class="t"><b>Потрібен мій апрув</b></div><label class="sw"><input type="checkbox" checked aria-label="Апрув"><i></i></label></div>
+        <div class="set"><div class="t"><b>Процес зупинено</b></div><label class="sw"><input type="checkbox" checked aria-label="Зупинка"><i></i></label></div>
+        <div class="set"><div class="t"><b>Крок чекає даних понад годину</b><span>Нове: з посиланням, що саме потрібно ввести</span></div><label class="sw"><input type="checkbox" checked aria-label="Чекає даних"><i></i></label></div>
+        <div class="set"><div class="t"><b>Дрібна дія в кабінеті</b></div><label class="sw"><input type="checkbox" checked aria-label="Дрібна дія"><i></i></label></div>
+        <div class="set"><div class="t"><b>Ранкове зведення</b></div><span class="row"><label class="sw"><input type="checkbox" checked aria-label="Зведення"><i></i></label><input class="inp" style="max-width:90px" value="09:00" aria-label="Час зведення"></span></div>
+      </div>
+    </div>
+    <div class="card stop row sp" style="margin-top:16px"><div><b>Аварійна зупинка всіх агентів</b><div class="small muted">Зупиняє всю роботу одразу. Зняти можна тут же.</div></div><button class="btn d" type="button">Зупинити все</button></div>
+  </section>
+
+  <!-- ============ SCREEN 3: PREFLIGHT ============ -->
+  <section class="screen" id="s-pre" hidden>
+    <div class="mock-note" style="margin-bottom:16px">Показується перед стартом і перед запуском у кабінет. Усе, що відомо як потрібне, на одному екрані. Відсутнє можна ввести тут же, воно запишеться в бриф.</div>
+    <div class="card row sp">
+      <div class="row"><div class="ring" id="ring" style="--p:62"><b id="ringTxt">8/13</b></div><div><h2>Готовність до запуску · Mon'Archi</h2><div class="muted small" id="preTxt">Не вистачає 4 обов'язкових речей. Без них запуск не почнеться.</div></div></div>
+      <div class="row"><button class="btn" type="button">Нагадати менеджеру в Telegram</button><button class="btn p" type="button" id="go" disabled>Запустити на паузі</button></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>Обов'язкове</h3>
+      <div class="chk"><span class="dot ok">✓</span><div><b>Сайт клієнта</b><div class="muted small">monarchi.agency читається</div></div><span class="pill ok">є</span></div>
+      <div class="chk"><span class="dot ok">✓</span><div><b>Рекламний кабінет Meta</b><div class="muted small">Mon'Archi (UAH), активний, право запису є</div></div><span class="pill ok">є</span></div>
+      <div class="chk"><span class="dot ok">✓</span><div><b>Піксель</b><div class="muted small">спрацьовував вчора</div></div><span class="pill ok">є</span></div>
+      <div class="chk"><span class="dot ok">✓</span><div><b>Фото товару й логотип</b><div class="muted small">фото 6, логотип 1</div></div><span class="pill ok">є</span></div>
+      <div class="chk"><span class="dot ok">✓</span><div><b>Оплата й договір</b></div><span class="pill ok">є</span></div>
+      <div class="chk" data-need><span class="dot bad">!</span><div><b>Місячний бюджет</b><div class="muted small">Потрібен Стратегу й Медіабаєру: без нього не можна розподілити гроші по кампаніях</div></div><span class="pill bad">немає</span>
+        <div class="ask"><input class="inp" placeholder="наприклад 4500" aria-label="Бюджет"><button class="btn sm p" type="button" data-save>Зберегти в бриф</button><button class="btn sm" type="button">Надиктувати</button></div></div>
+      <div class="chk" data-need><span class="dot bad">!</span><div><b>Сторінка Facebook</b><div class="muted small">Від її імені йде реклама. Кабінет може рекламувати: 107633047825429 (Mon'Archi)</div></div><span class="pill bad">немає</span>
+        <div class="ask"><input class="inp" value="107633047825429" aria-label="Сторінка"><button class="btn sm p" type="button" data-save>Використати цю</button></div></div>
+      <div class="chk" data-need><span class="dot bad">!</span><div><b>Назва рекламодавця для ЄС</b><div class="muted small">Країни показу: Україна, Польща. Для Польщі Meta вимагає назву рекламодавця й платника</div></div><span class="pill bad">немає</span>
+        <div class="ask"><input class="inp" placeholder="Як юридично називається клієнт" aria-label="Назва"><button class="btn sm p" type="button" data-save>Зберегти в бриф</button></div></div>
+      <div class="chk" data-need><span class="dot bad">!</span><div><b>Ціль у цифрах</b><div class="muted small">Потрібна Стратегу, щоб порахувати цільовий CPA</div></div><span class="pill bad">немає</span>
+        <div class="ask"><input class="inp" placeholder="наприклад 60 покупок на місяць" aria-label="Ціль"><button class="btn sm p" type="button" data-save>Зберегти в бриф</button></div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>Бажане</h3>
+      <div class="chk"><span class="dot warn">~</span><div><b>Цільовий ROAS</b><div class="muted small">Без нього візьмемо 2.5 за замовчуванням і позначимо як припущення</div></div><span class="pill warn">за замовчуванням</span></div>
+      <div class="chk"><span class="dot warn">~</span><div><b>GA4</b><div class="muted small">Без нього аудиторія буде без даних про вік і місто з аналітики</div></div><span class="pill warn">немає</span></div>
+      <div class="chk"><span class="dot ok">✓</span><div><b>Макет Figma</b><div class="muted small">не потрібен, є ДНК бренду</div></div><span class="pill ok">не потрібно</span></div>
+    </div>
+  </section>
+
+  <div class="card">
+    <h3>Питання до вас</h3>
+    <ol class="small" style="margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+      <li>Бриф як одна довга сторінка з лівою навігацією по розділах (як тут) чи кроки «майстра» по одному розділу?</li>
+      <li>Старі поля, яких агенти не читають (опис «Дослідження бізнесу», «Стратегія кампанії», «Додаткова інформація», «Готовність до агентів»): видалити зовсім чи сховати в архів?</li>
+      <li>«Налаштування агентів»: сповіщення, розклад, ліміти й пороги в одній сторінці, як тут. Чи чогось не вистачає?</li>
+      <li>Нагадування в Telegram про крок, що чекає даних понад годину: вмикати за замовчуванням?</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+(function(){
+  var tabs=document.querySelectorAll('.tabs button'), scr={brief:'s-brief',settings:'s-settings',pre:'s-pre'};
+  tabs.forEach(function(b){b.addEventListener('click',function(){
+    tabs.forEach(function(x){x.setAttribute('aria-pressed',x===b)});
+    Object.keys(scr).forEach(function(k){document.getElementById(scr[k]).hidden=(k!==b.dataset.s)});
+  })});
+  document.getElementById('parse').addEventListener('click',function(){document.getElementById('found').hidden=false});
+  var mic=document.getElementById('mic');
+  mic.addEventListener('click',function(){var on=mic.getAttribute('aria-pressed')!=='true';mic.setAttribute('aria-pressed',on);mic.textContent=on?'⏹ Слухаю… натисніть, щоб зупинити':'🎙 Надиктувати'});
+  var small=document.getElementById('small');
+  small.addEventListener('change',function(){document.getElementById('smallTxt').textContent=small.checked?'Увімкнено: сам пауза слабкого оголошення й підйом бюджету кроком у межах брифу':'Вимкнено: лише рекомендації, у кабінеті нічого не змінюється';document.getElementById('smallSet').hidden=!small.checked});
+  var need=document.querySelectorAll('[data-need]'), total=13, done=8;
+  function refresh(){
+    var left=document.querySelectorAll('[data-need]:not([data-ok])').length;
+    document.getElementById('ringTxt').textContent=(total-left-1)+'/'+total;
+    document.getElementById('ring').style.setProperty('--p',Math.round((total-left-1)/total*100));
+    document.getElementById('preTxt').textContent=left?('Не вистачає '+left+' обов’язкових речей. Без них запуск не почнеться.'):'Усе обов’язкове є. Можна запускати: перший запуск піде вимкненим (PAUSED).';
+    document.getElementById('go').disabled=!!left;
+  }
+  document.querySelectorAll('[data-save]').forEach(function(b){b.addEventListener('click',function(){
+    var row=b.closest('[data-need]'); row.setAttribute('data-ok','1');
+    row.querySelector('.dot').className='dot ok'; row.querySelector('.dot').textContent='✓';
+    var p=row.querySelector('.pill'); p.className='pill ok'; p.textContent='збережено';
+    row.querySelector('.ask').hidden=true; refresh();
+  })});
+  refresh();
+})();
+</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">

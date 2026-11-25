@@ -4,6 +4,7 @@ import { fetchProcess, fetchReadiness, patchState, requestRun, runTickNow, start
 import { readinessOf } from '../../lib/workflow/readiness';
 import { agentCards, ageText, nowCard } from '../../lib/workflow/view';
 import { Pill, Stepper } from './parts';
+import Preflight from './Preflight';
 
 // «Огляд» of a project (screen 1 of step A3, the variant B of the mockup): the card «Зараз» first, then the stages, the five agents and the journal.
 export default function ProcessOverview({ projectId, onGo }) {
@@ -99,6 +100,7 @@ export default function ProcessOverview({ projectId, onGo }) {
         </div>
       )}
 
+      {state && state.stage < 3 && <Preflight projectId={projectId} email={email} state={state} onChanged={load} />}
       {state && <Readiness projectId={projectId} email={email} />}
 
       <div className="wf-grid wf-g2">

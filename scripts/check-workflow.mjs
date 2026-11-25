@@ -67,6 +67,7 @@ import { BATCH_DEFAULT, BATCH_MAX, affordableCount, buildBatchGoals, clampCount,
 import { batchCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { MERGE_MAX, SYSTEM_PROMPT as SYSTEM_VARIATIONS, VAR_MAX, checkVariations, needsPicture, normalizeRequest } from '../api/_lib/wf/skills/variationsEngine.js';
 import { adVariations } from '../api/_lib/wf/skills/variationsAgent.js';
+import { FIELDS, SECTIONS as BS_SECTIONS, applyToBrief, checkBrief, geoHasEu, planWrite, unitInputsOk } from '../src/lib/workflow/briefSchema.js';
 import { briefDraft } from '../api/_lib/wf/skills/briefDraftAgent.js';
 import { VIDEO_MONTHLY_MAX, buildMotionPrompt, isTestimonial, normalizeVideoRequest, planVideos, renderVideosText, videosThisMonth } from '../api/_lib/wf/skills/videoEngine.js';
 import { animateCreatives } from '../api/_lib/wf/skills/videoAgent.js';
@@ -3391,5 +3392,63 @@ await test('small actions: the switch is per project, off by default, in the ove
   const ov = rd('src/components/Workflow/ProcessOverview.jsx'); assert.match(ov, /Дрібні дії оптимізатора/); assert.match(ov, /auto_small_actions: !state\.auto_small_actions/); assert.match(ov, /state\.stage >= 3/);
   assert.match(ACTIVE_AGENTS.find((a) => a.key === 'mediabuyer').note, /дрібні дії/);
   assert.equal(ACTIVE_AGENTS.find((a) => a.key === 'mediabuyer').rights, 'write'); assert.deepEqual(ACTIVE_AGENTS.filter((a) => a.rights === 'write').map((a) => a.key), ['mediabuyer'], 'still the only agent that writes to a cabinet');
+});
+// ---------------------------------------------------------------- the owner's rule of 2026-11-26: ONE brief, one list of what the agents need, asked for before the launch
+const BS_FULL = () => ({
+  brief: { general: { geo: 'Україна', goal: '60 покупок на місяць', competitors: 'a.com\nb.com', fb_page_id: '107633047825429', audience: 'Родини' }, economics: { currency: 'USD', budget_monthly: 4500, avg_order: 175, cogs_pct: 30, target_roas: 2.5, products: [{ name: 'Стілець', price: 3200, cogs: 1000 }] }, creative_goals: [{ goal: 'Продати хіт', product: '' }] },
+  project: { website: 'https://shop.example', country: 'Україна', client_language: 'uk' },
+  card: { settings: { inputs: { tone: { body: 'Тепло' }, about: { body: 'Меблі' } } }, assets: [{ kind: 'product', name: 'p.png', url: 'https://f/p.png' }] },
+  accounts: [{ platform: 'meta' }], state: { paid_at: '2026-11-20', contracts_signed_at: '2026-11-21' },
+});
+await test('brief schema: every fact has one place, one section and a level; the sections are the ones of the brief page; no key repeats', () => {
+  assert.equal(new Set(FIELDS.map((f) => f.key)).size, FIELDS.length);
+  assert.deepEqual(BS_SECTIONS.map((s) => s.key), ['biz', 'money', 'products', 'geo', 'brand', 'access', 'pay']);
+  for (const f of FIELDS) { assert.ok(BS_SECTIONS.some((s) => s.key === f.section), f.key); assert.ok(['required', 'recommended'].includes(f.level), f.key); assert.ok(f.store && f.label && f.why, f.key); assert.ok(Array.isArray(f.needFor) && f.needFor.length, f.key); }
+  assert.ok(FIELDS.filter((f) => f.level === 'required').length >= 12, 'what the process cannot do without is marked');
+});
+await test('brief schema: the check reads ONE brief from the brief, the project, the card, the cabinets and the state; a full client has nothing missing, an empty one lists everything with the inputs to ask', () => {
+  const full = checkBrief(BS_FULL());
+  assert.equal(full.ready, true); assert.equal(full.required.ok, full.required.total); assert.deepEqual(full.items.filter((i) => !i.ok && i.level === 'required'), []);
+  assert.ok(!full.items.some((i) => i.key === 'dsa_name'), 'the name of the advertiser is asked only for the EU');
+  const empty = checkBrief({});
+  assert.equal(empty.ready, false); assert.ok(empty.required.total >= 12 && empty.required.ok === 0);
+  const budget = empty.items.find((i) => i.key === 'budget_monthly'); assert.equal(budget.ok, false); assert.equal(budget.ask.kind, 'number'); assert.match(budget.why, /розподілити гроші/); assert.deepEqual(budget.needFor, ['Стратег', 'Медіабаєр']);
+  assert.equal(empty.items.find((i) => i.key === 'product_photo').ask.kind, 'files'); assert.equal(empty.items.find((i) => i.key === 'cabinet_meta').ask.kind, 'cabinet'); assert.equal(empty.items.find((i) => i.key === 'paid').ask.kind, 'flag');
+  const part = BS_FULL(); delete part.brief.general.fb_page_id; part.card.assets = []; part.accounts = []; part.state.paid_at = null;
+  assert.deepEqual(checkBrief(part).items.filter((i) => !i.ok && i.level === 'required').map((i) => i.key), ['product_photo', 'cabinet_meta', 'fb_page_id', 'paid']);
+  assert.equal(checkBrief(part).ready, false);
+});
+await test('brief schema: the Unit Economy needs a price and a cost per product OR the average order and the cost percent; the name of the advertiser is asked for the EU only', () => {
+  const noUnit = BS_FULL(); delete noUnit.brief.economics.avg_order; delete noUnit.brief.economics.cogs_pct; noUnit.brief.economics.products = [{ name: 'Стілець', price: 3200 }];
+  assert.deepEqual(checkBrief(noUnit).items.filter((i) => !i.ok && i.level === 'required').map((i) => i.key), ['avg_order', 'cogs_pct']);
+  noUnit.brief.economics.products = [{ name: 'Стілець', price: 3200, cogs: 1000 }];
+  assert.equal(checkBrief(noUnit).ready, true, 'every product with its own price and cost is enough');
+  assert.equal(unitInputsOk({ values: { avg_order: '175', cogs_pct: '30' }, products: [] }), true); assert.equal(unitInputsOk({ values: {}, products: [] }), false);
+  const eu = BS_FULL(); eu.brief.general.geo = 'Україна, Польща';
+  assert.deepEqual(checkBrief(eu).items.filter((i) => !i.ok && i.level === 'required').map((i) => i.key), ['dsa_name']); eu.brief.general.dsa_name = 'Lelior Sp. z o.o.'; assert.equal(checkBrief(eu).ready, true);
+  for (const g of ['Польща', 'Germany', 'PL', 'США, DE', 'Литва']) assert.equal(geoHasEu(g), true, g);
+  for (const g of ['США', 'Україна', 'UA, US', '']) assert.equal(geoHasEu(g), false, g);
+});
+await test('brief schema: a typed fact is written to the store it belongs to; a bad value is refused in words of the manager; the brief gets a human, confirmed value and loses the mark «з сайту»', () => {
+  assert.deepEqual(planWrite('budget_monthly', '4 500'), { store: 'brief', group: 'economics', key: 'budget_monthly', value: 4500 });
+  assert.throws(() => planWrite('budget_monthly', 'багато'), /потрібне число/); assert.throws(() => planWrite('goal', '  '), /Введіть значення/);
+  assert.deepEqual(planWrite('fb_page_id', '1076 3304 7825 429'), { store: 'brief', group: 'general', key: 'fb_page_id', value: '107633047825429' }); assert.throws(() => planWrite('fb_page_id', 'my page'), /лише цифри/);
+  assert.deepEqual(planWrite('website', 'https://x.example'), { store: 'project', key: 'website', value: 'https://x.example' }); assert.throws(() => planWrite('website', 'x'), /адресу сайту повністю/);
+  assert.deepEqual(planWrite('tone', 'Тепло'), { store: 'card_input', key: 'tone', value: 'Тепло' }); assert.deepEqual(planWrite('creative_goals', 'Продати хіт'), { store: 'goal', value: 'Продати хіт' });
+  assert.deepEqual(planWrite('currency', 'usd'), { store: 'brief', group: 'economics', key: 'currency', value: 'USD' }); assert.throws(() => planWrite('paid', 'x'), /окремо/); assert.throws(() => planWrite('nope', 'x'), /Невідоме поле/);
+  const base = { schema: 1, draft_from_site: true, general: { geo: 'Україна' }, economics: { products: [{ name: 'Стілець', price: 1 }] }, economics_meta: {}, creative_goals: [] };
+  const c = applyToBrief(base, planWrite('budget_monthly', '4500'));
+  assert.equal(c.economics.budget_monthly, 4500); assert.equal(c.economics_meta.budget_monthly.status, 'confirmed'); assert.equal(c.draft_from_site, undefined); assert.deepEqual(c.economics.products, base.economics.products, 'the rest of the brief stays'); assert.equal(base.economics.budget_monthly, undefined, 'the old version is not touched');
+  assert.equal(applyToBrief(base, planWrite('goal', '60 покупок')).general.goal, '60 покупок'); assert.equal(applyToBrief(null, planWrite('geo', 'Польща')).general.geo, 'Польща');
+  assert.deepEqual(applyToBrief(base, planWrite('creative_goals', 'Продати хіт')).creative_goals, [{ goal: 'Продати хіт', product: '' }]);
+  const after = BS_FULL(); delete after.brief.economics.budget_monthly; assert.equal(checkBrief(after).ready, false); after.brief = applyToBrief(after.brief, planWrite('budget_monthly', '4500')); assert.equal(checkBrief(after).ready, true, 'what was typed counts at once');
+});
+await test('brief schema: the overview of a project before the launch shows the check, the missing facts are typed in place and saved through the one store, the files and the cabinet are links', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  const ov = rd('src/components/Workflow/ProcessOverview.jsx'), pf = rd('src/components/Workflow/Preflight.jsx'), st = rd('src/lib/api/briefStore.js');
+  assert.match(ov, /<Preflight /); assert.match(ov, /state\.stage < 3/);
+  assert.match(pf, /checkBrief/); assert.match(pf, /saveFact\(projectId/); assert.match(pf, /Підтвердити/); assert.match(pf, /Додати фото/); assert.match(pf, /Підключити кабінет/);
+  assert.match(st, /saveHumanVersion\(projectId, 'brief'/); assert.match(st, /saveInput\(projectId/); assert.match(st, /updateProject\(projectId/);
 });
 console.log(`\n${passed} workflow checks passed`);

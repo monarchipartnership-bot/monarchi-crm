@@ -302,3 +302,13 @@ select.wf-bd-in { width:auto; }
 .wf-bd-mark.s { background:var(--wf-soft); color:var(--wf-plum); }
 .wf-bd-mark.h { background:var(--wf-ok-bg); color:var(--wf-ok); }
 .wf-bd-form .wf-ta { width:100%; }
+
+/* Готовність до запуску: one list of what the agents need, with the missing facts typed in place */
+.wf-ring { --p:0; width:56px; height:56px; border-radius:50%; background:conic-gradient(var(--wf-orchid) calc(var(--p)*1%), var(--wf-soft) 0); display:grid; place-items:center; flex:none; }
+.wf-ring b { width:42px; height:42px; border-radius:50%; background:var(--wf-surface); display:grid; place-items:center; font-size:12.5px; }
+.wf-pf-row { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:4px 12px; padding:9px 0; border-bottom:1px solid var(--wf-line); align-items:start; }
+.wf-pf-row:last-child { border-bottom:0; }
+.wf-pf-dot { width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:12.5px; font-weight:700; margin-top:1px; }
+.wf-pf-dot.ok { background:var(--wf-ok-bg); color:var(--wf-ok); } .wf-pf-dot.bad { background:var(--wf-bad-bg); color:var(--wf-bad); } .wf-pf-dot.warn { background:var(--wf-warn-bg); color:var(--wf-warn); }
+.wf-pf-ask { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; align-items:flex-start; }
+.wf-pf-in { max-width:380px; width:100%; }
