@@ -64,9 +64,10 @@ export async function animateCreatives({ run, ctx }) {
   let added = [], skipped = [];
   if (!follow) {
     const req = normalizeVideoRequest(run.input);
-    const left = VIDEO_MONTHLY_MAX - videosThisMonth(videos, now);
-    if (left <= 0) return { output: { made: 0, limited: 'month' }, steps: [{ title: `Ліміт відео на місяць вичерпано: ${VIDEO_MONTHLY_MAX} з ${VIDEO_MONTHLY_MAX}`, status: 'info' }] };
-    const plan = planVideos({ req, items: sec.items, videos, now });
+    const max = ctx.cfg?.video_per_month ?? VIDEO_MONTHLY_MAX; // the limit of videos per month from the settings of the agents
+    const left = max - videosThisMonth(videos, now);
+    if (left <= 0) return { output: { made: 0, limited: 'month' }, steps: [{ title: `Ліміт відео на місяць вичерпано: ${max} з ${max}`, status: 'info' }] };
+    const plan = planVideos({ req, items: sec.items, videos, now, max });
     skipped = plan.skipped;
     const base = videos.length;
     added = plan.videos.map((v, i) => ({ id: `v${base + i + 1}`, ...v }));
@@ -80,7 +81,7 @@ export async function animateCreatives({ run, ctx }) {
   return {
     writes: [{ key: 'creatives', body, content, sources: [{ title: 'Готові креативи (картинки)' }] }],
     steps: [
-      { title: follow ? 'Перевірено відео, що генерувались' : `Відео замовлено ${added.length}${skipped.length ? `, не вміщається в місячний ліміт ${VIDEO_MONTHLY_MAX}: ${skipped.join(', ')}` : ''}` },
+      { title: follow ? 'Перевірено відео, що генерувались' : `Відео замовлено ${added.length}${skipped.length ? `, не вміщається в місячний ліміт: ${skipped.join(', ')}` : ''}` },
       { title: `Відео готово ${ready} з ${videos.length}, витрачено $${made.spent.toFixed(2)}` },
     ],
     output: { made: added.length, ready, video_usd: made.spent, skipped: skipped.length },

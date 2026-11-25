@@ -19,7 +19,7 @@
   "crons": [
     { "path": "/api/agent-tick", "schedule": "* * * * *" },
     { "path": "/api/wf-tick", "schedule": "* * * * *" },
-    { "path": "/api/wf-digest", "schedule": "0 7 * * *" }
+    { "path": "/api/wf-digest", "schedule": "0 * * * *" }
   ],
   "headers": [
     { "source": "/r/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "Referrer-Policy", "value": "no-referrer" }] }

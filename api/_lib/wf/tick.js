@@ -3,12 +3,19 @@
 // ctx = { repo, handlers, now?, validate?, config? }.  repo: createWfRepo(db) or the in-memory twin; handlers: createHandlers(...)
 import { planNext } from './machine.js';
 import { monthStart, reached } from './limits.js';
+import { plannerConfig, resolveConfig } from '../../../src/lib/workflow/agentConfig.js';
 const GUARD = /may not replace/;
 const STOP_ACTIONS = new Set(['check_failed', 'skill_stopped', 'launch_stopped']);
 // a notice to the manager (Telegram); a failure to send never breaks the work
+// the kinds of notices and the switch of each one in the settings of the agents (notify.*)
+const NOTICE_SWITCH = { approval: 'approvals', stopped: 'stopped', cost_cap: 'cost_cap', waiting: 'waiting', auto: 'auto_actions' };
 async function tell(ctx, event) {
   if (!ctx.notify) return;
-  try { await ctx.notify(event); } catch { /* the notice is lost, the work goes on */ }
+  try {
+    const key = NOTICE_SWITCH[event.kind];
+    if (key) { const cfg = resolveConfig((await ctx.repo.readSettings?.())?.config); if (cfg.notify[key] === false) return; } // the person switched this notice off
+    await ctx.notify(event);
+  } catch { /* the notice is lost, the work goes on */ }
 }
 
 async function applyActions(ctx, projectId, actions, stats) {
@@ -33,7 +40,18 @@ export async function planProject(ctx, projectId, stats = { enqueued: 0, approva
   const snap = await ctx.repo.loadSnapshot(projectId);
   if (!snap.state) return 0;
   const checks = ctx.validate ? await ctx.validate({ projectId, ...snap }) : { ok: true, problems: [] };
-  const actions = planNext({ now, ...snap, checks, config: ctx.config });
+  const settings = (await ctx.repo.readSettings?.()) || {};
+  const cfg = resolveConfig(settings.config, snap.state?.config);
+  const actions = planNext({ now, ...snap, checks, config: { ...plannerConfig(cfg), ...ctx.config } });
+  // a step that waits for data of a person for longer than the person asked (settings: notify.waiting_after_min) is told once in Telegram
+  if (cfg.notify.waiting) {
+    for (const r of snap.runs.filter((x) => x.status === 'waiting' && x.state?.blocked_on)) {
+      const since = new Date(r.state.blocked_at || r.finished_at || r.created_at);
+      if (now - since < cfg.notify.waiting_after_min * 60e3) continue;
+      const written = await ctx.repo.journalOnce(projectId, { actor_kind: 'agent', actor: r.agent, action: 'waiting_notice', subject: r.skill, summary: `Крок чекає даних (прогін ${r.id}): ${r.error || r.state.blocked_on}`.slice(0, 300), meta: { run: r.id, blocked_on: r.state.blocked_on } });
+      if (written !== false) await tell(ctx, { kind: 'waiting', projectId, summary: String(r.error || 'Крок чекає даних від людини.').slice(0, 300) });
+    }
+  }
   await applyActions(ctx, projectId, actions, stats);
   return actions.length;
 }
@@ -61,7 +79,7 @@ async function runOne(ctx, run, stats) {
     return;
   }
   try {
-    const result = (await handler({ run, project: { id: run.project_id, state: snap.state }, ctx })) || {};
+    const result = (await handler({ run, project: { id: run.project_id, state: snap.state }, ctx: { ...ctx, cfg: resolveConfig(settings.config, snap.state?.config) } })) || {};
     for (const wr of result.writes || []) {
       const base = { body: wr.body, content: wr.content, author_kind: 'agent', author: run.agent, run_id: run.id, sources: wr.sources || [] };
       try { await repo.writeSectionVersion(run.project_id, wr.key, base); }

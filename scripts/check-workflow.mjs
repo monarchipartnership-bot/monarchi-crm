@@ -67,6 +67,7 @@ import { BATCH_DEFAULT, BATCH_MAX, affordableCount, buildBatchGoals, clampCount,
 import { batchCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { MERGE_MAX, SYSTEM_PROMPT as SYSTEM_VARIATIONS, VAR_MAX, checkVariations, needsPicture, normalizeRequest } from '../api/_lib/wf/skills/variationsEngine.js';
 import { adVariations } from '../api/_lib/wf/skills/variationsAgent.js';
+import { DEFAULTS as CFG_DEFAULTS, SPEC as CFG_SPEC, applyChanges, checkValue, getPath as cfgGet, plannerConfig, resolveConfig, sourceOf as cfgSource } from '../src/lib/workflow/agentConfig.js';
 import { FIELDS, SECTIONS as BS_SECTIONS, applyToBrief, checkBrief, geoHasEu, planWrite, unitInputsOk } from '../src/lib/workflow/briefSchema.js';
 import { briefDraft } from '../api/_lib/wf/skills/briefDraftAgent.js';
 import { VIDEO_MONTHLY_MAX, buildMotionPrompt, isTestimonial, normalizeVideoRequest, planVideos, renderVideosText, videosThisMonth } from '../api/_lib/wf/skills/videoEngine.js';
@@ -2196,7 +2197,7 @@ await test('notices: a stopped process (the skill failed three times) is told on
 await test('digest endpoint and cron: the file exists, the cron is daily, the settings are read from the shared loader', () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-  assert.ok(vercel.crons.some((c) => c.path === '/api/wf-digest' && /^0 \d+ \* \* \*$/.test(c.schedule)), 'one digest a day');
+  assert.ok(vercel.crons.some((c) => c.path === '/api/wf-digest' && c.schedule === '0 * * * *'), 'the cron comes every hour, the digest goes out once a day at the hour of the settings (Kyiv time)');
   const code = fs.readFileSync(path.join(root, 'api/wf-digest.js'), 'utf8');
   assert.match(code, /loadOverviewData/); assert.match(code, /no started projects/);
 });
@@ -2697,7 +2698,7 @@ await test('report bridge: the switch, the queue entry of a due report, a report
   assert.match((await enqueueReportRun(db({ code: '23505', message: 'dup' }))({ projectId: 5, periodType: 'weekly', scheduledFor: 'x' })).message, /уже в черзі/);
   await assert.rejects(enqueueReportRun(db({ code: '42501', message: 'denied' }))({ projectId: 5, periodType: 'weekly', scheduledFor: 'x' }), /Не вдалося поставити звіт у чергу: denied/);
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const tickSrc = fs.readFileSync(path.join(root, 'api/agent-tick.js'), 'utf8'); assert.match(tickSrc, /runFor: reportsViaOrchestrator\(\) \? enqueueReportRun\(db\) : /, 'without the switch the clock makes the report itself');
+  const tickSrc = fs.readFileSync(path.join(root, 'api/agent-tick.js'), 'utf8'); assert.match(tickSrc, /runFor: reportsViaOrchestrator\(process\.env, reportsSetting\) \? enqueueReportRun\(db\) : /, 'without the switch the clock makes the report itself');
   assert.match(fs.readFileSync(path.join(root, 'api/wf-tick.js'), 'utf8'), /const reports = \{ run: /);
 });
 // ---------------------------------------------------------------- Zeely item 1 (owner's decision 2026-11-25): the profile «ДНК бренду», made from the website, checked by a person, used by the Creator
@@ -3202,7 +3203,7 @@ await test('video: the skill estimates first, makes the videos of the chosen car
   await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'animate_creatives', input: { sources: ['c1', 'c2'] }, trigger: 'manual' });
   await processTick(s.ctx);
   const c2 = (await s.repo.readSection(1, 'creatives')).version.content;
-  assert.equal(c2.videos.length, 3, 'only one more fits into three a month'); assert.ok(s.repo.T.steps.some((x) => /не вміщається в місячний ліміт 3: c2/.test(x.title)));
+  assert.equal(c2.videos.length, 3, 'only one more fits into three a month'); assert.ok(s.repo.T.steps.some((x) => /не вміщається в місячний ліміт: c2/.test(x.title)));
   await s.repo.enqueueRun({ project_id: 1, agent: 'creator', skill: 'animate_creatives', input: { sources: ['c1'] }, trigger: 'manual' });
   await processTick(s.ctx);
   assert.equal(s.repo.T.runs[2].output.limited, 'month'); assert.equal(s.ctx.hfv.calls.submit.length, 3, 'nothing is made over the limit');
@@ -3450,5 +3451,87 @@ await test('brief schema: the overview of a project before the launch shows the 
   assert.match(ov, /<Preflight /); assert.match(ov, /state\.stage < 3/);
   assert.match(pf, /checkBrief/); assert.match(pf, /saveFact\(projectId/); assert.match(pf, /Підтвердити/); assert.match(pf, /Додати фото/); assert.match(pf, /Підключити кабінет/);
   assert.match(st, /saveHumanVersion\(projectId, 'brief'/); assert.match(st, /saveInput\(projectId/); assert.match(st, /updateProject\(projectId/);
+});
+// ---------------------------------------------------------------- «Налаштування агентів»: one place for when they work, how much they spend, what they do alone, when they tell a person
+await test('agent settings: every setting has a type, limits, a scope and a default; a value out of limits is refused in words; the step of the budget can never be more than 20%', () => {
+  for (const path of Object.keys(CFG_SPEC)) { assert.notEqual(cfgGet(CFG_DEFAULTS, path), undefined, 'default for ' + path); assert.ok(['project', 'global'].includes(CFG_SPEC[path].scope), path); assert.ok(CFG_SPEC[path].label, path); }
+  assert.deepEqual(checkValue('optimize.every_hours', '12'), { value: 12 }); assert.match(checkValue('optimize.every_hours', '0').error, /Від 1 до 168/); assert.match(checkValue('optimize.every_hours', '1.5').error, /ціле/); assert.match(checkValue('optimize.every_hours', 'часто').error, /число/);
+  assert.deepEqual(checkValue('thresholds.min_spend_factor', '1,5'), { value: 1.5 }); assert.match(checkValue('thresholds.budget_step_pct', 35).error, /Від 5 до 20/, 'a bigger step is always a decision of the manager');
+  assert.deepEqual(checkValue('optimize.skip_weekends', true), { value: true }); assert.match(checkValue('optimize.skip_weekends', 'так').error, /так або ні/); assert.match(checkValue('nope', 1).error, /Невідоме/);
+});
+await test('agent settings: the defaults, then the settings of all projects, then the settings of the project; a project cannot change what is common to all; bad stored values are ignored', () => {
+  const d = resolveConfig();
+  assert.deepEqual(d, CFG_DEFAULTS); assert.equal(d.optimize.every_hours, 24); assert.equal(d.notify.waiting, true);
+  const g = { optimize: { every_hours: 12 }, notify: { digest_hour: 8 }, thresholds: { learning_days: 5 } };
+  const p = { optimize: { at_hour: 14 }, thresholds: { learning_days: 2 }, notify: { digest_hour: 1 }, small_actions: { max_pauses: 99 } };
+  const r = resolveConfig(g, p);
+  assert.equal(r.optimize.every_hours, 12, 'common to all projects'); assert.equal(r.optimize.at_hour, 14, 'its own'); assert.equal(r.thresholds.learning_days, 2, 'the project wins over all projects');
+  assert.equal(r.notify.digest_hour, 8, 'a project cannot change a notice: it is the same chat for all'); assert.equal(r.small_actions.max_pauses, 3, 'out of limits: ignored');
+  assert.equal(cfgSource('optimize.every_hours', g, p), 'global'); assert.equal(cfgSource('optimize.at_hour', g, p), 'project'); assert.equal(cfgSource('optimize.skip_weekends', g, p), 'default');
+  assert.deepEqual(plannerConfig(r), { optimizeEveryHours: 12, optimizeAtHour: 14, skipWeekends: false, monthStartDay: 1 });
+  const original = JSON.stringify(g); resolveConfig(g, p); assert.equal(JSON.stringify(g), original, 'the stored settings are not changed');
+});
+await test('agent settings: a change from the page keeps only the values that differ, null goes back to the level above, errors say which setting and why, the digest mark of the cron survives', () => {
+  const a = applyChanges({}, { 'optimize.every_hours': 12, 'optimize.skip_weekends': true }, 'project');
+  assert.deepEqual(a.config, { optimize: { every_hours: 12, skip_weekends: true } }); assert.deepEqual(a.errors, []);
+  const b = applyChanges(a.config, { 'optimize.every_hours': null, 'month_plan.day': 40 }, 'project');
+  assert.deepEqual(b.config, { optimize: { skip_weekends: true } }, 'back to the default'); assert.deepEqual(b.errors, [{ path: 'month_plan.day', error: 'Від 1 до 28.' }]);
+  const c = applyChanges({}, { 'notify.digest_hour': 7 }, 'project'); assert.deepEqual(c.config, {}); assert.match(c.errors[0].error, /для всіх проєктів/);
+  const d = applyChanges({ _digest_on: '2026-11-26', optimize: { at_hour: 9 } }, { 'notify.digest_hour': 7 }, 'global');
+  assert.deepEqual(d.config, { optimize: { at_hour: 9 }, notify: { digest_hour: 7 }, _digest_on: '2026-11-26' });
+});
+await test('agent settings: the optimisation runs at the chosen hour (Kyiv time), not at the weekend when asked, not more often than chosen; the first one goes at once', () => {
+  const op = (finished, cfg, now) => planNext({ now: new Date(now), state: { stage: 4, paused: false }, runs: [{ id: 1, agent: 'mediabuyer', skill: 'optimize', status: 'done', input: {}, created_at: finished, finished_at: finished }], config: cfg }).some((a) => a.type === 'enqueue' && a.skill === 'optimize');
+  const cfg = { optimizeEveryHours: 24, optimizeAtHour: 10, skipWeekends: true };
+  assert.equal(op('2026-11-26T08:00:00Z', cfg, '2026-11-27T07:30:00Z'), false, '09:30 in Kyiv is before the chosen 10:00');
+  assert.equal(op('2026-11-26T08:00:00Z', cfg, '2026-11-27T08:30:00Z'), true, '10:30 in Kyiv: due');
+  assert.equal(op('2026-11-26T06:00:00Z', cfg, '2026-11-27T06:30:00Z'), false, '24 hours passed but it is 08:30 in Kyiv'); assert.equal(op('2026-11-26T06:00:00Z', { ...cfg, optimizeAtHour: null }, '2026-11-27T06:30:00Z'), true, 'no hour chosen: as soon as the time has passed');
+  assert.equal(op('2026-11-26T08:00:00Z', cfg, '2026-11-27T07:30:00Z'), false);
+  assert.equal(op('2026-11-26T08:00:00Z', { ...cfg, optimizeEveryHours: 12 }, '2026-11-27T06:30:00Z'), true, 'more often than once a day: the hour does not apply');
+  assert.equal(op('2026-11-27T08:00:00Z', cfg, '2026-11-28T09:00:00Z'), false, 'Saturday: the weekend is off'); assert.equal(op('2026-11-27T08:00:00Z', { ...cfg, skipWeekends: false }, '2026-11-28T09:00:00Z'), true);
+  assert.equal(op('2026-11-27T08:00:00Z', cfg, '2026-11-29T09:00:00Z'), false, 'Sunday'); assert.equal(op('2026-11-27T08:00:00Z', cfg, '2026-11-30T09:00:00Z'), true, 'Monday 11:00 in Kyiv');
+  assert.equal(planNext({ now: new Date('2026-11-28T09:00:00Z'), state: { stage: 4, paused: false }, runs: [], config: cfg }).some((a) => a.type === 'enqueue' && a.skill === 'optimize'), true, 'the first check after the launch is not postponed');
+  assert.equal(planNext({ now: new Date('2026-11-05T09:00:00Z'), state: { stage: 4, paused: false }, runs: [{ id: 1, agent: 'mediabuyer', skill: 'launch', status: 'done', input: {}, created_at: '2026-10-20T09:00:00Z' }], config: { monthStartDay: 10 } }).some((a) => a.type === 'set_stage'), false, 'the plan for the month waits for the chosen day');
+});
+await test('agent settings: the orchestrator reads them (global, then the project) and gives them to the skills; the thresholds, the limits of small actions and the videos per month follow them', async () => {
+  const s = await opSetup({}); s.repo.T.settings.config = { thresholds: { learning_days: 14 } };
+  await processTick(s.ctx);
+  const first = s.repo.T.runs.find((r) => r.skill === 'optimize'); assert.equal(first.status, 'done', first.error);
+  assert.ok(!s.repo.T.journal.some((j) => j.action === 'optimize' && /Витрачено/.test(j.summary) && /off \d/.test(j.summary)), 'with 14 days of learning nothing is judged yet: no «off»');
+  assert.match(s.repo.T.journal.find((j) => j.action === 'optimize').summary, /wait/);
+  const lim = await smSetup(); lim.repo.T.settings.config = { small_actions: { max_pauses: 0 } }; await processTick(lim.ctx);
+  assert.equal(lim.calls.length, 0, 'the limit of pauses of the settings is 0: the agent changes nothing alone');
+  const own = await smSetup(); own.repo.T.settings.config = { small_actions: { max_pauses: 0 } }; own.repo.T.states.get(1).config = { small_actions: { max_pauses: 3 } }; await processTick(own.ctx);
+  assert.deepEqual(own.calls.map((c) => c[0]), ['pause'], 'the project has its own setting and it wins');
+  const v = await vidSetup({ cap: 100, input: { sources: ['c1', 'c2'] } }); v.repo.T.settings.config = { video_per_month: 1 }; await processTick(v.ctx);
+  assert.equal((await v.repo.readSection(1, 'creatives')).version.content.videos.length, 1, 'one video a month by the settings');
+});
+await test('agent settings: a step that waits for data longer than chosen is told once in Telegram; a notice that is switched off is not sent; short waits are not told', async () => {
+  const mk = async (config) => {
+    const s = await setup({ handlers: createHandlers({ researcher: { site: async () => ({ blocked: { on: 'site_url', reason: 'У картці проєкту не вказано сайт клієнта.' } }) } }) });
+    s.events = []; s.ctx.notify = async (e) => { s.events.push(e); }; if (config) s.repo.T.settings.config = config;
+    await s.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'site' }); await processTick(s.ctx);
+    return s;
+  };
+  const s = await mk();
+  assert.equal(s.repo.T.runs[0].status, 'waiting'); assert.equal(s.events.filter((e) => e.kind === 'waiting').length, 0, 'not yet: less than an hour');
+  advance(61 * 60e3); await processTick(s.ctx);
+  assert.deepEqual(s.events.filter((e) => e.kind === 'waiting').map((e) => [e.projectId, e.summary]), [[1, 'У картці проєкту не вказано сайт клієнта.']]);
+  advance(60e3); await processTick(s.ctx); advance(3600e3); await processTick(s.ctx);
+  assert.equal(s.events.filter((e) => e.kind === 'waiting').length, 1, 'once for a run');
+  const off = await mk({ notify: { waiting: false } }); advance(3 * 3600e3); await processTick(off.ctx); assert.equal(off.events.filter((e) => e.kind === 'waiting').length, 0, 'switched off');
+  const fast = await mk({ notify: { waiting_after_min: 15 } }); advance(16 * 60e3); await processTick(fast.ctx); assert.equal(fast.events.filter((e) => e.kind === 'waiting').length, 1, 'the person chose 15 minutes');
+  const noApp = await setup({}); noApp.events = []; noApp.ctx.notify = async (e) => { noApp.events.push(e); }; noApp.repo.T.settings.config = { notify: { approvals: false } };
+  await human(noApp.repo, 'brief'); Object.assign(state(noApp.repo), { paid_at: now().toISOString(), contracts_signed_at: now().toISOString() }); await drain(noApp.ctx, 60);
+  assert.ok(noApp.repo.T.approvals.length > 0 && noApp.events.filter((e) => e.kind === 'approval').length === 0, 'the approval exists, the notice is switched off');
+  assert.match(noticeOf({ kind: 'waiting', project: 'Лоза', projectId: 7, summary: 'Немає сайту' }).text, /крок чекає на ваші дані[\s\S]*Немає сайту/); assert.equal(noticeOf({ kind: 'waiting', project: 'Лоза', projectId: 7 }).path, '/projects/7?tab=process');
+});
+await test('agent settings: the report switch works from the settings or the old variable; the digest comes out once a day at the hour of the settings; the cron is hourly', () => {
+  assert.equal(reportsViaOrchestrator({}, false), false); assert.equal(reportsViaOrchestrator({}, true), true); assert.equal(reportsViaOrchestrator({ REPORTS_VIA_ORCHESTRATOR: '1' }, false), true); assert.equal(reportsViaOrchestrator({ REPORTS_VIA_ORCHESTRATOR: '1' }), true);
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const dg = fs.readFileSync(path.join(root, 'api/wf-digest.js'), 'utf8');
+  assert.match(dg, /resolveConfig\(stored\)/); assert.match(dg, /cfg\.notify\.digest_hour/); assert.match(dg, /_digest_on/); assert.match(dg, /cfg\.notify\.digest\b/);
+  assert.match(fs.readFileSync(path.join(root, 'api/agent-tick.js'), 'utf8'), /reports_via_orchestrator/);
+  assert.match(fs.readFileSync(path.join(root, 'supabase/migrations/20261075000000_workflow_config.sql'), 'utf8'), /wf_settings add column if not exists config jsonb[\s\S]*wf_project_state add column if not exists config jsonb/);
 });
 console.log(`\n${passed} workflow checks passed`);

@@ -8,6 +8,8 @@ import { digestMessage } from './_lib/wf/notify.js';
 import { hasToken, sendMessage } from './_lib/telegram.js';
 import { loadOverviewData } from '../src/lib/workflow/overviewData.js';
 import { buildOverview, digestText } from '../src/lib/workflow/overview.js';
+import { resolveConfig } from '../src/lib/workflow/agentConfig.js';
+import { kyivParts } from '../src/lib/agentSchedule.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
@@ -27,12 +29,20 @@ export default async function handler(req, res) {
     }
     if (!hasToken()) { bad(res, 400, 'TELEGRAM_BOT_TOKEN не налаштовано на сервері.'); return; }
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
+    const stored = (await db.from('wf_settings').select('config').eq('id', 1).maybeSingle()).data?.config || {};
+    const cfg = resolveConfig(stored);
+    const k = kyivParts(new Date());
+    if (cron) { // the cron comes every hour: the digest goes out once a day, at the hour and only if the person did not switch it off
+      if (!cfg.notify.digest) { res.status(200).json({ ok: true, sent: false, reason: 'digest is off' }); return; }
+      if (Math.floor(k.minutes / 60) !== cfg.notify.digest_hour || stored._digest_on === k.date) { res.status(200).json({ ok: true, sent: false, reason: 'not the hour or already sent today' }); return; }
+    }
     const target = await createWfRepo(db).readNotifyTarget();
     if (!target?.chatId) { bad(res, 400, 'Чат Telegram не вказано: заповніть його в «Сповіщення» AI Agents.'); return; }
     const ov = buildOverview({ ...(await loadOverviewData(db)), now: new Date() });
     if (cron && !ov.rows.length) { res.status(200).json({ ok: true, sent: false, reason: 'no started projects' }); return; }
     const r = await sendMessage(digestMessage(target, digestText(ov)));
     if (!r.ok) { bad(res, 502, `Telegram не прийняв повідомлення: ${r.error}`); return; }
+    if (cron) await db.from('wf_settings').update({ config: { ...stored, _digest_on: k.date } }).eq('id', 1);
     res.status(200).json({ ok: true, sent: true, projects: ov.rows.length });
   } catch (e) {
     console.error('wf-digest failed:', e?.message || e);

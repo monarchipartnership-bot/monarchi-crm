@@ -28,13 +28,14 @@ export default async function handler(req, res) {
     const startedAt = Date.now();
     const beat = (report) => db.from('ai_agent_settings').update(report ? { last_tick_at: new Date().toISOString(), last_tick_report: report } : { last_tick_at: new Date().toISOString() }).eq('id', 1).then(() => null, () => null);
     await beat();
+    const reportsSetting = (await db.from('wf_settings').select('config').eq('id', 1).maybeSingle().then((r) => r.data?.config?.reports_via_orchestrator === true, () => false)); // «Звіти через оркестратор» in the settings of the agents
     let result = { checked: 0, due: 0, started: [], waiting: 0 };
     let projectsError = null;
     try {
       result = await runDueAgents({
         repo,
         // with REPORTS_VIA_ORCHESTRATOR=1 a due report is queued as a run of the Support agent (the orchestrator makes it); without the switch the clock makes it itself, as before
-        runFor: reportsViaOrchestrator() ? enqueueReportRun(db) : ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor, creativesGoogle: makeGoogleCreativesCollector(db), creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN), telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }),
+        runFor: reportsViaOrchestrator(process.env, reportsSetting) ? enqueueReportRun(db) : ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor, creativesGoogle: makeGoogleCreativesCollector(db), creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN), telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }),
       });
     } catch (e) { projectsError = e.message || String(e); }
     // New clients: the Meta accounts the CRM can see that have no project yet (once a day; the first run only learns what exists).

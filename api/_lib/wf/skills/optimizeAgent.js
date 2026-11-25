@@ -31,7 +31,9 @@ export async function optimize({ run, ctx }) {
   } else open.push('Стан груп і оголошень у кабінеті не читався: усі вважаються увімкненими.');
   const lastScale = ctx.repo.lastJournal ? await ctx.repo.lastJournal(run.project_id, 'optimize_scale') : null;
 
-  const r = analyse({ snapshot: snapSec, thresholds, rows, objects, now, lastScaleAt: lastScale?.at || null });
+  const cfg = ctx.cfg || null; // the settings of the agents for this project (the defaults when the skill is run without them)
+  const params = cfg ? { learning_days: cfg.thresholds.learning_days, min_spend_factor: cfg.thresholds.min_spend_factor, budget_step_pct: cfg.thresholds.budget_step_pct, budget_step_hours: cfg.thresholds.budget_step_hours, much_worse_factor: cfg.thresholds.much_worse_factor } : {};
+  const r = analyse({ snapshot: snapSec, thresholds, rows, objects, now, lastScaleAt: lastScale?.at || null, params });
   const actionable = r.actions.filter((a) => ['off', 'scale', 'replace', 'new_creative'].includes(a.action));
   const counts = ['off', 'scale', 'replace', 'new_creative', 'keep', 'wait'].map((k) => [k, r.actions.filter((a) => a.action === k).length]).filter(([, n]) => n);
   const period = `${win.life.since} – ${win.life.until}`;
@@ -48,7 +50,7 @@ export async function optimize({ run, ctx }) {
     else {
       const brief = (await ctx.repo.readSection(run.project_id, 'brief'))?.version?.content;
       const monthly = Number(brief?.economics?.budget_monthly);
-      const pick = pickSmallActions({ actions: r.actions, snapshot: snapSec, objects, dailyCap: Number.isFinite(monthly) && monthly > 0 ? monthly / 30 : null });
+      const pick = pickSmallActions({ actions: r.actions, snapshot: snapSec, objects, dailyCap: Number.isFinite(monthly) && monthly > 0 ? monthly / 30 : null, limits: cfg ? { max_ad_pauses: cfg.small_actions.max_pauses, max_scales: cfg.small_actions.max_scales, headroom_pct: 0 } : undefined, params });
       auto.skipped = pick.skipped;
       for (const x of pick.apply) {
         try {

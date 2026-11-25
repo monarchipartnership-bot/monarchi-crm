@@ -6,6 +6,7 @@
 
 export const STAGE = { START: 0, RESEARCH: 1, STRATEGY: 2, LAUNCH: 3, OPERATE: 4, MONTH: 5 };
 export const DEFAULTS = { optimizeEveryHours: 24, monthStartDay: 1 };
+import { kyivParts } from '../../../src/lib/agentSchedule.js';
 export const RESEARCH_SKILLS = ['site', 'audience', 'unit_economy', 'competitors'];
 
 const OPEN = new Set(['queued', 'running', 'waiting']);
@@ -161,7 +162,12 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
   // ---------------------------------------------------------------- 4 and 5 · optimisation and the monthly plan
   if (state.stage === STAGE.OPERATE || state.stage === STAGE.MONTH) {
     const lo = lastRun(runs, 'mediabuyer', 'optimize');
-    const due = !lo || (lo.finished_at && now - new Date(lo.finished_at) >= cfg.optimizeEveryHours * 3600e3);
+    let due = !lo || (lo.finished_at && now - new Date(lo.finished_at) >= cfg.optimizeEveryHours * 3600e3);
+    if (due && lo) { // the settings of the agents: not at the weekend, and (when the check is not more often than once a day) not before the chosen hour of the day, Kyiv time
+      const k = kyivParts(now);
+      if (cfg.skipWeekends && k.weekday >= 6) due = false;
+      else if (cfg.optimizeEveryHours >= 24 && cfg.optimizeAtHour != null && Math.floor(k.minutes / 60) < cfg.optimizeAtHour) due = false;
+    }
     if (due) enqueue('mediabuyer', 'optimize', {}, 50);
     const lw = lastRun(runs, 'support', 'weekly_report'); // the weekly feedback for the manager: every 7 days; the payment calendar is looked at every day
     if (!lw || (lw.finished_at && now - new Date(lw.finished_at) >= 7 * 24 * 3600e3)) enqueue('support', 'weekly_report', {}, 70);

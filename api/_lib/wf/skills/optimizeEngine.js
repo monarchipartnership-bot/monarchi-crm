@@ -18,11 +18,11 @@ export function agg(rows) {
 }
 
 // thresholds: { breakeven_cpa, target_cpa, breakeven_roas, target_roas }. → { state: 'wait' | 'off' | 'keep' | 'scale', reason }
-export function judge(m, th, daysLive) {
+export function judge(m, th, daysLive, P = PARAMS) {
   const be = num(th.breakeven_cpa), tg = num(th.target_cpa) ?? be;
-  const min = tg != null ? r2(tg * PARAMS.min_spend_factor) : null;
+  const min = tg != null ? r2(tg * P.min_spend_factor) : null;
   if (be == null || min == null) return { state: 'wait', reason: 'Немає порогів Unit Economy: оцінювати нічим.', min };
-  if (daysLive < PARAMS.learning_days) return { state: 'wait', reason: `Перші ${PARAMS.learning_days} дні лише спостерігаємо (минуло ${Math.max(0, Math.floor(daysLive))}).`, min };
+  if (daysLive < P.learning_days) return { state: 'wait', reason: `Перші ${P.learning_days} дні лише спостерігаємо (минуло ${Math.max(0, Math.floor(daysLive))}).`, min };
   if (m.spend < min) return { state: 'wait', reason: `Витрачено ${m.spend} з ${min}, потрібних для вердикту (1.5× цільового CPA ${tg}).`, min };
   if (!m.purchases) return { state: 'off', reason: `Витрачено ${m.spend} (не менше ${min}) без жодної покупки.`, min };
   if (m.cpa > be) return { state: 'off', reason: `Ціна покупки ${m.cpa} вища за беззбитковий ${be}: кожна покупка в збиток.`, min };
@@ -35,7 +35,8 @@ const byKey = (rows, k) => { const m = new Map(); for (const r of rows) { const 
 
 // snapshot = content of the section «Знімок запуску» (campaigns → adsets → ads with Meta ids); rows = { life, recent, prior } at the level of ads
 // objects = { adsets: Map id → { status, daily }, ads: Map id → { status } } (what is really on in the cabinet); lastScaleAt = ISO of the last recommended scale (72 hours between)
-export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastScaleAt = null }) {
+export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastScaleAt = null, params = {} }) {
+  const P = { ...PARAMS, ...params }; // the thresholds of the settings of the agents (src/lib/workflow/agentConfig.js) over the defaults
   const th = thresholds || {};
   const launched = new Date(snapshot.launched_at);
   const daysLive = (now - launched) / DAY;
@@ -49,7 +50,7 @@ export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastSca
   for (const c of snapshot.campaigns) for (const a of c.adsets) for (const x of a.ads) {
     if (!x.ad_id) continue;
     const m = agg(life.get(String(x.ad_id)) || []), rec = agg(recent.get(String(x.ad_id)) || []), pri = agg(prior.get(String(x.ad_id)) || []);
-    adInfo.push({ campaign: c, adset: a, ad: x, m, rec, pri, on: isOn(objects.ads, x.ad_id), verdict: judge(m, th, daysLive) });
+    adInfo.push({ campaign: c, adset: a, ad: x, m, rec, pri, on: isOn(objects.ads, x.ad_id), verdict: judge(m, th, daysLive, P) });
   }
   for (const a of snapshot.campaigns.flatMap((c) => c.adsets)) {
     const sibs = adInfo.filter((i) => i.adset === a && i.on);
@@ -63,7 +64,7 @@ export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastSca
       } else if (i.verdict.state === 'wait') act({ level: 'ad', id: i.ad.ad_id, name: label, action: 'wait', reason: i.verdict.reason, metrics: i.m });
       else {
         let note = '';
-        if (i.verdict.state === 'keep' && medianCpa != null && i.m.cpa > medianCpa * PARAMS.much_worse_factor && i.m.cpa <= num(th.breakeven_cpa)) note = ` Суттєво гірший за сусідів (ціна ${i.m.cpa} проти медіани ${r2(medianCpa)}), але вище беззбиткового: лишаємо, стежимо.`;
+        if (i.verdict.state === 'keep' && medianCpa != null && i.m.cpa > medianCpa * P.much_worse_factor && i.m.cpa <= num(th.breakeven_cpa)) note = ` Суттєво гірший за сусідів (ціна ${i.m.cpa} проти медіани ${r2(medianCpa)}), але вище беззбиткового: лишаємо, стежимо.`;
         // the budget lives at the level of the ad set, so a good ad is only «лишити»: the advice to scale is given for its group
         act({ level: 'ad', id: i.ad.ad_id, name: label, action: 'keep', reason: (i.verdict.state === 'scale' ? 'Працює добре. ' : '') + i.verdict.reason + note, metrics: i.m });
       }
@@ -86,18 +87,18 @@ export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastSca
     const mine = adInfo.filter((i) => i.adset === a);
     const m = agg(mine.flatMap((i) => life.get(String(i.ad.ad_id)) || []));
     const on = isOn(objects.adsets, a.id);
-    const v = judge(m, th, daysLive);
+    const v = judge(m, th, daysLive, P);
     const allOff = mine.length > 0 && mine.filter((i) => i.on).every((i) => actions.some((x) => x.id === i.ad.ad_id && x.action === 'off'));
     adsetInfo.push({ campaign: c, adset: a, m, on, v, allOff, budget: num(objects.adsets?.get?.(String(a.id))?.daily) ?? num(a.daily) });
   }
-  const scaleReady = !lastScaleAt || now - new Date(lastScaleAt) >= PARAMS.budget_step_hours * 3600e3;
+  const scaleReady = !lastScaleAt || now - new Date(lastScaleAt) >= P.budget_step_hours * 3600e3;
   for (const s of adsetInfo.filter((x) => x.on)) {
     const label = `Група «${s.adset.name}»`;
     if (s.v.state === 'off' || s.allOff) act({ level: 'adset', id: s.adset.id, name: label, action: 'off', reason: s.allOff ? 'Усі оголошення групи вимикаються за порогом.' : s.v.reason, metrics: s.m, effect: 'Зупиняє витрати групи, що не окупаються.' });
     else if (s.v.state === 'scale') {
-      const next = s.budget != null ? r2(s.budget * (1 + PARAMS.budget_step_pct / 100)) : null;
-      if (!scaleReady) act({ level: 'adset', id: s.adset.id, name: label, action: 'keep', reason: `${s.v.reason} Масштабувати можна, але з останньої зміни бюджету ще не минуло ${PARAMS.budget_step_hours} годин.`, metrics: s.m });
-      else act({ level: 'adset', id: s.adset.id, name: label, action: 'scale', reason: `${s.v.reason} Піднімаємо бюджет кроком ${PARAMS.budget_step_pct}%${next != null ? `: ${s.budget} → ${next} на день` : ''}.`, metrics: s.m, to_daily: next, effect: s.m.cpa && next != null ? `Орієнтовно +${r2((next - s.budget) / s.m.cpa)} покупок на день при тій самій ціні (оцінка, ціна може вирости).` : '' });
+      const next = s.budget != null ? r2(s.budget * (1 + P.budget_step_pct / 100)) : null;
+      if (!scaleReady) act({ level: 'adset', id: s.adset.id, name: label, action: 'keep', reason: `${s.v.reason} Масштабувати можна, але з останньої зміни бюджету ще не минуло ${P.budget_step_hours} годин.`, metrics: s.m });
+      else act({ level: 'adset', id: s.adset.id, name: label, action: 'scale', reason: `${s.v.reason} Піднімаємо бюджет кроком ${P.budget_step_pct}%${next != null ? `: ${s.budget} → ${next} на день` : ''}.`, metrics: s.m, to_daily: next, effect: s.m.cpa && next != null ? `Орієнтовно +${r2((next - s.budget) / s.m.cpa)} покупок на день при тій самій ціні (оцінка, ціна може вирости).` : '' });
     } else act({ level: 'adset', id: s.adset.id, name: label, action: s.v.state, reason: s.v.reason, metrics: s.m });
   }
 
@@ -112,8 +113,8 @@ export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastSca
 
   // ---- ads are in order but there are no sales: the site and the tracking come first (document: «перевіряємо сайт і трекінг»)
   const all = agg(adInfo.flatMap((i) => life.get(String(i.ad.ad_id)) || []));
-  const min = judge(all, th, 99).min;
-  if (min != null && daysLive >= PARAMS.learning_days && all.spend >= min * 2 && all.purchases === 0 && all.ctr != null && all.ctr >= 0.5) {
+  const min = judge(all, th, 99, P).min;
+  if (min != null && daysLive >= P.learning_days && all.spend >= min * 2 && all.purchases === 0 && all.ctr != null && all.ctr >= 0.5) {
     tasks.push({ type: 'tracking', owner: 'manager', priority: 'high', title: 'Реклама в нормі, продажів немає: перевірити сайт і трекінг', evidence: `Витрачено ${all.spend}, кліків ${all.clicks}, CTR ${all.ctr}%, покупок 0. Перевірте піксель, події покупки й оформлення замовлення.` });
     notes.push('Продажів немає при нормальному CTR: ймовірно, проблема на сайті або в трекінгу, а не в рекламі. Створено задачу.');
   }
@@ -129,7 +130,8 @@ export function analyse({ snapshot, thresholds, rows, objects = {}, now, lastSca
 export const SMALL = { max_ad_pauses: 3, max_scales: 2, headroom_pct: 0 }; // headroom_pct: how far above the daily budget of the brief the total may go (0 = never)
 
 // actions = analyse().actions; objects = what is on in the cabinet now; dailyCap = the daily budget of the brief (or null: no scaling). → { apply: [...], skipped: [{ name, why }] }
-export function pickSmallActions({ actions, snapshot, objects = {}, dailyCap = null, limits = SMALL }) {
+export function pickSmallActions({ actions, snapshot, objects = {}, dailyCap = null, limits = SMALL, params = {} }) {
+  const P = { ...PARAMS, ...params };
   const apply = [], skipped = [];
   const adsetOfAd = new Map();
   for (const c of snapshot?.campaigns || []) for (const a of c.adsets || []) for (const x of a.ads || []) if (x.ad_id) adsetOfAd.set(String(x.ad_id), a);
@@ -156,7 +158,7 @@ export function pickSmallActions({ actions, snapshot, objects = {}, dailyCap = n
     const cur = num(objects.adsets?.get?.(String(a.id))?.daily);
     if (cur == null) { skipped.push({ name: a.name, why: 'поточний бюджет групи в кабінеті невідомий' }); continue; }
     if (dailyCap == null) { skipped.push({ name: a.name, why: 'у брифі немає місячного бюджету: ліміту для підняття немає' }); continue; }
-    const next = r2(Math.min(num(a.to_daily), cur * (1 + PARAMS.budget_step_pct / 100)));
+    const next = r2(Math.min(num(a.to_daily), cur * (1 + P.budget_step_pct / 100)));
     if (!(next > cur)) { skipped.push({ name: a.name, why: 'підняття не більше за поточний бюджет' }); continue; }
     if (running - cur + next > dailyCap * (1 + limits.headroom_pct / 100) + 1e-9) { skipped.push({ name: a.name, why: `сума денних бюджетів вийшла б за бюджет із брифу (${r2(dailyCap)} на день)` }); continue; }
     if (apply.filter((x) => x.kind === 'adset_scale').length >= limits.max_scales) { skipped.push({ name: a.name, why: `ліміт ${limits.max_scales} підняттів за прохід` }); continue; }

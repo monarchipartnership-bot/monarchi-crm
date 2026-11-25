@@ -28,7 +28,7 @@ export function createWfRepo(db, { now = () => new Date() } = {}) {
       const [state, sections, runs, approvals] = await Promise.all([
         db.from('wf_project_state').select('*').eq('project_id', projectId).maybeSingle(),
         db.from('wf_sections').select('key, status, current_version_id').eq('project_id', projectId),
-        db.from('wf_runs').select('id, agent, skill, status, input, created_at, finished_at').eq('project_id', projectId).order('id', { ascending: false }).limit(300),
+        db.from('wf_runs').select('id, agent, skill, status, input, state, error, created_at, finished_at').eq('project_id', projectId).order('id', { ascending: false }).limit(300),
         db.from('wf_approvals').select('id, kind, subject, status, comment, requested_at, decided_at').eq('project_id', projectId).order('id', { ascending: false }).limit(100),
       ]);
       return {

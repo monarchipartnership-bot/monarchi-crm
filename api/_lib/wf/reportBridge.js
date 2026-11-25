@@ -3,7 +3,8 @@
 // Without the switch nothing changes: the clock makes the report itself, as before. The queue keeps one open run per project, so a report that is still waiting is not queued twice.
 const UNIQUE = '23505';
 
-export const reportsViaOrchestrator = (env = process.env) => String(env.REPORTS_VIA_ORCHESTRATOR || '').trim() === '1';
+// on when the person switched it on in the settings of the agents (settingOn) or, as before, with the variable of the server
+export const reportsViaOrchestrator = (env = process.env, settingOn = false) => settingOn === true || String(env.REPORTS_VIA_ORCHESTRATOR || '').trim() === '1';
 
 // db: a signed-in Supabase client. → a function with the signature of runFor of runDueAgents: ({ projectId, periodType, scheduledFor }) → { status, message }
 export function enqueueReportRun(db) {

@@ -7,10 +7,12 @@ import { escapeHtml } from '../telegram.js';
 export const CRM_URL = 'https://crm.monarchi.agency';
 
 // → { text (HTML), path, buttonText }
-export function noticeOf({ kind, project, approvalKind, summary }) {
+export function noticeOf({ kind, project, approvalKind, summary, projectId }) {
   const who = `<b>${escapeHtml(project)}</b>`;
   if (kind === 'approval') return { text: `🟣 ${who}: чекає на вас ${escapeHtml(approvalTitle(approvalKind))}. ${escapeHtml(APPROVAL_KIND[approvalKind]?.what || '')}`.trim(), path: '/projects/approvals', buttonText: 'Відкрити апруви' };
   if (kind === 'stopped') return { text: `🔴 ${who}: процес зупинено.\n${escapeHtml(summary || '')}`.trim(), path: '/projects/overview', buttonText: 'Відкрити огляд' };
+  if (kind === 'waiting') return { text: `🟡 ${who}: крок чекає на ваші дані.\n${escapeHtml(summary || '')}`.trim(), path: `/projects/${projectId}?tab=process`, buttonText: 'Відкрити проєкт' };
+  if (kind === 'auto') return { text: `🤖 ${who}: ${escapeHtml(summary || '')}`.trim(), path: `/projects/${projectId}?tab=process`, buttonText: 'Відкрити проєкт' };
   if (kind === 'cost_cap') return { text: `🟠 ${who}: досягнуто ліміт витрат агентів (${escapeHtml(summary || '')}). Кроки чекають, поки ви піднімете ліміт.`, path: '/projects/overview', buttonText: 'Відкрити огляд' };
   return { text: `${who}: ${escapeHtml(summary || '')}`, path: '/projects/overview', buttonText: 'Відкрити огляд' };
 }

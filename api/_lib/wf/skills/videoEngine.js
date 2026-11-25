@@ -51,10 +51,10 @@ export function buildMotionPrompt({ card, req }) {
 }
 
 // the video entries for the chosen cards. Errors (a card that is not ready, a testimonial) are told to the manager before anything is spent.
-export function planVideos({ req, items, videos = [], now }) {
+export function planVideos({ req, items, videos = [], now, max = VIDEO_MONTHLY_MAX }) {
   const month = monthKey(now);
   const out = [];
-  const left = VIDEO_MONTHLY_MAX - videosThisMonth(videos, now);
+  const left = max - videosThisMonth(videos, now);
   const skipped = [];
   for (const id of req.sources) {
     const card = items.find((x) => x.id === id);
