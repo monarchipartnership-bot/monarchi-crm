@@ -67,6 +67,9 @@ import { BATCH_DEFAULT, BATCH_MAX, affordableCount, buildBatchGoals, clampCount,
 import { batchCreatives } from '../api/_lib/wf/skills/creativesAgent.js';
 import { MERGE_MAX, SYSTEM_PROMPT as SYSTEM_VARIATIONS, VAR_MAX, checkVariations, needsPicture, normalizeRequest } from '../api/_lib/wf/skills/variationsEngine.js';
 import { adVariations } from '../api/_lib/wf/skills/variationsAgent.js';
+import { briefDraft } from '../api/_lib/wf/skills/briefDraftAgent.js';
+import { buildBriefDraftPrompt, checkBriefDraft, corpusOf, detectCurrency, numbersSet, parseBriefDraftAnswer, priceLines, renderBriefDraftText } from '../api/_lib/wf/skills/briefDraftEngine.js';
+import { QUICK_STEPS, nameFromSite, normalizeSite } from '../src/lib/workflow/quickStart.js';
 import { enqueueReportRun, reportsViaOrchestrator } from '../api/_lib/wf/reportBridge.js';
 import { dueFor, eventsFor, gatherPlanFacts, checkPlan, monthWindows, parsePlanAnswer, renderPlanText, summarizeLastMonth } from '../api/_lib/wf/skills/monthlyPlanEngine.js';
 import { monthlyPlan } from '../api/_lib/wf/skills/monthlyPlanAgent.js';
@@ -3042,5 +3045,84 @@ await test('variations: the skill is the Creator\'s and a person starts it from 
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const dossier = fs.readFileSync(path.join(root, 'src/components/Workflow/Dossier.jsx'), 'utf8'), panel = fs.readFileSync(path.join(root, 'src/components/Workflow/VariationsPanel.jsx'), 'utf8');
   assert.match(dossier, /VariationsPanel/); assert.match(panel, /requestRun\(projectId, 'creator', 'ad_variations'/); assert.match(panel, /VAR_MAX/); assert.match(panel, /LANGS/); assert.match(panel, /ELEMENTS/); assert.match(panel, /proposals/);
+});
+// ---------------------------------------------------------------- Zeely item 4 (owner's decision 2026-11-25): «швидкий старт»: a link is enough, the brief is DRAFTED from the site, the first launch is PAUSED
+await test('quick start: the address is cleaned and refused when it cannot be a public site; the project gets a name from the address', () => {
+  assert.equal(normalizeSite('loza.example'), 'https://loza.example'); assert.equal(normalizeSite(' https://www.loza.example/shop/ '), 'https://www.loza.example/shop');
+  assert.equal(normalizeSite('http://loza.example/?a=1'), 'http://loza.example');
+  for (const bad of ['', 'loza', 'ftp://loza.example', 'http://user:pw@loza.example', 'http://127.0.0.1/', 'два слова.com', 'javascript:alert(1)']) assert.equal(normalizeSite(bad), null, bad);
+  assert.equal(nameFromSite('https://www.loza-mebli.com.ua'), 'Loza mebli'); assert.equal(nameFromSite('nope'), '');
+  assert.equal(QUICK_STEPS.length, 5); assert.match(QUICK_STEPS.join(' '), /PAUSED/);
+});
+await test('brief draft: the currency, the price lines and the numbers are counted by code from the pages', async () => {
+  assert.equal(detectCurrency('Ціна 3200 грн, акція 2900 ₴, $5'), 'UAH'); assert.equal(detectCurrency('only $5 and $7'), 'USD'); assert.equal(detectCurrency('нічого'), null);
+  assert.equal(detectCurrency('10 грн і 10 $'), null, 'a tie is unknown: the manager says');
+  const d = await collectSiteData({ website: 'loza.example', ...fakeNet() });
+  const lines = priceLines(d.pages); assert.ok(lines.length >= 3 && lines.every((l) => /\d/.test(l.line))); assert.ok(lines.some((l) => /3200 грн/.test(l.line)));
+  const n = numbersSet('Ціна 3 200 грн, було 3,200.00 і 2900,50'); assert.ok(n.has(3200) && n.has(2900.5));
+});
+const DRAFT_ANSWER = (o = {}) => JSON.stringify({ products: [{ name: 'Стілець Дуб', price: 3200 }, { name: 'Диван Хмара', price: 5000 }, { name: 'Стілець Лоза', price: 4100 }, { name: 'стілець дуб', price: 3200 }], audience: 'Ті, хто шукає меблі з натурального дерева.', geo: 'Україна', goals: [{ goal: 'Продати Стілець Дуб', product: 'Стілець Дуб' }, { goal: 'Привести покупців на каталог', product: 'Чужий товар' }, { goal: '', product: '' }], ...o });
+await test('brief draft: only products and prices the site shows go in, the rest stays empty and becomes a task; everything is an assumption with a source', async () => {
+  const d = await collectSiteData({ website: 'loza.example', ...fakeNet() });
+  const r = checkBriefDraft(parseBriefDraftAnswer('```json\n' + DRAFT_ANSWER() + '\n```'), { corpus: corpusOf(d.pages), currency: 'UAH', project: {} });
+  assert.deepEqual(r.content.economics.products, [{ name: 'Стілець Дуб', price: 3200, cogs: null }, { name: 'Стілець Лоза', price: null, cogs: null }], 'a product that is not on the site and a repeat are dropped; a price that is not on the site is dropped');
+  assert.ok(r.notes.some((n) => /Диван Хмара/.test(n)) && r.notes.some((n) => /Ціну 4100/.test(n)));
+  assert.deepEqual(r.content.creative_goals, [{ goal: 'Продати Стілець Дуб', product: 'Стілець Дуб' }, { goal: 'Привести покупців на каталог', product: '' }], 'a goal about an unknown product keeps the words, not the product; an empty goal is dropped');
+  assert.equal(r.content.economics.currency, 'UAH'); assert.equal(r.content.economics_meta['product:Стілець Дуб'].status, 'assumption'); assert.match(r.content.economics_meta['product:Стілець Лоза'].source, /уточніть/);
+  assert.equal(r.content.general.geo, 'Україна'); assert.equal(r.content.draft_from_site, true); assert.equal(r.found.priced, 1);
+  assert.deepEqual(Object.keys(r.content.economics).sort(), ['currency', 'offers', 'products'], 'no budget, margin or ROAS is made up');
+  assert.ok(r.missing.includes('місячний бюджет') && r.missing.includes('ID сторінки Facebook'));
+  const noCur = checkBriefDraft({ products: [] }, { corpus: 'x', currency: null, project: { country: 'Польща' } });
+  assert.equal(noCur.content.economics.currency, 'USD'); assert.ok(noCur.notes.some((n) => /Валюту цін не визначено/.test(n))); assert.equal(noCur.content.general.geo, 'Польща', 'the country of the project card wins');
+  assert.match(renderBriefDraftText({ content: r.content, notes: r.notes, missing: r.missing, url: 'https://loza.example' }), /Це припущення[\s\S]*Стілець Дуб: 3200 UAH[\s\S]*Стілець Лоза: ціни на сайті немає[\s\S]*заповніть вручну/);
+  assert.match(buildBriefDraftPrompt({ pages: d.pages, project: { name: 'Лоза' }, currency: 'UAH' }).system, /Never calculate or guess/);
+  assert.throws(() => parseBriefDraftAnswer('нічого'), /не у форматі JSON/);
+});
+const ROBOTS_CLOSED = ['User-agent: *', 'Disallow: /'].join('\n');
+await test('brief draft: the skill drafts the brief from the site, flags it for confirmation and asks for the numbers; an existing brief is never touched; no site waits; no model fails clearly', async () => {
+  const mk = async (o = {}) => {
+    const s = await setup({ handlers: createHandlers({ researcher: { brief_draft: briefDraft } }) });
+    Object.assign(s.ctx, fakeNet(o.pages, o.robots)); s.asked = [];
+    s.ctx.ask = o.ask === undefined ? async (x) => { s.asked.push(x); return { costUsd: 0.02, text: DRAFT_ANSWER() }; } : o.ask;
+    if (o.site !== false) s.repo.setWebsite(1, 'https://loza.example');
+    if (o.brief) await human(s.repo, 'brief', 'мій бриф');
+    await s.repo.enqueueRun({ project_id: 1, agent: 'researcher', skill: 'brief_draft', trigger: 'manual' }); await processTick(s.ctx);
+    return s;
+  };
+  const s = await mk();
+  assert.equal(s.repo.T.runs[0].status, 'done', s.repo.T.runs[0].error);
+  const b = await s.repo.readSection(1, 'brief');
+  assert.equal(b.version.author_kind, 'agent'); assert.equal(b.version.content.economics.products.length, 2); assert.equal(b.version.content.draft_from_site, true); assert.match(b.version.body, /Це припущення/);
+  assert.equal(s.repo.T.states.get(1).brief_pending, true, 'the process waits for a person'); assert.equal(s.repo.T.runs[0].cost_usd, 0.02);
+  assert.ok(s.repo.T.tasks.some((t) => t.title === 'Перевірити чернетку брифу й заповнити цифри' && /місячний бюджет/.test(t.evidence)));
+  assert.match(s.asked[0].user, /price_lines/); assert.match(s.asked[0].user, /"detected_currency": "UAH"/);
+  const kept = await mk({ brief: true, ask: async () => { throw new Error('must not be called'); } });
+  assert.equal(kept.repo.T.runs[0].status, 'done'); assert.equal(kept.repo.T.runs[0].output.skipped, true); assert.equal((await kept.repo.readSection(1, 'brief')).version.body, 'мій бриф'); assert.notEqual(kept.repo.T.states.get(1).brief_pending, true);
+  const none = await mk({ site: false }); assert.equal(none.repo.T.runs[0].status, 'waiting'); assert.equal(none.repo.T.runs[0].state.blocked_on, 'site_url');
+  const nom = await mk({ ask: null }); assert.equal(nom.repo.T.runs[0].status, 'failed'); assert.match(nom.repo.T.runs[0].error, /ANTHROPIC_API_KEY/);
+  const closed = await mk({ robots: ROBOTS_CLOSED, ask: async () => { throw new Error('must not be called'); } });
+  assert.equal(closed.repo.T.runs[0].status, 'done'); assert.equal(closed.repo.T.runs[0].output.blocked_by_robots, true); assert.ok(closed.repo.T.tasks.some((x) => x.title === 'Заповнити бриф вручну')); assert.notEqual(closed.repo.T.states.get(1).brief_pending, true);
+});
+await test('quick start: a brief that waits for confirmation does not start the process; the first launch of a quick-start project is PAUSED, the others are as before', () => {
+  const base = { stage: 0, paused: false, paid_at: 'x', contracts_signed_at: 'x', has_data: false };
+  const secs = { brief: { hasCurrent: true } };
+  assert.ok(!planNext({ state: { ...base, brief_pending: true }, sections: secs }).some((a) => a.type === 'set_stage'), 'a draft brief is not a brief until confirmed');
+  assert.ok(planNext({ state: { ...base, brief_pending: false }, sections: secs }).some((a) => a.type === 'set_stage' && a.stage === 1));
+  assert.ok(planNext({ state: base, sections: secs }).some((a) => a.type === 'set_stage'), 'an ordinary project is not affected');
+  const launch = (flag) => planNext({ state: { stage: 3, paused: false, launch_paused: flag }, runs: [] }).find((a) => a.type === 'enqueue' && a.skill === 'launch');
+  assert.deepEqual(launch(true).input, { status: 'PAUSED' }); assert.deepEqual(launch(false).input, {}); assert.deepEqual(launch(undefined).input, {});
+  const retry = planNext({ state: { stage: 3, paused: false, launch_paused: true }, runs: [{ id: 1, agent: 'mediabuyer', skill: 'launch', status: 'failed', input: {} }] }).find((a) => a.type === 'enqueue');
+  assert.deepEqual(retry.input, { status: 'PAUSED' }, 'a retry stays paused too');
+});
+await test('quick start: the button on the page of projects, the dialog, the calls (project, process, flags, draft of the brief) and the confirmation of the brief in the overview exist; the migration adds the two flags', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  assert.match(rd('src/pages/Projects/Projects.jsx'), /QuickStartModal/); assert.match(rd('src/pages/Projects/Projects.jsx'), /Швидкий старт/);
+  const api = rd('src/lib/api/quickStart.js');
+  assert.match(api, /createProject\(/); assert.match(api, /startProcess\(/); assert.match(api, /launch_paused: true, brief_pending: true/); assert.match(api, /requestRun\(project\.id, 'researcher', 'brief_draft'/);
+  assert.match(rd('src/components/Projects/QuickStartModal.jsx'), /useDialogA11y/); assert.match(rd('src/components/Projects/QuickStartModal.jsx'), /normalizeSite/);
+  assert.match(rd('src/components/Workflow/ProcessOverview.jsx'), /brief_pending: false/); assert.match(rd('src/components/Workflow/ProcessOverview.jsx'), /Підтвердити бриф/);
+  const mig = rd('supabase/migrations/20261073000000_workflow_quick_start.sql'); assert.match(mig, /brief_pending boolean/); assert.match(mig, /launch_paused boolean/);
+  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'researcher').skills.some((s) => s.key === 'brief_draft'));
 });
 console.log(`\n${passed} workflow checks passed`);

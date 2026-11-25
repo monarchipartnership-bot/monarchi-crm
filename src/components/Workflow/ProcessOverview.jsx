@@ -57,6 +57,22 @@ export default function ProcessOverview({ projectId, onGo }) {
         </div>
       )}
 
+      {state && (state.brief_pending || (state.launch_paused && state.stage < 3)) && (
+        <div className="wf-card" style={{ background: 'var(--wf-info-bg)', boxShadow: 'none' }}>
+          <h3>Швидкий старт</h3>
+          {state.brief_pending && (
+            <div className="wf-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+              <div>{hasBrief ? 'Чернетку брифу складено з сайту: перевірте її, допишіть цифри (бюджет, ROAS, середній чек) і підтвердіть. Доки бриф не підтверджено, процес не стартує.' : 'Дослідник читає сайт і складає чернетку брифу. Коли вона з’явиться, перевірте її й підтвердіть.'}</div>
+              <div className="wf-row">
+                <button type="button" className="wf-btn sm" onClick={() => onGo?.('dossier', 'brief')}>Відкрити бриф</button>
+                <button type="button" className="wf-btn p sm" disabled={busy || !hasBrief} onClick={() => act(() => patchState(projectId, { brief_pending: false }, email, 'Бриф підтверджено менеджером.'))}>Підтвердити бриф</button>
+              </div>
+            </div>
+          )}
+          {state.launch_paused && state.stage < 3 && <div className="wf-muted" style={{ fontSize: 13 }}>Перший запуск піде ВИМКНЕНИМ (PAUSED): гроші не витрачаються, доки ви самі не ввімкнете кампанії в Ads Manager.</div>}
+        </div>
+      )}
+
       {state && state.stage === 0 && (
         <div className="wf-card">
           <h3>Умови старту</h3>

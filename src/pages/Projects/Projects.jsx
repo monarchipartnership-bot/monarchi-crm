@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectModal from '../../components/Projects/ProjectModal';
+import QuickStartModal from '../../components/Projects/QuickStartModal';
+import { quickStart } from '../../lib/api/quickStart';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchProjects, createProject } from '../../lib/api/projects';
 import { addProjectAccount, fetchAllProjectAccounts } from '../../lib/api/projectAccounts';
@@ -99,6 +101,22 @@ export default function Projects() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [projects, platformsOf, platform, tab, term],
   );
+
+  // «Швидкий старт»: a link is enough; the project, the process and the draft of the brief are made at once
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickBusy, setQuickBusy] = useState(false);
+  async function handleQuick(form) {
+    setQuickBusy(true);
+    try {
+      const { project, warnings } = await quickStart(form, email);
+      setQuickOpen(false);
+      if (warnings.length) alert(warnings.join(String.fromCharCode(10)));
+      navigate('/projects/' + project.id);
+    } catch (e) {
+      console.warn('quickStart failed', e);
+      alert('Не вдалося створити проєкт: ' + (e.message || e));
+    } finally { setQuickBusy(false); }
+  }
 
   async function handleSave({ project, accounts: linked }) {
     setSaving(true);
@@ -205,6 +223,7 @@ export default function Projects() {
             ))}
           </div>
           <div className="tb-sp" />
+          <button type="button" className="btn" onClick={() => setQuickOpen(true)} title="Проєкт із одного посилання: бриф складеться з сайту">Швидкий старт</button>
           <button ref={createBtn} type="button" className="btn btn-p proj-create" onClick={() => setModalOpen(true)}>
             <svg className="pf-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Створити проєкт
           </button>
@@ -221,6 +240,7 @@ export default function Projects() {
         </div>
       </div>
 
+      {quickOpen && <QuickStartModal onClose={() => setQuickOpen(false)} onStart={handleQuick} busy={quickBusy} />}
       {modalOpen && (
         <ProjectModal
           onClose={() => { setModalOpen(false); createBtn.current?.focus(); }}

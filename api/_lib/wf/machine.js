@@ -41,11 +41,13 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
     acts.push({ type: 'enqueue', agent, skill, input, priority });
   };
   const journal = (action, summary, meta = {}) => acts.push({ type: 'journal', action, summary, meta });
+  const launchInput = state.launch_paused ? { status: 'PAUSED' } : {}; // quick start: the first launch creates everything switched off
 
   // ---------------------------------------------------------------- 0 · start
   if (state.stage === STAGE.START) {
     if (has('brief') && state.has_data == null) { enqueue('researcher', 'intake'); return acts; } // find out whether the cabinets hold data (decides if there is an audit)
-    const ready = !!state.paid_at && !!state.contracts_signed_at && has('brief') && state.has_data != null;
+    // a brief drafted from the website (quick start) is not a brief until a person confirms it
+    const ready = !!state.paid_at && !!state.contracts_signed_at && has('brief') && state.has_data != null && !state.brief_pending;
     if (!ready) return acts;
     acts.push({ type: 'set_stage', stage: STAGE.RESEARCH });
     journal('stage', 'Умови старту виконані: оплата, договори, бриф. Починаємо дослідження.');
@@ -136,7 +138,7 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
         if (lApp.status === 'approved') {
           acts.push({ type: 'set_stage', stage: STAGE.LAUNCH });
           journal('stage', 'Апрув 2 отримано. Запуск.');
-          enqueue('mediabuyer', 'launch');
+          enqueue('mediabuyer', 'launch', launchInput);
         }
       }
     }
@@ -147,10 +149,10 @@ export function planNext({ now = new Date(), state, sections = {}, runs = [], ap
   if (state.stage === STAGE.LAUNCH) {
     const l = lastRun(runs, 'mediabuyer', 'launch');
     const failed = runs.filter((r) => r.agent === 'mediabuyer' && r.skill === 'launch' && r.status === 'failed').length;
-    if (!l) enqueue('mediabuyer', 'launch');
+    if (!l) enqueue('mediabuyer', 'launch', launchInput);
     else if (isDone(l)) { acts.push({ type: 'set_stage', stage: STAGE.OPERATE }); journal('stage', 'Кампанії запущено. Оптимізація.'); }
     else if (l.status === 'failed') { // the launch goes on from the saved progress; three failures in a row stop it for a person
-      if (failed < 3) { enqueue('mediabuyer', 'launch'); acts.push({ type: 'journal', action: 'launch_retry', summary: `Запуск не вдався (спроба ${failed} з 3): повторюю з того місця, де зупинились.`, meta: {}, once: true }); }
+      if (failed < 3) { enqueue('mediabuyer', 'launch', launchInput); acts.push({ type: 'journal', action: 'launch_retry', summary: `Запуск не вдався (спроба ${failed} з 3): повторюю з того місця, де зупинились.`, meta: {}, once: true }); }
       else acts.push({ type: 'journal', action: 'launch_stopped', summary: 'Запуск не вдався тричі поспіль: потрібна допомога менеджера. Причина в кроках запуску.', meta: {}, once: true });
     }
     return acts;
