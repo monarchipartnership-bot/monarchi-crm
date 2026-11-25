@@ -91,6 +91,7 @@ export function applyChanges(stored, changes, scope) {
     const c = checkValue(path, raw);
     if (c.error) errors.push({ path, error: c.error }); else setPath(next, path, c.value);
   }
+  for (const k of Object.keys(next)) if (next[k] && typeof next[k] === 'object' && !Object.keys(next[k]).length) delete next[k]; // a group that lost its last value is not stored empty
   return { config: next, errors };
 }
 

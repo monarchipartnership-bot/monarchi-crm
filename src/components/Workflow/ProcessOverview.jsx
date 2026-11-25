@@ -144,6 +144,7 @@ function Readiness({ projectId, email }) {
         <Pill tone={view.tone}>{view.title}</Pill>
       </div>
       <div className="wf-muted" style={{ fontSize: 12.5, marginBottom: 8 }}>Перевіряє кабінет Meta, сторінку Facebook і доступи токена. У кабінеті нічого не створюється.</div>
+      {data?.run?.finished_at && !view.busy && <div className="wf-muted" style={{ fontSize: 12.5, marginBottom: 6 }}>Остання перевірка кабінету: {ageText(data.run.finished_at) === 'щойно' ? 'щойно' : ageText(data.run.finished_at) + ' тому'}. Якщо після неї змінювали бриф чи доступи, натисніть «Перевірити».</div>}
       {err && <div className="wf-err" role="alert" style={{ marginBottom: 8 }}>{err}</div>}
       {view.lines.map((l, i) => <div key={i} className={'wf-rd ' + l.tone}>{l.text}</div>)}
       <div className="wf-row" style={{ marginTop: 10 }}>

@@ -3479,7 +3479,7 @@ await test('agent settings: a change from the page keeps only the values that di
   const a = applyChanges({}, { 'optimize.every_hours': 12, 'optimize.skip_weekends': true }, 'project');
   assert.deepEqual(a.config, { optimize: { every_hours: 12, skip_weekends: true } }); assert.deepEqual(a.errors, []);
   const b = applyChanges(a.config, { 'optimize.every_hours': null, 'month_plan.day': 40 }, 'project');
-  assert.deepEqual(b.config, { optimize: { skip_weekends: true } }, 'back to the default'); assert.deepEqual(b.errors, [{ path: 'month_plan.day', error: 'Від 1 до 28.' }]);
+  assert.deepEqual(b.config, { optimize: { skip_weekends: true } }, 'back to the default'); assert.deepEqual(applyChanges({ optimize: { every_hours: 12 } }, { 'optimize.every_hours': null }, 'project').config, {}, 'an emptied group is not stored (found on the live run)'); assert.deepEqual(b.errors, [{ path: 'month_plan.day', error: 'Від 1 до 28.' }]);
   const c = applyChanges({}, { 'notify.digest_hour': 7 }, 'project'); assert.deepEqual(c.config, {}); assert.match(c.errors[0].error, /для всіх проєктів/);
   const d = applyChanges({ _digest_on: '2026-11-26', optimize: { at_hour: 9 } }, { 'notify.digest_hour': 7 }, 'global');
   assert.deepEqual(d.config, { optimize: { at_hour: 9 }, notify: { digest_hour: 7 }, _digest_on: '2026-11-26' });
