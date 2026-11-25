@@ -21,7 +21,6 @@ import ActionIcon from '../../components/common/ActionIcon';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PAGE_ICONS, PLATFORM_ICONS, PLATFORM_SYMBOL } from '../../lib/pageIcons';
 import ProjectAgentTab from '../../components/Projects/Agent/ProjectAgentTab';
-import ProjectCreativeTab from '../../components/Projects/Creative/ProjectCreativeTab';
 import { fetchAgent } from '../../lib/api/projectAgents';
 import '../../styles/reportPage.css';
 import '../../styles/projectsPage.css';
@@ -41,10 +40,9 @@ import '../../styles/ddNight.css'; // the dark plum menus of the dropdowns and c
 import '../../styles/projectPlum.css';
 import '../../styles/reportsPlum.generated.css'; // the report styles recoloured to the plum palette (made by a script)
 import '../../styles/reportsPlum.css'; // the hand-made part: switch of the sections, mode tiles, striped table, glass bars; scoped to .is-plum
-import { fetchProjectCreative } from '../../lib/api/projectCreative';
-import { infoProgress } from '../../lib/agents/infoProgress';
 import ProcessOverview from '../../components/Workflow/ProcessOverview';
 import AgentSettings from '../AiAgents/AgentSettings';
+import BriefPage from '../../components/Workflow/BriefPage';
 import ApprovalsTab from '../../components/Workflow/ApprovalsTab';
 import { fetchApprovalsOf } from '../../lib/api/workflow';
 import { pendingCount } from '../../lib/workflow/approvalsTab';
@@ -53,6 +51,7 @@ import Tasks from '../../components/Workflow/Tasks';
 
 const TABS = [
   { key: 'overview', label: 'Інформація про проєкт', icon: PAGE_ICONS['page.projects'].src },
+  { key: 'brief', label: 'Бриф', icon: PAGE_ICONS['page.projects'].src }, // ONE brief for everything the agents need to know (owner's rule 2026-11-26)
   { key: 'process', label: 'Огляд', icon: PAGE_ICONS['page.projects'].src }, // the new agent system: where the project is and what waits for the manager
   { key: 'dossier', label: 'Досьє', icon: PAGE_ICONS['page.projects'].src }, // the 10 sections the agents and people write together
   { key: 'tasks', label: 'Задачі', icon: PAGE_ICONS['page.projects'].src }, // the pool of tasks: what the agents found or prepared, the drafts for the client
@@ -71,6 +70,7 @@ const REPORT_TABS = [['builder', 'Конструктор звіту'], ['compose
 const REPORT_KEYS = REPORT_TABS.map(([k]) => k);
 const STRIP = [
   TABS.find((x) => x.key === 'overview'),
+  TABS.find((x) => x.key === 'brief'),
   TABS.find((x) => x.key === 'process'),
   TABS.find((x) => x.key === 'dossier'),
   TABS.find((x) => x.key === 'tasks'),
@@ -82,6 +82,7 @@ const STRIP = [
 // the line icons of the menu of the card (the menu is the one of the AI Agents section: a round medallion with a line icon)
 const STRIP_LINE = {
   overview: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  brief: <path d="M6 3h9l4 4v14H6zM9 11h7M9 15h7M9 7h3" />,
   process: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   dossier: <path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2zM8 7h7M8 11h7M8 15h4" />,
   tasks: <path d="M5 4h14v16H5zM9 9l2 2 4-4M9 15h6" />,
@@ -92,24 +93,9 @@ const STRIP_LINE = {
 };
 const STATUSES = ['active', 'paused', 'completed'];
 
-// The summary of «Інформація про проєкт»: how many fields are filled and the next step (the ring + a button to the section).
-function InfoSummary({ fill, onGo }) {
-  if (!fill) return null;
-  const { pct, done, total, next } = fill;
-  return (
-    <section className="pw-sum" aria-label="Заповненість інформації про проєкт">
-      <div className="pw-sum-ring" style={{ '--p': pct }} role="img" aria-label={`Заповнено ${pct}%`}><b>{pct}%</b></div>
-      <div className="pw-sum-tx">
-        <b>Інформацію про проєкт заповнено: {done} з {total} полів</b>
-        <span>{next ? `Далі: «${next.sectionName}» → ${next.label}. ${next.hint}` : 'Усе заповнено: агенти мають усе, що їм потрібно.'}</span>
-      </div>
-      {next && <button type="button" className="pw-btn pw-btn--primary pw-sum-go" onClick={() => onGo(next.section)}>Заповнити «{next.sectionName}»</button>}
-    </section>
-  );
-}
 // «Інформація про проєкт» (owner, 2026-11-11): everything known about the client lives in this one card, for people and for the agents. The sections:
 // «Основне» is the former «Огляд»; the others come from the data the agents read (lib/agents/projectCreative.js).
-const INFO_SECTIONS = [['main', 'Основне'], ['client', 'Про клієнта'], ['business', 'Про бізнес'], ['competitors', 'Про конкурентів'], ['ready', 'Готовність до агентів']];
+const INFO_SECTIONS = [['main', 'Основне']]; // the rest (about the client, the business, the competitors, readiness) moved into the one brief (tab «Бриф»)
 const infoOf = (params) => (INFO_SECTIONS.some(([k]) => k === params.get('info')) ? params.get('info') : 'main');
 // «Формування звіту» holds three ways to look at a period; the old tabs (and the links the agent sends) still open them.
 const COMPOSE_MODES = [
@@ -174,7 +160,7 @@ function ProjectDetailCard() {
     const platform = ['compose', 'decks', 'builder', 'work'].includes(next) ? searchParams.get('platform') : null;
     setSearchParams(next === 'overview' ? {} : { tab: next, ...(next === 'compose' ? { mode } : {}), ...(platform ? { platform } : {}) }, { replace: true });
   };
-  const goWf = (next, section) => { setTabState(next); setSearchParams({ tab: next, ...(section ? { section } : {}) }, { replace: true }); }; // between «Огляд» and «Досьє» (and into a section of the dossier)
+  const goWf = (next0, section0) => { const [next, section] = next0 === 'dossier' && section0 === 'brief' ? ['brief', undefined] : [next0, section0]; setTabState(next); setSearchParams({ tab: next, ...(section ? { section } : {}) }, { replace: true }); }; // between «Огляд» and «Досьє» (and into a section of the dossier)
   const setMode = (next) => {
     setModeState(next);
     const platform = searchParams.get('platform');
@@ -223,13 +209,6 @@ function ProjectDetailCard() {
   }
 
   const [linkedAccounts, setLinkedAccounts] = useState([]);
-  const [fill, setFill] = useState(null); // how full «Інформація про проєкт» is: the counters of the sub-sections and the summary (refreshed when the section is opened)
-  useEffect(() => {
-    let off = false;
-    if (!id) return undefined;
-    fetchProjectCreative(id).then((d) => { if (!off) setFill(infoProgress({ settings: d.settings, assets: d.assets, accounts: linkedAccounts, project })); }).catch(() => { if (!off) setFill(null); });
-    return () => { off = true; };
-  }, [id, linkedAccounts, info, tab, project]);
   // The agent's state for the chip in the header (the tab itself loads everything it needs).
   const [agentChip, setAgentChip] = useState(null);
   // The project name in the header is a field that saves itself (like the deal title).
@@ -581,20 +560,10 @@ function ProjectDetailCard() {
       )}
       {tab === 'overview' && (
         <div className="pcr-wrap pw-info">
-          <div className="pcr-tabs pw-isub" role="tablist" aria-label="Розділи інформації про проєкт">
-            {INFO_SECTIONS.map(([k, label]) => {
-              const sec = fill?.sections?.[k];
-              return (
-                <button key={k} type="button" role="tab" aria-selected={info === k} className={'pcr-tab' + (info === k ? ' on' : '')} onClick={() => setInfo(k)}>
-                  {label}
-                  {sec && k !== 'ready' && sec.total > 0 && <span className="pw-isub-n">{sec.done} з {sec.total}</span>}
-                  {sec && k === 'ready' && sec.missing > 0 && <span className="pw-isub-n is-warn">{sec.missing} бракує</span>}
-                </button>
-              );
-            })}
+          <div className="pw-sum" role="note">
+            <div className="pw-sum-tx"><b>Тут лише дані CRM про проєкт</b><span>Усе, що потрібно агентам (бізнес, цілі, бюджет, бренд, файли, доступи), тепер в одному місці: вкладка «Бриф».</span></div>
+            <button type="button" className="pw-btn pw-btn--primary pw-sum-go" onClick={() => goWf('brief')}>Відкрити бриф</button>
           </div>
-          <InfoSummary fill={fill} onGo={setInfo} />
-          {info !== 'main' && <ProjectCreativeTab key={'info-' + id + '-' + info} projectId={id} section={info} embedded />}
         </div>
       )}
       {tab === 'overview' && info === 'main' && (
@@ -683,6 +652,7 @@ function ProjectDetailCard() {
       {tab === 'decks' && <ProjectHistoryTab key={'decks-' + id} projectId={id} />}
       {tab === 'agent' && <ProjectAgentTab key={'agent-' + id} projectId={id} />}
       {tab === 'settings' && <AgentSettings key={'settings-' + id} projectId={id} />}
+      {tab === 'brief' && <BriefPage key={'brief-' + id} projectId={id} onGo={goWf} />}
       </div>
       {confirmDialog}
     </div>

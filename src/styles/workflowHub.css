@@ -335,3 +335,21 @@ select.wf-bd-in { width:auto; }
 .wf-set-stop { box-shadow:0 0 0 1px var(--wf-bad); background:var(--wf-bad-bg); }
 .wf-set-bar { position:sticky; bottom:12px; display:flex; gap:10px; align-items:center; justify-content:flex-end; padding:10px 16px; border-radius:16px; background:var(--wf-surface); box-shadow:0 0 0 1px var(--wf-border), 0 8px 24px rgba(60,30,110,.18); z-index:5; }
 .wf-set-bar span { margin-right:auto; font-weight:600; }
+
+/* Бриф: одна сторінка з навігацією по розділах */
+.wf-bd-layout { display:grid; grid-template-columns:190px minmax(0,1fr); gap:14px; align-items:start; }
+@media (max-width:860px) { .wf-bd-layout { grid-template-columns:1fr; } }
+.wf-bd-rail { position:sticky; top:12px; display:flex; flex-direction:column; gap:2px; padding:10px; }
+@media (max-width:860px) { .wf-bd-rail { position:static; flex-direction:row; flex-wrap:wrap; } }
+.wf-bd-rail a { display:flex; justify-content:space-between; gap:8px; padding:7px 10px; border-radius:10px; color:var(--wf-text); text-decoration:none; font-weight:500; }
+.wf-bd-rail a:hover { background:var(--wf-soft); }
+.wf-bd-n { font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; background:var(--wf-warn-bg); color:var(--wf-warn); align-self:center; }
+.wf-bd-n.ok { background:var(--wf-ok-bg); color:var(--wf-ok); }
+.wf-bd-meta { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:6px; }
+.wf-pill-x { display:inline-flex; align-items:center; gap:6px; padding:3px 4px 3px 10px; border-radius:999px; background:var(--wf-soft); color:var(--wf-plum); font-size:12.5px; font-weight:600; }
+.wf-pill-x button { border:0; background:transparent; color:inherit; cursor:pointer; width:20px; height:20px; border-radius:50%; font-size:14px; line-height:1; }
+.wf-pill-x button:hover { background:var(--wf-border); }
+.wf-miss { display:inline-block; padding:3px 10px; border-radius:999px; background:var(--wf-bad-bg); color:var(--wf-bad); font-size:12.5px; font-weight:600; text-decoration:none; }
+.wf-bd-form h3 { margin-bottom:6px; }
+.wf-bd-form .wf-col > * { min-width:0; }
+.wf-bd-form .wf-ta { min-height:62px; }

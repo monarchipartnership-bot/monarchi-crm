@@ -22,7 +22,7 @@ export async function loadBriefContext(projectId) {
     supabase.from('projects').select('id, name, website, country, client_language').eq('id', projectId).maybeSingle().then((r) => must(r, 'project')),
     fetchProjectCreative(projectId),
     fetchProjectAccounts(projectId),
-    supabase.from('wf_project_state').select('paid_at, contracts_signed_at, stage').eq('project_id', projectId).maybeSingle().then((r) => must(r, 'state')),
+    supabase.from('wf_project_state').select('paid_at, contracts_signed_at, stage, brief_pending').eq('project_id', projectId).maybeSingle().then((r) => must(r, 'state')),
   ]);
   return { brief: brief.content, briefBody: brief.body, project, card, accounts, state };
 }

@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { acceptProposal, fetchAnsweredProposals, fetchDossier, fetchVersions, rejectProposal, saveHumanVersion } from '../../lib/api/workflow';
 import { agoText, openProposals, sectionRows } from '../../lib/workflow/view';
 import { Pill } from './parts';
-import BriefSheet from './BriefSheet';
+import BriefPage from './BriefPage';
 import UnitEconomyView from './UnitEconomyView';
 import AuditView from './AuditView';
 import SiteView from './SiteView';
@@ -87,17 +87,10 @@ export default function Dossier({ projectId, initialKey }) {
         <div className="wf-card">
           <div className="wf-row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
             <h3 style={{ margin: 0 }}>{sec.name}</h3>
-            {!editing && !isBrand && <button type="button" className="wf-btn p sm" disabled={busy} onClick={startEdit}>Редагувати</button>}
+            {!editing && !isBrand && !isBrief && <button type="button" className="wf-btn p sm" disabled={busy} onClick={startEdit}>Редагувати</button>}
           </div>
           {isBrief ? (
-            editing
-              ? <BriefSheet key={'e' + (current?.id || 0)} version={current} busy={busy} onSave={saveBrief} onCancel={() => setEditing(false)} />
-              : (
-                <>
-                  {shown && <div className="wf-src">Версія {shown.version} · {shown.author_kind === 'human' ? shown.author : 'агент'} · {agoText(shown.created_at)}{shown.id !== current?.id ? ' · це не поточна версія' : ''}</div>}
-                  <BriefSheet key={'r' + (shown?.id || 0)} version={shown} readOnly />
-                </>
-              )
+            <BriefPage key={'brief-page'} projectId={projectId} onGo={(tab, section) => setKey(section || 'brief')} />
           ) : isBrand && editing ? (
             <BrandDnaEditor key={'be' + current.id} content={current.content} busy={busy} onSave={saveBrand} onCancel={() => setEditing(false)} />
           ) : isBrand && shown ? (

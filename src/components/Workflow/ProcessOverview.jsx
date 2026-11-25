@@ -65,7 +65,7 @@ export default function ProcessOverview({ projectId, onGo }) {
             <div className="wf-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
               <div>{hasBrief ? 'Чернетку брифу складено з сайту: перевірте її, допишіть цифри (бюджет, ROAS, середній чек) і підтвердіть. Доки бриф не підтверджено, процес не стартує.' : 'Дослідник читає сайт і складає чернетку брифу. Коли вона з’явиться, перевірте її й підтвердіть.'}</div>
               <div className="wf-row">
-                <button type="button" className="wf-btn sm" onClick={() => onGo?.('dossier', 'brief')}>Відкрити бриф</button>
+                <button type="button" className="wf-btn sm" onClick={() => onGo?.('brief')}>Відкрити бриф</button>
                 <button type="button" className="wf-btn p sm" disabled={busy || !hasBrief} onClick={() => act(() => patchState(projectId, { brief_pending: false }, email, 'Бриф підтверджено менеджером.'))}>Підтвердити бриф</button>
               </div>
             </div>
@@ -77,7 +77,7 @@ export default function ProcessOverview({ projectId, onGo }) {
       {state && state.stage === 0 && (
         <div className="wf-card">
           <h3>Умови старту</h3>
-          <Cond ok={hasBrief} label="Бриф заповнено" action={<button type="button" className="wf-btn sm" onClick={() => onGo?.('dossier', 'brief')}>Відкрити бриф</button>} />
+          <Cond ok={hasBrief} label="Бриф заповнено" action={<button type="button" className="wf-btn sm" onClick={() => onGo?.('brief')}>Відкрити бриф</button>} />
           <Cond ok={!!state.paid_at} label="Оплату підтверджено" action={<button type="button" className="wf-btn sm" disabled={busy} onClick={() => act(() => patchState(projectId, { paid_at: state.paid_at ? null : new Date().toISOString() }, email, state.paid_at ? 'Оплату знято.' : 'Оплату підтверджено.'))}>{state.paid_at ? 'Зняти' : 'Підтвердити'}</button>} />
           <Cond ok={!!state.contracts_signed_at} label="Договори підписано" action={<button type="button" className="wf-btn sm" disabled={busy} onClick={() => act(() => patchState(projectId, { contracts_signed_at: state.contracts_signed_at ? null : new Date().toISOString() }, email, state.contracts_signed_at ? 'Підписання договорів знято.' : 'Договори підписано.'))}>{state.contracts_signed_at ? 'Зняти' : 'Підтвердити'}</button>} />
           <Cond ok={state.has_data != null} label={state.has_data == null ? 'Дані в кабінетах: Дослідник перевірить, коли заповнено бриф' : state.has_data ? 'У кабінетах є дані: буде аудит' : 'У кабінетах немає даних: аудиту не буде'} />

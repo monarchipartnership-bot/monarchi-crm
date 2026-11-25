@@ -32,7 +32,7 @@ export default function Preflight({ projectId, email, state, onChanged }) {
   const link = (qs) => `/projects/${projectId}?tab=overview&info=${qs}`;
   const ask = (i) => {
     if (i.kind === 'flag') return <button type="button" className="wf-btn sm p" disabled={busy === i.key} onClick={() => flag(i)}>Підтвердити</button>;
-    if (i.kind === 'files') return <a className="wf-btn sm" href={link('business')}>Додати фото</a>;
+    if (i.kind === 'files') return <a className="wf-btn sm" href={`/projects/${projectId}?tab=brief`}>Додати фото</a>;
     if (i.kind === 'cabinet') return <a className="wf-btn sm" href={link('main')}>Підключити кабінет</a>;
     const long = i.kind === 'long';
     return (

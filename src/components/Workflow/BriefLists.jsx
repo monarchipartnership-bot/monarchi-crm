@@ -1,46 +1,19 @@
-import { useState } from 'react';
-import { ROWS, STATUS_LABEL, STATUS_TONE, contentFromForm, formFromContent, rowStatus } from '../../lib/workflow/brief';
+import { STATUS_LABEL, STATUS_TONE } from '../../lib/workflow/brief';
 
-// The section «Бриф» as a sheet (step A4, variant B): a row = a parameter, next to it the status and the source. A new version keeps the numbers in content.economics
-// where the Researcher counts the Unit Economy. A number is an assumption until a person marks it confirmed.
-export default function BriefSheet({ version, busy, onSave, onCancel, readOnly }) {
-  const [form, setForm] = useState(() => formFromContent(version?.content, version?.body));
-  const setVal = (k, v) => setForm((f) => ({ ...f, values: { ...f.values, [k]: v } }));
-  const setMeta = (k, patch) => setForm((f) => ({ ...f, meta: { ...f.meta, [k]: { ...(f.meta[k] || {}), ...patch } } }));
-  const toggle = (k) => setMeta(k, { status: form.meta[k]?.status === 'confirmed' ? 'assumption' : 'confirmed' });
+// The lists of the brief: products, offers and the goals of the first creatives (moved from the old sheet of the brief; the page of the brief is BriefPage.jsx).
+// form = the form of src/lib/workflow/brief.js; setForm changes it.
+export default function BriefLists({ form, setForm, readOnly = false }) {
   const setList = (name, i, patch) => setForm((f) => ({ ...f, [name]: f[name].map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
   const addProduct = () => setForm((f) => ({ ...f, products: [...f.products, { name: '', price: '', cogs: '', status: 'assumption', source: '' }] }));
   const addOffer = () => setForm((f) => ({ ...f, offers: [...f.offers, { name: '', pays: '', list_value: '', extra_cost: '', approved: false, status: 'assumption', source: '' }] }));
   const addGoal = () => setForm((f) => ({ ...f, goals: [...(f.goals || []), { goal: '', product: '' }] }));
   const del = (name, i) => setForm((f) => ({ ...f, [name]: f[name].filter((_, j) => j !== i) }));
-
   const Pill = ({ status, onClick }) => (onClick && status !== 'empty'
-    ? <button type="button" className={'wf-st ' + STATUS_TONE[status]} onClick={onClick} title="Нажміть, щоб змінити: підтверджено або припущення"><i />{STATUS_LABEL[status]}</button>
+    ? <button type="button" className={'wf-st ' + STATUS_TONE[status]} onClick={onClick} title="Натисніть, щоб змінити: підтверджено або припущення"><i />{STATUS_LABEL[status]}</button>
     : <span className={'wf-st ' + STATUS_TONE[status]}><i />{STATUS_LABEL[status]}</span>);
   const stOf = (x) => (x.status === 'confirmed' ? 'confirmed' : 'assumption');
-
   return (
     <div className="wf-col">
-      <div style={{ overflowX: 'auto' }}>
-        <table className="wf-sheet">
-          <thead><tr><th>Параметр</th><th>Значення</th><th>Статус</th><th>Джерело</th></tr></thead>
-          <tbody>
-            {ROWS.map((r) => {
-              const val = form.values[r.key] ?? '';
-              const st = rowStatus(val, form.meta[r.key]);
-              return (
-                <tr key={r.key}>
-                  <td className="k">{r.label}</td>
-                  <td className={readOnly ? 'ro' : ''}>{readOnly ? (val || '—') : <input className="wf-inp" aria-label={r.label} value={val} inputMode={r.text ? 'text' : 'decimal'} onChange={(e) => setVal(r.key, e.target.value)} />}</td>
-                  <td><Pill status={st} onClick={readOnly ? null : () => toggle(r.key)} /></td>
-                  <td className={readOnly ? 'ro wf-muted' : ''}>{readOnly ? (form.meta[r.key]?.source || '') : <input className="wf-inp" aria-label={'Джерело: ' + r.label} value={form.meta[r.key]?.source || ''} onChange={(e) => setMeta(r.key, { source: e.target.value })} placeholder="Звідки цифра" />}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
       <div>
         <div className="wf-h">Товари</div>
         {form.products.length === 0 && <div className="wf-muted" style={{ marginBottom: 6 }}>Товарів немає: без них Unit Economy рахується на середньому чеку.</div>}
@@ -102,23 +75,8 @@ export default function BriefSheet({ version, busy, onSave, onCancel, readOnly }
           </table></div>
         )}
         {!readOnly && <button type="button" className="wf-btn sm" onClick={addGoal}>+ Ціль креатива</button>}
-        {!readOnly && <div className="wf-muted" style={{ marginTop: 6, fontSize: 12.5 }}>Файли клієнта (логотип, фото товару, приклади) вантажаться в картці проєкту, на сторінці «Креативи»: Креатор бере їх звідти.</div>}
       </div>
 
-      <div>
-        <label htmlFor="wf-brief-text" className="wf-h" style={{ display: 'block' }}>Вільний текст брифу</label>
-        {readOnly
-          ? <div className="wf-doc">{form.text || '(порожньо)'}</div>
-          : <textarea id="wf-brief-text" className="wf-ta" style={{ minHeight: 120 }} value={form.text} onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))} />}
-      </div>
-
-      {!readOnly && (
-        <div className="wf-row">
-          <button type="button" className="wf-btn p" disabled={busy} onClick={() => onSave(form.text || 'Бриф', contentFromForm(form))}>Зберегти версію брифу</button>
-          <button type="button" className="wf-btn" disabled={busy} onClick={onCancel}>Скасувати</button>
-          <span className="wf-muted">Після збереження Дослідник перерахує Unit Economy. Припущення потрапляють у «Потрібно від клієнта».</span>
-        </div>
-      )}
     </div>
   );
 }
