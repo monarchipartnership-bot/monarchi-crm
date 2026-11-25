@@ -9,6 +9,10 @@ import { CASES, caseFacts, pickCase } from '../src/lib/growth/cases.js';
 import { MAX_WORDS, checkDraft, followUpDates, isSensitive, languageFor, withFooter, wordCount } from '../src/lib/growth/draftRules.js';
 import { ACTIONS, UNLOCK_AFTER, canUnlockAuto, isQuietHour, levelsFor, recordDecision, sendMode } from '../src/lib/growth/autonomy.js';
 import { buildQueue, capsuleOf, classifySource, firstUrl, followUpsDue, funnel, monthStats, staleDeals } from '../src/lib/growth/leadFlow.js';
+import { checkAnalystAnswer, parseAuthorAnswer, parseJsonLoose } from '../src/lib/growth/prompts.js';
+import { detectTags, siteFindings } from '../src/lib/growth/siteFindings.js';
+import { HeldError, analyseLead, processLead, websiteOf, writeDraft } from '../api/_lib/gr/pipeline.js';
+import { createMemoryGrRepo } from './grMemoryRepo.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0;
@@ -164,8 +168,116 @@ await test('flow: the code watches quiet deals (open, no change of stage for 7 d
   const deals = [{ id: 1, title: 'old', stage_changed_at: '2026-11-01T00:00:00Z' }, { id: 2, title: 'fresh', stage_changed_at: '2026-11-25T00:00:00Z' }, { id: 3, title: 'closed', closed_at: '2026-11-02', stage_changed_at: '2026-11-01T00:00:00Z' }, { id: 4, title: 'arch', archived: true, stage_changed_at: '2026-11-01T00:00:00Z' }];
   assert.deepEqual(staleDeals(deals, { days: 7, now: new Date('2026-11-27T00:00:00Z') }).map((d) => [d.id, d.quietDays]), [[1, 26]]);
 });
+await test('site findings: only facts the code read; a Tag Manager container hides the «no pixel» claim; nothing is said about a site that was not read', () => {
+  assert.deepEqual(detectTags('<script>fbq("init","1")</script><script src="https://www.googletagmanager.com/gtag/js?id=G-ABCDEF1"></script>'), { meta_pixel: true, ga: true, gtm: false });
+  assert.equal(detectTags('<script src="https://www.googletagmanager.com/gtm.js?id=GTM-ABCD12"></script>').gtm, true);
+  const home = { kind: 'home', ok: true, signals: { viewport: false, phone_link: false, email_link: false, messengers: [], images: 20, lazy_images: 0, forms: 0, returns_words: [], review_words: [] } };
+  const prod = { kind: 'product', ok: true, signals: { structured: ['Organization'], returns_words: [], review_words: [], forms: 0 } };
+  const ids = (o) => siteFindings(o).map((f) => f.id);
+  assert.deepEqual(ids({ pages: [home, prod], tags: { meta_pixel: false, ga: false, gtm: false } }), ['no_viewport', 'no_meta_pixel', 'no_analytics', 'no_product_schema', 'no_returns_info', 'no_reviews', 'no_contact_channel', 'heavy_images', 'no_lead_form']);
+  assert.ok(!ids({ pages: [home, prod], tags: { meta_pixel: false, ga: false, gtm: true } }).includes('no_meta_pixel')); // the pixel may live inside the container
+  assert.deepEqual(ids({ pages: [{ kind: 'home', ok: false }], tags: null }), []);
+  assert.deepEqual(ids({ pages: [home], tags: null }).filter((x) => x.startsWith('no_meta')), []); // tags unknown: no claim
+});
+await test('analyst answer: every quote is checked against the text; invented budget, ad spend and problem are dropped with a reason', () => {
+  const lead = 'We run Meta ads for our candle shop, ROAS dropped to 1.2 last month. Budget is $2,000 per month. Based in the USA.';
+  const good = { niche: 'ecommerce', subniche: 'home', pays_ads: 'yes', pays_ads_quote: 'We run Meta ads', budget_amount: 2000, budget_currency: 'usd', budget_quote: 'Budget is $2,000 per month', problem_quote: 'ROAS dropped to 1.2 last month', channel: 'meta', finding_id: 'no_viewport', country: 'USA' };
+  const ok = checkAnalystAnswer(good, { leadText: lead, findingIds: ['no_viewport'] });
+  assert.deepEqual([ok.fields.paysAds, ok.fields.budget_amount, ok.fields.budget_currency, ok.fields.problemNamed, ok.fields.finding_id, ok.dropped.length], ['yes', 2000, 'USD', true, 'no_viewport', 0]);
+  const bad = checkAnalystAnswer({ ...good, pays_ads_quote: 'They spend a lot on ads', budget_quote: 'Budget is $5,000 per month', problem_quote: 'conversion is terrible', niche: 'candles', finding_id: 'made_up' }, { leadText: lead, findingIds: ['no_viewport'] });
+  assert.deepEqual([bad.fields.paysAds, bad.fields.budget_amount, bad.fields.problemNamed, bad.fields.finding_id, bad.fields.niche], ['unknown', null, false, null, 'other']);
+  assert.equal(bad.dropped.length, 4);
+  assert.deepEqual(parseJsonLoose('Here you go:\n```json\n{"a":1}\n```'), { a: 1 }); assert.equal(parseJsonLoose('no json'), null);
+  assert.equal(parseAuthorAnswer('{"body":"  "}'), null); assert.equal(parseAuthorAnswer('{"subject":"Hi","body":"Text"}').subject, 'Hi');
+});
+
+// ---- the pipeline with a stand-in model and a stand-in site (no network, no database)
+const PAGES = [{ kind: 'home', ok: true, signals: { viewport: true, cart_link: true, phone_link: true, email_link: true, messengers: [], images: 5, lazy_images: 5, forms: 1, h1: ['Candles'], returns_words: ['returns'], review_words: ['reviews'] } }, { kind: 'product', ok: true, signals: { structured: ['Product'], returns_words: [], review_words: [], forms: 0 } }];
+const SITE = { url: 'https://lumicandles.com/', pages: PAGES, tags: { meta_pixel: false, ga: true, gtm: false }, site: { url: 'https://lumicandles.com/', title: 'Lumi Candles', description: 'Handmade candles', h1: ['Candles'], text: 'Handmade soy candles. Free shipping.' } };
+const UPWORK_TEXT = 'Need a Meta Ads expert for our candle shop https://lumicandles.com. We run Meta ads now, ROAS dropped to 1.2. Budget is $2,000 per month. Payment method verified. Total spent $12,000. Rating 4.9. Proposals: 8. Location: USA.';
+const analystJson = (over = {}) => JSON.stringify({ company: 'Lumi Candles', country: 'USA', niche: 'ecommerce', subniche: 'other_ecom', pays_ads: 'yes', pays_ads_quote: 'We run Meta ads now', budget_amount: 2000, budget_currency: 'USD', budget_quote: 'Budget is $2,000 per month', problem_quote: 'ROAS dropped to 1.2', asks_guarantee: false, out_of_scope: false, language: 'en', channel: 'meta', finding_id: 'no_meta_pixel', upwork_payment_verified: true, upwork_payment_quote: 'Payment method verified', upwork_total_spent_usd: 12000, upwork_spent_quote: 'Total spent $12,000', upwork_rating: 4.9, upwork_rating_quote: 'Rating 4.9', upwork_proposals: 8, upwork_proposals_quote: 'Proposals: 8', ...over });
+const LETTER = JSON.stringify({ subject: null, body: "Hi, I looked at lumicandles.com before writing. I could not find the Meta Pixel loading on your home page, which makes it hard for campaigns to learn from sales. We recently cut MellowDiamond's cost per purchase by 34% on Meta, starting from the same kind of audit. I can send a one-page list of what I would check first, or we can do a 15-minute call. Mon'Archi team" });
+function crew({ analyst = analystJson(), author = [LETTER], site = SITE, settings = {} } = {}) {
+  const repo = createMemoryGrRepo({ settings, brand: { voice: 'Direct', donts: 'No hype' } });
+  const calls = []; let a = 0;
+  const deps = { readSite: async (u) => { calls.push('site:' + u); if (site instanceof Error) throw site; return site; }, ask: async ({ agentKey }) => { calls.push(agentKey); if (agentKey === 'gr-analyst') return { text: analyst, costUsd: 0.01 }; return { text: author[Math.min(a++, author.length - 1)], costUsd: 0.02 }; } };
+  return { repo, deps, calls };
+}
+const newLead = (repo, row) => repo.insertLead({ name: 'Lead', source: 'upwork', raw_text: UPWORK_TEXT, ...row });
+
+await test('pipeline: a good Upwork lead is scored 90, gets the case, the finding and a pending letter; the journal has two runs with their cost', async () => {
+  const { repo, deps, calls } = crew();
+  const l = await newLead(repo); const out = await processLead({ repo, leadId: l.id, deps });
+  assert.deepEqual([out.status, out.verdict, out.score, out.case_key, out.finding_id, out.website], ['draft', 'ok', 90, 'mellowdiamond', 'no_meta_pixel', 'https://lumicandles.com']);
+  assert.deepEqual(calls, ['site:https://lumicandles.com', 'gr-analyst', 'gr-author']);
+  assert.equal(repo.T.drafts.length, 1); const d = repo.T.drafts[0];
+  assert.deepEqual([d.status, d.kind, d.channel, d.lang, d.issues.length, d.case_key], ['pending', 'letter', 'upwork', 'en', 0, 'mellowdiamond']);
+  assert.ok(!/reply "no"/.test(d.body), 'no opt-out footer outside email');
+  assert.equal(repo.T.runs.length, 2); assert.ok(Math.abs(await repo.monthSpend() - 0.03) < 1e-9);
+  assert.equal(websiteOf({ raw_text: 'see https://www.linkedin.com/in/x and https://shop.example/a.' }), 'https://shop.example/a');
+});
+await test('pipeline: a letter by email gets the opt-out line added by code (not counted in the words)', async () => {
+  const { repo, deps } = crew({ analyst: analystJson({ company: 'Brightside' }) });
+  const l = await newLead(repo, { source: 'site', raw_text: 'Hi, we sell apparel at https://brightside.example, ads stopped working. We run Meta ads now. Budget is $2,000 per month.', website: null });
+  await processLead({ repo, leadId: l.id, deps }); const d = repo.T.drafts[0];
+  assert.equal(d.channel, 'email'); assert.match(d.body, /reply "no"/); assert.ok(d.words < 120);
+});
+await test('pipeline: the verdict «ask» stops before the letter and waits for the person; the missing facts are named', async () => {
+  const { repo, deps, calls } = crew({ analyst: analystJson({ pays_ads: 'unknown', pays_ads_quote: null, budget_amount: null, budget_quote: null, niche: 'leadgen', subniche: 'services', upwork_payment_verified: null }) });
+  const l = await newLead(repo, { source: 'site' }); const out = await processLead({ repo, leadId: l.id, deps });
+  assert.deepEqual([out.status, out.verdict], ['scored', 'ask']); assert.equal(repo.T.drafts.length, 0); assert.ok(!calls.includes('gr-author'));
+  assert.ok(out.missing.includes('рекламний бюджет'));
+});
+await test('pipeline: a lead from the grey market is refused by code without a letter, and a lead without a site is refused without reading anything', async () => {
+  let c = crew({ analyst: analystJson({ niche: 'excluded' }) });
+  let l = await newLead(c.repo); let out = await processLead({ repo: c.repo, leadId: l.id, deps: c.deps });
+  assert.deepEqual([out.status, out.score], ['rejected', 0]); assert.match(out.reject_reason, /Ринок/); assert.equal(c.repo.T.drafts.length, 0);
+  c = crew(); l = await newLead(c.repo, { raw_text: 'We need a Meta Ads expert, no site yet.' }); out = await processLead({ repo: c.repo, leadId: l.id, deps: c.deps });
+  assert.equal(out.status, 'rejected'); assert.match(out.reject_reason, /сайту/); assert.ok(!c.calls.some((x) => x.startsWith('site:')));
+});
+await test('pipeline: a site that cannot be read does not reject the lead: it asks the person (flag), and Upwork without a verified payment in the text asks too', async () => {
+  let c = crew({ site: new Error('timeout') });
+  let l = await newLead(c.repo); let out = await processLead({ repo: c.repo, leadId: l.id, deps: c.deps });
+  assert.deepEqual([out.status, out.verdict], ['scored', 'ask']); assert.ok(out.flags.some((f) => /Сайт не вдалося прочитати/.test(f)));
+  c = crew({ analyst: analystJson({ upwork_payment_verified: null, upwork_payment_quote: null }) }); l = await newLead(c.repo); out = await processLead({ repo: c.repo, leadId: l.id, deps: c.deps });
+  assert.equal(out.verdict, 'ask'); assert.ok(out.flags.some((f) => /Upwork: оплату/.test(f)));
+});
+await test('pipeline: what the model invents is not trusted: a budget with a quote that is not in the text is dropped and named', async () => {
+  const { repo, deps } = crew({ analyst: analystJson({ budget_amount: 9000, budget_quote: 'Budget is $9,000 per month' }) });
+  const l = await newLead(repo); const out = await processLead({ repo, leadId: l.id, deps });
+  assert.equal(out.budget_usd, null); assert.ok(out.flags.some((f) => /Не прийнято від Аналітика: бюджет/.test(f)));
+});
+await test('pipeline: the stop and the month budget hold the work BEFORE the model is called; a broken answer marks the lead failed with the reason', async () => {
+  let c = crew({ settings: { stopped: true } }); let l = await newLead(c.repo);
+  await assert.rejects(() => processLead({ repo: c.repo, leadId: l.id, deps: c.deps }), (e) => e instanceof HeldError && e.kind === 'stopped'); assert.deepEqual(c.calls, []); assert.equal((await c.repo.getLead(l.id)).status, 'new');
+  c = crew({ settings: { monthly_budget_usd: 0.05 } }); l = await newLead(c.repo); c.repo.T.runs.push({ cost_usd: 0.05 });
+  await assert.rejects(() => analyseLead({ repo: c.repo, leadId: l.id, deps: c.deps }), (e) => e instanceof HeldError && e.kind === 'budget'); assert.deepEqual(c.calls, []);
+  c = crew({ analyst: 'sorry, no json' }); l = await newLead(c.repo); const out = await processLead({ repo: c.repo, leadId: l.id, deps: c.deps });
+  assert.equal(out.status, 'failed'); assert.match(out.error, /JSON/); assert.equal(c.repo.T.runs.at(-1).status, 'failed');
+});
+await test('pipeline: a letter that breaks the rules is rewritten once; one that still breaks them is saved WITH its issues for the person to fix', async () => {
+  const bad = JSON.stringify({ body: "Hi, we guarantee results and we cut cost per purchase by 412% for HumanCentric. Let us talk about our price. Mon'Archi team. More words to pass the minimum length of the message so only the rules break here." });
+  let c = crew({ author: [bad, LETTER] }); let l = await newLead(c.repo); await processLead({ repo: c.repo, leadId: l.id, deps: c.deps });
+  assert.equal(c.calls.filter((x) => x === 'gr-author').length, 2); assert.equal(c.repo.T.drafts[0].issues.length, 0);
+  c = crew({ author: [bad, bad] }); l = await newLead(c.repo); await processLead({ repo: c.repo, leadId: l.id, deps: c.deps });
+  assert.ok(c.repo.T.drafts[0].issues.length >= 3, JSON.stringify(c.repo.T.drafts[0].issues)); assert.equal((await c.repo.getLead(l.id)).status, 'draft');
+});
+await test('pipeline: a reply is a draft of its own kind; the incoming words of the lead may be quoted back', async () => {
+  const { repo, deps } = crew({ author: [JSON.stringify({ body: "Hi Hana, thanks for the quick answer. Before any terms I would like to look at your Meta account for 20 minutes, so what I say is specific to you. Would Tuesday or Wednesday work for a short call? Mon'Archi team" })] });
+  const l = await newLead(repo, { source: 'linkedin', status: 'replied', case_key: null, country: 'Germany' });
+  const d = await writeDraft({ repo, leadId: l.id, deps, kind: 'reply', incoming: 'Interesting, please send the terms. We spend about 3500 EUR a month.' });
+  assert.deepEqual([d.kind, d.status, d.channel], ['reply', 'pending', 'linkedin']); assert.equal((await repo.getLead(l.id)).status, 'replied');
+});
+await test('the server side of the growth team is wired: the endpoint needs a signed-in person, the migration has RLS and no delete rights, nothing reaches the client agents', () => {
+  const ep = fs.readFileSync(path.join(root, 'api/gr.js'), 'utf8'), mig = fs.readFileSync(path.join(root, 'supabase/migrations/20261076000000_growth_team.sql'), 'utf8');
+  assert.match(ep, /auth\.getUser\(token\)/); assert.match(ep, /req\.method !== 'POST'/); assert.match(ep, /HeldError/); assert.ok(!/wf_runs|enqueue/.test(ep));
+  for (const t of ['gr_settings', 'gr_leads', 'gr_drafts', 'gr_runs']) assert.match(mig, new RegExp(`alter table public.${t} enable row level security`));
+  assert.ok(!/grant[^;]*delete/i.test(mig) && !/for delete/i.test(mig)); assert.match(mig, /revoke all on public\.gr_settings[^;]*anon/);
+  assert.match(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'), /api\/gr\.js/);
+});
+
 await test('the growth modules are pure: no network, no database, no browser, no import from the client agents', () => {
-  for (const f of ['icp', 'cases', 'draftRules', 'autonomy', 'leadFlow']) {
+  for (const f of ['icp', 'cases', 'draftRules', 'autonomy', 'leadFlow', 'siteFindings', 'prompts']) {
     const t = fs.readFileSync(path.join(root, `src/lib/growth/${f}.js`), 'utf8');
     assert.ok(!/\b(fetch|supabase|window|document|localStorage)\b/.test(t.replace(/\/\/.*$/gm, '')), f + ' is pure');
     assert.ok(!/workflow\//.test(t.replace(/\/\/.*$/gm, '')), f + ' does not touch the client agents');
