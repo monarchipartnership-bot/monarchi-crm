@@ -12,13 +12,16 @@ export const LEVELS = [
 ];
 export const UNLOCK_AFTER = 20; // approved drafts in a row, without a single edit of the person
 
-// maxLevel: the highest level the platform allows; ready: is the way to send built (false = only level 0, nothing to click)
+// maxLevel: the highest level the platform allows; ready: is the way to send BUILT (false = only level 0, there is nothing yet that could send; `why` says it in plain words)
+// Step 1 sends nothing: the letters are prepared and the person sends them. When a sender is built, its action gets ready: true.
 export const ACTIONS = [
-  { key: 'email_outreach', label: 'Листи потенційним клієнтам', channel: 'Email', maxLevel: 2, ready: true, dailyStart: 10 },
-  { key: 'linkedin_message', label: 'Повідомлення в LinkedIn', channel: 'LinkedIn', maxLevel: 1, ready: true, why: 'LinkedIn забороняє автоматичні повідомлення', daily: 15 },
-  { key: 'upwork_proposal', label: 'Відгуки на Upwork', channel: 'Upwork', maxLevel: 1, ready: true, why: 'Upwork забороняє автоматичні відгуки', daily: 5 },
+  { key: 'email_outreach', label: 'Листи потенційним клієнтам', channel: 'Email', maxLevel: 2, ready: false, why: 'Відправку з пошти підключимо наступним кроком', dailyStart: 10 },
+  { key: 'linkedin_message', label: 'Повідомлення в LinkedIn', channel: 'LinkedIn', maxLevel: 0, ready: false, why: 'LinkedIn забороняє відправку програмою: надсилаєте ви', daily: 15 },
+  { key: 'upwork_proposal', label: 'Відгуки на Upwork', channel: 'Upwork', maxLevel: 0, ready: false, why: 'Upwork забороняє відправку програмою: надсилаєте ви', daily: 5 },
   { key: 'social_post', label: 'Публікація постів', channel: 'Instagram, Facebook, LinkedIn', maxLevel: 2, ready: false, why: 'Чекає доступів до соцмереж' },
 ];
+// the action of a draft by its channel
+export const actionOfChannel = (channel) => ({ email: 'email_outreach', linkedin: 'linkedin_message', upwork: 'upwork_proposal' }[channel] || 'email_outreach');
 export const actionOf = (key) => ACTIONS.find((a) => a.key === key) || null;
 
 // the record of one kind of action: { streak: approved in a row without edits, unlockedAuto: the person said «yes» to level 2 }
@@ -45,8 +48,8 @@ export function levelsFor(action, { level = 0, record = emptyRecord() } = {}) {
 export const canUnlockAuto = (rec = emptyRecord()) => (rec.streak || 0) >= UNLOCK_AFTER;
 
 // what happens to a message right now: 'prepare' (the person sends), 'one_click' (waits for the click) or 'auto' (the system sends), with the reasons it was held back
-export function sendMode(actionKey, { level = 0, record = emptyRecord(), text = '', stopped = false, sentToday = 0, quiet = false, excluded = false } = {}) {
-  const a = actionOf(actionKey);
+export function sendMode(actionKey, { level = 0, record = emptyRecord(), text = '', stopped = false, sentToday = 0, quiet = false, excluded = false, action = null } = {}) {
+  const a = action || actionOf(actionKey); // `action` lets a check or a future sender pass an action whose way to send is ready
   const held = [];
   if (stopped) held.push('Команду зупинено');
   if (excluded) held.push('Адресат у списку виключень');

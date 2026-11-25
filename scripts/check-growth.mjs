@@ -6,8 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MIN_BUDGET_USD, THRESHOLDS, marketOf, scoreLead, toUsd } from '../src/lib/growth/icp.js';
 import { CASES, caseFacts, pickCase } from '../src/lib/growth/cases.js';
-import { MAX_WORDS, checkDraft, followUpDates, isSensitive, languageFor, withFooter, wordCount } from '../src/lib/growth/draftRules.js';
-import { ACTIONS, UNLOCK_AFTER, canUnlockAuto, isQuietHour, levelsFor, recordDecision, sendMode } from '../src/lib/growth/autonomy.js';
+import { FOOTERS, MAX_WORDS, checkDraft, followUpDates, isSensitive, languageFor, stripFooter, withFooter, wordCount } from '../src/lib/growth/draftRules.js';
+import { ACTIONS, UNLOCK_AFTER, actionOf, actionOfChannel, canUnlockAuto, isQuietHour, levelsFor, recordDecision, sendMode } from '../src/lib/growth/autonomy.js';
 import { buildQueue, capsuleOf, classifySource, firstUrl, followUpsDue, funnel, monthStats, staleDeals } from '../src/lib/growth/leadFlow.js';
 import { checkAnalystAnswer, parseAuthorAnswer, parseJsonLoose } from '../src/lib/growth/prompts.js';
 import { detectTags, siteFindings } from '../src/lib/growth/siteFindings.js';
@@ -98,37 +98,41 @@ await test('draft: language by market (Ukraine → Ukrainian, others → English
   assert.match(withFooter('Body', { channel: 'email', lang: 'en' }), /reply "no"/); assert.equal(withFooter('Body', { channel: 'linkedin' }), 'Body');
   assert.match(withFooter('Body', { channel: 'email', lang: 'uk' }), /більше не писатиму/);
   assert.equal(wordCount("It's a 15-minute call"), 4);
+  assert.equal(stripFooter(withFooter('Body.', { channel: 'email', lang: 'uk' })), 'Body.'); assert.equal(stripFooter('Only body'), 'Only body'); assert.ok(FOOTERS.en && FOOTERS.uk);
 });
 await test('draft: follow-ups after 3 and 7 days from the day it was sent; sensitive topics are recognised', () => {
   assert.deepEqual(followUpDates('2026-11-30T10:00:00Z'), ['2026-12-03', '2026-12-07']);
   assert.ok(isSensitive('What is your price?')); assert.ok(isSensitive('Надішліть договір')); assert.ok(!isSensitive('Thanks, Tuesday works'));
 });
 
-await test('autonomy: LinkedIn and Upwork never go above level 1, social posts wait for the API, email level 2 needs 20 good drafts and the person\'s yes', () => {
-  assert.deepEqual(levelsFor('linkedin_message', { level: 2 }).allowed, [0, 1]);
-  assert.equal(levelsFor('linkedin_message', { level: 2 }).level, 0); // a forbidden level falls back to 0
-  assert.deepEqual(levelsFor('upwork_proposal').allowed, [0, 1]);
-  assert.deepEqual(levelsFor('social_post').allowed, [0]); assert.match(levelsFor('social_post').locked[1], /доступ/);
+const READY = (key, over = {}) => ({ ...actionOf(key), ready: true, ...over }); // an action whose way to send is built (the future sender)
+await test('autonomy: step 1 sends nothing, so every action is level 0 and says why; the platform rules are kept for the day a sender exists', () => {
+  for (const a of ACTIONS) { const l = levelsFor(a.key, { level: 2 }); assert.deepEqual(l.allowed, [0], a.key); assert.equal(l.level, 0); assert.ok(l.locked[1] && l.locked[2], a.key + ' says why'); }
+  assert.match(levelsFor('email_outreach').locked[1], /пошти/); assert.match(levelsFor('linkedin_message').locked[1], /LinkedIn забороняє/); assert.match(levelsFor('upwork_proposal').locked[2], /Upwork забороняє/); assert.match(levelsFor('social_post').locked[1], /доступ/);
+  // once a sender exists: LinkedIn and Upwork stay at level 0 (the platforms forbid bots), email may go to 1, and to 2 only after 20 good drafts and the person's yes
+  assert.deepEqual(levelsFor(READY('linkedin_message', { maxLevel: 1 }), { level: 2 }).allowed, [0, 1]);
   let rec = { streak: 0, unlockedAuto: false };
-  assert.deepEqual(levelsFor('email_outreach', { record: rec }).allowed, [0, 1]); assert.match(levelsFor('email_outreach', { record: rec }).locked[2], /0 із 20/);
+  assert.deepEqual(levelsFor(READY('email_outreach'), { record: rec }).allowed, [0, 1]); assert.match(levelsFor(READY('email_outreach'), { record: rec }).locked[2], /0 із 20/);
   for (let i = 0; i < UNLOCK_AFTER; i += 1) rec = recordDecision(rec, { approved: true, edited: false });
-  assert.ok(canUnlockAuto(rec)); assert.deepEqual(levelsFor('email_outreach', { record: rec }).allowed, [0, 1]); // unlocked only by the person's yes
-  assert.deepEqual(levelsFor('email_outreach', { record: { ...rec, unlockedAuto: true }, level: 2 }).allowed, [0, 1, 2]);
+  assert.ok(canUnlockAuto(rec)); assert.deepEqual(levelsFor(READY('email_outreach'), { record: rec }).allowed, [0, 1]); // unlocked only by the person's yes
+  assert.deepEqual(levelsFor(READY('email_outreach'), { record: { ...rec, unlockedAuto: true }, level: 2 }).allowed, [0, 1, 2]);
+  assert.equal(actionOfChannel('upwork'), 'upwork_proposal'); assert.equal(actionOfChannel('linkedin'), 'linkedin_message'); assert.equal(actionOfChannel('email'), 'email_outreach');
 });
 await test('autonomy: one edit or one rejection breaks the streak', () => {
-  let rec = { streak: 19, unlockedAuto: false };
+  const rec = { streak: 19, unlockedAuto: false };
   assert.equal(recordDecision(rec, { approved: true, edited: true }).streak, 0);
   assert.equal(recordDecision(rec, { approved: false, edited: false }).streak, 0);
   assert.equal(recordDecision(rec, { approved: true, edited: false }).streak, 20);
 });
-await test('autonomy: the mode of a message: level 2 still waits for a click when the text is sensitive, the day limit is used or it is a quiet hour; a stop holds everything', () => {
-  const on = { level: 2, record: { streak: 25, unlockedAuto: true } };
+await test('autonomy: the mode of a message: with no sender everything is «prepare»; with a sender, level 2 still waits for a click when the text is sensitive, the day limit is used or it is a quiet hour; a stop holds everything', () => {
+  assert.equal(sendMode('email_outreach', { level: 2, record: { streak: 25, unlockedAuto: true } }).mode, 'prepare');
+  const action = READY('email_outreach'), on = { action, level: 2, record: { streak: 25, unlockedAuto: true } };
   assert.equal(sendMode('email_outreach', { ...on, text: 'Hello, thanks for your reply.' }).mode, 'auto');
   assert.equal(sendMode('email_outreach', { ...on, text: 'Here is our price list' }).mode, 'one_click');
   assert.equal(sendMode('email_outreach', { ...on, sentToday: 10 }).mode, 'one_click');
   assert.equal(sendMode('email_outreach', { ...on, quiet: true }).mode, 'one_click');
   assert.equal(sendMode('email_outreach', { ...on, stopped: true }).held[0], 'Команду зупинено');
-  assert.equal(sendMode('linkedin_message', { level: 1 }).mode, 'one_click'); assert.equal(sendMode('linkedin_message', { level: 2 }).mode, 'prepare');
+  assert.equal(sendMode('linkedin_message', { action: READY('linkedin_message', { maxLevel: 1 }), level: 1 }).mode, 'one_click'); assert.equal(sendMode('linkedin_message', { action: READY('linkedin_message', { maxLevel: 1 }), level: 2 }).mode, 'prepare');
   assert.ok(isQuietHour(new Date('2026-11-30T22:30:00Z'), 'UTC')); assert.ok(!isQuietHour(new Date('2026-11-30T12:00:00Z'), 'UTC')); assert.ok(isQuietHour(new Date('2026-11-30T05:00:00Z'), 'UTC'));
   assert.equal(ACTIONS.length, 4);
 });
@@ -276,6 +280,19 @@ await test('the server side of the growth team is wired: the endpoint needs a si
   assert.match(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'), /api\/gr\.js/);
 });
 
+await test('the window «Зростання»: a tab after «Огляд проєктів» and a quick button with its own badge, a dark window, its own sheets keep Esc, the dev fixture never reaches the production build', () => {
+  const home = fs.readFileSync(path.join(root, 'src/pages/AiAgents/AiAgentsHome.jsx'), 'utf8'), win = fs.readFileSync(path.join(root, 'src/pages/AiAgents/AiWindow.jsx'), 'utf8');
+  const page = fs.readFileSync(path.join(root, 'src/pages/AiAgents/Growth.jsx'), 'utf8'), api = fs.readFileSync(path.join(root, 'src/lib/api/growth.js'), 'utf8');
+  assert.match(home, /growth: \{ title: "Зростання Mon'Archi", Page: Growth, dark: true \}/);
+  assert.equal((home.match(/openWin\('growth'\)/g) || []).length, 2, 'the tab and the quick button');
+  assert.match(home, /openWin\('overview'\)\}>Огляд проєктів<\/button>\s*<button type="button" className=\{'aia-tab' \+ \(win === 'growth'/, 'the tab stands right after «Огляд проєктів»');
+  assert.match(home, /dark=\{!!WINDOWS\[win\]\.dark\}/); assert.match(win, /is-dark/); assert.match(win, /\.gr-ov/);
+  assert.match(api, /import\.meta\.env\.DEV[\s\S]*fixtureApi/, 'the fixture is loaded only by a dev server');
+  assert.ok(!/workflow\//.test(page.replace(/\/\/.*$/gm, '')) && !/api\/_lib/.test(page), 'the page does not touch the client agents');
+  assert.match(page, /key=\{draft\.id \+ ':' \+ draft\.body\}/); // a new text starts a fresh editor
+  assert.match(page, /issues\.length > 0/); // an approval is blocked while the text breaks a rule
+  assert.match(page, /Ціни, знижки, договірні умови й скарги завжди тільки з вашим підтвердженням/);
+});
 await test('the growth modules are pure: no network, no database, no browser, no import from the client agents', () => {
   for (const f of ['icp', 'cases', 'draftRules', 'autonomy', 'leadFlow', 'siteFindings', 'prompts']) {
     const t = fs.readFileSync(path.join(root, `src/lib/growth/${f}.js`), 'utf8');

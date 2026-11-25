@@ -2,6 +2,7 @@ import { lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchAgentsLive, runTickNow, setGlobalStop } from '../../lib/api/workflow';
+import { pickApi as pickGrowthApi } from '../../lib/api/growth';
 import { agentFacts, agentStates, feedOf, podStates } from '../../lib/workflow/mapLive';
 import { ARCHIVE_NOTE, agentOf, mapIslands, rightLabel } from '../../lib/workflow/registry';
 import { buildOverview, monthStart, money } from '../../lib/workflow/overview';
@@ -20,7 +21,8 @@ const Spend = lazy(() => import('./Spend'));
 const Runs = lazy(() => import('./Runs'));
 const Connections = lazy(() => import('./Connections'));
 const AgentSettings = lazy(() => import('./AgentSettings'));
-const WINDOWS = { approvals: { title: 'Апруви', Page: Approvals }, overview: { title: 'Огляд проєктів', Page: Overview }, runs: { title: 'Прогони', Page: Runs }, spend: { title: 'Витрати', Page: Spend }, connections: { title: 'Підключення', Page: Connections }, settings: { title: 'Налаштування агентів', Page: AgentSettings }, help: { title: 'Як це працює', Page: Help } };
+const Growth = lazy(() => import('./Growth'));
+const WINDOWS = { approvals: { title: 'Апруви', Page: Approvals }, overview: { title: 'Огляд проєктів', Page: Overview }, growth: { title: "Зростання Mon'Archi", Page: Growth, dark: true }, runs: { title: 'Прогони', Page: Runs }, spend: { title: 'Витрати', Page: Spend }, connections: { title: 'Підключення', Page: Connections }, settings: { title: 'Налаштування агентів', Page: AgentSettings }, help: { title: 'Як це працює', Page: Help } };
 
 const TICK = { ok: 'працює', warn: 'повільно', bad: 'не відповідає' };
 const tickLevel = (iso, now = new Date()) => { if (!iso) return 'bad'; const m = (now - new Date(iso)) / 60000; return m < 3 ? 'ok' : m < 15 ? 'warn' : 'bad'; };
@@ -39,10 +41,12 @@ export default function AiAgentsHome() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [confirm, confirmDialog] = useConfirm();
+  const [grWaiting, setGrWaiting] = useState(0); // decisions of the internal growth team (its own count, not mixed with the approvals of the projects)
   const islands = useMemo(() => mapIslands(), []);
 
   const load = useCallback(async () => { try { setLive(await fetchAgentsLive()); setErr(''); } catch (e) { setErr(e.message || String(e)); } }, []);
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, [load]);
+  useEffect(() => { let on = true; const pull = () => pickGrowthApi().then((a) => a.waiting()).then((n) => { if (on) setGrWaiting(n); }).catch(() => {}); pull(); const t = setInterval(pull, 60000); return () => { on = false; clearInterval(t); }; }, [win]);
 
   const ov = useMemo(() => (live ? buildOverview(live) : null), [live]);
   const queue = useMemo(() => (live ? buildQueue({ projects: live.projects, states: live.states, approvals: live.approvals }) : []), [live]);
@@ -65,7 +69,7 @@ export default function AiAgentsHome() {
   return (
     <div className="aia-page ai-immersive">
       {confirmDialog}
-      {win && <AiWindow title={WINDOWS[win].title} onClose={() => openWin(null)}>{(() => { const { Page } = WINDOWS[win]; return <Page onOpen={openWin} />; })()}</AiWindow>}
+      {win && <AiWindow title={WINDOWS[win].title} dark={!!WINDOWS[win].dark} onClose={() => openWin(null)}>{(() => { const { Page } = WINDOWS[win]; return <Page onOpen={openWin} />; })()}</AiWindow>}
       <div className="aia-map">
         <AgentMap3D islands={islands} runStates={states} onOpenAgent={onOpenAgent} onFocusDept={() => setSel(null)} hidden={!!win} />
       </div>
@@ -78,6 +82,7 @@ export default function AiAgentsHome() {
       <nav className="aia-nav" aria-label="Розділи AI Agents">
         <button type="button" className={'aia-tab' + (win ? '' : ' active')} onClick={() => openWin(null)}>Мапа</button>
         <button type="button" className={'aia-tab' + (win === 'overview' ? ' active' : '')} onClick={() => openWin('overview')}>Огляд проєктів</button>
+        <button type="button" className={'aia-tab' + (win === 'growth' ? ' active' : '')} onClick={() => openWin('growth')}>Зростання{grWaiting > 0 && <b className="aia-badge">{grWaiting}</b>}</button>
         <button type="button" className={'aia-tab' + (win === 'runs' ? ' active' : '')} onClick={() => openWin('runs')}>Прогони</button>
         <button type="button" className={'aia-tab' + (win === 'spend' ? ' active' : '')} onClick={() => openWin('spend')}>Витрати</button>
         <button type="button" className={'aia-tab' + (win === 'connections' ? ' active' : '')} onClick={() => openWin('connections')}>Підключення</button>
@@ -100,6 +105,7 @@ export default function AiAgentsHome() {
       <aside className="aia-left" aria-label="Швидкі дії">
         <button type="button" className="aia-q primary" onClick={() => openWin('approvals')}><span>Апруви</span>{queue.length > 0 && <b className="aia-badge">{queue.length}</b>}</button>
         <button type="button" className="aia-q" onClick={() => openWin('overview')}>Огляд проєктів</button>
+        <button type="button" className="aia-q" onClick={() => openWin('growth')}><span>Зростання</span>{grWaiting > 0 && <b className="aia-badge">{grWaiting}</b>}</button>
         <button type="button" className="aia-q" onClick={() => openWin('runs')}>Прогони</button>
         <button type="button" className="aia-q" onClick={() => openWin('spend')}>Витрати</button>
         <button type="button" className="aia-q" onClick={() => openWin('connections')}>Підключення</button>

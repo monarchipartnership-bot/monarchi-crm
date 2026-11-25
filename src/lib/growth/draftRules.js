@@ -64,10 +64,16 @@ export function checkDraft(body, { caseKey = null, allowedText = [], channel = '
 }
 
 // the opt-out line of an email is added by code, so the model cannot forget it and it does not count in the words of the message
+export const FOOTERS = { uk: 'Якщо це не актуально, просто дайте знати, і я більше не писатиму.', en: 'If this is not relevant, just reply "no" and I will not write again.' };
 export function withFooter(body, { channel = 'email', lang = 'en' } = {}) {
   if (channel !== 'email') return body;
-  const line = lang === 'uk' ? 'Якщо це не актуально, просто дайте знати, і я більше не писатиму.' : 'If this is not relevant, just reply "no" and I will not write again.';
-  return `${String(body).trim()}\n\n${line}`;
+  return `${String(body).trim()}\n\n${FOOTERS[lang === 'uk' ? 'uk' : 'en']}`;
+}
+// the text without the opt-out line: the rules of a message are checked on the part the Author wrote
+export function stripFooter(text) {
+  let t = String(text || '').trim();
+  for (const f of Object.values(FOOTERS)) if (t.endsWith(f)) t = t.slice(0, -f.length).trim();
+  return t;
 }
 
 // dates of the follow-ups counted from the day the message was sent

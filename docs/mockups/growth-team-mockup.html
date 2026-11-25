@@ -1,0 +1,259 @@
+<title>Зростання Mon'Archi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: one page of the window «Зростання» in the Hub style (ring medallions, pill controls, ring frames, plum gradient only for the main action). Two concepts of the main screen share the same parts. No hover effects by owner's rule; single dark look by design (the section is always plum). */
+:root{
+  --base:#17051c; --panel:#35113f; --text:#f9edf9; --sec:#d5a9dc; --lilac:#eb9cef; --accent:#ae40ae;
+  --grad:linear-gradient(88deg,#b544b5,#661466); --border:rgba(235,156,239,.3); --line:rgba(235,156,239,.16); --pill:rgba(39,8,39,.78);
+  --ok:#4be07f; --ok-bg:rgba(75,224,127,.15); --warn:#ffd23f; --warn-bg:rgba(255,210,63,.15); --bad:#ff9bd2; --bad-bg:rgba(255,155,210,.16); --info:#9db8ff; --info-bg:rgba(80,130,240,.2);
+  --ui:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background-color:var(--base);background-image:radial-gradient(60% 45% at 10% 0%,#431052 0%,transparent 70%),radial-gradient(50% 40% at 100% 100%,#2f0b3b 0%,transparent 70%);color:var(--text);font-family:var(--ui);font-size:14px;line-height:1.5;padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-height:100vh}
+h1,h2,h3,h4,p{margin:0} button{font:inherit;color:inherit} button:focus-visible,[tabindex]:focus-visible{outline:2px solid #edb5f0;outline-offset:3px}
+[hidden]{display:none!important}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.intro h1{font-size:24px;font-weight:800} .intro p{color:var(--sec);max-width:80ch;margin-top:4px}
+.ex{display:inline-block;margin-top:8px;padding:2px 10px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:12px;font-weight:700}
+.switch{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--sec);font-size:13px}
+.chip{height:32px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:none;cursor:pointer;font-weight:600;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:#fff}
+
+/* menu */
+.nav{display:flex;gap:2px;align-self:center;max-width:100%;overflow-x:auto;padding:4px;background:rgba(39,8,39,.86);border:1px solid rgba(181,68,181,.7);border-radius:999px;box-shadow:0 0 22px rgba(120,30,130,.35)}
+.tab{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 18px;border:0;background:none;border-radius:999px;font-size:14.5px;font-weight:500;white-space:nowrap;cursor:default}
+.tab.on{background:var(--grad);color:#fff;font-weight:600;box-shadow:inset 0 1px rgba(255,255,255,.28),0 0 16px rgba(174,64,174,.45)}
+.badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:linear-gradient(180deg,#d070d8,#b544b5);color:#fff;font-size:12px;font-weight:800}
+
+/* window */
+.win{background:rgba(39,8,39,.9);border:1px solid var(--border);border-radius:28px;padding:20px 22px 24px;box-shadow:0 24px 60px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:16px;min-width:0}
+.whead{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between}
+.whead .ttl{display:flex;align-items:center;gap:14px} .whead h2{font-size:21px;font-weight:800;line-height:1.2} .whead .sub{color:var(--sec);font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 18px;border-radius:999px;border:1px solid var(--border);background:var(--pill);cursor:pointer;font-weight:650;font-size:13.5px;white-space:nowrap}
+.btn.p{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 0 16px rgba(174,64,174,.45)}
+.btn.w{background:#fff;border-color:transparent;color:#5a0f66;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.btn.g{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35);color:#fff}
+.btn.sm{height:30px;padding:0 13px;font-size:12.5px} .btn.danger{color:var(--bad);border-color:rgba(255,155,210,.5)} .btn:disabled{opacity:.45;cursor:default}
+.pillbtn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px 0 6px;border-radius:999px;border:1px solid var(--border);background:var(--pill);cursor:pointer;font-weight:600;font-size:13px}
+
+/* medallion: ring carries the meaning */
+.med{--p:100;--c:var(--lilac);--s:48px;display:block;position:relative;flex:none;width:var(--s);height:var(--s);border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),rgba(235,156,239,.2) 0)}
+.med>span{position:absolute;inset:3.5px;border-radius:50%;background:linear-gradient(145deg,#8a2f97,#4c0f59);display:grid;place-items:center;color:#fff;font-weight:800;font-size:calc(var(--s)*.32);box-shadow:inset 0 1px rgba(255,255,255,.25)}
+.med svg{width:46%;height:46%} .med.ok{--c:var(--ok)} .med.warn{--c:var(--warn)} .med.bad{--c:var(--bad)} .med.mute{--c:#8a7090}
+.med.halo{box-shadow:0 0 0 5px rgba(255,210,63,.18),0 0 22px rgba(255,210,63,.35)}
+.med.plain>span{background:rgba(255,255,255,.1)}
+
+.cap{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;background:rgba(235,156,239,.16);color:var(--lilac)}
+.cap i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.cap.ok{background:var(--ok-bg);color:var(--ok)} .cap.warn{background:var(--warn);color:#3b2a00} .cap.info{background:var(--info-bg);color:var(--info)} .cap.mute{background:rgba(255,255,255,.1);color:var(--sec)} .cap.bad{background:var(--bad-bg);color:var(--bad)}
+
+/* hero «чекає на вас» */
+.hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:22px 26px;border-radius:28px;background:linear-gradient(120deg,#7e2189 0%,#5a0f66 55%,#3b0a48 100%);box-shadow:inset 0 0 0 1.5px rgba(235,156,239,.5),0 20px 50px rgba(120,30,130,.35)}
+.hero::after{content:"";position:absolute;right:-60px;top:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),transparent 65%);pointer-events:none}
+.hero .big{--s:76px}
+.hero .tx{flex:1;min-width:240px;position:relative;z-index:1} .hero h2{font-size:26px;font-weight:800;line-height:1.2} .hero p{margin-top:4px;color:#f0d4f4;max-width:60ch}
+.hero .acts{display:flex;gap:10px;flex-wrap:wrap;position:relative;z-index:1}
+.hero.calm{background:rgba(53,17,63,.55);box-shadow:inset 0 0 0 1.5px var(--border)}
+.strip{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 18px;border-radius:999px;background:linear-gradient(100deg,#6c1b78,#4b0f58);box-shadow:inset 0 0 0 1.5px rgba(235,156,239,.5)}
+.strip b{font-size:15px} .strip .tt{color:#f0d4f4;font-size:13px;flex:1;min-width:160px}
+
+/* boxes */
+.box{border-radius:24px;background:rgba(53,17,63,.5);box-shadow:inset 0 0 0 1.5px var(--border);padding:14px 18px 18px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.bh{display:flex;align-items:center;gap:12px} .bh h3{font-size:16px;font-weight:750;line-height:1.25} .bh small{display:block;color:var(--sec);font-size:12.5px} .bh .sp{margin-left:auto}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.kpi{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:20px;background:rgba(53,17,63,.5);box-shadow:inset 0 0 0 1.5px var(--line)} .kpi b{font-size:22px;font-weight:800;line-height:1.1;display:block} .kpi span{font-size:12px;color:var(--sec)}
+
+.lead{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;width:100%;text-align:left;padding:9px 12px;border-radius:18px;border:0;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1.5px var(--line);cursor:pointer}
+.lead.on{box-shadow:inset 0 0 0 1.5px var(--lilac),0 0 0 4px rgba(235,156,239,.14)}
+.lead .t{display:grid;gap:1px;min-width:0} .lead .t .cp{margin-top:4px} .lead .t b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .lead .t small{color:var(--sec);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list{display:grid;gap:8px}
+
+/* path (concept B) */
+.path{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;padding-top:6px}
+.path::before{content:"";position:absolute;top:44px;left:10%;right:10%;height:4px;border-radius:4px;background:rgba(235,156,239,.18)}
+.path::after{content:"";position:absolute;top:44px;left:10%;width:var(--fill,40%);height:4px;border-radius:4px;background:linear-gradient(90deg,#b544b5,#eb9cef)}
+.st{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;background:none;border:0;cursor:pointer;padding:0 4px 8px}
+.st .med{--s:76px} .st b{font-size:14px} .st small{color:var(--sec);font-size:12px;max-width:17ch}
+.st[aria-pressed="true"] .med{box-shadow:0 0 0 5px rgba(235,156,239,.2),0 0 22px rgba(235,156,239,.35)}
+.st .call{margin-top:2px}
+
+/* site and social */
+.spark{width:100%;height:64px} .issue{border-radius:16px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1.5px var(--line);padding:11px 13px;display:grid;gap:6px;font-size:13px}
+.days{display:grid;grid-template-columns:repeat(5,1fr);gap:8px} .day{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--sec)} .day .med{--s:42px}
+.note{border-radius:14px;padding:9px 13px;font-size:12.5px;background:var(--info-bg);color:var(--info)} .note.warn{background:var(--warn-bg);color:var(--warn)}
+.agents{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.agent{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:24px;background:rgba(53,17,63,.5);box-shadow:inset 0 0 0 1.5px var(--border)}
+.agent .top{display:flex;gap:12px;align-items:center} .agent .top b{font-size:15.5px;display:block} .agent p{font-size:13px;color:var(--sec)}
+.muted{color:var(--sec)} .small{font-size:12.5px} .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* overlays */
+.ov{position:fixed;inset:0;z-index:50;background:rgba(10,2,13,.7);backdrop-filter:blur(4px);display:flex;justify-content:center;align-items:flex-start;padding:40px 16px;overflow:auto}
+.ov.side{justify-content:flex-end;padding:0}
+.sheet{width:min(660px,100%);background:#2a0a33;border-radius:28px;box-shadow:inset 0 0 0 1.5px var(--border),0 30px 80px rgba(0,0,0,.5);padding:20px 22px 22px;display:flex;flex-direction:column;gap:14px}
+.ov.side .sheet{width:min(500px,100%);height:100%;border-radius:28px 0 0 28px;overflow:auto}
+.sh{display:flex;align-items:center;gap:12px} .sh h3{font-size:18px;font-weight:800;line-height:1.25} .sh .x{margin-left:auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:none;cursor:pointer;font-size:18px}
+.dots{display:flex;gap:6px} .dots i{width:26px;height:6px;border-radius:6px;background:rgba(235,156,239,.2)} .dots i.on{background:var(--lilac)} .dots i.done{background:var(--ok)}
+.why{display:grid;gap:6px;margin:0;padding:0;list-style:none} .why li{display:flex;gap:9px;align-items:flex-start;font-size:13.5px} .why svg{flex:none;width:18px;height:18px;color:var(--ok);margin-top:2px} .why li.no svg{color:var(--warn)}
+.txt{border-radius:18px;background:rgba(23,5,28,.75);box-shadow:inset 0 0 0 1.5px var(--line);padding:12px 14px;font-size:13.5px;white-space:pre-line}
+textarea.txt{width:100%;min-height:170px;color:var(--text);font:inherit;resize:vertical}
+.opts{display:grid;gap:8px} .opt{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;text-align:left;padding:11px 14px;border-radius:20px;border:0;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1.5px var(--line);cursor:pointer}
+.opt b{font-size:13.5px;display:block} .opt small{color:var(--sec);font-size:12px;display:block}
+.opt[aria-checked="true"]{box-shadow:inset 0 0 0 1.5px var(--lilac),0 0 0 4px rgba(235,156,239,.16);background:rgba(235,156,239,.1)}
+.opt[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.q{font-weight:750;font-size:14.5px;margin-top:4px}
+@media (max-width:980px){.cols,.cols2,.agents,.kpis{grid-template-columns:minmax(0,1fr)} .path{grid-template-columns:repeat(5,minmax(96px,1fr));overflow-x:auto} .win{padding:16px}}
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <h1>Зростання Mon'Archi: новий підхід</h1>
+    <p>Одна сторінка замість п'яти вкладок. Спочатку те, що чекає на вас; рішення розбираєте по одному; налаштування автоматизації сховані за простим питанням «хто надсилає?». Два варіанти головного екрана: переключайте нижче. Усе клікається.</p>
+    <span class="ex">Приклад даних: назви й цифри вигадані</span>
+  </div>
+
+  <nav class="nav" aria-label="Розділи AI Agents">
+    <span class="tab">Мапа</span><span class="tab">Огляд проєктів</span><span class="tab on">Зростання <span class="badge" id="navBadge">5</span></span><span class="tab">Прогони</span><span class="tab">Витрати</span><span class="tab">Підключення</span><span class="tab">Налаштування</span><span class="tab">Апруви <span class="badge">3</span></span>
+  </nav>
+
+  <div class="switch"><span>Головний екран:</span><button class="chip" type="button" data-concept="A" aria-pressed="true">A. Сьогодні (спочатку рішення)</button><button class="chip" type="button" data-concept="B" aria-pressed="false">B. Шлях клієнта (спочатку воронка)</button></div>
+
+  <section class="win" aria-label="Зростання" id="win"></section>
+</div>
+<div id="layer"></div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const IC={
+ growth:'<path d="M4 17l5-5 4 4 7-8"/><path d="M15 8h5v5"/>',
+ lead:'<path d="M16 8a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/>',
+ globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3 3 15 0 18"/><path d="M12 3c-3 3-3 15 0 18"/>',
+ share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4"/><path d="M15.4 6.5l-6.8 4"/>',
+ check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ pen:'<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/>',
+ send:'<path d="M21 3 10 14"/><path d="M21 3l-7 18-4-7-7-4 18-7Z"/>',
+ lock:'<rect x="6" y="11" width="12" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+ eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+ chat:'<path d="M4 5h16v11H9l-5 4V5Z"/>',
+ star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3Z"/>'
+};
+const ic=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
+const med=(inner,{p=100,tone='',s=48,halo=false,plain=false}={})=>`<span class="med ${tone}${halo?' halo':''}${plain?' plain':''}" style="--p:${p};--s:${s}px"><span>${inner}</span></span>`;
+const cap=(t,tone='')=>`<span class="cap ${tone}"><i></i>${t}</span>`;
+const ini=n=>n.split(' ').map(w=>w[0]).slice(0,2).join('');
+
+const L=[
+ {id:1,name:'Lumi Candles',src:'Upwork',country:'США',stage:'draft',score:90,v:'ok',why:[['Інтернет-магазин: наша головна ніша',1],['Уже платить за рекламу',1],['Бюджет близько $2 000 на місяць',1],['Ринок США',1]],obs:'Перевірено на сайті: у кошику не передається подія Purchase, тому реклама вчиться на додаванні в кошик, а не на покупках.',cs:'MellowDiamond: вартість покупки −34%, ROAS 330% → 600%',
+  draft:"Hi Sarah, I looked at lumicandles.com before writing. Your checkout sends no Purchase event to Meta, so campaigns optimise on add-to-cart instead of sales. Fixing that is usually the first thing we do.\nWe recently cut cost per purchase by 34% for a US DTC brand on Meta, starting from the same kind of audit.\nI can send a one-page list of what I would check first, or we can do a 15-minute call.\nMon'Archi team",lang:'англійською',words:71,hard:'Це Upwork: правила платформи забороняють автоматичну відправку, тому надсилаєте ви.'},
+ {id:2,name:'Kovalski Dental',src:'Сайт',country:'Польща',stage:'scored',score:65,v:'ask',why:[['Лідогенерація: друга за важливістю ніша',1],['Бюджет від $3 000 на місяць',1],['Невідомо, чи вже запускали рекламу',0]],obs:'Заявка прийшла з форми сайту. Оцінка посередині, тому питаємо вас: писати чи ні.',cs:'Oysters XO: 113 заявок на місяць, CPA $31 до $41',draft:null},
+ {id:3,name:'EduPath Academy',src:'LinkedIn',country:'Україна',stage:'draft',score:75,v:'ok',why:[['Освіта: друга за важливістю ніша',1],['Уже платить за рекламу',1],['Бюджет близько $1 500 на місяць',1],['Опублікованого кейса для освіти в нас немає',0]],obs:'На сторінці курсу не передається подія Lead, тому Meta не вчиться на заявках (перевірено).',cs:null,
+  draft:"Вітаю, Ірино. Подивився сторінку вашого курсу: подія Lead у піксель не передається, тож Meta не вчиться на заявках.\nЗвичайно ми починаємо саме з такого аудиту. Опублікованого кейса для освіти в нас поки немає, тому не буду підганяти чужий: можу показати, як ми діяли в схожій воронці заявок.\nМожемо коротко поговорити цього тижня?\nMon'Archi",lang:'українською',words:62,hard:'Це LinkedIn: правила платформи забороняють автоматичні повідомлення, тому надсилаєте ви.'},
+ {id:4,name:'NordCoin Exchange',src:'Upwork',country:'США',stage:'rejected',score:0,v:'no',why:[['Крипта: ми не працюємо з цим ринком',0]],obs:'Автоматична відмова за правилом. Оцінка не рахується.',cs:null,draft:null},
+ {id:5,name:'Brightside Apparel',src:'Сайт',country:'Канада',stage:'sent',score:88,v:'ok',why:[['Інтернет-магазин',1],['Платить за рекламу',1]],obs:'Лист надіслано 2 дні тому. Нагадування завтра.',cs:'byMe: ROAS 6.67 → 9.31',draft:null},
+ {id:6,name:'Hana Skincare',src:'LinkedIn',country:'Німеччина',stage:'replied',score:84,v:'ok',why:[['Інтернет-магазин',1],['Бюджет від $3 000',1]],obs:'Відповіла: «цікаво, надішліть умови». Агент оцінив це як інтерес і підготував відповідь.',cs:'Mola: ROAS 5.55 (+125%)',draft:"Hi Hana, thanks for getting back. Before sending terms I would like to look at your Meta account for 20 minutes, so the numbers are specific to you. Would Tuesday or Wednesday work?\nMon'Archi team",lang:'англійською',words:42,hard:'Це LinkedIn: надсилаєте ви.'},
+ {id:7,name:'Sklep Mebli',src:'Сайт',country:'Польща',stage:'won',score:80,v:'ok',why:[['Інтернет-магазин',1]],obs:'Угоду виграно. Створено проєкт через «Швидкий старт», далі працюють клієнтські агенти.',cs:null,draft:null},
+ {id:8,name:'Verde Pets',src:'Сайт',country:'США',stage:'new',score:null,v:'pending',why:[],obs:'Аналітик збирає дані про компанію.',cs:null,draft:null},
+ {id:9,name:'Atlas Courses',src:'LinkedIn',country:'Британія',stage:'new',score:null,v:'pending',why:[],obs:'Лід вставлено вручну за посиланням. Аналітик збирає дані.',cs:null,draft:null}
+];
+const SEND={1:['waiting','Лист чекає вас'],2:['waiting','Чекає вашого рішення'],3:['waiting','Лист чекає вас'],4:['mute','Відхилено'],5:['sent','Надіслано'],6:['reply','Відповіла: чекає вас'],7:['won','Клієнт'],8:['mute','Оцінюється'],9:['mute','Оцінюється']};
+const capOf=id=>{const[k,t]=SEND[id];return cap(t,{waiting:'warn',sent:'info',reply:'ok',won:'ok',mute:'mute'}[k])};
+const tone=x=>x.v==='ok'?'ok':x.v==='ask'?'warn':x.v==='no'?'bad':'mute';
+const leadMed=(x,s=42)=>med(x.score==null?ic('clock'):x.v==='no'?ic('lock'):ini(x.name),{p:x.score==null?30:x.v==='no'?100:x.score,tone:tone(x),s});
+const leadRow=x=>`<button type="button" class="lead" data-open="${x.id}">${leadMed(x)}<span class="t"><b>${esc(x.name)}</b><small>${esc(x.country)} · ${x.src}${x.score!=null&&x.v!=='no'?' · підходить на '+x.score+'%':''}</small><span class="cp">${capOf(x.id)}</span></span></button>`;
+
+const DEC=[{k:'lead',id:2},{k:'letter',id:1},{k:'letter',id:3},{k:'reply',id:6},{k:'plan'}];
+const STAGES=[['Знайдено','усі, хто з\'явився',L.filter(x=>true),'lead'],['Підходять','пройшли оцінку',L.filter(x=>['ok','ask'].includes(x.v)),'check'],['Написали','лист надіслано',L.filter(x=>['sent','replied','won'].includes(x.stage)),'send'],['Відповіли','є відповідь',L.filter(x=>['replied','won'].includes(x.stage)),'chat'],['Клієнт','угоду виграно',L.filter(x=>x.stage==='won'),'star']];
+let concept='A', stageSel=1, di=0, done=new Set(), stopped=false;
+
+const head=()=>`<div class="whead"><div class="ttl">${med(ic('growth'),{s:52})}<div><h2>Зростання Mon'Archi</h2><div class="sub">Нові клієнти, наш сайт і соцмережі. Окрема команда, не змішується з клієнтськими проєктами.</div></div></div>
+ <div class="row"><button class="pillbtn" type="button" data-act="budget">${med('',{p:21,s:28})}$6,40 із $30 за місяць</button><button class="btn ${stopped?'p':'danger'}" type="button" data-act="stop">${stopped?'Відновити команду':'Зупинити команду'}</button></div></div>`;
+const left=()=>5-done.size;
+const hero=()=>left()>0?`<div class="hero"><div class="big">${med(left(),{tone:'warn',s:76,p:100})}</div><div class="tx"><h2>${left()} ${left()===1?'рішення чекає':'рішень чекають'} на вас</h2><p>Один лід, два листи, відповідь клієнту й план тижня. Це близько 5 хвилин. Нічого не піде без вашого «так».</p></div><div class="acts"><button class="btn w" type="button" data-act="review">Розібрати по черзі</button><button class="btn g" type="button" data-act="list">Подивитись списком</button></div></div>`
+ :`<div class="hero calm"><div class="big">${med(ic('check'),{tone:'ok',s:76})}</div><div class="tx"><h2>Усе розібрано</h2><p>Нових рішень немає. Агенти працюють, наступну роботу покажемо тут.</p></div></div>`;
+const kpis=()=>`<div class="kpis"><div class="kpi">${med('7',{p:70,tone:'ok'})}<div><b>7 із 10</b><span>нових лідів цього місяця</span></div></div><div class="kpi">${med('2',{p:40})}<div><b>2 відповіді</b><span>на 3 надіслані листи</span></div></div><div class="kpi">${med(ic('globe'),{p:78,tone:'ok'})}<div><b>+8%</b><span>відвідуваність сайту за тиждень</span></div></div></div>`;
+const leadsBox=(title='Нові клієнти')=>`<section class="box"><div class="bh">${med(ic('lead'))}<div><h3>${title}</h3><small>9 лідів у роботі, 1 клієнт цього місяця</small></div></div><div class="list">${L.filter(x=>['draft','scored','sent','replied'].includes(x.stage)).map(leadRow).join('')}</div><div class="row"><button class="btn sm" type="button" data-act="addlead">+ Додати лід</button><span class="small muted">Вставте посилання на оголошення або профіль, агент оцінить сам.</span></div></section>`;
+const siteBox=()=>`<section class="box"><div class="bh">${med(ic('globe'))}<div><h3>Наш сайт</h3><small>Відвідувань за тиждень: 4 210</small></div><span class="sp">${cap('+8%','ok')}</span></div>
+ <svg class="spark" viewBox="0 0 300 64" preserveAspectRatio="none" aria-label="Відвідуваність за 7 днів"><defs><linearGradient id="g1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#eb9cef" stop-opacity=".45"/><stop offset="1" stop-color="#eb9cef" stop-opacity="0"/></linearGradient></defs><path d="M0 46 L50 40 L100 44 L150 30 L200 34 L250 18 L300 12 L300 64 L0 64Z" fill="url(#g1)"/><path d="M0 46 L50 40 L100 44 L150 30 L200 34 L250 18 L300 12" fill="none" stroke="#eb9cef" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="300" cy="12" r="4" fill="#fff"/></svg>
+ <div class="issue"><div class="row"><b>Одна річ, яку варто виправити</b>${cap('Висока','bad')}</div><span class="muted">Заголовок сторінки «Meta Ads» задовгий і обрізається в пошуку.</span><span>«Meta Ads для інтернет-магазинів: аудит і запуск»</span><div class="row"><button class="btn sm p" type="button" data-act="copy">Скопіювати новий заголовок</button><span class="small muted">Змінюєте ви на сайті.</span></div></div></section>`;
+const socBox=()=>`<section class="box"><div class="bh">${med(ic('share'))}<div><h3>Соцмережі</h3><small>План тижня 30 листопада</small></div><span class="sp">${cap('Чекає вас','warn')}</span></div>
+ <div class="days">${[['Пн','LI',1],['Вт','IG',0],['Ср','LI',0],['Чт','TH',0],['Пт','IG',0]].map(d=>`<div class="day">${med(d[1],{s:42,p:d[2]?100:35,tone:d[2]?'ok':'mute'})}${d[0]}</div>`).join('')}</div>
+ <div class="note warn">Публікуєте ви: ще не підключено доступи до Instagram, Facebook і LinkedIn. Агент готує текст і картинку.</div><div class="row"><button class="btn sm" type="button" data-act="review" data-to="4">Переглянути план</button><button class="btn sm" type="button" data-act="agents">Як підключити доступи</button></div></section>`;
+const AG=[['Аналітик','eye','Тільки читає','Оцінює 2 нових ліди, збирає дані про сайт.','ok',70],['Автор','pen','Готує чернетки','Написав 2 листи. Ви редагували 1 з 2.','ok',100],['Комунікатор','chat','Спілкується з людьми','Чекає вашого рішення по 4 текстах.','warn',100]];
+const team=()=>`<div class="bh" style="margin-top:2px">${med(ic('star'),{s:40})}<div><h3>Команда</h3><small>Три агенти. Вони готують, ви вирішуєте.</small></div></div><div class="agents">${AG.map((a,i)=>`<div class="agent"><div class="top">${med(ic(a[1]),{tone:a[4],p:a[5],s:52})}<div><b>${a[0]}</b><span class="cap mute">${a[2]}</span></div></div><p>${a[3]}</p><div class="row"><button class="btn sm" type="button" data-agent="${i}">Налаштувати</button></div></div>`).join('')}</div>`;
+const pathBox=()=>{const cur=STAGES[stageSel];return `<section class="box"><div class="bh">${med(ic('lead'))}<div><h3>Шлях нового клієнта</h3><small>Натисніть на етап, щоб побачити, хто на ньому</small></div></div>
+ <div class="path" style="--fill:${stageSel*20+10}%">${STAGES.map((s,i)=>`<button type="button" class="st" data-stage="${i}" aria-pressed="${i===stageSel}">${med(s[2].length,{p:Math.round(s[2].length/9*100),tone:i===4?'ok':i===1&&left()>0?'warn':'',s:76,halo:i===1&&left()>0})}<b>${s[0]}</b><small>${s[1]}</small>${i===1&&left()>0?`<span class="call">${cap('3 чекають вас','warn')}</span>`:''}</button>`).join('')}</div>
+ <div class="list">${cur[2].map(leadRow).join('')}</div></section>`};
+const strip=()=>left()>0?`<div class="strip">${med(left(),{tone:'warn',s:40})}<b>${left()} ${left()===1?'рішення чекає':'рішень чекають'} на вас</b><span class="tt">Ліди, листи, відповідь клієнту й план тижня.</span><button class="btn w sm" type="button" data-act="review">Розібрати по черзі</button></div>`:`<div class="strip" style="background:rgba(53,17,63,.55)">${med(ic('check'),{tone:'ok',s:40})}<b>Усе розібрано</b><span class="tt">Нових рішень немає.</span></div>`;
+
+function render(){
+  const body=concept==='A'
+   ? hero()+kpis()+`<div class="cols">${leadsBox()}${siteBox()}${socBox()}</div>`+team()
+   : strip()+pathBox()+`<div class="cols2">${siteBox()}${socBox()}</div>`+team();
+  $('#win').innerHTML=head()+(stopped?`<div class="note warn" role="alert">Команду зупинено: нові кроки не запускаються, нічого не надсилається.</div>`:'')+body;
+  $('#navBadge').textContent=left()||'';$('#navBadge').hidden=!left();
+}
+
+/* overlays */
+const layer=$('#layer');
+const close=()=>{layer.innerHTML='';document.body.style.overflow=''};
+function open(html,side=false){layer.innerHTML=`<div class="ov${side?' side':''}" data-bg="1"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;document.body.style.overflow='hidden';const b=$('.sheet button',layer);b&&b.focus()}
+function leadView(x){
+  const sc=x.score!=null&&x.v!=='no'?`<div class="row">${med(x.score,{p:x.score,tone:tone(x),s:56})}<div><b style="font-size:15px">Підходить на ${x.score} із 100</b><div class="small muted">Оцінку рахує код за нашими правилами, не модель</div></div></div>`:'';
+  return `<div class="sh">${leadMed(x,52)}<div><h3>${esc(x.name)}</h3><div class="small muted">${esc(x.country)} · ${x.src}</div></div><button class="x" type="button" data-close aria-label="Закрити">×</button></div>${sc}
+  ${x.why.length?`<ul class="why">${x.why.map(w=>`<li class="${w[1]?'':'no'}">${w[1]?ic('check'):ic('clock')}<span>${esc(w[0])}</span></li>`).join('')}</ul>`:''}
+  <div class="note">${esc(x.obs)}</div>${x.cs?`<div class="small"><span class="muted">Кейс у листі:</span> ${esc(x.cs)}</div>`:''}`;
+}
+function decision(i){
+  const d=DEC[i];const dots=`<div class="dots">${DEC.map((_,k)=>`<i class="${done.has(k)?'done':k===i?'on':''}"></i>`).join('')}</div>`;
+  const nav=`<div class="small muted">Рішення ${i+1} з ${DEC.length}</div>${dots}`;
+  if(d.k==='plan')return `<div class="sh">${med(ic('share'),{s:52})}<div><h3>План тижня 30 листопада</h3><div class="small muted">Автор підготує пости, коли ви затвердите</div></div><button class="x" type="button" data-close aria-label="Закрити">×</button></div>${nav}
+   <div class="list">${[['Пн','LinkedIn','Кейс: як ми знизили вартість покупки на 34%'],['Вт','Instagram','Карусель: 5 пасток в аудиті Meta'],['Ср','LinkedIn','Ваш ROAS не ваш справжній ROAS'],['Чт','Threads','Одна ідея: аудит перед бюджетом'],['Пт','Instagram','Результат кейса byMe, до і після']].map(p=>`<div class="lead" style="grid-template-columns:auto 1fr">${med(p[0],{s:40,tone:'mute',p:100})}<span class="t"><b>${p[2]}</b><small>${p[1]}</small></span></div>`).join('')}</div>
+   <div class="row"><button class="btn p" type="button" data-decide="ok">Затвердити план</button><button class="btn" type="button" data-decide="skip">Пропустити</button></div>`;
+  const x=L.find(l=>l.id===d.id);
+  let main='',btns='';
+  if(d.k==='lead'){main=`<div class="q">Писати цьому ліду?</div><div class="small muted">Оцінка посередині, тому рішення за вами.</div>`;btns=`<button class="btn p" type="button" data-decide="ok">Так, написати</button><button class="btn" type="button" data-decide="skip">Пропустити</button><button class="btn danger" type="button" data-decide="no">Відхилити</button>`}
+  else{main=`<div class="q">${d.k==='reply'?'Відповідь клієнту':'Лист'} ${x.lang}, ${x.words} слів</div><div class="txt" id="draftTxt">${esc(x.draft)}</div><div class="note warn">${x.hard}</div>`;
+    btns=`<button class="btn p" type="button" data-decide="ok">Затвердити й скопіювати</button><button class="btn" type="button" data-edit>Змінити текст</button><button class="btn" type="button" data-decide="skip">Пропустити</button>`}
+  return `${leadView(x).replace('<button class="x"','<button class="x"')}${nav}${main}<div class="row">${btns}</div>`;
+}
+function review(to){di=typeof to==='number'?to:[0,1,2,3,4].find(k=>!done.has(k));if(di===undefined){return}open(decision(di))}
+const DT={lead:['Лід','warn'],letter:['Лист',''],reply:['Відповідь','ok'],plan:['План тижня','info']};
+function listView(){return `<div class="sh">${med(left(),{tone:'warn',s:48})}<div><h3>Усі рішення</h3><div class="small muted">Натисніть, щоб відкрити</div></div><button class="x" type="button" data-close aria-label="Закрити">×</button></div><div class="list">${DEC.map((d,k)=>{const x=d.id?L.find(l=>l.id===d.id):null;return `<button type="button" class="lead" data-rv="${k}">${x?leadMed(x):med(ic('share'),{s:42})}<span class="t"><b>${x?esc(x.name):'План тижня 30 листопада'}</b><small>${x?x.country+' · '+x.src:'5 постів у 3 мережах'}</small><span class="cp">${done.has(k)?cap('Готово','ok'):cap(DT[d.k][0],DT[d.k][1]||'mute')}</span></span></button>`}).join('')}</div>`}
+const OPT=[['Надсилаєте ви','Агент готує текст, ви копіюєте й відправляєте','pen'],['Один клік','Ви тиснете «Надіслати», система відправляє','send'],['Агент сам','Відправляє сам у межах ліміту, ви бачите все в журналі','star']];
+const ACTS=[['Листи потенційним клієнтам','Email',0,{prog:12,max:2}],['Повідомлення в LinkedIn','LinkedIn',0,{max:1,why:'LinkedIn забороняє автоматичні повідомлення'}],['Відгуки на Upwork','Upwork',0,{max:1,why:'Upwork забороняє автоматичні відгуки'}],['Публікація постів','Instagram, Facebook, LinkedIn',null,{why:'Чекає доступів до соцмереж'}]];
+const lv={};
+function agentSheet(i){
+  const a=AG[i];
+  const head=`<div class="sh">${med(ic(a[1]),{s:52,tone:a[4]})}<div><h3>${a[0]}</h3><div class="small muted">${a[2]}</div></div><button class="x" type="button" data-close aria-label="Закрити">×</button></div>`;
+  if(i<2)return head+`<p class="muted">${i===0?'Аналітик нічого не надсилає й не змінює: тільки читає сайти, статистику і оцінює ліди.':'Автор тільки готує тексти й картинки. Нічого не надсилає сам.'}</p><div class="note">Тут налаштувань немає: рішення завжди за вами.</div>`;
+  return head+`<p class="muted">Для кожної дії окремо оберіть, хто надсилає.</p>`+ACTS.map((x,k)=>{const cur=lv[k]??x[2];return `<div class="q">${x[0]} <span class="small muted">· ${x[1]}</span></div><div class="opts" role="radiogroup" aria-label="${x[0]}">${OPT.map((o,n)=>{const dis=cur===null||n>x[3].max&&x[3].max!==undefined||(n===2&&x[3].prog!==undefined&&x[3].prog<20);const why=cur===null?x[3].why:n>(x[3].max??2)?x[3].why:n===2&&x[3].prog<20?`Відкриється після 20 схвалених листів без правок. Зараз ${x[3].prog} із 20`:'';return `<button type="button" role="radio" class="opt" aria-checked="${cur===n}" aria-disabled="${dis}" data-lv="${k}:${n}">${med(dis?ic('lock'):ic(o[2]),{s:38,plain:true,p:100})}<span><b>${o[0]}</b><small>${why||o[1]}</small></span></button>`}).join('')}</div>`}).join('')+`<div class="note warn">Ціни, знижки, договірні умови й скарги завжди тільки з вашим підтвердженням, незалежно від налаштувань.</div>`;
+}
+document.addEventListener('click',e=>{
+  const t=e.target;
+  const c=t.closest('[data-concept]');if(c){concept=c.dataset.concept;$$('[data-concept]').forEach(b=>b.setAttribute('aria-pressed',b===c));render();return}
+  if(t.closest('[data-close]')||t.dataset.bg){close();return}
+  const st=t.closest('[data-stage]');if(st){stageSel=+st.dataset.stage;render();return}
+  const op=t.closest('[data-open]');if(op){const x=L.find(l=>l.id===+op.dataset.open);const k=DEC.findIndex(d=>d.id===x.id);if(k>=0&&!done.has(k)){review(k)}else open(leadView(x));return}
+  const rv=t.closest('[data-rv]');if(rv){di=+rv.dataset.rv;open(decision(di));return}
+  const ag=t.closest('[data-agent]');if(ag){open(agentSheet(+ag.dataset.agent),true);return}
+  const lvb=t.closest('[data-lv]');if(lvb&&lvb.getAttribute('aria-disabled')!=='true'){const[k,n]=lvb.dataset.lv.split(':').map(Number);lv[k]=n;const i=2;$('.sheet',layer).innerHTML=agentSheet(i);return}
+  const dc=t.closest('[data-decide]');if(dc){done.add(di);const next=[0,1,2,3,4].find(k=>!done.has(k));close();render();if(next!==undefined)open(decision(di=next));return}
+  if(t.closest('[data-edit]')){const el=$('#draftTxt');const ta=document.createElement('textarea');ta.className='txt';ta.value=el.textContent;el.replaceWith(ta);ta.focus();t.closest('[data-edit]').remove();return}
+  const a=t.closest('[data-act]');if(a){const k=a.dataset.act;
+    if(k==='review'){review(a.dataset.to?+a.dataset.to:undefined)}
+    else if(k==='list'){open(listView())}
+    else if(k==='agents'){open(agentSheet(2),true)}
+    else if(k==='stop'){stopped=!stopped;render()}
+    else if(k==='budget'){open(`<div class="sh">${med('',{p:21,s:48})}<div><h3>Бюджет і ліміти</h3><div class="small muted">$6,40 із $30 за місяць</div></div><button class="x" type="button" data-close aria-label="Закрити">×</button></div><div class="small muted">Моделі $2,10 · картинки й відео $4,30. Після ліміту команда зупиняється сама. Клієнтські запуски завжди йдуть першими.</div><ul class="why"><li>${ic('check')}<span>Листи: до 10 на день у перший тиждень, далі до 20–30</span></li><li>${ic('check')}<span>LinkedIn: готуємо до 15 на день, надсилаєте ви</span></li><li>${ic('check')}<span>Upwork: до 5 відгуків на день (кожен коштує Connects)</span></li><li>${ic('check')}<span>Тихі години: з 20:00 до 08:00 за часом ліда</span></li></ul>`)}
+    else if(k==='addlead'){open(`<div class="sh">${med(ic('lead'),{s:48})}<div><h3>Додати лід</h3><div class="small muted">Агент сам збере дані й оцінить</div></div><button class="x" type="button" data-close aria-label="Закрити">×</button></div><input class="txt" style="width:100%;color:var(--text);font:inherit" placeholder="Посилання на оголошення, профіль або сайт" aria-label="Посилання"><div class="row"><button class="btn p" type="button" data-close>Додати</button></div>`)}
+    else if(k==='copy'){a.textContent='Скопійовано'}
+  }
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+render();
+</script>

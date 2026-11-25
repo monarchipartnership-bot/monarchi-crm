@@ -11,13 +11,15 @@ import { BudgetError, ModelError } from './_lib/modelClient.js';
 import { createGrRepo } from './_lib/gr/repo.js';
 import { readLeadSite } from './_lib/gr/leadSite.js';
 import { HeldError, analyseLead, processLead, writeDraft } from './_lib/gr/pipeline.js';
-import { classifySource, firstUrl } from '../src/lib/growth/leadFlow.js';
+import { SOURCE_LABEL, classifySource, firstUrl } from '../src/lib/growth/leadFlow.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
 const SUPA_KEY = 'sb_publishable_jnJ1vdEUtn8ytNdJ4KT5Eg_TVlzWYcA';
 const MODEL = 'claude-sonnet-5';
 
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return null; } };
+const BOARD = /(^|\.)(linkedin|upwork)\.com$/i; // a job board or a social network is not the name of the company
+const nameOf = ({ name, website, url, source }) => String(name || '').trim().slice(0, 120) || hostOf(website) || (hostOf(url) && !BOARD.test(hostOf(url)) ? hostOf(url) : null) || `Лід з ${SOURCE_LABEL[source] || 'джерела'}`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
@@ -42,7 +44,7 @@ export default async function handler(req, res) {
       const source = ['site', 'linkedin', 'upwork', 'manual'].includes(b.source) ? b.source : classifySource(url || text);
       const website = String(b.website || '').trim() || null;
       const lead = await repo.insertLead({
-        name: String(b.name || '').trim().slice(0, 120) || hostOf(website) || hostOf(url) || 'Новий лід', source, source_url: url || null, website,
+        name: nameOf({ name: b.name, website, url, source }), source, source_url: url || null, website,
         raw_text: [text, url && !text.includes(url) ? url : ''].filter(Boolean).join('\n').slice(0, 20000), contact_name: b.contactName ? String(b.contactName).slice(0, 120) : null,
         contact_email: b.contactEmail ? String(b.contactEmail).slice(0, 200) : null, country: b.country ? String(b.country).slice(0, 60) : null, created_by: email,
       });
