@@ -20,6 +20,7 @@ import { launch } from './skills/launchAgent.js';
 import { launchCheck } from './skills/launchCheck.js';
 import { optimize } from './skills/optimizeAgent.js';
 import { monthlyReport, onboarding, paymentReminder, weeklyReport } from './skills/supportAgent.js';
+import { periodReport } from './skills/periodReport.js';
 const w = (key, body) => ({ key, body: `[заглушка] ${body}`, content: { stub: true }, sources: [] });
 const done = (extra = {}) => async () => ({ output: { stub: true }, steps: [{ title: 'Виконано (заглушка)' }], ...extra });
 
@@ -51,11 +52,12 @@ export const STUBS = {
     payment_reminder: done(),
     weekly_report: done(),
     monthly_report: done(),
+    period_report: done(),
   },
 };
 
 // The real agents built so far. The cron door (api/wf-tick.js) uses them; the tests of the orchestrator use the stand-ins only.
-export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors }, creator: { materials_ideas: materialsIdeas, first_creatives: firstCreatives, rework_creatives: reworkCreatives }, strategist: { strategy, monthly_plan: monthlyPlan }, mediabuyer: { launch, launch_check: launchCheck, optimize }, support: { onboarding, payment_reminder: paymentReminder, weekly_report: weeklyReport, monthly_report: monthlyReport } };
+export const REAL = { researcher: { unit_economy: unitEconomy, intake, audit, site, audience, competitors }, creator: { materials_ideas: materialsIdeas, first_creatives: firstCreatives, rework_creatives: reworkCreatives }, strategist: { strategy, monthly_plan: monthlyPlan }, mediabuyer: { launch, launch_check: launchCheck, optimize }, support: { onboarding, payment_reminder: paymentReminder, weekly_report: weeklyReport, monthly_report: monthlyReport, period_report: periodReport } };
 export function createRealHandlers(overrides = {}) { return createHandlers({ ...REAL, researcher: { ...REAL.researcher, ...(overrides.researcher || {}) }, creator: { ...REAL.creator, ...(overrides.creator || {}) }, strategist: { ...REAL.strategist, ...(overrides.strategist || {}) }, mediabuyer: { ...REAL.mediabuyer, ...(overrides.mediabuyer || {}) }, support: { ...REAL.support, ...(overrides.support || {}) }, ...Object.fromEntries(Object.entries(overrides).filter(([k]) => !['researcher', 'creator', 'strategist', 'mediabuyer', 'support'].includes(k))) }); }
 
 export function createHandlers(overrides = {}) {

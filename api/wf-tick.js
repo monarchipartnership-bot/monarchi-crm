@@ -14,6 +14,11 @@ import { getModelClient } from './_lib/ai.js';
 import { createGa4Reader } from './_lib/ga4Client.js';
 import { createMetaWriter } from './_lib/metaAdsWrite.js';
 import { speedKeyFromEnv } from './_lib/pageSpeed.js';
+import { createAgentRepo } from './_lib/agentRepo.js';
+import { makeInternalPost } from './_lib/internalPost.js';
+import { runProjectReport } from './_lib/projectAgentRun.js';
+import { makeCreativesCollector } from './_lib/metaCreatives.js';
+import { makeGoogleCreativesCollector } from './_lib/googleCreatives.js';
 import { fetchMetaCampaigns, fetchMetaInsights, fetchMetaObjects, fetchMetaPixels } from './_lib/metaAdsData.js';
 
 const SUPA_URL = 'https://meyacsdlosuqbkbichsf.supabase.co';
@@ -22,14 +27,15 @@ const bad = (res, code, error) => res.status(code).json({ error });
 
 export default async function handler(req, res) {
   try {
-    let token;
-    if (isCronRequest(req)) token = (await signInAgent()).accessToken;
+    let token, email = null;
+    if (isCronRequest(req)) { const agent = await signInAgent(); token = agent.accessToken; email = agent.email; }
     else {
       if (req.method !== 'POST') { bad(res, 405, 'Method not allowed'); return; }
       token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
       if (!token) { bad(res, 401, 'Потрібна авторизація'); return; }
       const { data, error } = await createClient(SUPA_URL, SUPA_KEY).auth.getUser(token);
       if (error || !data?.user) { bad(res, 401, 'Сесія недійсна'); return; }
+      email = data.user.email || null;
     }
     const db = createClient(SUPA_URL, SUPA_KEY, { global: { headers: { Authorization: 'Bearer ' + token } }, auth: { persistSession: false, autoRefreshToken: false } });
     const metaToken = process.env.META_ACCESS_TOKEN;
@@ -42,7 +48,9 @@ export default async function handler(req, res) {
     } : null;
     const repo = createWfRepo(db);
     const notify = hasToken() ? createNotifier({ repo, send: (m) => sendMessage(m) }) : null; // notices to the manager in Telegram
-    const stats = await processTick({ repo, notify, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader(), metaWrite: (process.env.META_WRITE_TOKEN || metaToken) ? createMetaWriter({ token: process.env.META_WRITE_TOKEN || metaToken }) : null });
+    // the report agent of a project (the skill support/period_report): the same code as the clock of the report agent, handed to the skill as one function
+    const reports = { run: ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo: createAgentRepo(db, email || 'agent'), post: makeInternalPost(token), projectId, periodType, trigger: isCronRequest(req) ? 'cron' : 'manual', startedBy: isCronRequest(req) ? null : email, today: scheduledFor, creativesGoogle: makeGoogleCreativesCollector(db), creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN), telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }) };
+    const stats = await processTick({ repo, notify, reports, validate: createValidator(repo), handlers: createRealHandlers(), meta, ask, speedKey: speedKeyFromEnv(), ga4: createGa4Reader(), metaWrite: (process.env.META_WRITE_TOKEN || metaToken) ? createMetaWriter({ token: process.env.META_WRITE_TOKEN || metaToken }) : null });
     res.status(200).json({ ok: true, ...stats });
   } catch (e) {
     console.error('wf-tick failed:', e?.message || e);

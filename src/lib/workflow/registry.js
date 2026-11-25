@@ -2,7 +2,7 @@
 // so the team cannot be «forgotten» in one screen. PURE data.
 // An agent = a description (what it does, skills, what it reads, what it writes, its right) as the document «Робочий процес клієнта» says; the work itself runs per client (wf_runs).
 //   rights: 'read' (looks only) | 'write' (may change an ad cabinet; only the Media buyer, only after Апрув 2)
-//   skill.integrated === false: the skill is described here but is not yet a real run (period_report: the report agent of a project is being merged into the Support agent; stub: the orchestrator already asks for it, the skill is a stand-in)
+//   skill.integrated === false: the skill is described here but is not yet a real run (stub: the orchestrator already asks for it, the skill is a stand-in)
 
 export const ACTIVE_AGENTS = [
   {
@@ -38,9 +38,9 @@ export const ACTIVE_AGENTS = [
     skills: [
       { key: 'onboarding', label: 'готує супровід' }, { key: 'payment_reminder', label: 'дивиться календар оплат' },
       { key: 'weekly_report', label: 'готує тижневий фідбек' }, { key: 'monthly_report', label: 'готує місячний фідбек' },
-      { key: 'period_report', label: 'готує звіт за період (агент звітів проєкту)', integrated: false },
+      { key: 'period_report', label: 'готує звіт за період (агент звітів проєкту)' },
     ],
-    reads: ['Бриф', 'Календар оплат', 'Цифри кабінетів'], writes: ['Чернетки в «Задачах»', 'Звіти проєкту'], note: 'Клієнту повідомлення надсилає людина. Агент звітів проєкту зливається сюди (рішення 2026-11-24).',
+    reads: ['Бриф', 'Календар оплат', 'Цифри кабінетів'], writes: ['Чернетки в «Задачах»', 'Звіти проєкту'], note: 'Клієнту повідомлення надсилає людина. Агент звітів проєкту тепер навичка Супроводу (рішення 2026-11-24); через оркестратор він працює, коли ввімкнено REPORTS_VIA_ORCHESTRATOR.',
   },
 ];
 

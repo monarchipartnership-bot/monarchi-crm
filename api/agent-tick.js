@@ -9,6 +9,7 @@ import { runProjectReport } from './_lib/projectAgentRun.js';
 import { makeCreativesCollector } from './_lib/metaCreatives.js';
 import { makeGoogleCreativesCollector } from './_lib/googleCreatives.js';
 import { runDueAgents } from './_lib/agentTick.js';
+import { enqueueReportRun, reportsViaOrchestrator } from './_lib/wf/reportBridge.js';
 import { hasToken, sendMessage } from './_lib/telegram.js';
 import { runMetaSync } from './_lib/metaOnboarding.js';
 import { listMetaAccounts } from './_lib/metaAdsData.js';
@@ -32,7 +33,8 @@ export default async function handler(req, res) {
     try {
       result = await runDueAgents({
         repo,
-        runFor: ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor, creativesGoogle: makeGoogleCreativesCollector(db), creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN), telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }),
+        // with REPORTS_VIA_ORCHESTRATOR=1 a due report is queued as a run of the Support agent (the orchestrator makes it); without the switch the clock makes it itself, as before
+        runFor: reportsViaOrchestrator() ? enqueueReportRun(db) : ({ projectId, periodType, scheduledFor }) => runProjectReport({ repo, post, projectId, periodType, trigger: 'cron', today: scheduledFor, creativesGoogle: makeGoogleCreativesCollector(db), creatives: makeCreativesCollector(db, process.env.META_ACCESS_TOKEN), telegram: hasToken() ? { send: (m) => sendMessage(m) } : null, crmUrl: process.env.CRM_BASE_URL || 'https://crm.monarchi.agency' }),
       });
     } catch (e) { projectsError = e.message || String(e); }
     // New clients: the Meta accounts the CRM can see that have no project yet (once a day; the first run only learns what exists).

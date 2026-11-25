@@ -9,7 +9,7 @@ const bounds = (key) => { const [y, m] = key.split('-').map(Number); return { fr
 export const monthLabel = (key) => { const { from } = bounds(key); return from.toLocaleDateString('uk-UA', { month: 'long', year: 'numeric', timeZone: 'UTC' }); };
 
 // the spend of the AI that is not the work of the five agents (the report agent of a project, the old creative studio, ...): by the key of the caller
-export const otherLabel = (key = '') => (key.startsWith('creative-') ? 'Креативний відділ (старий)' : key === 'report-work-summary' ? 'Резюме роботи для звітів' : key.startsWith('report') ? 'Агент звітів проєкту' : key || 'Невідомо');
+export const otherLabel = (key = '') => (key.startsWith('creative-') ? 'Креативний відділ (старий)' : key === 'report-work-summary' ? 'Супровід: резюме роботи для звітів' : key.startsWith('report') ? 'Агент звітів проєкту' : key || 'Невідомо');
 
 export function spendReport({ month, now = new Date(), runs = [], calls = [], projects = {}, states = [], settings = {} } = {}) {
   const key = month || monthKey(now);

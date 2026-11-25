@@ -58,6 +58,8 @@ import { agentFacts, agentStates, feedOf, podStates } from '../src/lib/workflow/
 import { monthsOffered, spendReport } from '../src/lib/workflow/spendStats.js';
 import { durationText, filterRuns, runCounts, runRows } from '../src/lib/workflow/runsView.js';
 import { connectionChecks } from '../api/_lib/wf/status.js';
+import { periodReport } from '../api/_lib/wf/skills/periodReport.js';
+import { enqueueReportRun, reportsViaOrchestrator } from '../api/_lib/wf/reportBridge.js';
 import { dueFor, eventsFor, gatherPlanFacts, checkPlan, monthWindows, parsePlanAnswer, renderPlanText, summarizeLastMonth } from '../api/_lib/wf/skills/monthlyPlanEngine.js';
 import { monthlyPlan } from '../api/_lib/wf/skills/monthlyPlanAgent.js';
 import { HELP_CONTROLS, HELP_STAGES } from '../src/lib/workflow/helpContent.js';
@@ -2463,7 +2465,7 @@ await test('registry: the skills that the orchestrator runs are exactly the skil
   assert.deepEqual(ACTIVE_AGENTS.map((a) => a.key), ['researcher', 'creator', 'strategist', 'mediabuyer', 'support']);
   assert.deepEqual(ACTIVE_AGENTS.filter((a) => a.rights === 'write').map((a) => a.key), ['mediabuyer']);
   for (const a of ACTIVE_AGENTS) { assert.ok(a.name && a.does && a.skills.length && a.reads.length && a.writes.length, a.key); }
-  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'support').skills.some((s) => s.key === 'period_report' && s.integrated === false), 'the report agent is registered as a skill of the Support agent, not yet integrated');
+  assert.ok(ACTIVE_AGENTS.find((a) => a.key === 'support').skills.some((s) => s.key === 'period_report' && s.integrated !== false), 'the report agent is a skill of the Support agent');
   assert.deepEqual(ACTIVE_AGENTS.flatMap((x) => x.skills.filter((s) => s.stub).map((s) => `${x.key}/${s.key}`)), [], 'no stand-ins are left: the month plan is a real skill since 2026-11-25');
   assert.equal(AGENTS.length, 5); assert.equal(SKILL_LABEL.launch, 'запускає кампанії');
   const isl = mapIslands();
@@ -2523,7 +2525,7 @@ await test('spend: the month against the limits, by project, agent, skill and da
   assert.equal(rep.perSkill[0].label, 'робить перші креативи');
   assert.equal(rep.perDay.length, 30); assert.equal(rep.perDay[23].spent, 0.54); assert.equal(rep.perDay[24].future, true); assert.equal(rep.perDay[22].spent, 0.02);
   assert.deepEqual(rep.topRuns.map((r) => r.id), [1, 2, 3]);
-  assert.deepEqual(rep.other.map((o) => o.label), ['Креативний відділ (старий)', 'Резюме роботи для звітів']); assert.equal(rep.otherTotal, 0.156);
+  assert.deepEqual(rep.other.map((o) => o.label), ['Креативний відділ (старий)', 'Супровід: резюме роботи для звітів']); assert.equal(rep.otherTotal, 0.156);
   // the limit of a project reached, and a month in the past
   const hot = spendReport({ now, runs: [run(9, 27, 'strategist', 'strategy', 0.045, '2026-11-23T09:00:00Z')], states: [{ project_id: 27, cost_cap_usd: 0.05 }], settings: {} });
   assert.equal(hot.perProject[0].hot, true); assert.equal(hot.perProject[0].pct, 90);
@@ -2650,5 +2652,37 @@ await test('the windows «Прогони» and «Підключення» are wi
   const ep = read('api/wf-status.js'); assert.match(ep, /Method not allowed/); assert.match(ep, /Потрібна авторизація/); assert.match(ep, /getUser\(token\)/);
   assert.match(read('vercel.json'), /"api\/wf-status.js": \{ "maxDuration": 60 \}/);
   assert.match(read('src/pages/AiAgents/Runs.jsx'), /Запустити ще раз/); assert.match(read('src/pages/AiAgents/Connections.jsx'), /Перевірити знову/);
+});
+// ---------------------------------------------------------------- the report agent of a project merges into the Support agent (item 4 of the plan; owner's decision of 2026-11-24)
+await test('period_report: the report agent is a skill of the Support agent; a problem fails the run with its reason, a skipped report is a note, the cost goes to the run; the orchestrator makes it even for a project without a started process', async () => {
+  const mk = async (result, input = { periodType: 'weekly', scheduledFor: '2026-11-23' }, withReports = true, projectId = 1) => {
+    const s = await setup({ handlers: createHandlers({ support: { period_report: periodReport } }) });
+    s.calls = []; if (withReports) s.ctx.reports = { run: async (a) => { s.calls.push(a); return result; } };
+    await s.repo.enqueueRun({ project_id: projectId, agent: 'support', skill: 'period_report', input, trigger: 'cron' }); await processTick(s.ctx);
+    return { s, run: s.repo.T.runs.find((r) => r.skill === 'period_report') };
+  };
+  const ok = await mk({ status: 'ok', message: 'Створено 2 звіти', reportId: 7, deckIds: [3], notes: ['Креативи не знайдено для Google'], costUsd: 0.012 });
+  assert.equal(ok.run.status, 'done'); assert.equal(ok.run.cost_usd, 0.012); assert.deepEqual(ok.s.calls, [{ projectId: 1, periodType: 'weekly', scheduledFor: '2026-11-23' }]);
+  assert.equal(ok.run.output.report_id, 7); assert.match(ok.s.repo.T.steps.map((x) => x.title).join(' | '), /Чернетка звіту \(тижневий\) готова: Створено 2 звіти/); assert.match(ok.s.repo.T.steps.map((x) => x.title).join(' | '), /Креативи не знайдено/);
+  const skipped = await mk({ status: 'skipped', message: 'Звіт уже зроблено людиною', notes: [] }, { periodType: 'monthly', scheduledFor: '2026-11-01' });
+  assert.equal(skipped.run.status, 'done'); assert.match(skipped.s.repo.T.steps.map((x) => x.title).join(' | '), /Звіт пропущено: Звіт уже зроблено людиною/);
+  const problem = await mk({ status: 'problem', message: 'Meta не відповіла' });
+  assert.notEqual(problem.run.status, 'done'); assert.match(problem.run.error, /Звіт не вдалося зробити: Meta не відповіла/);
+  assert.match((await mk({ status: 'ok' }, {})).run.error, /Не вказано тип звіту/);
+  assert.match((await mk({ status: 'ok' }, undefined, false)).run.error, /Агент звітів не підключено/);
+  const noState = await mk({ status: 'ok', message: 'ok', notes: [] }, undefined, true, 2);
+  assert.equal(noState.run.status, 'done', 'a project that has no started process also gets its reports through the orchestrator'); assert.equal(noState.s.calls[0].projectId, 2);
+});
+await test('report bridge: the switch, the queue entry of a due report, a report that is already waiting is not queued twice, a real failure is not hidden', async () => {
+  assert.equal(reportsViaOrchestrator({}), false); assert.equal(reportsViaOrchestrator({ REPORTS_VIA_ORCHESTRATOR: '1' }), true); assert.equal(reportsViaOrchestrator({ REPORTS_VIA_ORCHESTRATOR: '0' }), false); assert.equal(reportsViaOrchestrator({ REPORTS_VIA_ORCHESTRATOR: 'true' }), false, 'only «1» switches it on');
+  const rows = []; const db = (error) => ({ from: (t) => ({ insert: async (row) => { rows.push([t, row]); return { error }; } }) });
+  const q = await enqueueReportRun(db(null))({ projectId: 5, periodType: 'monthly', scheduledFor: '2026-11-01' });
+  assert.deepEqual(q, { status: 'queued', message: 'Звіт поставлено в чергу оркестратора.' }); assert.equal(rows[0][0], 'wf_runs');
+  assert.deepEqual([rows[0][1].project_id, rows[0][1].agent, rows[0][1].skill, rows[0][1].trigger, rows[0][1].input], [5, 'support', 'period_report', 'cron', { periodType: 'monthly', scheduledFor: '2026-11-01' }]);
+  assert.match((await enqueueReportRun(db({ code: '23505', message: 'dup' }))({ projectId: 5, periodType: 'weekly', scheduledFor: 'x' })).message, /уже в черзі/);
+  await assert.rejects(enqueueReportRun(db({ code: '42501', message: 'denied' }))({ projectId: 5, periodType: 'weekly', scheduledFor: 'x' }), /Не вдалося поставити звіт у чергу: denied/);
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const tickSrc = fs.readFileSync(path.join(root, 'api/agent-tick.js'), 'utf8'); assert.match(tickSrc, /runFor: reportsViaOrchestrator\(\) \? enqueueReportRun\(db\) : /, 'without the switch the clock makes the report itself');
+  assert.match(fs.readFileSync(path.join(root, 'api/wf-tick.js'), 'utf8'), /const reports = \{ run: /);
 });
 console.log(`\n${passed} workflow checks passed`);
